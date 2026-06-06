@@ -16,41 +16,32 @@ services:
       timeout: 5s
       retries: 5
 
-  # 后端 API
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+  # Chroma 向量数据库（RAG 检索）
+  chroma:
+    image: chromadb/chroma:latest
     ports:
-      - "8000:8000"
-    env_file:
-      - ./backend/.env
-    depends_on:
-      db:
-        condition: service_healthy
+      - "8001:8000"
     volumes:
-      - ./backend:/app
-      - uploads:/app/uploads
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-
-  # 前端
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    ports:
-      - "3000:3000"
+      - chromadata:/chroma/chroma
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
-      - BACKEND_URL=http://backend:8000
-    depends_on:
-      - backend
+      - CHROMA_SERVER_HOST=0.0.0.0
+      - CHROMA_SERVER_HTTP_PORT=8000
+
+  # Neo4j 图数据库（人物关系图谱，MVP 阶段可选）
+  # 启用: docker compose --profile graph up -d
+  neo4j:
+    profiles: ["graph"]
+    image: neo4j:5-community
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    environment:
+      NEO4J_AUTH: neo4j/novelmind
+      NEO4J_PLUGINS: '["apoc"]'
     volumes:
-      - ./frontend:/app
-      - /app/node_modules
-      - /app/.next
-    command: npm run dev
+      - neo4jdata:/data
 
 volumes:
   pgdata:
-  uploads:
+  chromadata:
+  neo4jdata:

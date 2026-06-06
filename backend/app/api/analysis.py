@@ -41,9 +41,10 @@ async def analyze_chapter(novel_id: str, chapter_id: str):
 async def analyze_novel_stream(novel_id: str):
     """流式输出分析过程（SSE）"""
     async def event_generator():
-        yield f"data: {{"type": "start", "message": "开始分析..."}}\n\n"
+        import json
+        yield f"data: {json.dumps({'type': 'start', 'message': '开始分析...'})}\n\n"
         # TODO: 分步分析并流式输出
-        yield f"data: {{"type": "complete", "message": "分析完成"}}\n\n"
+        yield f"data: {json.dumps({'type': 'complete', 'message': '分析完成'})}\n\n"
 
     return StreamingResponse(
         event_generator(),

@@ -1,5 +1,9 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { Inter } from "next/font/google";
+import { cn } from "@/lib/utils";
+
+const inter = Inter({subsets:['latin'],variable:'--font-sans'});
 
 export const metadata: Metadata = {
   title: "NovelMind - AI 辅助小说创作与理解",
@@ -12,7 +16,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="zh-CN">
+    <html lang="zh-CN" className={cn("font-sans", inter.variable)}>
       <body className="min-h-screen bg-background font-sans antialiased">
         <div className="flex h-screen">
           {/* 侧边栏 */}

@@ -13,7 +13,7 @@ async def list_fanfictions(novel_id: str):
     return []
 
 
-@router.post("/")
+@router.post("")
 async def create_fanfiction(data: dict):
     """创建同人文"""
     # TODO: 创建记录
@@ -24,10 +24,11 @@ async def create_fanfiction(data: dict):
 async def continue_writing(fanfiction_id: str, prompt: dict):
     """AI 续写（流式输出）"""
     async def event_generator():
-        yield f"data: {{"type": "start"}}\n\n"
+        import json
+        yield f"data: {json.dumps({'type': 'start'})}\n\n"
         # TODO: 调用 AI 生成续写内容，逐段输出
-        yield f"data: {{"type": "text", "content": "续写功能待实现..."}}\n\n"
-        yield f"data: {{"type": "complete"}}\n\n"
+        yield f"data: {json.dumps({'type': 'text', 'content': '续写功能待实现...'})}\n\n"
+        yield f"data: {json.dumps({'type': 'complete'})}\n\n"
 
     return StreamingResponse(
         event_generator(),

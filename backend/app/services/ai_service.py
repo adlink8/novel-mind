@@ -55,6 +55,25 @@ class AIService:
             if content:
                 yield content
 
+    async def test_connection(self, model_config) -> str:
+        """
+        测试模型连接。
+        model_config: AIModelConfig ORM 对象
+        返回模型回复文本，失败抛出异常。
+        """
+        kwargs = {
+            "model": f"{model_config.provider}/{model_config.model_id}",
+            "messages": [{"role": "user", "content": "Please reply with 'OK'."}],
+            "max_tokens": 10,
+        }
+        if model_config.api_key:
+            kwargs["api_key"] = model_config.api_key
+        if model_config.base_url:
+            kwargs["api_base"] = model_config.base_url
+
+        response = await litellm.acompletion(**kwargs)
+        return response.choices[0].message.content or ""
+
 
 # 全局单例
 ai_service = AIService()

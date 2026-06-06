@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     # 应用
     app_name: str = "NovelMind"
     debug: bool = True
-    cors_origins: list[str] = ["http://localhost:3000"]
+    cors_origins: list[str] = ["http://localhost:3000", "http://localhost:3002"]
 
     # 数据库
     database_url: str = "postgresql+asyncpg://novelmind:novelmind@localhost:5432/novelmind"

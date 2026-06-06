@@ -36,3 +36,8 @@ uploads/
 # OS
 .DS_Store
 Thumbs.db
+
+# 测试/临时
+test_*.txt
+nul
+tsconfig.tsbuildinfo
