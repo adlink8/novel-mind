@@ -1,52 +1,41 @@
-"""剧情分析 API"""
+"""
+剧情分析 API 路由（Phase 3 实现）
 
-from fastapi import APIRouter
-from fastapi.responses import StreamingResponse
+当前状态: 占位实现，生成类端点返回 HTTP 501。
+查询类端点返回空状态。
+
+端点列表:
+  POST /api/analysis/{novel_id}/analyze            - 整本小说 AI 分析 -> 501
+  GET  /api/analysis/{novel_id}                    - 获取已有分析结果 -> 空状态
+  POST /api/analysis/{novel_id}/chapters/{id}/analyze - 章节级分析 -> 501
+  POST /api/analysis/{novel_id}/analyze/stream     - 流式分析（SSE）-> 501
+"""
+
+from fastapi import APIRouter, HTTPException
 
 router = APIRouter()
 
 
 @router.post("/{novel_id}/analyze")
 async def analyze_novel(novel_id: str):
-    """对整本小说进行 AI 分析"""
-    # TODO:
-    # 1. 从数据库加载小说内容
-    # 2. 调用 LiteLLM 进行分步分析
-    # 3. 存储分析结果
-    # 4. 返回结构化数据
-    return {
-        "novel_id": novel_id,
-        "summary": "分析功能待实现",
-        "characters": [],
-        "key_events": [],
-        "themes": [],
-    }
+    """对整本小说进行 AI 分析（摘要、人物、伏笔、叙事结构）"""
+    raise HTTPException(status_code=501, detail="AI 剧情分析尚未实现")
 
 
 @router.get("/{novel_id}")
 async def get_analysis(novel_id: str):
     """获取已有分析结果"""
-    # TODO: 从数据库读取
+    # TODO: 从 analysis_results 表查询
     return {"novel_id": novel_id, "status": "not_analyzed"}
 
 
 @router.post("/{novel_id}/chapters/{chapter_id}/analyze")
 async def analyze_chapter(novel_id: str, chapter_id: str):
-    """分析单个章节"""
-    # TODO: 章节级分析
-    return {"chapter_id": chapter_id, "status": "pending"}
+    """分析单个章节（摘要、情感、人物出场）"""
+    raise HTTPException(status_code=501, detail="章节级分析尚未实现")
 
 
 @router.post("/{novel_id}/analyze/stream")
 async def analyze_novel_stream(novel_id: str):
-    """流式输出分析过程（SSE）"""
-    async def event_generator():
-        import json
-        yield f"data: {json.dumps({'type': 'start', 'message': '开始分析...'})}\n\n"
-        # TODO: 分步分析并流式输出
-        yield f"data: {json.dumps({'type': 'complete', 'message': '分析完成'})}\n\n"
-
-    return StreamingResponse(
-        event_generator(),
-        media_type="text/event-stream",
-    )
+    """流式输出分析过程（SSE，实时展示 AI 分析进度）"""
+    raise HTTPException(status_code=501, detail="流式剧情分析尚未实现")

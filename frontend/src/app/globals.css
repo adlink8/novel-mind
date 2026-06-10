@@ -1,57 +1,122 @@
+/**
+ * 全局样式文件 - app/globals.css
+ * =================================
+ * NovelMind 的全局 CSS 样式定义，基于 Tailwind CSS + shadcn/ui 的主题系统。
+ *
+ * 主要职责：
+ * 1. 引入 Tailwind CSS 的 base/components/utilities 层
+ * 2. 定义 shadcn/ui 使用的 HSL 颜色 CSS 变量（亮色和暗色主题）
+ * 3. 设置全局基础样式（边框颜色、背景色、文字色）
+ *
+ * 主题系统说明：
+ * - 使用 HSL 格式的 CSS 变量（色相 饱和度 亮度）
+ * - shadcn/ui 组件通过 hsl(var(--xxx)) 引用这些变量
+ * - 亮色主题定义在 :root 下，暗色主题定义在 .dark 类下
+ *
+ * 品牌色：
+ * - 主色调 (--primary): HSL(262, 83%, 58%) - 紫色系
+ * - 环形色 (--ring): 同主色
+ * - 侧边栏主色: 同主色
+ *
+ * 注意：NovelMind 的品牌色通过 tailwind.config 中定义的 novel-* 色系扩展
+ */
+
+/* 引入 Tailwind CSS 的三个基础层 */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
+  /* ============================================================
+   * 亮色主题（默认）CSS 变量
+   * 所有颜色值为 HSL 格式（色相 饱和度% 亮度%）
+   * shadcn/ui 组件通过 hsl(var(--变量名)) 引用
+   * ============================================================ */
   :root {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    --primary: 262 83% 58%;
-    --primary-foreground: 0 0% 98%;
+    /* 页面背景和前景色 */
+    --background: 0 0% 100%;           /* 纯白背景 */
+    --foreground: 240 10% 3.9%;       /* 深灰近黑色文字 */
+
+    /* 卡片组件 */
+    --card: 0 0% 100%;                /* 卡片背景：白色 */
+    --card-foreground: 240 10% 3.9%;  /* 卡片文字：深灰 */
+
+    /* 弹出层（Popover、Dropdown 等） */
+    --popover: 0 0% 100%;             /* 弹出层背景：白色 */
+    --popover-foreground: 240 10% 3.9%; /* 弹出层文字：深灰 */
+
+    /* 主色调 - 紫色系，用于主要按钮、链接等 */
+    --primary: 262 83% 58%;           /* 品牌紫 */
+    --primary-foreground: 0 0% 98%;   /* 主色上的文字：近白色 */
+
+    /* 次要色 - 浅灰色，用于次要按钮 */
     --secondary: 240 4.8% 95.9%;
     --secondary-foreground: 240 5.9% 10%;
+
+    /* 静音色 - 用于禁用状态、辅助文字等 */
     --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
+    --muted-foreground: 240 3.8% 46.1%; /* 灰色辅助文字 */
+
+    /* 强调色 - 用于 hover 状态等 */
     --accent: 240 4.8% 95.9%;
     --accent-foreground: 240 5.9% 10%;
-    --destructive: 0 84.2% 60.2%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 262 83% 58%;
+
+    /* 危险/破坏色 - 用于删除、错误等 */
+    --destructive: 0 84.2% 60.2%;    /* 红色 */
+
+    /* 边框、输入框、聚焦环 */
+    --border: 240 5.9% 90%;           /* 浅灰色边框 */
+    --input: 240 5.9% 90%;            /* 输入框边框 */
+    --ring: 262 83% 58%;              /* 聚焦环：品牌紫 */
+
+    /* 圆角半径 */
     --radius: 0.5rem;
-    --sidebar: 0 0% 98%;
-    --sidebar-foreground: 240 10% 3.9%;
-    --sidebar-primary: 262 83% 58%;
+
+    /* 侧边栏专用变量 */
+    --sidebar: 0 0% 98%;              /* 侧边栏背景：近白色 */
+    --sidebar-foreground: 240 10% 3.9%; /* 侧边栏文字 */
+    --sidebar-primary: 262 83% 58%;   /* 侧边栏主色 */
     --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent: 240 4.8% 95.9%; /* 侧边栏强调色 */
     --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 240 5.9% 90%;
-    --sidebar-ring: 262 83% 58%;
+    --sidebar-border: 240 5.9% 90%;   /* 侧边栏边框 */
+    --sidebar-ring: 262 83% 58%;      /* 侧边栏聚焦环 */
   }
 
+  /* ============================================================
+   * 暗色主题 CSS 变量
+   * 通过在 <html> 上添加 .dark 类激活
+   * 颜色值经过调整以确保在深色背景上的可读性
+   * ============================================================ */
   .dark {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 5.9%;
+    --background: 240 10% 3.9%;       /* 深灰背景 */
+    --foreground: 0 0% 98%;           /* 近白色文字 */
+
+    --card: 240 10% 5.9%;             /* 卡片：略浅于背景 */
     --card-foreground: 0 0% 98%;
+
     --popover: 240 10% 5.9%;
     --popover-foreground: 0 0% 98%;
-    --primary: 262 83% 58%;
+
+    --primary: 262 83% 58%;           /* 主色保持一致 */
     --primary-foreground: 0 0% 98%;
-    --secondary: 240 3.7% 15.9%;
+
+    --secondary: 240 3.7% 15.9%;     /* 暗色次要色 */
     --secondary-foreground: 0 0% 98%;
+
     --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
+    --muted-foreground: 240% 5% 64.9%; /* 较亮的灰色 */
+
     --accent: 240 3.7% 15.9%;
     --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
+
+    --destructive: 0 62.8% 30.6%;    /* 暗色主题下更深的红色 */
+
     --border: 240 3.7% 15.9%;
     --input: 240 3.7% 15.9%;
     --ring: 262 83% 58%;
+
+    /* 侧边栏暗色主题 */
     --sidebar: 240 10% 5.9%;
     --sidebar-foreground: 0 0% 98%;
     --sidebar-primary: 262 83% 58%;
@@ -64,9 +129,12 @@
 }
 
 @layer base {
+  /* 全局基础样式重置 */
+  /* 所有元素的边框颜色使用主题变量 */
   * {
     border-color: hsl(var(--border));
   }
+  /* body 的背景色和文字色使用主题变量 */
   body {
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));

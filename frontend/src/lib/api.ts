@@ -1,3 +1,22 @@
+/**
+ * API 客户端模块
+ *
+ * 基于 Axios 封装所有后端 API 调用，按业务域组织:
+ * - novelsApi     : 小说 CRUD（列表、详情、上传、删除、章节）
+ * - analysisApi   : 剧情分析
+ * - timelineApi   : 时间线事件
+ * - charactersApi : 人物关系
+ * - fanfictionApi : 同人文
+ * - aiModelsApi   : AI 模型配置
+ *
+ * 基础配置:
+ * - baseURL: 通过 NEXT_PUBLIC_API_URL 环境变量配置，默认 "/api"（走 Next.js rewrite 代理）
+ * - timeout: 30 秒
+ * - Content-Type: application/json（上传时自动切换为 multipart/form-data）
+ *
+ * 每个 API 模块导出一组函数，返回 AxiosPromise，组件中通过 .data 获取响应体。
+ */
+
 import axios from "axios";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "/api";
@@ -5,42 +24,62 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || "/api";
 export const api = axios.create({
   baseURL: API_BASE,
   timeout: 30000,
-  headers: {
-    "Content-Type": "application/json",
-  },
+  headers: { "Content-Type": "application/json" },
 });
 
 // ==================== 小说 API ====================
 
+/** 小说基础信息（列表展示用） */
 export interface Novel {
-  id: string;
+  id: number;
   title: string;
-  author: string;
-  description: string;
-  genre: string;
+  author: string | null;
+  description: string | null;
+  genre: string | null;
   word_count: number;
   chapter_count: number;
   status: "importing" | "ready" | "analyzing" | "analyzed";
   created_at: string;
+  updated_at: string;
 }
 
+/** 章节信息 */
 export interface Chapter {
-  id: string;
-  novel_id: string;
+  id: number;
+  novel_id: number;
   chapter_number: number;
   title: string;
-  content: string;
   summary?: string;
+  word_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+/** 小说列表分页响应 */
+export interface NovelListResponse {
+  items: Novel[];
+  total: number;
+  skip: number;
+  limit: number;
+}
+
+/** 小说上传响应 */
+export interface NovelUploadResponse {
+  id: number;
+  title: string;
+  status: Novel["status"];
+  message: string;
+  chapter_count: number;
   word_count: number;
 }
 
 export const novelsApi = {
-  list: () => api.get<Novel[]>("/novels"),
+  list: () => api.get<NovelListResponse>("/novels"),
   get: (id: string) => api.get<Novel>(`/novels/${id}`),
   upload: (file: File) => {
     const formData = new FormData();
     formData.append("file", file);
-    return api.post<Novel>("/novels/upload", formData, {
+    return api.post<NovelUploadResponse>("/novels/upload", formData, {
       headers: { "Content-Type": "multipart/form-data" },
     });
   },
@@ -52,26 +91,17 @@ export const novelsApi = {
 
 // ==================== 分析 API ====================
 
+/** 分析结果结构 */
 export interface AnalysisResult {
   summary: string;
-  characters: Array<{
-    name: string;
-    role: string;
-    description: string;
-  }>;
-  key_events: Array<{
-    title: string;
-    description: string;
-    chapter: number;
-  }>;
+  characters: Array<{ name: string; role: string; description: string }>;
+  key_events: Array<{ title: string; description: string; chapter: number }>;
   themes: string[];
 }
 
 export const analysisApi = {
-  analyze: (novelId: string) =>
-    api.post<AnalysisResult>(`/analysis/${novelId}/analyze`),
-  getAnalysis: (novelId: string) =>
-    api.get<AnalysisResult>(`/analysis/${novelId}`),
+  analyze: (novelId: string) => api.post<AnalysisResult>(`/analysis/${novelId}/analyze`),
+  getAnalysis: (novelId: string) => api.get<AnalysisResult>(`/analysis/${novelId}`),
   analyzeChapter: (novelId: string, chapterId: string) =>
     api.post(`/analysis/${novelId}/chapters/${chapterId}/analyze`),
 };
@@ -92,10 +122,8 @@ export interface TimelineEvent {
 }
 
 export const timelineApi = {
-  getTimeline: (novelId: string) =>
-    api.get<TimelineEvent[]>(`/timeline/${novelId}`),
-  extractTimeline: (novelId: string) =>
-    api.post<TimelineEvent[]>(`/timeline/${novelId}/extract`),
+  getTimeline: (novelId: string) => api.get<TimelineEvent[]>(`/timeline/${novelId}`),
+  extractTimeline: (novelId: string) => api.post<TimelineEvent[]>(`/timeline/${novelId}/extract`),
   updateEvent: (eventId: string, data: Partial<TimelineEvent>) =>
     api.put(`/timeline/events/${eventId}`, data),
   deleteEvent: (eventId: string) => api.delete(`/timeline/events/${eventId}`),
@@ -125,12 +153,9 @@ export interface CharacterRelation {
 }
 
 export const charactersApi = {
-  getCharacters: (novelId: string) =>
-    api.get<Character[]>(`/characters/${novelId}`),
-  getRelations: (novelId: string) =>
-    api.get<CharacterRelation[]>(`/characters/${novelId}/relations`),
-  extractCharacters: (novelId: string) =>
-    api.post(`/characters/${novelId}/extract`),
+  getCharacters: (novelId: string) => api.get<Character[]>(`/characters/${novelId}`),
+  getRelations: (novelId: string) => api.get<CharacterRelation[]>(`/characters/${novelId}/relations`),
+  extractCharacters: (novelId: string) => api.post(`/characters/${novelId}/extract`),
 };
 
 // ==================== 同人文 API ====================
@@ -155,17 +180,44 @@ export const fanfictionApi = {
 // ==================== AI 模型 API ====================
 
 export interface AIModelConfig {
-  id: string;
+  id: number;
+  name: string;
   provider: "openai" | "anthropic" | "ollama" | "custom";
-  model_name: string;
+  model_id: string;
   base_url?: string;
+  tier: "quality" | "balanced" | "budget";
+  max_tokens: number;
+  temperature: number;
   is_default: boolean;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AIModelConfigCreate {
+  name: string;
+  provider: AIModelConfig["provider"];
+  model_id: string;
+  api_key?: string;
+  base_url?: string;
+  tier?: AIModelConfig["tier"];
+  max_tokens?: number;
+  temperature?: number;
+  is_default?: boolean;
+}
+
+export interface AIModelTestResponse {
+  success: boolean;
+  model_name: string;
+  latency_ms: number;
+  response_text?: string;
+  error?: string;
 }
 
 export const aiModelsApi = {
   list: () => api.get<AIModelConfig[]>("/models"),
-  create: (data: Partial<AIModelConfig>) => api.post("/models", data),
-  test: (id: string) => api.post(`/models/${id}/test`),
-  setDefault: (id: string) => api.post(`/models/${id}/default`),
-  delete: (id: string) => api.delete(`/models/${id}`),
+  create: (data: AIModelConfigCreate) => api.post<AIModelConfig>("/models", data),
+  test: (id: number) => api.post<AIModelTestResponse>(`/models/${id}/test`),
+  setDefault: (id: number) => api.post(`/models/${id}/default`),
+  delete: (id: number) => api.delete(`/models/${id}`),
 };

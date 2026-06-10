@@ -1,18 +1,34 @@
+/**
+ * 空状态展示组件
+ *
+ * 用于列表为空时的友好提示（如书架无小说、无同人文等）。
+ * 支持自定义图标、标题、描述和操作按钮。
+ *
+ * 使用方式:
+ *   <EmptyState
+ *     icon="📚"
+ *     title="书架是空的"
+ *     description="导入你的第一本小说"
+ *     actionLabel="导入 TXT 文件"
+ *     onAction={() => setOpen(true)}
+ *   />
+ */
+
 "use client";
 
 import React from "react";
 import { Button } from "@/components/ui/button";
 
 interface EmptyStateProps {
-  icon?: string;
-  title: string;
-  description?: string;
-  actionLabel?: string;
-  onAction?: () => void;
+  icon?: string;           // 显示图标（emoji，默认 📭）
+  title: string;           // 主标题
+  description?: string;    // 描述文字
+  actionLabel?: string;    // 操作按钮文字
+  onAction?: () => void;   // 操作按钮点击回调
 }
 
 export function EmptyState({
-  icon = "\uD83D\uDCED",
+  icon = "📭",
   title,
   description,
   actionLabel,

@@ -1,43 +1,47 @@
-# 依赖
-node_modules/
-__pycache__/
-*.pyc
-.venv/
-venv/
+# =============================================================================
+# NovelMind .gitignore
+# =============================================================================
 
-# 构建
-.next/
-dist/
-build/
-*.egg-info/
+# --- Python & Node.js 依赖目录 ---
+node_modules/                 # Node.js 依赖包（由 npm install 生成）
+__pycache__/                  # Python 字节码缓存目录
+*.pyc                         # Python 编译字节码文件
+.venv/                        # Python 虚拟环境（推荐使用 uv 或 venv 创建）
+venv/                         # Python 虚拟环境（另一种常见命名）
 
-# 环境变量
-.env
-.env.local
-.env.*.local
+# --- 构建产物 ---
+.next/                        # Next.js 构建缓存和输出（由 next build 生成）
+dist/                         # 通用构建输出目录
+build/                        # 通用构建输出目录
+*.egg-info/                   # Python 包元数据（由 setuptools 生成）
 
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
+# --- 环境变量（含敏感信息，绝不提交）---
+.env                          # 本地环境变量文件（从 .env.example 复制并填入实际值）
+.env.local                    # 本地覆盖环境变量
+.env.*.local                  # 各环境的本地覆盖文件
 
-# 上传文件
-uploads/
-*.tmp
+# --- IDE 配置 ---
+.vscode/                      # VS Code 工作区设置和调试配置
+.idea/                        # JetBrains IDE（PyCharm/WebStorm）项目配置
+*.swp                         # Vim 交换文件
+*.swo                         # Vim 交换文件
 
-# 数据库
-*.db
-*.sqlite3
+# --- 用户上传文件 ---
+uploads/                      # 用户上传的小说文档存储目录
+*.tmp                         # 临时文件
 
-# 日志
-*.log
+# --- 本地数据库文件 ---
+*.db                          # SQLite 数据库文件
+*.sqlite3                     # SQLite 数据库文件
 
-# OS
-.DS_Store
-Thumbs.db
+# --- 日志文件 ---
+*.log                         # 应用和服务器日志
 
-# 测试/临时
-test_*.txt
-nul
-tsconfig.tsbuildinfo
+# --- 操作系统生成文件 ---
+.DS_Store                     # macOS Finder 元数据
+Thumbs.db                     # Windows 缩略图缓存
+
+# --- 测试与临时文件 ---
+test_*.txt                    # 测试生成的文本文件
+nul                           # Windows 空设备重定向产生的意外文件
+tsconfig.tsbuildinfo          # TypeScript 增量编译缓存

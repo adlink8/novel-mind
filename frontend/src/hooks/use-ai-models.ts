@@ -1,3 +1,19 @@
+/**
+ * AI 模型管理 Hook
+ *
+ * 封装 useAIConfigStore + 便捷查询方法。
+ * AI 设置页面通过 useAIModels() 获取模型列表、测试结果等。
+ *
+ * 自动行为:
+ * - 组件挂载时自动 fetchModels()
+ *
+ * 额外工具方法:
+ * - getModelById(id)        - 按 ID 查找模型
+ * - getModelsByProvider(p)  - 按提供商筛选
+ * - getTestResult(id)       - 获取测试结果
+ * - routingDescriptions     - 路由偏好的中文描述映射
+ */
+
 "use client";
 
 import { useEffect } from "react";
@@ -6,63 +22,42 @@ import type { AIModelConfig } from "@/lib/api";
 
 export function useAIModels() {
   const {
-    models,
-    defaultModel,
-    routingPreference,
-    loading,
-    error,
-    testResults,
-    fetchModels,
-    addModel,
-    removeModel,
-    setDefaultModel,
-    testConnection,
-    setRoutingPreference,
-    clearError,
+    models, defaultModel, routingPreference, loading, error, testResults,
+    fetchModels, addModel, removeModel, setDefaultModel, testConnection,
+    setRoutingPreference, clearError,
   } = useAIConfigStore();
 
-  // Auto-fetch on mount
+  // 组件挂载时自动加载模型列表
   useEffect(() => {
     fetchModels();
   }, [fetchModels]);
 
-  const getModelById = (id: string): AIModelConfig | undefined => {
+  /** 按 ID 查找模型 */
+  const getModelById = (id: number): AIModelConfig | undefined => {
     return models.find((m) => m.id === id);
   };
 
-  const getModelsByProvider = (
-    provider: AIModelConfig["provider"]
-  ): AIModelConfig[] => {
+  /** 按提供商筛选模型 */
+  const getModelsByProvider = (provider: AIModelConfig["provider"]): AIModelConfig[] => {
     return models.filter((m) => m.provider === provider);
   };
 
-  const getTestResult = (id: string) => {
+  /** 获取指定模型的测试结果 */
+  const getTestResult = (id: number) => {
     return testResults[id] || null;
   };
 
+  /** 路由偏好的中文描述（用于 UI 展示） */
   const routingDescriptions: Record<string, string> = {
-    quality: "\u4F18\u5148\u4F7F\u7528\u6700\u5F3A\u6A21\u578B\uFF0C\u9002\u5408\u6DF1\u5EA6\u5206\u6790\u548C\u590D\u6742\u521B\u4F5C",
-    balanced: "\u667A\u80FD\u5206\u914D\u4EFB\u52A1\u5230\u5408\u9002\u7684\u6A21\u578B\uFF0C\u517C\u987E\u8D28\u91CF\u548C\u6210\u672C",
-    budget: "\u4F18\u5148\u4F7F\u7528\u8F7B\u91CF\u6A21\u578B\uFF0C\u9002\u5408\u65E5\u5E38\u7B80\u5355\u4EFB\u52A1",
+    quality: "优先使用最强模型，适合深度分析和复杂创作",
+    balanced: "智能分配任务到合适的模型，兼顾质量和成本",
+    budget: "优先使用轻量模型，适合日常简单任务",
   };
 
   return {
-    models,
-    defaultModel,
-    routingPreference,
-    loading,
-    error,
-    testResults,
-    fetchModels,
-    addModel,
-    removeModel,
-    setDefaultModel,
-    testConnection,
-    setRoutingPreference,
-    clearError,
-    getModelById,
-    getModelsByProvider,
-    getTestResult,
-    routingDescriptions,
+    models, defaultModel, routingPreference, loading, error, testResults,
+    fetchModels, addModel, removeModel, setDefaultModel, testConnection,
+    setRoutingPreference, clearError,
+    getModelById, getModelsByProvider, getTestResult, routingDescriptions,
   };
 }

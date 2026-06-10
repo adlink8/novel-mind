@@ -1,9 +1,23 @@
+/**
+ * 根布局组件 (Next.js App Router)
+ *
+ * 定义全局 HTML 结构:
+ * - <html lang="zh-CN">: 中文页面
+ * - Inter 字体: Google Fonts 加载的无衬线字体
+ * - 侧边栏导航: 左侧固定 64px 宽的导航栏（仪表盘/书架/创作中心/AI设置）
+ * - 主内容区: 右侧可滚动区域，渲染子页面
+ *
+ * 响应式:
+ * - md 以上: 显示侧边栏
+ * - md 以下: 隐藏侧边栏（未来可加移动端汉堡菜单）
+ */
+
 import type { Metadata } from "next";
 import "./globals.css";
 import { Inter } from "next/font/google";
 import { cn } from "@/lib/utils";
 
-const inter = Inter({subsets:['latin'],variable:'--font-sans'});
+const inter = Inter({subsets:["latin"], variable:"--font-sans"});
 
 export const metadata: Metadata = {
   title: "NovelMind - AI 辅助小说创作与理解",
@@ -19,7 +33,7 @@ export default function RootLayout({
     <html lang="zh-CN" className={cn("font-sans", inter.variable)}>
       <body className="min-h-screen bg-background font-sans antialiased">
         <div className="flex h-screen">
-          {/* 侧边栏 */}
+          {/* 侧边栏导航（桌面端可见） */}
           <aside className="hidden md:flex w-64 flex-col border-r bg-card">
             <div className="p-6">
               <h1 className="text-xl font-bold text-primary">NovelMind</h1>
@@ -36,7 +50,7 @@ export default function RootLayout({
             </div>
           </aside>
 
-          {/* 主内容区 */}
+          {/* 主内容区（占满剩余宽度） */}
           <main className="flex-1 overflow-auto">
             {children}
           </main>
@@ -46,6 +60,10 @@ export default function RootLayout({
   );
 }
 
+/**
+ * 侧边栏导航链接组件
+ * 渲染图标 + 文字的水平布局，hover 时高亮背景
+ */
 function SidebarLink({
   href,
   icon,

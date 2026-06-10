@@ -1,47 +1,78 @@
+# =============================================================================
+# NovelMind Docker Compose 配置
+# =============================================================================
+# 网络拓扑:
+#   前端 (Next.js :3000) --> 后端 (FastAPI :8000) --> db (PostgreSQL :5432)
+#                                                  --> chroma (ChromaDB :8001)
+#                                                  --> neo4j  (Neo4j :7474/:7687) [可选]
+# =============================================================================
+
 services:
-  # PostgreSQL + pgvector
+
+  # ---------------------------------------------------------------------------
+  # PostgreSQL 16 + pgvector 扩展
+  # 用途: 主数据库，存储小说、角色、章节等业务数据；pgvector 扩展支持向量检索
+  # 端口: 5432 (标准 PostgreSQL 端口)
+  # 卷: pgdata 持久化数据库文件，容器重建不丢数据
+  # 健康检查: 使用 pg_isready 探测数据库是否就绪，间隔 5 秒，最多重试 5 次
+  # ---------------------------------------------------------------------------
   db:
-    image: pgvector/pgvector:pg16
+    image: pgvector/pgvector:pg16        # PostgreSQL 16 + pgvector 向量扩展镜像
     environment:
-      POSTGRES_DB: novelmind
-      POSTGRES_USER: novelmind
-      POSTGRES_PASSWORD: novelmind
+      POSTGRES_DB: novelmind             # 自动创建的数据库名
+      POSTGRES_USER: novelmind           # 数据库超级用户名
+      POSTGRES_PASSWORD: novelmind       # 数据库密码（生产环境务必修改）
     ports:
-      - "5432:5432"
+      - "5432:5432"                      # 宿主机:容器 端口映射
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql/data  # 持久化 PostgreSQL 数据目录
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U novelmind"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+      test: ["CMD-SHELL", "pg_isready -U novelmind"]  # 检查数据库连接是否就绪
+      interval: 5s                       # 每 5 秒检查一次
+      timeout: 5s                        # 单次检查超时时间
+      retries: 5                         # 最大重试次数
 
-  # Chroma 向量数据库（RAG 检索）
+  # ---------------------------------------------------------------------------
+  # ChromaDB 向量数据库
+  # 用途: 存储小说文本的向量嵌入，用于 RAG（检索增强生成）语义搜索
+  #       后端通过 HTTP API 与其交互，实现"基于内容的智能问答"
+  # 端口: 8001 (宿主机) -> 8000 (容器内部)
+  # 卷: chromadata 持久化向量索引数据
+  # ---------------------------------------------------------------------------
   chroma:
-    image: chromadb/chroma:latest
+    image: chromadb/chroma:latest        # ChromaDB 官方镜像
     ports:
-      - "8001:8000"
+      - "8001:8000"                      # 映射到 8001 避免与后端 8000 冲突
     volumes:
-      - chromadata:/chroma/chroma
+      - chromadata:/chroma/chroma        # 持久化 Chroma 数据目录
     environment:
-      - CHROMA_SERVER_HOST=0.0.0.0
-      - CHROMA_SERVER_HTTP_PORT=8000
+      - CHROMA_SERVER_HOST=0.0.0.0       # 监听所有网络接口（允许容器间通信）
+      - CHROMA_SERVER_HTTP_PORT=8000     # 容器内部 HTTP 端口
 
-  # Neo4j 图数据库（人物关系图谱，MVP 阶段可选）
-  # 启用: docker compose --profile graph up -d
+  # ---------------------------------------------------------------------------
+  # Neo4j 5 图数据库（可选服务）
+  # 用途: 存储人物关系图谱，支持复杂的角色关系查询和可视化
+  #       仅在需要图谱功能时启用，MVP 阶段可跳过
+  # 启用方式: docker compose --profile graph up -d
+  # 端口: 7474 (Web 管理界面) / 7687 (Bolt 协议，应用连接用)
+  # 卷: neo4jdata 持久化图数据库文件
+  # ---------------------------------------------------------------------------
   neo4j:
-    profiles: ["graph"]
-    image: neo4j:5-community
+    profiles: ["graph"]                  # 仅在指定 --profile graph 时启动
+    image: neo4j:5-community             # Neo4j 5 社区版
     ports:
-      - "7474:7474"
-      - "7687:7687"
+      - "7474:7474"                      # Neo4j Web 浏览器管理界面
+      - "7687:7687"                      # Bolt 协议端口，应用通过此端口连接
     environment:
-      NEO4J_AUTH: neo4j/novelmind
-      NEO4J_PLUGINS: '["apoc"]'
+      NEO4J_AUTH: neo4j/novelmind        # 格式: 用户名/密码（生产环境务必修改）
+      NEO4J_PLUGINS: '["apoc"]'          # 自动安装 APOC 插件（常用图算法扩展）
     volumes:
-      - neo4jdata:/data
+      - neo4jdata:/data                  # 持久化 Neo4j 数据目录
 
+# =============================================================================
+# 命名卷声明 - Docker 管理的持久化存储
+# =============================================================================
 volumes:
-  pgdata:
-  chromadata:
-  neo4jdata:
+  pgdata:        # PostgreSQL 数据卷
+  chromadata:    # ChromaDB 数据卷
+  neo4jdata:     # Neo4j 数据卷

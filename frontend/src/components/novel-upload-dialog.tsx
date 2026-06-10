@@ -1,21 +1,35 @@
+/**
+ * 小说上传对话框组件
+ *
+ * 支持两种文件选择方式:
+ * 1. 拖拽上传（Drag & Drop）
+ * 2. 点击选择文件
+ *
+ * 上传流程:
+ * 1. 用户选择/拖入 .txt 文件
+ * 2. 前端校验格式和大小（50MB 限制）
+ * 3. 模拟进度条（300ms 间隔递增到 90%）
+ * 4. 调用 POST /api/novels/upload
+ * 5. 成功后回调 onUploadComplete，关闭对话框
+ *
+ * Props:
+ * - children: 触发按钮（通过 DialogTrigger 渲染）
+ * - onUploadComplete: 上传成功回调
+ */
+
 "use client";
 
 import React, { useCallback, useState, useRef } from "react";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogTrigger,
-  DialogClose,
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+  DialogDescription, DialogTrigger, DialogClose,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { novelsApi, type Novel } from "@/lib/api";
+import { novelsApi, type NovelUploadResponse } from "@/lib/api";
 
 interface NovelUploadDialogProps {
   children: React.ReactNode;
-  onUploadComplete?: (novel: Novel) => void;
+  onUploadComplete?: (novel: NovelUploadResponse) => void;
 }
 
 type UploadStatus = "idle" | "uploading" | "success" | "error";
@@ -32,6 +46,7 @@ export function NovelUploadDialog({
   const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  /** 重置所有状态（关闭对话框时调用） */
   const reset = useCallback(() => {
     setFile(null);
     setStatus("idle");
@@ -40,20 +55,22 @@ export function NovelUploadDialog({
     setDragOver(false);
   }, []);
 
+  /** 校验文件格式和大小 */
   const validateFile = useCallback((f: File): boolean => {
     if (!f.name.toLowerCase().endsWith(".txt")) {
-      setErrorMsg("\u53EA\u652F\u6301 .txt \u683C\u5F0F\u7684\u6587\u4EF6");
+      setErrorMsg("仅支持 .txt 格式的文件");
       setStatus("error");
       return false;
     }
     if (f.size > 50 * 1024 * 1024) {
-      setErrorMsg("\u6587\u4EF6\u5927\u5C0F\u4E0D\u80FD\u8D85\u8FC7 50MB");
+      setErrorMsg("文件大小不能超过 50MB");
       setStatus("error");
       return false;
     }
     return true;
   }, []);
 
+  /** 处理文件选择（点击或拖拽） */
   const handleFileSelect = useCallback(
     (f: File) => {
       setErrorMsg("");
@@ -65,6 +82,7 @@ export function NovelUploadDialog({
     [validateFile]
   );
 
+  /** 拖拽放下处理 */
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
@@ -97,12 +115,13 @@ export function NovelUploadDialog({
     [handleFileSelect]
   );
 
+  /** 执行上传 */
   const handleUpload = useCallback(async () => {
     if (!file) return;
     setStatus("uploading");
     setProgress(0);
 
-    // Simulate progress
+    // 模拟进度条（实际上传是单次请求，无法获取真实进度）
     const progressInterval = setInterval(() => {
       setProgress((prev) => {
         if (prev >= 90) {
@@ -119,20 +138,21 @@ export function NovelUploadDialog({
       setProgress(100);
       setStatus("success");
       onUploadComplete?.(res.data);
+      // 成功后 1 秒自动关闭
       setTimeout(() => {
         setOpen(false);
         reset();
       }, 1000);
     } catch (err) {
       clearInterval(progressInterval);
-      const message =
-        err instanceof Error ? err.message : "\u4E0A\u4F20\u5931\u8D25\uFF0C\u8BF7\u91CD\u8BD5";
+      const message = err instanceof Error ? err.message : "上传失败，请重试";
       setErrorMsg(message);
       setStatus("error");
       setProgress(0);
     }
   }, [file, onUploadComplete, reset]);
 
+  /** 对话框开关控制（关闭时重置状态） */
   const handleOpenChange = useCallback(
     (nextOpen: boolean) => {
       if (!nextOpen) {
@@ -148,14 +168,12 @@ export function NovelUploadDialog({
       <DialogTrigger render={children as React.ReactElement} />
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{"\u5BFC\u5165\u5C0F\u8BF4"}</DialogTitle>
-          <DialogDescription>
-            {"\u4E0A\u4F20 TXT \u6587\u4EF6\uFF0CAI \u5C06\u81EA\u52A8\u89E3\u6790\u5C0F\u8BF4\u5185\u5BB9"}
-          </DialogDescription>
+          <DialogTitle>{"导入小说"}</DialogTitle>
+          <DialogDescription>{"上传 TXT 文件，AI 将自动解析小说内容"}</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Drop zone */}
+          {/* 拖拽上传区域 */}
           <div
             onDrop={handleDrop}
             onDragOver={handleDragOver}
@@ -178,7 +196,7 @@ export function NovelUploadDialog({
               className="hidden"
             />
             <div className="text-4xl mb-3">
-              {file ? "\uD83D\uDCC4" : "\uD83D\uDCC1"}
+              {file ? "📄" : "📁"}
             </div>
             {file ? (
               <div className="text-center">
@@ -189,17 +207,13 @@ export function NovelUploadDialog({
               </div>
             ) : (
               <div className="text-center">
-                <p className="text-sm font-medium">
-                  {"\u62D6\u62FD\u6587\u4EF6\u5230\u8FD9\u91CC\uFF0C\u6216\u70B9\u51FB\u9009\u62E9\u6587\u4EF6"}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {"\u652F\u6301 .txt \u683C\u5F0F\uFF0C\u6700\u5927 50MB"}
-                </p>
+                <p className="text-sm font-medium">{"拖拽文件到这里，或点击选择文件"}</p>
+                <p className="text-xs text-muted-foreground mt-1">{"支持 .txt 格式，最大 50MB"}</p>
               </div>
             )}
           </div>
 
-          {/* Progress bar */}
+          {/* 进度条 */}
           {status === "uploading" && (
             <div className="space-y-2">
               <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
@@ -209,39 +223,37 @@ export function NovelUploadDialog({
                 />
               </div>
               <p className="text-xs text-center text-muted-foreground">
-                {"\u4E0A\u4F20\u4E2D..."} {Math.round(progress)}%
+                {"上传中..."} {Math.round(progress)}%
               </p>
             </div>
           )}
 
-          {/* Success state */}
+          {/* 成功状态 */}
           {status === "success" && (
             <div className="flex items-center justify-center gap-2 rounded-lg bg-green-50 border border-green-200 p-3 text-sm text-green-700">
-              <span>{"\u2705"}</span>
-              <span>{"\u4E0A\u4F20\u6210\u529F\uFF01\u6B63\u5728\u89E3\u6790\u5C0F\u8BF4..."}</span>
+              <span>{"✅"}</span>
+              <span>{"上传成功！正在解析小说..."}</span>
             </div>
           )}
 
-          {/* Error state */}
+          {/* 错误状态 */}
           {status === "error" && errorMsg && (
             <div className="flex items-center justify-center gap-2 rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">
-              <span>{"\u274C"}</span>
+              <span>{"❌"}</span>
               <span>{errorMsg}</span>
             </div>
           )}
 
-          {/* Action buttons */}
+          {/* 操作按钮 */}
           <div className="flex justify-end gap-2">
             <DialogClose>
-              <Button variant="outline">{"\u53D6\u6D88"}</Button>
+              <Button variant="outline">{"取消"}</Button>
             </DialogClose>
             <Button
               onClick={handleUpload}
               disabled={!file || status === "uploading"}
             >
-              {status === "uploading"
-                ? "\u4E0A\u4F20\u4E2D..."
-                : "\u5F00\u59CB\u4E0A\u4F20"}
+              {status === "uploading" ? "上传中..." : "开始上传"}
             </Button>
           </div>
         </div>

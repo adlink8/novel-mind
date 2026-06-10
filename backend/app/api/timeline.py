@@ -1,36 +1,40 @@
-"""时间线 API"""
+"""
+时间线 API 路由（Phase 4 实现）
 
-from fastapi import APIRouter
+当前状态: 占位实现，生成类端点返回 HTTP 501，查询类返回空数组。
+
+端点列表:
+  GET    /api/timeline/{novel_id}           - 获取小说时间线 -> []
+  POST   /api/timeline/{novel_id}/extract   - AI 自动提取时间线事件 -> 501
+  PUT    /api/timeline/events/{event_id}    - 更新时间线事件 -> 501
+  DELETE /api/timeline/events/{event_id}    - 删除时间线事件 -> 501
+"""
+
+from fastapi import APIRouter, HTTPException
 
 router = APIRouter()
 
 
 @router.get("/{novel_id}")
 async def get_timeline(novel_id: str):
-    """获取小说时间线"""
-    # TODO: 查询数据库
+    """获取小说时间线（事件列表，按 sort_order 排序）"""
+    # TODO: 从 timeline_events 表查询
     return []
 
 
 @router.post("/{novel_id}/extract")
 async def extract_timeline(novel_id: str):
-    """AI 自动提取时间线事件"""
-    # TODO:
-    # 1. 加载小说全文
-    # 2. 调用 AI 提取时间-事件对
-    # 3. 结构化存储
-    return {"novel_id": novel_id, "status": "extracting", "events": []}
+    """AI 自动提取时间线事件（LLM 从全文抽取事件 + 因果链）"""
+    raise HTTPException(status_code=501, detail="时间线事件抽取尚未实现")
 
 
 @router.put("/events/{event_id}")
 async def update_event(event_id: str, data: dict):
-    """更新时间线事件"""
-    # TODO: 更新数据库
-    return {"event_id": event_id, "status": "updated"}
+    """更新时间线事件（手动编辑）"""
+    raise HTTPException(status_code=501, detail="时间线事件编辑尚未实现")
 
 
 @router.delete("/events/{event_id}")
 async def delete_event(event_id: str):
     """删除时间线事件"""
-    # TODO: 删除数据库记录
-    return {"message": "已删除"}
+    raise HTTPException(status_code=501, detail="时间线事件删除尚未实现")

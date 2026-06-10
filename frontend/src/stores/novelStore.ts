@@ -24,7 +24,7 @@ export const useNovelStore = create<NovelState>((set, get) => ({
     set({ loading: true, error: null });
     try {
       const res = await novelsApi.list();
-      set({ novels: res.data, loading: false });
+      set({ novels: res.data.items, loading: false });
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Failed to fetch novels";
@@ -49,8 +49,8 @@ export const useNovelStore = create<NovelState>((set, get) => ({
     try {
       await novelsApi.delete(id);
       set((state) => ({
-        novels: state.novels.filter((n) => n.id !== id),
-        currentNovel: state.currentNovel?.id === id ? null : state.currentNovel,
+        novels: state.novels.filter((n) => String(n.id) !== id),
+        currentNovel: String(state.currentNovel?.id) === id ? null : state.currentNovel,
         loading: false,
       }));
     } catch (err) {
