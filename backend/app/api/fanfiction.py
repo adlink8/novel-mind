@@ -9,13 +9,15 @@
   POST /api/fanfiction/{id}/continue         - AI 续写（流式输出）-> 501
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
-router = APIRouter()
+from app.core.security import require_user
+
+router = APIRouter(dependencies=[Depends(require_user)])
 
 
 @router.get("/{novel_id}")
-async def list_fanfictions(novel_id: str):
+async def list_fanfictions(novel_id: int):
     """获取小说的同人文列表"""
     # TODO: 从 fan_fictions 表查询
     return []

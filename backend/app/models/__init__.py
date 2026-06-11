@@ -1,7 +1,7 @@
 """
 ORM 模型统一导出包
 
-本包包含 NovelMind 所有数据库模型（11 张表），分为 5 个业务域:
+本包包含 NovelMind 所有数据库模型（12 张表），分为 6 个业务域:
 
 小说域:
   - Novel          : 小说主表（标题、作者、字数、状态、文风指纹）
@@ -21,6 +21,7 @@ RAG 域:
   - FanFictionChapter: 同人文章节表（AI 生成标记、风格评分、RAG 上下文）
 
 基础设施域:
+  - User           : 用户与认证主体
   - AIModelConfig  : AI 模型配置表（提供商、密钥、路由层级）
   - AIUsageLog     : AI 调用日志表（token 用量、费用、延迟）
 
@@ -31,6 +32,7 @@ RAG 域:
 """
 
 from app.models.base import Base
+from app.models.user import User
 from app.models.novel import Novel, Chapter
 from app.models.analysis import AnalysisResult
 from app.models.timeline import TimelineEvent
@@ -43,6 +45,7 @@ from app.models.text_chunk import TextChunk
 
 __all__ = [
     "Base",
+    "User",
     "Novel",
     "Chapter",
     "AnalysisResult",

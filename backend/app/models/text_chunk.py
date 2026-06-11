@@ -18,7 +18,7 @@ embedding_status 状态机:
   - failed:   向量生成失败（可重试）
 """
 
-from sqlalchemy import ForeignKey, Integer, String, Text, JSON, Float
+from sqlalchemy import ForeignKey, Integer, String, Text, JSON
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin
@@ -33,6 +33,7 @@ class TextChunk(TimestampMixin, Base):
     2. RAG 检索时作为上下文注入 Prompt
     3. 搜索结果展示时跳转到原文位置
     """
+
     __tablename__ = "text_chunks"
 
     # 主键
@@ -40,17 +41,24 @@ class TextChunk(TimestampMixin, Base):
 
     # 外键关联
     novel_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("novels.id", ondelete="CASCADE"),
-        nullable=False, index=True,
+        Integer,
+        ForeignKey("novels.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
     chapter_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("chapters.id", ondelete="SET NULL"),
+        Integer,
+        ForeignKey("chapters.id", ondelete="SET NULL"),
         index=True,  # 章节删除时设为 NULL，不级联删除文本块
     )
 
     # 分块内容
-    chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)    # 章节内的块序号（0, 1, 2...）
-    content: Mapped[str] = mapped_column(Text, nullable=False)           # 文本块内容（300-500 字）
+    chunk_index: Mapped[int] = mapped_column(
+        Integer, nullable=False
+    )  # 章节内的块序号（0, 1, 2...）
+    content: Mapped[str] = mapped_column(
+        Text, nullable=False
+    )  # 文本块内容（300-500 字）
     chunk_type: Mapped[str] = mapped_column(
         String(50), default="paragraph"
     )  # 块类型: scene / dialogue / description / narration / paragraph
@@ -61,7 +69,7 @@ class TextChunk(TimestampMixin, Base):
     metadata_json: Mapped[dict | None] = mapped_column(JSON, default=dict)
 
     # 向量化状态
-    word_count: Mapped[int] = mapped_column(Integer, default=0)          # 块内字数
+    word_count: Mapped[int] = mapped_column(Integer, default=0)  # 块内字数
     embedding_status: Mapped[str] = mapped_column(
         String(20), default="pending"
     )  # 向量生成状态: pending / embedded / failed

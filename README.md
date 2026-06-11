@@ -1,102 +1,74 @@
 # NovelMind
 
-AI 辅助小说创作与理解平台 —— 让 AI 成为你的小说伙伴。
+NovelMind 是一个 AI 辅助小说理解与同人创作平台。当前已具备安全的账户体系、小说 TXT 导入与阅读、用户级模型配置，以及可重复执行的测试和迁移基线；RAG、剧情分析、人物图谱、时间线和同人文生成仍在后续计划中。
 
-## 功能
+实际实现状态以 [IMPLEMENTATION-STATUS.md](IMPLEMENTATION-STATUS.md) 为准。
 
-- **AI 剧情理解**：导入小说，AI 自动分析剧情、人物、伏笔、叙事结构
-- **AI 续写/同人文**：基于原作风格续写同人小说
-- **时间线可视化**：智能提取并可视化小说事件时间线
-- **人物关系图谱**：自动构建可交互的人物关系网络
+## Current Baseline
 
-## 技术栈
+- 后端：FastAPI、SQLAlchemy async、PostgreSQL 16 + pgvector
+- 前端：Next.js 16.3.0-canary.6、React 19、TypeScript、Tailwind CSS
+- AI：LiteLLM 1.83.10+；项目支持 Python 3.11-3.13，不支持 Python 3.14
+- 安全：HttpOnly Cookie/Bearer JWT、资源所有权隔离、版本化 Fernet 加密、出站主机白名单与 DNS/IP 校验
+- 验证：后端 68 tests、前端 22 tests、生产构建、ESLint、Ruff、Bandit、pip-audit、npm audit、Alembic PostgreSQL 检查均通过
+- GSD：`.gsd/` 是唯一 AI 状态目录；下一执行入口为 `02-03`
 
-- **前端**：Next.js 14 + TypeScript + Tailwind CSS + shadcn/ui
-- **后端**：Python FastAPI + SQLAlchemy
-- **数据库**：PostgreSQL + pgvector
-- **AI**：LiteLLM（支持 OpenAI / Claude / Ollama 等多模型）
-- **可视化**：ECharts
+## Repository Layout
 
-## 快速开始
-
-### 前置要求
-
-- Docker & Docker Compose
-- Node.js 20+（本地开发）
-- Python 3.12+（本地开发）
-
-### Docker 一键启动
-
-```bash
-# 1. 配置环境变量
-cp backend/.env.example backend/.env
-# 编辑 backend/.env，填入你的 AI 模型 API Key
-
-# 2. 启动所有服务
-docker compose up -d
-
-# 3. 访问
-# 前端：http://localhost:3000
-# 后端 API：http://localhost:8000/docs
+```text
+novel-mind/
+├── backend/              FastAPI、ORM、迁移和测试
+├── frontend/             Next.js 应用和前端测试
+├── docs/                 面向维护者的工程与产品文档
+├── .gsd/                 AI 规划、状态和任务文档
+├── docker-compose.yml    PostgreSQL 和 Chroma 开发服务
+└── IMPLEMENTATION-STATUS.md
 ```
 
-### 本地开发
+## Local Development
 
-```bash
-# 后端
+前置要求：Python 3.11-3.13、Node.js 20.9+、Docker Desktop。
+
+```powershell
+docker compose up -d db chroma
+
 cd backend
-pip install -r requirements.txt
-cp .env.example .env
-uvicorn app.main:app --reload
+py -3.11 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt -r requirements-dev.txt
+Copy-Item .env.example .env
+.\.venv\Scripts\python.exe -m alembic upgrade head
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload
 
-# 前端
-cd frontend
+cd ..\frontend
 npm install
 npm run dev
 ```
 
-## 项目结构
+- 前端：`http://localhost:3000`
+- 后端：`http://localhost:8000`
+- OpenAPI：`http://localhost:8000/docs`
 
-```
-novel-mind/
-├── frontend/           # Next.js 前端
-│   ├── src/
-│   │   ├── app/        # 页面路由
-│   │   ├── components/ # UI 组件
-│   │   ├── lib/        # 工具函数 & API 客户端
-│   │   ├── hooks/      # 自定义 Hooks
-│   │   ├── stores/     # Zustand 状态管理
-│   │   └── types/      # TypeScript 类型
-│   └── public/         # 静态资源
-├── backend/            # FastAPI 后端
-│   ├── app/
-│   │   ├── api/        # API 路由
-│   │   ├── services/   # 业务逻辑
-│   │   ├── models/     # 数据库模型
-│   │   ├── schemas/    # Pydantic 校验
-│   │   └── core/       # 核心工具
-│   └── tests/
-├── docs/               # 项目文档
-│   ├── 需求文档.md
-│   ├── 技术架构.md
-│   ├── 路线图.md
-│   ├── 项目状态.md
-│   └── 待办清单.md
-└── docker-compose.yml
+首次注册的活跃账户成为引导管理员，并接管迁移前的历史小说和模型记录。生产环境必须替换 `.env.example` 中的 JWT 与数据加密密钥，并启用 Secure Cookie。
+
+## Verification
+
+```powershell
+cd backend
+.\.venv\Scripts\python.exe -m pytest -q
+.\.venv\Scripts\python.exe -m ruff check app tests migrations
+.\.venv\Scripts\python.exe -m bandit -r app -ll -q
+.\.venv\Scripts\python.exe -m pip_audit --local --skip-editable
+.\.venv\Scripts\python.exe -m alembic current
+.\.venv\Scripts\python.exe -m alembic check
+
+cd ..\frontend
+npm test
+npm run lint
+npm run build
+npm audit --registry=https://registry.npmjs.org
 ```
 
-## 支持的 AI 模型
-
-| 提供商 | 模型示例 | 配置方式 |
-|--------|---------|---------|
-| OpenAI | GPT-4o, GPT-4o-mini | API Key |
-| Anthropic | Claude 3.5 Sonnet | API Key |
-| Ollama | Qwen2, Llama3 | 本地地址 |
-| 自定义 | 兼容 OpenAI API 的服务 | Base URL + Key |
-
-## 路线图
-
-详见 [docs/路线图.md](docs/路线图.md)，共 7 个阶段，预计 4 个月完成 MVP。
+文档入口：[docs/README.md](docs/README.md)。
 
 ## License
 

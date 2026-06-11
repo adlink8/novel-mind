@@ -21,6 +21,7 @@ LiteLLM 优势:
 
 import litellm
 from app.config import settings
+from app.core.url_security import validate_ai_base_url
 
 
 class AIService:
@@ -35,8 +36,8 @@ class AIService:
     """
 
     def __init__(self):
-        self.default_model = "gpt-4o-mini"       # 默认模型（未指定时使用）
-        self.default_provider = "openai"          # 默认提供商
+        self.default_model = "gpt-4o-mini"  # 默认模型（未指定时使用）
+        self.default_provider = "openai"  # 默认提供商
 
     async def chat(
         self,
@@ -140,7 +141,7 @@ class AIService:
         if model_config.api_key:
             kwargs["api_key"] = model_config.api_key
         if model_config.base_url:
-            kwargs["api_base"] = model_config.base_url
+            kwargs["api_base"] = await validate_ai_base_url(model_config.base_url)
 
         response = await litellm.acompletion(**kwargs)
         return response.choices[0].message.content or ""

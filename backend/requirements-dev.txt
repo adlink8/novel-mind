@@ -1,0 +1,15 @@
+# NovelMind backend dev dependencies
+# Usage: pip install -r requirements.txt -r requirements-dev.txt
+
+# --- Testing ---
+pytest>=8.3
+pytest-asyncio>=0.24
+httpx>=0.28
+
+# --- Test database ---
+aiosqlite>=0.20
+
+# --- Code quality ---
+ruff>=0.6
+bandit>=1.9
+pip-audit>=2.9

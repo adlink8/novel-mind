@@ -74,8 +74,10 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_fanfiction_chapters_fanfiction_id'), 'fanfiction_chapters', ['fanfiction_id'], unique=False)
-    op.add_column('novels', sa.Column('chapter_count', sa.Integer(), nullable=False))
-    op.add_column('novels', sa.Column('word_count', sa.Integer(), nullable=False))
+    op.add_column('novels', sa.Column('chapter_count', sa.Integer(), server_default='0', nullable=False))
+    op.add_column('novels', sa.Column('word_count', sa.Integer(), server_default='0', nullable=False))
+    op.alter_column('novels', 'chapter_count', server_default=None)
+    op.alter_column('novels', 'word_count', server_default=None)
     op.add_column('novels', sa.Column('style_fingerprint', sa.JSON(), nullable=True))
     op.alter_column('novels', 'status',
                existing_type=sa.VARCHAR(length=20),

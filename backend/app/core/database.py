@@ -21,8 +21,8 @@ from app.config import settings
 # - pool_pre_ping=True: 每次取连接前先 ping，自动剔除断开的连接
 engine = create_async_engine(
     settings.database_url,
-    echo=settings.debug,        # 开发环境打印 SQL，生产环境关闭
-    pool_pre_ping=True,         # 连接健康检查，防止使用已断开的连接
+    echo=settings.debug,  # 开发环境打印 SQL，生产环境关闭
+    pool_pre_ping=True,  # 连接健康检查，防止使用已断开的连接
 )
 
 # 异步会话工厂
@@ -37,6 +37,7 @@ async_session_factory = async_sessionmaker(
 
 class Base(DeclarativeBase):
     """所有 ORM 模型的声明式基类"""
+
     pass
 
 
@@ -57,12 +58,12 @@ async def get_db() -> AsyncSession:
     async with async_session_factory() as session:
         try:
             yield session
-            await session.commit()       # 正常退出时提交事务
+            await session.commit()  # 正常退出时提交事务
         except Exception:
-            await session.rollback()     # 异常时回滚，保证数据一致性
+            await session.rollback()  # 异常时回滚，保证数据一致性
             raise
         finally:
-            await session.close()        # 归还连接到池中
+            await session.close()  # 归还连接到池中
 
 
 async def init_db():

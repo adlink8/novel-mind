@@ -36,6 +36,7 @@ class Character(TimestampMixin, Base):
 
     extra_data 用于存储扩展信息（如经典台词、出场统计等）。
     """
+
     __tablename__ = "characters"
 
     # 主键
@@ -43,18 +44,26 @@ class Character(TimestampMixin, Base):
 
     # 外键：关联到小说
     novel_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("novels.id", ondelete="CASCADE"),
-        nullable=False, index=True,
+        Integer,
+        ForeignKey("novels.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
 
     # 角色信息
-    name: Mapped[str] = mapped_column(String(100), nullable=False, index=True)       # 角色名称（主名称）
-    aliases: Mapped[str | None] = mapped_column(Text)                                 # 别名列表（逗号分隔: "小明, 明哥, 阿明"）
-    role: Mapped[str] = mapped_column(String(50), default="supporting")               # 角色类型
-    description: Mapped[str | None] = mapped_column(Text)                             # 外貌/身份描述
-    personality: Mapped[str | None] = mapped_column(Text)                             # 性格特征
-    background: Mapped[str | None] = mapped_column(Text)                              # 背景故事
-    first_appearance_chapter: Mapped[int | None] = mapped_column(Integer)             # 首次出场章节号
+    name: Mapped[str] = mapped_column(
+        String(100), nullable=False, index=True
+    )  # 角色名称（主名称）
+    aliases: Mapped[str | None] = mapped_column(
+        Text
+    )  # 别名列表（逗号分隔: "小明, 明哥, 阿明"）
+    role: Mapped[str] = mapped_column(String(50), default="supporting")  # 角色类型
+    description: Mapped[str | None] = mapped_column(Text)  # 外貌/身份描述
+    personality: Mapped[str | None] = mapped_column(Text)  # 性格特征
+    background: Mapped[str | None] = mapped_column(Text)  # 背景故事
+    first_appearance_chapter: Mapped[int | None] = mapped_column(
+        Integer
+    )  # 首次出场章节号
 
     # 扩展数据（JSON 格式）
     # 示例: {"classic_quotes": ["xxx"], "dialogue_style": "简洁有力", "appearance_count": 42}
@@ -68,6 +77,7 @@ class CharacterRelation(TimestampMixin, Base):
     关系是有向的（source → target），但语义上通常双向理解。
     例如: source=贾宝玉, target=林黛玉, relation_type=lover
     """
+
     __tablename__ = "character_relations"
 
     # 主键
@@ -75,17 +85,21 @@ class CharacterRelation(TimestampMixin, Base):
 
     # 外键：关联到小说
     novel_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("novels.id", ondelete="CASCADE"),
-        nullable=False, index=True,
+        Integer,
+        ForeignKey("novels.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
 
     # 关系两端
     source_character_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("characters.id", ondelete="CASCADE"),
+        Integer,
+        ForeignKey("characters.id", ondelete="CASCADE"),
         nullable=False,  # 关系起点角色
     )
     target_character_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("characters.id", ondelete="CASCADE"),
+        Integer,
+        ForeignKey("characters.id", ondelete="CASCADE"),
         nullable=False,  # 关系终点角色
     )
 
@@ -93,6 +107,8 @@ class CharacterRelation(TimestampMixin, Base):
     relation_type: Mapped[str] = mapped_column(
         String(50), nullable=False
     )  # 关系类型: friend / enemy / family / lover / mentor / ...
-    description: Mapped[str | None] = mapped_column(Text)                             # 关系描述
-    strength: Mapped[int | None] = mapped_column(Integer, default=5)                  # 关系强度 1-10
-    chapter_first_seen: Mapped[int | None] = mapped_column(Integer)                   # 该关系首次出现的章节号
+    description: Mapped[str | None] = mapped_column(Text)  # 关系描述
+    strength: Mapped[int | None] = mapped_column(Integer, default=5)  # 关系强度 1-10
+    chapter_first_seen: Mapped[int | None] = mapped_column(
+        Integer
+    )  # 该关系首次出现的章节号

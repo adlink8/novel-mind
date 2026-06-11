@@ -35,46 +35,75 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ModelTier:
     """单个模型层级配置"""
-    name: str           # 显示名称（如 "GPT-4o"）
-    model_id: str       # LiteLLM 模型标识（如 "gpt-4o"）
-    provider: str       # 提供商（openai / anthropic / ollama）
+
+    name: str  # 显示名称（如 "GPT-4o"）
+    model_id: str  # LiteLLM 模型标识（如 "gpt-4o"）
+    provider: str  # 提供商（openai / anthropic / ollama）
     cost_per_1k: float  # 每 1K token 的大致成本（USD）
 
 
 @dataclass
 class RoutingConfig:
     """路由偏好配置：三个层级的模型池"""
-    quality_models: List[ModelTier] = field(default_factory=list)    # 质量优先模型池
-    balanced_models: List[ModelTier] = field(default_factory=list)   # 均衡模型池
-    budget_models: List[ModelTier] = field(default_factory=list)     # 经济模型池
+
+    quality_models: List[ModelTier] = field(default_factory=list)  # 质量优先模型池
+    balanced_models: List[ModelTier] = field(default_factory=list)  # 均衡模型池
+    budget_models: List[ModelTier] = field(default_factory=list)  # 经济模型池
 
 
 # ─────────── 预置模型池 ───────────
 _DEFAULT_ROUTING = RoutingConfig(
     quality_models=[
-        ModelTier(name="GPT-4o", model_id="gpt-4o", provider="openai", cost_per_1k=0.005),
-        ModelTier(name="Claude Opus", model_id="claude-3-opus-20240229", provider="anthropic", cost_per_1k=0.015),
+        ModelTier(
+            name="GPT-4o", model_id="gpt-4o", provider="openai", cost_per_1k=0.005
+        ),
+        ModelTier(
+            name="Claude Opus",
+            model_id="claude-3-opus-20240229",
+            provider="anthropic",
+            cost_per_1k=0.015,
+        ),
     ],
     balanced_models=[
-        ModelTier(name="GPT-4o-mini", model_id="gpt-4o-mini", provider="openai", cost_per_1k=0.00015),
-        ModelTier(name="Claude Sonnet", model_id="claude-3-5-sonnet-20241022", provider="anthropic", cost_per_1k=0.003),
+        ModelTier(
+            name="GPT-4o-mini",
+            model_id="gpt-4o-mini",
+            provider="openai",
+            cost_per_1k=0.00015,
+        ),
+        ModelTier(
+            name="Claude Sonnet",
+            model_id="claude-3-5-sonnet-20241022",
+            provider="anthropic",
+            cost_per_1k=0.003,
+        ),
     ],
     budget_models=[
-        ModelTier(name="Ollama-Qwen2", model_id="ollama/qwen2:7b", provider="ollama", cost_per_1k=0.0),
-        ModelTier(name="GPT-4o-mini", model_id="gpt-4o-mini", provider="openai", cost_per_1k=0.00015),
+        ModelTier(
+            name="Ollama-Qwen2",
+            model_id="ollama/qwen2:7b",
+            provider="ollama",
+            cost_per_1k=0.0,
+        ),
+        ModelTier(
+            name="GPT-4o-mini",
+            model_id="gpt-4o-mini",
+            provider="openai",
+            cost_per_1k=0.00015,
+        ),
     ],
 )
 
 # ─────────── 任务类型 → 推荐层级映射 ───────────
 _TASK_TIER_MAP: Dict[str, str] = {
-    "deep_analysis": "quality",       # 深度分析：需要最强模型
-    "extraction": "balanced",         # 角色/时间线提取：中等复杂度
-    "summary": "balanced",            # 摘要生成
-    "embedding": "budget",            # 向量嵌入：最便宜的即可
-    "fanfiction": "quality",          # 续写创作：需要高质量生成
-    "chapter_summary": "balanced",    # 章节摘要
-    "style_analysis": "quality",      # 文风分析
-    "translation": "balanced",        # 翻译
+    "deep_analysis": "quality",  # 深度分析：需要最强模型
+    "extraction": "balanced",  # 角色/时间线提取：中等复杂度
+    "summary": "balanced",  # 摘要生成
+    "embedding": "budget",  # 向量嵌入：最便宜的即可
+    "fanfiction": "quality",  # 续写创作：需要高质量生成
+    "chapter_summary": "balanced",  # 章节摘要
+    "style_analysis": "quality",  # 文风分析
+    "translation": "balanced",  # 翻译
 }
 
 
@@ -139,7 +168,9 @@ class AIRouter:
         tier_models = self._get_tier_models(tier)
         if tier_models:
             selected = tier_models[0]
-            logger.info(f"[AIRouter] 任务={task_type}, 层级={tier}, 选中={selected.name}")
+            logger.info(
+                f"[AIRouter] 任务={task_type}, 层级={tier}, 选中={selected.name}"
+            )
             return selected
 
         # 降级：依次尝试其他层级
@@ -187,7 +218,9 @@ class AIRouter:
             self.routing_preference = preference
             logger.info(f"[AIRouter] 全局偏好已更新: {preference}")
         else:
-            raise ValueError(f"无效的偏好值: {preference}，可选: quality / balanced / budget")
+            raise ValueError(
+                f"无效的偏好值: {preference}，可选: quality / balanced / budget"
+            )
 
 
 # 全局单例（默认 balanced 偏好）

@@ -9,26 +9,28 @@
   POST /api/characters/{novel_id}/extract   - AI 自动识别人物及关系 -> 501
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
-router = APIRouter()
+from app.core.security import require_user
+
+router = APIRouter(dependencies=[Depends(require_user)])
 
 
 @router.get("/{novel_id}")
-async def get_characters(novel_id: str):
+async def get_characters(novel_id: int):
     """获取小说人物列表"""
     # TODO: 从 characters 表查询
     return []
 
 
 @router.get("/{novel_id}/relations")
-async def get_relations(novel_id: str):
+async def get_relations(novel_id: int):
     """获取人物关系网络（用于 AntV G6 图谱可视化）"""
     # TODO: 从 character_relations 表查询
     return []
 
 
 @router.post("/{novel_id}/extract")
-async def extract_characters(novel_id: str):
+async def extract_characters(novel_id: int):
     """AI 自动识别人物及关系（NER + LLM 混合抽取）"""
     raise HTTPException(status_code=501, detail="人物与关系抽取尚未实现")

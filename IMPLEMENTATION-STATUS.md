@@ -1,83 +1,89 @@
 # NovelMind Implementation Status
 
-审计日期：2026-06-06  
-审计原则：以实际代码为准，不采信文档中的完成勾选作为完成证据。
+审计日期：2026-06-11 16:30（Asia/Shanghai）
 
-## Executive Summary
+事实来源：实际代码、自动化测试、依赖审计、Next.js 构建输出和真实 PostgreSQL Alembic 命令。规划文档中的勾选不作为完成证据。
 
-当前仓库不是一个已完成 Phase 1 的稳定基线，而是一个“基础骨架 + 部分可用小说导入链路 + 多个占位功能”的早期实现。
+## Summary
 
-GSD 01-02 已修复启动级前后端契约问题：小说列表分页响应、AI 模型新增字段、模型测试结果处理，以及占位生成/抽取端点的 501 语义。后续仍不应直接进入 Phase 2 RAG，直到 smoke verification 和文档状态校准完成。
+安全与启动基线已经修复并验证。已知的未授权访问、模型配置越权、SSRF、密钥复用、旧密文兼容、上传文件补偿、数据库迁移漂移、日志凭据泄露和高风险依赖问题均已关闭。当前未完成项属于产品与可靠性建设，主要是持久化导入任务和 RAG 管线。
 
-## Status Legend
+状态定义：
 
-- VERIFIED：代码中有实际实现，且结构上可验证。
-- PARTIAL：有部分代码或 UI，但缺少关键行为、端到端契约或验证。
-- MISSING：文档规划中存在，但代码中没有实际实现。
+- **VERIFIED**：存在实际实现，并通过当前可重复命令验证。
+- **PARTIAL**：已有部分实现，但关键端到端能力仍不完整。
+- **MISSING**：规划中存在，实际代码未实现。
 
 ## VERIFIED
 
 | Area | Status | Evidence |
 |---|---|---|
-| FastAPI 应用入口与路由注册 | VERIFIED | `backend/app/main.py` 注册 novels / analysis / timeline / characters / fanfiction / models 路由，并提供 `/api/health` |
-| CORS、请求日志、尾部斜杠处理中间件 | VERIFIED | `backend/app/main.py`、`backend/app/core/logging.py` |
-| SQLAlchemy async 数据层 | VERIFIED | `backend/app/core/database.py`、`backend/app/models/*.py` |
-| Alembic 迁移目录 | VERIFIED | `backend/migrations/versions/*.py` |
-| 小说上传 TXT 限制、编码检测、保存、基础清洗 | VERIFIED | `backend/app/api/novels.py`、`backend/app/services/novel_service.py` |
-| 基础章节分割 | VERIFIED | `CHAPTER_PATTERNS` / `CHAPTER_REGEX` 支持中文章节、英文 Chapter、数字标题 |
-| 小说 CRUD 和章节查询后端 | VERIFIED | `backend/app/api/novels.py` 接入数据库 |
-| AI 模型配置后端 CRUD | VERIFIED | `backend/app/api/models.py` 接入 `AIModelConfig` |
-| LiteLLM 调用封装存在 | VERIFIED | `backend/app/services/ai_service.py` 提供 chat / embedding / stream_chat / test_connection |
-| AI 路由策略对象存在 | VERIFIED | `backend/app/services/ai_router.py` 有 quality / balanced / budget 预设 |
-| Docker Compose 数据服务 | VERIFIED | `docker-compose.yml` 定义 PostgreSQL + pgvector、Chroma、Neo4j profile |
-| Next.js App Router 页面骨架 | VERIFIED | `frontend/src/app/page.tsx`、`novels/page.tsx`、`writing/page.tsx`、`settings/page.tsx` |
-| 前端上传对话框与书架页 UI | VERIFIED | `frontend/src/components/novel-upload-dialog.tsx`、`frontend/src/app/novels/page.tsx` |
-| 前端小说列表契约 | VERIFIED | GSD 01-02 后 `novelStore.ts` 读取后端 `items` 分页响应；`npx tsc --noEmit` 通过 |
-| 前端 AI 模型配置契约 | VERIFIED | GSD 01-02 后 settings 表单提交 `name` / `model_id`；`npx tsc --noEmit` 通过 |
-| 未实现生成/抽取端点语义 | VERIFIED | GSD 01-02 后 analysis / timeline / characters / fanfiction 写入或生成类占位端点返回 HTTP 501 |
+| 账户与会话 | VERIFIED | bcrypt、JWT issuer/audience、HttpOnly SameSite Cookie、Bearer API 支持、登录/注销和前端门禁 |
+| 小说权限隔离 | VERIFIED | 列表按 owner 过滤；详情、章节、进度、状态和删除执行所有权校验；跨用户测试返回 404 |
+| AI 模型配置隔离 | VERIFIED | 配置按 owner 唯一和查询；跨用户读写、测试、默认切换和删除均被阻止 |
+| SSRF 防护 | VERIFIED | 自定义地址要求服务端精确主机白名单；校验协议、凭据、DNS、IPv4/IPv6 和非公网地址；调用前重复验证 |
+| API Key 加密 | VERIFIED | JWT 与加密密钥分离；`enc:v1` Fernet 密文；旧明文/旧密钥兼容；支持 previous key 轮换 |
+| 上传与删除一致性 | VERIFIED | 随机文件名、根目录 containment、读取上限、原子写入；数据库失败清文件，删除提交失败恢复文件 |
+| 数据库迁移 | VERIFIED | 用户、owner 和复合唯一约束 migration；真实 PostgreSQL `upgrade/current/check` 通过，head `a91c4d7e5f20` |
+| 响应最小化 | VERIFIED | 小说详情不返回 `source_path`，章节集合不返回正文 |
+| 前端认证可用性 | VERIFIED | 注册、登录、Cookie 会话检查和注销 UI；Axios 携带凭据 |
+| 前端路由和构建 | VERIFIED | `/novels/[id]` 动态路由正确；Next 16 Turbopack 生产构建通过 |
+| 自动化与静态检查 | VERIFIED | pytest 70、Vitest 22、ESLint 0、Ruff 0、Bandit 中高风险 0 |
+| 依赖安全 | VERIFIED | Python 3.11 环境 `pip-audit` 0；`npm audit` 0 |
+| AI 状态目录 | VERIFIED | `.planning/` 已移除；`.gsd/` 为唯一 AI 读写状态目录 |
 
 ## PARTIAL
 
-| Area | Status | Evidence / Gap |
+| Area | Status | Gap |
 |---|---|---|
-| Phase 1 “联调通过” | PARTIAL | 文档宣称 13 个端点通过，但仓库没有测试报告或测试代码支撑；需重新跑 smoke tests |
-| AI 智能路由 | PARTIAL | 有内存路由策略，但未与用户配置、实际 AI 调用、任务执行链路打通 |
-| AI 调用成本统计 | PARTIAL | 有 `AIUsageLog` 模型和 UI 占位；没有写入、聚合或展示真实用量 |
-| Chroma / Neo4j | PARTIAL | Docker 服务存在，但没有 Python client、同步服务或业务 API 集成 |
-| TextChunk / pgvector | PARTIAL | ORM 模型存在；没有分块、embedding、写入、检索流程 |
-| 小说导入 | PARTIAL | TXT 上传和基础分章可用；没有进度反馈、大文件分片、作者/类型推断、目录检测 |
-| 首页仪表盘 | PARTIAL | 页面存在，但统计和最近活动是硬编码占位 |
-| 写作中心 | PARTIAL | 页面存在，但新建按钮 disabled，数据是空数组占位 |
-| 分析 / 人物 / 时间线 / 同人文 API | PARTIAL | 查询类路由仍是空状态；写入/生成/抽取类占位端点已改为 HTTP 501 |
+| 阅读进度 | PARTIAL | 已受 owner 隔离，但仍存于 Novel 记录，没有独立设备/历史同步模型 |
+| 导入进度 | PARTIAL | 请求使用唯一临时键，但状态仍在进程内，重启后丢失 |
+| 数据服务集成 | PARTIAL | PostgreSQL/pgvector 和 Chroma 容器存在，尚未形成完整索引/检索链路 |
+| AI 路由与成本统计 | PARTIAL | 服务与模型骨架存在，业务生成端点仍未接入 |
+| 生产部署 | PARTIAL | 应用会拒绝弱生产密钥，但 TLS、秘密管理和网络策略由部署环境提供 |
 
 ## MISSING
 
-| Area | Status | Evidence / Gap |
+| Area | Status | Gap |
 |---|---|---|
-| RAG 三级分块管线 | MISSING | 无 `embedding_service.py`、`rag_service.py`、分块服务或批处理任务 |
-| BGE-large-zh-v1.5 本地 embedding | MISSING | 无模型服务、Docker worker、调用配置 |
-| Chroma 写入与检索 | MISSING | 无 Chroma client 代码 |
-| pgvector 检索 | MISSING | 模型有 embedding 字段相关设计，但无向量索引查询实现 |
-| 混合语义搜索 | MISSING | 只有小说标题/作者列表搜索，无文本块搜索 |
-| 小说阅读详情页 | MISSING | 文档规划 `novels/[id]`，实际没有该路由 |
-| AI 剧情分析引擎 | MISSING | `analysis.py` 仅占位；无摘要、叙事结构、伏笔、情感曲线 |
-| RexUniNLU / NLP 管线 | MISSING | 无 NER、关系抽取、冲突消解服务 |
-| 时间线提取与 D3 可视化 | MISSING | 无事件提取服务；前端未安装/使用 D3 时间线组件 |
-| 人物关系图谱与 AntV G6 | MISSING | 前端依赖无 `@antv/g6`；无图谱组件或 Neo4j 查询 |
-| 同人文续写引擎 | MISSING | 无 RAG 上下文注入、风格指纹、流式续写实际调用 |
-| 富文本/Markdown 编辑器 | MISSING | 无编辑器组件或续写章节管理页面 |
-| 导出 TXT / Markdown / EPUB | MISSING | 无导出 API 或前端入口 |
-| 用户认证与权限隔离 | MISSING | 无 NextAuth 或后端用户上下文 |
-| API Key 加密存储 | MISSING | 后端字段名为 `api_key`，没有加密层 |
-| 自动化测试体系 | MISSING | 未发现后端 pytest、前端测试、端到端 smoke 脚本 |
+| 持久化导入任务 | MISSING | 无 job 表、worker、幂等重试、租约和重启恢复 |
+| RAG 管线 | MISSING | 无完整分块、embedding、索引、检索和引用链路 |
+| 混合语义搜索 | MISSING | 无向量 + 关键词搜索 API 与前端结果页 |
+| AI 分析与创作 | MISSING | 分析、人物、时间线和同人文生成仍返回空状态或 501 |
+| 编辑与导出 | MISSING | 无富文本编辑、版本管理和 EPUB/Markdown 导出 |
 
-## Required Startup Fixes
+## Security Closure
 
-1. 已完成：修复前后端 API 契约：小说列表分页响应、AI 模型字段、测试连接响应处理。
-2. 已完成：将占位成功端点改为 HTTP 501，避免 `/gsd auto` 误判完成。
-3. 已完成：添加最小 smoke verification 文档，覆盖后端 import/compile 和前端 TypeScript/build。
-4. 已完成：更新文档状态，把 Phase 1 从“已完成”降级为“PARTIAL，启动修复中”。
+| Finding | Result |
+|---|---|
+| 匿名和跨用户 IDOR | CLOSED：统一认证与 owner 依赖，新增跨用户回归测试 |
+| Cookie 会话 CSRF | CLOSED：写请求要求 Origin 命中服务端 CORS 白名单；Bearer 客户端不受影响 |
+| bcrypt 超长密码 | CLOSED：注册和登录均拒绝超过 72 UTF-8 bytes 的密码 |
+| 模型配置越权 | CLOSED：AIModelConfig 增加 owner_id 和用户级唯一约束 |
+| 自定义 URL SSRF | CLOSED：管理员白名单 + DNS/IP 校验；私网主机需显式配置 |
+| JWT/加密共用弱密钥 | CLOSED：独立密钥，生产启动校验，旧密钥 keyring |
+| 上传/数据库双写不一致 | CLOSED：失败补偿与删除隔离恢复测试 |
+| ORM/Alembic 漂移 | CLOSED：真实 PostgreSQL upgrade/current/check 通过 |
+| 数据库 URL 日志泄漏 | CLOSED：SQLAlchemy URL 脱敏渲染 |
+| Python/Node 已知依赖漏洞 | CLOSED：LiteLLM 1.83.10+、Next 16.3.0-canary.6、Vitest 4、Vite 8；审计均为 0 |
+
+## Verification Snapshot
+
+| Check | Result |
+|---|---|
+| Backend pytest | VERIFIED：70 passed，Python 3.11.15 |
+| Frontend Vitest | VERIFIED：22 passed |
+| Frontend lint/build | VERIFIED：ESLint 0；Next 16 Turbopack build passed |
+| Python audit | VERIFIED：pip-audit 0；Bandit 中高风险 0 |
+| Node audit | VERIFIED：npm audit 0 |
+| Alembic | VERIFIED：head `a91c4d7e5f20`；current/check passed on PostgreSQL 16 |
 
 ## GSD Starting Point
 
-第一个 active milestone 必须从“审计与启动修复”开始。不要直接进入原文档中的 Phase 2 RAG，直到上述启动修复通过验证。
+当前 milestone：**v0.2 - 安全与架构修复**。
+
+`02-01` 与 `02-02` 已完成。`/gsd auto` 下一入口：
+
+`.gsd/phases/02-security-and-architecture-remediation/02-03-PLAN.md`
+
+`02-03` 只保留未完成的持久化导入任务和收尾验证，不重新执行已关闭的安全修复。

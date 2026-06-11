@@ -23,9 +23,9 @@ async def test_health_check(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_novels_list_empty(client: AsyncClient):
+async def test_novels_list_empty(auth_client: AsyncClient):
     """测试空数据库下的小说列表"""
-    response = await client.get("/api/novels")
+    response = await auth_client.get("/api/novels")
     assert response.status_code == 200
     data = response.json()
     assert "items" in data
@@ -35,9 +35,9 @@ async def test_novels_list_empty(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_models_list_empty(client: AsyncClient):
+async def test_models_list_empty(auth_client: AsyncClient):
     """测试空数据库下的模型列表"""
-    response = await client.get("/api/models")
+    response = await auth_client.get("/api/models")
     assert response.status_code == 200
     data = response.json()
     assert isinstance(data, list)
@@ -45,21 +45,21 @@ async def test_models_list_empty(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_analysis_not_implemented(client: AsyncClient):
+async def test_analysis_not_implemented(auth_client: AsyncClient):
     """测试占位端点返回 501"""
-    response = await client.post("/api/analysis/1/analyze")
+    response = await auth_client.post("/api/analysis/1/analyze")
     assert response.status_code == 501
 
 
 @pytest.mark.asyncio
-async def test_timeline_not_implemented(client: AsyncClient):
+async def test_timeline_not_implemented(auth_client: AsyncClient):
     """测试时间线提取端点返回 501"""
-    response = await client.post("/api/timeline/1/extract")
+    response = await auth_client.post("/api/timeline/1/extract")
     assert response.status_code == 501
 
 
 @pytest.mark.asyncio
-async def test_characters_not_implemented(client: AsyncClient):
+async def test_characters_not_implemented(auth_client: AsyncClient):
     """测试人物抽取端点返回 501"""
-    response = await client.post("/api/characters/1/extract")
+    response = await auth_client.post("/api/characters/1/extract")
     assert response.status_code == 501

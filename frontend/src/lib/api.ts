@@ -24,8 +24,25 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || "/api";
 export const api = axios.create({
   baseURL: API_BASE,
   timeout: 30000,
+  withCredentials: true,
   headers: { "Content-Type": "application/json" },
 });
+
+export interface AuthUser {
+  id: number;
+  username: string;
+  email: string;
+  is_active: boolean;
+}
+
+export const authApi = {
+  me: () => api.get<AuthUser>("/auth/me"),
+  login: (username: string, password: string) =>
+    api.post("/auth/login", { username, password }),
+  register: (username: string, email: string, password: string) =>
+    api.post<AuthUser>("/auth/register", { username, email, password }),
+  logout: () => api.post("/auth/logout"),
+};
 
 // ==================== 小说 API ====================
 
@@ -49,6 +66,7 @@ export interface Chapter {
   novel_id: number;
   chapter_number: number;
   title: string;
+  content: string;       // 章节完整正文内容
   summary?: string;
   word_count: number;
   created_at: string;
@@ -73,6 +91,14 @@ export interface NovelUploadResponse {
   word_count: number;
 }
 
+/** 导入进度状态 */
+export interface ImportStatus {
+  novel_id: number;
+  stage: string;       // uploading / detecting / parsing / saving / ready / error
+  percent: number;     // 0-100
+  message: string;
+}
+
 export const novelsApi = {
   list: () => api.get<NovelListResponse>("/novels"),
   get: (id: string) => api.get<Novel>(`/novels/${id}`),
@@ -87,6 +113,9 @@ export const novelsApi = {
   getChapters: (id: string) => api.get<Chapter[]>(`/novels/${id}/chapters`),
   getChapter: (novelId: string, chapterId: string) =>
     api.get<Chapter>(`/novels/${novelId}/chapters/${chapterId}`),
+  updateProgress: (novelId: string, chapterId: number, progressPercent: number) =>
+    api.patch(`/novels/${novelId}/progress`, { chapter_id: chapterId, progress_percent: progressPercent }),
+  getImportStatus: (novelId: string) => api.get<ImportStatus>(`/novels/${novelId}/import-status`),
 };
 
 // ==================== 分析 API ====================

@@ -45,18 +45,21 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         start_time = time.perf_counter()
 
         # 提取请求元信息
-        method = request.method               # GET / POST / PUT / DELETE
-        path = request.url.path               # 请求路径，如 /api/novels
+        method = request.method  # GET / POST / PUT / DELETE
+        path = request.url.path  # 请求路径，如 /api/novels
         client_ip = request.client.host if request.client else "unknown"
 
         # 输出请求开始日志（JSON 格式，便于日志系统解析）
         logger.info(
-            json.dumps({
-                "event": "request_start",
-                "method": method,
-                "path": path,
-                "client_ip": client_ip,
-            }, ensure_ascii=False)
+            json.dumps(
+                {
+                    "event": "request_start",
+                    "method": method,
+                    "path": path,
+                    "client_ip": client_ip,
+                },
+                ensure_ascii=False,
+            )
         )
 
         # 执行后续中间件和路由处理
@@ -68,14 +71,17 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 
         # 输出请求完成日志
         logger.info(
-            json.dumps({
-                "event": "request_complete",
-                "method": method,
-                "path": path,
-                "status_code": status_code,
-                "duration_ms": duration_ms,
-                "client_ip": client_ip,
-            }, ensure_ascii=False)
+            json.dumps(
+                {
+                    "event": "request_complete",
+                    "method": method,
+                    "path": path,
+                    "status_code": status_code,
+                    "duration_ms": duration_ms,
+                    "client_ip": client_ip,
+                },
+                ensure_ascii=False,
+            )
         )
 
         return response
@@ -117,8 +123,8 @@ def setup_logging(debug: bool = False):
     root_logger.addHandler(console_handler)
 
     # 降低第三方库日志级别，减少噪音
-    logging.getLogger("uvicorn.access").setLevel(logging.WARNING)      # uvicorn 访问日志
-    logging.getLogger("sqlalchemy.engine").setLevel(                    # SQL 语句
+    logging.getLogger("uvicorn.access").setLevel(logging.WARNING)  # uvicorn 访问日志
+    logging.getLogger("sqlalchemy.engine").setLevel(  # SQL 语句
         logging.WARNING if not debug else logging.INFO
     )
-    logging.getLogger("httpx").setLevel(logging.WARNING)               # httpx HTTP 客户端
+    logging.getLogger("httpx").setLevel(logging.WARNING)  # httpx HTTP 客户端

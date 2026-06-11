@@ -13,13 +13,14 @@
 """
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
 class AnalysisRequest(BaseModel):
     """发起分析请求"""
+
     novel_id: int = Field(..., description="小说 ID")
     analysis_type: str = Field(
         default="plot_summary",
@@ -33,21 +34,23 @@ class AnalysisRequest(BaseModel):
 
 class AnalysisResponse(BaseModel):
     """整本书的分析结果响应"""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
     novel_id: int
     analysis_type: str
     result_data: Dict[str, Any] = Field(default_factory=dict)  # 结构化分析结果
-    model_used: Optional[str] = None             # 使用的 AI 模型
-    prompt_tokens: Optional[int] = None          # 输入 token 数
-    completion_tokens: Optional[int] = None      # 输出 token 数
+    model_used: Optional[str] = None  # 使用的 AI 模型
+    prompt_tokens: Optional[int] = None  # 输入 token 数
+    completion_tokens: Optional[int] = None  # 输出 token 数
     created_at: datetime
     updated_at: datetime
 
 
 class ChapterAnalysisResponse(BaseModel):
     """章节级分析结果响应"""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int

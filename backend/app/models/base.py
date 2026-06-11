@@ -24,6 +24,7 @@ class Base(DeclarativeBase):
     - 通过 Base.metadata.create_all() 可快速建表（开发用）
     - Alembic 迁移通过 Base.metadata 自动生成 DDL
     """
+
     pass
 
 
@@ -42,13 +43,13 @@ class TimestampMixin:
     """
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),    # 带时区的日期时间
+        DateTime(timezone=True),  # 带时区的日期时间
         server_default=func.now(),  # 数据库层面的默认值（不依赖 Python）
         nullable=False,
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
-        onupdate=func.now(),        # 每次 UPDATE 时自动刷新
+        onupdate=func.now(),  # 每次 UPDATE 时自动刷新
         nullable=False,
     )

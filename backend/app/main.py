@@ -17,13 +17,13 @@ NovelMind 后端 - FastAPI ASGI 应用入口
 
 import logging
 from contextlib import asynccontextmanager
+from sqlalchemy.engine import make_url
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from starlette.middleware.base import BaseHTTPMiddleware
 
-from app.api import novels, analysis, timeline, characters, fanfiction, models
+from app.api import novels, analysis, timeline, characters, fanfiction, models, auth
 from app.config import settings
 from app.core.logging import RequestLoggingMiddleware, setup_logging
 
@@ -45,7 +45,10 @@ async def lifespan(app: FastAPI):
     """
     setup_logging(debug=settings.debug)
     logger.info("NovelMind API 启动中...")
-    logger.info(f"  数据库: {settings.database_url[:50]}...")
+    logger.info(
+        "  数据库: %s",
+        make_url(settings.database_url).render_as_string(hide_password=True),
+    )
     logger.info(f"  调试模式: {settings.debug}")
     logger.info("服务就绪 ✓")
     yield
@@ -54,11 +57,11 @@ async def lifespan(app: FastAPI):
 
 # 创建 FastAPI 应用实例
 app = FastAPI(
-    title="NovelMind API",                          # Swagger UI 标题
-    description="AI 辅助小说创作与理解平台",           # API 描述
-    version="0.1.0",                                 # 版本号
-    lifespan=lifespan,                               # 生命周期管理
-    redirect_slashes=False,                          # 禁用自动斜杠重定向（由中间件处理）
+    title="NovelMind API",  # Swagger UI 标题
+    description="AI 辅助小说创作与理解平台",  # API 描述
+    version="0.1.0",  # 版本号
+    lifespan=lifespan,  # 生命周期管理
+    redirect_slashes=False,  # 禁用自动斜杠重定向（由中间件处理）
 )
 
 
@@ -106,6 +109,7 @@ app.add_middleware(
 
 # ── 全局异常处理 ──
 
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     """
@@ -136,6 +140,7 @@ async def value_error_handler(request: Request, exc: ValueError):
 
 # ── 注册 API 路由 ──
 # 每个路由模块负责一个业务领域，prefix 定义 URL 前缀，tags 用于 Swagger 分组
+app.include_router(auth.router, prefix="/api/auth", tags=["认证"])
 app.include_router(novels.router, prefix="/api/novels", tags=["小说管理"])
 app.include_router(analysis.router, prefix="/api/analysis", tags=["剧情分析"])
 app.include_router(timeline.router, prefix="/api/timeline", tags=["时间线"])

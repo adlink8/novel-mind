@@ -19,7 +19,7 @@
 
 "use client";
 
-import React, { useCallback, useState, useRef } from "react";
+import React, { useCallback, useState, useRef, useEffect } from "react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
   DialogDescription, DialogTrigger, DialogClose,
@@ -34,6 +34,17 @@ interface NovelUploadDialogProps {
 
 type UploadStatus = "idle" | "uploading" | "success" | "error";
 
+/** 导入阶段中文映射 */
+const STAGE_LABELS: Record<string, string> = {
+  uploading: "正在接收文件...",
+  detecting: "正在检测编码...",
+  parsing: "正在解析章节...",
+  saving: "正在保存到数据库...",
+  ready: "导入完成",
+  error: "导入失败",
+  unknown: "处理中...",
+};
+
 export function NovelUploadDialog({
   children,
   onUploadComplete,
@@ -42,18 +53,32 @@ export function NovelUploadDialog({
   const [file, setFile] = useState<File | null>(null);
   const [status, setStatus] = useState<UploadStatus>("idle");
   const [progress, setProgress] = useState(0);
+  const [stageMessage, setStageMessage] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [dragOver, setDragOver] = useState(false);
+  const [novelId, setNovelId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  /** 清理轮询定时器 */
+  const clearPollTimer = useCallback(() => {
+    if (pollTimerRef.current) {
+      clearInterval(pollTimerRef.current);
+      pollTimerRef.current = null;
+    }
+  }, []);
 
   /** 重置所有状态（关闭对话框时调用） */
   const reset = useCallback(() => {
     setFile(null);
     setStatus("idle");
     setProgress(0);
+    setStageMessage("");
     setErrorMsg("");
     setDragOver(false);
-  }, []);
+    setNovelId(null);
+    clearPollTimer();
+  }, [clearPollTimer]);
 
   /** 校验文件格式和大小 */
   const validateFile = useCallback((f: File): boolean => {
@@ -115,42 +140,57 @@ export function NovelUploadDialog({
     [handleFileSelect]
   );
 
+  /** 轮询导入进度 */
+  const startPolling = useCallback((id: string) => {
+    clearPollTimer();
+    pollTimerRef.current = setInterval(async () => {
+      try {
+        const res = await novelsApi.getImportStatus(id);
+        const data = res.data;
+        setProgress(data.percent);
+        setStageMessage(STAGE_LABELS[data.stage] || data.message || "处理中...");
+
+        if (data.stage === "ready" || data.stage === "error") {
+          clearPollTimer();
+          if (data.stage === "ready") {
+            setStatus("success");
+            setTimeout(() => {
+              setOpen(false);
+              reset();
+            }, 800);
+          }
+        }
+      } catch {
+        // 轮询失败不中断，继续尝试
+      }
+    }, 500);
+  }, [clearPollTimer, reset]);
+
   /** 执行上传 */
   const handleUpload = useCallback(async () => {
     if (!file) return;
     setStatus("uploading");
-    setProgress(0);
-
-    // 模拟进度条（实际上传是单次请求，无法获取真实进度）
-    const progressInterval = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 90) {
-          clearInterval(progressInterval);
-          return 90;
-        }
-        return prev + Math.random() * 15;
-      });
-    }, 300);
+    setProgress(5);
+    setStageMessage(STAGE_LABELS.uploading);
 
     try {
       const res = await novelsApi.upload(file);
-      clearInterval(progressInterval);
-      setProgress(100);
-      setStatus("success");
-      onUploadComplete?.(res.data);
-      // 成功后 1 秒自动关闭
-      setTimeout(() => {
-        setOpen(false);
-        reset();
-      }, 1000);
+      const data = res.data;
+      setNovelId(String(data.id));
+      setProgress(50);
+      setStageMessage(STAGE_LABELS.parsing);
+
+      // 上传完成后开始轮询后端实际进度
+      startPolling(String(data.id));
+      onUploadComplete?.(data);
     } catch (err) {
-      clearInterval(progressInterval);
+      clearPollTimer();
       const message = err instanceof Error ? err.message : "上传失败，请重试";
       setErrorMsg(message);
       setStatus("error");
       setProgress(0);
     }
-  }, [file, onUploadComplete, reset]);
+  }, [file, onUploadComplete, clearPollTimer, startPolling]);
 
   /** 对话框开关控制（关闭时重置状态） */
   const handleOpenChange = useCallback(
@@ -162,6 +202,11 @@ export function NovelUploadDialog({
     },
     [reset]
   );
+
+  // 组件卸载时清理定时器
+  useEffect(() => {
+    return () => clearPollTimer();
+  }, [clearPollTimer]);
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -208,7 +253,7 @@ export function NovelUploadDialog({
             ) : (
               <div className="text-center">
                 <p className="text-sm font-medium">{"拖拽文件到这里，或点击选择文件"}</p>
-                <p className="text-xs text-muted-foreground mt-1">{"支持 .txt 格式，最大 50MB"}</p>
+                <p className="text-xs text-muted-foreground mt-1">{"支持 .txt 格式，最大 50MB（自动检测 UTF-8 / GBK / Big5 等编码）"}</p>
               </div>
             )}
           </div>
@@ -223,7 +268,7 @@ export function NovelUploadDialog({
                 />
               </div>
               <p className="text-xs text-center text-muted-foreground">
-                {"上传中..."} {Math.round(progress)}%
+                {stageMessage || "上传中..."} {Math.round(progress)}%
               </p>
             </div>
           )}
@@ -232,7 +277,7 @@ export function NovelUploadDialog({
           {status === "success" && (
             <div className="flex items-center justify-center gap-2 rounded-lg bg-green-50 border border-green-200 p-3 text-sm text-green-700">
               <span>{"✅"}</span>
-              <span>{"上传成功！正在解析小说..."}</span>
+              <span>{"导入成功！"}</span>
             </div>
           )}
 
@@ -253,7 +298,7 @@ export function NovelUploadDialog({
               onClick={handleUpload}
               disabled={!file || status === "uploading"}
             >
-              {status === "uploading" ? "上传中..." : "开始上传"}
+              {status === "uploading" ? "处理中..." : "开始上传"}
             </Button>
           </div>
         </div>

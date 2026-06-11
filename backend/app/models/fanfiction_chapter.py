@@ -25,6 +25,7 @@ class FanFictionChapter(TimestampMixin, Base):
     支持多次 AI 生成（每次生成一个章节），
     记录生成所用模型、风格评分、RAG 上下文。
     """
+
     __tablename__ = "fanfiction_chapters"
 
     # 主键
@@ -32,22 +33,30 @@ class FanFictionChapter(TimestampMixin, Base):
 
     # 外键：关联到同人文
     fanfiction_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("fan_fictions.id", ondelete="CASCADE"),
-        nullable=False, index=True,
+        Integer,
+        ForeignKey("fan_fictions.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
 
     # 章节内容
-    chapter_number: Mapped[int] = mapped_column(Integer, nullable=False)              # 章节序号
-    title: Mapped[str] = mapped_column(String(200), default="")                       # 章节标题
-    content: Mapped[str | None] = mapped_column(Text)                                 # 章节正文
+    chapter_number: Mapped[int] = mapped_column(Integer, nullable=False)  # 章节序号
+    title: Mapped[str] = mapped_column(String(200), default="")  # 章节标题
+    content: Mapped[str | None] = mapped_column(Text)  # 章节正文
 
     # AI 生成元数据
-    ai_generated: Mapped[bool] = mapped_column(Boolean, default=False)                # 是否为 AI 生成（vs 用户手写）
-    model_used: Mapped[str | None] = mapped_column(String(100))                       # 使用的 AI 模型标识
-    style_score: Mapped[float | None] = mapped_column(Float)                          # 风格一致性评分（0-100，对比原作）
+    ai_generated: Mapped[bool] = mapped_column(
+        Boolean, default=False
+    )  # 是否为 AI 生成（vs 用户手写）
+    model_used: Mapped[str | None] = mapped_column(String(100))  # 使用的 AI 模型标识
+    style_score: Mapped[float | None] = mapped_column(
+        Float
+    )  # 风格一致性评分（0-100，对比原作）
 
     # RAG 上下文
-    rag_context: Mapped[dict | None] = mapped_column(JSON, default=dict)              # 生成时的 RAG 参考段落
+    rag_context: Mapped[dict | None] = mapped_column(
+        JSON, default=dict
+    )  # 生成时的 RAG 参考段落
 
     # 统计
-    word_count: Mapped[int] = mapped_column(Integer, default=0)                       # 章节字数
+    word_count: Mapped[int] = mapped_column(Integer, default=0)  # 章节字数

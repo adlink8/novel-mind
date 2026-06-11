@@ -10,20 +10,22 @@
   DELETE /api/timeline/events/{event_id}    - 删除时间线事件 -> 501
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
-router = APIRouter()
+from app.core.security import require_user
+
+router = APIRouter(dependencies=[Depends(require_user)])
 
 
 @router.get("/{novel_id}")
-async def get_timeline(novel_id: str):
+async def get_timeline(novel_id: int):
     """获取小说时间线（事件列表，按 sort_order 排序）"""
     # TODO: 从 timeline_events 表查询
     return []
 
 
 @router.post("/{novel_id}/extract")
-async def extract_timeline(novel_id: str):
+async def extract_timeline(novel_id: int):
     """AI 自动提取时间线事件（LLM 从全文抽取事件 + 因果链）"""
     raise HTTPException(status_code=501, detail="时间线事件抽取尚未实现")
 

@@ -28,6 +28,7 @@ class TimelineEvent(TimestampMixin, Base):
 
     与 Chapter 的关系: 一个章节可能包含多个事件，一个事件通常属于一个章节。
     """
+
     __tablename__ = "timeline_events"
 
     # 主键
@@ -35,20 +36,28 @@ class TimelineEvent(TimestampMixin, Base):
 
     # 外键关联
     novel_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("novels.id", ondelete="CASCADE"),
-        nullable=False, index=True,
+        Integer,
+        ForeignKey("novels.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
     chapter_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("chapters.id", ondelete="SET NULL")
     )  # 关联章节（可选，章节删除时设为 NULL）
 
     # 事件信息
-    event_title: Mapped[str] = mapped_column(String(200), nullable=False)             # 事件标题
-    event_description: Mapped[str | None] = mapped_column(Text)                       # 事件详细描述
-    event_type: Mapped[str] = mapped_column(String(50), default="plot")               # 事件类型
-    sort_order: Mapped[float] = mapped_column(Float, default=0.0)                     # 排序权重（越小越靠前）
+    event_title: Mapped[str] = mapped_column(String(200), nullable=False)  # 事件标题
+    event_description: Mapped[str | None] = mapped_column(Text)  # 事件详细描述
+    event_type: Mapped[str] = mapped_column(String(50), default="plot")  # 事件类型
+    sort_order: Mapped[float] = mapped_column(
+        Float, default=0.0
+    )  # 排序权重（越小越靠前）
 
     # 关联信息
-    characters_involved: Mapped[str | None] = mapped_column(Text)                     # 涉及角色（JSON 数组字符串）
-    location: Mapped[str | None] = mapped_column(String(200))                         # 事件发生地点
-    time_reference: Mapped[str | None] = mapped_column(String(200))                   # 时间参考（"第3天", "一年后"）
+    characters_involved: Mapped[str | None] = mapped_column(
+        Text
+    )  # 涉及角色（JSON 数组字符串）
+    location: Mapped[str | None] = mapped_column(String(200))  # 事件发生地点
+    time_reference: Mapped[str | None] = mapped_column(
+        String(200)
+    )  # 时间参考（"第3天", "一年后"）

@@ -22,13 +22,13 @@ from alembic import context
 # 导入所有模型，使 Alembic 可以检测到它们
 # Base 包含所有通过 SQLAlchemy 定义的表结构
 from app.models import Base  # noqa: F401
+from app.config import settings
 
 # Alembic 配置对象，读取 alembic.ini 中的配置项
 config = context.config
 
 # 从应用配置中读取数据库 URL，并转换为同步驱动
 # 原因: Alembic 不支持异步驱动，需要将 asyncpg 替换为 psycopg2
-from app.config import settings
 _sync_url = settings.database_url.replace("+asyncpg", "+psycopg2")
 config.set_main_option("sqlalchemy.url", _sync_url)
 

@@ -11,31 +11,33 @@
   POST /api/analysis/{novel_id}/analyze/stream     - 流式分析（SSE）-> 501
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
-router = APIRouter()
+from app.core.security import require_user
+
+router = APIRouter(dependencies=[Depends(require_user)])
 
 
 @router.post("/{novel_id}/analyze")
-async def analyze_novel(novel_id: str):
+async def analyze_novel(novel_id: int):
     """对整本小说进行 AI 分析（摘要、人物、伏笔、叙事结构）"""
     raise HTTPException(status_code=501, detail="AI 剧情分析尚未实现")
 
 
 @router.get("/{novel_id}")
-async def get_analysis(novel_id: str):
+async def get_analysis(novel_id: int):
     """获取已有分析结果"""
     # TODO: 从 analysis_results 表查询
     return {"novel_id": novel_id, "status": "not_analyzed"}
 
 
 @router.post("/{novel_id}/chapters/{chapter_id}/analyze")
-async def analyze_chapter(novel_id: str, chapter_id: str):
+async def analyze_chapter(novel_id: int, chapter_id: int):
     """分析单个章节（摘要、情感、人物出场）"""
     raise HTTPException(status_code=501, detail="章节级分析尚未实现")
 
 
 @router.post("/{novel_id}/analyze/stream")
-async def analyze_novel_stream(novel_id: str):
+async def analyze_novel_stream(novel_id: int):
     """流式输出分析过程（SSE，实时展示 AI 分析进度）"""
     raise HTTPException(status_code=501, detail="流式剧情分析尚未实现")

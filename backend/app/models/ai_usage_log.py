@@ -29,26 +29,33 @@ class AIUsageLog(TimestampMixin, Base):
     每次 AI 调用（chat、embedding、stream_chat）都应写入一条日志，
     用于前端"用量概览"面板和成本监控。
     """
+
     __tablename__ = "ai_usage_logs"
 
     # 主键
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
 
     # 调用信息
-    model_name: Mapped[str] = mapped_column(String(100), nullable=False, index=True)  # 模型名称
-    provider: Mapped[str] = mapped_column(String(50), default="openai")               # 提供商
+    model_name: Mapped[str] = mapped_column(
+        String(100), nullable=False, index=True
+    )  # 模型名称
+    provider: Mapped[str] = mapped_column(String(50), default="openai")  # 提供商
     task_type: Mapped[str] = mapped_column(
         String(50), nullable=False, index=True
     )  # 任务类型: analysis / embedding / fanfiction / nlp / summary / timeline
 
     # Token 用量
-    input_tokens: Mapped[int] = mapped_column(Integer, default=0)                    # 输入 token 数
-    output_tokens: Mapped[int] = mapped_column(Integer, default=0)                   # 输出 token 数
-    cost_usd: Mapped[float] = mapped_column(Float, default=0.0)                      # 费用（美元）
+    input_tokens: Mapped[int] = mapped_column(Integer, default=0)  # 输入 token 数
+    output_tokens: Mapped[int] = mapped_column(Integer, default=0)  # 输出 token 数
+    cost_usd: Mapped[float] = mapped_column(Float, default=0.0)  # 费用（美元）
 
     # 性能指标
-    latency_ms: Mapped[int] = mapped_column(Integer, default=0)                      # 响应延迟（毫秒）
+    latency_ms: Mapped[int] = mapped_column(Integer, default=0)  # 响应延迟（毫秒）
 
     # 关联信息
-    novel_id: Mapped[int | None] = mapped_column(Integer, index=True)                # 关联小说 ID（可选）
-    status: Mapped[str] = mapped_column(String(20), default="success")               # 调用状态: success / failed / timeout
+    novel_id: Mapped[int | None] = mapped_column(
+        Integer, index=True
+    )  # 关联小说 ID（可选）
+    status: Mapped[str] = mapped_column(
+        String(20), default="success"
+    )  # 调用状态: success / failed / timeout

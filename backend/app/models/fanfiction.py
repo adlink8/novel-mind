@@ -29,6 +29,7 @@ class FanFiction(TimestampMixin, Base):
     parent_chapter_id 指定从原作哪个章节开始续写，
     结合 RAG 检索该章节前后的相关段落作为上下文。
     """
+
     __tablename__ = "fan_fictions"
 
     # 主键
@@ -36,20 +37,24 @@ class FanFiction(TimestampMixin, Base):
 
     # 外键：关联到原作小说
     novel_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("novels.id", ondelete="CASCADE"),
-        nullable=False, index=True,
+        Integer,
+        ForeignKey("novels.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
 
     # 创作信息
-    title: Mapped[str] = mapped_column(String(200), nullable=False)                   # 同人文标题
-    prompt: Mapped[str] = mapped_column(Text, nullable=False)                         # 用户输入的续写提示/创作要求
-    content: Mapped[str | None] = mapped_column(Text)                                 # AI 生成的完整内容
-    style_config: Mapped[str | None] = mapped_column(Text)                            # 风格配置（JSON 字符串）
+    title: Mapped[str] = mapped_column(String(200), nullable=False)  # 同人文标题
+    prompt: Mapped[str] = mapped_column(
+        Text, nullable=False
+    )  # 用户输入的续写提示/创作要求
+    content: Mapped[str | None] = mapped_column(Text)  # AI 生成的完整内容
+    style_config: Mapped[str | None] = mapped_column(Text)  # 风格配置（JSON 字符串）
 
     # 状态与统计
-    word_count: Mapped[int] = mapped_column(Integer, default=0)                       # 已生成字数
-    status: Mapped[str] = mapped_column(String(20), default="draft")                  # 生成状态
-    model_used: Mapped[str | None] = mapped_column(String(100))                       # 使用的 AI 模型
+    word_count: Mapped[int] = mapped_column(Integer, default=0)  # 已生成字数
+    status: Mapped[str] = mapped_column(String(20), default="draft")  # 生成状态
+    model_used: Mapped[str | None] = mapped_column(String(100))  # 使用的 AI 模型
 
     # 续写起点
     parent_chapter_id: Mapped[int | None] = mapped_column(

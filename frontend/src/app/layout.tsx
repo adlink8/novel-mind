@@ -16,6 +16,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Inter } from "next/font/google";
 import { cn } from "@/lib/utils";
+import { AuthGate } from "@/components/auth-gate";
 
 const inter = Inter({subsets:["latin"], variable:"--font-sans"});
 
@@ -32,6 +33,7 @@ export default function RootLayout({
   return (
     <html lang="zh-CN" className={cn("font-sans", inter.variable)}>
       <body className="min-h-screen bg-background font-sans antialiased">
+        <AuthGate>
         <div className="flex h-screen">
           {/* 侧边栏导航（桌面端可见） */}
           <aside className="hidden md:flex w-64 flex-col border-r bg-card">
@@ -55,6 +57,7 @@ export default function RootLayout({
             {children}
           </main>
         </div>
+        </AuthGate>
       </body>
     </html>
   );

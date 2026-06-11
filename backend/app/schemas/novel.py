@@ -22,8 +22,10 @@ from pydantic import BaseModel, ConfigDict, Field
 
 # ─────────── 小说 ───────────
 
+
 class NovelCreate(BaseModel):
     """创建小说请求（手动录入元信息，非文件上传场景）"""
+
     title: str = Field(..., min_length=1, max_length=200, description="小说标题")
     author: Optional[str] = Field(None, max_length=100, description="作者")
     description: Optional[str] = Field(None, description="简介")
@@ -33,6 +35,7 @@ class NovelCreate(BaseModel):
 
 class NovelUpdate(BaseModel):
     """更新小说信息请求（所有字段可选，仅更新传入的字段）"""
+
     title: Optional[str] = Field(None, min_length=1, max_length=200)
     author: Optional[str] = Field(None, max_length=100)
     description: Optional[str] = None
@@ -40,8 +43,13 @@ class NovelUpdate(BaseModel):
     cover_url: Optional[str] = Field(None, max_length=500)
 
 
-class ChapterResponse(BaseModel):
-    """章节详情响应（不含完整 content，阅读页单独获取）"""
+class ChapterSummaryResponse(BaseModel):
+    """
+    章节摘要响应（不含完整 content，用于章节列表）。
+
+    安全设计: 列表接口不返回完整正文，避免大 payload。
+    """
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -49,13 +57,36 @@ class ChapterResponse(BaseModel):
     chapter_number: int
     title: str
     word_count: int
-    summary: Optional[str] = None              # AI 生成的章节摘要（Phase 3）
+    summary: Optional[str] = None  # AI 生成的章节摘要（Phase 3）
+    created_at: datetime
+    updated_at: datetime
+
+
+class ChapterResponse(BaseModel):
+    """章节详情响应（含完整 content，用于阅读页）"""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    novel_id: int
+    chapter_number: int
+    title: str
+    content: str  # 章节完整正文内容
+    word_count: int
+    summary: Optional[str] = None  # AI 生成的章节摘要（Phase 3）
     created_at: datetime
     updated_at: datetime
 
 
 class NovelResponse(BaseModel):
-    """小说详情响应（含完整章节列表，用于小说详情页）"""
+    """
+    小说详情响应（含章节摘要列表，用于小说详情页）。
+
+    安全设计:
+      - 不返回 source_path（服务端文件路径泄露风险）
+      - chapters 使用 ChapterSummaryResponse（不含 content），避免大 payload
+    """
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -67,10 +98,10 @@ class NovelResponse(BaseModel):
     chapter_count: int = 0
     word_count: int = 0
     status: str
-    source_path: Optional[str] = None
+    reading_progress: Optional[dict] = None  # 阅读进度
     created_at: datetime
     updated_at: datetime
-    chapters: List[ChapterResponse] = []       # 关联的章节列表（通过 selectin 预加载）
+    chapters: List[ChapterSummaryResponse] = []  # 关联的章节摘要列表
 
 
 class NovelListResponse(BaseModel):
@@ -79,6 +110,7 @@ class NovelListResponse(BaseModel):
 
     与 NovelResponse 的区别: 不含 chapters 列表，减少数据传输量。
     """
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -96,9 +128,43 @@ class NovelListResponse(BaseModel):
 
 class NovelUploadResponse(BaseModel):
     """小说上传结果响应（含处理状态和统计信息）"""
-    id: int                                      # 新创建的小说 ID
-    title: str                                   # 小说标题（从文件名提取）
-    status: str = Field(..., description="处理状态: importing / chunking / embedding / ready")
+
+    id: int  # 新创建的小说 ID
+    title: str  # 小说标题（从文件名提取）
+    status: str = Field(
+        ..., description="处理状态: importing / chunking / embedding / ready"
+    )
     message: str = Field(default="文件已上传，正在处理中...")
-    chapter_count: int = 0                       # 解析出的章节数
-    word_count: int = 0                          # 总字数
+    chapter_count: int = 0  # 解析出的章节数
+    word_count: int = 0  # 总字数
+
+
+class ReadingProgressUpdate(BaseModel):
+    """更新阅读进度请求"""
+
+    chapter_id: int = Field(..., description="当前阅读到的章节ID")
+    progress_percent: float = Field(
+        ..., ge=0, le=100, description="阅读进度百分比 0-100"
+    )
+
+
+class ReadingProgressResponse(BaseModel):
+    """阅读进度响应"""
+
+    novel_id: int
+    chapter_id: int
+    progress_percent: float
+    chapter_title: Optional[str] = None
+    updated_at: Optional[datetime] = None
+
+
+class ImportStatusResponse(BaseModel):
+    """小说导入状态响应（用于前端轮询进度）"""
+
+    novel_id: int
+    stage: str = Field(
+        ...,
+        description="当前阶段: uploading / detecting / parsing / saving / ready / error",
+    )
+    percent: int = Field(..., ge=0, le=100, description="进度百分比 0-100")
+    message: str = Field(default="", description="阶段描述信息")

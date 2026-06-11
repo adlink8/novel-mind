@@ -10,7 +10,6 @@ pytest 配置文件
   .venv/Scripts/python.exe -m pytest -v
 """
 
-import pytest
 import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
@@ -27,7 +26,9 @@ import app.models  # noqa: F401
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
 engine = create_async_engine(TEST_DATABASE_URL, echo=False)
-TestSessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+TestSessionLocal = async_sessionmaker(
+    engine, class_=AsyncSession, expire_on_commit=False
+)
 
 
 # 为 SQLite 启用外键支持（SQLite 默认不强制外键约束）
@@ -59,6 +60,7 @@ async def client(db_session: AsyncSession):
 
     覆盖 get_db 依赖注入，使用测试数据库会话。
     """
+
     async def override_get_db():
         yield db_session
 
@@ -69,3 +71,37 @@ async def client(db_session: AsyncSession):
         yield ac
 
     fastapi_app.dependency_overrides.clear()
+
+
+@pytest_asyncio.fixture
+async def auth_client(client: AsyncClient):
+    """
+    已认证的测试客户端。
+
+    自动注册测试用户并登录，所有请求携带 Bearer Token。
+    """
+    # 注册测试用户
+    register_resp = await client.post(
+        "/api/auth/register",
+        json={
+            "username": "testuser",
+            "email": "test@example.com",
+            "password": "testpass123",
+        },
+    )
+    # 如果用户已存在（幂等），继续登录
+    if register_resp.status_code not in (201, 400):
+        register_resp.raise_for_status()
+
+    # 登录获取 Token
+    login_resp = await client.post(
+        "/api/auth/login",
+        json={"username": "testuser", "password": "testpass123"},
+    )
+    assert login_resp.status_code == 200
+    token = login_resp.json()["access_token"]
+
+    # 设置默认请求头
+    client.headers["Authorization"] = f"Bearer {token}"
+    yield client
+    del client.headers["Authorization"]

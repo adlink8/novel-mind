@@ -1,5 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  agentRules: false,
+  allowedDevOrigins: ["127.0.0.1"],
   // 代理后端 API，避免跨域
   async rewrites() {
     return [

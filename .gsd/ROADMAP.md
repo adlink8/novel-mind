@@ -1,39 +1,37 @@
 # Roadmap: NovelMind
 
-## Active Milestone
+## Milestones
 
-v0.1 - 审计与启动修复
+- [x] v0.1 审计与启动修复 - 建立可信实现基线和启动级契约。
+- [ ] v0.2 安全与架构修复 - 关闭安全、迁移、路由、依赖和导入可靠性阻断项。
+- [ ] v0.3 小说导入 + RAG 索引 - 在 v0.2 门槛通过后激活。
 
-## Phases
+第一个 active milestone 已按要求设为并完成“审计与启动修复”。当前 active milestone 为 v0.2。
 
-- [x] Phase 1: 审计与启动修复 - 建立可信基线，修复启动级契约问题，让后续 GSD 自动执行从正确位置开始。
+## v0.2 Plans
 
-## Phase Details
+- [x] 02-01: 仓库与上传边界修复
+- [x] 02-02: 认证、SSRF 与密钥保护
+- [ ] 02-03: 持久化导入任务与里程碑收尾
 
-### Phase 1: 审计与启动修复
+## v0.2 Success Criteria
 
-**Goal**: 让仓库从“文档声称完成”转为“代码状态可信、基础链路可验证、占位功能不误导”。
-
-**Depends on**: Nothing
-
-**Requirements**: REQ-AUDIT-01, REQ-AUDIT-02, REQ-AUDIT-03, REQ-AUDIT-04, REQ-AUDIT-05
-
-**Success Criteria**:
-1. `IMPLEMENTATION-STATUS.md` 反映实际代码状态，并按 VERIFIED / PARTIAL / MISSING 分类。
-2. 前端书架和 AI 设置不再因 API 契约错误而基础失败。
-3. 未实现 API 明确返回未实现状态或真实空状态，不伪装成功生成结果。
-4. 有一组本地命令能验证后端导入链路、前端类型/build 和关键契约。
-5. 项目状态文档不再声明未经验证的完成状态。
-
-**Plans**: 3 plans
-
-Plans:
-- [x] 01-01: 审计基线与状态校准
-- [x] 01-02: 前后端契约启动修复
-- [x] 01-03: 验证脚本与文档状态修正
+1. Git/secret、上传路径、未授权访问、SSRF 和密钥存储测试通过。 VERIFIED
+2. PostgreSQL Alembic upgrade/current/check 通过。 VERIFIED
+3. Next.js 输出 `/novels/[id]`，集合响应不包含正文或 `source_path`。 VERIFIED
+4. backend/frontend tests、build、lint、CI 和依赖审计通过。 VERIFIED
+5. 导入任务有持久 job、并发安全状态机、幂等重试和重启恢复。 MISSING
 
 ## Progress
 
-| Phase | Plans Complete | Status | Completed |
-|---|---:|---|---|
-| 1. 审计与启动修复 | 3/3 | Complete | 2026-06-06 |
+| Milestone | Plans Complete | Status |
+|---|---:|---|
+| v0.1 审计与启动修复 | 3/3 | Complete |
+| v0.2 安全与架构修复 | 2/3 | Active |
+| v0.3 小说导入 + RAG 索引 | 0/TBD | Backlog |
+
+## Auto Start
+
+`/gsd auto` must start from:
+
+`.gsd/phases/02-security-and-architecture-remediation/02-03-PLAN.md`
