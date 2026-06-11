@@ -45,3 +45,7 @@ Thumbs.db                     # Windows 缩略图缓存
 test_*.txt                    # 测试生成的文本文件
 nul                           # Windows 空设备重定向产生的意外文件
 tsconfig.tsbuildinfo          # TypeScript 增量编译缓存
+
+# --- 后端上传的测试数据 ---
+backend/uploads/              # 后端上传目录（用户数据，不提交）
+test_novel.txt                # 根目录的测试小说文件

@@ -1,27 +1,43 @@
 # GSD Smoke Tests
 
-更新日期：2026-06-06
+更新日期：2026-06-10
 
-这些命令用于 GSD “审计与启动修复” milestone 的最小回归验证。
+这些命令用于 GSD "审计与启动修复" milestone 的最小回归验证。
 
 ## Backend
 
 在 `backend/` 执行：
 
 ```powershell
-.\.venv\Scripts\python.exe -m compileall app
-.\.venv\Scripts\python.exe -c "from app.main import app; print(app.title); print(len(app.routes))"
+# 编译检查
+.\\.venv\\Scripts\\python.exe -m compileall app
+
+# 应用导入验证
+.\\.venv\\Scripts\\python.exe -c "from app.main import app; print(app.title); print(len(app.routes))"
+
+# pytest 自动化测试（6 个冒烟测试）
+.\\.venv\\Scripts\\python.exe -m pytest tests/test_health.py -v
 ```
 
 当前结果：
 
 - `compileall app`：通过
 - `from app.main import app`：通过，输出 `NovelMind API` 和 `31`
-- Docker Compose `db`：运行中，PostgreSQL healthy
-- 临时后端 `127.0.0.1:8003`：health 通过
-- 上传 `test_novel.txt`：通过，返回 `uploaded_id=4`、`chapter_count=3`
-- 小说列表：通过，返回 `list_total=2`
-- 章节查询：通过，返回 `fetched_chapters=3`
+- `pytest tests/test_health.py`：4/6 通过
+  - ✅ test_health_check
+  - ❌ test_novels_list_empty（SQLite 兼容性问题，需 PostgreSQL 环境）
+  - ❌ test_models_list_empty（同上）
+  - ✅ test_analysis_not_implemented（501 正确返回）
+  - ✅ test_timeline_not_implemented（501 正确返回）
+  - ✅ test_characters_not_implemented（501 正确返回）
+
+Makefile 快捷命令：
+
+```bash
+make test    # 运行后端测试
+make lint    # 前端 TypeScript 类型检查
+make dev     # 启动 Docker 数据库服务
+```
 
 注意：系统全局 Python 3.14 当前未安装 `sqlalchemy`，直接运行 `python -c "from app.main import app"` 会失败。请使用 `backend/.venv/Scripts/python.exe`。
 
