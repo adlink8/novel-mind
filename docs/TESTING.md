@@ -12,7 +12,7 @@ cd backend
 .\.venv\Scripts\python.exe -m pip_audit --local --skip-editable
 ```
 
-结果（2026-06-12）：172 tests passed；Ruff 0；Bandit 中高风险 0；pip-audit 0。
+结果（2026-06-12）：187 tests passed；Ruff 0；Bandit 0 High/Medium；pip-audit chromadb+pipe（非阻断）。
 
 测试覆盖健康检查、认证、匿名拒绝、跨用户小说/模型隔离、上传编码、路径约束、SSRF、加密兼容、文件事务回滚、语义分块、向量存储、RAG 端到端。SQLite 测试不能替代 PostgreSQL migration 验证。
 

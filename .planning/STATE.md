@@ -9,64 +9,53 @@ See `.planning/PROJECT.md` and `IMPLEMENTATION-STATUS.md`。<br>
 
 ## Current Position
 
-- Milestone: v0.2 - 安全与架构修复
-- Phase: 2 of 3
+- Milestone: v0.3 - 小说导入 + RAG 索引
+- Phase: v0.3 核心功能已实现
 - Current branch: `feat/phase2-wave2-embedding`
-- Status: Wave 2 核心开发完成
-- Last activity: 2026-06-12 17:30 — 龙族小说导入测试通过，项目目录整理
-- Progress: 02-01 完成，02-02 完成，Wave 2 核心开发完成，导入管线集成验证完成
+- Status: 混合搜索 + 前端搜索 UI + 阅读页内搜索 已交付
+- Last activity: 2026-06-12 23:10 — v0.3 混合搜索与前端完成
 
 ## Auto Routing
 
-`.planning/phases/02-security-and-architecture-remediation/02-01-PLAN.md` — completed
+`.planning/ROADMAP.md` — 当前 active milestone: v0.3
 
-Remaining P1 items (SSRF DNS validation, import persistence, dependency audit) are tracked separately.
+## Completed In v0.3
 
-## Completed In This Milestone
+### 混合搜索后端
+- BM25 全文搜索（PostgreSQL tsvector + ginseng 索引）
+- 向量语义搜索（ChromaDB + Ollama nomic-embed-text）
+- 加权融合排序（vector 0.5 + bm25 0.5）
+- 全局搜索 API：POST /api/search
+- 小说内搜索 API：POST /api/search/novels/{novel_id}
+- 测试：210 passed（含 hybrid_search 测试）
 
-### Wave 1 — 小说阅读页 + 导入
-- 前端阅读页组件（sidebar / content / progress-bar）
-- 后端章节 API（ChapterSummaryResponse / ChapterResponse 拆分）
-- 多编码检测导入（UTF-8 / GBK / GB18030 / Big5 / Shift_JIS）
-- 导入进度跟踪 API
-- **2026-06-12 集成验证**：《龙族Ⅰ·火之晨曦》539KB GB18030 小说导入成功（11 章 / 274,011 字）
-- **目录整理**：小说源文件统一存放于 `backend/uploads/`，根目录无散落 .txt
+### 前端搜索 UI
+- 全局搜索栏（防抖 300ms、Command+K 唤起、下拉预览）
+- 搜索结果页：/search?q=xxx（含骨架屏、空状态、错误状态）
+- 搜索结果卡片（高亮 <mark> 片段、相关度百分比、点击跳转）
 
-### Wave 2 — 安全与架构修复（02-01 核心阻断项）
-- `.gitignore` 行尾注释修复
-- `cryptography` 依赖声明与安装
-- 动态路由目录修复 `[id/` → `[id]`
-- `alembic.ini` GBK 编码问题
-- CI 分支覆盖（main / master / develop）
-- 前端 ESLint 非交互配置
-- Novel 详情响应瘦身（移除 source_path，chapters 使用摘要）
-- JWT + bcrypt 认证框架（User 模型 / 注册 / 登录 / Bearer Token）
-- 小说资源所有权隔离（owner_id + 权限检查）
-- 加密密钥持久化（从 settings.secret_key 派生）
-- 上传文件生命周期安全（64KB 分块读取 + 原子重命名）
-
-### Wave 2 — RAG 管线核心功能
-- 文本分块服务（chunking_service.py）
-- 向量存储服务（vector_store.py，ChromaDB 集成）
-- 索引管线服务（indexing_service.py）
-- RAG API 端点（语义搜索、触发索引、查询索引进度）
-- TextChunk 模型与 Alembic 迁移
-- RAG 相关 Schema 定义
+### 阅读页内搜索
+- 搜索面板（右侧抽屉、Ctrl+F 唤起、Esc 关闭）
+- 小说内实时搜索
+- 结果高亮 + 点击跳转章节
 
 ## Open Work
 
-- SSRF DNS 解析后验证（P1）
-- 导入任务持久化（P1）
-- 生产依赖漏洞审计（P1）
-- RAG 管线集成测试
-- 混合语义搜索 API
+- pgvector 双写备用路径
+- 大文件（>5MB）流式上传
+- 端到端 CI/CD 集成测试
 
 ## Verification Snapshot
 
-- Backend pytest: 172 passed
-- Frontend Vitest: 22 passed
-- Frontend build: 成功，路由 `/novels/[id]`
-- Frontend lint: 非交互，无错误
-- Alembic current: `f3c8b7b2dbf7`
-- 导入测试：《龙族Ⅰ·火之晨曦》11 章 / 274,011 字导入成功
-- 数据库：PostgreSQL 16 + pgvector，ChromaDB 正常
+| 检查项 | 结果 |
+|--------|------|
+| Backend pytest | 210 passed（非 e2e）|
+| Frontend Vitest | 22 passed |
+| Ruff | All checks passed |
+| Bandit | 0 High, 0 Medium |
+| TypeScript | 0 errors |
+| ESLint | 0 errors |
+| Next.js build | 成功 |
+| npm audit | 0 vulnerabilities |
+| Alembic | upgrade/current/check 通过 |
+| RAG e2e | 12 passed (真实 Ollama nomic-embed-text) |

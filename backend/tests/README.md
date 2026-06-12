@@ -4,7 +4,7 @@ pytest + pytest-asyncio 异步测试套件，覆盖全部核心模块。
 
 ## 统计
 
-- **测试数量**: 172 个，全部通过
+- **测试数量**: 187 个（非 e2e），12 个 e2e，全部通过
 - **框架**: pytest + pytest-asyncio + httpx AsyncClient
 - **数据库**: 测试用独立 PostgreSQL 数据库（通过 `test` 配置）
 

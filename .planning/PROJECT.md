@@ -6,13 +6,13 @@
 
 ## Current Reality
 
-基础导入、阅读、模型配置和测试已经存在。认证授权、SSRF、文件边界、密钥保护、数据库迁移、前端路由和依赖漏洞已经修复并验证；当前门槛只剩持久化导入任务。详细证据见 `IMPLEMENTATION-STATUS.md`。
+v0.2 里程碑已全部完成。认证授权、SSRF、文件边界、密钥保护、数据库迁移、持久化导入任务（租约/幂等/取消/恢复）和依赖漏洞均已修复并验证。RAG 管线已实现（分块、embedding、向量存储、语义搜索）。当前进入 v0.3 — 小说导入 + RAG 索引的完善与前端集成。详细证据见 `IMPLEMENTATION-STATUS.md`。
 
 ## Milestone History
 
 - v0.1 审计与启动修复：完成，建立 VERIFIED / PARTIAL / MISSING 基线并修复启动级 API 契约。
-- v0.2 安全与架构修复：当前 active milestone，关闭 2026-06-11 复审发现的 P0/P1 阻断项。
-- 小说导入 + RAG 索引：保留为下一里程碑，不在安全门槛通过前自动执行。
+- v0.2 安全与架构修复：完成，关闭 2026-06-11 复审发现的 P0/P1 阻断项（3 个 Phase，全部 VERIFIED）。
+- v0.3 小说导入 + RAG 索引：当前 active milestone，在 v0.2 门槛通过后激活。
 
 ## Planning Sources
 

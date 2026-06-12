@@ -1,11 +1,11 @@
 {
   "project": "novel-mind",
-  "active_milestone": "v0.2 - 安全与架构修复",
-  "active_phase": "2",
-  "active_plan": "02-03",
+  "active_milestone": "v0.3 - 小说导入 + RAG 索引",
+  "active_phase": "3",
+  "active_plan": "03",
   "status": "ready",
   "canonical_dir": ".planning",
-  "auto_start": ".planning/phases/02-security-and-architecture-remediation/02-03-PLAN.md",
+  "auto_start": ".planning/backlog/03-novel-import-rag/03-PLAN.md",
   "documentation_ownership": {
     "human": ["README.md", "IMPLEMENTATION-STATUS.md", "docs/"],
     "ai": [".planning/"]

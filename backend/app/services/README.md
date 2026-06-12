@@ -7,7 +7,7 @@
 | 文件 | 大小 | 职责 |
 |---|---|---|
 | `novel_service.py` | 18.7 KB | **最大模块**。小说文件上传（随机文件名、根目录 containment）、GB18030 / Big5 / Shift_JIS 多编码自动检测、章节分割、CRUD、删除时文件 + DB 补偿清理 |
-| `import_service.py` | 8.2 KB | 导入任务状态机 — pending → processing → completed / failed，进度追踪，重试逻辑，异步后台任务处理 |
+| `import_service.py` | 11.3 KB | 导入任务状态机，租约并发控制（lease_id + 300s 超时），SHA-256 幂等键（content_hash），取消支持（cancel_job），重启恢复（recover_stale_jobs），异步后台任务处理 |
 | `chunking_service.py` | 10.4 KB | 文本分块 — 语义分块算法，三级分块策略（章节 / 场景 / 段落），块类型检测 |
 | `vector_store.py` | 9.1 KB | ChromaDB 向量存储封装 — 文档写入、语义搜索、集合删除 |
 | `indexing_service.py` | 11.6 KB | 索引管线 — 协调分块 + embedding 生成 + 向量存储写入，进度报告 |

@@ -25,19 +25,19 @@ The first active account becomes the bootstrap administrator and claims legacy u
 
 | Method | Path | Auth | Status | Description |
 |---|---|---|---|---|
-| POST | `/api/novels/upload` | required | PARTIAL | Synchronous TXT import; progress is process-local |
-| GET | `/api/novels` | required | VERIFIED | Owner-scoped paginated list |
-| GET | `/api/novels/{id}` | required | VERIFIED | Owner-scoped metadata and chapter summaries |
-| DELETE | `/api/novels/{id}` | required | VERIFIED | Owner-scoped delete with file/DB compensation |
-| GET | `/api/novels/{id}/chapters` | required | VERIFIED | Summaries only; no chapter body |
-| GET | `/api/novels/{id}/chapters/{chapter_id}` | required | VERIFIED | Single chapter body |
-| PATCH | `/api/novels/{id}/progress` | required | PARTIAL | Owner-isolated, but stored on Novel rather than per-user history |
-| GET | `/api/novels/{id}/import-status` | required | PARTIAL | Process-local status; not restart-safe |
-| POST | `/api/novels/{novel_id}/search` | Bearer (optional) | implemented | 语义搜索（RAG） |
-| POST | `/api/novels/{novel_id}/index` | Bearer | implemented | 触发小说索引 |
-| GET | `/api/novels/{novel_id}/index-status` | Bearer | implemented | 查询索引进度 |
-
-Cross-owner resource access returns 404. Public responses do not include `source_path` or provider secrets.
+| POST | `/api/novels/upload` | required | VERIFIED | TXT 导入，租约并发 + SHA-256 幂等 + 取消支持 |
+| GET | `/api/novels` | required | VERIFIED | 所有者隔离的分页列表 |
+| GET | `/api/novels/{id}` | required | VERIFIED | 小说元数据 + 章节摘要（无正文） |
+| GET | `/api/novels/{id}/chapters` | required | VERIFIED | 章节摘要列表（无正文） |
+| GET | `/api/novels/{id}/chapters/{ch_id}` | required | VERIFIED | 单个章节含完整正文 |
+| PATCH | `/api/novels/{id}/progress` | required | VERIFIED | 更新阅读进度 |
+| DELETE | `/api/novels/{id}` | required | VERIFIED | 删除小说（文件 + DB 补偿） |
+| GET | `/api/novels/{id}/import-status` | required | VERIFIED | 轮询导入任务状态 |
+| POST | `/api/novels/{id}/import-retry` | required | VERIFIED | 重试失败导入 |
+| POST | `/api/novels/{id}/import-cancel` | required | VERIFIED | 取消运行中的导入 |
+| POST | `/api/novels/{id}/search` | optional | VERIFIED | RAG 语义搜索 |
+| POST | `/api/novels/{id}/index` | required | VERIFIED | 触发 RAG 索引 |
+| GET | `/api/novels/{id}/index-status` | required | VERIFIED | 查询索引进度 |
 
 ## AI Models
 
