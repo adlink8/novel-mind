@@ -34,4 +34,4 @@
 
 `/gsd auto` must start from:
 
-`.gsd/phases/02-security-and-architecture-remediation/02-03-PLAN.md`
+`.planning/phases/02-security-and-architecture-remediation/02-03-PLAN.md`

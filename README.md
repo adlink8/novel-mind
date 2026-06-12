@@ -11,7 +11,7 @@ NovelMind 是一个 AI 辅助小说理解与同人创作平台。当前已具备
 - AI：LiteLLM 1.83.10+；项目支持 Python 3.11-3.13，不支持 Python 3.14
 - 安全：HttpOnly Cookie/Bearer JWT、资源所有权隔离、版本化 Fernet 加密、出站主机白名单与 DNS/IP 校验
 - 验证：后端 68 tests、前端 22 tests、生产构建、ESLint、Ruff、Bandit、pip-audit、npm audit、Alembic PostgreSQL 检查均通过
-- GSD：`.gsd/` 是唯一 AI 状态目录；下一执行入口为 `02-03`
+- GSD：`.planning/` 是唯一 AI 状态目录（GSD 工作流）；下一执行入口为 `02-03`
 
 ## Repository Layout
 
@@ -20,7 +20,7 @@ novel-mind/
 ├── backend/              FastAPI、ORM、迁移和测试
 ├── frontend/             Next.js 应用和前端测试
 ├── docs/                 面向维护者的工程与产品文档
-├── .gsd/                 AI 规划、状态和任务文档
+├── .planning/            AI 规划、状态和任务文档（GSD 工作流）
 ├── docker-compose.yml    PostgreSQL 和 Chroma 开发服务
 └── IMPLEMENTATION-STATUS.md
 ```

@@ -1,0 +1,116 @@
+{
+  "modules": {
+    "auth": {
+      "dir": "backend/app/api/auth.py",
+      "owns": ["user registration", "login/logout", "session management"],
+      "does_not_own": ["JWT signing logic", "password hashing"],
+      "depends_on": ["core/security.py", "core/database.py", "models/user.py"],
+      "test": "backend/tests/test_auth.py"
+    },
+    "novels": {
+      "dir": "backend/app/api/novels.py",
+      "owns": ["novel CRUD", "chapter listing", "upload endpoint"],
+      "does_not_own": ["file parsing", "encoding detection", "chapter splitting"],
+      "depends_on": ["services/novel_service.py", "core/security.py"],
+      "test": "backend/tests/test_novels.py"
+    },
+    "rag": {
+      "dir": "backend/app/api/rag.py",
+      "owns": ["semantic search endpoint", "index trigger", "index status"],
+      "does_not_own": ["chunk storage", "vector storage", "embedding generation"],
+      "depends_on": ["services/indexing_service.py", "services/chunking_service.py", "services/vector_store.py"],
+      "test": "backend/tests/test_rag.py"
+    },
+    "ai_models": {
+      "dir": "backend/app/api/models.py",
+      "owns": ["model config CRUD", "test connection", "set default"],
+      "does_not_own": ["API key encryption", "LLM calling"],
+      "depends_on": ["core/crypto.py", "models/ai_model.py"],
+      "test": "backend/tests/test_ai_models.py"
+    },
+    "import_service": {
+      "dir": "backend/app/services/novel_service.py",
+      "owns": ["file upload safety", "multi-encoding detection", "chapter splitting", "transactional storage"],
+      "does_not_own": ["import job state machine"],
+      "depends_on": ["core/url_security.py", "models/novel.py"],
+      "test": "backend/tests/test_novels.py"
+    },
+    "chunking": {
+      "dir": "backend/app/services/chunking_service.py",
+      "owns": ["semantic text splitting", "chunk type detection", "metadata extraction"],
+      "does_not_own": ["embedding", "vector storage"],
+      "depends_on": ["models/text_chunk.py"],
+      "test": "backend/tests/test_chunking.py"
+    },
+    "indexing": {
+      "dir": "backend/app/services/indexing_service.py",
+      "owns": ["index pipeline orchestration", "progress tracking"],
+      "does_not_own": ["chunking logic", "embedding generation", "vector write"],
+      "depends_on": ["chunking_service", "ai_service", "vector_store"],
+      "test": "backend/tests/test_indexing.py"
+    },
+    "vector_store": {
+      "dir": "backend/app/services/vector_store.py",
+      "owns": ["ChromaDB collection management", "vector write/read/delete"],
+      "does_not_own": ["embedding generation", "chunk storage"],
+      "depends_on": ["ChromaDB HTTP API"],
+      "test": "backend/tests/test_vector_store.py"
+    },
+    "ai_service": {
+      "dir": "backend/app/services/ai_service.py",
+      "owns": ["LiteLLM chat/embed/stream wrapping"],
+      "does_not_own": ["model routing", "cost tracking"],
+      "depends_on": ["services/ai_router.py"],
+      "test": null
+    },
+    "crypto": {
+      "dir": "backend/app/core/crypto.py",
+      "owns": ["Fernet encryption/decryption", "key rotation", "legacy plaintext migration"],
+      "does_not_own": ["JWT signing"],
+      "depends_on": [],
+      "test": "backend/tests/test_crypto.py"
+    },
+    "security": {
+      "dir": "backend/app/core/security.py",
+      "owns": ["JWT issue/verify", "bcrypt hashing", "Cookie management"],
+      "does_not_own": ["API key encryption", "SSRF protection"],
+      "depends_on": [],
+      "test": "backend/tests/test_auth.py"
+    },
+    "ssrf": {
+      "dir": "backend/app/core/url_security.py",
+      "owns": ["URL protocol/DNS/IP validation", "SSRF allowlist"],
+      "does_not_own": ["API call execution"],
+      "depends_on": [],
+      "test": "backend/tests/test_security.py"
+    },
+    "frontend_app": {
+      "dir": "frontend/src/app/",
+      "owns": ["page routing", "auth gate layout", "globals"],
+      "does_not_own": ["API logic", "state management"],
+      "depends_on": ["lib/api.ts", "stores/"],
+      "test": "frontend/src/__tests__/"
+    },
+    "frontend_reader": {
+      "dir": "frontend/src/components/reader/",
+      "owns": ["chapter sidebar", "reader content", "progress bar"],
+      "does_not_own": ["novel data fetching"],
+      "depends_on": ["hooks/use-novels.ts"],
+      "test": "frontend/src/__tests__/"
+    },
+    "frontend_api": {
+      "dir": "frontend/src/lib/api.ts",
+      "owns": ["all backend HTTP calls", "credential handling"],
+      "does_not_own": ["state management"],
+      "depends_on": [],
+      "test": "frontend/src/lib/api.test.ts"
+    },
+    "frontend_stores": {
+      "dir": "frontend/src/stores/",
+      "owns": ["global state for novels and AI configs"],
+      "does_not_own": ["data fetching"],
+      "depends_on": ["lib/api.ts"],
+      "test": "frontend/src/__tests__/"
+    }
+  }
+}

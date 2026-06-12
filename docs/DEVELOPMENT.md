@@ -11,7 +11,7 @@
 | Frontend routes | `frontend/src/app/` |
 | Frontend components | `frontend/src/components/` |
 | Human documentation | `README.md`, `IMPLEMENTATION-STATUS.md`, `docs/` |
-| AI planning/execution state | `.gsd/` |
+| AI planning/execution state | `.planning/` |
 
 ## Change Rules
 
@@ -24,7 +24,7 @@
 
 ## GSD Workflow
 
-`.gsd/` 是唯一 AI 读写状态目录，不创建 `.planning/` 镜像。当前 active milestone 是 v0.2 安全与架构修复；`02-01`、`02-02` 已完成，`/gsd auto` 从 `02-03` 开始。
+`.planning/` 是唯一 AI 读写状态目录（GSD 工作流）。当前 active milestone 是 v0.2 安全与架构修复；`02-01`、`02-02` 已完成，自动执行从 `02-03` 开始。
 
 每个 task plan 必须包含 `Steps / Must-Haves / Verification`。每个 implementation slice 的最后一步必须是 `Test, Fix, and Confirm`。
 
@@ -45,4 +45,4 @@ cd backend
 - Ruff、ESLint、typecheck 和 production build 通过；
 - migration 在真实 PostgreSQL 上通过；
 - pip-audit、npm audit、Bandit 无未接受的高风险问题；
-- `IMPLEMENTATION-STATUS.md`、`docs/` 和 `.gsd/` 与结果一致。
+- `IMPLEMENTATION-STATUS.md`、`docs/` 和 `.planning/` 与结果一致。

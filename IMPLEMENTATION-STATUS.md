@@ -31,7 +31,7 @@
 | 前端路由和构建 | VERIFIED | `/novels/[id]` 动态路由正确；Next 16 Turbopack 生产构建通过 |
 | 自动化与静态检查 | VERIFIED | pytest 172、Vitest 22、ESLint 0、Ruff 0、Bandit 中高风险 0 |
 | 依赖安全 | VERIFIED | Python 3.11 环境 `pip-audit` 0；`npm audit` 0 |
-| AI 状态目录 | VERIFIED | `.planning/` 已移除；`.gsd/` 为唯一 AI 读写状态目录 |
+| AI 状态目录 | VERIFIED | `.planning/` 为唯一 AI 读写状态目录（GSD 工作流） |
 
 ## PARTIAL
 
@@ -86,6 +86,6 @@
 
 `02-01` 与 `02-02` 已完成。`/gsd auto` 下一入口：
 
-`.gsd/phases/02-security-and-architecture-remediation/02-03-PLAN.md`
+`.planning/phases/02-security-and-architecture-remediation/02-03-PLAN.md`
 
 `02-03` 只保留未完成的持久化导入任务和收尾验证，不重新执行已关闭的安全修复。

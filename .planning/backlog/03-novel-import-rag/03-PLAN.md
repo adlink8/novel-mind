@@ -1,6 +1,6 @@
 # Phase 2 执行计划
 
-> 状态：**BLOCKED / DEFERRED**。本文件保留 2026-06-11 前的“小说导入 + RAG”工作草案。当前 `/gsd auto` 不执行本文件；先完成 `.gsd/phases/02-security-and-architecture-remediation/02-01-PLAN.md` 至 `02-03-PLAN.md`。安全门槛通过后，再复审并激活本计划。
+> 状态：**BLOCKED / DEFERRED**。本文件保留 2026-06-11 前的“小说导入 + RAG”工作草案。当前 `/gsd auto` 不执行本文件；先完成 `.planning/phases/02-security-and-architecture-remediation/02-01-PLAN.md` 至 `02-03-PLAN.md`。安全门槛通过后，再复审并激活本计划。
 
 ## Steps
 

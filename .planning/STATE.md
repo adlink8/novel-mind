@@ -2,7 +2,7 @@
 
 ## Project Reference
 
-See `.gsd/PROJECT.md` and `IMPLEMENTATION-STATUS.md`。<br>
+See `.planning/PROJECT.md` and `IMPLEMENTATION-STATUS.md`。<br>
 系统结构以 `docs/architecture/` 为准。
 
 **Core value:** 先建立可信、安全、可迁移的实现基线，再扩展 RAG。
@@ -18,7 +18,7 @@ See `.gsd/PROJECT.md` and `IMPLEMENTATION-STATUS.md`。<br>
 
 ## Auto Routing
 
-`.gsd/phases/02-security-and-architecture-remediation/02-01-PLAN.md` — completed
+`.planning/phases/02-security-and-architecture-remediation/02-01-PLAN.md` — completed
 
 Remaining P1 items (SSRF DNS validation, import persistence, dependency audit) are tracked separately.
 

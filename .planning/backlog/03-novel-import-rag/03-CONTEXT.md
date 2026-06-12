@@ -1,6 +1,6 @@
 # Phase 2 决策上下文
 
-> 2026-06-11 复审更新：本上下文已暂停执行，并转为后续 Phase 3 候选输入。原文中“稳定基线”“阅读页缺失”和测试数量等陈述已经漂移，实时状态以 `IMPLEMENTATION-STATUS.md` 与 `.gsd/STATE.md` 为准。
+> 2026-06-11 复审更新：本上下文已暂停执行，并转为后续 Phase 3 候选输入。原文中“稳定基线”“阅读页缺失”和测试数量等陈述已经漂移，实时状态以 `IMPLEMENTATION-STATUS.md` 与 `.planning/STATE.md` 为准。
 
 ## Security Gate Added 2026-06-11
 

@@ -17,14 +17,14 @@
 ## Planning Sources
 
 - `IMPLEMENTATION-STATUS.md`：实现事实基线
-- `.gsd/ROADMAP.md`：规范化 GSD 路线图
-- `.gsd/STATE.md`：当前自动执行位置
-- `.gsd/backlog/`：尚未激活的计划输入
+- `.planning/ROADMAP.md`：规范化 GSD 路线图
+- `.planning/STATE.md`：当前自动执行位置
+- `.planning/backlog/`：尚未激活的计划输入
 
 ## Execution Rules
 
 1. 所有 task plan 包含 `Steps / Must-Haves / Verification`。
 2. 每个 implementation slice 以 `Test, Fix, and Confirm` 结束。
 3. 文档完成状态必须有实际命令或代码证据。
-4. `.gsd/STATE.md` 是唯一执行状态源，不创建 `.planning` 镜像。
-5. 人类可读文档写入 `README.md`、`IMPLEMENTATION-STATUS.md` 和 `docs/`；AI 执行文档写入 `.gsd/`。
+4. `.planning/STATE.md` 是唯一执行状态源。
+5. 人类可读文档写入 `README.md`、`IMPLEMENTATION-STATUS.md` 和 `docs/`；AI 执行文档写入 `.planning/`。
