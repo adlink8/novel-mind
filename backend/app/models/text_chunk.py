@@ -73,3 +73,9 @@ class TextChunk(TimestampMixin, Base):
     embedding_status: Mapped[str] = mapped_column(
         String(20), default="pending"
     )  # 向量生成状态: pending / embedded / failed
+
+    # 全文搜索向量（PostgreSQL tsvector，用于 BM25 混合搜索）
+    # SQLite 不支持 tsvector，设为 nullable
+    search_vector: Mapped[str | None] = mapped_column(
+        Text, nullable=True, default=None
+    )

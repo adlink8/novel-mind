@@ -223,3 +223,38 @@ class IndexStatusResponse(BaseModel):
     status: str
     chunk_count: int
     embedded_count: int
+
+
+# ─────────── 混合搜索 ───────────
+
+
+# ─────────── 混合搜索（BM25 + 向量）───────────
+
+class SearchRequest(BaseModel):
+    """混合搜索请求（BM25 + 向量）"""
+
+    query: str = Field(..., min_length=1, max_length=500, description="搜索查询文本")
+    top_k: int = Field(default=10, ge=1, le=50, description="返回结果数量上限")
+
+
+class SearchResultItem(BaseModel):
+    """单条搜索结果"""
+
+    novel_id: int
+    novel_title: str | None = None
+    chapter_id: int | None = None
+    chapter_title: str | None = None
+    chunk_id: int
+    chunk_index: int
+    content_snippet: str  # 高亮片段（含 <mark> 标签）
+    score: float
+    vector_score: float | None = None
+    bm25_score: float | None = None
+
+
+class SearchResponse(BaseModel):
+    """混合搜索响应"""
+
+    results: list[SearchResultItem]
+    total: int
+    query: str

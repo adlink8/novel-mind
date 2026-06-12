@@ -23,7 +23,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api import novels, analysis, timeline, characters, fanfiction, models, auth, rag
+from app.api import novels, analysis, timeline, characters, fanfiction, models, auth, rag, search
 from app.config import settings
 from app.core.logging import RequestLoggingMiddleware, setup_logging
 
@@ -50,6 +50,16 @@ async def lifespan(app: FastAPI):
         make_url(settings.database_url).render_as_string(hide_password=True),
     )
     logger.info(f"  调试模式: {settings.debug}")
+
+    # 恢复过期租约的导入任务
+    from app.services.import_service import import_service
+    from app.core.database import async_session_factory
+    async with async_session_factory() as db:
+        recovered = await import_service.recover_stale_jobs(db)
+        if recovered:
+            logger.info(f"恢复 {len(recovered)} 个过期导入任务")
+        await db.commit()
+
     logger.info("服务就绪 ✓")
     yield
     logger.info("NovelMind API 已关闭")
@@ -148,6 +158,7 @@ app.include_router(characters.router, prefix="/api/characters", tags=["人物关
 app.include_router(fanfiction.router, prefix="/api/fanfiction", tags=["同人文"])
 app.include_router(models.router, prefix="/api/models", tags=["AI 模型"])
 app.include_router(rag.router, prefix="/api/novels", tags=["RAG 检索"])
+app.include_router(search.router, prefix="/api/search", tags=["搜索"])
 
 
 @app.get("/api/health")
