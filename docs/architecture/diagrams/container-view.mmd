@@ -1,0 +1,40 @@
+graph TD
+    subgraph "Frontend Container"
+        Next[Next.js 16 App Router]
+        Components[React Components]
+        Stores[Zustand Stores]
+        ApiClient[Axios API Client]
+    end
+
+    subgraph "Backend Container"
+        API[FastAPI Routes]
+        Core[Core: Security / Crypto / DB / Logging]
+        Services[Service Layer]
+        ORM[SQLAlchemy ORM]
+        Alembic[Alembic Migrations]
+    end
+
+    subgraph "Data Stores"
+        PG[(PostgreSQL 16)]
+        CH[(ChromaDB)]
+    end
+
+    subgraph "External"
+        AIProvider[AI Providers]
+    end
+
+    Next --> Components
+    Components --> Stores
+    Stores --> ApiClient
+    ApiClient -->|HTTP / Cookie JWT| API
+
+    API --> Core
+    API --> Services
+    Services --> ORM
+    Services --> Core
+    ORM --> PG
+    Core --> Alembic
+    Alembic --> PG
+
+    Services --> CH
+    Services -->|LiteLLM| AIProvider

@@ -1,0 +1,24 @@
+graph TD
+    subgraph "Indexing Pipeline"
+        Novel[Novel / Chapters] --> Chunking[Chunking Service]
+        Chunking --> Chunks[TextChunks in PostgreSQL]
+        Chunks --> Embedding[Embedding Service]
+        Embedding --> VS[ChromaDB Vector Store]
+    end
+
+    subgraph "Search Pipeline"
+        Query[User Query] --> EmbQuery[Query Embedding]
+        EmbQuery --> Search[Semantic Search]
+        Search --> VS
+        VS --> Results[Top-K Evidence Chunks]
+        Results --> Response[Search Response with Citations]
+    end
+
+    Chunks -->|embedding_status=failed| Retry[Retry Mechanism]
+
+    style Novel fill:#e8f5e9
+    style Chunking fill:#f3e5f5
+    style Embedding fill:#f3e5f5
+    style VS fill:#fff3e0
+    style Results fill:#e1f5fe
+    style Response fill:#c8e6c9

@@ -2,7 +2,8 @@
 
 ## Project Reference
 
-See `.gsd/PROJECT.md` and `IMPLEMENTATION-STATUS.md`.
+See `.gsd/PROJECT.md` and `IMPLEMENTATION-STATUS.md`。<br>
+系统结构以 `docs/architecture/` 为准。
 
 **Core value:** 先建立可信、安全、可迁移的实现基线，再扩展 RAG。
 

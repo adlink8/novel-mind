@@ -1,6 +1,6 @@
 # NovelMind Architecture
 
-本文描述 2026-06-11 的实际代码架构。目标架构见 `技术架构.md`，其中未落地的 RAG、图谱和生成模块不能视为已实现。
+> **注意**：本文为 2026-06-11 的历史架构快照。最新的完整架构文档请查看 [docs/architecture/](architecture/README.md)。当前架构体系包含 11 篇系统结构文档 + 5 张 Mermaid 图，覆盖模块地图、数据模型、业务流、导入管线、RAG 管线、安全架构、AI 模型层、前端架构和测试 CI。
 
 ## Runtime Topology
 

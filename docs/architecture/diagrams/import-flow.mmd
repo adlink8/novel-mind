@@ -1,0 +1,26 @@
+graph TD
+    Upload[TXT File Upload] --> Validate{Security Validation}
+    Validate -->|.txt only| SizeCheck[Size Limit Check]
+    Validate -->|blocked| Reject[Reject Non-TXT]
+    SizeCheck --> Write[Stream Write to Disk<br>Random Filename]
+    Write --> Detect[Multi-Encoding Detection<br>UTF-8 / GB18030 / Big5 / Shift_JIS]
+    Detect --> Clean[Text Cleaning<br>BOM / Whitespace / Newlines]
+    Clean --> Split[Chapter Splitting<br>Regex: 第X章 / Chapter X]
+    Split --> Txn[Database Transaction]
+    
+    subgraph "Transaction"
+        Txn --> InsertNovel[INSERT Novel]
+        InsertNovel --> InsertChapters[INSERT Chapters Batch]
+        InsertChapters --> InsertJob[INSERT ImportJob]
+    end
+    
+    InsertJob -->|success| Done[Return Import Result]
+    InsertJob -->|failure| Compensate[Delete Uploaded File<br>Rollback Transaction]
+    
+    Done --> Index[Trigger RAG Indexing<br>optional]
+
+    style Validate fill:#ffebee
+    style Reject fill:#ffcdd2
+    style Txn fill:#e8f5e9
+    style Done fill:#c8e6c9
+    style Compensate fill:#ffcdd2

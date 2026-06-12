@@ -68,7 +68,9 @@ npm run build
 npm audit --registry=https://registry.npmjs.org
 ```
 
-文档入口：[docs/README.md](docs/README.md)。
+文档入口：
+- [产品与工程文档](docs/README.md)
+- [架构设计文档](docs/architecture/README.md) — 11 篇系统结构文档 + Mermaid 图
 
 ## License
 
