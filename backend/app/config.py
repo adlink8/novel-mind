@@ -56,8 +56,12 @@ class Settings(BaseSettings):
 
     # ── Embedding 配置 ──
     # 用于 RAG 向量检索的文本嵌入模型
-    embedding_model: str = "text-embedding-3-small"  # 默认使用 OpenAI 小型嵌入模型
-    embedding_dimensions: int = 1536  # 向量维度（与模型匹配）
+    # 默认使用 Ollama nomic-embed-text（轻量级，274MB，768 维）
+    # 备选: bge-m3 (Ollama 本地，1.2GB，1024 维，中文更佳)
+    # 云备选: text-embedding-3-small (OpenAI API，1536 维)
+    embedding_model: str = "nomic-embed-text"  # Ollama 模型名
+    embedding_provider: str = "ollama"          # 提供商: ollama / openai
+    embedding_dimensions: int = 768             # nomic-embed-text: 768, bge-m3: 1024, text-embedding-3-small: 1536
 
     # ── 认证与敏感数据保护 ──
     secret_key: str = DEV_JWT_SECRET

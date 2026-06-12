@@ -75,6 +75,10 @@ class AIService:
         """
         生成文本向量（embedding）。
 
+        支持两种模式:
+          - Ollama 本地: 直接调用 ollama API（避免 LiteLLM 包装问题）
+          - OpenAI/其他: 通过 LiteLLM aembedding
+
         Args:
             texts: 待向量化的文本列表
             model: 嵌入模型标识（默认使用 settings.embedding_model）
@@ -84,6 +88,31 @@ class AIService:
         """
         model = model or settings.embedding_model
 
+        # Ollama 本地模型：直接调用 Ollama API
+        if settings.embedding_provider == "ollama":
+            import httpx
+            # 去除 LiteLLM 前缀（ollama/nomic-embed-text → nomic-embed-text）
+            ollama_model = model.replace("ollama/", "")
+            embeddings = []
+            async with httpx.AsyncClient(timeout=120) as client:
+                for text in texts:
+                    resp = await client.post(
+                        f"{settings.ollama_base_url}/api/embed",
+                        json={"model": model, "input": text},
+                    )
+                    data = resp.json()
+                    # Ollama /api/embed 返回 {"embeddings": [[...]]}
+                    emb_list = data.get("embeddings", [])
+                    if emb_list and emb_list[0]:
+                        embeddings.append(emb_list[0])
+                    else:
+                        raise RuntimeError(
+                            f"Ollama embedding 返回空向量。模型 {model} 可能不支持 embedding。"
+                            f" 响应: {data}"
+                        )
+            return embeddings
+
+        # OpenAI / LiteLLM 模式
         response = await litellm.aembedding(
             model=model,
             input=texts,

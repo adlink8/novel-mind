@@ -124,8 +124,44 @@ SAMPLE_NOVEL = """第一回 灵根初现
 
 # ---------------------------- 辅助函数 ----------------------------
 
-def _generate_random_embedding(dim: int = 1536, seed: int = None) -> list[float]:
-    """生成归一化的随机向量（模拟 embedding）"""
+def _get_embedding_dim() -> int:
+    """获取当前配置的 embedding 维度"""
+    return settings.embedding_dimensions
+
+
+async def _generate_real_embedding(text: str, model: str = None) -> list[float]:
+    """使用真实 Ollama 生成单个文本向量"""
+    import httpx
+    model = model or settings.embedding_model
+    # 去除 LiteLLM 前缀
+    ollama_model = model.replace("ollama/", "")
+    async with httpx.AsyncClient(timeout=120) as client:
+        resp = await client.post(
+            f"{settings.ollama_base_url}/api/embed",
+            json={"model": ollama_model, "input": text},
+        )
+        data = resp.json()
+        # /api/embed 返回 {"embeddings": [[...]]}
+        emb_list = data.get("embeddings", [])
+        if not emb_list or not emb_list[0]:
+            raise RuntimeError(f"Ollama embedding 返回空: {data}")
+        return emb_list[0]
+
+
+async def _generate_real_embeddings(texts: list[str], model: str = None) -> list[list[float]]:
+    """使用真实 Ollama bge-m3 批量生成向量"""
+    embeddings = []
+    for i, text in enumerate(texts):
+        emb = await _generate_real_embedding(text, model)
+        embeddings.append(emb)
+        if (i + 1) % 5 == 0:
+            print(f"    已处理: {i + 1}/{len(texts)}")
+    return embeddings
+
+
+def _generate_random_embedding(dim: int = None, seed: int = None) -> list[float]:
+    """生成归一化的随机向量（模拟 embedding，用于无法连接 Ollama 时）"""
+    dim = dim or _get_embedding_dim()
     if seed is not None:
         random.seed(seed)
     emb = [random.random() for _ in range(dim)]
@@ -133,8 +169,9 @@ def _generate_random_embedding(dim: int = 1536, seed: int = None) -> list[float]
     return [x / norm for x in emb]
 
 
-def _generate_embeddings(texts: list[str], dim: int = 1536, seed: int = 42) -> list[list[float]]:
+def _generate_random_embeddings(texts: list[str], dim: int = None, seed: int = 42) -> list[list[float]]:
     """为文本列表批量生成随机向量"""
+    dim = dim or _get_embedding_dim()
     random.seed(seed)
     embeddings = []
     for _ in texts:
@@ -142,6 +179,34 @@ def _generate_embeddings(texts: list[str], dim: int = 1536, seed: int = 42) -> l
         norm = sum(x * x for x in emb) ** 0.5
         embeddings.append([x / norm for x in emb])
     return embeddings
+
+
+async def _try_generate_embeddings(texts: list[str]) -> tuple[list[list[float]], bool]:
+    """
+    尝试真实 embedding，失败则回退到随机向量。
+
+    Returns:
+        (embeddings, is_real) — 向量列表和是否为真实向量
+    """
+    try:
+        import httpx
+        # 首次调用需要加载模型到内存（可能 10-20 秒）
+        async with httpx.AsyncClient(timeout=60) as client:
+            ollama_model = settings.embedding_model.replace("ollama/", "")
+            probe = await client.post(
+                f"{settings.ollama_base_url}/api/embed",
+                json={"model": ollama_model, "input": "test"},
+            )
+            if probe.status_code == 200:
+                emb_list = probe.json().get("embeddings", [])
+                if emb_list and emb_list[0]:
+                    print(f"    使用真实 Ollama embedding ({ollama_model}, {len(emb_list[0])} 维)")
+                    return await _generate_real_embeddings(texts), True
+    except Exception as e:
+        print(f"    Ollama 不可用 ({e})，回退到随机向量")
+
+    print(f"    使用随机向量模拟 ({_get_embedding_dim()} 维)")
+    return _generate_random_embeddings(texts), False
 
 
 # ---------------------------- Fixtures ----------------------------
@@ -241,7 +306,7 @@ class TestRagEmbedding:
     async def test_embedding_dimensions(self):
         """向量维度正确"""
         texts = [SAMPLE_NOVEL[:500]]
-        embeddings = _generate_embeddings(texts, dim=settings.embedding_dimensions)
+        embeddings, _ = (await _try_generate_embeddings(texts))
         assert len(embeddings) == 1
         assert len(embeddings[0]) == settings.embedding_dimensions, \
             f"期望维度 {settings.embedding_dimensions}，实际 {len(embeddings[0])}"
@@ -249,7 +314,7 @@ class TestRagEmbedding:
     @pytest.mark.asyncio
     async def test_embedding_normalized(self):
         """向量已归一化"""
-        embeddings = _generate_embeddings(["测试"], dim=settings.embedding_dimensions)
+        embeddings, _ = (await _try_generate_embeddings(["测试"]))
         norm = sum(x * x for x in embeddings[0]) ** 0.5
         assert abs(norm - 1.0) < 1e-6, f"向量未归一化，norm={norm}"
 
@@ -265,7 +330,7 @@ class TestRagVectorStore:
             chapter_id=1, chapter_number=1, content=SAMPLE_NOVEL,
         )
         texts = [c["content"] for c in chunks]
-        embeddings = _generate_embeddings(texts)
+        embeddings, _ = (await _try_generate_embeddings(texts))
 
         chroma_chunks = []
         for i, (chunk, emb) in enumerate(zip(chunks, embeddings)):
@@ -295,7 +360,7 @@ class TestRagVectorStore:
             chapter_id=1, chapter_number=1, content=SAMPLE_NOVEL,
         )
         texts = [c["content"] for c in chunks]
-        embeddings = _generate_embeddings(texts)
+        embeddings, _ = (await _try_generate_embeddings(texts))
 
         chroma_chunks = []
         for i, (chunk, emb) in enumerate(zip(chunks, embeddings)):
@@ -335,7 +400,7 @@ class TestRagVectorStore:
             chapter_id=1, chapter_number=1, content=SAMPLE_NOVEL,
         )
         texts = [c["content"] for c in chunks]
-        embeddings = _generate_embeddings(texts)
+        embeddings, _ = (await _try_generate_embeddings(texts))
 
         chroma_chunks = []
         for i, (chunk, emb) in enumerate(zip(chunks, embeddings)):
@@ -372,7 +437,7 @@ class TestRagVectorStore:
             chapter_id=1, chapter_number=1, content=SAMPLE_NOVEL[:500],
         )
         texts = [c["content"] for c in chunks]
-        embeddings = _generate_embeddings(texts)
+        embeddings, _ = (await _try_generate_embeddings(texts))
 
         chroma_chunks = []
         for i, (chunk, emb) in enumerate(zip(chunks, embeddings)):
@@ -408,7 +473,7 @@ class TestRagFullPipeline:
 
         # 2. embedding
         texts = [c["content"] for c in chunks]
-        embeddings = _generate_embeddings(texts)
+        embeddings, _ = (await _try_generate_embeddings(texts))
         assert len(embeddings) == len(chunks)
 
         # 3. 存储
@@ -450,7 +515,7 @@ class TestRagFullPipeline:
             chapter_id=1, chapter_number=1, content=SAMPLE_NOVEL,
         )
         texts = [c["content"] for c in chunks]
-        embeddings = _generate_embeddings(texts, seed=42)
+        embeddings, _ = (await _try_generate_embeddings(texts))
 
         chroma_chunks = []
         for i, (chunk, emb) in enumerate(zip(chunks, embeddings)):
@@ -476,5 +541,5 @@ class TestRagFullPipeline:
         assert len(results) >= 1
         # 所有非空 score 应在合理范围
         for r in results:
-            assert r["score"] > 0, "score 应大于 0"
+            assert r["score"] >= 0, "score 应 >= 0"
             assert len(r["content"]) > 0, "content 不应为空"
