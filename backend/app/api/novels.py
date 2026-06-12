@@ -1,7 +1,5 @@
 """小说管理 API — 接入 novel_service + 数据库"""
 
-import secrets
-
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Query, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -200,3 +198,30 @@ async def retry_import(
         created_at=job.created_at,
         updated_at=job.updated_at,
     )
+
+
+@router.post("/{novel_id}/import-cancel")
+async def cancel_import(
+    novel_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """取消正在运行的导入任务"""
+    # 权限检查：只有小说所有者或超级用户可以取消
+    novel = await novel_service.get_novel(db, novel_id)
+    if not novel:
+        raise HTTPException(status_code=404, detail="小说不存在")
+
+    if not current_user.is_superuser and novel.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="没有权限取消此导入任务")
+
+    job = await import_service.get_job_by_novel(db, novel.id)
+    if not job:
+        raise HTTPException(status_code=404, detail="未找到导入任务")
+
+    success = await import_service.cancel_job(db, job.id)
+    if not success:
+        raise HTTPException(status_code=400, detail="无法取消该导入任务（已处于终态）")
+
+    await db.commit()
+    return {"message": "已取消导入任务", "job_id": job.id}

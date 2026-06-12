@@ -22,11 +22,10 @@ Embedding 索引管线服务
   results = await indexing_service.search_similar(db, novel_id=1, query="主角的性格")
 """
 
-import json
 import logging
 from typing import Any, Callable, Awaitable
 
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.novel import Novel, Chapter

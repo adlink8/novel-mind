@@ -14,7 +14,7 @@
 """
 
 import pytest
-import pytest_asyncio
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.import_job import ImportJob
@@ -481,3 +481,446 @@ async def test_import_service_update_nonexistent_job(db_session: AsyncSession):
 
     # 验证返回 False
     assert result is False
+
+
+# ─────────── 租约并发控制测试 ───────────
+
+
+class TestImportJobLease:
+    """租约并发控制测试"""
+
+    @pytest.mark.asyncio
+    async def test_acquire_lease_success(self, db_session: AsyncSession):
+        """测试成功获取租约"""
+        user = await _create_test_user(db_session)
+        novel = await _create_test_novel(db_session, user)
+
+        job = ImportJob(
+            novel_id=novel.id,
+            status="pending",
+            progress=0,
+        )
+        db_session.add(job)
+        await db_session.flush()
+
+        service = ImportService()
+        result = await service.acquire_lease(db_session, job.id)
+
+        assert result is True
+        assert job.lease_id is not None
+        assert len(job.lease_id) == 32  # uuid4().hex 长度
+        assert job.lease_expires_at is not None
+        # 租约过期时间应该在未来的 300 秒内
+        now = datetime.now(timezone.utc)
+        assert job.lease_expires_at > now
+        assert job.lease_expires_at <= now + timedelta(seconds=300)
+
+    @pytest.mark.asyncio
+    async def test_acquire_lease_already_held(self, db_session: AsyncSession):
+        """测试租约已被持有时无法再次获取"""
+        user = await _create_test_user(db_session)
+        novel = await _create_test_novel(db_session, user)
+
+        job = ImportJob(
+            novel_id=novel.id,
+            status="uploading",
+            progress=10,
+        )
+        db_session.add(job)
+        await db_session.flush()
+
+        service = ImportService()
+
+        # 第一次获取租约成功
+        result = await service.acquire_lease(db_session, job.id)
+        assert result is True
+
+        # 第二次获取租约失败（租约仍有效）
+        result = await service.acquire_lease(db_session, job.id)
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_lease_expiry(self, db_session: AsyncSession):
+        """测试租约过期后可以重新获取"""
+        user = await _create_test_user(db_session)
+        novel = await _create_test_novel(db_session, user)
+
+        job = ImportJob(
+            novel_id=novel.id,
+            status="uploading",
+            progress=10,
+        )
+        db_session.add(job)
+        await db_session.flush()
+
+        service = ImportService()
+
+        # 第一次获取租约
+        result = await service.acquire_lease(db_session, job.id)
+        assert result is True
+        old_lease_id = job.lease_id
+
+        # 手动设置租约为过期状态
+        job.lease_expires_at = datetime.now(timezone.utc) - timedelta(seconds=1)
+        await db_session.flush()
+
+        # 租约过期后可以重新获取
+        result = await service.acquire_lease(db_session, job.id)
+        assert result is True
+        assert job.lease_id != old_lease_id  # 新租约 ID 应该不同
+
+    @pytest.mark.asyncio
+    async def test_release_lease(self, db_session: AsyncSession):
+        """测试释放租约"""
+        user = await _create_test_user(db_session)
+        novel = await _create_test_novel(db_session, user)
+
+        job = ImportJob(
+            novel_id=novel.id,
+            status="uploading",
+            progress=50,
+        )
+        db_session.add(job)
+        await db_session.flush()
+
+        service = ImportService()
+
+        # 获取租约
+        result = await service.acquire_lease(db_session, job.id)
+        assert result is True
+        lease_id = job.lease_id
+
+        # 释放租约
+        result = await service.release_lease(db_session, job.id, lease_id)
+        assert result is True
+        assert job.lease_id is None
+        assert job.lease_expires_at is None
+
+        # 释放后可以重新获取
+        result = await service.acquire_lease(db_session, job.id)
+        assert result is True
+
+
+# ─────────── 幂等键测试 ───────────
+
+
+class TestImportJobIdempotency:
+    """幂等键测试"""
+
+    def test_compute_content_hash(self):
+        """测试内容哈希计算"""
+        content = b"Hello, World!"
+        hash_val = ImportService.compute_content_hash(content)
+
+        # SHA-256 十六进制字符串长度应为 64
+        assert len(hash_val) == 64
+        # 相同内容应产生相同哈希
+        assert hash_val == ImportService.compute_content_hash(content)
+        # 不同内容应产生不同哈希
+        assert hash_val != ImportService.compute_content_hash(b"Different content")
+
+    @pytest.mark.asyncio
+    async def test_find_duplicate_job(self, db_session: AsyncSession):
+        """测试查找到重复的导入任务"""
+        user = await _create_test_user(db_session)
+        novel = await _create_test_novel(db_session, user)
+
+        content_hash = "a" * 64
+
+        # 创建一个进行中的任务（带 content_hash）
+        job = ImportJob(
+            novel_id=novel.id,
+            status="uploading",
+            progress=10,
+            content_hash=content_hash,
+        )
+        db_session.add(job)
+        await db_session.flush()
+
+        service = ImportService()
+
+        # 查找重复任务
+        duplicate = await service.find_duplicate_job(db_session, content_hash, user.id)
+
+        assert duplicate is not None
+        assert duplicate.id == job.id
+        assert duplicate.content_hash == content_hash
+
+    @pytest.mark.asyncio
+    async def test_duplicate_not_found_for_different_content(self, db_session: AsyncSession):
+        """测试不同内容不会匹配为重复"""
+        user = await _create_test_user(db_session)
+        novel = await _create_test_novel(db_session, user)
+
+        # 创建一个任务（带 content_hash）
+        job = ImportJob(
+            novel_id=novel.id,
+            status="uploading",
+            progress=10,
+            content_hash="a" * 64,
+        )
+        db_session.add(job)
+        await db_session.flush()
+
+        service = ImportService()
+
+        # 查找不同的哈希
+        duplicate = await service.find_duplicate_job(db_session, "b" * 64, user.id)
+
+        assert duplicate is None
+
+    @pytest.mark.asyncio
+    async def test_duplicate_not_found_for_failed_job(self, db_session: AsyncSession):
+        """测试失败的任务不视为重复"""
+        user = await _create_test_user(db_session)
+        novel = await _create_test_novel(db_session, user)
+
+        content_hash = "a" * 64
+
+        # 创建一个失败的任务
+        job = ImportJob(
+            novel_id=novel.id,
+            status="failed",
+            progress=0,
+            content_hash=content_hash,
+        )
+        db_session.add(job)
+        await db_session.flush()
+
+        service = ImportService()
+
+        # 失败的任务不应被匹配为重复
+        duplicate = await service.find_duplicate_job(db_session, content_hash, user.id)
+
+        assert duplicate is None
+
+
+# ─────────── 取消测试 ───────────
+
+
+class TestImportJobCancel:
+    """取消测试"""
+
+    @pytest.mark.asyncio
+    async def test_cancel_running_job(self, db_session: AsyncSession):
+        """测试取消正在运行的任务"""
+        user = await _create_test_user(db_session)
+        novel = await _create_test_novel(db_session, user)
+
+        job = ImportJob(
+            novel_id=novel.id,
+            status="uploading",
+            progress=30,
+            message="正在上传文件...",
+        )
+        db_session.add(job)
+        await db_session.flush()
+
+        service = ImportService()
+
+        # 取消任务
+        result = await service.cancel_job(db_session, job.id)
+
+        assert result is True
+        assert job.status == "cancelled"
+        assert job.message == "用户取消"
+        assert job.is_terminal() is True
+
+    @pytest.mark.asyncio
+    async def test_cancel_terminal_job_fails(self, db_session: AsyncSession):
+        """测试取消终态任务失败"""
+        user = await _create_test_user(db_session)
+        novel = await _create_test_novel(db_session, user)
+
+        job = ImportJob(
+            novel_id=novel.id,
+            status="ready",
+            progress=100,
+            message="导入完成",
+        )
+        db_session.add(job)
+        await db_session.flush()
+
+        service = ImportService()
+
+        # 取消终态任务
+        result = await service.cancel_job(db_session, job.id)
+
+        assert result is False
+        assert job.status == "ready"  # 状态不变
+
+    @pytest.mark.asyncio
+    async def test_cancel_failed_job_fails(self, db_session: AsyncSession):
+        """测试取消失败的任务也失败（failed 是终态）"""
+        user = await _create_test_user(db_session)
+        novel = await _create_test_novel(db_session, user)
+
+        job = ImportJob(
+            novel_id=novel.id,
+            status="failed",
+            progress=0,
+            message="导入失败",
+        )
+        db_session.add(job)
+        await db_session.flush()
+
+        service = ImportService()
+
+        # 取消失败任务
+        result = await service.cancel_job(db_session, job.id)
+
+        assert result is False
+        assert job.status == "failed"
+
+    @pytest.mark.asyncio
+    async def test_cancel_pending_job(self, db_session: AsyncSession):
+        """测试取消等待中的任务"""
+        user = await _create_test_user(db_session)
+        novel = await _create_test_novel(db_session, user)
+
+        job = ImportJob(
+            novel_id=novel.id,
+            status="pending",
+            progress=0,
+            message="等待处理",
+        )
+        db_session.add(job)
+        await db_session.flush()
+
+        service = ImportService()
+
+        # 取消等待中的任务
+        result = await service.cancel_job(db_session, job.id)
+
+        assert result is True
+        assert job.status == "cancelled"
+        assert job.is_terminal() is True
+
+
+# ─────────── 重启恢复测试 ───────────
+
+
+class TestImportJobRecovery:
+    """重启恢复测试"""
+
+    @pytest.mark.asyncio
+    async def test_recover_stale_jobs(self, db_session: AsyncSession):
+        """测试恢复过期租约的任务"""
+        user = await _create_test_user(db_session)
+        novel = await _create_test_novel(db_session, user)
+
+        # 创建一个运行中但租约已过期的任务
+        stale_job = ImportJob(
+            novel_id=novel.id,
+            status="uploading",
+            progress=20,
+            lease_id="old-lease-id",
+            lease_expires_at=datetime.now(timezone.utc) - timedelta(hours=1),
+        )
+        db_session.add(stale_job)
+
+        # 创建另一个同样过期的任务
+        stale_job2 = ImportJob(
+            novel_id=novel.id,
+            status="parsing",
+            progress=40,
+            lease_id="old-lease-id-2",
+            lease_expires_at=datetime.now(timezone.utc) - timedelta(minutes=10),
+        )
+        db_session.add(stale_job2)
+
+        # 创建一个 pending 任务（不应被恢复）
+        pending_job = ImportJob(
+            novel_id=novel.id,
+            status="pending",
+            progress=0,
+            lease_id=None,
+            lease_expires_at=None,
+        )
+        db_session.add(pending_job)
+
+        # 创建一个已完成的任务（不应被恢复）
+        ready_job = ImportJob(
+            novel_id=novel.id,
+            status="ready",
+            progress=100,
+        )
+        db_session.add(ready_job)
+
+        await db_session.flush()
+
+        service = ImportService()
+
+        # 恢复过期租约的任务
+        recovered = await service.recover_stale_jobs(db_session)
+
+        # 验证恢复了 2 个任务
+        assert len(recovered) == 2
+        assert stale_job.id in recovered
+        assert stale_job2.id in recovered
+
+        # 验证恢复后的状态
+        assert stale_job.status == "pending"
+        assert stale_job.lease_id is None
+        assert stale_job.lease_expires_at is None
+        assert stale_job.message == "任务已恢复（服务重启）"
+
+        assert stale_job2.status == "pending"
+        assert stale_job2.lease_id is None
+        assert stale_job2.lease_expires_at is None
+
+        # 验证 pending 和 ready 任务未被修改
+        assert pending_job.status == "pending"
+        assert ready_job.status == "ready"
+
+    @pytest.mark.asyncio
+    async def test_no_recovery_for_pending(self, db_session: AsyncSession):
+        """测试 pending 任务不被恢复"""
+        user = await _create_test_user(db_session)
+        novel = await _create_test_novel(db_session, user)
+
+        # 创建 pending 任务
+        job = ImportJob(
+            novel_id=novel.id,
+            status="pending",
+            progress=0,
+            lease_id=None,
+            lease_expires_at=None,
+        )
+        db_session.add(job)
+        await db_session.flush()
+
+        service = ImportService()
+
+        # 恢复过期租约的任务
+        recovered = await service.recover_stale_jobs(db_session)
+
+        # pending 任务不应被包含
+        assert len(recovered) == 0
+        assert job.status == "pending"
+
+    @pytest.mark.asyncio
+    async def test_no_recovery_for_valid_lease(self, db_session: AsyncSession):
+        """测试有效租约的任务不被恢复"""
+        user = await _create_test_user(db_session)
+        novel = await _create_test_novel(db_session, user)
+
+        # 创建运行中且租约有效的任务
+        job = ImportJob(
+            novel_id=novel.id,
+            status="uploading",
+            progress=20,
+            lease_id="valid-lease",
+            lease_expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+        )
+        db_session.add(job)
+        await db_session.flush()
+
+        service = ImportService()
+
+        # 恢复过期租约的任务
+        recovered = await service.recover_stale_jobs(db_session)
+
+        # 有效租约的任务不应被恢复
+        assert len(recovered) == 0
+        assert job.status == "uploading"

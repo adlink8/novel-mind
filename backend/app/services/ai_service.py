@@ -92,7 +92,7 @@ class AIService:
         if settings.embedding_provider == "ollama":
             import httpx
             # 去除 LiteLLM 前缀（ollama/nomic-embed-text → nomic-embed-text）
-            ollama_model = model.replace("ollama/", "")
+            model = model.replace("ollama/", "")
             embeddings = []
             async with httpx.AsyncClient(timeout=120) as client:
                 for text in texts:

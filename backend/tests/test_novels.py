@@ -286,7 +286,7 @@ async def test_upload_import_status(auth_client: AsyncClient):
     )
 
     assert response.status_code == 200
-    job_id = response.json().get("id")
+    _job_id = response.json().get("id")
 
     # 等待导入完成
     await asyncio.sleep(0.5)
