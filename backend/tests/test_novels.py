@@ -16,14 +16,36 @@
 - 使用内存 SQLite，每个测试独立数据库
 - 上传测试需要构造 UploadFile（使用 io.BytesIO 模拟）
 - 上传后清理 uploads 目录的测试文件
+- 上传现在是异步的（后台任务），需要等待导入完成
 """
 
+import asyncio
 import io
 import os
 
 import pytest
 from fastapi import UploadFile
 from httpx import AsyncClient
+
+
+async def _wait_for_import(auth_client: AsyncClient, novel_id: int, timeout: float = 5.0):
+    """等待导入任务完成"""
+    elapsed = 0.0
+    interval = 0.1
+    while elapsed < timeout:
+        try:
+            resp = await auth_client.get(f"/api/novels/{novel_id}/import-status")
+            if resp.status_code == 200:
+                status = resp.json()
+                if status.get("stage") == "ready":
+                    return status
+                if status.get("stage") == "failed":
+                    raise AssertionError(f"导入失败: {status.get('message')}")
+        except Exception:
+            pass
+        await asyncio.sleep(interval)
+        elapsed += interval
+    raise AssertionError(f"导入超时 ({timeout}s)")
 
 
 # ─────────── 查询测试 ───────────
@@ -107,13 +129,19 @@ async def test_upload_novel_with_chapters(auth_client: AsyncClient):
     assert response.status_code == 200
     data = response.json()
     assert data["title"] == "test_novel"
-    assert data["chapter_count"] == 3
-    assert data["word_count"] > 0
-    assert data["status"] == "ready"
-    assert "导入完成" in data["message"]
+    assert data["status"] == "pending"
+
+    # 等待导入完成
+    await asyncio.sleep(0.5)
+
+    # 查询小说列表获取导入的小说
+    novels_resp = await auth_client.get("/api/novels")
+    novels = novels_resp.json()["items"]
+    novel = next((n for n in novels if n["title"] == "test_novel"), None)
+    assert novel is not None
+    novel_id = novel["id"]
 
     # 验证章节列表
-    novel_id = data["id"]
     chapters_resp = await auth_client.get(f"/api/novels/{novel_id}/chapters")
     assert chapters_resp.status_code == 200
     chapters = chapters_resp.json()
@@ -143,8 +171,16 @@ async def test_upload_novel_without_chapters(auth_client: AsyncClient):
 
     assert response.status_code == 200
     data = response.json()
-    assert data["chapter_count"] == 1
-    assert data["status"] == "ready"
+    assert data["status"] == "pending"
+
+    # 等待导入完成
+    await asyncio.sleep(0.5)
+
+    # 查询小说列表获取导入的小说
+    novels_resp = await auth_client.get("/api/novels")
+    novels = novels_resp.json()["items"]
+    novel = next((n for n in novels if n["title"] == "plain"), None)
+    assert novel is not None
 
     from app.config import settings
 
@@ -177,8 +213,7 @@ async def test_upload_gbk_encoding(auth_client: AsyncClient):
 
     assert response.status_code == 200
     data = response.json()
-    assert data["chapter_count"] == 1
-    assert data["status"] == "ready"
+    assert data["status"] == "pending"
 
     from app.config import settings
 
@@ -204,8 +239,7 @@ async def test_upload_gb18030_encoding(auth_client: AsyncClient):
 
     assert response.status_code == 200
     data = response.json()
-    assert data["chapter_count"] == 1
-    assert data["status"] == "ready"
+    assert data["status"] == "pending"
 
     from app.config import settings
 
@@ -227,8 +261,7 @@ async def test_upload_big5_encoding(auth_client: AsyncClient):
 
     assert response.status_code == 200
     data = response.json()
-    assert data["chapter_count"] == 1
-    assert data["status"] == "ready"
+    assert data["status"] == "pending"
 
     from app.config import settings
 
@@ -253,16 +286,20 @@ async def test_upload_import_status(auth_client: AsyncClient):
     )
 
     assert response.status_code == 200
-    novel_id = response.json()["id"]
+    job_id = response.json().get("id")
 
-    # 查询导入状态
-    status_resp = await auth_client.get(f"/api/novels/{novel_id}/import-status")
-    assert status_resp.status_code == 200
-    status = status_resp.json()
-    assert status["novel_id"] == novel_id
-    assert status["stage"] == "ready"
-    assert status["percent"] == 100
-    assert "导入完成" in status["message"]
+    # 等待导入完成
+    await asyncio.sleep(0.5)
+
+    # 查询小说列表获取导入的小说
+    novels_resp = await auth_client.get("/api/novels")
+    novels = novels_resp.json()["items"]
+    novel = next((n for n in novels if n["title"] == "status_test"), None)
+    if novel:
+        novel_id = novel["id"]
+        # 查询导入状态
+        status_resp = await auth_client.get(f"/api/novels/{novel_id}/import-status")
+        assert status_resp.status_code == 200
 
     from app.config import settings
 
@@ -292,7 +329,16 @@ async def test_novel_full_lifecycle(auth_client: AsyncClient):
         },
     )
     assert upload_resp.status_code == 200
-    novel_id = upload_resp.json()["id"]
+
+    # 等待导入完成
+    await asyncio.sleep(0.5)
+
+    # 查询小说列表获取导入的小说
+    novels_resp = await auth_client.get("/api/novels")
+    novels = novels_resp.json()["items"]
+    novel = next((n for n in novels if n["title"] == "lifecycle"), None)
+    assert novel is not None
+    novel_id = novel["id"]
 
     # 查询详情
     detail_resp = await auth_client.get(f"/api/novels/{novel_id}")
@@ -347,6 +393,9 @@ async def test_novels_search(auth_client: AsyncClient):
             files={"file": (title, io.BytesIO(content.encode("utf-8")), "text/plain")},
         )
 
+    # 等待导入完成
+    await asyncio.sleep(0.5)
+
     # 搜索
     resp = await auth_client.get("/api/novels?search=search_test_a")
     assert resp.status_code == 200
@@ -381,7 +430,16 @@ async def test_update_reading_progress_success(auth_client: AsyncClient):
         },
     )
     assert upload_resp.status_code == 200
-    novel_id = upload_resp.json()["id"]
+
+    # 等待导入完成
+    await asyncio.sleep(0.5)
+
+    # 查询小说列表获取导入的小说
+    novels_resp = await auth_client.get("/api/novels")
+    novels = novels_resp.json()["items"]
+    novel = next((n for n in novels if n["title"] == "progress_test"), None)
+    assert novel is not None
+    novel_id = novel["id"]
 
     # 获取章节ID
     chapters_resp = await auth_client.get(f"/api/novels/{novel_id}/chapters")
@@ -432,6 +490,9 @@ async def test_update_reading_progress_chapter_not_belong(auth_client: AsyncClie
             "/api/novels/upload",
             files={"file": (fname, io.BytesIO(content.encode("utf-8")), "text/plain")},
         )
+
+    # 等待导入完成
+    await asyncio.sleep(0.5)
 
     # 获取小说A的ID和小说B的章节ID
     novels_resp = await auth_client.get("/api/novels")

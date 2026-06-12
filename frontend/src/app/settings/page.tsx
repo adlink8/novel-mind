@@ -533,8 +533,8 @@ export default function SettingsPage() {
 
             {/* 操作按钮：取消 + 添加 */}
             <div className="flex justify-end gap-2 pt-2">
-              <DialogClose>
-                <Button variant="outline">{"取消"}</Button>
+              <DialogClose render={<Button variant="outline" />}>
+                {"取消"}
               </DialogClose>
               <Button
                 onClick={handleAddModel}

@@ -291,8 +291,8 @@ export function NovelUploadDialog({
 
           {/* 操作按钮 */}
           <div className="flex justify-end gap-2">
-            <DialogClose>
-              <Button variant="outline">{"取消"}</Button>
+            <DialogClose render={<Button variant="outline" />}>
+              {"取消"}
             </DialogClose>
             <Button
               onClick={handleUpload}
