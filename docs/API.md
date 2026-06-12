@@ -33,6 +33,9 @@ The first active account becomes the bootstrap administrator and claims legacy u
 | GET | `/api/novels/{id}/chapters/{chapter_id}` | required | VERIFIED | Single chapter body |
 | PATCH | `/api/novels/{id}/progress` | required | PARTIAL | Owner-isolated, but stored on Novel rather than per-user history |
 | GET | `/api/novels/{id}/import-status` | required | PARTIAL | Process-local status; not restart-safe |
+| POST | `/api/novels/{novel_id}/search` | Bearer (optional) | implemented | 语义搜索（RAG） |
+| POST | `/api/novels/{novel_id}/index` | Bearer | implemented | 触发小说索引 |
+| GET | `/api/novels/{novel_id}/index-status` | Bearer | implemented | 查询索引进度 |
 
 Cross-owner resource access returns 404. Public responses do not include `source_path` or provider secrets.
 
@@ -56,4 +59,5 @@ Analysis, timeline, characters and fanfiction routes require authentication. Que
 - Backend pytest: 70 passed on Python 3.11.15.
 - Cross-user novel and model isolation tests pass.
 - SSRF, legacy-key decryption and upload/delete rollback tests pass.
+- RAG 管线核心功能已实现：文本分块、向量存储、索引管线、搜索 API。
 - Persistent import jobs remain MISSING and are the active `02-03` work.

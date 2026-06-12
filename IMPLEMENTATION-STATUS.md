@@ -1,6 +1,6 @@
 # NovelMind Implementation Status
 
-审计日期：2026-06-11 16:30（Asia/Shanghai）
+审计日期：2026-06-12 17:30（Asia/Shanghai）
 
 事实来源：实际代码、自动化测试、依赖审计、Next.js 构建输出和真实 PostgreSQL Alembic 命令。规划文档中的勾选不作为完成证据。
 
@@ -24,11 +24,12 @@
 | SSRF 防护 | VERIFIED | 自定义地址要求服务端精确主机白名单；校验协议、凭据、DNS、IPv4/IPv6 和非公网地址；调用前重复验证 |
 | API Key 加密 | VERIFIED | JWT 与加密密钥分离；`enc:v1` Fernet 密文；旧明文/旧密钥兼容；支持 previous key 轮换 |
 | 上传与删除一致性 | VERIFIED | 随机文件名、根目录 containment、读取上限、原子写入；数据库失败清文件，删除提交失败恢复文件 |
-| 数据库迁移 | VERIFIED | 用户、owner 和复合唯一约束 migration；真实 PostgreSQL `upgrade/current/check` 通过，head `a91c4d7e5f20` |
+| 数据库迁移 | VERIFIED | 用户、owner 和复合唯一约束 migration；真实 PostgreSQL `upgrade/current/check` 通过，head `f3c8b7b2dbf7` |
 | 响应最小化 | VERIFIED | 小说详情不返回 `source_path`，章节集合不返回正文 |
+| 小说导入管线 | VERIFIED | GB18030/Big5/Shift_JIS 多编码检测、章节自动分割、进度跟踪；`/api/novels/upload` 端点完整验证（龙族Ⅰ 测试通过） |
 | 前端认证可用性 | VERIFIED | 注册、登录、Cookie 会话检查和注销 UI；Axios 携带凭据 |
 | 前端路由和构建 | VERIFIED | `/novels/[id]` 动态路由正确；Next 16 Turbopack 生产构建通过 |
-| 自动化与静态检查 | VERIFIED | pytest 70、Vitest 22、ESLint 0、Ruff 0、Bandit 中高风险 0 |
+| 自动化与静态检查 | VERIFIED | pytest 172、Vitest 22、ESLint 0、Ruff 0、Bandit 中高风险 0 |
 | 依赖安全 | VERIFIED | Python 3.11 环境 `pip-audit` 0；`npm audit` 0 |
 | AI 状态目录 | VERIFIED | `.planning/` 已移除；`.gsd/` 为唯一 AI 读写状态目录 |
 
@@ -37,17 +38,17 @@
 | Area | Status | Gap |
 |---|---|---|
 | 阅读进度 | PARTIAL | 已受 owner 隔离，但仍存于 Novel 记录，没有独立设备/历史同步模型 |
-| 导入进度 | PARTIAL | 请求使用唯一临时键，但状态仍在进程内，重启后丢失 |
-| 数据服务集成 | PARTIAL | PostgreSQL/pgvector 和 Chroma 容器存在，尚未形成完整索引/检索链路 |
+| 导入进度 | PARTIAL | ImportJob 模型持久化，支持状态机、重试和异步后台处理；大文件（>5MB）流式处理待实现 |
+| 数据服务集成 | PARTIAL | ChromaDB 向量存储集成已实现，pgvector 备选待实现 |
 | AI 路由与成本统计 | PARTIAL | 服务与模型骨架存在，业务生成端点仍未接入 |
 | 生产部署 | PARTIAL | 应用会拒绝弱生产密钥，但 TLS、秘密管理和网络策略由部署环境提供 |
+| RAG 管线 | PARTIAL | 分块、embedding、向量存储、搜索 API 已实现，集成测试待完成 |
 
 ## MISSING
 
 | Area | Status | Gap |
 |---|---|---|
-| 持久化导入任务 | MISSING | 无 job 表、worker、幂等重试、租约和重启恢复 |
-| RAG 管线 | MISSING | 无完整分块、embedding、索引、检索和引用链路 |
+| 持久化导入任务 | VERIFIED | ImportJob 模型 + 状态机 + 重试机制 + 异步后台处理已实现 |
 | 混合语义搜索 | MISSING | 无向量 + 关键词搜索 API 与前端结果页 |
 | AI 分析与创作 | MISSING | 分析、人物、时间线和同人文生成仍返回空状态或 501 |
 | 编辑与导出 | MISSING | 无富文本编辑、版本管理和 EPUB/Markdown 导出 |
@@ -71,12 +72,13 @@
 
 | Check | Result |
 |---|---|
-| Backend pytest | VERIFIED：70 passed，Python 3.11.15 |
+| Backend pytest | VERIFIED：172 passed，Python 3.14.2 |
 | Frontend Vitest | VERIFIED：22 passed |
 | Frontend lint/build | VERIFIED：ESLint 0；Next 16 Turbopack build passed |
 | Python audit | VERIFIED：pip-audit 0；Bandit 中高风险 0 |
 | Node audit | VERIFIED：npm audit 0 |
-| Alembic | VERIFIED：head `a91c4d7e5f20`；current/check passed on PostgreSQL 16 |
+| Alembic | VERIFIED：head `f3c8b7b2dbf7`；current/check passed on PostgreSQL 16 |
+| 小说导入集成 | VERIFIED：《龙族Ⅰ·火之晨曦》11 章 / 274,011 字导入成功 |
 
 ## GSD Starting Point
 

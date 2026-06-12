@@ -7,7 +7,7 @@
 | Variable | Purpose |
 |---|---|
 | `NOVELMIND_DEBUG=false` | 启用生产密钥强校验 |
-| `NOVELMIND_DATABASE_URL` | PostgreSQL async URL |
+| `NOVELMIND_DATABASE_URL` | PostgreSQL async URL（Windows 必须使用 `127.0.0.1` 而非 `localhost`） |
 | `NOVELMIND_SECRET_KEY` | JWT 签名密钥，至少 32 字符 |
 | `NOVELMIND_ENCRYPTION_KEY` | API Key 数据加密密钥，至少 32 字符且不得与 JWT 密钥相同 |
 | `NOVELMIND_AUTH_COOKIE_SECURE=true` | 仅通过 HTTPS 发送会话 Cookie |

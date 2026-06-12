@@ -6,6 +6,9 @@
 - Node.js 20.9+
 - Docker Desktop with Compose
 
+> **Windows 特别注意**：`localhost` 在 Windows 上可能解析为 IPv6 `::1`，而 Docker 端口映射仅支持 IPv4。
+> `.env` 中 `NOVELMIND_DATABASE_URL` 的 host 必须使用 `127.0.0.1`，不要用 `localhost`。
+
 ## Start Data Services
 
 ```powershell
