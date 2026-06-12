@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ChapterSidebar } from "@/components/reader/chapter-sidebar";
 import { ReaderContent } from "@/components/reader/reader-content";
 import { ProgressBar } from "@/components/reader/progress-bar";
+import { SearchPanel } from "@/components/reader/search-panel";
 import { novelsApi, type Novel, type Chapter } from "@/lib/api";
 
 /** 阅读进度 localStorage 键名 */
@@ -46,6 +47,7 @@ export default function NovelReaderPage() {
   const [currentChapterId, setCurrentChapterId] = useState<number>(0);
   const [chapterContent, setChapterContent] = useState<Chapter | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -126,6 +128,18 @@ export default function NovelReaderPage() {
     }
   }, [chapters, currentChapterId, handleSelectChapter]);
 
+  /** Ctrl+F 快捷键打开搜索面板 */
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "f") {
+        e.preventDefault();
+        setSearchOpen(true);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
   // 加载中
   if (loading) {
     return (
@@ -184,6 +198,27 @@ export default function NovelReaderPage() {
 
           <div className="flex items-center gap-2">
             <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSearchOpen(true)}
+              title="搜索 (Ctrl+F)"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="11" cy="11" r="8" />
+                <path d="m21 21-4.3-4.3" />
+              </svg>
+            </Button>
+            <Button
               variant="outline"
               size="sm"
               onClick={handlePrevChapter}
@@ -214,6 +249,14 @@ export default function NovelReaderPage() {
           chapterTitle={currentChapterTitle}
         />
       </main>
+
+      {/* 搜索面板 */}
+      <SearchPanel
+        novelId={Number(novelId)}
+        isOpen={searchOpen}
+        onClose={() => setSearchOpen(false)}
+        onNavigate={(chapterId) => handleSelectChapter(chapterId)}
+      />
     </div>
   );
 }
