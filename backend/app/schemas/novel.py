@@ -168,3 +168,58 @@ class ImportStatusResponse(BaseModel):
     )
     percent: int = Field(..., ge=0, le=100, description="进度百分比 0-100")
     message: str = Field(default="", description="阶段描述信息")
+
+
+class ImportJobResponse(BaseModel):
+    """导入任务响应"""
+
+    job_id: int
+    novel_id: int
+    status: str = Field(
+        ...,
+        description="任务状态: pending / uploading / detecting / parsing / chunking / embedding / ready / failed",
+    )
+    progress: int = Field(..., ge=0, le=100, description="进度百分比 0-100")
+    message: str = Field(default="", description="状态描述信息")
+    error_detail: Optional[str] = Field(None, description="错误详情")
+    retry_count: int = Field(0, description="已重试次数")
+    max_retries: int = Field(3, description="最大重试次数")
+    created_at: datetime
+    updated_at: datetime
+
+
+# ─────────── RAG 检索 ───────────
+
+
+class RAGSearchRequest(BaseModel):
+    """RAG 语义搜索请求"""
+
+    query: str = Field(..., min_length=1, max_length=1000, description="搜索查询文本")
+    top_k: int = Field(5, ge=1, le=50, description="返回结果数量上限")
+    chunk_types: list[str] | None = Field(None, description="按块类型过滤: scene/dialogue/description/narration/paragraph")
+
+
+class RAGSearchResult(BaseModel):
+    """单条 RAG 搜索结果"""
+
+    chunk_id: int
+    content: str
+    score: float
+    chapter_id: int | None = None
+    chunk_index: int
+    chunk_type: str
+
+
+class RAGSearchResponse(BaseModel):
+    """RAG 语义搜索响应"""
+
+    results: list[RAGSearchResult]
+
+
+class IndexStatusResponse(BaseModel):
+    """小说索引状态响应"""
+
+    novel_id: int
+    status: str
+    chunk_count: int
+    embedded_count: int

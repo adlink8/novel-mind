@@ -17,10 +17,17 @@
   用于后续同人文续写时保持风格一致性。
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from sqlalchemy import ForeignKey, Integer, String, Text, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
+
+if TYPE_CHECKING:
+    from app.models.import_job import ImportJob
 
 
 class Novel(TimestampMixin, Base):
@@ -82,6 +89,13 @@ class Novel(TimestampMixin, Base):
     # - lazy="selectin": 查询 Novel 时自动预加载 chapters（避免 N+1 查询）
     chapters: Mapped[list["Chapter"]] = relationship(
         back_populates="novel", cascade="all, delete-orphan", lazy="selectin"
+    )
+
+    # 导入任务关系
+    # - back_populates: 双向关联，ImportJob.novel 指回 Novel
+    # - cascade: 删除 Novel 时级联删除所有 ImportJob
+    import_jobs: Mapped[list["ImportJob"]] = relationship(
+        back_populates="novel", cascade="all, delete-orphan"
     )
 
 

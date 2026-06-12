@@ -30,6 +30,8 @@ from app.schemas.common import (
 # 小说 & 章节
 from app.schemas.novel import (
     ChapterResponse,
+    ImportJobResponse,
+    ImportStatusResponse,
     NovelCreate,
     NovelListResponse,
     NovelResponse,
@@ -81,6 +83,8 @@ __all__ = [
     "SuccessResponse",
     # 小说
     "ChapterResponse",
+    "ImportJobResponse",
+    "ImportStatusResponse",
     "NovelCreate",
     "NovelListResponse",
     "NovelResponse",

@@ -23,7 +23,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api import novels, analysis, timeline, characters, fanfiction, models, auth
+from app.api import novels, analysis, timeline, characters, fanfiction, models, auth, rag
 from app.config import settings
 from app.core.logging import RequestLoggingMiddleware, setup_logging
 
@@ -147,6 +147,7 @@ app.include_router(timeline.router, prefix="/api/timeline", tags=["时间线"])
 app.include_router(characters.router, prefix="/api/characters", tags=["人物关系"])
 app.include_router(fanfiction.router, prefix="/api/fanfiction", tags=["同人文"])
 app.include_router(models.router, prefix="/api/models", tags=["AI 模型"])
+app.include_router(rag.router, prefix="/api/novels", tags=["RAG 检索"])
 
 
 @app.get("/api/health")

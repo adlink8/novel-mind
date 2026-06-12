@@ -2,7 +2,7 @@
 
 import secrets
 
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Query
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Query, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -18,8 +18,10 @@ from app.schemas.novel import (
     ReadingProgressUpdate,
     ReadingProgressResponse,
     ImportStatusResponse,
+    ImportJobResponse,
 )
 from app.services.novel_service import novel_service
+from app.services.import_service import import_service
 
 router = APIRouter()
 
@@ -49,6 +51,7 @@ async def list_novels(
 @router.post("/upload", response_model=NovelUploadResponse)
 async def upload_novel(
     file: UploadFile = File(...),
+    background_tasks: BackgroundTasks = BackgroundTasks(),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_user),
 ):
@@ -58,57 +61,35 @@ async def upload_novel(
     需要登录认证。
 
     处理流程:
-    1. 接收文件并检测/转换编码（支持 UTF-8、GBK、GB18030、Big5 等）
-    2. 文本清洗与章节自动分割
-    3. 保存到数据库并返回结果
+    1. 创建导入任务（ImportJob）
+    2. 后台处理：接收文件、检测编码、解析章节、保存到数据库
+    3. 返回任务 ID 和状态
     """
     if not file.filename or not file.filename.lower().endswith(".txt"):
         raise HTTPException(status_code=400, detail="仅支持 .txt 格式文件")
 
-    # 用临时 ID 跟踪进度（实际 novel_id 在数据库创建后才获得）
-    # 这里先记录上传阶段
-    temp_id = -secrets.randbelow(2_000_000_000) - 1
-    novel_service.set_import_status(temp_id, "uploading", 10, "正在接收文件...")
+    # 创建导入任务（novel_id 为空，后续在 process_import 中关联）
+    job = await import_service.create_import_job(db, novel_id=None)
+    await db.commit()
 
-    save_path = None
-    try:
-        # 1. 保存文件 + 编码检测（自动回退多编码）
-        novel_service.set_import_status(temp_id, "detecting", 20, "正在检测文件编码...")
-        save_path, content = await novel_service.upload_novel(file)
+    # 后台处理导入任务
+    background_tasks.add_task(
+        import_service.process_import,
+        db,
+        job.id,
+        job.novel_id,
+        file,
+        current_user.id,
+    )
 
-        # 2. 文本清洗 + 章节分割
-        novel_service.set_import_status(temp_id, "parsing", 40, "正在解析章节...")
-        chapters = novel_service.parse_novel(content)
-
-        # 3. 存入数据库（create_novel_record 内部会更新进度到 saving / ready）
-        title = file.filename.rsplit(".", 1)[0]
-        novel = await novel_service.create_novel_record(
-            db,
-            title=title,
-            chapters=chapters,
-            source_path=save_path,
-            owner_id=current_user.id,
-        )
-        await db.commit()
-
-        # create_novel_record 内部已完成进度跟踪（saving → ready）
-        # 清理临时进度记录
-        novel_service.clear_import_status(temp_id)
-
-        return NovelUploadResponse(
-            id=novel.id,
-            title=novel.title,
-            status=novel.status,
-            message=f"导入完成：{len(chapters)} 章，{sum(c['word_count'] for c in chapters)} 字",
-            chapter_count=len(chapters),
-            word_count=sum(c["word_count"] for c in chapters),
-        )
-    except Exception as exc:
-        await db.rollback()
-        if save_path:
-            novel_service.remove_uploaded_file(save_path)
-        novel_service.set_import_status(temp_id, "error", 0, f"导入失败: {str(exc)}")
-        raise
+    return NovelUploadResponse(
+        id=job.id,
+        title=file.filename.rsplit(".", 1)[0] if file.filename else "未知标题",
+        status="pending",
+        message="导入任务已创建，正在后台处理",
+        chapter_count=0,
+        word_count=0,
+    )
 
 
 @router.get("/{novel_id}", response_model=NovelResponse)
@@ -164,12 +145,14 @@ async def update_progress(
 
 
 @router.get("/{novel_id}/import-status", response_model=ImportStatusResponse)
-async def get_import_status(novel: Novel = Depends(require_owned_novel)):
+async def get_import_status(
+    novel: Novel = Depends(require_owned_novel),
+    db: AsyncSession = Depends(get_db),
+):
     """获取小说导入进度状态（前端轮询用）"""
-    status = novel_service.get_import_status(novel.id)
-    if not status:
-        # 如果内存中没有状态记录，查询数据库确认
-        # 这里简化处理：返回一个默认状态
+    job = await import_service.get_job_by_novel(db, novel.id)
+    if not job:
+        # 如果数据库中没有任务记录，返回默认状态
         return ImportStatusResponse(
             novel_id=novel.id,
             stage="unknown",
@@ -178,7 +161,42 @@ async def get_import_status(novel: Novel = Depends(require_owned_novel)):
         )
     return ImportStatusResponse(
         novel_id=novel.id,
-        stage=status["stage"],
-        percent=status["percent"],
-        message=status["message"],
+        stage=job.status,
+        percent=job.progress,
+        message=job.message,
+    )
+
+
+@router.post("/{novel_id}/import-retry", response_model=ImportJobResponse)
+async def retry_import(
+    novel: Novel = Depends(require_owned_novel),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """重试失败的导入任务"""
+    job = await import_service.get_job_by_novel(db, novel.id)
+    if not job:
+        raise HTTPException(status_code=404, detail="未找到导入任务")
+
+    # 权限检查：只有小说所有者或超级用户可以重试
+    if not current_user.is_superuser and novel.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="没有权限重试此任务")
+
+    try:
+        job = await import_service.retry_job(db, job.id)
+        await db.commit()
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    return ImportJobResponse(
+        job_id=job.id,
+        novel_id=job.novel_id,
+        status=job.status,
+        progress=job.progress,
+        message=job.message,
+        error_detail=job.error_detail,
+        retry_count=job.retry_count,
+        max_retries=job.max_retries,
+        created_at=job.created_at,
+        updated_at=job.updated_at,
     )
