@@ -35,3 +35,14 @@
 `/gsd auto` must start from:
 
 `.planning/backlog/03-novel-import-rag/03-PLAN.md`
+
+## Backlog
+
+### Phase 999.1: 首页 UI 优化 (BACKLOG)
+- 删除占位统计卡片（小说总数/章节总数/AI分析次数/同人文作品）
+- 已完成：2026-06-13
+
+### Phase 999.2: Bug 修复 (BACKLOG)
+- 阅读页右上角"上一章"与"退出账号"按钮重合
+- 搜索返回"搜索失败请重试"无内容
+- 已完成：2026-06-13

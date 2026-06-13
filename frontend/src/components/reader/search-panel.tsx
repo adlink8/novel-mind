@@ -89,8 +89,11 @@ export function SearchPanel({
         const res = await searchApi.inNovel(novelId, q, 10);
         setResults(res.data.results);
         setHasSearched(true);
-      } catch {
-        setError("搜索失败，请重试");
+      } catch (err: any) {
+        const msg = err?.response?.data?.detail 
+          || err?.message 
+          || "搜索失败，请重试";
+        setError(msg);
         setResults([]);
       } finally {
         setLoading(false);

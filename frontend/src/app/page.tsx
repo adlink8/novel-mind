@@ -3,27 +3,18 @@
  *
  * 展示:
  * 1. Hero Section: 应用介绍 + 快速入口按钮
- * 2. 统计卡片: 小说总数/章节数/AI分析次数/同人文作品（当前为占位数据）
- * 3. 快捷操作: 4 个功能入口卡片（导入/书架/创作/设置）
- * 4. 最近活动: 活动时间线（当前为占位数据）
+ * 2. 快捷操作: 4 个功能入口卡片（导入/书架/创作/设置）
+ * 3. 最近活动: 活动时间线（当前为占位数据）
  *
- * TODO: 统计数据和最近活动需要接入后端 API（当前是硬编码占位）
+ * TODO: 最近活动需要接入后端 API（当前是硬编码占位）
  */
 
 "use client";
 
 import React from "react";
 import Link from "next/link";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-
-/** 统计卡片数据（占位，未来接入 API） */
-const stats = [
-  { label: "小说总数", value: "0", icon: "📚" },
-  { label: "章节总数", value: "0", icon: "📝" },
-  { label: "AI 分析次数", value: "0", icon: "🤖" },
-  { label: "同人文作品", value: "0", icon: "✍️" },
-];
 
 /** 快捷操作入口配置 */
 const quickActions = [
@@ -61,23 +52,6 @@ export default function HomePage() {
               </Link>
             </div>
           </div>
-        </div>
-      </section>
-
-      {/* 统计卡片行 */}
-      <section className="mb-10">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {stats.map((stat) => (
-            <Card key={stat.label}>
-              <CardContent className="flex items-center gap-4">
-                <div className="text-3xl">{stat.icon}</div>
-                <div>
-                  <p className="text-2xl font-bold">{stat.value}</p>
-                  <p className="text-xs text-muted-foreground">{stat.label}</p>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
         </div>
       </section>
 

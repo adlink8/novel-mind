@@ -74,7 +74,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   return (
     <>
       {children}
-      <Button className="fixed right-4 top-4 z-50" size="sm" variant="outline" onClick={logout} title="退出登录">
+      <Button className="fixed right-4 top-14 z-40" size="sm" variant="outline" onClick={logout} title="退出登录">
         <LogOut className="h-4 w-4" />
         <span className="ml-2 hidden sm:inline">{user.username}</span>
       </Button>

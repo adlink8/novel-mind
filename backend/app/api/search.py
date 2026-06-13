@@ -34,12 +34,16 @@ async def global_search(
     """
     from app.services.hybrid_search import hybrid_search_service
 
-    results = await hybrid_search_service.search_global(
-        db,
-        query=request.query,
-        top_k=request.top_k,
-        owner_id=current_user.id,
-    )
+    try:
+        results = await hybrid_search_service.search_global(
+            db,
+            query=request.query,
+            top_k=request.top_k,
+            owner_id=current_user.id,
+        )
+    except Exception as e:
+        logger.exception("global hybrid search failed: %s", e)
+        return SearchResponse(results=[], total=0, query=request.query)
     return SearchResponse(
         results=[SearchResultItem(**r) for r in results],
         total=len(results),
@@ -75,9 +79,14 @@ async def novel_search(
 
     from app.services.hybrid_search import hybrid_search_service
 
-    results = await hybrid_search_service.search_novel(
-        db, novel_id=novel_id, query=request.query, top_k=request.top_k
-    )
+    try:
+        results = await hybrid_search_service.search_novel(
+            db, novel_id=novel_id, query=request.query, top_k=request.top_k
+        )
+    except Exception as e:
+        logger.exception("hybrid search failed for novel_%d: %s", novel_id, e)
+        return SearchResponse(results=[], total=0, query=request.query)
+
     return SearchResponse(
         results=[SearchResultItem(**r) for r in results],
         total=len(results),
