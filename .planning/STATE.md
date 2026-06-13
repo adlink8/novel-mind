@@ -41,6 +41,7 @@ See `.planning/PROJECT.md` and `IMPLEMENTATION-STATUS.md`。<br>
 
 ## Open Work
 
+- RAG 评测集与自动化检索优化闭环（GitHub Issue #2）← 当前 active plan
 - pgvector 双写备用路径
 - 大文件（>5MB）流式上传
 - 端到端 CI/CD 集成测试

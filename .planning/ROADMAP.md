@@ -8,6 +8,13 @@
 
 第一个 active milestone 已按要求设为并完成"审计与启动修复"。当前 active milestone 为 v0.3。
 
+## v0.3 Plans
+
+- [x] 核心 RAG 管线（分块/embedding/ChromaDB）
+- [x] 混合搜索（BM25 + 向量融合）
+- [x] 前端搜索 UI + 阅读页内搜索
+- [ ] 03-rag-eval: RAG 评测集与自动化检索优化闭环 (GitHub Issue #2)
+
 ## v0.2 Plans
 
 - [x] 02-01: 仓库与上传边界修复
@@ -34,7 +41,7 @@
 
 `/gsd auto` must start from:
 
-`.planning/backlog/03-novel-import-rag/03-PLAN.md`
+`.planning/phases/03-rag-eval/03-01-PLAN.md`
 
 ## Backlog
 
