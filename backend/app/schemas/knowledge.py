@@ -126,6 +126,17 @@ class KnowledgeExtractionRunCreate(BaseModel):
     config_snapshot: dict = Field(default_factory=dict)
 
 
+class KnowledgeRunStartRequest(BaseModel):
+    """API request for creating a user-owned extraction run."""
+
+    novel_id: int = Field(..., ge=1)
+    run_name: str = Field(..., min_length=1, max_length=200)
+    domain_profile: DomainProfile = "fiction"
+    ontology_profile: str = Field(default="fiction.v1", min_length=1, max_length=100)
+    prompt_version: str | None = Field(default=None, max_length=100)
+    config_snapshot: dict = Field(default_factory=dict)
+
+
 class KnowledgeExtractionRunResponse(BaseModel):
     """Persisted extraction run response."""
 
@@ -393,6 +404,12 @@ class KnowledgeReviewQueueCreate(BaseModel):
     resolution: str | None = Field(default=None, max_length=60)
     reviewer_notes: str | None = None
     assigned_to: str | None = Field(default=None, max_length=120)
+
+
+class KnowledgeReviewActionRequest(BaseModel):
+    """Manual review action payload."""
+
+    reviewer_notes: str | None = None
 
 
 class KnowledgeReviewQueueResponse(BaseModel):

@@ -17,6 +17,23 @@ from app.services.knowledge.llm_judge import (
     KnowledgeLLMJudgeService,
     llm_judge_service,
 )
+from app.services.knowledge.gates import (
+    GateDecision,
+    GatePolicy,
+    KnowledgeGateService,
+    knowledge_gate_service,
+)
+from app.services.knowledge.projection import (
+    KnowledgeProjectionService,
+    ProjectionResult,
+    knowledge_projection_service,
+)
+from app.services.knowledge.graph_sync import (
+    GraphSyncConfig,
+    GraphSyncResult,
+    KnowledgeGraphSyncService,
+    knowledge_graph_sync_service,
+)
 
 __all__ = [
     "CandidateRecallConfig",
@@ -30,4 +47,15 @@ __all__ = [
     "PROMPT_VERSION",
     "KnowledgeLLMJudgeService",
     "llm_judge_service",
+    "GateDecision",
+    "GatePolicy",
+    "KnowledgeGateService",
+    "knowledge_gate_service",
+    "KnowledgeProjectionService",
+    "ProjectionResult",
+    "knowledge_projection_service",
+    "GraphSyncConfig",
+    "GraphSyncResult",
+    "KnowledgeGraphSyncService",
+    "knowledge_graph_sync_service",
 ]

@@ -24,6 +24,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api import novels, analysis, timeline, characters, fanfiction, models, auth, rag, search
+from app.api.knowledge import router as knowledge_router
 from app.config import settings
 from app.core.logging import RequestLoggingMiddleware, setup_logging
 
@@ -158,6 +159,7 @@ app.include_router(characters.router, prefix="/api/characters", tags=["人物关
 app.include_router(fanfiction.router, prefix="/api/fanfiction", tags=["同人文"])
 app.include_router(models.router, prefix="/api/models", tags=["AI 模型"])
 app.include_router(rag.router, prefix="/api/novels", tags=["RAG 检索"])
+app.include_router(knowledge_router)
 app.include_router(search.router, prefix="/api/search", tags=["搜索"])
 
 
