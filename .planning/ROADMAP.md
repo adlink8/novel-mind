@@ -58,6 +58,7 @@
 **Goal:** 建立可审计的知识图谱构建链路：脚本负责召回、证据、规则、阈值和写库；LLM 只负责语义理解、关系候选和判断。该链路同时支持小说与历史语料。
 **Requirements**: REQ-KG-01..06
 **Depends on:** Phase 3
+**Status:** VERIFIED on 2026-07-02
 **Plans:** 4/4 plans complete
 
 Plans:
