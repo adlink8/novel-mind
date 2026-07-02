@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v0.3
 milestone_name: Plans
-status: unknown
-last_updated: "2026-07-02T07:49:16.063Z"
+status: ready_for_verification
+last_updated: "2026-07-02T08:12:16.028Z"
 progress:
   total_phases: 4
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 11
-  completed_plans: 10
-  percent: 91
+  completed_plans: 11
+  percent: 100
 ---
 
 # Project State
@@ -23,14 +23,14 @@ See `.planning/PROJECT.md` and `IMPLEMENTATION-STATUS.md`。<br>
 
 ## Current Position
 
-Phase: 04 (llm) — EXECUTING
+Phase: 04 (llm) — READY FOR VERIFICATION
 Plan: 4 of 4
 
 - Milestone: **v0.3 - 小说导入 + RAG 索引** — GAPS FOUND
 - Phase: 03-01 RAG 评测集与自动化检索优化闭环 — PARTIAL
 - Current branch: `feat/phase2-wave2-embedding`
-- Status: 导入/索引/混合搜索/前端 VERIFIED；评测基础设施 VERIFIED，质量闭环 PARTIAL
-- Last activity: 2026-06-13 16:25 — 后端边界审计、eval owner 隔离/NDCG/迁移漂移修复，v0.3 状态复核
+- Status: Phase 04 LLM-gated knowledge graph pipeline plans complete; ready for verification. v0.3 RAG eval quality gap remains PARTIAL.
+- Last activity: 2026-07-02 08:08 UTC — completed 04-04 evaluation/domain fixtures with deterministic graph eval CLI and 20 labeled examples.
 
 ## Auto Routing
 
@@ -112,6 +112,7 @@ v0.3 保持 active，但没有可自动执行 plan。需要人工完成评测题
 - 2026-07-02: 04-03 uses accepted KnowledgeRelationJudgment rows as PostgreSQL source-of-truth projection input because no accepted-edge migration was added.
 - 2026-07-02: 04-03 skips text_chunk-only projection until entity/event resolution exists, preserving recall signals as non-truth.
 - 2026-07-02: 04-03 keeps Neo4j sync disabled by default and read-only from accepted PostgreSQL rows.
+- 2026-07-02: 04-04 evaluates fiction/history with the same offline graph eval core while keeping recall signal quality separate from accepted graph fact quality.
 
 ### Performance Metrics
 
@@ -119,9 +120,10 @@ v0.3 保持 active，但没有可自动执行 plan。需要人工完成评测题
 |---|---:|---:|---:|
 | Phase 04 P02 | 10min | 1 task | 7 files |
 | Phase 04 P03 | 16min | 1 task | 10 files |
+| Phase 04 P04 | 14min | 1 task | 6 files |
 
 ### Session
 
-- Last session: 2026-07-02T07:49:33.830Z
-- Stopped At: Completed 04-03-evidence-gates-and-projection-PLAN.md
+- Last session: 2026-07-02T08:08:40Z
+- Stopped At: Completed 04-04-evaluation-and-domain-fixtures-PLAN.md
 - Resume File: None
