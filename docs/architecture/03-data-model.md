@@ -1,6 +1,6 @@
 # 03 — 数据模型与实体关系
 
-NovelMind 使用 PostgreSQL 16 作为主数据库（13 张 ORM 表），ChromaDB 作为向量存储。Neo4j 为 Phase 3 规划，尚未使用。
+NovelMind 使用 PostgreSQL 16 作为主数据库，ChromaDB 作为向量存储。Phase 04 新增知识图谱候选、证据、判定和 review audit 表；Neo4j 仍是可选投影边界，默认不启用。
 
 ## 核心实体
 
@@ -109,7 +109,42 @@ NovelMind 使用 PostgreSQL 16 作为主数据库（13 张 ORM 表），ChromaDB
 
 **来源**: `backend/app/models/ai_usage_log.py`
 
-### Phase 3 预留模型（表已存在，业务未实现）
+### RAG 评测模型
+
+| 模型 | 表名 | 职责 |
+|---|---|---|
+| EvalDataset | `eval_datasets` | 测试问题、题型、难度与 gold chunk 标注 |
+| EvalRun | `eval_runs` | 一次评测运行的策略、状态、聚合指标和延迟 |
+| EvalResult | `eval_results` | 单题检索结果、指标与错误案例标记 |
+
+**来源**: `backend/app/models/eval.py`
+
+### 知识图谱候选、证据与判定模型
+
+Phase 04 的知识图谱链路以 PostgreSQL audit row 为事实源。召回信号只能生成候选和 evidence package；只有通过 LLM 语义判定和 deterministic gates 的 `KnowledgeRelationJudgment(status='accepted', gate_status='accepted')` 才能作为 accepted graph fact 的输入。
+
+| 模型 | 表名 | 职责 |
+|---|---|---|
+| KnowledgeExtractionRun | `knowledge_extraction_runs` | 一次 CLI/批处理运行，记录 domain/ontology profile、候选/判定/accepted/review 计数、token、cost、latency 和 metrics summary |
+| KnowledgeEvidenceRef | `knowledge_evidence_refs` | evidence ref 定位器，绑定 owner、novel、run、source_type、chunk/chapter locator 和 excerpt |
+| KnowledgeEntityCandidate | `knowledge_entity_candidates` | deterministic 或 LLM 输出前的实体候选，带 evidence refs、domain profile 和 review status |
+| KnowledgeEventCandidate | `knowledge_event_candidates` | 事件候选，带 time/location/participant/evidence refs |
+| KnowledgeRelationCandidate | `knowledge_relation_candidates` | 关系候选；保存 recall_signals 和 package_snapshot，但不是图事实 |
+| KnowledgeRelationJudgment | `knowledge_relation_judgments` | LLM 结构化语义判定及 schema/evidence/threshold/conflict gate 状态 |
+| KnowledgeReviewQueue | `knowledge_review_queue` | 低置信度、risk flag、冲突或人工复核项 |
+
+**来源**: `backend/app/models/knowledge.py`
+
+### 知识图谱离线评测 Fixture
+
+| 文件 | 领域 | 内容 |
+|---|---|---|
+| `backend/evals/knowledge_graph_fiction_sample.json` | fiction | 10 个 labeled examples，覆盖 character relation、conflict、foreshadowing、event sequence、alias/family 等 |
+| `backend/evals/knowledge_graph_history_sample.json` | history | 10 个 labeled examples，覆盖 person/organization、rule、succession、causality、temporal sequence、source conflict 等 |
+
+`backend/scripts/run_knowledge_graph_eval.py` 离线读取这些 fixture，分别报告 recall signal quality、judgment quality、accepted graph fact quality、faithfulness、cost/latency。该 eval 不写库，live LLM faithfulness check 为可选且不可用时报告 blocked，不阻塞 deterministic tests。
+
+### 后续业务预留模型（表已存在，业务未实现）
 
 | 模型 | 表名 | 状态 |
 |---|---|---|
@@ -129,6 +164,16 @@ users (1)
             ├──< chapters (novel_id, CASCADE)
             ├──< text_chunks (novel_id CASCADE, chapter_id SET NULL)
             ├──< import_jobs (novel_id CASCADE)
+            ├──< eval_datasets (novel_id CASCADE)
+            ├──< eval_runs (novel_id CASCADE)
+            │     └──< eval_results (run_id CASCADE, dataset_id CASCADE)
+            ├──< knowledge_extraction_runs (owner_id + novel_id CASCADE)
+            │     ├──< knowledge_evidence_refs (run_id CASCADE)
+            │     ├──< knowledge_entity_candidates (run_id CASCADE)
+            │     ├──< knowledge_event_candidates (run_id CASCADE)
+            │     ├──< knowledge_relation_candidates (run_id CASCADE)
+            │     │     └──< knowledge_relation_judgments (candidate_id CASCADE)
+            │     └──< knowledge_review_queue (run_id CASCADE)
             ├──< analysis_results (novel_id CASCADE, chapter_id SET NULL)
             ├──< characters (novel_id CASCADE)
             │     └──< character_relations (source + target, CASCADE)
@@ -146,6 +191,7 @@ users (1)
 - **Chapter**: 通过 `novel.owner_id` 间接校验
 - **AIModelConfig**: 列表/更新/删除/测试均校验 `owner_id`
 - **TextChunk**: 通过 `novel.owner_id` 间接校验
+- **Knowledge\***: 表内直接保存 `owner_id`，API 和 gate/projection 查询同时校验 owner、novel、run 范围
 - 跨用户访问统一返回 **404**（不暴露资源是否存在）
 
 ## 存储分布

@@ -1,0 +1,508 @@
+{
+  "fixture_version": "knowledge-graph-eval-fixture.v1",
+  "name": "knowledge_graph_history_sample",
+  "domain_profile": "history",
+  "ontology_profile": "history.v1",
+  "description": "Ten labeled history relation examples for offline knowledge graph evaluation.",
+  "examples": [
+    {
+      "id": "hs-01",
+      "category": "person_organization_relation",
+      "expected_decision": "accepted",
+      "expected_evidence_refs": ["ev-hs-0101", "ev-hs-0102"],
+      "candidate": {
+        "candidate_id": 1,
+        "relation_type": "served",
+        "source": {"kind": "entity_candidate", "id": 301, "name": "Zhang Qian"},
+        "target": {"kind": "entity_candidate", "id": 302, "name": "Han court"},
+        "recall_signals": {
+          "entity_overlap": {"shared": ["Zhang Qian", "Han court"], "source": "metadata_json"},
+          "time_window": {"shared": ["138 BCE"], "source": "metadata_json_or_text"}
+        },
+        "evidence_refs": ["ev-hs-0101", "ev-hs-0102"]
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev-hs-0101",
+          "source_type": "text_chunk",
+          "chunk_id": 20101,
+          "chapter_id": 31,
+          "chapter_title": "Western Embassy",
+          "chunk_index": 0,
+          "excerpt": "In 138 BCE, Zhang Qian was dispatched by the Han court toward the western regions.",
+          "metadata": {"people": ["Zhang Qian"], "organizations": ["Han court"], "time_refs": ["138 BCE"]}
+        },
+        {
+          "evidence_id": "ev-hs-0102",
+          "source_type": "text_chunk",
+          "chunk_id": 20102,
+          "chapter_id": 31,
+          "chapter_title": "Western Embassy",
+          "chunk_index": 1,
+          "excerpt": "The court record describes Zhang Qian as an envoy acting on imperial orders.",
+          "metadata": {"people": ["Zhang Qian"], "organizations": ["Han court"]}
+        }
+      ],
+      "judgment": {
+        "candidate_id": 1,
+        "relation_type": "served",
+        "confidence": 0.91,
+        "evidence_refs": ["ev-hs-0101", "ev-hs-0102"],
+        "rationale": "The cited records show Zhang Qian acting as an envoy of the Han court.",
+        "risk_flags": [],
+        "needs_human_review": false,
+        "rationale_supported_by_evidence": true
+      },
+      "llm_usage": {"prompt_tokens": 0, "completion_tokens": 0, "cost_usd": 0.0, "latency_ms": 0.0}
+    },
+    {
+      "id": "hs-02",
+      "category": "organization_relation",
+      "expected_decision": "accepted",
+      "expected_evidence_refs": ["ev-hs-0201", "ev-hs-0202"],
+      "candidate": {
+        "candidate_id": 2,
+        "relation_type": "allied_with",
+        "source": {"kind": "entity_candidate", "id": 303, "name": "Qi"},
+        "target": {"kind": "entity_candidate", "id": 304, "name": "Lu"},
+        "recall_signals": {
+          "adjacency": {"same_chapter": true, "chapter_distance": 0, "chunk_distance": 1},
+          "time_window": {"shared": ["681 BCE"], "source": "metadata_json_or_text"}
+        },
+        "evidence_refs": ["ev-hs-0201", "ev-hs-0202"]
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev-hs-0201",
+          "source_type": "text_chunk",
+          "chunk_id": 20201,
+          "chapter_id": 32,
+          "chapter_title": "Spring Covenant",
+          "chunk_index": 0,
+          "excerpt": "In 681 BCE, Qi and Lu envoys swore a covenant at Ke.",
+          "metadata": {"organizations": ["Qi", "Lu"], "time_refs": ["681 BCE"]}
+        },
+        {
+          "evidence_id": "ev-hs-0202",
+          "source_type": "text_chunk",
+          "chunk_id": 20202,
+          "chapter_id": 32,
+          "chapter_title": "Spring Covenant",
+          "chunk_index": 1,
+          "excerpt": "The covenant required both states to send troops if either border was attacked.",
+          "metadata": {"organizations": ["Qi", "Lu"], "time_refs": ["681 BCE"]}
+        }
+      ],
+      "judgment": {
+        "candidate_id": 2,
+        "relation_type": "allied_with",
+        "confidence": 0.9,
+        "evidence_refs": ["ev-hs-0201", "ev-hs-0202"],
+        "rationale": "The covenant and mutual defense obligation support an alliance relation.",
+        "risk_flags": [],
+        "needs_human_review": false,
+        "rationale_supported_by_evidence": true
+      },
+      "llm_usage": {"prompt_tokens": 0, "completion_tokens": 0, "cost_usd": 0.0, "latency_ms": 0.0}
+    },
+    {
+      "id": "hs-03",
+      "category": "conflict",
+      "expected_decision": "accepted",
+      "expected_evidence_refs": ["ev-hs-0301", "ev-hs-0302"],
+      "candidate": {
+        "candidate_id": 3,
+        "relation_type": "conflicted_with",
+        "source": {"kind": "entity_candidate", "id": 305, "name": "Athens"},
+        "target": {"kind": "entity_candidate", "id": 306, "name": "Sparta"},
+        "recall_signals": {
+          "retrieval": {"source": {"bm25": {"score": 2.1}}, "target": {"vector": {"score": 0.84}}},
+          "time_window": {"shared": ["431 BCE"], "source": "metadata_json_or_text"}
+        },
+        "evidence_refs": ["ev-hs-0301", "ev-hs-0302"]
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev-hs-0301",
+          "source_type": "text_chunk",
+          "chunk_id": 20301,
+          "chapter_id": 33,
+          "chapter_title": "War Begins",
+          "chunk_index": 0,
+          "excerpt": "The account marks 431 BCE as the year open war began between Athens and Sparta.",
+          "metadata": {"organizations": ["Athens", "Sparta"], "time_refs": ["431 BCE"]}
+        },
+        {
+          "evidence_id": "ev-hs-0302",
+          "source_type": "text_chunk",
+          "chunk_id": 20302,
+          "chapter_id": 33,
+          "chapter_title": "War Begins",
+          "chunk_index": 1,
+          "excerpt": "Spartan forces entered Attica while Athenian ships raided Peloponnesian coasts.",
+          "metadata": {"organizations": ["Athens", "Sparta"], "time_refs": ["431 BCE"]}
+        }
+      ],
+      "judgment": {
+        "candidate_id": 3,
+        "relation_type": "conflicted_with",
+        "confidence": 0.96,
+        "evidence_refs": ["ev-hs-0301", "ev-hs-0302"],
+        "rationale": "The passages directly describe war and reciprocal military action.",
+        "risk_flags": [],
+        "needs_human_review": false,
+        "rationale_supported_by_evidence": true
+      },
+      "llm_usage": {"prompt_tokens": 0, "completion_tokens": 0, "cost_usd": 0.0, "latency_ms": 0.0}
+    },
+    {
+      "id": "hs-04",
+      "category": "rule_relation",
+      "expected_decision": "accepted",
+      "expected_evidence_refs": ["ev-hs-0401", "ev-hs-0402"],
+      "candidate": {
+        "candidate_id": 4,
+        "relation_type": "ruled",
+        "source": {"kind": "entity_candidate", "id": 307, "name": "Emperor Wen"},
+        "target": {"kind": "entity_candidate", "id": 308, "name": "Han empire"},
+        "recall_signals": {
+          "entity_overlap": {"shared": ["Emperor Wen", "Han empire"], "source": "metadata_json"},
+          "time_window": {"shared": ["180 BCE"], "source": "metadata_json_or_text"}
+        },
+        "evidence_refs": ["ev-hs-0401", "ev-hs-0402"]
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev-hs-0401",
+          "source_type": "text_chunk",
+          "chunk_id": 20401,
+          "chapter_id": 34,
+          "chapter_title": "Accession",
+          "chunk_index": 2,
+          "excerpt": "Emperor Wen ascended the Han throne in 180 BCE.",
+          "metadata": {"people": ["Emperor Wen"], "organizations": ["Han empire"], "time_refs": ["180 BCE"]}
+        },
+        {
+          "evidence_id": "ev-hs-0402",
+          "source_type": "text_chunk",
+          "chunk_id": 20402,
+          "chapter_id": 34,
+          "chapter_title": "Accession",
+          "chunk_index": 3,
+          "excerpt": "Subsequent edicts identify him as ruler over the Han commanderies.",
+          "metadata": {"people": ["Emperor Wen"], "organizations": ["Han empire"]}
+        }
+      ],
+      "judgment": {
+        "candidate_id": 4,
+        "relation_type": "ruled",
+        "confidence": 0.93,
+        "evidence_refs": ["ev-hs-0401", "ev-hs-0402"],
+        "rationale": "The evidence identifies Emperor Wen's accession and rule over Han commanderies.",
+        "risk_flags": [],
+        "needs_human_review": false,
+        "rationale_supported_by_evidence": true
+      },
+      "llm_usage": {"prompt_tokens": 0, "completion_tokens": 0, "cost_usd": 0.0, "latency_ms": 0.0}
+    },
+    {
+      "id": "hs-05",
+      "category": "succession",
+      "expected_decision": "accepted",
+      "expected_evidence_refs": ["ev-hs-0501", "ev-hs-0502"],
+      "candidate": {
+        "candidate_id": 5,
+        "relation_type": "succeeded",
+        "source": {"kind": "entity_candidate", "id": 309, "name": "King Edward VI"},
+        "target": {"kind": "entity_candidate", "id": 310, "name": "Henry VIII"},
+        "recall_signals": {
+          "adjacency": {"same_chapter": true, "chapter_distance": 0, "chunk_distance": 1},
+          "time_window": {"shared": ["1547"], "source": "metadata_json_or_text"}
+        },
+        "evidence_refs": ["ev-hs-0501", "ev-hs-0502"]
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev-hs-0501",
+          "source_type": "text_chunk",
+          "chunk_id": 20501,
+          "chapter_id": 35,
+          "chapter_title": "Tudor Succession",
+          "chunk_index": 0,
+          "excerpt": "Henry VIII died in January 1547.",
+          "metadata": {"people": ["Henry VIII"], "time_refs": ["1547"]}
+        },
+        {
+          "evidence_id": "ev-hs-0502",
+          "source_type": "text_chunk",
+          "chunk_id": 20502,
+          "chapter_id": 35,
+          "chapter_title": "Tudor Succession",
+          "chunk_index": 1,
+          "excerpt": "His son Edward VI was proclaimed king after Henry's death.",
+          "metadata": {"people": ["Edward VI", "Henry VIII"], "time_refs": ["1547"]}
+        }
+      ],
+      "judgment": {
+        "candidate_id": 5,
+        "relation_type": "succeeded",
+        "confidence": 0.95,
+        "evidence_refs": ["ev-hs-0501", "ev-hs-0502"],
+        "rationale": "Edward VI is explicitly described as becoming king after Henry VIII's death.",
+        "risk_flags": [],
+        "needs_human_review": false,
+        "rationale_supported_by_evidence": true
+      },
+      "llm_usage": {"prompt_tokens": 0, "completion_tokens": 0, "cost_usd": 0.0, "latency_ms": 0.0}
+    },
+    {
+      "id": "hs-06",
+      "category": "event_causality",
+      "expected_decision": "accepted",
+      "expected_evidence_refs": ["ev-hs-0601", "ev-hs-0602"],
+      "candidate": {
+        "candidate_id": 6,
+        "relation_type": "caused",
+        "source": {"kind": "event_candidate", "id": 401, "name": "Volcanic eruption"},
+        "target": {"kind": "event_candidate", "id": 402, "name": "Harvest failure"},
+        "recall_signals": {
+          "time_window": {"shared": ["1815", "1816"], "source": "metadata_json_or_text"},
+          "retrieval": {"source": {"bm25": {"score": 2.8}}, "target": {"bm25": {"score": 2.6}}}
+        },
+        "evidence_refs": ["ev-hs-0601", "ev-hs-0602"]
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev-hs-0601",
+          "source_type": "text_chunk",
+          "chunk_id": 20601,
+          "chapter_id": 36,
+          "chapter_title": "Tambora",
+          "chunk_index": 0,
+          "excerpt": "The 1815 Tambora eruption injected ash into the atmosphere and dimmed sunlight.",
+          "metadata": {"time_refs": ["1815"], "events": ["Tambora eruption"]}
+        },
+        {
+          "evidence_id": "ev-hs-0602",
+          "source_type": "text_chunk",
+          "chunk_id": 20602,
+          "chapter_id": 36,
+          "chapter_title": "Tambora",
+          "chunk_index": 1,
+          "excerpt": "Contemporary reports linked the dim sunlight to failed harvests in 1816.",
+          "metadata": {"time_refs": ["1816"], "events": ["Harvest failure"]}
+        }
+      ],
+      "judgment": {
+        "candidate_id": 6,
+        "relation_type": "caused",
+        "confidence": 0.9,
+        "evidence_refs": ["ev-hs-0601", "ev-hs-0602"],
+        "rationale": "The evidence states that atmospheric ash dimmed sunlight and reports linked it to harvest failures.",
+        "risk_flags": [],
+        "needs_human_review": false,
+        "rationale_supported_by_evidence": true
+      },
+      "llm_usage": {"prompt_tokens": 0, "completion_tokens": 0, "cost_usd": 0.0, "latency_ms": 0.0}
+    },
+    {
+      "id": "hs-07",
+      "category": "temporal_sequence",
+      "expected_decision": "accepted",
+      "expected_evidence_refs": ["ev-hs-0701", "ev-hs-0702"],
+      "candidate": {
+        "candidate_id": 7,
+        "relation_type": "preceded",
+        "source": {"kind": "event_candidate", "id": 403, "name": "Petition submitted"},
+        "target": {"kind": "event_candidate", "id": 404, "name": "Edict issued"},
+        "recall_signals": {
+          "adjacency": {"same_chapter": true, "chapter_distance": 0, "chunk_distance": 1},
+          "time_window": {"shared": ["March 3", "March 10"], "source": "metadata_json_or_text"}
+        },
+        "evidence_refs": ["ev-hs-0701", "ev-hs-0702"]
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev-hs-0701",
+          "source_type": "text_chunk",
+          "chunk_id": 20701,
+          "chapter_id": 37,
+          "chapter_title": "Court Calendar",
+          "chunk_index": 4,
+          "excerpt": "The merchants' petition was submitted on March 3.",
+          "metadata": {"time_refs": ["March 3"], "organizations": ["merchants"]}
+        },
+        {
+          "evidence_id": "ev-hs-0702",
+          "source_type": "text_chunk",
+          "chunk_id": 20702,
+          "chapter_id": 37,
+          "chapter_title": "Court Calendar",
+          "chunk_index": 5,
+          "excerpt": "The tax edict was issued on March 10.",
+          "metadata": {"time_refs": ["March 10"], "events": ["tax edict"]}
+        }
+      ],
+      "judgment": {
+        "candidate_id": 7,
+        "relation_type": "preceded",
+        "confidence": 0.87,
+        "evidence_refs": ["ev-hs-0701", "ev-hs-0702"],
+        "rationale": "The petition date precedes the edict date.",
+        "risk_flags": [],
+        "needs_human_review": false,
+        "rationale_supported_by_evidence": true
+      },
+      "llm_usage": {"prompt_tokens": 0, "completion_tokens": 0, "cost_usd": 0.0, "latency_ms": 0.0}
+    },
+    {
+      "id": "hs-08",
+      "category": "schema_violation",
+      "expected_decision": "rejected",
+      "expected_evidence_refs": ["ev-hs-0801", "ev-hs-0802"],
+      "candidate": {
+        "candidate_id": 8,
+        "relation_type": "preceded",
+        "source": {"kind": "event_candidate", "id": 405, "name": "Debate"},
+        "target": {"kind": "event_candidate", "id": 406, "name": "Vote"},
+        "recall_signals": {
+          "adjacency": {"same_chapter": true, "chapter_distance": 0, "chunk_distance": 1}
+        },
+        "evidence_refs": ["ev-hs-0801", "ev-hs-0802"]
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev-hs-0801",
+          "source_type": "text_chunk",
+          "chunk_id": 20801,
+          "chapter_id": 38,
+          "chapter_title": "Assembly",
+          "chunk_index": 0,
+          "excerpt": "The assembly debated the proposal through the afternoon.",
+          "metadata": {"events": ["debate"]}
+        },
+        {
+          "evidence_id": "ev-hs-0802",
+          "source_type": "text_chunk",
+          "chunk_id": 20802,
+          "chapter_id": 38,
+          "chapter_title": "Assembly",
+          "chunk_index": 1,
+          "excerpt": "A vote was held after sunset.",
+          "metadata": {"events": ["vote"]}
+        }
+      ],
+      "judgment": {
+        "candidate_id": 8,
+        "relation_type": "influenced",
+        "confidence": 0.82,
+        "evidence_refs": ["ev-hs-0801", "ev-hs-0802"],
+        "rationale": "The relation label is not part of the history ontology.",
+        "risk_flags": [],
+        "needs_human_review": false,
+        "rationale_supported_by_evidence": false
+      },
+      "llm_usage": {"prompt_tokens": 0, "completion_tokens": 0, "cost_usd": 0.0, "latency_ms": 0.0}
+    },
+    {
+      "id": "hs-09",
+      "category": "unsupported_claim",
+      "expected_decision": "rejected",
+      "expected_evidence_refs": ["ev-hs-0901", "ev-hs-0902"],
+      "candidate": {
+        "candidate_id": 9,
+        "relation_type": "caused",
+        "source": {"kind": "event_candidate", "id": 407, "name": "Coinage reform"},
+        "target": {"kind": "event_candidate", "id": 408, "name": "Border revolt"},
+        "recall_signals": {
+          "retrieval": {"source": {"vector": {"score": 0.76}}, "target": {"vector": {"score": 0.74}}},
+          "time_window": {"shared": ["1200"], "source": "metadata_json_or_text"}
+        },
+        "evidence_refs": ["ev-hs-0901", "ev-hs-0902"]
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev-hs-0901",
+          "source_type": "text_chunk",
+          "chunk_id": 20901,
+          "chapter_id": 39,
+          "chapter_title": "Coins",
+          "chunk_index": 2,
+          "excerpt": "The coinage reform was announced in the capital.",
+          "metadata": {"events": ["coinage reform"], "time_refs": ["1200"]}
+        },
+        {
+          "evidence_id": "ev-hs-0902",
+          "source_type": "text_chunk",
+          "chunk_id": 20902,
+          "chapter_id": 39,
+          "chapter_title": "Coins",
+          "chunk_index": 3,
+          "excerpt": "A border revolt was recorded later that year, but the chronicle gives no stated cause.",
+          "metadata": {"events": ["border revolt"], "time_refs": ["1200"]}
+        }
+      ],
+      "judgment": {
+        "candidate_id": 9,
+        "relation_type": "caused",
+        "confidence": 0.86,
+        "evidence_refs": ["ev-hs-9999"],
+        "rationale": "The causal claim cites evidence outside the package.",
+        "risk_flags": [],
+        "needs_human_review": false,
+        "rationale_supported_by_evidence": false
+      },
+      "llm_usage": {"prompt_tokens": 0, "completion_tokens": 0, "cost_usd": 0.0, "latency_ms": 0.0}
+    },
+    {
+      "id": "hs-10",
+      "category": "source_conflict",
+      "expected_decision": "needs_human_review",
+      "expected_evidence_refs": ["ev-hs-1001", "ev-hs-1002"],
+      "candidate": {
+        "candidate_id": 10,
+        "relation_type": "same_entity",
+        "source": {"kind": "entity_candidate", "id": 311, "name": "Aru the Younger"},
+        "target": {"kind": "entity_candidate", "id": 312, "name": "Aru the Elder"},
+        "recall_signals": {
+          "entity_overlap": {"shared": ["Aru"], "source": "metadata_json"},
+          "time_window": {"shared": ["late inscription"], "source": "metadata_json_or_text"}
+        },
+        "evidence_refs": ["ev-hs-1001", "ev-hs-1002"]
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev-hs-1001",
+          "source_type": "text_chunk",
+          "chunk_id": 21001,
+          "chapter_id": 40,
+          "chapter_title": "Inscription Notes",
+          "chunk_index": 0,
+          "excerpt": "The late inscription calls the donor Aru the Younger.",
+          "metadata": {"people": ["Aru the Younger"], "sources": ["late inscription"]}
+        },
+        {
+          "evidence_id": "ev-hs-1002",
+          "source_type": "text_chunk",
+          "chunk_id": 21002,
+          "chapter_id": 40,
+          "chapter_title": "Inscription Notes",
+          "chunk_index": 1,
+          "excerpt": "A damaged earlier copy appears to call the same officeholder Aru the Elder.",
+          "metadata": {"people": ["Aru the Elder"], "sources": ["damaged copy"]}
+        }
+      ],
+      "judgment": {
+        "candidate_id": 10,
+        "relation_type": "same_entity",
+        "confidence": 0.7,
+        "evidence_refs": ["ev-hs-1001", "ev-hs-1002"],
+        "rationale": "The sources may refer to one officeholder, but the inscription conflict is unresolved.",
+        "risk_flags": ["source_conflict"],
+        "needs_human_review": true,
+        "rationale_supported_by_evidence": true
+      },
+      "llm_usage": {"prompt_tokens": 0, "completion_tokens": 0, "cost_usd": 0.0, "latency_ms": 0.0}
+    }
+  ]
+}

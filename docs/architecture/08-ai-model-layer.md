@@ -65,6 +65,7 @@ AI 模型的配置管理、密钥加密、调用路由与成本统计。
 |---|---|---|
 | chunking → embedding | budget | embedding 任务量最大，优先低成本 |
 | analysis → chat | quality | 分析质量重要，优先高能力模型 |
+| extraction → chat | quality | 知识图谱关系判定需要语义理解，但只输出结构化 judgment |
 | fanfiction → chat | balanced | 创作平衡成本与质量 |
 | summary → chat | balanced | 摘要中等复杂度 |
 
@@ -95,6 +96,33 @@ async for chunk in ai_service.stream_chat(messages, model):
 ```
 
 支持所有 OpenAI-compatible 提供商（OpenAI、Anthropic、Ollama、自定义端点等）。
+
+### 知识图谱 LLM 判定边界
+
+**来源**: `backend/app/services/knowledge/llm_judge.py`
+
+Phase 04 的知识图谱链路强制区分 LLM 与脚本职责：
+
+| 层 | 职责 |
+|---|---|
+| `CandidateRecallService` | 生成 deterministic chunk/entity/time/retrieval recall signals 和 evidence package |
+| `KnowledgeLLMJudgeService` | 通过 `ai_router.route_task("extraction")` 选择模型，仅输出 JSON relation judgment |
+| `KnowledgeGateService` | 脚本执行 schema、evidence、threshold、conflict gates，决定 accepted/rejected/review |
+| `KnowledgeProjectionService` | 只读取 accepted PostgreSQL judgment rows，投影到现有 graph-facing tables |
+
+LLM 输出必须符合 `KnowledgeLLMRelationJudgmentOutput`，只能引用 package 内的 allowed evidence IDs。LLM 不直接写 accepted graph facts；vector/BM25/adjacency/time-window 仅作为 recall signals。
+
+### 知识图谱 Eval 与 Faithfulness
+
+**来源**: `backend/scripts/run_knowledge_graph_eval.py`
+
+离线 eval 使用 `backend/evals/knowledge_graph_fiction_sample.json` 与 `backend/evals/knowledge_graph_history_sample.json`，共 20 个 labeled examples。报告分为：
+
+- `recall_signal_quality`: candidate coverage 和 evidence-bound candidate rate，不代表事实准确性。
+- `accepted_graph_fact_quality`: deterministic gates 后的 accepted precision/recall。
+- `judgment_quality`: schema failures、evidence gate failures、review routing accuracy。
+- `faithfulness`: deterministic citation support；live LLM faithfulness check 为 optional，LLM 不可用时报告 blocked。
+- `cost_latency`: LLM calls、prompt/completion tokens、cost estimate、latency p50/p95，即使 mock/local 成本为 0 也输出。
 
 ### SSRF 双重校验
 
