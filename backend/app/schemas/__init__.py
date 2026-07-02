@@ -76,6 +76,27 @@ from app.schemas.ai_model import (
     AIModelTestResponse,
 )
 
+# Knowledge graph
+from app.schemas.knowledge import (
+    KnowledgeEntityCandidateCreate,
+    KnowledgeEntityCandidateResponse,
+    KnowledgeEventCandidateCreate,
+    KnowledgeEventCandidateResponse,
+    KnowledgeEvidenceRefCreate,
+    KnowledgeEvidenceRefResponse,
+    KnowledgeExtractionRunCreate,
+    KnowledgeExtractionRunResponse,
+    KnowledgeLLMEntityOutput,
+    KnowledgeLLMEventOutput,
+    KnowledgeLLMRelationJudgmentOutput,
+    KnowledgeRelationCandidateCreate,
+    KnowledgeRelationCandidateResponse,
+    KnowledgeRelationJudgmentCreate,
+    KnowledgeRelationJudgmentResponse,
+    KnowledgeReviewQueueCreate,
+    KnowledgeReviewQueueResponse,
+)
+
 __all__ = [
     # 通用
     "ErrorResponse",
@@ -112,4 +133,22 @@ __all__ = [
     "AIModelConfigUpdate",
     "AIModelTestRequest",
     "AIModelTestResponse",
+    # Knowledge graph
+    "KnowledgeExtractionRunCreate",
+    "KnowledgeExtractionRunResponse",
+    "KnowledgeEvidenceRefCreate",
+    "KnowledgeEvidenceRefResponse",
+    "KnowledgeEntityCandidateCreate",
+    "KnowledgeEntityCandidateResponse",
+    "KnowledgeEventCandidateCreate",
+    "KnowledgeEventCandidateResponse",
+    "KnowledgeRelationCandidateCreate",
+    "KnowledgeRelationCandidateResponse",
+    "KnowledgeRelationJudgmentCreate",
+    "KnowledgeRelationJudgmentResponse",
+    "KnowledgeReviewQueueCreate",
+    "KnowledgeReviewQueueResponse",
+    "KnowledgeLLMRelationJudgmentOutput",
+    "KnowledgeLLMEntityOutput",
+    "KnowledgeLLMEventOutput",
 ]

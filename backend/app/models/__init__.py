@@ -46,6 +46,15 @@ from app.models.fanfiction_chapter import FanFictionChapter
 from app.models.ai_model import AIModelConfig
 from app.models.ai_usage_log import AIUsageLog
 from app.models.text_chunk import TextChunk
+from app.models.knowledge import (
+    KnowledgeEntityCandidate,
+    KnowledgeEventCandidate,
+    KnowledgeEvidenceRef,
+    KnowledgeExtractionRun,
+    KnowledgeRelationCandidate,
+    KnowledgeRelationJudgment,
+    KnowledgeReviewQueue,
+)
 
 __all__ = [
     "Base",
@@ -62,4 +71,11 @@ __all__ = [
     "AIModelConfig",
     "AIUsageLog",
     "TextChunk",
+    "KnowledgeExtractionRun",
+    "KnowledgeEntityCandidate",
+    "KnowledgeEventCandidate",
+    "KnowledgeRelationCandidate",
+    "KnowledgeRelationJudgment",
+    "KnowledgeEvidenceRef",
+    "KnowledgeReviewQueue",
 ]
