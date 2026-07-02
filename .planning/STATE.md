@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v0.3
 milestone_name: Plans
 status: unknown
-last_updated: "2026-07-02T07:26:41.996Z"
+last_updated: "2026-07-02T07:49:16.063Z"
 progress:
   total_phases: 4
   completed_phases: 3
   total_plans: 11
-  completed_plans: 9
-  percent: 75
+  completed_plans: 10
+  percent: 91
 ---
 
 # Project State
@@ -24,7 +24,7 @@ See `.planning/PROJECT.md` and `IMPLEMENTATION-STATUS.md`。<br>
 ## Current Position
 
 Phase: 04 (llm) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 
 - Milestone: **v0.3 - 小说导入 + RAG 索引** — GAPS FOUND
 - Phase: 03-01 RAG 评测集与自动化检索优化闭环 — PARTIAL
@@ -109,15 +109,19 @@ v0.3 保持 active，但没有可自动执行 plan。需要人工完成评测题
 
 - 2026-07-02: 04-02 uses text_chunk pairs as evidence-unit relation candidates; no accepted graph facts are created.
 - 2026-07-02: 04-02 reports unavailable live LLM calls as blocked judgment audit status instead of fabricating semantic output.
+- 2026-07-02: 04-03 uses accepted KnowledgeRelationJudgment rows as PostgreSQL source-of-truth projection input because no accepted-edge migration was added.
+- 2026-07-02: 04-03 skips text_chunk-only projection until entity/event resolution exists, preserving recall signals as non-truth.
+- 2026-07-02: 04-03 keeps Neo4j sync disabled by default and read-only from accepted PostgreSQL rows.
 
 ### Performance Metrics
 
 | Plan | Duration | Tasks | Files |
 |---|---:|---:|---:|
 | Phase 04 P02 | 10min | 1 task | 7 files |
+| Phase 04 P03 | 16min | 1 task | 10 files |
 
 ### Session
 
-- Last session: 2026-07-02T07:25:13.620Z
-- Stopped At: Completed 04-02-candidate-packages-and-llm-judgment-PLAN.md
+- Last session: 2026-07-02T07:49:33.830Z
+- Stopped At: Completed 04-03-evidence-gates-and-projection-PLAN.md
 - Resume File: None

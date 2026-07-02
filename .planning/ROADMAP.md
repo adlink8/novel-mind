@@ -58,10 +58,10 @@
 **Goal:** 建立可审计的知识图谱构建链路：脚本负责召回、证据、规则、阈值和写库；LLM 只负责语义理解、关系候选和判断。该链路同时支持小说与历史语料。
 **Requirements**: REQ-KG-01..06
 **Depends on:** Phase 3
-**Plans:** 2/4 plans executed
+**Plans:** 3/4 plans executed
 
 Plans:
 - [x] 04-01 knowledge data contracts: PostgreSQL candidate/judgment/evidence/review contracts
 - [x] 04-02 candidate packages and LLM judgment: deterministic recall package + structured LLM semantic judgment
-- [ ] 04-03 evidence gates and projection: schema/evidence/threshold/conflict gates + accepted graph projection
+- [x] 04-03 evidence gates and projection: schema/evidence/threshold/conflict gates + accepted graph projection
 - [ ] 04-04 evaluation and domain fixtures: fiction/history fixtures, graph eval CLI, cost/latency/faithfulness reporting
