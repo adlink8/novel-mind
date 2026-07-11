@@ -15,7 +15,7 @@
 """
 
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -235,6 +235,7 @@ class SearchRequest(BaseModel):
 
     query: str = Field(..., min_length=1, max_length=500, description="搜索查询文本")
     top_k: int = Field(default=10, ge=1, le=50, description="返回结果数量上限")
+    mode: Literal["chunks", "units", "hybrid"] = Field(default="chunks")
 
 
 class SearchResultItem(BaseModel):
@@ -250,6 +251,10 @@ class SearchResultItem(BaseModel):
     score: float
     vector_score: float | None = None
     bm25_score: float | None = None
+    source_type: Literal["chunk", "unit"] = "chunk"
+    unit_id: int | None = None
+    evidence_refs: list[str] = Field(default_factory=list)
+    lifecycle: str | None = None
 
 
 class SearchResponse(BaseModel):

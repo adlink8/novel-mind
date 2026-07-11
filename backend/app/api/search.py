@@ -35,12 +35,35 @@ async def global_search(
     from app.services.hybrid_search import hybrid_search_service
 
     try:
-        results = await hybrid_search_service.search_global(
-            db,
-            query=request.query,
-            top_k=request.top_k,
-            owner_id=current_user.id,
-        )
+        if request.mode == "chunks":
+            results = await hybrid_search_service.search_global(
+                db,
+                query=request.query,
+                top_k=request.top_k,
+                owner_id=current_user.id,
+            )
+        else:
+            from app.services.knowledge_units.search import (
+                fuse_results,
+                narrative_search_service,
+            )
+
+            units = await narrative_search_service.search_global_units(
+                db,
+                owner_id=current_user.id,
+                query=request.query,
+                top_k=request.top_k,
+            )
+            if request.mode == "units":
+                results = units
+            else:
+                chunks = await hybrid_search_service.search_global(
+                    db,
+                    query=request.query,
+                    top_k=request.top_k,
+                    owner_id=current_user.id,
+                )
+                results = fuse_results(chunks, units, top_k=request.top_k)
     except Exception as e:
         logger.exception("global hybrid search failed: %s", e)
         return SearchResponse(results=[], total=0, query=request.query)
@@ -80,9 +103,32 @@ async def novel_search(
     from app.services.hybrid_search import hybrid_search_service
 
     try:
-        results = await hybrid_search_service.search_novel(
-            db, novel_id=novel_id, query=request.query, top_k=request.top_k
-        )
+        if request.mode == "chunks":
+            results = await hybrid_search_service.search_novel(
+                db, novel_id=novel_id, query=request.query, top_k=request.top_k
+            )
+        else:
+            if current_user is None:
+                raise HTTPException(status_code=401, detail="知识单元检索需要认证")
+            from app.services.knowledge_units.search import (
+                fuse_results,
+                narrative_search_service,
+            )
+
+            units = await narrative_search_service.search_units(
+                db,
+                owner_id=current_user.id,
+                novel_id=novel_id,
+                query=request.query,
+                top_k=request.top_k,
+            )
+            if request.mode == "units":
+                results = units
+            else:
+                chunks = await hybrid_search_service.search_novel(
+                    db, novel_id=novel_id, query=request.query, top_k=request.top_k
+                )
+                results = fuse_results(chunks, units, top_k=request.top_k)
     except Exception as e:
         logger.exception("hybrid search failed for novel_%d: %s", novel_id, e)
         return SearchResponse(results=[], total=0, query=request.query)

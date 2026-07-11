@@ -49,7 +49,23 @@ class VectorStore:
             host: ChromaDB 服务地址
             port: ChromaDB 服务端口（docker-compose 中映射的宿主机端口）
         """
-        self.client = chromadb.HttpClient(host=host, port=port)
+        self.host = host
+        self.port = port
+        self._client = None
+
+    @property
+    def client(self):
+        """Create the HTTP client lazily so imports work while Chroma is down."""
+        if self._client is None:
+            self._client = chromadb.HttpClient(host=self.host, port=self.port)
+        return self._client
+
+    def get_named_collection(self, name: str, *, create: bool = False):
+        if create:
+            return self.client.get_or_create_collection(
+                name=name, metadata={"hnsw:space": "cosine"}
+            )
+        return self.client.get_collection(name=name)
 
     def _get_collection(self, novel_id: int):
         """
