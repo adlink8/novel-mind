@@ -62,25 +62,54 @@ def test_documented_build_and_rollback_dry_runs_execute():
         assert result.returncode == 0, result.stderr
 
 
-def test_exact_05_02_build_command_reaches_runtime_contract():
+@pytest.mark.asyncio
+async def test_exact_05_02_build_command_executes_against_frozen_snapshot(tmp_path):
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+    import app.models  # noqa: F401
+    from app.models.base import Base
+    from tests.test_knowledge_unit_materialize import _accepted_source
+
+    database = tmp_path / "cli-contract.sqlite3"
+    engine = create_async_engine(f"sqlite+aiosqlite:///{database.as_posix()}")
+    search_vector = Base.metadata.tables["text_chunks"].c.search_vector
+    postgres_computed = search_vector.computed
+    search_vector.computed = None
+    try:
+        async with engine.begin() as connection:
+            await connection.run_sync(Base.metadata.create_all)
+        session_factory = async_sessionmaker(engine, expire_on_commit=False)
+        async with session_factory() as session:
+            snapshot = await _accepted_source(session)
+            snapshot_id = snapshot.id
+            await session.commit()
+    finally:
+        search_vector.computed = postgres_computed
+        await engine.dispose()
+
+    env = os.environ.copy()
+    env["NOVELMIND_DATABASE_URL"] = (
+        f"sqlite+aiosqlite:///{database.as_posix()}"
+    )
     result = subprocess.run(
         [
             sys.executable,
             "scripts/build_narrative_units.py",
             "--snapshot-id",
-            "1",
+            str(snapshot_id),
             "--dry-run",
         ],
         cwd=BACKEND,
+        env=env,
         capture_output=True,
         text=True,
         timeout=30,
         check=False,
     )
-    # A local DB may be unavailable or may not contain snapshot 1, but the exact
-    # documented argv must pass argparse and execute the read-only runtime path.
-    assert "unrecognized arguments" not in result.stderr
-    assert "invalid int value" not in result.stderr
+    assert result.returncode == 0, result.stderr
+    payload = __import__("json").loads(result.stdout[result.stdout.index("{") :])
+    assert payload["materialize"]["snapshot_id"] == snapshot_id
+    assert payload["materialize"]["created"] == 1
 
 
 @pytest.mark.parametrize(
