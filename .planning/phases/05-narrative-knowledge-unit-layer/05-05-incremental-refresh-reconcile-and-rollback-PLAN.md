@@ -54,9 +54,8 @@ Close the narrative-unit lifecycle with affected-subject refresh, deletion/depre
 cd backend
 pytest tests/test_knowledge_unit_incremental.py tests/test_knowledge_unit_reconcile.py tests/test_knowledge_unit_rollback.py -v
 pytest tests/test_knowledge_*.py tests/test_eval_*.py -v
-python scripts/refresh_narrative_units.py --dry-run
+python scripts/refresh_narrative_units.py --owner-id 1 --novel-id 1 --snapshot-id 1 --domain fiction --dry-run
 python scripts/reconcile_narrative_unit_index.py --active
 python scripts/rollback_narrative_unit_index.py --journal-id TEST --dry-run
 pytest tests -m "not e2e" -q
 ```
-

@@ -15,11 +15,11 @@ from app.core.database import async_session_factory  # noqa: E402
 from app.models.knowledge_unit import NarrativeIndexBuild  # noqa: E402
 from app.services.ai_service import ai_service  # noqa: E402
 from app.services.vector_store import vector_store  # noqa: E402
-from app.services.knowledge_units.eval import (
+from app.services.knowledge_units.eval import (  # noqa: E402
     candidate_retriever,
     evaluate_candidate,
     load_fixture,
-)  # noqa: E402
+)
 
 
 async def _run(args) -> dict:

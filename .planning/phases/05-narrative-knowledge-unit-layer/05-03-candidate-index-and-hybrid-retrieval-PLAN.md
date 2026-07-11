@@ -51,7 +51,6 @@ Build immutable candidate collections from canonical units and expose owner-safe
 ```powershell
 cd backend
 pytest tests/test_knowledge_unit_indexing.py tests/test_knowledge_unit_search.py tests/test_hybrid_search.py -v
-python scripts/build_narrative_unit_index.py --build-id TEST --dry-run
+python scripts/build_narrative_unit_index.py --build-id 1 --dry-run
 ruff check app/services/knowledge_units/indexing.py app/services/knowledge_units/search.py app/services/vector_store.py app/services/hybrid_search.py app/api/search.py
 ```
-

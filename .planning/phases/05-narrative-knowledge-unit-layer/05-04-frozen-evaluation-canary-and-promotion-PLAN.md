@@ -52,7 +52,8 @@ Prove candidate retrieval quality on fiction and history, then promote only an e
 ```powershell
 cd backend
 pytest tests/test_knowledge_unit_eval.py tests/test_knowledge_unit_promotion.py -v
-python scripts/run_narrative_unit_eval.py --fixture evals/narrative_units_fiction.json --dry-run
-python scripts/run_narrative_unit_eval.py --fixture evals/narrative_units_history.json --dry-run
-python scripts/promote_narrative_unit_index.py --candidate TEST --prepare --dry-run
+$env:NARRATIVE_EVAL_SIGNING_SECRET = "<operator-secret>"
+python scripts/run_narrative_unit_eval.py --fixture evals/narrative_units_fiction.json --build-id 1 --output fiction-run.json
+python scripts/run_narrative_unit_eval.py --fixture evals/narrative_units_history.json --build-id 2 --output history-run.json
+python scripts/promote_narrative_unit_index.py --candidate 1 --checksum <64-char-checksum> --prepare --eval-report fiction-run.json --reconcile-report reconcile.json --approved-by <operator>
 ```
