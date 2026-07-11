@@ -24,13 +24,13 @@ See `.planning/PROJECT.md` and `IMPLEMENTATION-STATUS.md`。<br>
 ## Current Position
 
 Phase: 05 (narrative-knowledge-unit-layer) — EXECUTING
-Plan: 4 of 5
+Plan: 5 of 5
 
 - Milestone: **v0.3 - 小说导入 + RAG 索引** — GAPS FOUND
 - Phase: 03-01 RAG 评测集与自动化检索优化闭环 — PARTIAL
 - Current branch: `feat/phase2-wave2-embedding`
-- Status: 05-01 through 05-03 are complete; Phase 05 remains in progress.
-- Last activity: 2026-07-11 — Completed 05-03 immutable candidate indexing and chunks/units/hybrid retrieval; 31 targeted/regression tests passed.
+- Status: 05-01 through 05-04 are complete; Phase 05 lifecycle closure remains in progress.
+- Last activity: 2026-07-11 — Completed 05-04 frozen fiction/history evaluation, canary gates, and journaled promotion; 10 targeted tests passed.
 
 ## Auto Routing
 
