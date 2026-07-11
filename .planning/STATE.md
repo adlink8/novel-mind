@@ -2,15 +2,14 @@
 gsd_state_version: 1.0
 milestone: v0.4
 milestone_name: Narrative Knowledge Unit Layer
-status: planning
-last_updated: 2026-07-05T04:00:00.000Z
+status: executing
+last_updated: "2026-07-11T06:20:39.996Z"
 progress:
-  total_phases: 5
-  completed_phases: 4
-  total_plans: 16
-  completed_plans: 11
-  percent: 80
-stopped_at: Phase 05 planned, not yet started
+  total_phases: 4
+  completed_phases: 1
+  total_plans: 9
+  completed_plans: 5
+  percent: 56
 ---
 
 # Project State
@@ -24,18 +23,18 @@ See `.planning/PROJECT.md` and `IMPLEMENTATION-STATUS.md`。<br>
 
 ## Current Position
 
-Phase: 05 (Narrative Knowledge Unit Layer) — PLANNED
-Plan: 0 of 5 complete
+Phase: 05 (narrative-knowledge-unit-layer) — EXECUTING
+Plan: 2 of 5
 
 - Milestone: **v0.3 - 小说导入 + RAG 索引** — GAPS FOUND
 - Phase: 03-01 RAG 评测集与自动化检索优化闭环 — PARTIAL
 - Current branch: `feat/phase2-wave2-embedding`
-- Status: Phase 05 replanned from the verified Phase 04 graph pipeline and the production patterns validated by the reference project's Phase 13-14.
-- Last activity: 2026-07-11 — Phase 05 production narrative knowledge unit plan created; execution not started.
+- Status: 05-01 source-of-truth contracts and accepted-source snapshot are complete; Phase 05 remains in progress.
+- Last activity: 2026-07-11 — Completed 05-01 with 17 targeted tests, Ruff, py_compile, and offline Alembic verification; live PostgreSQL checks blocked by connection refusal.
 
 ## Auto Routing
 
-v0.3 保持 active，但没有可自动执行 plan。需要人工完成评测题确认和 gold chunk 校准后再继续自动评测。
+Phase 05 next cursor is 05-02. Live PostgreSQL `upgrade/current/check` for 05-01 remains pending until the local database service is available.
 
 ## Verified In v0.3
 
@@ -96,6 +95,7 @@ v0.3 保持 active，但没有可自动执行 plan。需要人工完成评测题
 | Bandit | 0 High, 0 Medium |
 | npm audit | 0 vulnerabilities |
 | Alembic | upgrade/current/check 通过 (head: 518675fa18f8) |
+| Phase 05 05-01 | 17 targeted tests + Ruff + py_compile + offline Alembic passed; live PostgreSQL blocked |
 | RAG e2e | 12 passed (真实 Ollama nomic-embed-text) |
 | Eval 三策略 | 可执行，但现有 6 次运行的质量指标均为 0；不能作为效果验收 |
 | UI 浏览器验收 | 1280px + 390px 通过，console 0 errors |
@@ -115,6 +115,12 @@ v0.3 保持 active，但没有可自动执行 plan。需要人工完成评测题
 - 2026-07-02: 04-03 keeps Neo4j sync disabled by default and read-only from accepted PostgreSQL rows.
 - 2026-07-02: 04-04 evaluates fiction/history with the same offline graph eval core while keeping recall signal quality separate from accepted graph fact quality.
 
+### Phase 05 Execution Decisions
+
+- 2026-07-11: 05-01 carries owner_id and novel_id through composite source/build foreign keys to prevent cross-owner lineage.
+- 2026-07-11: 05-01 snapshot identity includes accepted semantic and exact evidence content while excluding raw LLM audit output and rationale.
+- 2026-07-11: 05-01 checks source manifests before and after savepoint writes and aborts moving inputs without a partial snapshot.
+
 ### Performance Metrics
 
 | Plan | Duration | Tasks | Files |
@@ -122,9 +128,10 @@ v0.3 保持 active，但没有可自动执行 plan。需要人工完成评测题
 | Phase 04 P02 | 10min | 1 task | 7 files |
 | Phase 04 P03 | 16min | 1 task | 10 files |
 | Phase 04 P04 | 14min | 1 task | 6 files |
+| Phase 05 P01 | 20min | 3 tasks | 9 files |
 
 ### Session
 
-- Last session: 2026-07-02T08:08:40Z
-- Stopped At: Completed 04-04-evaluation-and-domain-fixtures-PLAN.md
+- Last session: 2026-07-11T06:20:39Z
+- Stopped At: Completed 05-01-narrative-unit-contracts-and-source-snapshot-PLAN.md
 - Resume File: None
