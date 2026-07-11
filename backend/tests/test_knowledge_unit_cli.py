@@ -62,6 +62,27 @@ def test_documented_build_and_rollback_dry_runs_execute():
         assert result.returncode == 0, result.stderr
 
 
+def test_exact_05_02_build_command_reaches_runtime_contract():
+    result = subprocess.run(
+        [
+            sys.executable,
+            "scripts/build_narrative_units.py",
+            "--snapshot-id",
+            "1",
+            "--dry-run",
+        ],
+        cwd=BACKEND,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    # A local DB may be unavailable or may not contain snapshot 1, but the exact
+    # documented argv must pass argparse and execute the read-only runtime path.
+    assert "unrecognized arguments" not in result.stderr
+    assert "invalid int value" not in result.stderr
+
+
 @pytest.mark.parametrize(
     "script",
     ("promote_narrative_unit_index.py", "refresh_narrative_units.py"),

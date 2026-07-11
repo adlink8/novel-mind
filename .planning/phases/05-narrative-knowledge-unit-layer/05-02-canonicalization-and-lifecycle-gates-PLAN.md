@@ -49,7 +49,6 @@ Materialize evidence-backed draft units from frozen accepted judgments and conse
 ```powershell
 cd backend
 pytest tests/test_knowledge_unit_materialize.py tests/test_knowledge_unit_canonicalize.py -v
-python scripts/build_narrative_units.py --snapshot-id TEST --dry-run
+python scripts/build_narrative_units.py --snapshot-id 1 --dry-run
 ruff check app/services/knowledge_units/materialize.py app/services/knowledge_units/canonicalize.py app/services/knowledge_units/lifecycle.py scripts/build_narrative_units.py
 ```
-

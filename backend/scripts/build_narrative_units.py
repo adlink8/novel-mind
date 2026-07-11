@@ -46,7 +46,14 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--snapshot-id", type=int, required=True)
     parser.add_argument("--write", action="store_true")
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="materialize without writes (the default; explicit for verification)",
+    )
     args = parser.parse_args()
+    if args.write and args.dry_run:
+        parser.error("--write and --dry-run are mutually exclusive")
     print(json.dumps(asyncio.run(run(args.snapshot_id, write=args.write)), ensure_ascii=False, indent=2))
     return 0
 
