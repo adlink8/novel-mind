@@ -3,13 +3,19 @@
 import argparse
 import asyncio
 import json
+import sys
+from pathlib import Path
 
-from app.core.database import AsyncSessionLocal
-from app.services.knowledge_units.indexing import narrative_indexing_service
+BACKEND_DIR = Path(__file__).resolve().parents[1]
+if str(BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(BACKEND_DIR))
+
+from app.core.database import async_session_factory  # noqa: E402
+from app.services.knowledge_units.indexing import narrative_indexing_service  # noqa: E402
 
 
 async def run(build_id: int) -> dict:
-    async with AsyncSessionLocal() as db:
+    async with async_session_factory() as db:
         report = await narrative_indexing_service.build_candidate(db, build_id=build_id)
         await db.commit()
         return {name: getattr(report, name) for name in report.__dataclass_fields__}

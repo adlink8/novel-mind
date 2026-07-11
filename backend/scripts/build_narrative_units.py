@@ -3,14 +3,20 @@
 import argparse
 import asyncio
 import json
+import sys
+from pathlib import Path
 
-from app.database import AsyncSessionLocal
-from app.services.knowledge_units.canonicalize import narrative_canonicalizer
-from app.services.knowledge_units.materialize import narrative_unit_materializer
+BACKEND_DIR = Path(__file__).resolve().parents[1]
+if str(BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(BACKEND_DIR))
+
+from app.core.database import async_session_factory  # noqa: E402
+from app.services.knowledge_units.canonicalize import narrative_canonicalizer  # noqa: E402
+from app.services.knowledge_units.materialize import narrative_unit_materializer  # noqa: E402
 
 
 async def run(snapshot_id: int, *, write: bool) -> dict:
-    async with AsyncSessionLocal() as db:
+    async with async_session_factory() as db:
         materialized = await narrative_unit_materializer.materialize_snapshot(
             db, snapshot_id=snapshot_id, write=write
         )
