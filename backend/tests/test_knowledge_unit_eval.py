@@ -11,7 +11,9 @@ from app.services.knowledge_units.eval import (
     evaluate_candidate,
     load_fixture,
     verify_run,
+    candidate_retriever,
 )
+from app.services.knowledge_units.search import NarrativeRetrievalStrategy
 
 EVALS = Path(__file__).parents[1] / "evals"
 
@@ -101,3 +103,50 @@ async def test_wrong_candidate_metadata_cannot_pass():
         payload, build=_build(), retrieve=retrieve, signing_secret="secret"
     )
     assert not report["passed"] and not report["canary"]["passed"]
+
+
+async def test_candidate_adapter_uses_production_policy_with_candidate_selector():
+    build = _build()
+
+    class Chunks:
+        async def search_novel(self, db, *, novel_id, query, top_k):
+            return [
+                {
+                    "chunk_id": 10,
+                    "score": 0.8,
+                    "content_snippet": "raw citation",
+                }
+            ]
+
+    class Units:
+        async def search_units(self, db, **kwargs):
+            selected = await kwargs["build_selector"](
+                db,
+                kwargs["owner_id"],
+                kwargs["novel_id"],
+                kwargs["domain_profile"],
+            )
+            assert selected.id == build.id
+            return [
+                {
+                    "unit_id": 20,
+                    "chunk_id": 11,
+                    "score": 1.0,
+                    "evidence_refs": ["ev-20"],
+                    "lifecycle": "disputed",
+                }
+            ]
+
+    class DB:
+        async def get(self, model, key):
+            return build if key == build.id else None
+
+    policy = NarrativeRetrievalStrategy(chunks=Chunks(), units=Units())
+    adapter = candidate_retriever(build, db=DB(), strategy=policy)
+    context = {"strategy": "hybrid", "top_k": 5}
+    rows = await adapter("query", context)
+
+    assert [row["id"] for row in rows] == ["20", "10"]
+    assert rows[0]["evidence_ids"] == ["ev-20"]
+    assert rows[0]["metadata"]["lifecycle_status"] == "disputed"
+    assert all(row["metadata"]["build_id"] == build.id for row in rows)

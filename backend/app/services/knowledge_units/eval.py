@@ -197,60 +197,53 @@ def load_fixture(path: str | Path) -> dict[str, Any]:
 
 
 def candidate_retriever(
-    build: Any, *, vector_store: Any, ai_service: Any
+    build: Any,
+    *,
+    db: Any,
+    strategy: Any | None = None,
 ) -> RetrievalAdapter:
-    """Production retrieval adapter used by CLI and refresh wiring."""
+    """Candidate-bound adapter over the same production retrieval policy as the API."""
+
+    from app.services.knowledge_units.search import (
+        production_retrieval_strategy,
+        select_candidate_build,
+    )
+
+    policy = strategy or production_retrieval_strategy()
+    selector = select_candidate_build(build)
 
     async def retrieve(query: str, context: dict[str, Any]) -> list[dict[str, Any]]:
-        import asyncio
-
-        embedding = (await ai_service.embedding(texts=[query]))[0]
-        metadata = {
-            "build_id": build.id,
-            "manifest_checksum": build.manifest_checksum,
-            "owner_id": build.owner_id,
-            "novel_id": build.novel_id,
-            "lifecycle_status": "current",
-        }
-        if context["strategy"] == "chunks":
-            raw = await vector_store.search(
-                build.novel_id, query_embedding=embedding, top_k=context["top_k"]
-            )
-            return [
-                {
-                    "id": str(item.get("id") or item.get("chunk_id")),
-                    "metadata": metadata,
-                    "evidence_ids": [str(item.get("id") or item.get("chunk_id"))],
-                }
-                for item in raw
-            ]
-        collection = vector_store.get_named_collection(build.collection_name)
-        raw = await asyncio.to_thread(
-            collection.query,
-            query_embeddings=[embedding],
-            n_results=context["top_k"],
-            include=["metadatas"],
+        rows = await policy.search_novel(
+            db,
+            owner_id=build.owner_id,
+            novel_id=build.novel_id,
+            domain_profile=build.domain_profile,
+            query=query,
+            mode=context["strategy"],
+            top_k=context["top_k"],
+            build_selector=selector,
         )
-        units = [
-            {
-                "id": item_id,
-                "metadata": meta or {},
-                "evidence_ids": [str((meta or {}).get("evidence_checksum", ""))],
-            }
-            for item_id, meta in zip(
-                (raw.get("ids") or [[]])[0],
-                (raw.get("metadatas") or [[]])[0],
-                strict=True,
-            )
-        ]
-        if context["strategy"] == "units":
-            return units
-        chunks = await retrieve(query, {**context, "strategy": "chunks"})
-        seen: set[str] = set()
         return [
-            item
-            for item in units + chunks
-            if not (item["id"] in seen or seen.add(item["id"]))
+            {
+                "id": str(row.get("unit_id") or row.get("chunk_id")),
+                "metadata": {
+                    "build_id": build.id,
+                    "manifest_checksum": build.manifest_checksum,
+                    "owner_id": build.owner_id,
+                    "novel_id": build.novel_id,
+                    "lifecycle_status": row.get("lifecycle", "current"),
+                    "source_type": row.get("source_type", "chunk"),
+                },
+                "evidence_ids": [
+                    str(item)
+                    for item in (
+                        row.get("evidence_refs")
+                        or [row.get("chunk_id")]
+                    )
+                    if item is not None
+                ],
+            }
+            for row in rows
         ]
 
     return retrieve
