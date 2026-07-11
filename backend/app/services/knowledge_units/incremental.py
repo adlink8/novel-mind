@@ -16,6 +16,9 @@ from app.models.knowledge_unit import (
     NarrativeUnit,
 )
 from app.services.knowledge_units.materialize import stable_hash
+from app.services.knowledge_units.materialize import narrative_unit_materializer
+from app.services.knowledge_units.canonicalize import narrative_canonicalizer
+from app.services.knowledge_units.indexing import narrative_indexing_service
 
 
 @dataclass(frozen=True, slots=True)
@@ -107,6 +110,68 @@ async def execute_refresh(db: AsyncSession, *, plan: DeltaPlan, owner_id: int, n
     db.add(run)
     await db.flush()
     return RefreshReport("prepared", run.id, plan, zero)
+
+
+async def rebuild_affected_candidate(
+    db: AsyncSession,
+    *,
+    plan: DeltaPlan,
+    owner_id: int,
+    novel_id: int,
+    domain_profile: str,
+) -> RefreshReport:
+    """Rebuild changed subjects while carrying forward unaffected canonical units."""
+    prepared = await execute_refresh(
+        db,
+        plan=plan,
+        owner_id=owner_id,
+        novel_id=novel_id,
+        domain_profile=domain_profile,
+    )
+    if plan.no_change:
+        return prepared
+    affected_ids = set(plan.changed + plan.removed)
+    old_units = list(
+        (
+            await db.scalars(
+                select(NarrativeUnit).where(
+                    NarrativeUnit.owner_id == owner_id,
+                    NarrativeUnit.novel_id == novel_id,
+                    NarrativeUnit.source_judgment_id.in_(affected_ids),
+                    NarrativeUnit.status.in_(("candidate", "active")),
+                )
+            )
+        ).all()
+    ) if affected_ids else []
+    for unit in old_units:
+        unit.status = "deprecated"
+        unit.lifecycle_status = "deprecated"
+    materialized = await narrative_unit_materializer.materialize_snapshot(
+        db,
+        snapshot_id=plan.after_snapshot_id,
+        judgment_ids=set(plan.added + plan.changed),
+    )
+    canonical = await narrative_canonicalizer.canonicalize_snapshot(
+        db, snapshot_id=plan.after_snapshot_id
+    )
+    build = await narrative_indexing_service.prepare_build(
+        db,
+        snapshot_id=plan.after_snapshot_id,
+        config={"mode": "incremental", "delta": plan.delta_checksum},
+    )
+    run = await db.get(NarrativeRefreshRun, prepared.run_id)
+    writes = {
+        "llm": 0,
+        "canonical": materialized.created + canonical.canonicalized + len(old_units),
+        "chroma": 0,
+        "pointer": 0,
+        "watermark": 0,
+    }
+    run.status = "candidate"
+    run.candidate_build_id = build.id
+    run.counters = writes
+    await db.flush()
+    return RefreshReport("candidate", run.id, plan, writes)
 
 
 async def _items(db: AsyncSession, snapshot_id: int) -> dict[int, str]:

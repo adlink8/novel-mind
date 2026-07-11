@@ -32,7 +32,7 @@ async def reconcile_build(db: AsyncSession, *, build_id: int, actual_items: list
     build = await db.get(NarrativeIndexBuild, build_id)
     if build is None:
         raise ValueError("build not found")
-    units = list((await db.scalars(select(NarrativeUnit).where(NarrativeUnit.owner_id == build.owner_id, NarrativeUnit.novel_id == build.novel_id, NarrativeUnit.source_snapshot_id == build.source_snapshot_id, NarrativeUnit.unit_stage == "canonical").order_by(NarrativeUnit.canonical_id, NarrativeUnit.id))).all())
+    units = list((await db.scalars(select(NarrativeUnit).where(NarrativeUnit.owner_id == build.owner_id, NarrativeUnit.novel_id == build.novel_id, NarrativeUnit.domain_profile == build.domain_profile, NarrativeUnit.unit_stage == "canonical").order_by(NarrativeUnit.canonical_id, NarrativeUnit.id))).all())
     expected = tuple(f"unit_{unit.canonical_id}_{unit.id}" for unit in units if unit.status in {"candidate", "active"} and unit.lifecycle_status in {"current", "disputed"})
     actual = tuple(str(item["id"]) for item in actual_items)
     duplicates = tuple(sorted({item for item in actual if actual.count(item) > 1}))

@@ -6,10 +6,10 @@ import re
 from dataclasses import dataclass
 from difflib import SequenceMatcher
 
-from sqlalchemy import select
+from sqlalchemy import case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.knowledge_unit import NarrativeUnit
+from app.models.knowledge_unit import NarrativeSourceSnapshot, NarrativeUnit
 from app.services.knowledge_units.materialize import stable_hash
 
 
@@ -67,15 +67,30 @@ class NarrativeCanonicalizer:
     async def canonicalize_snapshot(
         self, db: AsyncSession, *, snapshot_id: int, similarity_threshold: float = 0.86
     ) -> CanonicalizationReport:
+        snapshot = await db.get(NarrativeSourceSnapshot, snapshot_id)
+        if snapshot is None:
+            raise ValueError("snapshot not found")
         units = list(
             (
                 await db.scalars(
                     select(NarrativeUnit)
                     .where(
-                        NarrativeUnit.source_snapshot_id == snapshot_id,
-                        NarrativeUnit.unit_stage == "draft",
+                        NarrativeUnit.owner_id == snapshot.owner_id,
+                        NarrativeUnit.novel_id == snapshot.novel_id,
+                        NarrativeUnit.domain_profile == snapshot.domain_profile,
+                        or_(
+                            NarrativeUnit.source_snapshot_id == snapshot_id,
+                            (
+                                (NarrativeUnit.unit_stage == "canonical")
+                                & (NarrativeUnit.status == "candidate")
+                                & NarrativeUnit.lifecycle_status.in_(("current", "disputed"))
+                            ),
+                        ),
                     )
-                    .order_by(NarrativeUnit.id)
+                    .order_by(
+                        case((NarrativeUnit.unit_stage == "canonical", 0), else_=1),
+                        NarrativeUnit.id,
+                    )
                 )
             ).all()
         )
@@ -89,7 +104,15 @@ class NarrativeCanonicalizer:
             if representative.canonical_id == key and representative.unit_stage == "canonical":
                 reused += 1
             else:
+                max_version = await db.scalar(
+                    select(func.max(NarrativeUnit.version)).where(
+                        NarrativeUnit.owner_id == representative.owner_id,
+                        NarrativeUnit.novel_id == representative.novel_id,
+                        NarrativeUnit.canonical_id == key,
+                    )
+                )
                 representative.canonical_id = key
+                representative.version = (max_version or 0) + 1
                 representative.unit_stage = "canonical"
                 representative.status = "candidate"
                 canonicalized += 1

@@ -9,7 +9,7 @@ from typing import Awaitable, Callable
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.knowledge_unit import NarrativeIndexBuild, NarrativeUnit
+from app.models.knowledge_unit import NarrativeIndexBuild, NarrativeSourceSnapshot, NarrativeUnit
 from app.services.ai_service import ai_service
 from app.services.knowledge_units.materialize import stable_hash
 from app.services.vector_store import VectorStore, VectorStoreError, vector_store
@@ -42,12 +42,17 @@ class NarrativeIndexingService:
         snapshot_id: int,
         config: dict | None = None,
     ) -> NarrativeIndexBuild:
+        snapshot = await db.get(NarrativeSourceSnapshot, snapshot_id)
+        if snapshot is None:
+            raise CandidateIndexError("source snapshot not found")
         units = list(
             (
                 await db.scalars(
                     select(NarrativeUnit)
                     .where(
-                        NarrativeUnit.source_snapshot_id == snapshot_id,
+                        NarrativeUnit.owner_id == snapshot.owner_id,
+                        NarrativeUnit.novel_id == snapshot.novel_id,
+                        NarrativeUnit.domain_profile == snapshot.domain_profile,
                         NarrativeUnit.unit_stage == "canonical",
                         NarrativeUnit.status == "candidate",
                         NarrativeUnit.lifecycle_status.in_(("current", "disputed")),
@@ -114,7 +119,7 @@ class NarrativeIndexingService:
                     .where(
                         NarrativeUnit.owner_id == build.owner_id,
                         NarrativeUnit.novel_id == build.novel_id,
-                        NarrativeUnit.source_snapshot_id == build.source_snapshot_id,
+                        NarrativeUnit.domain_profile == build.domain_profile,
                         NarrativeUnit.unit_stage == "canonical",
                         NarrativeUnit.status == "candidate",
                         NarrativeUnit.lifecycle_status.in_(("current", "disputed")),

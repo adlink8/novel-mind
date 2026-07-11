@@ -54,7 +54,12 @@ def unit_text(candidate: KnowledgeRelationCandidate, judgment: KnowledgeRelation
 
 class NarrativeUnitMaterializer:
     async def materialize_snapshot(
-        self, db: AsyncSession, *, snapshot_id: int, write: bool = True
+        self,
+        db: AsyncSession,
+        *,
+        snapshot_id: int,
+        write: bool = True,
+        judgment_ids: set[int] | None = None,
     ) -> MaterializationReport:
         snapshot = await db.get(NarrativeSourceSnapshot, snapshot_id)
         if snapshot is None or snapshot.status != "frozen":
@@ -77,7 +82,14 @@ class NarrativeUnitMaterializer:
                     KnowledgeRelationCandidate.id
                     == NarrativeSourceSnapshotItem.source_candidate_id,
                 )
-                .where(NarrativeSourceSnapshotItem.snapshot_id == snapshot_id)
+                .where(
+                    NarrativeSourceSnapshotItem.snapshot_id == snapshot_id,
+                    *(
+                        [NarrativeSourceSnapshotItem.source_judgment_id.in_(judgment_ids)]
+                        if judgment_ids is not None
+                        else []
+                    ),
+                )
                 .order_by(NarrativeSourceSnapshotItem.id)
             )
         ).all()
