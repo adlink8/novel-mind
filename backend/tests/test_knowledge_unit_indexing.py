@@ -5,7 +5,10 @@ from sqlalchemy import select
 from app.models.knowledge_unit import NarrativeIndexBuild, NarrativeUnit
 from app.services.knowledge_units.canonicalize import narrative_canonicalizer
 from app.services.knowledge_units.indexing import NarrativeIndexingService
-from app.services.knowledge_units.materialize import narrative_unit_materializer, stable_hash
+from app.services.knowledge_units.materialize import (
+    narrative_unit_materializer,
+    stable_hash,
+)
 from app.services.vector_store import VectorStore
 from tests.test_knowledge_unit_materialize import _accepted_source
 
@@ -25,7 +28,7 @@ class FakeCollection:
         self.metadatas.extend(metadatas)
 
     def get(self, include=None):
-        return {"ids": list(self.ids)}
+        return {"ids": list(self.ids), "metadatas": list(self.metadatas)}
 
 
 class FakeStore:
@@ -42,10 +45,28 @@ async def _candidate_build(db):
     snapshot = await _accepted_source(db)
     await narrative_unit_materializer.materialize_snapshot(db, snapshot_id=snapshot.id)
     await narrative_canonicalizer.canonicalize_snapshot(db, snapshot_id=snapshot.id)
-    units = list((await db.scalars(select(NarrativeUnit).order_by(NarrativeUnit.canonical_id, NarrativeUnit.id))).all())
+    units = list(
+        (
+            await db.scalars(
+                select(NarrativeUnit).order_by(
+                    NarrativeUnit.canonical_id, NarrativeUnit.id
+                )
+            )
+        ).all()
+    )
     ids = [f"unit_{unit.canonical_id}_{unit.id}" for unit in units]
     manifest = stable_hash([(ids[i], units[i].content_hash) for i in range(len(units))])
-    build = NarrativeIndexBuild(owner_id=snapshot.owner_id, novel_id=snapshot.novel_id, source_snapshot_id=snapshot.id, domain_profile=snapshot.domain_profile, build_key="test-build", status="draft", manifest_checksum=manifest, config_checksum="c" * 64, unit_count=0)
+    build = NarrativeIndexBuild(
+        owner_id=snapshot.owner_id,
+        novel_id=snapshot.novel_id,
+        source_snapshot_id=snapshot.id,
+        domain_profile=snapshot.domain_profile,
+        build_key="test-build",
+        status="draft",
+        manifest_checksum=manifest,
+        config_checksum="c" * 64,
+        unit_count=0,
+    )
     db.add(build)
     await db.flush()
     return build
@@ -59,7 +80,9 @@ async def test_builds_and_reconciles_immutable_candidate(db_session):
     async def embed(texts):
         return [[0.1, 0.2] for _ in texts]
 
-    report = await service.build_candidate(db_session, build_id=build.id, embedder=embed)
+    report = await service.build_candidate(
+        db_session, build_id=build.id, embedder=embed
+    )
     assert report.status == "candidate"
     assert report.expected_ids == report.actual_ids
     assert report.missing == report.orphan == ()
@@ -96,7 +119,9 @@ async def test_reuses_exact_immutable_collection(db_session):
 
     first = await service.build_candidate(db_session, build_id=build.id, embedder=embed)
     build.status = "draft"
-    second = await service.build_candidate(db_session, build_id=build.id, embedder=embed)
+    second = await service.build_candidate(
+        db_session, build_id=build.id, embedder=embed
+    )
     assert first.actual_ids == second.actual_ids
 
 

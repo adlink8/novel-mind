@@ -16,19 +16,43 @@ from app.services.knowledge_units.rollback import rollback_journal, restore_jour
 
 async def _run(args) -> dict:
     if args.dry_run:
-        return {"dry_run": True, "journal_id": args.journal_id, "action": "restore" if args.restore else "rollback"}
+        return {
+            "dry_run": True,
+            "journal_id": args.journal_id,
+            "action": "restore" if args.restore else "rollback",
+        }
     async with async_session_factory() as db:
-        pointer = await (restore_journal(db, journal_id=args.journal_id) if args.restore else rollback_journal(db, journal_id=args.journal_id))
+        pointer = await (
+            restore_journal(db, journal_id=args.journal_id)
+            if args.restore
+            else rollback_journal(db, journal_id=args.journal_id)
+        )
         await db.commit()
-        return {"build_id": pointer.build_id if pointer else None, "pointer_version": pointer.pointer_version if pointer else None}
+        return {
+            "build_id": pointer.build_id if pointer else None,
+            "pointer_version": pointer.pointer_version if pointer else None,
+        }
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--journal-id", type=int, required=True)
+    parser.add_argument(
+        "--journal-id",
+        required=True,
+        help="integer journal id; TEST is accepted only with --dry-run",
+    )
     parser.add_argument("--restore", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
+    if args.journal_id == "TEST" and args.dry_run:
+        args.journal_id = "TEST"
+    else:
+        try:
+            args.journal_id = int(args.journal_id)
+        except ValueError:
+            parser.error(
+                "--journal-id must be an integer outside documented TEST dry-run"
+            )
     print(json.dumps(asyncio.run(_run(args)), indent=2))
     return 0
 

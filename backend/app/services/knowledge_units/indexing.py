@@ -9,7 +9,11 @@ from typing import Awaitable, Callable
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.knowledge_unit import NarrativeIndexBuild, NarrativeSourceSnapshot, NarrativeUnit
+from app.models.knowledge_unit import (
+    NarrativeIndexBuild,
+    NarrativeSourceSnapshot,
+    NarrativeUnit,
+)
 from app.services.ai_service import ai_service
 from app.services.knowledge_units.materialize import stable_hash
 from app.services.vector_store import VectorStore, VectorStoreError, vector_store
@@ -76,7 +80,11 @@ class NarrativeIndexingService:
         )
         config_checksum = stable_hash(config or {"embedding": "configured-provider"})
         build_key = stable_hash(
-            {"snapshot_id": snapshot_id, "manifest": manifest, "config": config_checksum}
+            {
+                "snapshot_id": snapshot_id,
+                "manifest": manifest,
+                "config": config_checksum,
+            }
         )[:32]
         existing = await db.scalar(
             select(NarrativeIndexBuild).where(
@@ -134,7 +142,9 @@ class NarrativeIndexingService:
         )
         if build.manifest_checksum != manifest:
             raise CandidateIndexError("build manifest checksum mismatch")
-        collection_name = build.collection_name or f"narrative_{build.build_key}_{manifest[:12]}"
+        collection_name = (
+            build.collection_name or f"narrative_{build.build_key}_{manifest[:12]}"
+        )
         texts = [f"Q: {unit.question}\nA: {unit.answer}" for unit in units]
         if embedder is None:
             embedder = ai_service.embedding
@@ -147,16 +157,21 @@ class NarrativeIndexingService:
                 existing = await asyncio.to_thread(collection.get, include=[])
                 existing_ids = tuple(sorted(existing.get("ids", [])))
                 if existing_ids != tuple(sorted(expected_ids)):
-                    raise CandidateIndexError("immutable collection already has different IDs")
+                    raise CandidateIndexError(
+                        "immutable collection already has different IDs"
+                    )
             elif units:
                 metadatas = [
                     {
                         "owner_id": unit.owner_id,
                         "novel_id": unit.novel_id,
                         "unit_id": unit.id,
+                        "build_id": build.id,
+                        "manifest_checksum": manifest,
                         "canonical_id": unit.canonical_id,
                         "domain_profile": unit.domain_profile,
                         "lifecycle": unit.lifecycle_status,
+                        "lifecycle_status": unit.lifecycle_status,
                         "source_judgment_id": unit.source_judgment_id,
                         "evidence_checksum": unit.evidence_manifest_checksum,
                     }
@@ -185,12 +200,23 @@ class NarrativeIndexingService:
         if missing or orphan:
             build.status = "failed"
             await db.flush()
-            raise CandidateIndexError(f"candidate reconcile failed: missing={missing}, orphan={orphan}")
+            raise CandidateIndexError(
+                f"candidate reconcile failed: missing={missing}, orphan={orphan}"
+            )
         build.collection_name = collection_name
         build.unit_count = len(units)
         build.status = "candidate"
         await db.flush()
-        return CandidateBuildReport(build.id, collection_name, expected_ids, actual_ids, missing, orphan, manifest, build.status)
+        return CandidateBuildReport(
+            build.id,
+            collection_name,
+            expected_ids,
+            actual_ids,
+            missing,
+            orphan,
+            manifest,
+            build.status,
+        )
 
 
 narrative_indexing_service = NarrativeIndexingService()

@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.knowledge import KnowledgeRelationCandidate
 from app.models.knowledge_unit import (
     NarrativeRefreshRun,
+    NarrativeIndexBuild,
     NarrativeSourceSnapshot,
     NarrativeSourceSnapshotItem,
     NarrativeSourceWatermark,
@@ -19,6 +20,96 @@ from app.services.knowledge_units.materialize import stable_hash
 from app.services.knowledge_units.materialize import narrative_unit_materializer
 from app.services.knowledge_units.canonicalize import narrative_canonicalizer
 from app.services.knowledge_units.indexing import narrative_indexing_service
+
+
+async def complete_refresh(
+    db: AsyncSession,
+    *,
+    plan: DeltaPlan,
+    owner_id: int,
+    novel_id: int,
+    domain_profile: str,
+    approved_by: str,
+    evidence_secret: str,
+    fixture_path: str,
+    indexing_service=None,
+    retrieve=None,
+    store=None,
+) -> RefreshReport:
+    """Resumable production state machine; watermark is deliberately the final write."""
+    from app.services.ai_service import ai_service
+    from app.services.vector_store import vector_store
+    from app.services.knowledge_units.eval import (
+        candidate_retriever,
+        evaluate_candidate,
+        load_fixture,
+    )
+    from app.services.knowledge_units.promotion import narrative_promotion_service
+    from app.services.knowledge_units.reconcile import (
+        read_actual_collection,
+        reconcile_build,
+    )
+    from app.services.knowledge_units.rollback import (
+        advance_watermark,
+        rollback_journal,
+    )
+
+    report = await rebuild_affected_candidate(
+        db,
+        plan=plan,
+        owner_id=owner_id,
+        novel_id=novel_id,
+        domain_profile=domain_profile,
+    )
+    if report.status == "no_change":
+        return report
+    run = await db.get(NarrativeRefreshRun, report.run_id)
+    build = await db.get(NarrativeIndexBuild, run.candidate_build_id)
+    service = indexing_service or narrative_indexing_service
+    if build.status != "candidate" or not build.collection_name:
+        await service.build_candidate(db, build_id=build.id)
+    chosen_store = store or vector_store
+    adapter = retrieve or candidate_retriever(
+        build, vector_store=chosen_store, ai_service=ai_service
+    )
+    evaluation = await evaluate_candidate(
+        load_fixture(fixture_path),
+        build=build,
+        retrieve=adapter,
+        signing_secret=evidence_secret,
+    )
+    actual = await read_actual_collection(build, chosen_store)
+    before = await reconcile_build(db, build_id=build.id, actual_items=actual)
+    reconcile_payload = {
+        **{name: getattr(before, name) for name in before.__dataclass_fields__},
+        "collection": build.collection_name,
+    }
+    journal = await narrative_promotion_service.prepare(
+        db,
+        candidate_build_id=build.id,
+        candidate_checksum=build.manifest_checksum,
+        eval_reports=[evaluation],
+        reconcile_report=reconcile_payload,
+        approved_by=approved_by,
+        evidence_secret=evidence_secret,
+    )
+    await narrative_promotion_service.commit(
+        db, journal_id=journal.id, candidate_checksum=build.manifest_checksum
+    )
+    try:
+        actual = await read_actual_collection(build, chosen_store)
+        after = await reconcile_build(db, build_id=build.id, actual_items=actual)
+        await advance_watermark(
+            db, build_id=build.id, snapshot_id=plan.after_snapshot_id, reconcile=after
+        )
+    except Exception:
+        await rollback_journal(db, journal_id=journal.id)
+        run.status = "failed"
+        raise
+    run.status = "committed"
+    run.counters = {**run.counters, "chroma": len(actual), "pointer": 1, "watermark": 1}
+    await db.flush()
+    return RefreshReport("committed", run.id, plan, run.counters)
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,7 +144,11 @@ async def prepare_delta(
     after_snapshot_id: int,
 ) -> DeltaPlan:
     after = await db.get(NarrativeSourceSnapshot, after_snapshot_id)
-    if after is None or (after.owner_id, after.novel_id, after.domain_profile) != (owner_id, novel_id, domain_profile):
+    if after is None or (after.owner_id, after.novel_id, after.domain_profile) != (
+        owner_id,
+        novel_id,
+        domain_profile,
+    ):
         raise ValueError("after snapshot is outside refresh scope")
     watermark = await db.scalar(
         select(NarrativeSourceWatermark).where(
@@ -67,19 +162,29 @@ async def prepare_delta(
     before_items = await _items(db, before_id) if before_id else {}
     added = tuple(sorted(set(after_items) - set(before_items)))
     removed = tuple(sorted(set(before_items) - set(after_items)))
-    changed = tuple(sorted(key for key in set(after_items) & set(before_items) if after_items[key] != before_items[key]))
+    changed = tuple(
+        sorted(
+            key
+            for key in set(after_items) & set(before_items)
+            if after_items[key] != before_items[key]
+        )
+    )
     affected_ids = set(added + changed + removed)
-    subjects = set(
-        (
-            await db.scalars(
-                select(NarrativeUnit.subject_key).where(
-                    NarrativeUnit.owner_id == owner_id,
-                    NarrativeUnit.novel_id == novel_id,
-                    NarrativeUnit.source_judgment_id.in_(affected_ids),
+    subjects = (
+        set(
+            (
+                await db.scalars(
+                    select(NarrativeUnit.subject_key).where(
+                        NarrativeUnit.owner_id == owner_id,
+                        NarrativeUnit.novel_id == novel_id,
+                        NarrativeUnit.source_judgment_id.in_(affected_ids),
+                    )
                 )
-            )
-        ).all()
-    ) if affected_ids else set()
+            ).all()
+        )
+        if affected_ids
+        else set()
+    )
     if added or changed:
         candidate_ids = [
             row.source_candidate_id
@@ -87,26 +192,86 @@ async def prepare_delta(
                 await db.scalars(
                     select(NarrativeSourceSnapshotItem).where(
                         NarrativeSourceSnapshotItem.snapshot_id == after_snapshot_id,
-                        NarrativeSourceSnapshotItem.source_judgment_id.in_(set(added + changed)),
+                        NarrativeSourceSnapshotItem.source_judgment_id.in_(
+                            set(added + changed)
+                        ),
                     )
                 )
             ).all()
         ]
-        candidates = list((await db.scalars(select(KnowledgeRelationCandidate).where(KnowledgeRelationCandidate.id.in_(candidate_ids)))).all()) if candidate_ids else []
-        subjects.update(f"{candidate.source_kind}:{candidate.source_id}" for candidate in candidates)
-    payload = {"before": before_id, "after": after_snapshot_id, "added": added, "changed": changed, "removed": removed, "subjects": sorted(subjects)}
-    return DeltaPlan(before_id, after_snapshot_id, added, changed, removed, tuple(sorted(subjects)), stable_hash(payload))
+        candidates = (
+            list(
+                (
+                    await db.scalars(
+                        select(KnowledgeRelationCandidate).where(
+                            KnowledgeRelationCandidate.id.in_(candidate_ids)
+                        )
+                    )
+                ).all()
+            )
+            if candidate_ids
+            else []
+        )
+        subjects.update(
+            f"{candidate.source_kind}:{candidate.source_id}" for candidate in candidates
+        )
+    payload = {
+        "before": before_id,
+        "after": after_snapshot_id,
+        "added": added,
+        "changed": changed,
+        "removed": removed,
+        "subjects": sorted(subjects),
+    }
+    return DeltaPlan(
+        before_id,
+        after_snapshot_id,
+        added,
+        changed,
+        removed,
+        tuple(sorted(subjects)),
+        stable_hash(payload),
+    )
 
 
-async def execute_refresh(db: AsyncSession, *, plan: DeltaPlan, owner_id: int, novel_id: int, domain_profile: str) -> RefreshReport:
+async def execute_refresh(
+    db: AsyncSession,
+    *,
+    plan: DeltaPlan,
+    owner_id: int,
+    novel_id: int,
+    domain_profile: str,
+) -> RefreshReport:
     zero = {"llm": 0, "canonical": 0, "chroma": 0, "pointer": 0, "watermark": 0}
     if plan.no_change:
         return RefreshReport("no_change", None, plan, zero)
-    run_key = stable_hash({"scope": [owner_id, novel_id, domain_profile], "delta": plan.delta_checksum})[:120]
-    existing = await db.scalar(select(NarrativeRefreshRun).where(NarrativeRefreshRun.run_key == run_key))
+    run_key = stable_hash(
+        {"scope": [owner_id, novel_id, domain_profile], "delta": plan.delta_checksum}
+    )[:120]
+    existing = await db.scalar(
+        select(NarrativeRefreshRun).where(NarrativeRefreshRun.run_key == run_key)
+    )
     if existing is not None:
-        return RefreshReport(existing.status, existing.id, plan, existing.counters or zero)
-    run = NarrativeRefreshRun(owner_id=owner_id, novel_id=novel_id, domain_profile=domain_profile, run_key=run_key, status="prepared", before_snapshot_id=plan.before_snapshot_id, after_snapshot_id=plan.after_snapshot_id, delta_manifest={"added": list(plan.added), "changed": list(plan.changed), "removed": list(plan.removed), "checksum": plan.delta_checksum}, affected_subjects=list(plan.affected_subjects), counters=zero)
+        return RefreshReport(
+            existing.status, existing.id, plan, existing.counters or zero
+        )
+    run = NarrativeRefreshRun(
+        owner_id=owner_id,
+        novel_id=novel_id,
+        domain_profile=domain_profile,
+        run_key=run_key,
+        status="prepared",
+        before_snapshot_id=plan.before_snapshot_id,
+        after_snapshot_id=plan.after_snapshot_id,
+        delta_manifest={
+            "added": list(plan.added),
+            "changed": list(plan.changed),
+            "removed": list(plan.removed),
+            "checksum": plan.delta_checksum,
+        },
+        affected_subjects=list(plan.affected_subjects),
+        counters=zero,
+    )
     db.add(run)
     await db.flush()
     return RefreshReport("prepared", run.id, plan, zero)
@@ -131,18 +296,22 @@ async def rebuild_affected_candidate(
     if plan.no_change:
         return prepared
     affected_ids = set(plan.changed + plan.removed)
-    old_units = list(
-        (
-            await db.scalars(
-                select(NarrativeUnit).where(
-                    NarrativeUnit.owner_id == owner_id,
-                    NarrativeUnit.novel_id == novel_id,
-                    NarrativeUnit.source_judgment_id.in_(affected_ids),
-                    NarrativeUnit.status.in_(("candidate", "active")),
+    old_units = (
+        list(
+            (
+                await db.scalars(
+                    select(NarrativeUnit).where(
+                        NarrativeUnit.owner_id == owner_id,
+                        NarrativeUnit.novel_id == novel_id,
+                        NarrativeUnit.source_judgment_id.in_(affected_ids),
+                        NarrativeUnit.status.in_(("candidate", "active")),
+                    )
                 )
-            )
-        ).all()
-    ) if affected_ids else []
+            ).all()
+        )
+        if affected_ids
+        else []
+    )
     for unit in old_units:
         unit.status = "deprecated"
         unit.lifecycle_status = (
@@ -177,5 +346,13 @@ async def rebuild_affected_candidate(
 
 
 async def _items(db: AsyncSession, snapshot_id: int) -> dict[int, str]:
-    rows = list((await db.scalars(select(NarrativeSourceSnapshotItem).where(NarrativeSourceSnapshotItem.snapshot_id == snapshot_id))).all())
+    rows = list(
+        (
+            await db.scalars(
+                select(NarrativeSourceSnapshotItem).where(
+                    NarrativeSourceSnapshotItem.snapshot_id == snapshot_id
+                )
+            )
+        ).all()
+    )
     return {row.source_judgment_id: row.item_content_hash for row in rows}
