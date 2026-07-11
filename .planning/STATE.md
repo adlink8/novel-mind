@@ -29,8 +29,8 @@ Plan: 5 of 5
 - Milestone: **v0.3 - 小说导入 + RAG 索引** — GAPS FOUND
 - Phase: 03-01 RAG 评测集与自动化检索优化闭环 — PARTIAL
 - Current branch: `feat/phase2-wave2-embedding`
-- Status: All five Phase 05 plans are implemented and locally verified; independent GSD verifier review is pending.
-- Last activity: 2026-07-11 — Completed 05-05 incremental refresh, exact reconcile, rollback/restore, and watermark closure; 58 phase tests and 331 full non-e2e tests passed.
+- Status: Phase 05 verifier gap closure revision loop 1 implemented; independent re-verification is pending.
+- Last activity: 2026-07-11 — Closed candidate-bound eval/promotion, refresh, direct reconcile, and durable rollback gaps; 70 Phase 05 tests passed.
 
 ## Auto Routing
 
@@ -129,9 +129,10 @@ Phase 05 next cursor is 05-02. Live PostgreSQL `upgrade/current/check` for 05-01
 | Phase 04 P03 | 16min | 1 task | 10 files |
 | Phase 04 P04 | 14min | 1 task | 6 files |
 | Phase 05 P01 | 20min | 3 tasks | 9 files |
+| Phase 05 GAP-CLOSURE-01 | 32min | 3 tasks | 25 files |
 
 ### Session
 
-- Last session: 2026-07-11T06:20:39Z
-- Stopped At: Completed 05-01-narrative-unit-contracts-and-source-snapshot-PLAN.md
+- Last session: 2026-07-11T07:37:00Z
+- Stopped At: Completed Phase 05 verifier gap closure revision loop 1; independent re-verification pending
 - Resume File: None
