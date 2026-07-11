@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v0.3
-milestone_name: Plans
-status: milestone_complete
-last_updated: 2026-07-02T12:43:22.966Z
+milestone: v0.4
+milestone_name: Narrative Knowledge Unit Layer
+status: planning
+last_updated: 2026-07-05T04:00:00.000Z
 progress:
-  total_phases: 4
+  total_phases: 5
   completed_phases: 4
-  total_plans: 11
+  total_plans: 16
   completed_plans: 11
-  percent: 100
-stopped_at: Milestone complete (Phase 04 was final phase)
+  percent: 80
+stopped_at: Phase 05 planned, not yet started
 ---
 
 # Project State
@@ -24,14 +24,14 @@ See `.planning/PROJECT.md` and `IMPLEMENTATION-STATUS.md`。<br>
 
 ## Current Position
 
-Phase: 04 (llm) — VERIFIED
-Plan: 4 of 4 complete
+Phase: 05 (Narrative Knowledge Unit Layer) — PLANNED
+Plan: 0 of 5 complete
 
 - Milestone: **v0.3 - 小说导入 + RAG 索引** — GAPS FOUND
 - Phase: 03-01 RAG 评测集与自动化检索优化闭环 — PARTIAL
 - Current branch: `feat/phase2-wave2-embedding`
-- Status: Phase 04 LLM-gated knowledge graph pipeline verified. v0.3 RAG eval quality gap remains PARTIAL.
-- Last activity: 2026-07-02 — Phase 04 verified with 34 knowledge tests, fiction/history fixture dry-runs, and schema drift gate passing.
+- Status: Phase 05 replanned from the verified Phase 04 graph pipeline and the production patterns validated by the reference project's Phase 13-14.
+- Last activity: 2026-07-11 — Phase 05 production narrative knowledge unit plan created; execution not started.
 
 ## Auto Routing
 

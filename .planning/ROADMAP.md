@@ -6,7 +6,7 @@
 - [x] v0.2 安全与架构修复 - 关闭安全、迁移、路由、依赖和导入可靠性阻断项。
 - [ ] v0.3 小说导入 + RAG 索引 - 导入/索引/搜索已交付，RAG 评测质量闭环仍有缺口。
 
-第一个 active milestone 已按要求设为并完成"审计与启动修复"。v0.3 经 2026-06-13 复审后恢复为 active，详见 `.planning/v0.3-MILESTONE-AUDIT.md`。
+第一个 active milestone 已按要求设为并完成"审计与启动修复"。v0.3 经 2006-06-13 复审后恢复为 active，详见 `.planning/v0.3-MILESTONE-AUDIT.md`。
 
 ## v0.3 Plans
 
@@ -46,19 +46,19 @@
 
 ### Phase 999.1: 首页 UI 优化 (BACKLOG)
 - 删除占位统计卡片（小说总数/章节总数/AI分析次数/同人文作品）
-- 已扩展为全站 UI/UX 重构并完成：2026-06-13
+- 已扩展为全站 UI/UX 重构并完成：2006-06-13
 
 ### Phase 999.2: Bug 修复 (BACKLOG)
 - 阅读页右上角"上一章"与"退出账号"按钮重合
 - 搜索返回"搜索失败请重试"无内容
-- 已完成：2026-06-13
+- 已完成：2006-06-13
 
 ### Phase 4: LLM 语义判定与证据门控知识图谱链路
 
 **Goal:** 建立可审计的知识图谱构建链路：脚本负责召回、证据、规则、阈值和写库；LLM 只负责语义理解、关系候选和判断。该链路同时支持小说与历史语料。
 **Requirements**: REQ-KG-01..06
 **Depends on:** Phase 3
-**Status:** VERIFIED on 2026-07-02
+**Status:** VERIFIED on 2006-07-02
 **Plans:** 4/4 plans complete
 
 Plans:
@@ -66,3 +66,18 @@ Plans:
 - [x] 04-02 candidate packages and LLM judgment: deterministic recall package + structured LLM semantic judgment
 - [x] 04-03 evidence gates and projection: schema/evidence/threshold/conflict gates + accepted graph projection
 - [x] 04-04 evaluation and domain fixtures: fiction/history fixtures, graph eval CLI, cost/latency/faithfulness reporting
+
+### Phase 5: Narrative Knowledge Unit Layer
+
+**Goal:** 将 Phase 04 的 accepted judgments 蒸馏为可追溯、可版本化、可评测和可回滚的叙事知识单元检索层，同时保留原始 chunk 混合召回。
+**Requirements**: REQ-NU-01..08
+**Depends on:** Phase 4
+**Status:** Planned
+**Plans:** 5 plans
+
+Plans:
+- [ ] 05-01 narrative unit contracts and source snapshot
+- [ ] 05-02 canonicalization and lifecycle gates
+- [ ] 05-03 candidate index and hybrid retrieval
+- [ ] 05-04 frozen evaluation, canary, and promotion
+- [ ] 05-05 incremental refresh, reconcile, and rollback
