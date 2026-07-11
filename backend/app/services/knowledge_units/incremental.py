@@ -145,7 +145,9 @@ async def rebuild_affected_candidate(
     ) if affected_ids else []
     for unit in old_units:
         unit.status = "deprecated"
-        unit.lifecycle_status = "deprecated"
+        unit.lifecycle_status = (
+            "deleted" if unit.source_judgment_id in set(plan.removed) else "deprecated"
+        )
     materialized = await narrative_unit_materializer.materialize_snapshot(
         db,
         snapshot_id=plan.after_snapshot_id,

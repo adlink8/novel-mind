@@ -42,7 +42,7 @@ NARRATIVE_UNIT_STATUSES = (
     "deprecated",
     "rolled_back",
 )
-NARRATIVE_LIFECYCLE_STATUSES = ("current", "disputed", "deprecated")
+NARRATIVE_LIFECYCLE_STATUSES = ("current", "disputed", "deprecated", "deleted")
 NARRATIVE_BUILD_STATUSES = (
     "draft",
     "candidate",

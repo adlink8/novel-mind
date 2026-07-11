@@ -12,7 +12,7 @@ NarrativeUnitStage = Literal["draft", "canonical"]
 NarrativeUnitStatus = Literal[
     "draft", "candidate", "active", "failed", "deprecated", "rolled_back"
 ]
-NarrativeLifecycleStatus = Literal["current", "disputed", "deprecated"]
+NarrativeLifecycleStatus = Literal["current", "disputed", "deprecated", "deleted"]
 NarrativeBuildStatus = Literal[
     "draft", "candidate", "active", "failed", "deprecated", "rolled_back"
 ]
