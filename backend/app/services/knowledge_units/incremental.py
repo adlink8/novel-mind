@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from collections.abc import Awaitable, Callable
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -35,9 +37,9 @@ async def complete_refresh(
     indexing_service=None,
     retrieve=None,
     store=None,
+    stage_hook: Callable[[str, int], Awaitable[None]] | None = None,
 ) -> RefreshReport:
-    """Resumable production state machine; watermark is deliberately the final write."""
-    from app.services.ai_service import ai_service
+    """Durable state machine; every completed stage survives a new DB session."""
     from app.services.vector_store import vector_store
     from app.services.knowledge_units.eval import (
         candidate_retriever,
@@ -55,69 +57,186 @@ async def complete_refresh(
         rollback_journal,
     )
 
-    report = await rebuild_affected_candidate(
-        db,
-        plan=plan,
-        owner_id=owner_id,
-        novel_id=novel_id,
-        domain_profile=domain_profile,
-    )
-    if report.status == "no_change":
-        return report
-    run = await db.get(NarrativeRefreshRun, report.run_id)
-    build = await db.get(NarrativeIndexBuild, run.candidate_build_id)
-    service = indexing_service or narrative_indexing_service
-    if build.status != "candidate" or not build.collection_name:
-        await service.build_candidate(db, build_id=build.id)
     chosen_store = store or vector_store
-    adapter = retrieve or candidate_retriever(
-        build, vector_store=chosen_store, ai_service=ai_service
-    )
-    evaluation = await evaluate_candidate(
-        load_fixture(fixture_path),
-        build=build,
-        retrieve=adapter,
-        signing_secret=evidence_secret,
-    )
-    actual = await read_actual_collection(build, chosen_store)
-    before = await reconcile_build(db, build_id=build.id, actual_items=actual)
-    reconcile_payload = {
-        **{name: getattr(before, name) for name in before.__dataclass_fields__},
-        "collection": build.collection_name,
-    }
-    journal = await narrative_promotion_service.prepare(
-        db,
-        candidate_build_id=build.id,
-        candidate_checksum=build.manifest_checksum,
-        eval_reports=[evaluation],
-        reconcile_report=reconcile_payload,
-        approved_by=approved_by,
-        evidence_secret=evidence_secret,
-    )
-    await narrative_promotion_service.commit(
-        db,
-        journal_id=journal.id,
-        candidate_checksum=build.manifest_checksum,
-        evidence_secret=evidence_secret,
-    )
     try:
+        report = await rebuild_affected_candidate(
+            db,
+            plan=plan,
+            owner_id=owner_id,
+            novel_id=novel_id,
+            domain_profile=domain_profile,
+        )
+        if report.status == "no_change":
+            return report
+        run = await db.get(NarrativeRefreshRun, report.run_id)
+        build = await db.get(NarrativeIndexBuild, run.candidate_build_id)
+        state = dict(run.delta_manifest or {})
+        if not state.get("stage"):
+            await _checkpoint(db, run, stage="candidate")
+            await _notify(stage_hook, "candidate", run.id)
+
+        service = indexing_service or narrative_indexing_service
+        if _stage_before(run, "indexed"):
+            if build.status != "candidate" or not build.collection_name:
+                await service.build_candidate(db, build_id=build.id)
+            await _checkpoint(db, run, stage="indexed", build_id=build.id)
+            await _notify(stage_hook, "indexed", run.id)
+
+        if _stage_before(run, "evaluated"):
+            adapter = retrieve or candidate_retriever(build, db=db)
+            evaluation = await evaluate_candidate(
+                load_fixture(fixture_path),
+                build=build,
+                retrieve=adapter,
+                signing_secret=evidence_secret,
+            )
+            await _checkpoint(db, run, stage="evaluated", evaluation=evaluation)
+            await _notify(stage_hook, "evaluated", run.id)
+        else:
+            evaluation = run.delta_manifest["evaluation"]
+
+        if _stage_before(run, "promotion_prepared"):
+            actual = await read_actual_collection(build, chosen_store)
+            before = await reconcile_build(db, build_id=build.id, actual_items=actual)
+            reconcile_payload = {
+                **{
+                    name: getattr(before, name)
+                    for name in before.__dataclass_fields__
+                },
+                "collection": build.collection_name,
+            }
+            journal = await narrative_promotion_service.prepare(
+                db,
+                candidate_build_id=build.id,
+                candidate_checksum=build.manifest_checksum,
+                eval_reports=[evaluation],
+                reconcile_report=reconcile_payload,
+                approved_by=approved_by,
+                evidence_secret=evidence_secret,
+            )
+            await _checkpoint(
+                db,
+                run,
+                stage="promotion_prepared",
+                journal_id=journal.id,
+                pre_reconcile=reconcile_payload,
+            )
+            await _notify(stage_hook, "promotion_prepared", run.id)
+        else:
+            from app.models.knowledge_unit import NarrativePromotionJournal
+
+            journal = await db.get(
+                NarrativePromotionJournal, run.delta_manifest["journal_id"]
+            )
+
+        if _stage_before(run, "promoted"):
+            if journal.status == "rolled_back":
+                # Resume an interrupted release without restoring its watermark.
+                build.status = "candidate"
+                journal.status = "prepared"
+                await db.flush()
+            if journal.status == "prepared":
+                await narrative_promotion_service.commit(
+                    db,
+                    journal_id=journal.id,
+                    candidate_checksum=build.manifest_checksum,
+                    evidence_secret=evidence_secret,
+                )
+            await _checkpoint(db, run, stage="promoted")
+            await _notify(stage_hook, "promoted", run.id)
+
         actual = await read_actual_collection(build, chosen_store)
         after = await reconcile_build(db, build_id=build.id, actual_items=actual)
+        await _checkpoint(
+            db,
+            run,
+            stage="post_reconciled",
+            post_reconcile={
+                name: getattr(after, name) for name in after.__dataclass_fields__
+            },
+        )
+        await _notify(stage_hook, "post_reconciled", run.id)
         await advance_watermark(
             db, build_id=build.id, snapshot_id=plan.after_snapshot_id, reconcile=after
         )
-    except Exception:
-        await rollback_journal(
-            db,
-            journal_id=journal.id,
-            collection_probe=collection_checkpoint_probe(chosen_store),
+        run.status = "committed"
+        run.counters = {
+            **run.counters,
+            "chroma": len(actual),
+            "pointer": 1,
+            "watermark": 1,
+        }
+        await _checkpoint(db, run, stage="committed")
+        return RefreshReport("committed", run.id, plan, run.counters)
+    except Exception as exc:
+        await db.rollback()
+        run = await db.scalar(
+            select(NarrativeRefreshRun).where(
+                NarrativeRefreshRun.run_key
+                == stable_hash(
+                    {
+                        "scope": [owner_id, novel_id, domain_profile],
+                        "delta": plan.delta_checksum,
+                    }
+                )[:120]
+            )
         )
+        if run is None:
+            raise
+        state = dict(run.delta_manifest or {})
+        journal_id = state.get("journal_id")
+        if journal_id is not None:
+            from app.models.knowledge_unit import NarrativePromotionJournal
+
+            journal = await db.get(NarrativePromotionJournal, journal_id)
+            if journal is not None and journal.status == "committed":
+                await rollback_journal(
+                    db,
+                    journal_id=journal.id,
+                    collection_probe=collection_checkpoint_probe(chosen_store),
+                )
+                state["stage"] = "promotion_prepared"
+                state["recovery"] = "rolled_back_after_interruption"
         run.status = "failed"
+        run.error_detail = f"{type(exc).__name__}: {exc}"
+        run.delta_manifest = state
+        await db.commit()
         raise
-    run.status = "committed"
-    run.counters = {**run.counters, "chroma": len(actual), "pointer": 1, "watermark": 1}
-    await db.flush()
-    return RefreshReport("committed", run.id, plan, run.counters)
+
+
+_STAGES = (
+    "candidate",
+    "indexed",
+    "evaluated",
+    "promotion_prepared",
+    "promoted",
+    "post_reconciled",
+    "committed",
+)
+
+
+def _stage_before(run: NarrativeRefreshRun, target: str) -> bool:
+    current = (run.delta_manifest or {}).get("stage", "candidate")
+    return _STAGES.index(current) < _STAGES.index(target)
+
+
+async def _checkpoint(
+    db: AsyncSession, run: NarrativeRefreshRun, *, stage: str, **artifacts: Any
+) -> None:
+    state = dict(run.delta_manifest or {})
+    state.update(artifacts)
+    state["stage"] = stage
+    run.delta_manifest = state
+    run.status = "committed" if stage == "committed" else "candidate"
+    run.error_detail = None
+    await db.commit()
+
+
+async def _notify(
+    hook: Callable[[str, int], Awaitable[None]] | None, stage: str, run_id: int
+) -> None:
+    if hook is not None:
+        await hook(stage, run_id)
 
 
 @dataclass(frozen=True, slots=True)
@@ -303,6 +422,14 @@ async def rebuild_affected_candidate(
     )
     if plan.no_change:
         return prepared
+    existing_run = await db.get(NarrativeRefreshRun, prepared.run_id)
+    if existing_run.candidate_build_id is not None:
+        return RefreshReport(
+            existing_run.status,
+            existing_run.id,
+            plan,
+            existing_run.counters,
+        )
     affected_ids = set(plan.changed + plan.removed)
     old_units = (
         list(

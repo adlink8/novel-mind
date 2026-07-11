@@ -20,15 +20,49 @@ from app.services.knowledge_units.reconcile import (  # noqa: E402
 )
 
 
-async def _run(build_id: int | None, active: bool) -> dict:
+async def resolve_active_build_id(
+    db,
+    *,
+    pointer_id: int | None = None,
+    owner_id: int | None = None,
+    novel_id: int | None = None,
+    domain: str | None = None,
+) -> int:
+    query = select(NarrativeActivePointer)
+    if pointer_id is not None:
+        query = query.where(NarrativeActivePointer.id == pointer_id)
+    if owner_id is not None:
+        query = query.where(NarrativeActivePointer.owner_id == owner_id)
+    if novel_id is not None:
+        query = query.where(NarrativeActivePointer.novel_id == novel_id)
+    if domain is not None:
+        query = query.where(NarrativeActivePointer.domain_profile == domain)
+    pointers = list((await db.scalars(query)).all())
+    if len(pointers) != 1:
+        raise ValueError(
+            "--active scope must select exactly one active pointer"
+        )
+    return pointers[0].build_id
+
+
+async def _run(
+    build_id: int | None,
+    active: bool,
+    *,
+    pointer_id: int | None = None,
+    owner_id: int | None = None,
+    novel_id: int | None = None,
+    domain: str | None = None,
+) -> dict:
     async with async_session_factory() as db:
         if active:
-            pointers = list((await db.scalars(select(NarrativeActivePointer))).all())
-            if len(pointers) != 1:
-                raise ValueError(
-                    "--active requires exactly one active pointer; scope the database"
-                )
-            build_id = pointers[0].build_id
+            build_id = await resolve_active_build_id(
+                db,
+                pointer_id=pointer_id,
+                owner_id=owner_id,
+                novel_id=novel_id,
+                domain=domain,
+            )
         build = await db.get(NarrativeIndexBuild, build_id)
         if build is None:
             raise ValueError("build not found")
@@ -47,8 +81,27 @@ def main() -> int:
     source = parser.add_mutually_exclusive_group(required=True)
     source.add_argument("--build-id", type=int)
     source.add_argument("--active", action="store_true")
+    parser.add_argument("--pointer-id", type=int)
+    parser.add_argument("--owner-id", type=int)
+    parser.add_argument("--novel-id", type=int)
+    parser.add_argument("--domain", choices=("fiction", "history"))
     args = parser.parse_args()
-    report = asyncio.run(_run(args.build_id, args.active))
+    scoped = any(
+        value is not None
+        for value in (args.pointer_id, args.owner_id, args.novel_id, args.domain)
+    )
+    if scoped and not args.active:
+        parser.error("pointer scope options require --active")
+    report = asyncio.run(
+        _run(
+            args.build_id,
+            args.active,
+            pointer_id=args.pointer_id,
+            owner_id=args.owner_id,
+            novel_id=args.novel_id,
+            domain=args.domain,
+        )
+    )
     print(json.dumps(report, indent=2, default=list))
     return (
         0

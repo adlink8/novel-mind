@@ -48,8 +48,7 @@ async def _run(args) -> dict:
                 fixture_path=args.fixture,
             )
         )
-        if not args.dry_run:
-            await db.commit()
+        # complete_refresh owns durable stage commits; dry-run owns no writes.
         return {
             "status": report.status,
             "run_id": report.run_id,

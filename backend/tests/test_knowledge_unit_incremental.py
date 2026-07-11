@@ -1,10 +1,13 @@
 """Affected-subject delta and zero-write refresh tests."""
 
 from sqlalchemy import func, select
+import pytest
 
 from app.models.knowledge import KnowledgeRelationJudgment
 from app.models.knowledge_unit import (
     NarrativeIndexBuild,
+    NarrativeActivePointer,
+    NarrativePromotionJournal,
     NarrativeRefreshRun,
     NarrativeSourceWatermark,
     NarrativeUnit,
@@ -22,6 +25,7 @@ from app.services.knowledge_units.materialize import narrative_unit_materializer
 from app.services.knowledge_units.source_snapshot import source_snapshot_service
 from tests.test_knowledge_unit_materialize import _accepted_source
 from tests.test_knowledge_unit_indexing import FakeStore
+from tests.conftest import TestSessionLocal
 
 
 async def _watermark(db, snapshot):
@@ -269,3 +273,112 @@ async def test_complete_refresh_executes_release_chain(db_session, tmp_path):
     )
     assert report.status == "committed" and calls == ["chunks", "units", "hybrid"]
     assert report.writes["pointer"] == report.writes["watermark"] == 1
+
+
+@pytest.mark.parametrize("interrupted_stage", ("indexed", "promoted", "post_reconciled"))
+async def test_committed_failure_resumes_in_new_session_without_duplicate_artifacts(
+    db_session, tmp_path, interrupted_stage
+):
+    import json
+
+    snapshot = await _accepted_source(db_session)
+    plan = await prepare_delta(
+        db_session,
+        owner_id=snapshot.owner_id,
+        novel_id=snapshot.novel_id,
+        domain_profile="fiction",
+        after_snapshot_id=snapshot.id,
+    )
+    payload = {
+        "version": "resume.v1",
+        "domain": "fiction",
+        "split": "frozen",
+        "cases": [
+            {
+                "id": "q1",
+                "query": "人物关系",
+                "gold_ids": ["u1"],
+                "gold_evidence_ids": ["e1"],
+            }
+        ],
+    }
+    payload["dataset_hash"] = stable_hash(payload)
+    fixture = tmp_path / f"{interrupted_stage}.json"
+    fixture.write_text(json.dumps(payload), encoding="utf-8")
+    store = FakeStore()
+    real = NarrativeIndexingService(store)
+
+    class Indexer:
+        calls = 0
+
+        async def build_candidate(self, db, *, build_id):
+            self.calls += 1
+
+            async def embed(texts):
+                return [[0.1, 0.2] for _ in texts]
+
+            return await real.build_candidate(db, build_id=build_id, embedder=embed)
+
+    indexer = Indexer()
+
+    async def retrieve(query, context):
+        return [
+            {
+                "id": "u1",
+                "evidence_ids": ["e1"],
+                "metadata": {
+                    "build_id": context["build_id"],
+                    "manifest_checksum": context["candidate_checksum"],
+                    "owner_id": context["owner_id"],
+                    "novel_id": context["novel_id"],
+                    "lifecycle_status": "current",
+                },
+            }
+        ]
+
+    async def interrupt(stage, run_id):
+        if stage == interrupted_stage:
+            raise RuntimeError(f"interrupt after {stage}")
+
+    await db_session.commit()
+    with pytest.raises(RuntimeError, match="interrupt after"):
+        await complete_refresh(
+            db_session,
+            plan=plan,
+            owner_id=snapshot.owner_id,
+            novel_id=snapshot.novel_id,
+            domain_profile="fiction",
+            approved_by="tester",
+            evidence_secret="secret",
+            fixture_path=str(fixture),
+            indexing_service=indexer,
+            retrieve=retrieve,
+            store=store,
+            stage_hook=interrupt,
+        )
+
+    async with TestSessionLocal() as fresh:
+        failed = await fresh.scalar(select(NarrativeRefreshRun))
+        assert failed.status == "failed"
+        assert await fresh.scalar(select(NarrativeSourceWatermark)) is None
+        if interrupted_stage in {"promoted", "post_reconciled"}:
+            assert await fresh.scalar(select(NarrativeActivePointer)) is None
+        resumed = await complete_refresh(
+            fresh,
+            plan=plan,
+            owner_id=snapshot.owner_id,
+            novel_id=snapshot.novel_id,
+            domain_profile="fiction",
+            approved_by="tester",
+            evidence_secret="secret",
+            fixture_path=str(fixture),
+            indexing_service=indexer,
+            retrieve=retrieve,
+            store=store,
+        )
+        assert resumed.status == "committed"
+        assert await fresh.scalar(select(NarrativeSourceWatermark)) is not None
+        assert await fresh.scalar(select(NarrativeActivePointer)) is not None
+        assert await fresh.scalar(select(func.count()).select_from(NarrativeIndexBuild)) == 1
+        assert await fresh.scalar(select(func.count()).select_from(NarrativePromotionJournal)) == 1
+        assert indexer.calls == 1
