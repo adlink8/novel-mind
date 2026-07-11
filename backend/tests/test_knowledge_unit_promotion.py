@@ -101,7 +101,11 @@ async def test_prepare_is_idempotent_and_binds_reports(db_session):
         evidence_secret=SECRET,
     )
     assert first.id == second.id
-    assert first.details["eval_runs"][0]["dataset_hash"] == "e" * 64
+    envelope = first.details["promotion_evidence"]
+    assert envelope["schema_version"] == "promotion-evidence.v2"
+    assert envelope["domain_evaluations"][0]["dataset_hash"] == "e" * 64
+    assert envelope["direct_chroma_reconcile"]["build_id"] == build.id
+    assert envelope["approval"]["identity"] == "owner"
 
 
 async def test_commit_activates_exact_candidate(db_session):
@@ -117,7 +121,10 @@ async def test_commit_activates_exact_candidate(db_session):
         evidence_secret=SECRET,
     )
     pointer = await narrative_promotion_service.commit(
-        db_session, journal_id=journal.id, candidate_checksum=build.manifest_checksum
+        db_session,
+        journal_id=journal.id,
+        candidate_checksum=build.manifest_checksum,
+        evidence_secret=SECRET,
     )
     assert pointer.build_id == build.id and pointer.pointer_version == 1
     assert build.status == "active" and journal.status == "committed"
@@ -137,7 +144,10 @@ async def test_failed_commit_leaves_pointer_absent(db_session):
     )
     with pytest.raises(PromotionError, match="checksum"):
         await narrative_promotion_service.commit(
-            db_session, journal_id=journal.id, candidate_checksum="x" * 64
+            db_session,
+            journal_id=journal.id,
+            candidate_checksum="x" * 64,
+            evidence_secret=SECRET,
         )
     assert await db_session.scalar(select(NarrativeActivePointer)) is None
     assert (
@@ -176,5 +186,42 @@ async def test_forged_or_other_candidate_report_cannot_promote(db_session):
             eval_report=forged,
             reconcile_report=_reconcile(build),
             approved_by="owner",
+            evidence_secret=SECRET,
+        )
+
+
+@pytest.mark.parametrize(
+    ("path", "replacement"),
+    [
+        (("direct_chroma_reconcile", "orphan"), ["forged"]),
+        (("approval", "identity"), "attacker"),
+        (("candidate", "build_id"), 999),
+        (("domain_evaluations", 0, "run_id"), "substituted-run"),
+    ],
+)
+async def test_commit_rejects_any_promotion_envelope_substitution(
+    db_session, path, replacement
+):
+    build = await _candidate_build(db_session)
+    build.status = "candidate"
+    journal = await narrative_promotion_service.prepare(
+        db_session,
+        candidate_build_id=build.id,
+        candidate_checksum=build.manifest_checksum,
+        eval_report=_eval_report(build),
+        reconcile_report=_reconcile(build),
+        approved_by="owner",
+        evidence_secret=SECRET,
+    )
+    envelope = journal.details["promotion_evidence"]
+    target = envelope
+    for key in path[:-1]:
+        target = target[key]
+    target[path[-1]] = replacement
+    with pytest.raises(PromotionError, match="envelope|domain run"):
+        await narrative_promotion_service.commit(
+            db_session,
+            journal_id=journal.id,
+            candidate_checksum=build.manifest_checksum,
             evidence_secret=SECRET,
         )

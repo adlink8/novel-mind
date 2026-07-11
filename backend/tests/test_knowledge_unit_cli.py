@@ -2,6 +2,7 @@
 
 import subprocess
 import sys
+import os
 from pathlib import Path
 
 import pytest
@@ -59,3 +60,60 @@ def test_documented_build_and_rollback_dry_runs_execute():
             check=False,
         )
         assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize(
+    "script",
+    ("promote_narrative_unit_index.py", "refresh_narrative_units.py"),
+)
+def test_production_cli_rejects_evidence_secret_override(script):
+    result = subprocess.run(
+        [sys.executable, f"scripts/{script}", "--evidence-secret", "attacker-key"],
+        cwd=BACKEND,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    assert result.returncode != 0
+    assert "evidence-secret" in result.stderr
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        (
+            "scripts/promote_narrative_unit_index.py",
+            "--prepare",
+            "--checksum",
+            "checksum",
+        ),
+        (
+            "scripts/refresh_narrative_units.py",
+            "--owner-id",
+            "1",
+            "--novel-id",
+            "1",
+            "--snapshot-id",
+            "1",
+            "--fixture",
+            "fixture.json",
+            "--approved-by",
+            "owner",
+        ),
+    ),
+)
+def test_production_cli_requires_environment_signing_secret(command):
+    env = os.environ.copy()
+    env.pop("NARRATIVE_EVAL_SIGNING_SECRET", None)
+    result = subprocess.run(
+        [sys.executable, *command],
+        cwd=BACKEND,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    assert result.returncode != 0
+    assert "NARRATIVE_EVAL_SIGNING_SECRET is required" in result.stderr

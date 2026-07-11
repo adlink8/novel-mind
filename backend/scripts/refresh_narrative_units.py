@@ -44,7 +44,7 @@ async def _run(args) -> dict:
                 novel_id=args.novel_id,
                 domain_profile=args.domain,
                 approved_by=args.approved_by,
-                evidence_secret=args.evidence_secret,
+                evidence_secret=os.environ["NARRATIVE_EVAL_SIGNING_SECRET"],
                 fixture_path=args.fixture,
             )
         )
@@ -63,6 +63,8 @@ async def _run(args) -> dict:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
+    if "--evidence-secret" in sys.argv:
+        parser.error("--evidence-secret is forbidden; use NARRATIVE_EVAL_SIGNING_SECRET")
     parser.add_argument("--owner-id", type=int)
     parser.add_argument("--novel-id", type=int)
     parser.add_argument("--domain", choices=("fiction", "history"), default="fiction")
@@ -70,20 +72,17 @@ def main() -> int:
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--fixture")
     parser.add_argument("--approved-by")
-    parser.add_argument(
-        "--evidence-secret", default=os.environ.get("NARRATIVE_EVAL_SIGNING_SECRET", "")
-    )
     args = parser.parse_args()
     if None in (args.owner_id, args.novel_id, args.snapshot_id):
         parser.error(
             "refresh requires --owner-id, --novel-id, and --snapshot-id even in dry-run"
         )
     if not args.dry_run and (
-        not args.fixture or not args.approved_by or not args.evidence_secret
+        not args.fixture
+        or not args.approved_by
+        or not os.environ.get("NARRATIVE_EVAL_SIGNING_SECRET")
     ):
-        parser.error(
-            "write mode requires --fixture, --approved-by and NARRATIVE_EVAL_SIGNING_SECRET"
-        )
+        parser.error("NARRATIVE_EVAL_SIGNING_SECRET is required in write mode")
     print(json.dumps(asyncio.run(_run(args)), ensure_ascii=False, indent=2))
     return 0
 

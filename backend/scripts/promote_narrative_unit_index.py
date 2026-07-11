@@ -23,6 +23,9 @@ async def _run(args) -> dict:
             "candidate_checksum": args.checksum,
         }
     async with async_session_factory() as db:
+        evidence_secret = os.environ.get("NARRATIVE_EVAL_SIGNING_SECRET", "")
+        if not evidence_secret:
+            raise RuntimeError("NARRATIVE_EVAL_SIGNING_SECRET is required")
         if args.prepare:
             eval_reports = [
                 json.loads(Path(path).read_text(encoding="utf-8"))
@@ -36,12 +39,15 @@ async def _run(args) -> dict:
                 eval_reports=eval_reports,
                 reconcile_report=reconcile,
                 approved_by=args.approved_by,
-                evidence_secret=args.evidence_secret,
+                evidence_secret=evidence_secret,
             )
             await db.commit()
             return {"journal_id": journal.id, "status": journal.status}
         pointer = await narrative_promotion_service.commit(
-            db, journal_id=args.commit, candidate_checksum=args.checksum
+            db,
+            journal_id=args.commit,
+            candidate_checksum=args.checksum,
+            evidence_secret=evidence_secret,
         )
         await db.commit()
         return {
@@ -52,6 +58,8 @@ async def _run(args) -> dict:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
+    if "--evidence-secret" in sys.argv:
+        parser.error("--evidence-secret is forbidden; use NARRATIVE_EVAL_SIGNING_SECRET")
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--prepare", action="store_true")
     mode.add_argument("--commit", type=int)
@@ -60,11 +68,10 @@ def main() -> int:
     parser.add_argument("--eval-report", action="append", default=[])
     parser.add_argument("--reconcile-report")
     parser.add_argument("--approved-by", default="")
-    parser.add_argument(
-        "--evidence-secret", default=os.environ.get("NARRATIVE_EVAL_SIGNING_SECRET", "")
-    )
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
+    if not args.dry_run and not os.environ.get("NARRATIVE_EVAL_SIGNING_SECRET"):
+        parser.error("NARRATIVE_EVAL_SIGNING_SECRET is required")
     print(json.dumps(asyncio.run(_run(args)), indent=2))
     return 0
 

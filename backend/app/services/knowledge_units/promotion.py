@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,12 +14,84 @@ from app.models.knowledge_unit import (
     NarrativePromotionJournal,
     NarrativeSourceWatermark,
 )
+from app.services.knowledge_units.eval import sign_run, verify_run
 from app.services.knowledge_units.materialize import stable_hash
-from app.services.knowledge_units.eval import verify_run
+
+
+PROMOTION_EVIDENCE_VERSION = "promotion-evidence.v2"
 
 
 class PromotionError(ValueError):
     pass
+
+
+def _verify_promotion_envelope(
+    envelope: dict[str, Any], *, secret: str, build: NarrativeIndexBuild
+) -> None:
+    if (
+        envelope.get("schema_version") != PROMOTION_EVIDENCE_VERSION
+        or not secret
+        or not verify_run(envelope, secret)
+    ):
+        raise PromotionError("promotion evidence envelope is invalid")
+    candidate = envelope.get("candidate", {})
+    if candidate != {
+        "build_id": build.id,
+        "checksum": build.manifest_checksum,
+        "collection": build.collection_name,
+        "owner_id": build.owner_id,
+        "novel_id": build.novel_id,
+        "domain": build.domain_profile,
+        "source_snapshot_id": build.source_snapshot_id,
+        "build_key": build.build_key,
+    }:
+        raise PromotionError("promotion evidence candidate lineage mismatch")
+    approval = envelope.get("approval", {})
+    if not approval.get("identity") or not approval.get("approved_at"):
+        raise PromotionError("promotion evidence approval is invalid")
+    reports = envelope.get("domain_evaluations")
+    if not isinstance(reports, list) or not reports:
+        raise PromotionError("promotion evidence domain runs are missing")
+    for report in reports:
+        if not verify_run(report, secret):
+            raise PromotionError("promotion evidence domain run is invalid")
+
+
+def _signed_promotion_envelope(
+    *,
+    build: NarrativeIndexBuild,
+    reports: list[dict[str, Any]],
+    reconcile_report: dict[str, Any],
+    approved_by: str,
+    approved_at: datetime,
+    before: dict[str, Any],
+    after: dict[str, Any],
+    secret: str,
+) -> dict[str, Any]:
+    envelope = {
+        "schema_version": PROMOTION_EVIDENCE_VERSION,
+        "candidate": {
+            "build_id": build.id,
+            "checksum": build.manifest_checksum,
+            "collection": build.collection_name,
+            "owner_id": build.owner_id,
+            "novel_id": build.novel_id,
+            "domain": build.domain_profile,
+            "source_snapshot_id": build.source_snapshot_id,
+            "build_key": build.build_key,
+        },
+        "domain_evaluations": sorted(
+            reports, key=lambda item: (item["domain"], item["run_id"])
+        ),
+        "direct_chroma_reconcile": reconcile_report,
+        "approval": {
+            "identity": approved_by,
+            "approved_at": approved_at.isoformat(),
+        },
+        "lineage": {"before": before, "after": after},
+    }
+    envelope["signature"] = sign_run(envelope, secret)
+    return envelope
 
 
 class NarrativePromotionService:
@@ -114,11 +187,38 @@ class NarrativePromotionService:
                 NarrativeSourceWatermark.domain_profile == build.domain_profile,
             )
         )
+        previous_build = (
+            await db.get(NarrativeIndexBuild, pointer.build_id) if pointer else None
+        )
+        before = {
+            "build_id": pointer.build_id if pointer else None,
+            "collection": previous_build.collection_name if previous_build else None,
+            "manifest": pointer.active_manifest_checksum if pointer else None,
+            "watermark": {
+                "snapshot_id": watermark.snapshot_id,
+                "build_id": watermark.build_id,
+                "source_watermark": watermark.source_watermark,
+                "manifest_checksum": watermark.manifest_checksum,
+            }
+            if watermark
+            else None,
+        }
+        after = {
+            "build_id": build.id,
+            "collection": build.collection_name,
+            "manifest": build.manifest_checksum,
+            "watermark": {
+                "snapshot_id": build.source_snapshot_id,
+                "build_id": build.id,
+                "manifest_checksum": build.manifest_checksum,
+            },
+        }
         transaction_key = stable_hash(
             {
                 "candidate": candidate_build_id,
                 "checksum": candidate_checksum,
                 "eval_runs": sorted(r["run_id"] for r in reports),
+                "reconcile": reconcile_report,
                 "approved_by": approved_by,
             }
         )[:120]
@@ -128,7 +228,23 @@ class NarrativePromotionService:
             )
         )
         if existing is not None:
+            _verify_promotion_envelope(
+                existing.details.get("promotion_evidence", {}),
+                secret=evidence_secret,
+                build=build,
+            )
             return existing
+        envelope = _signed_promotion_envelope(
+            build=build,
+            reports=reports,
+            reconcile_report=reconcile_report,
+            approved_by=approved_by,
+            approved_at=datetime.now(UTC),
+            before=before,
+            after=after,
+            secret=evidence_secret,
+        )
+        _verify_promotion_envelope(envelope, secret=evidence_secret, build=build)
         journal = NarrativePromotionJournal(
             owner_id=build.owner_id,
             novel_id=build.novel_id,
@@ -140,36 +256,9 @@ class NarrativePromotionService:
             candidate_checksum=candidate_checksum,
             previous_checksum=pointer.active_manifest_checksum if pointer else None,
             details={
-                "approved_by": approved_by,
-                "eval_runs": reports,
-                "reconcile": reconcile_report,
-                "before": {
-                    "build_id": pointer.build_id if pointer else None,
-                    "collection": (
-                        await db.get(NarrativeIndexBuild, pointer.build_id)
-                    ).collection_name
-                    if pointer
-                    else None,
-                    "manifest": pointer.active_manifest_checksum if pointer else None,
-                    "watermark": {
-                        "snapshot_id": watermark.snapshot_id,
-                        "build_id": watermark.build_id,
-                        "source_watermark": watermark.source_watermark,
-                        "manifest_checksum": watermark.manifest_checksum,
-                    }
-                    if watermark
-                    else None,
-                },
-                "after": {
-                    "build_id": build.id,
-                    "collection": build.collection_name,
-                    "manifest": build.manifest_checksum,
-                    "watermark": {
-                        "snapshot_id": build.source_snapshot_id,
-                        "build_id": build.id,
-                        "manifest_checksum": build.manifest_checksum,
-                    },
-                },
+                "promotion_evidence": envelope,
+                "before": before,
+                "after": after,
             },
         )
         db.add(journal)
@@ -182,6 +271,7 @@ class NarrativePromotionService:
         *,
         journal_id: int,
         candidate_checksum: str,
+        evidence_secret: str,
     ) -> NarrativeActivePointer:
         journal = await db.get(NarrativePromotionJournal, journal_id)
         if journal is None or journal.status != "prepared":
@@ -195,6 +285,11 @@ class NarrativePromotionService:
             or build.manifest_checksum != candidate_checksum
         ):
             raise PromotionError("candidate changed after prepare")
+        _verify_promotion_envelope(
+            journal.details.get("promotion_evidence", {}),
+            secret=evidence_secret,
+            build=build,
+        )
         pointer = await db.scalar(
             select(NarrativeActivePointer).where(
                 NarrativeActivePointer.owner_id == journal.owner_id,
