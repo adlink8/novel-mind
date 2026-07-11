@@ -394,14 +394,18 @@ class TestUpdateChunkStatus:
 class TestInit:
     """测试 VectorStore 初始化"""
 
-    def test_init_creates_http_client(self):
-        """验证初始化创建 HttpClient"""
+    def test_init_creates_http_client_lazily(self):
+        """构造不触网，首次访问客户端时才创建 HttpClient。"""
         with patch("app.services.vector_store.chromadb.HttpClient") as mock_cls:
-            VectorStore(host="chroma-host", port=9000)
+            store = VectorStore(host="chroma-host", port=9000)
+            mock_cls.assert_not_called()
+            _ = store.client
             mock_cls.assert_called_once_with(host="chroma-host", port=9000)
 
     def test_init_default_params(self):
-        """验证默认参数"""
+        """验证惰性客户端使用默认参数。"""
         with patch("app.services.vector_store.chromadb.HttpClient") as mock_cls:
-            VectorStore()
+            store = VectorStore()
+            mock_cls.assert_not_called()
+            _ = store.client
             mock_cls.assert_called_once_with(host="localhost", port=8001)
