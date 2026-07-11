@@ -46,6 +46,7 @@ from app.models.fanfiction_chapter import FanFictionChapter
 from app.models.ai_model import AIModelConfig
 from app.models.ai_usage_log import AIUsageLog
 from app.models.text_chunk import TextChunk
+from app.models.eval import EvalDataset, EvalRun, EvalResult
 from app.models.knowledge import (
     KnowledgeEntityCandidate,
     KnowledgeEventCandidate,
@@ -59,6 +60,8 @@ from app.models.knowledge_unit import (
     NarrativeActivePointer,
     NarrativeIndexBuild,
     NarrativePromotionJournal,
+    NarrativeRefreshRun,
+    NarrativeSourceWatermark,
     NarrativeSourceSnapshot,
     NarrativeSourceSnapshotItem,
     NarrativeUnit,
@@ -80,6 +83,9 @@ __all__ = [
     "AIModelConfig",
     "AIUsageLog",
     "TextChunk",
+    "EvalDataset",
+    "EvalRun",
+    "EvalResult",
     "KnowledgeExtractionRun",
     "KnowledgeEntityCandidate",
     "KnowledgeEventCandidate",
@@ -94,4 +100,6 @@ __all__ = [
     "NarrativeIndexBuild",
     "NarrativeActivePointer",
     "NarrativePromotionJournal",
+    "NarrativeRefreshRun",
+    "NarrativeSourceWatermark",
 ]

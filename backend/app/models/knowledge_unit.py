@@ -53,6 +53,7 @@ NARRATIVE_BUILD_STATUSES = (
 )
 PROMOTION_JOURNAL_STATUSES = ("prepared", "committed", "failed", "rolled_back")
 SOURCE_SNAPSHOT_STATUSES = ("frozen",)
+REFRESH_RUN_STATUSES = ("prepared", "candidate", "committed", "failed", "no_change")
 
 
 # Composite references below prevent a row owned by one user/work from pointing
@@ -453,6 +454,52 @@ class NarrativePromotionJournal(TimestampMixin, Base):
     candidate_checksum: Mapped[str] = mapped_column(String(64), nullable=False)
     previous_checksum: Mapped[str | None] = mapped_column(String(64), nullable=True)
     details: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    error_detail: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class NarrativeSourceWatermark(TimestampMixin, Base):
+    """Last source snapshot proven active after post-promotion reconcile."""
+
+    __tablename__ = "narrative_source_watermarks"
+    __table_args__ = (
+        UniqueConstraint("owner_id", "novel_id", "domain_profile", name="uq_narrative_watermark_scope"),
+        ForeignKeyConstraint(["owner_id", "novel_id", "snapshot_id"], ["narrative_source_snapshots.owner_id", "narrative_source_snapshots.novel_id", "narrative_source_snapshots.id"], ondelete="RESTRICT", name="fk_narrative_watermark_snapshot_scope"),
+        ForeignKeyConstraint(["owner_id", "novel_id", "build_id"], ["narrative_index_builds.owner_id", "narrative_index_builds.novel_id", "narrative_index_builds.id"], ondelete="RESTRICT", name="fk_narrative_watermark_build_scope"),
+        Index("idx_narrative_watermark_build_id", "build_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    owner_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    novel_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    domain_profile: Mapped[str] = mapped_column(String(20), nullable=False)
+    snapshot_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    build_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    source_watermark: Mapped[str] = mapped_column(String(160), nullable=False)
+    manifest_checksum: Mapped[str] = mapped_column(String(64), nullable=False)
+
+
+class NarrativeRefreshRun(TimestampMixin, Base):
+    """Auditable affected-subject refresh run; no-change creates no row."""
+
+    __tablename__ = "narrative_refresh_runs"
+    __table_args__ = (
+        UniqueConstraint("run_key", name="uq_narrative_refresh_run_key"),
+        Index("idx_narrative_refresh_owner_novel", "owner_id", "novel_id"),
+        Index("idx_narrative_refresh_status", "status"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    owner_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    novel_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    domain_profile: Mapped[str] = mapped_column(String(20), nullable=False)
+    run_key: Mapped[str] = mapped_column(String(120), nullable=False)
+    status: Mapped[str] = mapped_column(String(30), nullable=False, default="prepared")
+    before_snapshot_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    after_snapshot_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    candidate_build_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    delta_manifest: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    affected_subjects: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    counters: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     error_detail: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
