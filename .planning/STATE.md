@@ -29,8 +29,8 @@ Plan: 5 of 5
 - Milestone: **v0.3 - 小说导入 + RAG 索引** — GAPS FOUND
 - Phase: 03-01 RAG 评测集与自动化检索优化闭环 — PARTIAL
 - Current branch: `feat/phase2-wave2-embedding`
-- Status: 05-01 through 05-04 are complete; Phase 05 lifecycle closure remains in progress.
-- Last activity: 2026-07-11 — Completed 05-04 frozen fiction/history evaluation, canary gates, and journaled promotion; 10 targeted tests passed.
+- Status: All five Phase 05 plans are implemented and locally verified; independent GSD verifier review is pending.
+- Last activity: 2026-07-11 — Completed 05-05 incremental refresh, exact reconcile, rollback/restore, and watermark closure; 58 phase tests and 331 full non-e2e tests passed.
 
 ## Auto Routing
 
