@@ -96,6 +96,16 @@ from app.schemas.knowledge import (
     KnowledgeReviewQueueCreate,
     KnowledgeReviewQueueResponse,
 )
+from app.schemas.knowledge_unit import (
+    NarrativeActivePointerCreate,
+    NarrativeEvidenceLineage,
+    NarrativeIndexBuildCreate,
+    NarrativePromotionJournalCreate,
+    NarrativeSourceSnapshotCreate,
+    NarrativeSourceSnapshotResponse,
+    NarrativeUnitCreate,
+    NarrativeUnitResponse,
+)
 
 __all__ = [
     # 通用
@@ -151,4 +161,13 @@ __all__ = [
     "KnowledgeLLMRelationJudgmentOutput",
     "KnowledgeLLMEntityOutput",
     "KnowledgeLLMEventOutput",
+    # Narrative knowledge units
+    "NarrativeEvidenceLineage",
+    "NarrativeSourceSnapshotCreate",
+    "NarrativeSourceSnapshotResponse",
+    "NarrativeUnitCreate",
+    "NarrativeUnitResponse",
+    "NarrativeIndexBuildCreate",
+    "NarrativeActivePointerCreate",
+    "NarrativePromotionJournalCreate",
 ]

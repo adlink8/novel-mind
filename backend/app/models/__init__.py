@@ -55,6 +55,15 @@ from app.models.knowledge import (
     KnowledgeRelationJudgment,
     KnowledgeReviewQueue,
 )
+from app.models.knowledge_unit import (
+    NarrativeActivePointer,
+    NarrativeIndexBuild,
+    NarrativePromotionJournal,
+    NarrativeSourceSnapshot,
+    NarrativeSourceSnapshotItem,
+    NarrativeUnit,
+    NarrativeUnitEvidenceLink,
+)
 
 __all__ = [
     "Base",
@@ -78,4 +87,11 @@ __all__ = [
     "KnowledgeRelationJudgment",
     "KnowledgeEvidenceRef",
     "KnowledgeReviewQueue",
+    "NarrativeSourceSnapshot",
+    "NarrativeSourceSnapshotItem",
+    "NarrativeUnit",
+    "NarrativeUnitEvidenceLink",
+    "NarrativeIndexBuild",
+    "NarrativeActivePointer",
+    "NarrativePromotionJournal",
 ]
