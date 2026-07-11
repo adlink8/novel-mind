@@ -21,6 +21,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    event,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -453,3 +454,13 @@ class NarrativePromotionJournal(TimestampMixin, Base):
     previous_checksum: Mapped[str | None] = mapped_column(String(64), nullable=True)
     details: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     error_detail: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+def _reject_snapshot_mutation(_mapper: object, _connection: object, target: object) -> None:
+    raise ValueError(f"{type(target).__name__} records are immutable")
+
+
+event.listen(NarrativeSourceSnapshot, "before_update", _reject_snapshot_mutation)
+event.listen(NarrativeSourceSnapshot, "before_delete", _reject_snapshot_mutation)
+event.listen(NarrativeSourceSnapshotItem, "before_update", _reject_snapshot_mutation)
+event.listen(NarrativeSourceSnapshotItem, "before_delete", _reject_snapshot_mutation)
