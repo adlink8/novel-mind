@@ -9,6 +9,7 @@ from app.services.knowledge_units.reconcile import reconcile_build
 from app.services.knowledge_units.rollback import (
     RollbackError,
     advance_watermark,
+    collection_checkpoint_probe,
     rollback_journal,
     restore_journal,
 )
@@ -30,18 +31,29 @@ async def _promoted(db):
         evidence_secret=SECRET,
     )
     pointer = await narrative_promotion_service.commit(
-        db, journal_id=journal.id, candidate_checksum=build.manifest_checksum
+        db,
+        journal_id=journal.id,
+        candidate_checksum=build.manifest_checksum,
+        evidence_secret=SECRET,
     )
     return build, journal, pointer
 
 
 async def test_rollback_restore_drill_is_reversible(db_session):
     build, journal, pointer = await _promoted(db_session)
+
+    async def probe(checkpoint):
+        return checkpoint.get("build_id") == build.id
+
     assert pointer.build_id == build.id
-    rolled = await rollback_journal(db_session, journal_id=journal.id)
+    rolled = await rollback_journal(
+        db_session, journal_id=journal.id, collection_probe=probe
+    )
     assert rolled is None
     assert await db_session.scalar(select(NarrativeActivePointer)) is None
-    restored = await restore_journal(db_session, journal_id=journal.id)
+    restored = await restore_journal(
+        db_session, journal_id=journal.id, collection_probe=probe
+    )
     assert restored.build_id == build.id and build.status == "active"
     assert restored.pointer_version == 2
 
@@ -101,10 +113,8 @@ async def test_committed_new_session_rollback_restore_and_collection_probe(db_se
     build, journal, _ = await _promoted(db_session)
     await db_session.commit()
 
-    async def probe(collection, manifest):
-        return (
-            collection == build.collection_name and manifest == build.manifest_checksum
-        )
+    async def probe(checkpoint):
+        return checkpoint == journal.details["after"]
 
     async with TestSessionLocal() as fresh:
         assert (
@@ -124,7 +134,7 @@ async def test_collection_checkpoint_failure_is_recoverable(db_session):
     _, journal, _ = await _promoted(db_session)
     await db_session.commit()
 
-    async def missing_collection(collection, manifest):
+    async def missing_collection(checkpoint):
         return False
 
     async with TestSessionLocal() as fresh:
@@ -133,3 +143,48 @@ async def test_collection_checkpoint_failure_is_recoverable(db_session):
                 fresh, journal_id=journal.id, collection_probe=missing_collection
             )
         await fresh.rollback()
+
+
+async def test_production_gateway_rejects_missing_and_wrong_manifest(db_session):
+    from tests.test_knowledge_unit_indexing import FakeStore
+
+    build, journal, _ = await _promoted(db_session)
+    store = FakeStore()
+    probe = collection_checkpoint_probe(store)
+    with pytest.raises(RollbackError, match="collection checkpoint"):
+        await rollback_journal(
+            db_session, journal_id=journal.id, collection_probe=probe
+        )
+
+    collection = store.get_named_collection(build.collection_name, create=True)
+    collection.ids = ["unit-1"]
+    collection.metadatas = [
+        {"build_id": build.id, "manifest_checksum": "wrong-manifest"}
+    ]
+    with pytest.raises(RollbackError, match="collection checkpoint"):
+        await rollback_journal(
+            db_session, journal_id=journal.id, collection_probe=probe
+        )
+
+
+async def test_production_gateway_rollback_then_restore(db_session):
+    from tests.test_knowledge_unit_indexing import FakeStore
+
+    build, journal, _ = await _promoted(db_session)
+    store = FakeStore()
+    collection = store.get_named_collection(build.collection_name, create=True)
+    collection.ids = ["unit-1"]
+    collection.metadatas = [
+        {"build_id": build.id, "manifest_checksum": build.manifest_checksum}
+    ]
+    probe = collection_checkpoint_probe(store)
+    assert (
+        await rollback_journal(
+            db_session, journal_id=journal.id, collection_probe=probe
+        )
+        is None
+    )
+    restored = await restore_journal(
+        db_session, journal_id=journal.id, collection_probe=probe
+    )
+    assert restored.build_id == build.id

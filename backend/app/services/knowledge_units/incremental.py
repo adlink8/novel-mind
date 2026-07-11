@@ -51,6 +51,7 @@ async def complete_refresh(
     )
     from app.services.knowledge_units.rollback import (
         advance_watermark,
+        collection_checkpoint_probe,
         rollback_journal,
     )
 
@@ -94,7 +95,10 @@ async def complete_refresh(
         evidence_secret=evidence_secret,
     )
     await narrative_promotion_service.commit(
-        db, journal_id=journal.id, candidate_checksum=build.manifest_checksum
+        db,
+        journal_id=journal.id,
+        candidate_checksum=build.manifest_checksum,
+        evidence_secret=evidence_secret,
     )
     try:
         actual = await read_actual_collection(build, chosen_store)
@@ -103,7 +107,11 @@ async def complete_refresh(
             db, build_id=build.id, snapshot_id=plan.after_snapshot_id, reconcile=after
         )
     except Exception:
-        await rollback_journal(db, journal_id=journal.id)
+        await rollback_journal(
+            db,
+            journal_id=journal.id,
+            collection_probe=collection_checkpoint_probe(chosen_store),
+        )
         run.status = "failed"
         raise
     run.status = "committed"

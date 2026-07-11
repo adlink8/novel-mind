@@ -11,7 +11,12 @@ if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
 from app.core.database import async_session_factory  # noqa: E402
-from app.services.knowledge_units.rollback import rollback_journal, restore_journal  # noqa: E402
+from app.services.knowledge_units.rollback import (  # noqa: E402
+    collection_checkpoint_probe,
+    rollback_journal,
+    restore_journal,
+)
+from app.services.vector_store import vector_store  # noqa: E402
 
 
 async def _run(args) -> dict:
@@ -22,10 +27,13 @@ async def _run(args) -> dict:
             "action": "restore" if args.restore else "rollback",
         }
     async with async_session_factory() as db:
+        probe = collection_checkpoint_probe(vector_store)
         pointer = await (
-            restore_journal(db, journal_id=args.journal_id)
+            restore_journal(db, journal_id=args.journal_id, collection_probe=probe)
             if args.restore
-            else rollback_journal(db, journal_id=args.journal_id)
+            else rollback_journal(
+                db, journal_id=args.journal_id, collection_probe=probe
+            )
         )
         await db.commit()
         return {

@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
+from typing import Any, Awaitable, Callable
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,8 +22,56 @@ class RollbackError(ValueError):
     pass
 
 
+CollectionProbe = Callable[[dict[str, Any]], Awaitable[bool]]
+
+
+def collection_checkpoint_probe(store: Any) -> CollectionProbe:
+    """Build a strict direct-Chroma checkpoint validator for production paths."""
+
+    async def probe(checkpoint: dict[str, Any]) -> bool:
+        collection_name = checkpoint.get("collection")
+        manifest = checkpoint.get("manifest")
+        build_id = checkpoint.get("build_id")
+        if not collection_name or not manifest or build_id is None:
+            return False
+        try:
+            collection = await asyncio.to_thread(
+                store.get_named_collection, collection_name
+            )
+            payload = await asyncio.to_thread(collection.get, include=["metadatas"])
+        except Exception:
+            return False
+        ids = payload.get("ids") or []
+        metadatas = payload.get("metadatas") or []
+        return bool(ids) and len(ids) == len(metadatas) and all(
+            metadata
+            and metadata.get("build_id") == build_id
+            and metadata.get("manifest_checksum") == manifest
+            for metadata in metadatas
+        )
+
+    return probe
+
+
+async def _require_checkpoint(
+    checkpoint: dict[str, Any],
+    *,
+    build: NarrativeIndexBuild,
+    collection_probe: CollectionProbe,
+) -> None:
+    expected = {
+        "build_id": build.id,
+        "collection": build.collection_name,
+        "manifest": build.manifest_checksum,
+    }
+    if any(checkpoint.get(key) != value for key, value in expected.items()):
+        raise RollbackError("target collection checkpoint does not match PostgreSQL")
+    if not await collection_probe(checkpoint):
+        raise RollbackError("target collection checkpoint is not recoverable")
+
+
 async def rollback_journal(
-    db: AsyncSession, *, journal_id: int, collection_probe=None
+    db: AsyncSession, *, journal_id: int, collection_probe: CollectionProbe
 ) -> NarrativeActivePointer | None:
     journal = await db.get(NarrativePromotionJournal, journal_id)
     if journal is None or journal.status != "committed":
@@ -35,22 +86,28 @@ async def rollback_journal(
     if pointer is None or pointer.build_id != journal.candidate_build_id:
         raise RollbackError("active pointer no longer matches journal")
     candidate = await db.get(NarrativeIndexBuild, journal.candidate_build_id)
+    if candidate is None:
+        raise RollbackError("candidate build is missing")
+    before = journal.details.get("before", {})
     after = journal.details.get("after", {})
-    if collection_probe and not await collection_probe(
-        after.get("collection"), after.get("manifest")
-    ):
-        raise RollbackError("candidate collection checkpoint is not recoverable")
-    if candidate:
-        candidate.status = "rolled_back"
+    if journal.previous_build_id:
+        target = await db.get(NarrativeIndexBuild, journal.previous_build_id)
+        if target is None:
+            raise RollbackError("previous build is missing")
+        checkpoint = before
+    else:
+        target = candidate
+        checkpoint = after
+    await _require_checkpoint(
+        checkpoint, build=target, collection_probe=collection_probe
+    )
+    candidate.status = "rolled_back"
     if journal.previous_build_id is None:
         await db.delete(pointer)
         result = None
     else:
-        previous = await db.get(NarrativeIndexBuild, journal.previous_build_id)
-        if previous is None:
-            raise RollbackError("previous build is missing")
-        previous.status = "active"
-        pointer.build_id = previous.id
+        target.status = "active"
+        pointer.build_id = target.id
         pointer.pointer_version += 1
         pointer.active_manifest_checksum = journal.previous_checksum
         result = pointer
@@ -61,7 +118,7 @@ async def rollback_journal(
 
 
 async def restore_journal(
-    db: AsyncSession, *, journal_id: int, collection_probe=None
+    db: AsyncSession, *, journal_id: int, collection_probe: CollectionProbe
 ) -> NarrativeActivePointer:
     journal = await db.get(NarrativePromotionJournal, journal_id)
     if journal is None or journal.status != "rolled_back":
@@ -77,10 +134,9 @@ async def restore_journal(
     if candidate is None:
         raise RollbackError("candidate build is missing")
     after = journal.details.get("after", {})
-    if collection_probe and not await collection_probe(
-        after.get("collection"), after.get("manifest")
-    ):
-        raise RollbackError("candidate collection checkpoint is not recoverable")
+    await _require_checkpoint(
+        after, build=candidate, collection_probe=collection_probe
+    )
     if pointer is None:
         from datetime import UTC, datetime
 
