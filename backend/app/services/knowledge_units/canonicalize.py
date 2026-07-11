@@ -85,14 +85,20 @@ class NarrativeCanonicalizer:
             groups.setdefault(canonical_key(unit), []).append(unit)
         canonicalized = reused = 0
         for key, members in groups.items():
-            for unit in members:
-                if unit.canonical_id == key and unit.unit_stage == "canonical":
-                    reused += 1
-                    continue
-                unit.canonical_id = key
-                unit.unit_stage = "canonical"
-                unit.status = "candidate"
+            representative, *duplicates = members
+            if representative.canonical_id == key and representative.unit_stage == "canonical":
+                reused += 1
+            else:
+                representative.canonical_id = key
+                representative.unit_stage = "canonical"
+                representative.status = "candidate"
                 canonicalized += 1
+            # Preserve every source row and its lineage, but publish only one
+            # representative. Duplicate rows stay auditable and non-indexable.
+            for duplicate in duplicates:
+                duplicate.canonical_id = None
+                duplicate.unit_stage = "draft"
+                duplicate.status = "deprecated"
 
         for index, left in enumerate(units):
             for right in units[index + 1 :]:
@@ -105,7 +111,7 @@ class NarrativeCanonicalizer:
                 reviews.append((left.id, right.id, reason))
         await db.flush()
         checksum = stable_hash(
-            sorted((unit.id, unit.canonical_id, unit.lifecycle_status) for unit in units)
+            sorted((unit.id, unit.canonical_id, unit.status, unit.lifecycle_status) for unit in units)
         )
         return CanonicalizationReport(
             canonicalized=canonicalized,

@@ -52,6 +52,43 @@ async def test_canonicalization_persists_candidate_state(db_session):
     assert unit is not None and unit.unit_stage == "canonical" and unit.status == "candidate"
 
 
+async def test_exact_duplicates_publish_one_representative(db_session):
+    snapshot = await _accepted_source(db_session)
+    await narrative_unit_materializer.materialize_snapshot(db_session, snapshot_id=snapshot.id)
+    original = await db_session.scalar(select(NarrativeUnit))
+    duplicate = NarrativeUnit(
+        owner_id=original.owner_id,
+        novel_id=original.novel_id,
+        source_snapshot_id=original.source_snapshot_id,
+        source_judgment_id=original.source_judgment_id,
+        source_candidate_id=original.source_candidate_id,
+        primary_evidence_id=original.primary_evidence_id,
+        domain_profile=original.domain_profile,
+        ontology_profile=original.ontology_profile,
+        unit_stage="draft",
+        status="draft",
+        lifecycle_status=original.lifecycle_status,
+        canonical_id=None,
+        version=2,
+        subject_key=original.subject_key,
+        relation_type=original.relation_type,
+        question=original.question,
+        answer=original.answer,
+        confidence=original.confidence,
+        evidence_count=original.evidence_count,
+        content_hash=original.content_hash,
+        evidence_manifest_checksum=original.evidence_manifest_checksum,
+    )
+    db_session.add(duplicate)
+    await db_session.flush()
+    await narrative_canonicalizer.canonicalize_snapshot(db_session, snapshot_id=snapshot.id)
+    rows = list((await db_session.scalars(select(NarrativeUnit).order_by(NarrativeUnit.id))).all())
+    assert [(row.unit_stage, row.status) for row in rows] == [
+        ("canonical", "candidate"),
+        ("draft", "deprecated"),
+    ]
+
+
 async def test_rejected_source_deprecates_without_deleting(db_session):
     snapshot = await _accepted_source(db_session)
     await narrative_unit_materializer.materialize_snapshot(db_session, snapshot_id=snapshot.id)
