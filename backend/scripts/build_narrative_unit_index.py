@@ -14,8 +14,13 @@ from app.core.database import async_session_factory  # noqa: E402
 from app.services.knowledge_units.indexing import narrative_indexing_service  # noqa: E402
 
 
-async def run(build_id: int) -> dict:
+async def run(build_id: int | None, snapshot_id: int | None) -> dict:
     async with async_session_factory() as db:
+        if build_id is None:
+            build = await narrative_indexing_service.prepare_build(
+                db, snapshot_id=snapshot_id
+            )
+            build_id = build.id
         report = await narrative_indexing_service.build_candidate(db, build_id=build_id)
         await db.commit()
         return {name: getattr(report, name) for name in report.__dataclass_fields__}
@@ -23,9 +28,15 @@ async def run(build_id: int) -> dict:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--build-id", type=int, required=True)
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--build-id", type=int)
+    source.add_argument("--snapshot-id", type=int)
     args = parser.parse_args()
-    print(json.dumps(asyncio.run(run(args.build_id)), indent=2, default=list))
+    print(
+        json.dumps(
+            asyncio.run(run(args.build_id, args.snapshot_id)), indent=2, default=list
+        )
+    )
     return 0
 
 

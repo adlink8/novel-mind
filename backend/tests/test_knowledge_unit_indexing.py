@@ -66,6 +66,26 @@ async def test_builds_and_reconciles_immutable_candidate(db_session):
     assert build.collection_name.startswith("narrative_test-build_")
 
 
+async def test_prepare_build_closes_canonical_to_candidate_link(db_session):
+    snapshot = await _accepted_source(db_session)
+    await narrative_unit_materializer.materialize_snapshot(
+        db_session, snapshot_id=snapshot.id
+    )
+    await narrative_canonicalizer.canonicalize_snapshot(
+        db_session, snapshot_id=snapshot.id
+    )
+    service = NarrativeIndexingService(store=FakeStore())
+    first = await service.prepare_build(
+        db_session, snapshot_id=snapshot.id, config={"model": "test"}
+    )
+    second = await service.prepare_build(
+        db_session, snapshot_id=snapshot.id, config={"model": "test"}
+    )
+    assert first.id == second.id
+    assert first.status == "draft" and first.unit_count == 1
+    assert len(first.manifest_checksum) == 64
+
+
 async def test_reuses_exact_immutable_collection(db_session):
     build = await _candidate_build(db_session)
     store = FakeStore()

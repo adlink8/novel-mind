@@ -35,6 +35,68 @@ class NarrativeIndexingService:
     def __init__(self, store: VectorStore = vector_store):
         self.store = store
 
+    async def prepare_build(
+        self,
+        db: AsyncSession,
+        *,
+        snapshot_id: int,
+        config: dict | None = None,
+    ) -> NarrativeIndexBuild:
+        units = list(
+            (
+                await db.scalars(
+                    select(NarrativeUnit)
+                    .where(
+                        NarrativeUnit.source_snapshot_id == snapshot_id,
+                        NarrativeUnit.unit_stage == "canonical",
+                        NarrativeUnit.status == "candidate",
+                        NarrativeUnit.lifecycle_status.in_(("current", "disputed")),
+                    )
+                    .order_by(NarrativeUnit.canonical_id, NarrativeUnit.id)
+                )
+            ).all()
+        )
+        if not units:
+            raise CandidateIndexError("snapshot has no publishable canonical units")
+        first = units[0]
+        if any(
+            (unit.owner_id, unit.novel_id, unit.domain_profile)
+            != (first.owner_id, first.novel_id, first.domain_profile)
+            for unit in units
+        ):
+            raise CandidateIndexError("canonical units cross owner/work/domain scope")
+        ids = [f"unit_{unit.canonical_id}_{unit.id}" for unit in units]
+        manifest = stable_hash(
+            [(ids[index], units[index].content_hash) for index in range(len(units))]
+        )
+        config_checksum = stable_hash(config or {"embedding": "configured-provider"})
+        build_key = stable_hash(
+            {"snapshot_id": snapshot_id, "manifest": manifest, "config": config_checksum}
+        )[:32]
+        existing = await db.scalar(
+            select(NarrativeIndexBuild).where(
+                NarrativeIndexBuild.owner_id == first.owner_id,
+                NarrativeIndexBuild.novel_id == first.novel_id,
+                NarrativeIndexBuild.build_key == build_key,
+            )
+        )
+        if existing is not None:
+            return existing
+        build = NarrativeIndexBuild(
+            owner_id=first.owner_id,
+            novel_id=first.novel_id,
+            source_snapshot_id=snapshot_id,
+            domain_profile=first.domain_profile,
+            build_key=build_key,
+            status="draft",
+            manifest_checksum=manifest,
+            config_checksum=config_checksum,
+            unit_count=len(units),
+        )
+        db.add(build)
+        await db.flush()
+        return build
+
     async def build_candidate(
         self,
         db: AsyncSession,
