@@ -1,5 +1,7 @@
 """Narrative knowledge-unit ORM and strict-schema contract tests."""
 
+from pathlib import Path
+
 import pytest
 from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError
@@ -23,6 +25,11 @@ from app.models.novel import Chapter, Novel
 from app.models.text_chunk import TextChunk
 from app.models.user import User
 from app.schemas.knowledge_unit import NarrativeUnitCreate
+
+
+MIGRATION_PATH = Path(__file__).parents[1] / "migrations" / "versions" / (
+    "d4a7f19c2b61_create_narrative_unit_truth_tables.py"
+)
 
 
 async def _accepted_lineage(
@@ -129,6 +136,17 @@ def test_metadata_exposes_all_postgres_truth_contracts() -> None:
     assert "rationale" not in tables["narrative_units"].c
     assert tables["narrative_units"].c.source_judgment_id.nullable is False
     assert tables["narrative_units"].c.primary_evidence_id.nullable is False
+
+
+def test_migration_has_scoped_lineage_and_required_indexes() -> None:
+    migration = MIGRATION_PATH.read_text(encoding="utf-8")
+    assert 'down_revision: Union[str, Sequence[str], None] = "7bbf6b6c0d24"' in migration
+    assert "fk_snapshot_items_judgment_scope" in migration
+    assert "fk_narrative_units_primary_evidence_scope" in migration
+    assert "uq_narrative_snapshot_judgment" in migration
+    assert "idx_narrative_units_owner_novel_status" in migration
+    assert "idx_narrative_builds_owner_novel_status" in migration
+    assert "idx_narrative_units_canonical_id" in migration
 
 
 def test_status_contracts_cover_publication_and_rollback_states() -> None:
