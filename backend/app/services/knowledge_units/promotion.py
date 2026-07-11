@@ -11,8 +11,10 @@ from app.models.knowledge_unit import (
     NarrativeActivePointer,
     NarrativeIndexBuild,
     NarrativePromotionJournal,
+    NarrativeSourceWatermark,
 )
 from app.services.knowledge_units.materialize import stable_hash
+from app.services.knowledge_units.eval import verify_run
 
 
 class PromotionError(ValueError):
@@ -26,22 +28,77 @@ class NarrativePromotionService:
         *,
         candidate_build_id: int,
         candidate_checksum: str,
-        eval_report: dict,
         reconcile_report: dict,
         approved_by: str,
+        eval_report: dict | None = None,
+        eval_reports: list[dict] | None = None,
+        evidence_secret: str = "",
     ) -> NarrativePromotionJournal:
         build = await db.get(NarrativeIndexBuild, candidate_build_id)
-        if build is None or build.status != "candidate":
+        if build is None or build.status != "candidate" or not build.collection_name:
             raise PromotionError("candidate build is missing or not candidate")
         if build.manifest_checksum != candidate_checksum:
             raise PromotionError("candidate checksum mismatch")
         if not approved_by.strip():
             raise PromotionError("first cutover approval is required")
-        if not eval_report.get("passed") or not eval_report.get("dataset_hash"):
-            raise PromotionError("frozen evaluation did not pass")
-        if not eval_report.get("canary", {}).get("passed"):
-            raise PromotionError("canary did not pass")
-        if any(reconcile_report.get(key) for key in ("missing", "orphan", "duplicate", "wrong_owner", "deleted", "deprecated")):
+        reports = eval_reports or ([eval_report] if eval_report else [])
+        required_domains = (
+            {build.domain_profile}
+            if build.domain_profile in {"fiction", "history"}
+            else {"fiction", "history"}
+        )
+        if (
+            not evidence_secret
+            or {r.get("domain") for r in reports} != required_domains
+        ):
+            raise PromotionError("signed frozen evaluation domain evidence is required")
+        for report in reports:
+            if (
+                not verify_run(report, evidence_secret)
+                or not report.get("passed")
+                or not report.get("canary", {}).get("passed")
+            ):
+                raise PromotionError("frozen evaluation evidence is invalid")
+            expected = (
+                build.id,
+                build.manifest_checksum,
+                build.collection_name,
+                build.owner_id,
+                build.novel_id,
+            )
+            actual = tuple(
+                report.get(k)
+                for k in (
+                    "build_id",
+                    "candidate_checksum",
+                    "collection",
+                    "owner_id",
+                    "novel_id",
+                )
+            )
+            if (
+                actual != expected
+                or report.get("faithfulness_failures") != 0
+                or not report.get("outputs")
+            ):
+                raise PromotionError(
+                    "evaluation evidence belongs to another candidate or is static"
+                )
+        residue_keys = (
+            "missing",
+            "orphan",
+            "duplicate",
+            "wrong_build",
+            "wrong_owner",
+            "deleted",
+            "deprecated",
+        )
+        if (
+            reconcile_report.get("build_id") != build.id
+            or reconcile_report.get("collection") != build.collection_name
+        ):
+            raise PromotionError("candidate reconcile binding mismatch")
+        if any(reconcile_report.get(key) for key in residue_keys):
             raise PromotionError("candidate reconcile has residue")
         pointer = await db.scalar(
             select(NarrativeActivePointer).where(
@@ -50,11 +107,18 @@ class NarrativePromotionService:
                 NarrativeActivePointer.domain_profile == build.domain_profile,
             )
         )
+        watermark = await db.scalar(
+            select(NarrativeSourceWatermark).where(
+                NarrativeSourceWatermark.owner_id == build.owner_id,
+                NarrativeSourceWatermark.novel_id == build.novel_id,
+                NarrativeSourceWatermark.domain_profile == build.domain_profile,
+            )
+        )
         transaction_key = stable_hash(
             {
                 "candidate": candidate_build_id,
                 "checksum": candidate_checksum,
-                "eval": eval_report["dataset_hash"],
+                "eval_runs": sorted(r["run_id"] for r in reports),
                 "approved_by": approved_by,
             }
         )[:120]
@@ -77,9 +141,35 @@ class NarrativePromotionService:
             previous_checksum=pointer.active_manifest_checksum if pointer else None,
             details={
                 "approved_by": approved_by,
-                "dataset_hash": eval_report["dataset_hash"],
-                "eval": eval_report,
+                "eval_runs": reports,
                 "reconcile": reconcile_report,
+                "before": {
+                    "build_id": pointer.build_id if pointer else None,
+                    "collection": (
+                        await db.get(NarrativeIndexBuild, pointer.build_id)
+                    ).collection_name
+                    if pointer
+                    else None,
+                    "manifest": pointer.active_manifest_checksum if pointer else None,
+                    "watermark": {
+                        "snapshot_id": watermark.snapshot_id,
+                        "build_id": watermark.build_id,
+                        "source_watermark": watermark.source_watermark,
+                        "manifest_checksum": watermark.manifest_checksum,
+                    }
+                    if watermark
+                    else None,
+                },
+                "after": {
+                    "build_id": build.id,
+                    "collection": build.collection_name,
+                    "manifest": build.manifest_checksum,
+                    "watermark": {
+                        "snapshot_id": build.source_snapshot_id,
+                        "build_id": build.id,
+                        "manifest_checksum": build.manifest_checksum,
+                    },
+                },
             },
         )
         db.add(journal)
@@ -99,7 +189,11 @@ class NarrativePromotionService:
         if journal.candidate_checksum != candidate_checksum:
             raise PromotionError("commit checksum mismatch")
         build = await db.get(NarrativeIndexBuild, journal.candidate_build_id)
-        if build is None or build.status != "candidate" or build.manifest_checksum != candidate_checksum:
+        if (
+            build is None
+            or build.status != "candidate"
+            or build.manifest_checksum != candidate_checksum
+        ):
             raise PromotionError("candidate changed after prepare")
         pointer = await db.scalar(
             select(NarrativeActivePointer).where(
@@ -120,7 +214,10 @@ class NarrativePromotionService:
             )
             db.add(pointer)
         else:
-            if pointer.build_id != journal.previous_build_id or pointer.active_manifest_checksum != journal.previous_checksum:
+            if (
+                pointer.build_id != journal.previous_build_id
+                or pointer.active_manifest_checksum != journal.previous_checksum
+            ):
                 raise PromotionError("active pointer changed after prepare")
             previous = await db.get(NarrativeIndexBuild, pointer.build_id)
             if previous is not None:

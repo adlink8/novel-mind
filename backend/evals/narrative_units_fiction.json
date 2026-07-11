@@ -1,13 +1,1 @@
-{
-  "version": "narrative-units-fiction.v1",
-  "domain": "fiction",
-  "split": "frozen",
-  "cases": [
-    {"id":"f1","query":"人物关系","gold_ids":["u1"],"retrieved":{"chunks":[],"units":["u1"],"hybrid":["u1"]},"faithful":true,"canary":true,"latency_ms":{"chunks":20,"units":30,"hybrid":45}},
-    {"id":"f2","query":"谁帮助了乙","gold_ids":["u2"],"retrieved":{"chunks":["u2"],"units":["u2"],"hybrid":["u2"]},"faithful":true,"canary":true,"latency_ms":{"chunks":18,"units":28,"hybrid":42}},
-    {"id":"f3","query":"事件先后","gold_ids":["u3"],"retrieved":{"chunks":["x","u3"],"units":["u3"],"hybrid":["u3","x"]},"faithful":true,"canary":false,"latency_ms":{"chunks":22,"units":31,"hybrid":48}},
-    {"id":"f4","query":"敌对关系","gold_ids":["u4"],"retrieved":{"chunks":[],"units":["u4"],"hybrid":["u4"]},"faithful":true,"canary":false,"latency_ms":{"chunks":17,"units":27,"hybrid":39}},
-    {"id":"f5","query":"伏笔指向","gold_ids":["u5"],"retrieved":{"chunks":["x"],"units":["u5"],"hybrid":["u5","x"]},"faithful":true,"canary":false,"latency_ms":{"chunks":19,"units":29,"hybrid":44}},
-    {"id":"f6","query":"别名人物","gold_ids":["u6"],"retrieved":{"chunks":["u6"],"units":["u6"],"hybrid":["u6"]},"faithful":true,"canary":false,"latency_ms":{"chunks":21,"units":32,"hybrid":46}}
-  ]
-}
+{"version":"narrative-units-fiction.v1","domain":"fiction","split":"frozen","cases":[{"id":"f1","query":"人物关系","gold_ids":["u1"],"gold_evidence_ids":["u1"]},{"id":"f2","query":"谁帮助了乙","gold_ids":["u2"],"gold_evidence_ids":["u2"]},{"id":"f3","query":"事件先后","gold_ids":["u3"],"gold_evidence_ids":["u3"]},{"id":"f4","query":"敌对关系","gold_ids":["u4"],"gold_evidence_ids":["u4"]},{"id":"f5","query":"伏笔指向","gold_ids":["u5"],"gold_evidence_ids":["u5"]},{"id":"f6","query":"别名人物","gold_ids":["u6"],"gold_evidence_ids":["u6"]}],"dataset_hash":"536ad950d4beb46daa50b579fd969e86dd48d45cd0a7c2b6af816ad619a8388d"}

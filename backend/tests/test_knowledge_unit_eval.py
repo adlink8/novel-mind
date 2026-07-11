@@ -1,42 +1,103 @@
-"""Frozen fiction/history narrative retrieval evaluation tests."""
+"""Candidate-bound frozen evaluation evidence tests."""
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
-from app.services.knowledge_units.eval import NarrativeEvalError, evaluate_fixture, load_and_evaluate
-
+from app.services.knowledge_units.eval import (
+    NarrativeEvalError,
+    evaluate_candidate,
+    load_fixture,
+    verify_run,
+)
 
 EVALS = Path(__file__).parents[1] / "evals"
 
 
-@pytest.mark.parametrize("name", ["narrative_units_fiction.json", "narrative_units_history.json"])
-def test_frozen_fixture_passes_all_release_gates(name):
-    report = load_and_evaluate(EVALS / name)
-    assert report["passed"] is True
-    assert report["case_count"] == 6
-    assert report["strategies"]["hybrid"]["recall_at_5"] >= report["strategies"]["chunks"]["recall_at_5"]
-    assert report["canary"]["passed"] is True
-    assert report["faithfulness_failures"] == 0
+def _build(domain="fiction"):
+    return SimpleNamespace(
+        id=7,
+        status="candidate",
+        collection_name="candidate_7",
+        manifest_checksum="a" * 64,
+        owner_id=11,
+        novel_id=22,
+        domain_profile=domain,
+    )
 
 
-def test_frozen_hash_mismatch_is_rejected():
-    payload = json.loads((EVALS / "narrative_units_fiction.json").read_text(encoding="utf-8"))
-    payload["dataset_hash"] = "0" * 64
-    with pytest.raises(NarrativeEvalError, match="hash mismatch"):
-        evaluate_fixture(payload)
+@pytest.mark.parametrize(
+    "name,domain",
+    [
+        ("narrative_units_fiction.json", "fiction"),
+        ("narrative_units_history.json", "history"),
+    ],
+)
+async def test_eval_calls_retrieval_for_every_query_and_strategy(name, domain):
+    payload = load_fixture(EVALS / name)
+    calls = []
+
+    async def retrieve(query, context):
+        calls.append((query, context.copy()))
+        case = next(case for case in payload["cases"] if case["query"] == query)
+        return [
+            {
+                "id": case["gold_ids"][0],
+                "evidence_ids": case["gold_evidence_ids"],
+                "metadata": {
+                    "build_id": 7,
+                    "manifest_checksum": "a" * 64,
+                    "owner_id": 11,
+                    "novel_id": 22,
+                    "lifecycle_status": "current",
+                },
+            }
+        ]
+
+    report = await evaluate_candidate(
+        payload, build=_build(domain), retrieve=retrieve, signing_secret="secret"
+    )
+    assert report["passed"] and verify_run(report, "secret")
+    assert len(calls) == len(payload["cases"]) * 3
+    assert all(
+        row["strategies"]["hybrid"]["latency_ms"] >= 0 for row in report["outputs"]
+    )
 
 
-def test_critical_canary_error_blocks_release():
-    payload = json.loads((EVALS / "narrative_units_history.json").read_text(encoding="utf-8"))
-    payload["cases"][0]["stale"] = True
-    report = evaluate_fixture(payload)
-    assert report["passed"] is False
-    assert report["canary"]["stale"] == 1
+def test_frozen_hash_and_prefilled_answers_are_rejected():
+    payload = json.loads(
+        (EVALS / "narrative_units_fiction.json").read_text(encoding="utf-8")
+    )
+    payload["cases"][0]["retrieved"] = {"hybrid": ["u1"]}
+    with pytest.raises(NarrativeEvalError):
+        load_fixture_payload(payload)
 
 
-def test_faithfulness_failure_blocks_release():
-    payload = json.loads((EVALS / "narrative_units_fiction.json").read_text(encoding="utf-8"))
-    payload["cases"][0]["faithful"] = False
-    assert evaluate_fixture(payload)["passed"] is False
+def load_fixture_payload(payload):
+    from app.services.knowledge_units.eval import validate_fixture
+
+    return validate_fixture(payload)
+
+
+async def test_wrong_candidate_metadata_cannot_pass():
+    payload = load_fixture(EVALS / "narrative_units_fiction.json")
+
+    async def retrieve(query, context):
+        return [
+            {
+                "id": "u1",
+                "metadata": {
+                    "build_id": 999,
+                    "manifest_checksum": "x",
+                    "owner_id": 999,
+                    "novel_id": 22,
+                },
+            }
+        ]
+
+    report = await evaluate_candidate(
+        payload, build=_build(), retrieve=retrieve, signing_secret="secret"
+    )
+    assert not report["passed"] and not report["canary"]["passed"]

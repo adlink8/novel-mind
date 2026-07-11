@@ -1,13 +1,1 @@
-{
-  "version": "narrative-units-history.v1",
-  "domain": "history",
-  "split": "frozen",
-  "cases": [
-    {"id":"h1","query":"官渡之战对手","gold_ids":["h1"],"retrieved":{"chunks":[],"units":["h1"],"hybrid":["h1"]},"faithful":true,"canary":true,"latency_ms":{"chunks":20,"units":35,"hybrid":50}},
-    {"id":"h2","query":"事件发生顺序","gold_ids":["h2"],"retrieved":{"chunks":["x","h2"],"units":["h2"],"hybrid":["h2","x"]},"faithful":true,"canary":true,"latency_ms":{"chunks":19,"units":33,"hybrid":48}},
-    {"id":"h3","query":"史料争议","gold_ids":["h3"],"retrieved":{"chunks":[],"units":["h3"],"hybrid":["h3"]},"faithful":true,"canary":false,"latency_ms":{"chunks":18,"units":31,"hybrid":44}},
-    {"id":"h4","query":"组织支持关系","gold_ids":["h4"],"retrieved":{"chunks":["h4"],"units":["h4"],"hybrid":["h4"]},"faithful":true,"canary":false,"latency_ms":{"chunks":23,"units":34,"hybrid":52}},
-    {"id":"h5","query":"因果与先后","gold_ids":["h5"],"retrieved":{"chunks":["x"],"units":["h5"],"hybrid":["h5","x"]},"faithful":true,"canary":false,"latency_ms":{"chunks":21,"units":32,"hybrid":47}},
-    {"id":"h6","query":"同名人物区分","gold_ids":["h6"],"retrieved":{"chunks":["h6"],"units":["h6"],"hybrid":["h6"]},"faithful":true,"canary":false,"latency_ms":{"chunks":20,"units":30,"hybrid":45}}
-  ]
-}
+{"version":"narrative-units-history.v1","domain":"history","split":"frozen","cases":[{"id":"h1","query":"官渡之战对手","gold_ids":["h1"],"gold_evidence_ids":["h1"]},{"id":"h2","query":"事件发生顺序","gold_ids":["h2"],"gold_evidence_ids":["h2"]},{"id":"h3","query":"史料争议","gold_ids":["h3"],"gold_evidence_ids":["h3"]},{"id":"h4","query":"组织支持关系","gold_ids":["h4"],"gold_evidence_ids":["h4"]},{"id":"h5","query":"因果与先后","gold_ids":["h5"],"gold_evidence_ids":["h5"]},{"id":"h6","query":"同名人物区分","gold_ids":["h6"],"gold_evidence_ids":["h6"]}],"dataset_hash":"1cf561b1ca15b3229c969c87cf23465fcf8a6329e928d7fb915584b4ac941f40"}

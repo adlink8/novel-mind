@@ -1,91 +1,256 @@
-"""Frozen retrieval evaluation and canary gates for narrative candidates."""
+"""Candidate-bound frozen retrieval evaluation and signed release evidence."""
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
 import math
+import time
 from pathlib import Path
 from statistics import mean
-from typing import Any
+from typing import Any, Awaitable, Callable
 
 from app.services.knowledge_units.materialize import stable_hash
+
+RetrievalAdapter = Callable[[str, dict[str, Any]], Awaitable[list[dict[str, Any]]]]
+STRATEGIES = ("chunks", "units", "hybrid")
 
 
 class NarrativeEvalError(ValueError):
     pass
 
 
-def _metrics(gold: list[str], recalled: list[str], top_k: int) -> dict[str, float]:
-    ranked = recalled[:top_k]
-    gold_set = set(gold)
-    hits = [1 if item in gold_set else 0 for item in ranked]
-    recall = len(set(ranked) & gold_set) / len(gold_set) if gold_set else 1.0
-    precision = sum(hits) / len(ranked) if ranked else (1.0 if not gold_set else 0.0)
-    first = next((index + 1 for index, hit in enumerate(hits) if hit), None)
-    mrr = 1.0 / first if first else 0.0
-    dcg = sum(hit / math.log2(index + 2) for index, hit in enumerate(hits))
-    ideal = sum(1.0 / math.log2(index + 2) for index in range(min(len(gold_set), top_k)))
-    return {"recall_at_5": recall, "precision_at_5": precision, "mrr_at_5": mrr, "ndcg_at_5": dcg / ideal if ideal else 1.0}
+def fixture_hash(payload: dict[str, Any]) -> str:
+    return stable_hash(
+        {key: value for key, value in payload.items() if key != "dataset_hash"}
+    )
 
 
-def evaluate_fixture(payload: dict[str, Any], *, latency_budget_ms: float = 1000.0) -> dict[str, Any]:
-    if payload.get("split") != "frozen" or payload.get("domain") not in {"fiction", "history"}:
+def validate_fixture(payload: dict[str, Any]) -> str:
+    if payload.get("split") != "frozen" or payload.get("domain") not in {
+        "fiction",
+        "history",
+    }:
         raise NarrativeEvalError("fixture must be a frozen fiction/history dataset")
-    cases = payload.get("cases")
-    if not isinstance(cases, list) or not cases:
+    if not isinstance(payload.get("cases"), list) or not payload["cases"]:
         raise NarrativeEvalError("fixture has no cases")
-    dataset_hash = stable_hash({key: value for key, value in payload.items() if key != "dataset_hash"})
-    if payload.get("dataset_hash") not in {None, dataset_hash}:
+    forbidden = {
+        "retrieved",
+        "latency_ms",
+        "faithful",
+        "passed",
+        "canary_passed",
+        "wrong",
+        "stale",
+        "cross_owner",
+    }
+    if any(forbidden.intersection(case) for case in payload["cases"]):
+        raise NarrativeEvalError(
+            "frozen cases may contain only query/gold/expected evidence"
+        )
+    actual = fixture_hash(payload)
+    if not payload.get("dataset_hash") or not hmac.compare_digest(
+        payload["dataset_hash"], actual
+    ):
         raise NarrativeEvalError("frozen dataset hash mismatch")
-    strategies: dict[str, list[dict[str, float]]] = {"chunks": [], "units": [], "hybrid": []}
-    latencies: dict[str, list[float]] = {name: [] for name in strategies}
-    critical = {"wrong": 0, "stale": 0, "cross_owner": 0}
+    return actual
+
+
+def _metrics(gold: list[str], recalled: list[str], top_k: int = 5) -> dict[str, float]:
+    ranked, gold_set = recalled[:top_k], set(gold)
+    hits = [item in gold_set for item in ranked]
+    dcg = sum(int(hit) / math.log2(i + 2) for i, hit in enumerate(hits))
+    ideal = sum(1 / math.log2(i + 2) for i in range(min(len(gold_set), top_k)))
+    first = next((i + 1 for i, hit in enumerate(hits) if hit), None)
+    return {
+        "recall_at_5": len(set(ranked) & gold_set) / len(gold_set) if gold_set else 1.0,
+        "precision_at_5": sum(hits) / len(ranked)
+        if ranked
+        else (1.0 if not gold_set else 0.0),
+        "mrr_at_5": 1 / first if first else 0.0,
+        "ndcg_at_5": dcg / ideal if ideal else 1.0,
+    }
+
+
+def sign_run(report: dict[str, Any], secret: str) -> str:
+    body = json.dumps(
+        {k: v for k, v in report.items() if k != "signature"},
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hmac.new(secret.encode(), body.encode(), hashlib.sha256).hexdigest()
+
+
+def verify_run(report: dict[str, Any], secret: str) -> bool:
+    signature = report.get("signature", "")
+    return bool(signature) and hmac.compare_digest(signature, sign_run(report, secret))
+
+
+async def evaluate_candidate(
+    payload: dict[str, Any],
+    *,
+    build: Any,
+    retrieve: RetrievalAdapter,
+    signing_secret: str,
+    latency_budget_ms: float = 1000.0,
+) -> dict[str, Any]:
+    dataset_hash = validate_fixture(payload)
+    if not build.collection_name or build.status not in {"candidate", "active"}:
+        raise NarrativeEvalError("evaluation requires an indexed candidate build")
+    outputs, rows = [], {name: [] for name in STRATEGIES}
+    latencies = {name: [] for name in STRATEGIES}
+    critical = {"wrong_build": 0, "cross_owner": 0, "stale": 0}
     faithfulness_failures = 0
-    zero_results = 0
-    canary_total = 0
-    for case in cases:
-        gold = case.get("gold_ids", [])
-        for strategy in strategies:
-            recalled = case.get("retrieved", {}).get(strategy, [])
-            strategies[strategy].append(_metrics(gold, recalled, 5))
-            latencies[strategy].append(float(case.get("latency_ms", {}).get(strategy, 0.0)))
-            if strategy == "hybrid" and not recalled:
-                zero_results += 1
-        if not case.get("faithful", False):
-            faithfulness_failures += 1
-        if case.get("canary"):
-            canary_total += 1
-            for key in critical:
-                critical[key] += int(bool(case.get(key, False)))
-    summary: dict[str, dict[str, float]] = {}
-    for strategy, rows in strategies.items():
-        summary[strategy] = {
-            metric: round(mean(row[metric] for row in rows), 6)
-            for metric in ("recall_at_5", "precision_at_5", "mrr_at_5", "ndcg_at_5")
-        }
+    for case in payload["cases"]:
+        case_output = {"id": case["id"], "query": case["query"], "strategies": {}}
+        for strategy in STRATEGIES:
+            context = {
+                "strategy": strategy,
+                "build_id": build.id,
+                "candidate_checksum": build.manifest_checksum,
+                "collection": build.collection_name,
+                "owner_id": build.owner_id,
+                "novel_id": build.novel_id,
+                "domain": build.domain_profile,
+                "top_k": 5,
+            }
+            started = time.perf_counter_ns()
+            results = await retrieve(case["query"], context)
+            elapsed = (time.perf_counter_ns() - started) / 1_000_000
+            ids = [str(item["id"]) for item in results]
+            rows[strategy].append(_metrics(case.get("gold_ids", []), ids))
+            latencies[strategy].append(elapsed)
+            faithful = (
+                all(
+                    set(item.get("evidence_ids", ()))
+                    & set(case.get("gold_evidence_ids", ()))
+                    for item in results
+                )
+                if results and case.get("gold_evidence_ids")
+                else True
+            )
+            faithfulness_failures += int(strategy == "hybrid" and not faithful)
+            for item in results:
+                meta = item.get("metadata", {})
+                critical["wrong_build"] += int(
+                    meta.get("build_id") != build.id
+                    or meta.get("manifest_checksum") != build.manifest_checksum
+                )
+                critical["cross_owner"] += int(
+                    meta.get("owner_id") != build.owner_id
+                    or meta.get("novel_id") != build.novel_id
+                )
+                critical["stale"] += int(
+                    meta.get("lifecycle_status") in {"deleted", "deprecated"}
+                )
+            case_output["strategies"][strategy] = {
+                "retrieved_ids": ids,
+                "latency_ms": elapsed,
+                "faithful": faithful,
+            }
+        outputs.append(case_output)
+    summary = {}
+    for strategy in STRATEGIES:
         ordered = sorted(latencies[strategy])
-        p95_index = max(0, math.ceil(len(ordered) * 0.95) - 1)
-        summary[strategy]["latency_p95_ms"] = ordered[p95_index]
-    canary_passed = canary_total > 0 and sum(critical.values()) == 0
+        summary[strategy] = {
+            metric: round(mean(row[metric] for row in rows[strategy]), 6)
+            for metric in rows[strategy][0]
+        }
+        summary[strategy].update(
+            latency_p50_ms=ordered[(len(ordered) - 1) // 2],
+            latency_p95_ms=ordered[max(0, math.ceil(len(ordered) * 0.95) - 1)],
+        )
+    canary_passed = not any(critical.values())
     passed = (
         summary["hybrid"]["recall_at_5"] >= summary["chunks"]["recall_at_5"]
         and summary["hybrid"]["mrr_at_5"] >= summary["chunks"]["mrr_at_5"]
         and summary["hybrid"]["latency_p95_ms"] <= latency_budget_ms
-        and faithfulness_failures == 0
+        and not faithfulness_failures
         and canary_passed
     )
-    return {
+    report = {
+        "run_id": stable_hash(
+            {"build": build.id, "dataset": dataset_hash, "outputs": outputs}
+        ),
         "passed": passed,
         "domain": payload["domain"],
         "dataset_hash": dataset_hash,
-        "case_count": len(cases),
+        "build_id": build.id,
+        "candidate_checksum": build.manifest_checksum,
+        "collection": build.collection_name,
+        "owner_id": build.owner_id,
+        "novel_id": build.novel_id,
         "strategies": summary,
+        "outputs": outputs,
         "faithfulness_failures": faithfulness_failures,
-        "zero_result_rate": zero_results / len(cases),
-        "canary": {"passed": canary_passed, "sample_size": canary_total, **critical},
-        "frozen_unchanged": True,
+        "canary": {"passed": canary_passed, **critical},
     }
+    report["signature"] = sign_run(report, signing_secret)
+    return report
 
 
-def load_and_evaluate(path: str | Path, *, latency_budget_ms: float = 1000.0) -> dict[str, Any]:
-    return evaluate_fixture(json.loads(Path(path).read_text(encoding="utf-8")), latency_budget_ms=latency_budget_ms)
+def load_fixture(path: str | Path) -> dict[str, Any]:
+    payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    validate_fixture(payload)
+    return payload
+
+
+def candidate_retriever(
+    build: Any, *, vector_store: Any, ai_service: Any
+) -> RetrievalAdapter:
+    """Production retrieval adapter used by CLI and refresh wiring."""
+
+    async def retrieve(query: str, context: dict[str, Any]) -> list[dict[str, Any]]:
+        import asyncio
+
+        embedding = (await ai_service.embedding(texts=[query]))[0]
+        metadata = {
+            "build_id": build.id,
+            "manifest_checksum": build.manifest_checksum,
+            "owner_id": build.owner_id,
+            "novel_id": build.novel_id,
+            "lifecycle_status": "current",
+        }
+        if context["strategy"] == "chunks":
+            raw = await vector_store.search(
+                build.novel_id, query_embedding=embedding, top_k=context["top_k"]
+            )
+            return [
+                {
+                    "id": str(item.get("id") or item.get("chunk_id")),
+                    "metadata": metadata,
+                    "evidence_ids": [str(item.get("id") or item.get("chunk_id"))],
+                }
+                for item in raw
+            ]
+        collection = vector_store.get_named_collection(build.collection_name)
+        raw = await asyncio.to_thread(
+            collection.query,
+            query_embeddings=[embedding],
+            n_results=context["top_k"],
+            include=["metadatas"],
+        )
+        units = [
+            {
+                "id": item_id,
+                "metadata": meta or {},
+                "evidence_ids": [str((meta or {}).get("evidence_checksum", ""))],
+            }
+            for item_id, meta in zip(
+                (raw.get("ids") or [[]])[0],
+                (raw.get("metadatas") or [[]])[0],
+                strict=True,
+            )
+        ]
+        if context["strategy"] == "units":
+            return units
+        chunks = await retrieve(query, {**context, "strategy": "chunks"})
+        seen: set[str] = set()
+        return [
+            item
+            for item in units + chunks
+            if not (item["id"] in seen or seen.add(item["id"]))
+        ]
+
+    return retrieve

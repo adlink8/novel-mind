@@ -3,6 +3,7 @@
 import argparse
 import asyncio
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -16,17 +17,37 @@ from app.services.knowledge_units.promotion import narrative_promotion_service  
 
 async def _run(args) -> dict:
     if args.dry_run:
-        return {"dry_run": True, "action": "prepare" if args.prepare else "commit", "candidate_checksum": args.checksum}
+        return {
+            "dry_run": True,
+            "action": "prepare" if args.prepare else "commit",
+            "candidate_checksum": args.checksum,
+        }
     async with async_session_factory() as db:
         if args.prepare:
-            eval_report = json.loads(open(args.eval_report, encoding="utf-8").read())
+            eval_reports = [
+                json.loads(Path(path).read_text(encoding="utf-8"))
+                for path in args.eval_report
+            ]
             reconcile = json.loads(open(args.reconcile_report, encoding="utf-8").read())
-            journal = await narrative_promotion_service.prepare(db, candidate_build_id=args.candidate, candidate_checksum=args.checksum, eval_report=eval_report, reconcile_report=reconcile, approved_by=args.approved_by)
+            journal = await narrative_promotion_service.prepare(
+                db,
+                candidate_build_id=args.candidate,
+                candidate_checksum=args.checksum,
+                eval_reports=eval_reports,
+                reconcile_report=reconcile,
+                approved_by=args.approved_by,
+                evidence_secret=args.evidence_secret,
+            )
             await db.commit()
             return {"journal_id": journal.id, "status": journal.status}
-        pointer = await narrative_promotion_service.commit(db, journal_id=args.commit, candidate_checksum=args.checksum)
+        pointer = await narrative_promotion_service.commit(
+            db, journal_id=args.commit, candidate_checksum=args.checksum
+        )
         await db.commit()
-        return {"build_id": pointer.build_id, "pointer_version": pointer.pointer_version}
+        return {
+            "build_id": pointer.build_id,
+            "pointer_version": pointer.pointer_version,
+        }
 
 
 def main() -> int:
@@ -36,9 +57,12 @@ def main() -> int:
     mode.add_argument("--commit", type=int)
     parser.add_argument("--candidate", type=int)
     parser.add_argument("--checksum", required=True)
-    parser.add_argument("--eval-report")
+    parser.add_argument("--eval-report", action="append", default=[])
     parser.add_argument("--reconcile-report")
     parser.add_argument("--approved-by", default="")
+    parser.add_argument(
+        "--evidence-secret", default=os.environ.get("NARRATIVE_EVAL_SIGNING_SECRET", "")
+    )
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
     print(json.dumps(asyncio.run(_run(args)), indent=2))
