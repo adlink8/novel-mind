@@ -1,0 +1,11 @@
+{
+  "version": "narrative-unit-merge.v1",
+  "cases": [
+    {"id": "fiction-exact", "domain": "fiction", "expected": "merge", "relation": "ally"},
+    {"id": "fiction-direction", "domain": "fiction", "expected": "review", "relation": "mentor"},
+    {"id": "fiction-enemy", "domain": "fiction", "expected": "block", "relations": ["ally", "enemy"]},
+    {"id": "history-name", "domain": "history", "expected": "block", "reason": "same name different person"},
+    {"id": "history-sequence", "domain": "history", "expected": "block", "relations": ["precedes", "causes"]},
+    {"id": "history-disputed", "domain": "history", "expected": "block", "reason": "lifecycle mismatch"}
+  ]
+}
