@@ -2,12 +2,13 @@
 评测服务 测试 — 仅测试指标计算（模型层），不依赖外部服务
 
 服务依赖采用惰性加载，因此可以直接测试生产指标实现，不复制算法。
+Phase 06-04: legacy gold migration + quality-path exception policy helpers.
 """
 import pytest
 
 pytestmark = pytest.mark.unit
 
-from app.services.eval_service import EvalService
+from app.services.eval_service import DEPRECATION_META, EvalService
 
 
 service = EvalService()
@@ -94,3 +95,32 @@ class TestComputeMetrics:
         ndcg = service._compute_ndcg(gold, recalled, top_k=4, scores=scores)
         assert 0.0 <= ndcg <= 1.0
         assert ndcg == service._compute_ndcg(gold, recalled, top_k=4)
+
+
+class TestLegacyGoldMigration:
+    def test_quarantine_without_mapping(self):
+        r = service.classify_legacy_gold([1, 2, 3], id_to_hash=None)
+        assert r["status"] == "quarantined"
+        assert r["quality_comparable"] is False
+        assert r["evidence_hashes"] == []
+
+    def test_quarantine_partial_mapping(self):
+        r = service.classify_legacy_gold([1, 2], id_to_hash={1: "a" * 64})
+        assert r["status"] == "quarantined"
+        assert r["quality_comparable"] is False
+
+    def test_migrate_when_fully_provable(self):
+        mapping = {1: "a" * 64, 2: "b" * 64}
+        r = service.classify_legacy_gold([1, 2], id_to_hash=mapping)
+        assert r["status"] == "migrated"
+        assert r["evidence_hashes"] == ["a" * 64, "b" * 64]
+        # still not quality_comparable until full fixture freeze
+        assert r["quality_comparable"] is False
+
+    def test_empty_gold_quarantined(self):
+        r = service.classify_legacy_gold([], id_to_hash={1: "a" * 64})
+        assert r["status"] == "quarantined"
+
+    def test_deprecation_meta_present(self):
+        assert DEPRECATION_META["deprecated"] is True
+        assert "POST /api/eval/quality/runs" in DEPRECATION_META["replacement"]["create"]
