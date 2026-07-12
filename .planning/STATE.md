@@ -23,17 +23,17 @@ See `.planning/PROJECT.md` and `IMPLEMENTATION-STATUS.md`.<br>
 
 ## Current Position
 
-Phase: 06 (automated-quality-ci) — **COMPLETE** (09/09)
-Plan: 9 of 9 complete; next **Phase 07 / 07-01**
+Phase: 07 (semantic-hierarchical-chunking) — IN PROGRESS
+Plan: 1 of 6 complete; next **07-02**
 
-- Milestone: **v0.5 - 自动质量与 CI 门禁** closed for REQ-AUTO-11
+- Milestone: Phase 06 v0.5 complete; Phase 07 started
 - Current branch: `feat/phase2-wave2-embedding`
-- Status: 06-01..06-09 complete (persistent QualityRun + baseline prepare/commit + cross-chunker reports).
-- Last activity: 2026-07-13 — Completed 06-09 BaselineCandidate prepare/commit and cross-chunker reports.
+- Status: 07-01 complete (baseline manifests + offsets); 07-02..07-06 pending.
+- Last activity: 2026-07-13 — Completed 07-01 deterministic baseline chunker lineage.
 
 ## Auto Routing
 
-Phase 06 complete. Next: **Phase 07 semantic hierarchical chunking** starting at **07-01**. Auto-start remains disabled.
+Execute **07-02** next (depends on 07-01). Auto-start remains disabled.
 
 ## Verified In v0.3
 
@@ -149,6 +149,12 @@ Phase 06 complete. Next: **Phase 07 semantic hierarchical chunking** starting at
 - 将 90 条 candidate 完成人工确认/驳回，达到 100 条高质量 confirmed 的 issue 门槛
 - 校准 gold_chunks；当前 6 次运行 Recall/Precision/MRR/NDCG 均为 0
 
+### 07-01 COMPLETE
+
+- `chunking/schemas|manifests|baseline` packages
+- Unicode offsets + deterministic manifest checksum
+- Tests: 41 passed (unit + integration + legacy chunking)
+
 ## Next Action
 
-Execute **07-01-PLAN.md** (chunker manifests, source lineage, deterministic baseline).
+Execute **07-02-PLAN.md** (rule boundary confidence and candidate segmentation).

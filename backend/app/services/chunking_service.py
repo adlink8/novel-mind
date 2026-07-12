@@ -332,3 +332,30 @@ class ChunkingService:
 
 # 单例实例
 chunking_service = ChunkingService()
+
+
+async def chunk_novel_with_baseline_lineage(
+    novel_id: int,
+    chapters: list[Chapter],
+    *,
+    owner_id: int | None = None,
+    service: ChunkingService | None = None,
+):
+    """Legacy chunk list + Phase 07 baseline manifest (does not touch active index).
+
+    Returns (legacy_chunks, manifest, source_snapshot).
+    """
+    from app.services.chunking.baseline import BaselineChunker
+
+    svc = service or chunking_service
+    # Preserve exact legacy chunk payloads
+    legacy = await svc.chunk_novel(novel_id=novel_id, chapters=chapters)
+    baseline = BaselineChunker(
+        svc,
+        min_chunk_size=svc.min_chunk_size,
+        max_chunk_size=svc.max_chunk_size,
+    )
+    manifest, snapshot = await baseline.build_baseline_manifest(
+        novel_id=novel_id, chapters=chapters, owner_id=owner_id
+    )
+    return legacy, manifest, snapshot
