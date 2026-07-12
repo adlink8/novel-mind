@@ -3,20 +3,20 @@ gsd_state_version: 1.0
 milestone: v0.5
 milestone_name: Automated Quality and CI Gates
 status: executing
-last_updated: "2026-07-12T17:20:00.000Z"
+last_updated: "2026-07-12T18:45:00.000Z"
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 17
-  completed_plans: 14
-  percent: 42
+  completed_plans: 15
+  percent: 48
 ---
 
 # Project State
 
 ## Project Reference
 
-See `.planning/PROJECT.md` and `IMPLEMENTATION-STATUS.md`。<br>
+See `.planning/PROJECT.md` and `IMPLEMENTATION-STATUS.md`.<br>
 系统结构以 `docs/architecture/` 为准。
 
 **Core value:** 先建立可信、安全、可迁移的实现基线，再扩展 RAG。
@@ -24,12 +24,12 @@ See `.planning/PROJECT.md` and `IMPLEMENTATION-STATUS.md`。<br>
 ## Current Position
 
 Phase: 06 (automated-quality-ci) — EXECUTING
-Plan: 2 of 7 (06-01 COMPLETE)
+Plan: 3 of 7 (06-01 COMPLETE, 06-02 COMPLETE)
 
 - Milestone: **v0.5 - 自动质量与 CI 门禁**
 - Current branch: `feat/phase2-wave2-embedding`
-- Status: 06-01 complete — test taxonomy, fail-closed live semantics, coverage/timeout/flake policy locked and verified.
-- Last activity: 2026-07-12 — Executed 06-01 (classification + quality policy foundation).
+- Status: 06-02 complete — PostgreSQL 16 + Chroma 1.5.9 digests locked; real-service migration/semantics/contract/recovery integration tests verified.
+- Last activity: 2026-07-12 — Executed 06-02 (CI service lock + PG/Chroma integration matrix).
 
 ## Auto Routing
 
@@ -71,70 +71,29 @@ Phase 06 is ready for plan verification and later explicit execution. Auto-start
 - 搜索结果高亮移除 `dangerouslySetInnerHTML`，跳转对齐 `/novels/[id]`
 - 1280px 桌面与 390px 移动端浏览器验收通过，控制台无错误
 
+## Phase 06 Progress
+
+### 06-01 COMPLETE
+
+- pytest markers unit/integration/contract/live (+ e2e scope), fail-closed classification gate
+- marker timeouts D-16; live embeddings no random fallback
+- coverage/timeout/flake policy locked
+
+### 06-02 COMPLETE
+
+- `docker-compose.ci.yml` + `.github/ci/service-lock.json`
+- Postgres `16.10@sha256:21f6013…` on :5433 / `novelmind_ci`
+- Chroma `1.5.9@sha256:abcce7c…` on :8002, health `/api/v2/heartbeat`, client `chromadb==1.5.9`
+- Integration tests: 12 postgres + 8 chroma passed against real services
+
 ## Open Work
 
 - pgvector 双写备用路径
 - 大文件（>5MB）流式上传
-- 端到端 CI/CD 集成测试
+- 端到端 CI/CD 集成测试 (remaining 06-03..06-07)
 - 将 90 条 candidate 完成人工确认/驳回，达到 100 条高质量 confirmed 的 issue 门槛
 - 校准 gold_chunks；当前 6 次运行 Recall/Precision/MRR/NDCG 均为 0
-- 实现并验证 faithfulness 与 cost 指标
-- 将评测运行从同步 HTTP 请求迁移到持久化后台任务
 
-## Verification Snapshot
+## Next Action
 
-| 检查项 | 结果 |
-|--------|------|
-| Backend pytest | 239 passed（非 e2e）|
-| Frontend Vitest | 22 passed |
-| Frontend build | Next.js 16 Turbopack passed |
-| ESLint | 0 errors |
-| TypeScript | 0 errors |
-| Ruff | All checks passed |
-| Bandit | 0 High, 0 Medium |
-| npm audit | 0 vulnerabilities |
-| Alembic | upgrade/current/check 通过 (head: 518675fa18f8) |
-| Phase 05 05-01 | 17 targeted tests + Ruff + py_compile + offline Alembic passed; live PostgreSQL blocked |
-| RAG e2e | 12 passed (真实 Ollama nomic-embed-text) |
-| Eval 三策略 | 可执行，但现有 6 次运行的质量指标均为 0；不能作为效果验收 |
-| UI 浏览器验收 | 1280px + 390px 通过，console 0 errors |
-
-## Accumulated Context
-
-### Roadmap Evolution
-
-- 2026-07-02: Phase 04 added and planned: LLM 语义判定与证据门控知识图谱链路。该 phase 参考 `C:\Users\li\Desktop\数据分析` 的候选召回 -> LLM proposal/judgment -> deterministic evidence gate -> accepted graph projection 模式，并明确 Phase 04 执行依赖 Phase 03 缺口关闭或人工覆盖。
-
-### Phase 04 Execution Decisions
-
-- 2026-07-02: 04-02 uses text_chunk pairs as evidence-unit relation candidates; no accepted graph facts are created.
-- 2026-07-02: 04-02 reports unavailable live LLM calls as blocked judgment audit status instead of fabricating semantic output.
-- 2026-07-02: 04-03 uses accepted KnowledgeRelationJudgment rows as PostgreSQL source-of-truth projection input because no accepted-edge migration was added.
-- 2026-07-02: 04-03 skips text_chunk-only projection until entity/event resolution exists, preserving recall signals as non-truth.
-- 2026-07-02: 04-03 keeps Neo4j sync disabled by default and read-only from accepted PostgreSQL rows.
-- 2026-07-02: 04-04 evaluates fiction/history with the same offline graph eval core while keeping recall signal quality separate from accepted graph fact quality.
-
-### Phase 05 Execution Decisions
-
-- 2026-07-11: 05-01 carries owner_id and novel_id through composite source/build foreign keys to prevent cross-owner lineage.
-- 2026-07-11: 05-01 snapshot identity includes accepted semantic and exact evidence content while excluding raw LLM audit output and rationale.
-- 2026-07-11: 05-01 checks source manifests before and after savepoint writes and aborts moving inputs without a partial snapshot.
-
-### Performance Metrics
-
-| Plan | Duration | Tasks | Files |
-|---|---:|---:|---:|
-| Phase 04 P02 | 10min | 1 task | 7 files |
-| Phase 04 P03 | 16min | 1 task | 10 files |
-| Phase 04 P04 | 14min | 1 task | 6 files |
-| Phase 05 P01 | 20min | 3 tasks | 9 files |
-| Phase 05 GAP-CLOSURE-01 | 32min | 3 tasks | 25 files |
-| Phase 05 GAP-CLOSURE-02 | 45min | 2 tasks | 11 files |
-| Phase 05 GAP-CLOSURE-03 | 31min | 3 tasks | 14 files |
-| Phase 05 GAP-CLOSURE-04 | 7min | 1 task | 3 files |
-
-### Session
-
-- Last session: 2026-07-12
-- Stopped At: Phase 06 plan 06-01 COMPLETE; next is 06-02 (PostgreSQL/Chroma services)
-- Resume File: `.planning/phases/06-automated-quality-ci/06-02-PLAN.md` (when started)
+Execute **06-03** (frozen fixtures, adversarial gates, Judge calibration) when scheduled. Do not auto-start.

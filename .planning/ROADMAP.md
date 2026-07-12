@@ -38,7 +38,7 @@
 | v0.1 审计与启动修复 | 3/3 | Complete |
 | v0.2 安全与架构修复 | 3/3 | Complete |
 | v0.3 小说导入 + RAG 索引 | 4/5 | **Gaps Found** |
-| v0.5 自动质量与 CI 门禁 | 0/7 | Planned |
+| v0.5 自动质量与 CI 门禁 | 2/7 | Executing |
 
 ## Auto Start
 
@@ -89,12 +89,12 @@ Plans:
 **Goal:** 补齐后端、前端、数据库、向量库、API、浏览器和 live AI 的自动化验证，并以冻结证据、双模型仲裁和确定性规则建立无需日常人工逐题确认的 RAG 质量门禁。
 **Requirements:** REQ-AUTO-01..10
 **Depends on:** Phase 3, Phase 5
-**Status:** Planned
+**Status:** Executing (06-01, 06-02 complete)
 **Plans:** 7 plans
 
 Plans:
-- [ ] 06-01 test taxonomy and deterministic quality foundations
-- [ ] 06-02 PostgreSQL and Chroma integration matrix
+- [x] 06-01 test taxonomy and deterministic quality foundations
+- [x] 06-02 PostgreSQL and Chroma integration matrix
 - [ ] 06-03 frozen fixtures, adversarial gates, and Judge calibration
 - [ ] 06-04 RAG scoring, durable worker, and Eval API compatibility
 - [ ] 06-05 API contracts, frontend components, and browser journeys
