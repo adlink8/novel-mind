@@ -82,7 +82,8 @@ cd frontend && npm run test:coverage
 
 ## Commit Hashes
 
-(filled after commit)
+- `34f8072` — `feat(06-01): test taxonomy, fail-closed live embeddings, quality policy`
+- `aef3dbe` — `docs(06-01): add plan summary and update execution state`
 
 ## Next
 
