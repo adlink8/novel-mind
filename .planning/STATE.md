@@ -29,8 +29,8 @@ Plan: 5 of 5
 - Milestone: **v0.3 - 小说导入 + RAG 索引** — GAPS FOUND
 - Phase: 03-01 RAG 评测集与自动化检索优化闭环 — PARTIAL
 - Current branch: `feat/phase2-wave2-embedding`
-- Status: Phase 05 gap closure revision loop 3 implemented for production retrieval parity, durable refresh resume/scoped reconcile, and CLI parity; independent re-verification is pending.
-- Last activity: 2026-07-12 — Shared production retrieval with candidate evaluation, committed resumable refresh stages, scoped active reconcile, and exact CLI execution; 112 Phase 05+hybrid tests and 362 backend non-e2e tests passed.
+- Status: Phase 05 gap closure revision loop 4 implemented; production API and candidate evaluation now invoke one NarrativeRetrievalStrategy boundary, with independent re-verification pending.
+- Last activity: 2026-07-12 — Closed REQ-NU-06/D-07 shared strategy wiring while preserving search 401/403 semantics; 116 Phase 05+hybrid tests and 366 backend non-e2e tests passed.
 
 ## Auto Routing
 
@@ -132,9 +132,10 @@ Phase 05 next cursor is 05-02. Live PostgreSQL `upgrade/current/check` for 05-01
 | Phase 05 GAP-CLOSURE-01 | 32min | 3 tasks | 25 files |
 | Phase 05 GAP-CLOSURE-02 | 45min | 2 tasks | 11 files |
 | Phase 05 GAP-CLOSURE-03 | 31min | 3 tasks | 14 files |
+| Phase 05 GAP-CLOSURE-04 | 7min | 1 task | 3 files |
 
 ### Session
 
-- Last session: 2026-07-11T22:58:00Z
-- Stopped At: Completed Phase 05 verifier gap closure revision loop 3; independent re-verification pending
+- Last session: 2026-07-12T03:33:00Z
+- Stopped At: Completed Phase 05 verifier gap closure revision loop 4; independent re-verification pending
 - Resume File: None
