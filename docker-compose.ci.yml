@@ -1,0 +1,55 @@
+# =============================================================================
+# NovelMind CI-locked service topology (Phase 06-02 / D-05)
+# =============================================================================
+# Isolated from developer docker-compose.yml:
+#   - project name: novelmind-ci
+#   - host ports: 5433 (Postgres), 8002 (Chroma)
+#   - dedicated volumes: ci_pgdata, ci_chromadata
+# Image digests are pinned; missing/drift is fail-closed via service-lock.json.
+# =============================================================================
+
+name: novelmind-ci
+
+services:
+  db:
+    image: postgres:16.10@sha256:21f6013073bc6b92830a2129570e2f5ec42a6c734b5a985a41e83aa58f54c3c1
+    environment:
+      POSTGRES_DB: novelmind_ci
+      POSTGRES_USER: novelmind
+      POSTGRES_PASSWORD: novelmind
+    ports:
+      - "5433:5432"
+    volumes:
+      - ci_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U novelmind -d novelmind_ci"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  chroma:
+    image: chromadb/chroma:1.5.9@sha256:abcce7c335e2dab9f11ef629296f7309b09cb19ae4b34da32ac7e34ff5773140
+    ports:
+      - "8002:8000"
+    volumes:
+      - ci_chromadata:/chroma/chroma
+    environment:
+      - CHROMA_SERVER_HOST=0.0.0.0
+      - CHROMA_SERVER_HTTP_PORT=8000
+    # Image has no curl/wget/python; bash /dev/tcp probes HTTP /api/v2/heartbeat.
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >
+          bash -c 'exec 3<>/dev/tcp/127.0.0.1/8000;
+          printf "GET /api/v2/heartbeat HTTP/1.0\r\nHost: localhost\r\n\r\n" >&3;
+          timeout 3 cat <&3 | head -n 1 | grep -Eq "HTTP/1\.[01] 200"'
+      interval: 5s
+      timeout: 5s
+      retries: 18
+      start_period: 20s
+
+volumes:
+  ci_pgdata:
+  ci_chromadata:

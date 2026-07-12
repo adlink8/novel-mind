@@ -1,0 +1,37 @@
+{
+  "schema_version": "service-lock.v1",
+  "phase": "06-02",
+  "locked_at": "2026-07-12",
+  "fail_closed": true,
+  "postgres": {
+    "image": "postgres",
+    "tag": "16.10",
+    "digest": "sha256:21f6013073bc6b92830a2129570e2f5ec42a6c734b5a985a41e83aa58f54c3c1",
+    "image_ref": "postgres:16.10@sha256:21f6013073bc6b92830a2129570e2f5ec42a6c734b5a985a41e83aa58f54c3c1",
+    "database": "novelmind_ci",
+    "user": "novelmind",
+    "password": "novelmind",
+    "host_port": 5433,
+    "container_port": 5432,
+    "async_url": "postgresql+asyncpg://novelmind:novelmind@127.0.0.1:5433/novelmind_ci",
+    "sync_url": "postgresql+psycopg2://novelmind:novelmind@127.0.0.1:5433/novelmind_ci",
+    "healthcheck": {
+      "command": "pg_isready -U novelmind -d novelmind_ci"
+    }
+  },
+  "chroma": {
+    "image": "chromadb/chroma",
+    "tag": "1.5.9",
+    "digest": "sha256:abcce7c335e2dab9f11ef629296f7309b09cb19ae4b34da32ac7e34ff5773140",
+    "image_ref": "chromadb/chroma:1.5.9@sha256:abcce7c335e2dab9f11ef629296f7309b09cb19ae4b34da32ac7e34ff5773140",
+    "host_port": 8002,
+    "container_port": 8000,
+    "health_path": "/api/v2/heartbeat",
+    "health_url": "http://127.0.0.1:8002/api/v2/heartbeat",
+    "python_client": "chromadb==1.5.9"
+  },
+  "compose": {
+    "file": "docker-compose.ci.yml",
+    "project_name": "novelmind-ci"
+  }
+}
