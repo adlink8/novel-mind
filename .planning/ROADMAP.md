@@ -38,7 +38,7 @@
 | v0.1 审计与启动修复 | 3/3 | Complete |
 | v0.2 安全与架构修复 | 3/3 | Complete |
 | v0.3 小说导入 + RAG 索引 | 4/5 | **Gaps Found** |
-| v0.5 自动质量与 CI 门禁 | 2/7 | Executing |
+| v0.5 自动质量与 CI 门禁 | 5/7 | Executing |
 
 ## Auto Start
 

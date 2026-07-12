@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v0.5
 milestone_name: Automated Quality and CI Gates
 status: executing
-last_updated: "2026-07-12T22:00:00.000Z"
+last_updated: "2026-07-12T18:30:00.000Z"
 progress:
   total_phases: 5
   completed_phases: 2
-  total_plans: 17
-  completed_plans: 17
-  percent: 56
+  total_plans: 18
+  completed_plans: 18
+  percent: 60
 ---
 
 # Project State
@@ -24,12 +24,12 @@ See `.planning/PROJECT.md` and `IMPLEMENTATION-STATUS.md`.<br>
 ## Current Position
 
 Phase: 06 (automated-quality-ci) — EXECUTING
-Plan: 5 of 7 (06-01..06-04 COMPLETE)
+Plan: 6 of 7 (06-01..06-05 COMPLETE)
 
 - Milestone: **v0.5 - 自动质量与 CI 门禁**
 - Current branch: `feat/phase2-wave2-embedding`
-- Status: 06-04 complete — SUT scoring, D-08 policy arbiter, durable quality worker, legacy Eval API adapter.
-- Last activity: 2026-07-12 — Executed 06-04 (scoring + worker + compatibility).
+- Status: 06-05 complete — OpenAPI contract, frontend eval/quality consumer tests, Playwright desktop+390px.
+- Last activity: 2026-07-12 — Executed 06-05 (OpenAPI + frontend + Playwright).
 
 ## Auto Routing
 
@@ -98,6 +98,13 @@ Phase 06 is ready for plan verification and later explicit execution. Auto-start
 
 - SUT retrieve+answer scoring; faithfulness/relevance/context precision/recall@5
 - Deterministic arbiter with locked D-08 thresholds; fail-closed on missing policy/baseline/health/lineage
+
+### 06-05 COMPLETE
+
+- OpenAPI export + frozen baseline + oasdiff v1.17.0 (Python fallback); pos/neg fixtures
+- Frontend `evalApi` / `use-eval` / eval store consume legacy + all quality statuses + deprecation
+- Playwright 1.61.1: chromium-desktop + chromium-mobile-390; core + error/isolation journeys
+- Verified: contract 7 passed; vitest 54 passed; playwright 10 passed
 - Durable quality worker: lease/heartbeat/checkpoint/resume/cancel + stage-cache idempotency
 - Legacy Eval API compatibility fields + `/api/eval/quality/*` durable endpoints
 - Live dual-model test: Ollama outage → `blocked_dependency`, metrics=null
