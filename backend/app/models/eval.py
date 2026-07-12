@@ -17,8 +17,12 @@
 
 from typing import TYPE_CHECKING
 
+from datetime import datetime
+
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
+    DateTime,
     Float,
     ForeignKey,
     Index,
@@ -286,3 +290,75 @@ class RagEvalCase(TimestampMixin, Base):
     payload: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
 
     snapshot: Mapped["RagSourceSnapshot"] = relationship(back_populates="cases")
+
+
+# ── Phase 06-08 durable quality run + chunker/source lineage ─────────
+
+
+class QualityRun(TimestampMixin, Base):
+    """Persisted durable quality job (lease / checkpoint / stage cache / report).
+
+    Five-tuple lineage (chunker_name, chunker_version, chunker_config_hash,
+    chunk_manifest_hash, source_snapshot_hash) is required for quality_comparable.
+    Legacy / incomplete rows stay readable with quality_comparable=false.
+    """
+
+    __tablename__ = "quality_runs"
+    __table_args__ = (
+        UniqueConstraint("job_id", name="uq_quality_runs_job_id"),
+        Index("idx_quality_runs_owner", "owner_id"),
+        Index("idx_quality_runs_status", "status"),
+        Index("idx_quality_runs_owner_status", "owner_id", "status"),
+        Index("idx_quality_runs_lease_expires", "lease_expires_at"),
+        # Fail-closed: comparable rows must carry complete five-tuple lineage.
+        CheckConstraint(
+            "(quality_comparable = false) OR ("
+            "chunker_name IS NOT NULL AND length(trim(chunker_name)) > 0 AND "
+            "chunker_version IS NOT NULL AND length(trim(chunker_version)) > 0 AND "
+            "chunker_config_hash IS NOT NULL AND length(chunker_config_hash) = 64 AND "
+            "chunk_manifest_hash IS NOT NULL AND length(chunk_manifest_hash) = 64 AND "
+            "source_snapshot_hash IS NOT NULL AND length(source_snapshot_hash) = 64"
+            ")",
+            name="ck_quality_runs_comparable_requires_lineage",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    job_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    owner_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    work_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("novels.id", ondelete="SET NULL"), nullable=True
+    )
+    status: Mapped[str] = mapped_column(String(40), nullable=False, default="queued")
+    attempt: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    cancel_requested: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )
+    lease_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    lease_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    heartbeat_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    payload: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    checkpoint: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    stage_cache: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    metrics: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    report: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    input_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    output_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    report_signature: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    # Five-tuple chunker / source lineage (nullable only for legacy/incomparable)
+    chunker_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    chunker_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    chunker_config_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    chunk_manifest_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    source_snapshot_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    quality_comparable: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )
+    incomparable_reason: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    error_detail: Mapped[str | None] = mapped_column(Text, nullable=True)

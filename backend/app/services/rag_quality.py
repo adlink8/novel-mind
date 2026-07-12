@@ -19,8 +19,11 @@ from pathlib import Path
 from typing import Any, Callable, Protocol
 
 from app.schemas.eval import (
+    INVALID_LINEAGE_REASON,
+    LEGACY_INCOMPARABLE_REASON,
     SCHEMA_VERSION_RAG_QUALITY,
     CalibrationReport,
+    ChunkerLineage,
     EvalCase,
     ModelLineage,
     SourceSnapshot,
@@ -43,6 +46,130 @@ logger = logging.getLogger(__name__)
 
 POLICY_VERSION = "rag-quality-policy.v1"
 ANSWER_JUDGE_PROMPT_VERSION = "rag_answer_judge.v1"
+_SHA256_HEX_LEN = 64
+
+
+def recompute_chunker_config_hash(chunker_config: dict[str, Any] | None) -> str:
+    """Canonical config hash — never trust a caller-supplied config hash alone."""
+    return stable_hash(chunker_config if isinstance(chunker_config, dict) else {})
+
+
+def canonicalize_chunker_lineage(
+    lineage: ChunkerLineage | dict[str, Any] | None,
+    *,
+    expected_source_snapshot_hash: str | None = None,
+    expected_chunk_manifest_hash: str | None = None,
+) -> tuple[ChunkerLineage | None, str | None]:
+    """Normalize five-tuple lineage or return (None, reason).
+
+    Reasons:
+      - legacy_incomparable: missing / empty (no invented hashes)
+      - invalid_lineage: present but malformed or mismatched evidence
+    """
+    if lineage is None:
+        return None, LEGACY_INCOMPARABLE_REASON
+    if isinstance(lineage, dict):
+        if not lineage:
+            return None, LEGACY_INCOMPARABLE_REASON
+        try:
+            lineage = ChunkerLineage.model_validate(lineage)
+        except Exception as exc:
+            return None, f"{INVALID_LINEAGE_REASON}: {exc}"
+
+    name = (lineage.chunker_name or "").strip()
+    version = (lineage.chunker_version or "").strip()
+    if not name or not version:
+        return None, LEGACY_INCOMPARABLE_REASON
+
+    cfg = lineage.chunker_config if isinstance(lineage.chunker_config, dict) else {}
+    config_hash = recompute_chunker_config_hash(cfg)
+    # If caller sent a config hash and it disagrees with recomputed → invalid.
+    if (
+        lineage.chunker_config_hash
+        and lineage.chunker_config_hash != config_hash
+    ):
+        return None, f"{INVALID_LINEAGE_REASON}: chunker_config_hash mismatch"
+
+    for label, value in (
+        ("chunk_manifest_hash", lineage.chunk_manifest_hash),
+        ("source_snapshot_hash", lineage.source_snapshot_hash),
+    ):
+        if not value or len(value) != _SHA256_HEX_LEN:
+            return None, f"{INVALID_LINEAGE_REASON}: {label} must be sha256 hex"
+
+    if (
+        expected_source_snapshot_hash
+        and lineage.source_snapshot_hash != expected_source_snapshot_hash
+    ):
+        return None, f"{INVALID_LINEAGE_REASON}: source_snapshot_hash mismatch"
+    if (
+        expected_chunk_manifest_hash
+        and lineage.chunk_manifest_hash != expected_chunk_manifest_hash
+    ):
+        return None, f"{INVALID_LINEAGE_REASON}: chunk_manifest_hash mismatch"
+
+    canonical = lineage.model_copy(
+        update={
+            "chunker_name": name,
+            "chunker_version": version,
+            "chunker_config": cfg,
+            "chunker_config_hash": config_hash,
+        }
+    )
+    return canonical, None
+
+
+def lineage_five_tuple(lineage: ChunkerLineage | dict[str, Any] | None) -> dict[str, str] | None:
+    """Extract five-tuple for hashing; None if incomplete (never invent)."""
+    canonical, err = canonicalize_chunker_lineage(lineage)
+    if canonical is None or err is not None:
+        return None
+    return canonical.five_tuple()
+
+
+def build_quality_input_hash(
+    *,
+    snapshot_manifest_hash: str | None,
+    case_fixture_hashes: list[str | None],
+    baseline: dict[str, Any] | None,
+    policy_hash_value: str | None = None,
+    chunker_lineage: ChunkerLineage | dict[str, Any] | None,
+) -> str:
+    """Input identity includes complete canonical five-tuple lineage when present."""
+    five = lineage_five_tuple(chunker_lineage)
+    return stable_hash(
+        {
+            "snapshot": snapshot_manifest_hash,
+            "cases": case_fixture_hashes,
+            "baseline": baseline,
+            "policy_hash": policy_hash_value,
+            "chunker_lineage": five,
+        }
+    )
+
+
+def build_stage_cache_key(
+    *,
+    run_input_hash: str | None,
+    case_id: str,
+    fixture_hash: str | None,
+    repetition: int,
+    top_k: int,
+    chunker_lineage: ChunkerLineage | dict[str, Any] | None = None,
+) -> str:
+    """Idempotency key binds run input (incl. lineage) so cross-chunker never collides."""
+    five = lineage_five_tuple(chunker_lineage)
+    digest = stable_hash(
+        {
+            "run_input_hash": run_input_hash,
+            "case_id": case_id,
+            "fixture_hash": fixture_hash,
+            "repetition": repetition,
+            "top_k": top_k,
+            "chunker_lineage": five,
+        }
+    )
+    return f"{case_id}:r{repetition}:{digest[:16]}"
 
 COMPARABLE_STATUSES = frozenset({"passed", "qualified"})
 NON_COMPARABLE_TERMINAL = frozenset(
@@ -625,21 +752,22 @@ def run_case_once(
     judge_fn: AnswerJudgeFn | None = None,
     judge_lineage: ModelLineage | None = None,
     stage_cache: dict[str, Any] | None = None,
+    run_input_hash: str | None = None,
+    chunker_lineage: ChunkerLineage | dict[str, Any] | None = None,
 ) -> CaseRunArtifact:
     """Execute retrieve -> answer -> score for one case/repetition (idempotent via cache)."""
     retrieve_fn = retrieve_fn or default_stub_retrieve
     answer_fn = answer_fn or default_stub_answer
     judge_fn = judge_fn or default_stub_answer_judge
 
-    input_hash = stable_hash(
-        {
-            "case_id": case.case_id,
-            "fixture_hash": case.fixture_hash,
-            "repetition": repetition,
-            "top_k": top_k,
-        }
+    call_id = build_stage_cache_key(
+        run_input_hash=run_input_hash,
+        case_id=case.case_id,
+        fixture_hash=case.fixture_hash,
+        repetition=repetition,
+        top_k=top_k,
+        chunker_lineage=chunker_lineage,
     )
-    call_id = f"{case.case_id}:r{repetition}:{input_hash[:16]}"
 
     if stage_cache is not None and call_id in stage_cache:
         cached = stage_cache[call_id]
@@ -1016,6 +1144,9 @@ def run_quality_evaluation(
     stage_cache: dict[str, Any] | None = None,
     repeats: int | None = None,
     top_k: int | None = None,
+    chunker_lineage: ChunkerLineage | dict[str, Any] | None = None,
+    require_chunker_lineage: bool = False,
+    run_input_hash: str | None = None,
 ) -> dict[str, Any]:
     """Run SUT scoring + deterministic arbiter. Never swallows exceptions into 0 scores."""
 
@@ -1033,11 +1164,64 @@ def run_quality_evaluation(
             "usable_for_baseline": False,
             "artifacts": [],
             "report_signature": None,
+            "output_hash": None,
+            "chunker_lineage": None,
         }
 
     run_cfg = loaded_policy.get("run") or {}
     n_repeats = int(repeats if repeats is not None else run_cfg.get("repeats", 3))
     k = int(top_k if top_k is not None else run_cfg.get("top_k", 5))
+    p_hash = policy_hash(loaded_policy)
+
+    # Chunker/source five-tuple lineage (before scoring when required)
+    canonical_lineage, lineage_reason = canonicalize_chunker_lineage(
+        chunker_lineage,
+        expected_source_snapshot_hash=snapshot.manifest_hash,
+    )
+    if require_chunker_lineage and (
+        canonical_lineage is None
+        or (lineage_reason and lineage_reason.startswith(INVALID_LINEAGE_REASON))
+        or lineage_reason == LEGACY_INCOMPARABLE_REASON
+    ):
+        reason = lineage_reason or INVALID_LINEAGE_REASON
+        if reason == LEGACY_INCOMPARABLE_REASON:
+            reason = f"{INVALID_LINEAGE_REASON}: missing chunker/source lineage"
+        return {
+            "status": "invalid_lineage",
+            "metrics": None,
+            "quality_comparable": False,
+            "reason": reason,
+            "detail": {"incomparable_reason": reason},
+            "usable_for_baseline": False,
+            "artifacts": [],
+            "report_signature": None,
+            "output_hash": None,
+            "chunker_lineage": None,
+            "incomparable_reason": reason,
+        }
+    if lineage_reason and lineage_reason.startswith(INVALID_LINEAGE_REASON):
+        return {
+            "status": "invalid_lineage",
+            "metrics": None,
+            "quality_comparable": False,
+            "reason": lineage_reason,
+            "detail": {"incomparable_reason": lineage_reason},
+            "usable_for_baseline": False,
+            "artifacts": [],
+            "report_signature": None,
+            "output_hash": None,
+            "chunker_lineage": None,
+            "incomparable_reason": lineage_reason,
+        }
+
+    five = canonical_lineage.five_tuple() if canonical_lineage else None
+    effective_input_hash = run_input_hash or build_quality_input_hash(
+        snapshot_manifest_hash=snapshot.manifest_hash,
+        case_fixture_hashes=[c.fixture_hash for c in cases],
+        baseline=baseline,
+        policy_hash_value=p_hash,
+        chunker_lineage=canonical_lineage,
+    )
 
     # Fixtures
     fixture_fail = validate_fixtures_for_scoring(
@@ -1049,6 +1233,9 @@ def run_quality_evaluation(
             "usable_for_baseline": False,
             "artifacts": [],
             "report_signature": None,
+            "output_hash": None,
+            "chunker_lineage": five,
+            "input_hash": effective_input_hash,
         }
 
     # Infer lineages from first case if not provided
@@ -1066,6 +1253,9 @@ def run_quality_evaluation(
             "usable_for_baseline": False,
             "artifacts": [],
             "report_signature": None,
+            "output_hash": None,
+            "chunker_lineage": five,
+            "input_hash": effective_input_hash,
         }
 
     health_fail = validate_dependency_health(health)
@@ -1075,6 +1265,9 @@ def run_quality_evaluation(
             "usable_for_baseline": False,
             "artifacts": [],
             "report_signature": None,
+            "output_hash": None,
+            "chunker_lineage": five,
+            "input_hash": effective_input_hash,
         }
 
     cache = stage_cache if stage_cache is not None else {}
@@ -1095,6 +1288,8 @@ def run_quality_evaluation(
                     judge_fn=judge_fn,
                     judge_lineage=j_lin,
                     stage_cache=cache,
+                    run_input_hash=effective_input_hash,
+                    chunker_lineage=canonical_lineage,
                 )
                 if art.status == "blocked_dependency":
                     blocked = True
@@ -1116,6 +1311,9 @@ def run_quality_evaluation(
             "usable_for_baseline": False,
             "artifacts": [],
             "report_signature": None,
+            "output_hash": None,
+            "chunker_lineage": five,
+            "input_hash": effective_input_hash,
         }
 
     metrics = None if blocked else aggregate_run_metrics(artifacts, policy=loaded_policy)
@@ -1133,10 +1331,13 @@ def run_quality_evaluation(
     report = {
         **decision,
         "policy_version": loaded_policy.get("version"),
-        "policy_hash": policy_hash(loaded_policy),
+        "policy_hash": p_hash,
         "schema_version": SCHEMA_VERSION_RAG_QUALITY,
         "n_cases": len(cases),
         "repeats": n_repeats,
+        "input_hash": effective_input_hash,
+        # Canonical lineage enters the signed report before signature/output_hash.
+        "chunker_lineage": five,
         "artifacts": [
             {
                 "case_id": a.case_id,
@@ -1156,9 +1357,10 @@ def run_quality_evaluation(
             "note": "SUT may share family with G or J; disclosed for audit only",
         },
     }
-    # Sign report (without embedding signature field)
-    payload = {k: v for k, v in report.items() if k != "report_signature"}
-    report["report_signature"] = sign_payload(payload, secret)
+    # Sign complete unsigned report (lineage included); then bind output_hash.
+    unsigned = {k: v for k, v in report.items() if k not in ("report_signature", "output_hash")}
+    report["report_signature"] = sign_payload(unsigned, secret)
+    report["output_hash"] = stable_hash(unsigned)
     return report
 
 

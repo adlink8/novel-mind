@@ -9,19 +9,21 @@ Examples:
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.schemas.eval import CalibrationReport, EvalCase, SourceSnapshot
-from app.services.rag_fixture import DEFAULT_SIGNING_SECRET, load_json
+from app.schemas.eval import CalibrationReport, ChunkerLineage, EvalCase, SourceSnapshot
+from app.services.rag_fixture import DEFAULT_SIGNING_SECRET, load_json, stable_hash
 from app.services.rag_quality import (
     default_healthy,
     load_policy,
     make_baseline_from_metrics,
     probe_ollama_health,
+    recompute_chunker_config_hash,
     run_quality_evaluation,
 )
 from app.services.rag_quality_worker import RagQualityWorker, QualityJobStore
@@ -131,21 +133,42 @@ def main() -> int:
             return 1
         baseline = make_baseline_from_metrics(establish["metrics"])
 
+    chunker_cfg = {"size": 512, "overlap": 64, "name": "cli-default"}
+    chunker = ChunkerLineage(
+        chunker_name="baseline-fixed",
+        chunker_version="1.0.0",
+        chunker_config=chunker_cfg,
+        chunker_config_hash=recompute_chunker_config_hash(chunker_cfg),
+        chunk_manifest_hash=stable_hash(
+            {"chunks": [c.content_hash for c in snap.chunks], "chunker": "baseline-fixed"}
+        ),
+        source_snapshot_hash=snap.manifest_hash,
+    )
+
     if args.durable:
-        worker = RagQualityWorker(store=QualityJobStore(), secret=DEFAULT_SIGNING_SECRET)
-        job = worker.create_job(
-            owner_id=args.owner_id,
-            snapshot=snap,
-            cases=cases,
-            generator_lineage=g,
-            judge_lineage=j,
-            calibration_report=cal,
-            baseline=baseline,
-            health=health,
-        )
-        job = worker.resume(job.job_id, owner_id=args.owner_id)
-        report = job.report or job.to_public()
-        print(f"[OK] job={job.job_id} status={job.status} comparable={job.quality_comparable}")
+
+        async def _durable() -> dict:
+            worker = RagQualityWorker(
+                store=QualityJobStore(), secret=DEFAULT_SIGNING_SECRET
+            )
+            job = await worker.create_job(
+                owner_id=args.owner_id,
+                snapshot=snap,
+                cases=cases,
+                generator_lineage=g,
+                judge_lineage=j,
+                calibration_report=cal,
+                baseline=baseline,
+                health=health,
+                chunker_lineage=chunker,
+            )
+            job = await worker.resume(job.job_id, owner_id=args.owner_id)
+            print(
+                f"[OK] job={job.job_id} status={job.status} comparable={job.quality_comparable}"
+            )
+            return job.report or job.to_public()
+
+        report = asyncio.run(_durable())
     else:
         report = run_quality_evaluation(
             snapshot=snap,
@@ -156,7 +179,9 @@ def main() -> int:
             baseline=baseline,
             health=health,
             secret=DEFAULT_SIGNING_SECRET,
+            chunker_lineage=chunker,
         )
+
         print(
             f"[OK] status={report.get('status')} comparable={report.get('quality_comparable')}"
         )

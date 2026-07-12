@@ -7,12 +7,19 @@ from pathlib import Path
 
 import pytest
 
-from app.schemas.eval import CalibrationReport, EvalCase, ModelLineage, SourceSnapshot
+from app.schemas.eval import (
+    CalibrationReport,
+    ChunkerLineage,
+    EvalCase,
+    ModelLineage,
+    SourceSnapshot,
+)
 from app.services.rag_fixture import (
     DEFAULT_SIGNING_SECRET,
     load_json,
     resolve_lineage,
     schema_contract_hash,
+    stable_hash,
     verify_frozen_case,
     verify_source_snapshot,
 )
@@ -20,6 +27,8 @@ from app.services.rag_quality import (
     DependencyOutage,
     apply_policy_arbiter,
     bootstrap_lower_bound,
+    build_quality_input_hash,
+    build_stage_cache_key,
     context_precision_at_k,
     context_recall_at_k,
     default_healthy,
@@ -29,6 +38,7 @@ from app.services.rag_quality import (
     load_policy,
     make_baseline_from_metrics,
     policy_path,
+    recompute_chunker_config_hash,
     run_quality_evaluation,
     validate_calibrated_lineage,
     validate_fixtures_for_scoring,
@@ -514,11 +524,13 @@ def test_idempotent_stage_cache_no_duplicate_calls():
         return default_stub_answer(case, retrieved)
 
     cache: dict = {}
+    # Same baseline keeps input_hash identical so stage keys hit the cache.
     baseline = {
         "context_recall_at_5_mean": 0.0,
         "answer_relevance_mean": 0.0,
         "cost_usd_total": 999.0,
     }
+    chunker = _chunker(snap, "baseline-fixed", "1.0.0")
     r1 = run_quality_evaluation(
         snapshot=snap,
         cases=cases[:1],
@@ -531,6 +543,7 @@ def test_idempotent_stage_cache_no_duplicate_calls():
         answer_fn=counting_answer,
         stage_cache=cache,
         repeats=3,
+        chunker_lineage=chunker,
     )
     n_first = calls["n"]
     assert n_first == 3  # 1 case × 3 repeats
@@ -540,12 +553,14 @@ def test_idempotent_stage_cache_no_duplicate_calls():
         generator_lineage=g,
         judge_lineage=j,
         calibration_report=cal,
-        baseline=make_baseline_from_metrics(r1["metrics"]) if r1.get("metrics") else baseline,
+        baseline=baseline,
         health=default_healthy(),
         secret=SECRET,
         answer_fn=counting_answer,
         stage_cache=cache,
         repeats=3,
+        chunker_lineage=chunker,
+        run_input_hash=r1.get("input_hash"),
     )
     assert calls["n"] == n_first  # no new answer calls
     assert r2["status"] in {"passed", "qualified", "quality_regression", "failed_policy"}
@@ -599,3 +614,146 @@ def test_db_id_only_case_rejected():
     assert fail is not None
     assert fail["status"] in {"invalid_fixture"}
     assert fail["metrics"] is None
+
+
+def _chunker(snap: SourceSnapshot, name: str, version: str, **cfg) -> ChunkerLineage:
+    config = {"size": 512, **cfg}
+    return ChunkerLineage(
+        chunker_name=name,
+        chunker_version=version,
+        chunker_config=config,
+        chunker_config_hash=recompute_chunker_config_hash(config),
+        chunk_manifest_hash=stable_hash(
+            {"chunks": [c.content_hash for c in snap.chunks], "chunker": name, "v": version}
+        ),
+        source_snapshot_hash=snap.manifest_hash,
+    )
+
+
+def test_input_hash_and_stage_keys_differ_across_chunkers():
+    snap, cases = _load_benchmark()
+    a = _chunker(snap, "baseline-fixed", "1.0.0")
+    b = _chunker(snap, "semantic", "2.0.0", size=256)
+    ha = build_quality_input_hash(
+        snapshot_manifest_hash=snap.manifest_hash,
+        case_fixture_hashes=[c.fixture_hash for c in cases],
+        baseline={"x": 1},
+        chunker_lineage=a,
+    )
+    hb = build_quality_input_hash(
+        snapshot_manifest_hash=snap.manifest_hash,
+        case_fixture_hashes=[c.fixture_hash for c in cases],
+        baseline={"x": 1},
+        chunker_lineage=b,
+    )
+    assert ha != hb
+    ka = build_stage_cache_key(
+        run_input_hash=ha,
+        case_id=cases[0].case_id,
+        fixture_hash=cases[0].fixture_hash,
+        repetition=0,
+        top_k=5,
+        chunker_lineage=a,
+    )
+    kb = build_stage_cache_key(
+        run_input_hash=hb,
+        case_id=cases[0].case_id,
+        fixture_hash=cases[0].fixture_hash,
+        repetition=0,
+        top_k=5,
+        chunker_lineage=b,
+    )
+    assert ka != kb
+
+
+def test_report_signature_includes_lineage_and_changes_with_it():
+    snap, cases = _load_benchmark()
+    g, j = _lineages_from_cases(cases)
+    cal = _passed_calibration(j)
+    baseline = {
+        "context_recall_at_5_mean": 0.0,
+        "answer_relevance_mean": 0.0,
+        "cost_usd_total": 999.0,
+    }
+    a = _chunker(snap, "baseline-fixed", "1.0.0")
+    b = _chunker(snap, "semantic", "2.0.0")
+    ra = run_quality_evaluation(
+        snapshot=snap,
+        cases=cases[:1],
+        generator_lineage=g,
+        judge_lineage=j,
+        calibration_report=cal,
+        baseline=baseline,
+        health=default_healthy(),
+        secret=SECRET,
+        chunker_lineage=a,
+    )
+    rb = run_quality_evaluation(
+        snapshot=snap,
+        cases=cases[:1],
+        generator_lineage=g,
+        judge_lineage=j,
+        calibration_report=cal,
+        baseline=baseline,
+        health=default_healthy(),
+        secret=SECRET,
+        chunker_lineage=b,
+    )
+    assert ra.get("chunker_lineage")
+    assert ra["chunker_lineage"]["chunker_name"] == "baseline-fixed"
+    assert ra["report_signature"]
+    assert ra["output_hash"]
+    assert ra["report_signature"] != rb["report_signature"]
+    assert ra["output_hash"] != rb["output_hash"]
+    assert ra["input_hash"] != rb["input_hash"]
+
+
+def test_mismatched_source_snapshot_hash_invalid_lineage():
+    snap, cases = _load_benchmark()
+    g, j = _lineages_from_cases(cases)
+    cal = _passed_calibration(j)
+    bad = _chunker(snap, "baseline-fixed", "1.0.0")
+    bad = bad.model_copy(update={"source_snapshot_hash": "f" * 64})
+    report = run_quality_evaluation(
+        snapshot=snap,
+        cases=cases[:1],
+        generator_lineage=g,
+        judge_lineage=j,
+        calibration_report=cal,
+        baseline={
+            "context_recall_at_5_mean": 0.0,
+            "answer_relevance_mean": 0.0,
+            "cost_usd_total": 999.0,
+        },
+        health=default_healthy(),
+        secret=SECRET,
+        chunker_lineage=bad,
+        require_chunker_lineage=True,
+    )
+    assert report["status"] == "invalid_lineage"
+    assert report["metrics"] is None
+    assert report["quality_comparable"] is False
+
+
+def test_require_chunker_lineage_missing_terminates():
+    snap, cases = _load_benchmark()
+    g, j = _lineages_from_cases(cases)
+    cal = _passed_calibration(j)
+    report = run_quality_evaluation(
+        snapshot=snap,
+        cases=cases[:1],
+        generator_lineage=g,
+        judge_lineage=j,
+        calibration_report=cal,
+        baseline={
+            "context_recall_at_5_mean": 0.0,
+            "answer_relevance_mean": 0.0,
+            "cost_usd_total": 999.0,
+        },
+        health=default_healthy(),
+        secret=SECRET,
+        chunker_lineage=None,
+        require_chunker_lineage=True,
+    )
+    assert report["status"] == "invalid_lineage"
+    assert report["metrics"] is None

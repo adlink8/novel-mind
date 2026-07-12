@@ -411,3 +411,64 @@ class CalibrationReport(BaseModel):
     metrics: dict[str, Any] | None = None
     quality_comparable: bool = False
     signature: str | None = None
+
+
+# ── Phase 06-08 chunker / source five-tuple lineage ───────────────────
+
+LEGACY_INCOMPARABLE_REASON = "legacy_incomparable"
+INVALID_LINEAGE_REASON = "invalid_lineage"
+
+
+class ChunkerLineage(BaseModel):
+    """Canonical five-tuple chunker/source lineage for quality comparability.
+
+    Caller-supplied ``chunker_config_hash`` is untrusted; services recompute it
+    from ``chunker_config`` via stable canonical JSON before hashing identities.
+    """
+
+    chunker_name: str = Field(..., min_length=1, max_length=128)
+    chunker_version: str = Field(..., min_length=1, max_length=64)
+    chunker_config: dict[str, Any] = Field(default_factory=dict)
+    # Untrusted if provided by caller — always recomputed for comparable runs.
+    chunker_config_hash: str | None = Field(default=None, min_length=64, max_length=64)
+    chunk_manifest_hash: str = Field(..., min_length=64, max_length=64)
+    source_snapshot_hash: str = Field(..., min_length=64, max_length=64)
+
+    def five_tuple(self) -> dict[str, str]:
+        """Return only the five canonical identity fields (config hash required)."""
+        if not self.chunker_config_hash:
+            raise ValueError("chunker_config_hash must be set before five_tuple()")
+        return {
+            "chunker_name": self.chunker_name,
+            "chunker_version": self.chunker_version,
+            "chunker_config_hash": self.chunker_config_hash,
+            "chunk_manifest_hash": self.chunk_manifest_hash,
+            "source_snapshot_hash": self.source_snapshot_hash,
+        }
+
+
+class QualityRunPublic(BaseModel):
+    """API-facing durable quality run status (06-08)."""
+
+    job_id: str
+    owner_id: int
+    status: str
+    attempt: int = 0
+    input_hash: str | None = None
+    output_hash: str | None = None
+    report_signature: str | None = None
+    quality_comparable: bool = False
+    metrics: dict[str, Any] | None = None
+    error_detail: str | None = None
+    incomparable_reason: str | None = None
+    checkpoint_stage: str | None = None
+    lease_held: bool = False
+    cancel_requested: bool = False
+    chunker_name: str | None = None
+    chunker_version: str | None = None
+    chunker_config_hash: str | None = None
+    chunk_manifest_hash: str | None = None
+    source_snapshot_hash: str | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
+    report: dict[str, Any] | None = None

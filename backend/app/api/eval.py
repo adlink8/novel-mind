@@ -32,6 +32,7 @@ from app.models.novel import Novel
 from app.models.user import User
 from app.schemas.eval import (
     CalibrationReport,
+    ChunkerLineage,
     EvalCase,
     EvalDatasetResponse,
     EvalDatasetUpdate,
@@ -43,9 +44,9 @@ from app.schemas.eval import (
 from app.services.eval_service import DEPRECATION_META, eval_service, EvalServiceError
 from app.services.rag_quality import default_healthy
 from app.services.rag_quality_worker import (
+    QualityRunRepository,
     QualityWorkerError,
-    rag_quality_worker,
-    quality_job_store,
+    make_quality_worker,
 )
 
 logger = logging.getLogger(__name__)
@@ -222,6 +223,8 @@ class QualityRunCreate(BaseModel):
     calibration_report: dict[str, Any] | None = None
     baseline: dict[str, Any] | None = None
     health: dict[str, Any] | None = None
+    # Five-tuple chunker/source lineage (required for comparable runs).
+    chunker_lineage: dict[str, Any] | None = None
     run_immediately: bool = True
 
 
@@ -229,8 +232,9 @@ class QualityRunCreate(BaseModel):
 async def create_quality_run(
     body: QualityRunCreate,
     current_user: User = Depends(require_user),
+    db: AsyncSession = Depends(get_db),
 ):
-    """Create (and optionally run) a durable quality job."""
+    """Create (and optionally run) a durable quality job backed by QualityRun."""
     try:
         snapshot = SourceSnapshot.model_validate(body.snapshot)
         cases = [EvalCase.model_validate(c) for c in body.cases]
@@ -250,12 +254,16 @@ async def create_quality_run(
                 cal = CalibrationReport.model_validate(cal)
             except Exception:
                 pass
+        chunker = None
+        if body.chunker_lineage:
+            chunker = ChunkerLineage.model_validate(body.chunker_lineage)
 
         # Ownership: snapshot owner must match current user (unless superuser)
         if not current_user.is_superuser and snapshot.owner_id != current_user.id:
             raise HTTPException(status_code=404, detail="snapshot not found")
 
-        job = rag_quality_worker.create_job(
+        worker = make_quality_worker(db)
+        job = await worker.create_job(
             owner_id=current_user.id,
             snapshot=snapshot,
             cases=cases,
@@ -264,9 +272,10 @@ async def create_quality_run(
             calibration_report=cal,
             baseline=body.baseline,
             health=body.health if body.health is not None else default_healthy(),
+            chunker_lineage=chunker,
         )
         if body.run_immediately:
-            job = rag_quality_worker.resume(job.job_id, owner_id=current_user.id)
+            job = await worker.resume(job.job_id, owner_id=current_user.id)
         return {
             "status": job.status,
             "job_id": job.job_id,
@@ -288,9 +297,11 @@ async def create_quality_run(
 async def get_quality_run(
     job_id: str,
     current_user: User = Depends(require_user),
+    db: AsyncSession = Depends(get_db),
 ):
     try:
-        public = rag_quality_worker.get_status(job_id, owner_id=current_user.id)
+        worker = make_quality_worker(db)
+        public = await worker.get_status(job_id, owner_id=current_user.id)
         return {
             "status": public["status"],
             "job_id": public["job_id"],
@@ -307,9 +318,11 @@ async def get_quality_run(
 async def resume_quality_run(
     job_id: str,
     current_user: User = Depends(require_user),
+    db: AsyncSession = Depends(get_db),
 ):
     try:
-        job = rag_quality_worker.resume(job_id, owner_id=current_user.id)
+        worker = make_quality_worker(db)
+        job = await worker.resume(job_id, owner_id=current_user.id)
         return {
             "status": job.status,
             "job_id": job.job_id,
@@ -326,9 +339,11 @@ async def resume_quality_run(
 async def cancel_quality_run(
     job_id: str,
     current_user: User = Depends(require_user),
+    db: AsyncSession = Depends(get_db),
 ):
     try:
-        job = rag_quality_worker.request_cancel(job_id, owner_id=current_user.id)
+        worker = make_quality_worker(db)
+        job = await worker.request_cancel(job_id, owner_id=current_user.id)
         return {
             "status": job.status,
             "job_id": job.job_id,
@@ -344,6 +359,9 @@ async def cancel_quality_run(
 @router.get("/quality/runs", response_model=list[dict])
 async def list_quality_runs(
     current_user: User = Depends(require_user),
+    db: AsyncSession = Depends(get_db),
 ):
-    jobs = quality_job_store.list_for_owner(current_user.id)
+    repo = QualityRunRepository(db)
+    jobs = await repo.list_for_owner(current_user.id)
     return [j.to_public() for j in jobs]
+

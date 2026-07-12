@@ -6,13 +6,22 @@ from datetime import datetime, timezone
 
 import pytest
 from pydantic import ValidationError
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.eval import EvalDataset, RagEvalCase, RagFixtureJob, RagSourceSnapshot
+from app.models.eval import (
+    EvalDataset,
+    QualityRun,
+    RagEvalCase,
+    RagFixtureJob,
+    RagSourceSnapshot,
+)
 from app.models.novel import Novel
 from app.models.user import User
 from app.schemas.eval import (
+    LEGACY_INCOMPARABLE_REASON,
     SCHEMA_VERSION_RAG_QUALITY,
+    ChunkerLineage,
     Claim,
     EvalCase,
     EvidenceRef,
@@ -26,6 +35,11 @@ from app.services.rag_fixture import (
     make_evidence_ref,
     resolve_lineage,
     schema_contract_hash,
+    stable_hash,
+)
+from app.services.rag_quality import (
+    canonicalize_chunker_lineage,
+    recompute_chunker_config_hash,
 )
 
 pytestmark = pytest.mark.unit
@@ -228,3 +242,101 @@ def test_resolve_lineage_requires_weights():
             schema_hash=schema_contract_hash(),
         )
     assert "weights" in str(ei.value).lower() or "revision" in str(ei.value).lower()
+
+
+def test_chunker_lineage_recomputes_config_hash():
+    cfg = {"size": 512, "overlap": 64}
+    lin = ChunkerLineage(
+        chunker_name="baseline-fixed",
+        chunker_version="1.0.0",
+        chunker_config=cfg,
+        chunker_config_hash="0" * 64,  # wrong on purpose
+        chunk_manifest_hash="a" * 64,
+        source_snapshot_hash="b" * 64,
+    )
+    canonical, err = canonicalize_chunker_lineage(lin)
+    assert canonical is None
+    assert err is not None and "chunker_config_hash mismatch" in err
+
+    good = ChunkerLineage(
+        chunker_name="baseline-fixed",
+        chunker_version="1.0.0",
+        chunker_config=cfg,
+        chunker_config_hash=recompute_chunker_config_hash(cfg),
+        chunk_manifest_hash="a" * 64,
+        source_snapshot_hash="b" * 64,
+    )
+    canonical2, err2 = canonicalize_chunker_lineage(good)
+    assert err2 is None
+    assert canonical2 is not None
+    assert canonical2.chunker_config_hash == recompute_chunker_config_hash(cfg)
+
+
+def test_missing_lineage_is_legacy_incomparable_never_invented():
+    canonical, reason = canonicalize_chunker_lineage(None)
+    assert canonical is None
+    assert reason == LEGACY_INCOMPARABLE_REASON
+    canonical2, reason2 = canonicalize_chunker_lineage({})
+    assert canonical2 is None
+    assert reason2 == LEGACY_INCOMPARABLE_REASON
+
+
+@pytest.mark.asyncio
+async def test_quality_run_persist_with_lineage(db_session: AsyncSession):
+    user, novel = await _user_novel(db_session, "qrun_ok")
+    cfg = {"size": 256}
+    cfg_hash = recompute_chunker_config_hash(cfg)
+    row = QualityRun(
+        job_id="qjob-persist-1",
+        owner_id=user.id,
+        work_id=novel.id,
+        status="queued",
+        payload={"hello": "world"},
+        checkpoint={"stage": "queued", "committed": []},
+        stage_cache={},
+        input_hash=stable_hash({"x": 1}),
+        chunker_name="baseline-fixed",
+        chunker_version="1.0.0",
+        chunker_config_hash=cfg_hash,
+        chunk_manifest_hash="c" * 64,
+        source_snapshot_hash="d" * 64,
+        quality_comparable=True,
+    )
+    db_session.add(row)
+    await db_session.commit()
+
+    loaded = (
+        await db_session.execute(
+            select(QualityRun).where(QualityRun.job_id == "qjob-persist-1")
+        )
+    ).scalar_one()
+    assert loaded.quality_comparable is True
+    assert loaded.chunker_name == "baseline-fixed"
+    assert loaded.chunker_config_hash == cfg_hash
+    assert loaded.payload["hello"] == "world"
+
+
+@pytest.mark.asyncio
+async def test_quality_run_legacy_without_lineage_incomparable(db_session: AsyncSession):
+    user, novel = await _user_novel(db_session, "qrun_legacy")
+    row = QualityRun(
+        job_id="qjob-legacy-1",
+        owner_id=user.id,
+        work_id=novel.id,
+        status="passed",
+        payload={},
+        checkpoint={},
+        stage_cache={},
+        metrics={"context_recall_at_5_mean": 0.9},
+        # No five-tuple — must remain incomparable; never invent hashes.
+        quality_comparable=False,
+        incomparable_reason=LEGACY_INCOMPARABLE_REASON,
+    )
+    db_session.add(row)
+    await db_session.commit()
+    loaded = await db_session.get(QualityRun, row.id)
+    assert loaded is not None
+    assert loaded.quality_comparable is False
+    assert loaded.incomparable_reason == LEGACY_INCOMPARABLE_REASON
+    assert loaded.chunker_name is None
+    assert loaded.chunker_config_hash is None
