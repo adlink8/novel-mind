@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v0.4
-milestone_name: Narrative Knowledge Unit Layer
-status: phase_complete
+milestone: v0.5
+milestone_name: Automated Quality and CI Gates
+status: planned
 last_updated: 2026-07-12T03:41:10.690Z
 progress:
-  total_phases: 2
-  completed_phases: 2
-  total_plans: 9
-  completed_plans: 9
-  percent: 100
-stopped_at: Phase 5 independently verified complete (5/5 plans, 8/8 requirements)
+  total_phases: 1
+  completed_phases: 0
+  total_plans: 7
+  completed_plans: 0
+  percent: 0
+stopped_at: Phase 6 planned; implementation explicitly not started
 ---
 
 # Project State
@@ -24,18 +24,18 @@ See `.planning/PROJECT.md` and `IMPLEMENTATION-STATUS.md`。<br>
 
 ## Current Position
 
-Phase: 05 (narrative-knowledge-unit-layer) — VERIFIED
-Plan: 5 of 5 complete
+Phase: 06 (automated-quality-ci) — PLANNED
+Plan: 0 of 7 executed
 
 - Milestone: **v0.3 - 小说导入 + RAG 索引** — GAPS FOUND
 - Phase: 03-01 RAG 评测集与自动化检索优化闭环 — PARTIAL
 - Current branch: `feat/phase2-wave2-embedding`
-- Status: Phase 05 independently verified passed; REQ-NU-01..08 and D-01..D-10 are complete.
-- Last activity: 2026-07-12 — Fifth independent verifier passed 8/8 requirements; 366 backend non-e2e tests passed with 12 deselected.
+- Status: Phase 06 planning complete; no implementation, test execution, migration, build, CI run, or live model call has started.
+- Last activity: 2026-07-12 — Planned automated test/CI closure and dual-model RAG quality qualification in seven dependency-ordered plans.
 
 ## Auto Routing
 
-Phase 05 is complete. Next active product work remains governed by the milestone roadmap; backlog phases are not auto-started.
+Phase 06 is ready for plan verification and later explicit execution. Auto-start remains disabled.
 
 ## Verified In v0.3
 
@@ -137,6 +137,6 @@ Phase 05 is complete. Next active product work remains governed by the milestone
 
 ### Session
 
-- Last session: 2026-07-12T03:39:31Z
-- Stopped At: Phase 05 independently verified complete
+- Last session: 2026-07-12
+- Stopped At: Phase 06 GSD planning only; implementation not started
 - Resume File: None

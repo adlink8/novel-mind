@@ -5,6 +5,7 @@
 - [x] v0.1 审计与启动修复 - 建立可信实现基线和启动级契约。
 - [x] v0.2 安全与架构修复 - 关闭安全、迁移、路由、依赖和导入可靠性阻断项。
 - [ ] v0.3 小说导入 + RAG 索引 - 导入/索引/搜索已交付，RAG 评测质量闭环仍有缺口。
+- [ ] v0.5 自动质量与 CI 门禁 - 以全栈自动化和双模型仲裁替代人工 RAG 质量确认。
 
 第一个 active milestone 已按要求设为并完成"审计与启动修复"。v0.3 经 2006-06-13 复审后恢复为 active，详见 `.planning/v0.3-MILESTONE-AUDIT.md`。
 
@@ -37,6 +38,7 @@
 | v0.1 审计与启动修复 | 3/3 | Complete |
 | v0.2 安全与架构修复 | 3/3 | Complete |
 | v0.3 小说导入 + RAG 索引 | 4/5 | **Gaps Found** |
+| v0.5 自动质量与 CI 门禁 | 0/7 | Planned |
 
 ## Auto Start
 
@@ -81,3 +83,20 @@ Plans:
 - [x] 05-03 candidate index and hybrid retrieval
 - [x] 05-04 frozen evaluation, canary, and promotion
 - [x] 05-05 incremental refresh, reconcile, and rollback
+
+### Phase 6: Automated Quality and CI Gates
+
+**Goal:** 补齐后端、前端、数据库、向量库、API、浏览器和 live AI 的自动化验证，并以冻结证据、双模型仲裁和确定性规则建立无需日常人工逐题确认的 RAG 质量门禁。
+**Requirements:** REQ-AUTO-01..10
+**Depends on:** Phase 3, Phase 5
+**Status:** Planned
+**Plans:** 7 plans
+
+Plans:
+- [ ] 06-01 test taxonomy and deterministic quality foundations
+- [ ] 06-02 PostgreSQL and Chroma integration matrix
+- [ ] 06-03 frozen fixtures, adversarial gates, and Judge calibration
+- [ ] 06-04 RAG scoring, durable worker, and Eval API compatibility
+- [ ] 06-05 API contracts, frontend components, and browser journeys
+- [ ] 06-06 unified CI producer DAG, security, artifacts, and nightly qualification
+- [ ] 06-07 ci-gate aggregation, branch protection, and release gate
