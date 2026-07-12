@@ -96,7 +96,7 @@ Plans:
 - [x] 06-01 test taxonomy and deterministic quality foundations
 - [x] 06-02 PostgreSQL and Chroma integration matrix
 - [x] 06-03 frozen fixtures, adversarial gates, and Judge calibration
-- [ ] 06-04 RAG scoring, durable worker, and Eval API compatibility
+- [x] 06-04 RAG scoring, durable worker, and Eval API compatibility
 - [ ] 06-05 API contracts, frontend components, and browser journeys
 - [ ] 06-06 unified CI producer DAG, security, artifacts, and nightly qualification
 - [ ] 06-07 ci-gate aggregation, branch protection, and release gate

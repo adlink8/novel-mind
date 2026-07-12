@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v0.5
 milestone_name: Automated Quality and CI Gates
 status: executing
-last_updated: "2026-07-12T20:30:00.000Z"
+last_updated: "2026-07-12T22:00:00.000Z"
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 17
-  completed_plans: 16
-  percent: 53
+  completed_plans: 17
+  percent: 56
 ---
 
 # Project State
@@ -24,12 +24,12 @@ See `.planning/PROJECT.md` and `IMPLEMENTATION-STATUS.md`.<br>
 ## Current Position
 
 Phase: 06 (automated-quality-ci) — EXECUTING
-Plan: 4 of 7 (06-01 COMPLETE, 06-02 COMPLETE, 06-03 COMPLETE)
+Plan: 5 of 7 (06-01..06-04 COMPLETE)
 
 - Milestone: **v0.5 - 自动质量与 CI 门禁**
 - Current branch: `feat/phase2-wave2-embedding`
-- Status: 06-03 complete — frozen fixtures, adversarial fail-closed gates, G/J isolation, independent Judge calibration (offline stubs; no SUT scoring).
-- Last activity: 2026-07-12 — Executed 06-03 (fixture pipeline + calibration).
+- Status: 06-04 complete — SUT scoring, D-08 policy arbiter, durable quality worker, legacy Eval API adapter.
+- Last activity: 2026-07-12 — Executed 06-04 (scoring + worker + compatibility).
 
 ## Auto Routing
 
@@ -94,14 +94,23 @@ Phase 06 is ready for plan verification and later explicit execution. Auto-start
 - Independent signed Judge calibration (3-repeat, CFA=0, consistency≥0.80); domain/hash isolated from benchmark
 - Alembic head `f6a0303ragfix`; tests 26 fixture + 8 calibration passed
 
+### 06-04 COMPLETE
+
+- SUT retrieve+answer scoring; faithfulness/relevance/context precision/recall@5
+- Deterministic arbiter with locked D-08 thresholds; fail-closed on missing policy/baseline/health/lineage
+- Durable quality worker: lease/heartbeat/checkpoint/resume/cancel + stage-cache idempotency
+- Legacy Eval API compatibility fields + `/api/eval/quality/*` durable endpoints
+- Live dual-model test: Ollama outage → `blocked_dependency`, metrics=null
+- Tests: 16 scoring + 2 live + 31 worker/api/service
+
 ## Open Work
 
 - pgvector 双写备用路径
 - 大文件（>5MB）流式上传
-- 端到端 CI/CD 集成测试 (remaining 06-04..06-07)
+- 端到端 CI/CD 集成测试 (remaining 06-05..06-07)
 - 将 90 条 candidate 完成人工确认/驳回，达到 100 条高质量 confirmed 的 issue 门槛
 - 校准 gold_chunks；当前 6 次运行 Recall/Precision/MRR/NDCG 均为 0
 
 ## Next Action
 
-Execute **06-04** (SUT scoring, policy arbiter, durable worker, legacy Eval API adapter) when scheduled. Do not auto-start.
+Execute **06-05** (OpenAPI, frontend/component, Playwright) when scheduled. Do not auto-start.
