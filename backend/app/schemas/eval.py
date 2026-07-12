@@ -472,3 +472,95 @@ class QualityRunPublic(BaseModel):
     created_at: str | None = None
     updated_at: str | None = None
     report: dict[str, Any] | None = None
+
+
+# ── Phase 06-09 baseline prepare/commit + cross-chunker report ───────
+
+BASELINE_ELIGIBLE_STATUSES = frozenset({"passed", "qualified"})
+
+
+class BaselinePrepareRequest(BaseModel):
+    """Prepare a baseline candidate from a durable QualityRun job_id."""
+
+    job_id: str = Field(..., min_length=1, max_length=128)
+
+
+class BaselineCommitRequest(BaseModel):
+    """Commit a prepared candidate; server reloads DB state (payload not trusted)."""
+
+    candidate_id: int = Field(..., ge=1)
+    prepare_token: str = Field(..., min_length=8, max_length=64)
+
+
+class BaselineCandidatePublic(BaseModel):
+    id: int
+    owner_id: int
+    quality_run_id: int
+    quality_run_job_id: str
+    prepare_token: str
+    prepare_version: int = 1
+    state: str
+    reason: str | None = None
+    chunker_name: str
+    chunker_version: str
+    chunker_config_hash: str
+    chunk_manifest_hash: str
+    source_snapshot_hash: str
+    run_status: str
+    input_hash: str
+    output_hash: str
+    report_signature: str
+    metrics_snapshot: dict[str, Any]
+    prepare_fingerprint: str
+    journal: list[dict[str, Any]] = Field(default_factory=list)
+    prepared_at: str | None = None
+    committed_at: str | None = None
+
+
+class ActiveBaselinePublic(BaseModel):
+    owner_id: int
+    candidate_id: int
+    quality_run_id: int
+    metrics_snapshot: dict[str, Any]
+    chunker_name: str
+    chunker_version: str
+    chunker_config_hash: str
+    chunk_manifest_hash: str
+    source_snapshot_hash: str
+    committed_at: str | None = None
+
+
+class CrossChunkerReportRequest(BaseModel):
+    """Aggregate comparable QualityRuns for one source snapshot."""
+
+    source_snapshot_hash: str = Field(..., min_length=64, max_length=64)
+
+
+class CrossChunkerSeriesItem(BaseModel):
+    job_id: str
+    quality_run_id: int
+    status: str
+    chunker_name: str
+    chunker_version: str
+    chunker_config_hash: str
+    chunk_manifest_hash: str
+    source_snapshot_hash: str
+    metrics: dict[str, Any]
+    input_hash: str | None = None
+    output_hash: str | None = None
+    report_signature: str | None = None
+    cost_usd_total: float | None = None
+    latency_ms_total: float | None = None
+
+
+class CrossChunkerExclusion(BaseModel):
+    job_id: str | None = None
+    quality_run_id: int | None = None
+    reason: str
+
+
+class CrossChunkerReportResponse(BaseModel):
+    source_snapshot_hash: str
+    series: list[CrossChunkerSeriesItem]
+    exclusions: list[CrossChunkerExclusion] = Field(default_factory=list)
+

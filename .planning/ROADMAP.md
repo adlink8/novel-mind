@@ -5,7 +5,7 @@
 - [x] v0.1 审计与启动修复 - 建立可信实现基线和启动级契约。
 - [x] v0.2 安全与架构修复 - 关闭安全、迁移、路由、依赖和导入可靠性阻断项。
 - [ ] v0.3 小说导入 + RAG 索引 - 导入/索引/搜索已交付，RAG 评测质量闭环仍有缺口。
-- [ ] v0.5 自动质量与 CI 门禁 - 以全栈自动化和双模型仲裁替代人工 RAG 质量确认；REQ-AUTO-11 gap：06-08 完成，06-09 待执行。
+- [x] v0.5 自动质量与 CI 门禁 - 以全栈自动化和双模型仲裁替代人工 RAG 质量确认；REQ-AUTO-11 closed（06-08/06-09）。
 
 第一个 active milestone 已按要求设为并完成"审计与启动修复"。v0.3 经 2006-06-13 复审后恢复为 active，详见 `.planning/v0.3-MILESTONE-AUDIT.md`。
 
@@ -42,7 +42,7 @@
 
 ## Auto Start
 
-Phase 06 REQ-AUTO-11 gap-closure：06-08 已完成；下一步执行 06-09 持久 baseline/report。auto-start 保持关闭。
+Phase 06 已完成（含 REQ-AUTO-11）。下一步 Phase 07 语义/层级分块。auto-start 保持关闭。
 
 ## Backlog
 
@@ -89,7 +89,7 @@ Plans:
 **Goal:** 补齐后端、前端、数据库、向量库、API、浏览器和 live AI 的自动化验证，并以冻结证据、双模型仲裁和确定性规则建立无需日常人工逐题确认的 RAG 质量门禁。
 **Requirements:** REQ-AUTO-01..11
 **Depends on:** Phase 3, Phase 5
-**Status:** IN PROGRESS (06-01..06-08 complete; 06-09 gap closure pending)
+**Status:** COMPLETE (06-01..06-09; REQ-AUTO-11 closed)
 **Plans:** 9 plans
 
 Plans:
@@ -101,7 +101,7 @@ Plans:
 - [x] 06-06 unified CI producer DAG, security, artifacts, and nightly qualification
 - [x] 06-07 ci-gate aggregation, branch protection, and release gate
 - [x] 06-08 persistent QualityRun repository and lineage-bound identity chain
-- [ ] 06-09 persistent baseline prepare/commit and cross-chunker reports
+- [x] 06-09 persistent baseline prepare/commit and cross-chunker reports
 
 ### Phase 7: Semantic and Hierarchical Chunking
 

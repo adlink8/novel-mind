@@ -362,3 +362,95 @@ class QualityRun(TimestampMixin, Base):
     )
     incomparable_reason: Mapped[str | None] = mapped_column(String(64), nullable=True)
     error_detail: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+# ── Phase 06-09 baseline candidate prepare/commit + active pointer ───
+
+
+class BaselineCandidate(TimestampMixin, Base):
+    """Two-phase baseline promotion candidate (prepare evidence + commit journal).
+
+    Prepare freezes lineage/hashes/metrics fingerprint from a QualityRun.
+    Commit reloads DB state and revalidates before moving the active pointer.
+    """
+
+    __tablename__ = "baseline_candidates"
+    __table_args__ = (
+        UniqueConstraint("prepare_token", name="uq_baseline_candidates_prepare_token"),
+        Index("idx_baseline_candidates_owner", "owner_id"),
+        Index("idx_baseline_candidates_run", "quality_run_id"),
+        Index("idx_baseline_candidates_owner_state", "owner_id", "state"),
+        Index(
+            "idx_baseline_candidates_snapshot",
+            "owner_id",
+            "source_snapshot_hash",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    owner_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    quality_run_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("quality_runs.id", ondelete="RESTRICT"), nullable=False
+    )
+    quality_run_job_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    prepare_token: Mapped[str] = mapped_column(String(64), nullable=False)
+    prepare_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    state: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="prepared"
+    )  # prepared | committed | rejected | expired
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Frozen five-tuple lineage at prepare time
+    chunker_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    chunker_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    chunker_config_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    chunk_manifest_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    source_snapshot_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    # Frozen run identity
+    run_status: Mapped[str] = mapped_column(String(40), nullable=False)
+    input_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    output_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    report_signature: Mapped[str] = mapped_column(String(128), nullable=False)
+    metrics_snapshot: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    prepare_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    journal: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    prepared_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    committed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+
+class ActiveBaseline(TimestampMixin, Base):
+    """Per-owner active baseline pointer (only updated on successful commit)."""
+
+    __tablename__ = "active_baselines"
+    __table_args__ = (
+        UniqueConstraint("owner_id", name="uq_active_baselines_owner"),
+        Index("idx_active_baselines_candidate", "candidate_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    owner_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    candidate_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("baseline_candidates.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    quality_run_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("quality_runs.id", ondelete="RESTRICT"), nullable=False
+    )
+    metrics_snapshot: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    chunker_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    chunker_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    chunker_config_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    chunk_manifest_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    source_snapshot_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    committed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+

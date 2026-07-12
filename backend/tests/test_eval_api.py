@@ -146,6 +146,10 @@ async def test_quality_run_endpoints_require_auth(client: AsyncClient):
         ("GET", "/api/eval/quality/runs/nope"),
         ("POST", "/api/eval/quality/runs/nope/resume"),
         ("POST", "/api/eval/quality/runs/nope/cancel"),
+        ("POST", "/api/eval/quality/baseline/prepare"),
+        ("POST", "/api/eval/quality/baseline/commit"),
+        ("GET", "/api/eval/quality/baseline/active"),
+        ("POST", "/api/eval/quality/reports/cross-chunker"),
     ]:
         response = await client.request(method, path)
         assert response.status_code == 401, path
@@ -185,3 +189,100 @@ async def test_quality_job_cross_owner_and_cancel(client: AsyncClient, db_sessio
 
     r = await client.post(f"/api/eval/quality/runs/{job.job_id}/cancel")
     assert r.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_baseline_prepare_commit_and_report_api(
+    client: AsyncClient, db_session: AsyncSession
+):
+    from app.models.eval import QualityRun
+    from app.services.rag_fixture import stable_hash
+    from app.services.rag_quality import recompute_chunker_config_hash
+
+    await _register_and_login(client, "bl_api_owner")
+    owner = await _user(db_session, "bl_api_owner")
+
+    cfg = {"size": 128}
+    cfg_hash = recompute_chunker_config_hash(cfg)
+    snap = "c" * 64
+    man = stable_hash({"m": 1})
+    metrics = {
+        "context_recall_at_5_mean": 0.9,
+        "answer_relevance_mean": 0.8,
+        "cost_usd_total": 0.02,
+        "answer_faithfulness_95lb": 0.75,
+        "context_precision_mean": 0.7,
+    }
+    run = QualityRun(
+        job_id="api-bl-job-1",
+        owner_id=owner.id,
+        status="passed",
+        payload={},
+        checkpoint={},
+        stage_cache={},
+        metrics=metrics,
+        input_hash="1" * 64,
+        output_hash="2" * 64,
+        report_signature="s" * 64,
+        chunker_name="api-chunker",
+        chunker_version="1.0.0",
+        chunker_config_hash=cfg_hash,
+        chunk_manifest_hash=man,
+        source_snapshot_hash=snap,
+        quality_comparable=True,
+    )
+    db_session.add(run)
+    # second chunker same snap for report
+    run2 = QualityRun(
+        job_id="api-bl-job-2",
+        owner_id=owner.id,
+        status="passed",
+        payload={},
+        checkpoint={},
+        stage_cache={},
+        metrics=metrics,
+        input_hash="3" * 64,
+        output_hash="4" * 64,
+        report_signature="t" * 64,
+        chunker_name="api-chunker-b",
+        chunker_version="2.0.0",
+        chunker_config_hash=recompute_chunker_config_hash({"size": 200}),
+        chunk_manifest_hash=stable_hash({"m": 2}),
+        source_snapshot_hash=snap,
+        quality_comparable=True,
+    )
+    db_session.add(run2)
+    await db_session.commit()
+
+    r = await client.post(
+        "/api/eval/quality/baseline/prepare", json={"job_id": "api-bl-job-1"}
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["status"] == "prepared"
+    cand = body["candidate"]
+    assert cand["prepare_token"]
+
+    r = await client.post(
+        "/api/eval/quality/baseline/commit",
+        json={"candidate_id": cand["id"], "prepare_token": cand["prepare_token"]},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["status"] == "committed"
+    assert r.json()["active"]["candidate_id"] == cand["id"]
+
+    r = await client.get("/api/eval/quality/baseline/active")
+    assert r.status_code == 200
+    assert r.json()["active"]["candidate_id"] == cand["id"]
+
+    r = await client.post(
+        "/api/eval/quality/reports/cross-chunker",
+        json={"source_snapshot_hash": snap},
+    )
+    assert r.status_code == 200, r.text
+    report = r.json()
+    assert len(report["series"]) == 2
+    assert {s["chunker_name"] for s in report["series"]} == {
+        "api-chunker",
+        "api-chunker-b",
+    }

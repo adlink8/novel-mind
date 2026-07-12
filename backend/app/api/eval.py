@@ -42,7 +42,14 @@ from app.schemas.eval import (
     SourceSnapshot,
 )
 from app.services.eval_service import DEPRECATION_META, eval_service, EvalServiceError
-from app.services.rag_quality import default_healthy
+from app.services.rag_quality import (
+    BaselineServiceError,
+    build_cross_chunker_report,
+    commit_baseline_candidate,
+    default_healthy,
+    get_active_baseline,
+    prepare_baseline_candidate,
+)
 from app.services.rag_quality_worker import (
     QualityRunRepository,
     QualityWorkerError,
@@ -364,4 +371,100 @@ async def list_quality_runs(
     repo = QualityRunRepository(db)
     jobs = await repo.list_for_owner(current_user.id)
     return [j.to_public() for j in jobs]
+
+
+# ── Phase 06-09 baseline prepare/commit + cross-chunker report ───────
+
+
+@router.post("/quality/baseline/prepare", response_model=dict)
+async def prepare_quality_baseline(
+    body: dict[str, Any],
+    current_user: User = Depends(require_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Prepare baseline candidate from a durable QualityRun (DB revalidated)."""
+    job_id = (body or {}).get("job_id")
+    if not job_id or not isinstance(job_id, str):
+        raise HTTPException(status_code=400, detail="job_id is required")
+    try:
+        candidate = await prepare_baseline_candidate(
+            db, owner_id=current_user.id, job_id=job_id
+        )
+        return {
+            "status": "prepared",
+            "candidate": candidate,
+            "deprecation": DEPRECATION_META,
+        }
+    except BaselineServiceError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+
+
+@router.post("/quality/baseline/commit", response_model=dict)
+async def commit_quality_baseline(
+    body: dict[str, Any],
+    current_user: User = Depends(require_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Commit prepared candidate after reloading QualityRun lineage/hashes."""
+    candidate_id = (body or {}).get("candidate_id")
+    prepare_token = (body or {}).get("prepare_token")
+    if not isinstance(candidate_id, int) or candidate_id < 1:
+        raise HTTPException(status_code=400, detail="candidate_id is required")
+    if not prepare_token or not isinstance(prepare_token, str):
+        raise HTTPException(status_code=400, detail="prepare_token is required")
+    try:
+        result = await commit_baseline_candidate(
+            db,
+            owner_id=current_user.id,
+            candidate_id=candidate_id,
+            prepare_token=prepare_token,
+        )
+        if not result.get("ok"):
+            return {
+                "status": "rejected",
+                "candidate": result.get("candidate"),
+                "active": result.get("active"),
+                "error": result.get("error"),
+                "deprecation": DEPRECATION_META,
+            }
+        return {
+            "status": "committed",
+            "candidate": result.get("candidate"),
+            "active": result.get("active"),
+            "idempotent": result.get("idempotent", False),
+            "deprecation": DEPRECATION_META,
+        }
+    except BaselineServiceError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+
+
+@router.get("/quality/baseline/active", response_model=dict)
+async def get_quality_active_baseline(
+    current_user: User = Depends(require_user),
+    db: AsyncSession = Depends(get_db),
+):
+    active = await get_active_baseline(db, owner_id=current_user.id)
+    return {
+        "active": active,
+        "deprecation": DEPRECATION_META,
+    }
+
+
+@router.post("/quality/reports/cross-chunker", response_model=dict)
+async def cross_chunker_quality_report(
+    body: dict[str, Any],
+    current_user: User = Depends(require_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Same-snapshot multi-chunker comparable report with explicit exclusions."""
+    snap = (body or {}).get("source_snapshot_hash")
+    if not snap or not isinstance(snap, str):
+        raise HTTPException(status_code=400, detail="source_snapshot_hash is required")
+    try:
+        report = await build_cross_chunker_report(
+            db, owner_id=current_user.id, source_snapshot_hash=snap
+        )
+        return {**report, "deprecation": DEPRECATION_META}
+    except BaselineServiceError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
 

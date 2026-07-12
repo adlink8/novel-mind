@@ -47,6 +47,8 @@ from app.models.ai_model import AIModelConfig
 from app.models.ai_usage_log import AIUsageLog
 from app.models.text_chunk import TextChunk
 from app.models.eval import (
+    ActiveBaseline,
+    BaselineCandidate,
     EvalDataset,
     EvalRun,
     EvalResult,
@@ -98,6 +100,8 @@ __all__ = [
     "RagFixtureJob",
     "RagEvalCase",
     "QualityRun",
+    "BaselineCandidate",
+    "ActiveBaseline",
     "KnowledgeExtractionRun",
     "KnowledgeEntityCandidate",
     "KnowledgeEventCandidate",

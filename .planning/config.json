@@ -2,9 +2,9 @@
   "project": "novel-mind",
   "active_milestone": "v0.5 - 自动质量与 CI 门禁",
   "last_completed_milestone": "v0.2 - 安全与架构修复",
-  "active_phase": "06-automated-quality-ci",
-  "active_plan": null,
-  "status": "phase_complete",
+  "active_phase": "07-semantic-hierarchical-chunking",
+  "active_plan": "07-01",
+  "status": "planning",
   "canonical_dir": ".planning",
   "auto_start": null,
   "documentation_ownership": {

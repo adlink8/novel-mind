@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v0.5
 milestone_name: Automated Quality and CI Gates
 status: executing
-last_updated: "2026-07-12T21:00:00.000Z"
+last_updated: "2026-07-13T00:00:00.000Z"
 progress:
-  total_phases: 5
-  completed_phases: 3
-  total_plans: 27
-  completed_plans: 26
-  percent: 96
+  total_phases: 6
+  completed_phases: 4
+  total_plans: 33
+  completed_plans: 27
+  percent: 82
 ---
 
 # Project State
@@ -23,17 +23,17 @@ See `.planning/PROJECT.md` and `IMPLEMENTATION-STATUS.md`.<br>
 
 ## Current Position
 
-Phase: 06 (automated-quality-ci) — GAP CLOSURE IN PROGRESS
-Plan: 8 of 9 complete; next **06-09**
+Phase: 06 (automated-quality-ci) — **COMPLETE** (09/09)
+Plan: 9 of 9 complete; next **Phase 07 / 07-01**
 
-- Milestone: **v0.5 - 自动质量与 CI 门禁**
+- Milestone: **v0.5 - 自动质量与 CI 门禁** closed for REQ-AUTO-11
 - Current branch: `feat/phase2-wave2-embedding`
-- Status: 06-01..06-08 complete; 06-09 persists baseline prepare/commit and cross-chunker reports.
-- Last activity: 2026-07-12 — Completed 06-08 QualityRun persistence + five-tuple lineage identity chain.
+- Status: 06-01..06-09 complete (persistent QualityRun + baseline prepare/commit + cross-chunker reports).
+- Last activity: 2026-07-13 — Completed 06-09 BaselineCandidate prepare/commit and cross-chunker reports.
 
 ## Auto Routing
 
-Execute **06-09** next (depends on 06-08). Phase 07 remains planned and depends on completed Phase 06. Auto-start remains disabled.
+Phase 06 complete. Next: **Phase 07 semantic hierarchical chunking** starting at **07-01**. Auto-start remains disabled.
 
 ## Verified In v0.3
 
@@ -133,9 +133,17 @@ Execute **06-09** next (depends on 06-08). Phase 07 remains planned and depends 
 - Legacy incomplete rows: `quality_comparable=false`, reason `legacy_incomparable` (no invented hashes)
 - Tests: models + worker + scoring + eval API → 49 passed
 
+### 06-09 COMPLETE
+
+- BaselineCandidate + ActiveBaseline; Alembic `08baselinecand01`
+- prepare/commit revalidate current QualityRun lineage/hashes/signature/metrics
+- Cross-chunker report by `source_snapshot_hash` with explicit exclusions
+- Additive APIs: `/api/eval/quality/baseline/*`, `/api/eval/quality/reports/cross-chunker`
+- Tests: baseline + models + scoring + eval API → 45 related passed
+
 ## Open Work
 
-- **06-09** persistent baseline prepare/commit and cross-chunker reports (REQ-AUTO-11 remainder)
+- Phase 07 semantic hierarchical chunking (07-01..07-06)
 - pgvector 双写备用路径
 - 大文件（>5MB）流式上传
 - 将 90 条 candidate 完成人工确认/驳回，达到 100 条高质量 confirmed 的 issue 门槛
@@ -143,4 +151,4 @@ Execute **06-09** next (depends on 06-08). Phase 07 remains planned and depends 
 
 ## Next Action
 
-Execute **06-09-PLAN.md** (persistent baseline/report consumption). Do not start Phase 07 until 06-09 and Phase 06 re-verification complete.
+Execute **07-01-PLAN.md** (chunker manifests, source lineage, deterministic baseline).
