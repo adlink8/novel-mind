@@ -1,5 +1,5 @@
 ---
-status: partial
+status: passed
 phase: 05-narrative-knowledge-unit-layer
 updated: 2026-07-11
 ---
@@ -18,3 +18,5 @@ updated: 2026-07-11
 ## First Real Cutover
 
 No live candidate was promoted during implementation. The first real active-pointer cutover remains an explicit operator action using the exact prepared journal after PostgreSQL, Chroma, frozen eval, and canary are healthy. Automated tests prove the transaction contract but do not impersonate operator approval.
+
+This operational approval is a production rollout checkpoint, not an implementation or verification gap. The automated release contract passed in `05-VERIFICATION.md`.

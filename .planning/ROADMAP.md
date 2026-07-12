@@ -72,12 +72,12 @@ Plans:
 **Goal:** 将 Phase 04 的 accepted judgments 蒸馏为可追溯、可版本化、可评测和可回滚的叙事知识单元检索层，同时保留原始 chunk 混合召回。
 **Requirements**: REQ-NU-01..08
 **Depends on:** Phase 4
-**Status:** Planned
-**Plans:** 5 plans
+**Status:** VERIFIED on 2026-07-12
+**Plans:** 5/5 plans complete
 
 Plans:
-- [ ] 05-01 narrative unit contracts and source snapshot
-- [ ] 05-02 canonicalization and lifecycle gates
-- [ ] 05-03 candidate index and hybrid retrieval
-- [ ] 05-04 frozen evaluation, canary, and promotion
-- [ ] 05-05 incremental refresh, reconcile, and rollback
+- [x] 05-01 narrative unit contracts and source snapshot
+- [x] 05-02 canonicalization and lifecycle gates
+- [x] 05-03 candidate index and hybrid retrieval
+- [x] 05-04 frozen evaluation, canary, and promotion
+- [x] 05-05 incremental refresh, reconcile, and rollback

@@ -2,14 +2,15 @@
 gsd_state_version: 1.0
 milestone: v0.4
 milestone_name: Narrative Knowledge Unit Layer
-status: executing
-last_updated: "2026-07-11T06:20:39.996Z"
+status: phase_complete
+last_updated: 2026-07-12T03:41:10.690Z
 progress:
-  total_phases: 4
-  completed_phases: 1
+  total_phases: 2
+  completed_phases: 2
   total_plans: 9
-  completed_plans: 5
-  percent: 56
+  completed_plans: 9
+  percent: 100
+stopped_at: Phase 5 independently verified complete (5/5 plans, 8/8 requirements)
 ---
 
 # Project State
@@ -23,18 +24,18 @@ See `.planning/PROJECT.md` and `IMPLEMENTATION-STATUS.md`。<br>
 
 ## Current Position
 
-Phase: 05 (narrative-knowledge-unit-layer) — EXECUTING
-Plan: 5 of 5
+Phase: 05 (narrative-knowledge-unit-layer) — VERIFIED
+Plan: 5 of 5 complete
 
 - Milestone: **v0.3 - 小说导入 + RAG 索引** — GAPS FOUND
 - Phase: 03-01 RAG 评测集与自动化检索优化闭环 — PARTIAL
 - Current branch: `feat/phase2-wave2-embedding`
-- Status: Phase 05 gap closure revision loop 4 implemented; production API and candidate evaluation now invoke one NarrativeRetrievalStrategy boundary, with independent re-verification pending.
-- Last activity: 2026-07-12 — Closed REQ-NU-06/D-07 shared strategy wiring while preserving search 401/403 semantics; 116 Phase 05+hybrid tests and 366 backend non-e2e tests passed.
+- Status: Phase 05 independently verified passed; REQ-NU-01..08 and D-01..D-10 are complete.
+- Last activity: 2026-07-12 — Fifth independent verifier passed 8/8 requirements; 366 backend non-e2e tests passed with 12 deselected.
 
 ## Auto Routing
 
-Phase 05 next cursor is 05-02. Live PostgreSQL `upgrade/current/check` for 05-01 remains pending until the local database service is available.
+Phase 05 is complete. Next active product work remains governed by the milestone roadmap; backlog phases are not auto-started.
 
 ## Verified In v0.3
 
@@ -136,6 +137,6 @@ Phase 05 next cursor is 05-02. Live PostgreSQL `upgrade/current/check` for 05-01
 
 ### Session
 
-- Last session: 2026-07-12T03:33:00Z
-- Stopped At: Completed Phase 05 verifier gap closure revision loop 4; independent re-verification pending
+- Last session: 2026-07-12T03:39:31Z
+- Stopped At: Phase 05 independently verified complete
 - Resume File: None
