@@ -1,0 +1,25 @@
+# CodeQL configuration for NovelMind unified CI (06-06 / D-13)
+# Single config — Python + JS/TS only; avoid duplicate default+advanced scans.
+
+name: "NovelMind CodeQL"
+
+paths:
+  - backend
+  - frontend
+  - scripts
+
+paths-ignore:
+  - "**/node_modules/**"
+  - "**/venv/**"
+  - "**/.venv/**"
+  - "**/coverage/**"
+  - "**/artifacts/**"
+  - "**/test-results/**"
+  - "**/playwright-report/**"
+  - "backend/uploads/**"
+  - "**/__pycache__/**"
+  - "**/*.min.js"
+  - "frontend/.next/**"
+
+queries:
+  - uses: security-and-quality

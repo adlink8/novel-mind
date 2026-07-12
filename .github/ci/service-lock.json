@@ -1,8 +1,10 @@
 {
   "schema_version": "service-lock.v1",
-  "phase": "06-02",
+  "phase": "06-06",
   "locked_at": "2026-07-12",
   "fail_closed": true,
+  "ci_workflow": "ci.yml",
+  "notes": "Consumed by unified CI producer DAG (06-06); digests fail-closed on drift",
   "postgres": {
     "image": "postgres",
     "tag": "16.10",
