@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v0.5
 milestone_name: Automated Quality and CI Gates
-status: phase_complete
-last_updated: "2026-07-12T20:00:00.000Z"
+status: executing
+last_updated: "2026-07-12T21:00:00.000Z"
 progress:
   total_phases: 5
   completed_phases: 3
-  total_plans: 25
-  completed_plans: 25
-  percent: 100
+  total_plans: 27
+  completed_plans: 26
+  percent: 96
 ---
 
 # Project State
@@ -23,17 +23,17 @@ See `.planning/PROJECT.md` and `IMPLEMENTATION-STATUS.md`.<br>
 
 ## Current Position
 
-Phase: 06 (automated-quality-ci) — COMPLETE
-Plan: 7 of 7 (06-01..06-07 COMPLETE)
+Phase: 06 (automated-quality-ci) — GAP CLOSURE IN PROGRESS
+Plan: 8 of 9 complete; next **06-09**
 
 - Milestone: **v0.5 - 自动质量与 CI 门禁**
 - Current branch: `feat/phase2-wave2-embedding`
-- Status: 06-07 complete — ci-gate aggregate, branch protection contexts=["ci-gate"], phase release gate PASS.
-- Last activity: 2026-07-12 — Executed 06-07 (ci-gate + protection + release verifier).
+- Status: 06-01..06-08 complete; 06-09 persists baseline prepare/commit and cross-chunker reports.
+- Last activity: 2026-07-12 — Completed 06-08 QualityRun persistence + five-tuple lineage identity chain.
 
 ## Auto Routing
 
-Phase 06 execution complete (7/7 plans). Auto-start remains disabled. Next step: independent verification / human docs update if desired.
+Execute **06-09** next (depends on 06-08). Phase 07 remains planned and depends on completed Phase 06. Auto-start remains disabled.
 
 ## Verified In v0.3
 
@@ -125,8 +125,17 @@ Phase 06 execution complete (7/7 plans). Auto-start remains disabled. Next step:
 - Release gate verifier: seven SUMMARYs + policy/signed evidence + remote protection
 - Tests: test_ci_gate / test_branch_protection / test_release_gate; full tests/ci green
 
+### 06-08 COMPLETE
+
+- `QualityRun` ORM + Alembic `07qualityruns01` (after `f6a0303ragfix`)
+- `QualityRunRepository` CAS leases/checkpoint/stage_cache; API injects AsyncSession
+- Five-tuple lineage in input_hash, stage-cache keys, output_hash, report_signature
+- Legacy incomplete rows: `quality_comparable=false`, reason `legacy_incomparable` (no invented hashes)
+- Tests: models + worker + scoring + eval API → 49 passed
+
 ## Open Work
 
+- **06-09** persistent baseline prepare/commit and cross-chunker reports (REQ-AUTO-11 remainder)
 - pgvector 双写备用路径
 - 大文件（>5MB）流式上传
 - 将 90 条 candidate 完成人工确认/驳回，达到 100 条高质量 confirmed 的 issue 门槛
@@ -134,4 +143,4 @@ Phase 06 execution complete (7/7 plans). Auto-start remains disabled. Next step:
 
 ## Next Action
 
-Phase 06 complete. Prefer milestone audit / next planned phase; do not re-open 06-07 unless protection drifts.
+Execute **06-09-PLAN.md** (persistent baseline/report consumption). Do not start Phase 07 until 06-09 and Phase 06 re-verification complete.
