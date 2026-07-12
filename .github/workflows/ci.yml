@@ -1,6 +1,6 @@
-# NovelMind unified CI producer DAG (Phase 06-06)
-# Decisions: D-10, D-13, D-14, D-16, D-17, D-18
-# Final ci-gate aggregate is 06-07 — this workflow only produces reports/artifacts.
+# NovelMind unified CI producer DAG + ci-gate aggregate (Phase 06-06 / 06-07)
+# Decisions: D-10, D-13, D-14, D-16, D-17, D-18, D-19
+# Producers emit results/artifacts; single required check context is `ci-gate`.
 #
 # Event matrix:
 #   pull_request  — secretless unit/contract + locked Postgres/Chroma + Chromium smoke
@@ -853,3 +853,100 @@ jobs:
                 labels,
               });
             }
+
+  # ---------------------------------------------------------------------------
+  # ci-gate — single stable required check (06-07 / D-13 / D-19)
+  # Aggregates producer needs.*.result only; does NOT re-run tests or re-score.
+  # Job id + name must remain exactly `ci-gate` for branch protection context.
+  # ---------------------------------------------------------------------------
+  ci-gate:
+    name: ci-gate
+    needs:
+      - guard
+      - static
+      - unit
+      - openapi
+      - integration
+      - browser
+      - codeql
+      - workflow-lint
+      - live
+      - nightly
+      - promote-baseline
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Write producer results envelope
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          RUN_NIGHTLY: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.run_nightly) }}
+          RESULT_GUARD: ${{ needs.guard.result }}
+          RESULT_STATIC: ${{ needs.static.result }}
+          RESULT_UNIT: ${{ needs.unit.result }}
+          RESULT_OPENAPI: ${{ needs.openapi.result }}
+          RESULT_INTEGRATION: ${{ needs.integration.result }}
+          RESULT_BROWSER: ${{ needs.browser.result }}
+          RESULT_CODEQL: ${{ needs.codeql.result }}
+          RESULT_WORKFLOW_LINT: ${{ needs.workflow-lint.result }}
+          RESULT_LIVE: ${{ needs.live.result }}
+          RESULT_NIGHTLY: ${{ needs.nightly.result }}
+          RESULT_PROMOTE: ${{ needs.promote-baseline.result }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/ci-gate
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+
+          def r(key: str) -> str:
+              return (os.environ.get(key) or "missing").strip().lower()
+
+          run_nightly_raw = (os.environ.get("RUN_NIGHTLY") || "false").strip().lower()
+          run_nightly = run_nightly_raw in ("true", "1", "yes")
+          payload = {
+              "event": os.environ.get("EVENT_NAME") or "",
+              "run_nightly": run_nightly,
+              "require_artifacts": False,
+              "producers": {
+                  "guard": {"result": r("RESULT_GUARD")},
+                  "static": {"result": r("RESULT_STATIC")},
+                  "unit": {"result": r("RESULT_UNIT")},
+                  "openapi": {"result": r("RESULT_OPENAPI")},
+                  "integration": {"result": r("RESULT_INTEGRATION")},
+                  "browser": {"result": r("RESULT_BROWSER")},
+                  "codeql": {"result": r("RESULT_CODEQL")},
+                  "workflow-lint": {"result": r("RESULT_WORKFLOW_LINT")},
+                  "live": {"result": r("RESULT_LIVE")},
+                  "nightly": {"result": r("RESULT_NIGHTLY")},
+                  "promote-baseline": {"result": r("RESULT_PROMOTE")},
+              },
+          }
+          out = Path("/tmp/ci-gate/producer-results.json")
+          out.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+          print(out.read_text(encoding="utf-8"))
+          PY
+
+      - name: Aggregate ci-gate (fail closed)
+        run: |
+          python scripts/ci/ci-gate.py \
+            --results-json /tmp/ci-gate/producer-results.json \
+            --out /tmp/ci-gate/verdict.json
+
+      - name: Upload ci-gate verdict
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-gate-verdict
+          path: /tmp/ci-gate/**
+          if-no-files-found: warn
+          retention-days: 14
