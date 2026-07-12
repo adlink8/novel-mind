@@ -162,6 +162,29 @@ class NarrativeRetrievalStrategy:
         self.chunks = chunks
         self.units = units
 
+    async def search_global(
+        self,
+        db: AsyncSession,
+        *,
+        owner_id: int,
+        query: str,
+        mode: str,
+        top_k: int,
+    ) -> list[dict[str, Any]]:
+        unit_rows: list[dict[str, Any]] = []
+        if mode in {"units", "hybrid"}:
+            unit_rows = await self.units.search_global_units(
+                db, owner_id=owner_id, query=query, top_k=top_k
+            )
+        if mode == "units":
+            return unit_rows
+        chunk_rows = await self.chunks.search_global(
+            db, query=query, top_k=top_k, owner_id=owner_id
+        )
+        if mode == "chunks":
+            return chunk_rows
+        return fuse_results(chunk_rows, unit_rows, top_k=top_k)
+
     async def search_novel(
         self,
         db: AsyncSession,
