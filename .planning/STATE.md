@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v0.5
 milestone_name: Automated Quality and CI Gates
-status: executing
-last_updated: "2026-07-12T18:30:00.000Z"
+status: phase_complete
+last_updated: "2026-07-12T20:00:00.000Z"
 progress:
   total_phases: 5
-  completed_phases: 2
-  total_plans: 18
-  completed_plans: 18
-  percent: 60
+  completed_phases: 3
+  total_plans: 25
+  completed_plans: 25
+  percent: 100
 ---
 
 # Project State
@@ -23,13 +23,13 @@ See `.planning/PROJECT.md` and `IMPLEMENTATION-STATUS.md`.<br>
 
 ## Current Position
 
-Phase: 06 (automated-quality-ci) — EXECUTING
-Plan: 7 of 7 (06-01..06-06 COMPLETE; 06-07 pending)
+Phase: 06 (automated-quality-ci) — COMPLETE
+Plan: 7 of 7 (06-01..06-07 COMPLETE)
 
 - Milestone: **v0.5 - 自动质量与 CI 门禁**
 - Current branch: `feat/phase2-wave2-embedding`
-- Status: 06-06 complete — unified CI producer DAG, fork safety, artifacts/retention, nightly baseline/alert.
-- Last activity: 2026-07-12 — Executed 06-06 (ci.yml + policy scripts + 49 CI tests).
+- Status: 06-07 complete — ci-gate aggregate, branch protection contexts=["ci-gate"], phase release gate PASS.
+- Last activity: 2026-07-12 — Executed 06-07 (ci-gate + protection + release verifier).
 
 ## Auto Routing
 
@@ -118,14 +118,20 @@ Phase 06 is ready for plan verification and later explicit execution. Auto-start
 - Nightly self-hosted dual-model + signed promote-baseline (passed/qualified only)
 - actionlint v1.7.12 clean; pytest tests/ci → 49 passed
 
+### 06-07 COMPLETE
+
+- Fail-closed aggregate job `ci-gate` (always()) over event-aware producer matrix
+- Branch protection on `adlink8/novel-mind` default `master`: required contexts exactly `["ci-gate"]` (live GET readback)
+- Release gate verifier: seven SUMMARYs + policy/signed evidence + remote protection
+- Tests: test_ci_gate / test_branch_protection / test_release_gate; full tests/ci green
+
 ## Open Work
 
 - pgvector 双写备用路径
 - 大文件（>5MB）流式上传
-- 端到端 CI/CD 集成测试 (remaining 06-07 ci-gate + branch protection)
 - 将 90 条 candidate 完成人工确认/驳回，达到 100 条高质量 confirmed 的 issue 门槛
 - 校准 gold_chunks；当前 6 次运行 Recall/Precision/MRR/NDCG 均为 0
 
 ## Next Action
 
-Execute **06-07** (ci-gate aggregate, branch protection, release gate) when scheduled. Do not auto-start.
+Phase 06 complete. Prefer milestone audit / next planned phase; do not re-open 06-07 unless protection drifts.
