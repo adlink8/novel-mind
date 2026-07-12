@@ -1,17 +1,18 @@
 # NovelMind
 
-NovelMind 是一个 AI 辅助小说理解与同人创作平台。当前已具备安全的账户体系、小说 TXT 导入与阅读、用户级模型配置，以及可重复执行的测试和迁移基线；RAG、剧情分析、人物图谱、时间线和同人文生成仍在后续计划中。
+NovelMind 是一个 AI 辅助小说理解与同人创作平台。当前已具备安全账户体系、小说 TXT 导入与阅读、持久化导入任务、用户级模型配置、端到端 RAG、混合搜索和 RAG 评测闭环。剧情分析、人物图谱、时间线和同人文生成仍在后续计划中。
 
 实际实现状态以 [IMPLEMENTATION-STATUS.md](IMPLEMENTATION-STATUS.md) 为准。
 
 ## Current Baseline
 
 - 后端：FastAPI、SQLAlchemy async、PostgreSQL 16 + pgvector
-- 前端：Next.js 16.3.0-canary.6、React 19、TypeScript、Tailwind CSS
+- 前端：Next.js 16.3.0-canary.6、React 19、TypeScript、Tailwind CSS；文学编辑台视觉系统，支持桌面侧栏和移动底部导航
 - AI：LiteLLM 1.83.10+；项目支持 Python 3.11-3.13，不支持 Python 3.14
 - 安全：HttpOnly Cookie/Bearer JWT、资源所有权隔离、版本化 Fernet 加密、出站主机白名单与 DNS/IP 校验
-- 验证：后端 68 tests、前端 22 tests、生产构建、ESLint、Ruff、Bandit、pip-audit、npm audit、Alembic PostgreSQL 检查均通过
-- GSD：`.planning/` 是唯一 AI 状态目录（GSD 工作流）；下一执行入口为 `02-03`
+- 验证：后端 236 tests、前端 22 tests、生产构建、ESLint、TypeScript、Ruff、Bandit、pip-audit、npm audit、Alembic PostgreSQL 检查均通过
+- UI 验收：登录、工作台、书架、评测和设置已在 1280px 桌面与 390px 移动端浏览器验证，无控制台错误
+- GSD：`.planning/` 是唯一 AI 状态目录；v0.3 当前为 gaps_found，评测质量闭环仍在验收
 
 ## Repository Layout
 

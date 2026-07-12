@@ -30,6 +30,6 @@
 
 ## Active Entry
 
-读取 `config.json` 的 `auto_start`。当前入口为：
+读取 `config.json` 的 `auto_start`。v0.3 当前为 gaps_found，值为 `null`；人工校准评测集后再创建关闭缺口的执行计划。
 
-`phases/02-security-and-architecture-remediation/02-03-PLAN.md`
+创建下一里程碑计划后，必须同时更新 `STATE.md`、`ROADMAP.md` 和 `config.json.auto_start`。

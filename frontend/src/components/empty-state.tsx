@@ -16,11 +16,12 @@
 
 "use client";
 
-import React from "react";
+import React, { type ReactNode } from "react";
+import { Inbox } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface EmptyStateProps {
-  icon?: string;           // 显示图标（emoji，默认 📭）
+  icon?: ReactNode;
   title: string;           // 主标题
   description?: string;    // 描述文字
   actionLabel?: string;    // 操作按钮文字
@@ -28,16 +29,16 @@ interface EmptyStateProps {
 }
 
 export function EmptyState({
-  icon = "📭",
+  icon = <Inbox className="size-6" />,
   title,
   description,
   actionLabel,
   onAction,
 }: EmptyStateProps) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border bg-muted/30 p-12 text-center">
-      <div className="text-5xl mb-4">{icon}</div>
-      <h3 className="text-lg font-semibold mb-2">{title}</h3>
+    <div className="paper-surface flex flex-col items-center justify-center rounded-3xl border-dashed p-10 text-center sm:p-14">
+      <div className="mb-5 grid size-14 place-items-center rounded-2xl bg-secondary text-primary">{icon}</div>
+      <h3 className="font-serif text-xl font-semibold mb-2">{title}</h3>
       {description && (
         <p className="text-sm text-muted-foreground mb-6 max-w-md">
           {description}

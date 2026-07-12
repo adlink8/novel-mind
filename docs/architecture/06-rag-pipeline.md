@@ -157,7 +157,7 @@ async def index_novel(novel_id: int) -> dict:
     # 7. 返回进度报告
 ```
 
-进度追踪通过内存字典，服务重启后丢失（将在 02-03 改善）。
+索引服务仍维护进程内进度视图；导入主流程的阶段状态由 `ImportJob` 持久化，并通过租约处理重启恢复。
 
 ## ChromaDB 集合管理
 
@@ -177,14 +177,57 @@ await vector_store.delete_collection(f"novel_{novel_id}")
 | ChromaDB 写入失败 | 返回错误，标记对应 chunks |
 | 两库并发不一致 | 暂无事务协调机制（已知缺口） |
 
-## 质量评估缺口
+## 质量评估闭环（RAG 评测体系）
 
-当前 RAG 管线缺少：
+**来源**: `backend/app/services/eval_service.py`, `backend/app/api/eval.py`, `frontend/src/app/eval/page.tsx`
 
-- 检索质量评估（recall/precision）
-- 分块策略效果对比
-- 不同 embedding 模型的效果对比
-- 用户反馈收集机制
+### 评测策略
+
+| 策略 | 延迟 | 原理 |
+|------|------|------|
+| **bm25** | ~9ms | PostgreSQL tsvector 全文搜索，无需 Ollama |
+| **baseline_vector** | ~22s | ChromaDB 纯语义搜索 (nomic-embed-text) |
+| **hybrid_search** | ~587ms | BM25 + 向量加权融合 (0.5:0.5) |
+
+### 评测指标
+
+- recall@k / precision@k — 召回率/精确率
+- MRR — 平均倒数排名
+- NDCG@k — 归一化折损累计增益
+- 错误案例识别 (recall=0 条目)
+
+`faithfulness_score` 与 `cost_usd` 字段已预留，但当前未计算，不能作为已交付指标。
+
+### 评测管线
+
+```
+测试题 (EvalDataset) → 策略检索 → 结果对比 gold_chunks → 计算指标 → 存储 (EvalResult)
+                                                                    ↓
+                                                            前端 ECharts 可视化
+```
+
+### 可视化
+
+前端 `/eval` 页面上边栏 4 个面板：
+- **评测数据集**：100 条测试题，按类型/状态筛选，人工确认/驳回
+- **评测运行**：创建 Run → 历史列表 → 报告详情 + 错误案例
+- **指标对比**：ECharts 柱状图（Recall/Precision/MRR/NDCG 按策略对比）+ 延迟对比
+- **趋势分析**：ECharts 折线图（指标随时间变化 + 50% 目标线）+ 延迟面积图
+
+### 当前质量状态（2026-06-13）
+
+- PostgreSQL 数据集：100 条，5 类各 20；10 confirmed / 90 candidate。
+- 真实运行：6 次；当前 Recall/Precision/MRR/NDCG 均为 0。
+- 结论：评测工程基础设施 VERIFIED，gold chunk 校准与质量闭环 PARTIAL。
+- 安全边界：所有 eval API 强制认证，并按 `Novel.owner_id` 隔离 dataset/run。
+
+### 模型存储
+
+Ollama 模型目录：`D:\Ollama\models`（系统级 `OLLAMA_MODELS` 环境变量）
+
+已安装模型：bge-m3 (1.2G), nomic-embed-text (274M), qwen3.5:9b (6.6G), gemma4-local (16G)
+
+当前使用 nomic-embed-text (768维) — 与 ChromaDB 中已存储向量维度一致。
 
 ## 测试验证
 

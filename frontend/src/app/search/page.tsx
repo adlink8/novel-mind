@@ -15,6 +15,8 @@ import { searchApi, type SearchResult } from "@/lib/api";
 import { SearchResultCard } from "@/components/search/search-result-card";
 import { SearchBar } from "@/components/search/search-bar";
 import { EmptyState } from "@/components/empty-state";
+import { FileQuestion, Search, SearchX, TriangleAlert } from "lucide-react";
+import { PageContainer, PageHeader } from "@/components/page-header";
 
 function SearchContent() {
   const searchParams = useSearchParams();
@@ -27,9 +29,6 @@ function SearchContent() {
 
   useEffect(() => {
     if (query.trim().length === 0) {
-      setResults([]);
-      setTotal(0);
-      setError(null);
       return;
     }
 
@@ -67,33 +66,26 @@ function SearchContent() {
   // ========== 无查询参数 ==========
   if (query.trim().length === 0) {
     return (
-      <div className="flex flex-col items-center gap-8 py-16">
-        <div className="w-full max-w-lg">
+      <PageContainer className="space-y-8">
+        <PageHeader eyebrow="Semantic retrieval" title="原文检索" description="跨越章节与作品，查找人物、事件、对白和伏笔对应的原文证据。" />
+        <div className="paper-surface mx-auto w-full max-w-2xl rounded-3xl p-4 sm:p-6">
           <SearchBar />
         </div>
         <EmptyState
-          icon="🔍"
+          icon={<Search className="size-6" />}
           title="输入关键词开始搜索"
           description="搜索小说名称、章节标题或正文内容"
         />
-      </div>
+      </PageContainer>
     );
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8">
-      {/* 标题 */}
-      <h1 className="text-xl font-bold mb-6">
-        搜索：<span className="text-primary">{query}</span>
-        {!loading && total > 0 && (
-          <span className="ml-2 text-sm font-normal text-muted-foreground">
-            共 {total} 个结果
-          </span>
-        )}
-      </h1>
+    <PageContainer className="space-y-7">
+      <PageHeader eyebrow="Search results" title={`“${query}”`} description={!loading && total > 0 ? `从你的故事库中找到 ${total} 条相关原文` : "正在你的故事库中寻找相关证据"} />
 
       {/* 搜索栏 */}
-      <div className="mb-6">
+      <div className="paper-surface rounded-3xl p-4 sm:p-5">
         <SearchBar />
       </div>
 
@@ -116,7 +108,7 @@ function SearchContent() {
       {/* 错误 */}
       {!loading && error && (
         <EmptyState
-          icon="⚠️"
+          icon={<TriangleAlert className="size-6" />}
           title="搜索出错"
           description={error}
         />
@@ -125,7 +117,7 @@ function SearchContent() {
       {/* 空结果 */}
       {!loading && !error && results.length === 0 && (
         <EmptyState
-          icon="📭"
+          icon={<SearchX className="size-6" />}
           title="未找到相关结果"
           description={`没有找到与「${query}」相关的内容，请尝试其他关键词`}
         />
@@ -142,7 +134,7 @@ function SearchContent() {
           ))}
         </div>
       )}
-    </div>
+    </PageContainer>
   );
 }
 

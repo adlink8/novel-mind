@@ -57,6 +57,8 @@ import {
 import { EmptyState } from "@/components/empty-state";
 import { useAIModels } from "@/hooks/use-ai-models";
 import type { AIModelConfig } from "@/lib/api";
+import { Bot, CheckCircle2, CircleDollarSign, Gauge, LoaderCircle, Plus, Scale, Sparkles, Wrench, XCircle } from "lucide-react";
+import { PageContainer, PageHeader } from "@/components/page-header";
 
 /** 路由策略偏好类型 */
 type RoutingPreference = "quality" | "balanced" | "budget";
@@ -72,25 +74,25 @@ type RoutingPreference = "quality" | "balanced" | "budget";
 const routingOptions: {
   value: RoutingPreference;
   label: string;
-  icon: string;
+  icon: React.ComponentType<{ className?: string }>;
   description: string;
 }[] = [
   {
     value: "quality",
     label: "极致质量",
-    icon: "⭐",
+    icon: Sparkles,
     description: "优先使用最强模型，适合深度分析和复杂创作",
   },
   {
     value: "balanced",
     label: "智能均衡",
-    icon: "⚖️",
+    icon: Scale,
     description: "智能分配任务到合适的模型，兼顾质量和成本",
   },
   {
     value: "budget",
     label: "省钱模式",
-    icon: "💰",
+    icon: CircleDollarSign,
     description: "优先使用轻量模型，适合日常简单任务",
   },
 ];
@@ -112,11 +114,11 @@ const providerLabels: Record<AIModelConfig["provider"], string> = {
 };
 
 /** 提供商 Emoji 图标映射 */
-const providerIcons: Record<AIModelConfig["provider"], string> = {
-  openai: "🤖",
-  anthropic: "🧠",
-  ollama: "🦙",
-  custom: "🔧",
+const providerIcons: Record<AIModelConfig["provider"], React.ComponentType<{ className?: string }>> = {
+  openai: Bot,
+  anthropic: Sparkles,
+  ollama: Gauge,
+  custom: Wrench,
 };
 
 // ============================================================
@@ -217,38 +219,35 @@ export default function SettingsPage() {
   );
 
   return (
-    <div className="p-6 md:p-8 max-w-4xl mx-auto">
+    <PageContainer className="space-y-9">
       {/* ========== 页面头部 ========== */}
-      <div className="mb-8">
-        <h2 className="text-2xl font-bold">{"AI 设置"}</h2>
-        <p className="text-muted-foreground mt-1">
-          {"配置 AI 模型和智能路由策略"}
-        </p>
-      </div>
+      <PageHeader eyebrow="Model routing" title="AI 设置" description="连接本地或云端模型，为检索、分析与创作选择合适的推理路径。" />
 
       {/* ========== 路由策略选择区 ========== */}
       {/* 三张卡片，用户点击选择当前使用的路由策略 */}
-      <section className="mb-10">
-        <h3 className="text-lg font-semibold mb-4">{"智能路由策略"}</h3>
+      <section>
+        <h3 className="mb-4 font-serif text-xl font-semibold">智能路由策略</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {routingOptions.map((option) => (
+          {routingOptions.map((option) => {
+            const OptionIcon = option.icon;
+            return (
             <Card
               key={option.value}
               className={`cursor-pointer transition-all ${
                 // 选中状态高亮：显示 ring 边框和阴影
                 routingPreference === option.value
-                  ? "ring-2 ring-novel-500 shadow-md"
-                  : "hover:ring-1 hover:ring-novel-300"
+                  ? "paper-surface border-primary/40 bg-primary/[0.06] ring-1 ring-primary/30"
+                  : "paper-surface hover:-translate-y-0.5 hover:border-primary/20 hover:shadow-lg"
               }`}
               onClick={() => setRoutingPreference(option.value)}
             >
               <CardContent>
                 <div className="flex items-center gap-3 mb-2">
-                  <span className="text-2xl">{option.icon}</span>
+                  <span className="grid size-10 place-items-center rounded-xl bg-secondary text-primary"><OptionIcon className="size-4.5" /></span>
                   <h4 className="font-semibold">{option.label}</h4>
                   {/* 当前选中标记 */}
                   {routingPreference === option.value && (
-                    <Badge className="ml-auto bg-novel-500 text-white text-xs">
+                    <Badge className="ml-auto bg-primary text-primary-foreground text-xs">
                       {"当前"}
                     </Badge>
                   )}
@@ -258,16 +257,16 @@ export default function SettingsPage() {
                 </p>
               </CardContent>
             </Card>
-          ))}
+          )})}
         </div>
       </section>
 
       {/* ========== AI 模型管理区 ========== */}
-      <section className="mb-10">
+      <section>
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold">{"AI 模型"}</h3>
-          <Button onClick={() => setAddDialogOpen(true)}>
-            + {"添加模型"}
+          <h3 className="font-serif text-xl font-semibold">AI 模型</h3>
+          <Button className="rounded-full px-4" onClick={() => setAddDialogOpen(true)}>
+            <Plus className="mr-1 size-4" />添加模型
           </Button>
         </div>
 
@@ -275,7 +274,7 @@ export default function SettingsPage() {
         {loading && models.length === 0 && (
           <div className="flex items-center justify-center py-12">
             <div className="text-center">
-              <div className="text-4xl mb-4 animate-pulse">{"⏳"}</div>
+              <LoaderCircle className="mx-auto mb-4 size-7 animate-spin text-primary" />
               <p className="text-muted-foreground">{"加载中..."}</p>
             </div>
           </div>
@@ -284,7 +283,7 @@ export default function SettingsPage() {
         {/* 空状态：未配置任何模型 */}
         {!loading && models.length === 0 && (
           <EmptyState
-            icon={"🤖"}
+            icon={<Bot className="size-6" />}
             title={"还没有配置 AI 模型"}
             description={
               "添加你的第一个 AI 模型，开始智能分析与创作"
@@ -301,14 +300,12 @@ export default function SettingsPage() {
               // 获取当前模型的连接测试结果
               const testResult = getTestResult(model.id);
               return (
-                <Card key={model.id}>
+                <Card key={model.id} className="paper-surface rounded-2xl">
                   <CardContent>
                     <div className="flex items-center justify-between">
                       {/* 左侧：模型信息（图标 + 名称 + 提供商 + 模型ID） */}
                       <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center text-2xl">
-                          {providerIcons[model.provider]}
-                        </div>
+                        <div className="grid size-12 place-items-center rounded-2xl bg-secondary text-primary">{React.createElement(providerIcons[model.provider], { className: "size-5" })}</div>
                         <div>
                           <div className="flex items-center gap-2">
                             <h4 className="font-semibold">
@@ -344,7 +341,7 @@ export default function SettingsPage() {
                                 : "text-red-600"
                             }`}
                           >
-                            {testResult.success ? "✅" : "❌"}{" "}
+                            {testResult.success ? <CheckCircle2 className="mr-1 inline size-3.5" /> : <XCircle className="mr-1 inline size-3.5" />}{" "}
                             {testResult.message}
                           </span>
                         )}
@@ -389,7 +386,7 @@ export default function SettingsPage() {
 
       {/* ========== 用量概览区 ========== */}
       {/* 展示费用统计和 Token 消耗，目前使用占位数据 */}
-      <section className="mb-10">
+      <section>
         <h3 className="text-lg font-semibold mb-4">{"用量概览"}</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Card>
@@ -546,6 +543,6 @@ export default function SettingsPage() {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </PageContainer>
   );
 }

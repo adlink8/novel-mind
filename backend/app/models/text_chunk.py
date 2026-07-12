@@ -18,7 +18,8 @@ embedding_status 状态机:
   - failed:   向量生成失败（可重试）
 """
 
-from sqlalchemy import ForeignKey, Integer, String, Text, JSON
+from sqlalchemy import Computed, ForeignKey, Index, Integer, String, Text, JSON
+from sqlalchemy.dialects.postgresql import TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin
@@ -35,6 +36,13 @@ class TextChunk(TimestampMixin, Base):
     """
 
     __tablename__ = "text_chunks"
+    __table_args__ = (
+        Index(
+            "idx_text_chunks_search",
+            "search_vector",
+            postgresql_using="gin",
+        ),
+    )
 
     # 主键
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -77,5 +85,7 @@ class TextChunk(TimestampMixin, Base):
     # 全文搜索向量（PostgreSQL tsvector，用于 BM25 混合搜索）
     # SQLite 不支持 tsvector，设为 nullable
     search_vector: Mapped[str | None] = mapped_column(
-        Text, nullable=True, default=None
+        TSVECTOR().with_variant(Text(), "sqlite"),
+        Computed("to_tsvector('simple'::regconfig, content)", persisted=True),
+        nullable=True,
     )

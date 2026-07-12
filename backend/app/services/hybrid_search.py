@@ -16,9 +16,11 @@ BM25 实现使用 PostgreSQL tsvector + tsquery + ts_rank_cd，
 import logging
 from typing import Any
 
-from sqlalchemy import text
+from sqlalchemy import bindparam, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.novel import Chapter, Novel
+from app.models.text_chunk import TextChunk
 from app.services.vector_store import vector_store
 from app.services.ai_service import ai_service
 
@@ -147,38 +149,41 @@ class HybridSearchService:
             搜索结果列表，每项包含 novel_id, chunk_id, content_snippet (高亮),
             score, chapter_id, chapter_title, novel_title, chunk_index
         """
-        # 构建 SQL
-        where_clauses = ["tc.search_vector @@ plainto_tsquery('simple', :query)"]
         params: dict[str, Any] = {"query": query, "limit": limit}
+        tsquery = func.plainto_tsquery("simple", bindparam("query"))
+        rank = func.ts_rank_cd(TextChunk.search_vector, tsquery)
+        headline = func.ts_headline(
+            "simple",
+            TextChunk.content,
+            tsquery,
+            "MaxWords=50, MinWords=20, StartSel=<mark>, StopSel=</mark>",
+        )
+        query_sql = (
+            select(
+                TextChunk.id.label("chunk_id"),
+                TextChunk.content,
+                TextChunk.chapter_id,
+                TextChunk.chunk_index,
+                TextChunk.novel_id,
+                rank.label("rank"),
+                headline.label("headline"),
+                func.coalesce(Chapter.title, "").label("chapter_title"),
+                func.coalesce(Novel.title, "").label("novel_title"),
+            )
+            .join(Novel, Novel.id == TextChunk.novel_id)
+            .outerjoin(Chapter, Chapter.id == TextChunk.chapter_id)
+            .where(TextChunk.search_vector.op("@@")(tsquery))
+            .order_by(rank.desc())
+            .limit(bindparam("limit"))
+        )
 
         if novel_id is not None:
-            where_clauses.append("tc.novel_id = :novel_id")
+            query_sql = query_sql.where(TextChunk.novel_id == bindparam("novel_id"))
             params["novel_id"] = novel_id
 
         if owner_id is not None:
-            where_clauses.append("n.owner_id = :owner_id")
+            query_sql = query_sql.where(Novel.owner_id == bindparam("owner_id"))
             params["owner_id"] = owner_id
-
-        where_sql = " AND ".join(where_clauses)
-
-        query_sql = text(f"""
-            SELECT tc.id AS chunk_id,
-                   tc.content,
-                   tc.chapter_id,
-                   tc.chunk_index,
-                   tc.novel_id,
-                   ts_rank_cd(tc.search_vector, plainto_tsquery('simple', :query)) AS rank,
-                   ts_headline('simple', tc.content, plainto_tsquery('simple', :query),
-                               'MaxWords=50, MinWords=20, StartSel=<mark>, StopSel=</mark>') AS headline,
-                   COALESCE(ch.title, '') AS chapter_title,
-                   COALESCE(n.title, '') AS novel_title
-            FROM text_chunks tc
-            JOIN novels n ON n.id = tc.novel_id
-            LEFT JOIN chapters ch ON ch.id = tc.chapter_id
-            WHERE {where_sql}
-            ORDER BY rank DESC
-            LIMIT :limit
-        """)
 
         try:
             result = await db.execute(query_sql, params)

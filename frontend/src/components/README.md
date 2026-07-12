@@ -7,6 +7,8 @@ React 组件，按功能域分目录组织。
 | 组件 | 文件 | 职责 |
 |---|---|---|
 | `AuthGate` | `auth-gate.tsx` | 认证门禁 — 检查登录状态，未登录显示登录/注册表单 |
+| `AppShell` | `app-shell.tsx` | 响应式应用框架 — 桌面侧栏、移动导航、全局搜索入口 |
+| `PageHeader` | `page-header.tsx` | 页面标题区 — eyebrow、标题、说明和操作插槽 |
 | `NovelCard` | `novel-card.tsx` | 小说卡片 — 封面、标题、作者、状态标签 |
 | `NovelUploadDialog` | `novel-upload-dialog.tsx` | 小说上传对话框 — 文件选择、进度显示 |
 | `EmptyState` | `empty-state.tsx` | 空状态占位 — 无数据时的友好提示 |
@@ -17,7 +19,15 @@ React 组件，按功能域分目录组织。
 |---|---|---|
 | `ChapterSidebar` | `reader/chapter-sidebar.tsx` | 章节侧边栏 — 章节目录、切换、当前高亮 |
 | `ProgressBar` | `reader/progress-bar.tsx` | 阅读进度条 — 当前章节/总章节、百分比 |
-| `ReaderContent` | `reader/reader-content.tsx` | 阅读内容区 — 正文渲染、字体大小调节 |
+| `ReaderContent` | `reader/reader-content.tsx` | 阅读内容区 — 正文排版、可读宽度和章节空状态 |
+| `SearchPanel` | `reader/search-panel.tsx` | 阅读页内搜索抽屉 — Ctrl+F、结果定位、Esc 关闭 |
+
+## 搜索组件 (`search/`)
+
+| 组件 | 文件 | 职责 |
+|---|---|---|
+| `SearchBar` | `search/search-bar.tsx` | 全局搜索输入、300ms 防抖、Command/Ctrl+K 与下拉预览 |
+| `SearchResultCard` | `search/search-result-card.tsx` | 搜索结果、高亮片段、相关度与章节跳转 |
 
 ## UI 基础组件 (`ui/`)
 
@@ -25,13 +35,7 @@ React 组件，按功能域分目录组织。
 
 使用 `npx shadcn-ui@latest add <name>` 添加新组件。
 
-## 预留子模块
-
-| 目录 | 状态 | 计划用途 |
-|---|---|---|
-| `editor/` | 空目录 | 富文本编辑器组件（v0.3） |
-| `timeline/` | 空目录 | 时间线可视化组件（v0.3） |
-| `character-graph/` | 空目录 | 人物关系图可视化组件（v0.3） |
+富文本编辑器、时间线和人物关系图组件当前尚未创建。
 
 ## 约定
 
@@ -39,3 +43,5 @@ React 组件，按功能域分目录组织。
 - 使用 Tailwind CSS 原子类，避免内联样式
 - 可复用组件放在顶层或子目录，页面专有逻辑留在页面文件中
 - 组件状态优先使用 props 传递，跨组件共享用 `stores/`
+- 搜索高亮使用 React 节点拆分，不注入原始 HTML
+- 视觉基线采用石墨黑、米白与低饱和金色，并保持键盘焦点可见

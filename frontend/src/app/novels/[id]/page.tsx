@@ -8,6 +8,7 @@ import { ReaderContent } from "@/components/reader/reader-content";
 import { ProgressBar } from "@/components/reader/progress-bar";
 import { SearchPanel } from "@/components/reader/search-panel";
 import { novelsApi, type Novel, type Chapter } from "@/lib/api";
+import { ArrowLeft, ChevronLeft, ChevronRight, LoaderCircle, Menu, Search } from "lucide-react";
 
 /** 阅读进度 localStorage 键名 */
 function getStorageKey(novelId: string): string {
@@ -143,9 +144,9 @@ export default function NovelReaderPage() {
   // 加载中
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
+      <div className="flex min-h-[70vh] items-center justify-center">
         <div className="text-center">
-          <div className="text-4xl mb-4 animate-pulse">{"⏳"}</div>
+          <LoaderCircle className="mx-auto mb-4 size-7 animate-spin text-primary" />
           <p className="text-muted-foreground">{"加载中..."}</p>
         </div>
       </div>
@@ -155,7 +156,7 @@ export default function NovelReaderPage() {
   // 错误
   if (error || !novel) {
     return (
-      <div className="flex items-center justify-center h-screen">
+      <div className="flex min-h-[70vh] items-center justify-center">
         <div className="text-center">
           <p className="text-muted-foreground mb-4">{error || "小说不存在"}</p>
           <Button onClick={() => router.push("/novels")}>{"返回书架"}</Button>
@@ -168,7 +169,7 @@ export default function NovelReaderPage() {
   const currentChapterTitle = chapterContent?.title || "-";
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="relative flex h-[calc(100vh-4rem)] overflow-hidden bg-[#f6f1e8]/70 lg:h-screen lg:p-4 lg:pl-0">
       {/* 章节侧边栏 */}
       <ChapterSidebar
         chapters={chapters}
@@ -179,9 +180,9 @@ export default function NovelReaderPage() {
       />
 
       {/* 主内容区 */}
-      <main className="flex-1 flex flex-col min-w-0">
+      <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden lg:rounded-[28px] lg:border lg:border-white/60 lg:bg-card/75 lg:shadow-[0_25px_70px_-45px_rgba(52,42,32,0.55)]">
         {/* 顶栏 */}
-        <header className="flex items-center justify-between px-4 py-3 border-b border-border bg-background/95 backdrop-blur z-20">
+        <header className="z-20 flex items-center justify-between border-b border-border/70 bg-card/80 px-3 py-3 backdrop-blur-xl sm:px-5">
           <div className="flex items-center gap-3">
             <Button
               variant="ghost"
@@ -189,11 +190,11 @@ export default function NovelReaderPage() {
               onClick={() => setSidebarOpen(true)}
               className="lg:hidden"
             >
-              {"☰"}
+              <Menu className="size-4" />
             </Button>
-            <h1 className="font-semibold text-lg truncate max-w-[200px] sm:max-w-md">
-              {novel.title}
-            </h1>
+            <Button variant="ghost" size="sm" onClick={() => router.push("/novels")} className="hidden sm:inline-flex"><ArrowLeft className="size-4" />书架</Button>
+            <div className="h-5 w-px bg-border/80" />
+            <h1 className="max-w-[150px] truncate font-serif text-base font-semibold sm:max-w-md sm:text-lg">{novel.title}</h1>
           </div>
 
           <div className="flex items-center gap-2">
@@ -203,20 +204,7 @@ export default function NovelReaderPage() {
               onClick={() => setSearchOpen(true)}
               title="搜索 (Ctrl+F)"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <circle cx="11" cy="11" r="8" />
-                <path d="m21 21-4.3-4.3" />
-              </svg>
+              <Search className="size-4" />
             </Button>
             <Button
               variant="outline"
@@ -224,7 +212,7 @@ export default function NovelReaderPage() {
               onClick={handlePrevChapter}
               disabled={currentIndex <= 0}
             >
-              {"上一章"}
+              <ChevronLeft className="size-4" /><span className="hidden sm:inline">上一章</span>
             </Button>
             <Button
               variant="outline"
@@ -232,13 +220,13 @@ export default function NovelReaderPage() {
               onClick={handleNextChapter}
               disabled={currentIndex >= chapters.length - 1}
             >
-              {"下一章"}
+              <span className="hidden sm:inline">下一章</span><ChevronRight className="size-4" />
             </Button>
           </div>
         </header>
 
         {/* 阅读区 */}
-        <div className="flex-1 overflow-y-auto pb-20">
+        <div className="flex-1 overflow-y-auto pb-16">
           <ReaderContent chapter={chapterContent} />
         </div>
 

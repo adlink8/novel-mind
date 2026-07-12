@@ -43,6 +43,7 @@ Thumbs.db
 
 # --- 测试与临时文件 ---
 test_*.txt
+.test-tmp*/
 nul
 tsconfig.tsbuildinfo
 
@@ -52,4 +53,18 @@ test_novel.txt
 
 # --- Local agent state and imported novel sources ---
 .workbuddy/
+.gsd/
 /*.txt
+
+# --- Test/CI local artifacts (do not commit) ---
+.coverage
+coverage/
+htmlcov/
+backend/artifacts/**
+!backend/artifacts/.gitkeep
+frontend/coverage/
+frontend/playwright-report/
+frontend/test-results/
+*.xml
+!**/coverage-policy.schema.json
+!**/openapi-baseline.json

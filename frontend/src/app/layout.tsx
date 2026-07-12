@@ -17,6 +17,7 @@ import "./globals.css";
 import { Inter } from "next/font/google";
 import { cn } from "@/lib/utils";
 import { AuthGate } from "@/components/auth-gate";
+import { AppShell } from "@/components/app-shell";
 
 const inter = Inter({subsets:["latin"], variable:"--font-sans"});
 
@@ -33,56 +34,8 @@ export default function RootLayout({
   return (
     <html lang="zh-CN" className={cn("font-sans", inter.variable)}>
       <body className="min-h-screen bg-background font-sans antialiased">
-        <AuthGate>
-        <div className="flex h-screen">
-          {/* 侧边栏导航（桌面端可见） */}
-          <aside className="hidden md:flex w-64 flex-col border-r bg-card">
-            <div className="p-6">
-              <h1 className="text-xl font-bold text-primary">NovelMind</h1>
-              <p className="text-xs text-muted-foreground mt-1">AI 小说助手</p>
-            </div>
-            <nav className="flex-1 px-3 space-y-1">
-              <SidebarLink href="/" icon="📊" label="仪表盘" />
-              <SidebarLink href="/novels" icon="📚" label="我的书架" />
-              <SidebarLink href="/writing" icon="✍️" label="创作中心" />
-              <SidebarLink href="/settings" icon="⚙️" label="AI 设置" />
-            </nav>
-            <div className="p-4 border-t text-xs text-muted-foreground">
-              v0.1.0 · MVP
-            </div>
-          </aside>
-
-          {/* 主内容区（占满剩余宽度） */}
-          <main className="flex-1 overflow-auto">
-            {children}
-          </main>
-        </div>
-        </AuthGate>
+        <AuthGate><AppShell>{children}</AppShell></AuthGate>
       </body>
     </html>
-  );
-}
-
-/**
- * 侧边栏导航链接组件
- * 渲染图标 + 文字的水平布局，hover 时高亮背景
- */
-function SidebarLink({
-  href,
-  icon,
-  label,
-}: {
-  href: string;
-  icon: string;
-  label: string;
-}) {
-  return (
-    <a
-      href={href}
-      className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm hover:bg-accent transition-colors"
-    >
-      <span>{icon}</span>
-      <span>{label}</span>
-    </a>
   );
 }

@@ -13,6 +13,8 @@
 | `indexing_service.py` | 11.6 KB | 索引管线 — 协调分块 + embedding 生成 + 向量存储写入，进度报告 |
 | `ai_service.py` | 4.9 KB | LiteLLM 统一封装 — chat / embedding / stream_chat，多提供商统一接口 |
 | `ai_router.py` | 8.0 KB | AI 智能路由器 — 按任务类型和路由层级选择最优模型 |
+| `hybrid_search.py` | — | PostgreSQL tsvector + Chroma 向量结果融合，返回章节/chunk/evidence |
+| `eval_service.py` | — | bm25/baseline_vector/hybrid_search 评测，Recall/Precision/MRR/NDCG 与错误案例 |
 
 ## 服务间依赖
 
@@ -26,6 +28,8 @@ services/
 ├── indexing_service.py    ← 依赖 chunking_service + vector_store + ai_service
 ├── chunking_service.py    ← 独立：纯文本处理
 ├── vector_store.py        ← 依赖 ChromaDB HTTP API
+├── hybrid_search.py       ← 依赖 PostgreSQL + vector_store + ai_service
+├── eval_service.py        ← 依赖 hybrid_search + vector_store + eval ORM
 ├── ai_service.py          ← 依赖 ai_router + LiteLLM
 └── ai_router.py           ← 依赖 models.AIModelConfig
 ```

@@ -43,6 +43,8 @@ import { NovelUploadDialog } from "@/components/novel-upload-dialog";
 import { EmptyState } from "@/components/empty-state";
 import { useNovels } from "@/hooks/use-novels";
 import type { Novel } from "@/lib/api";
+import { BookOpenText, Plus, Search, SlidersHorizontal } from "lucide-react";
+import { PageContainer, PageHeader } from "@/components/page-header";
 
 /** 排序选项类型：按日期、按标题、按字数 */
 type SortOption = "date" | "title" | "wordCount";
@@ -142,49 +144,37 @@ export default function NovelsPage() {
   ];
 
   return (
-    <div className="p-6 md:p-8 max-w-6xl mx-auto">
+    <PageContainer className="space-y-7">
       {/* ========== 页面头部：标题 + 上传按钮 ========== */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h2 className="text-2xl font-bold">{"我的书架"}</h2>
-          <p className="text-muted-foreground mt-1">
-            {"管理你的小说库"}
-            {/* 显示小说总数（仅在有数据时显示） */}
-            {novels.length > 0 && (
-              <span className="ml-2 text-sm">
-                ({novels.length} {"本"})
-              </span>
-            )}
-          </p>
-        </div>
-
-        {/* 上传小说对话框触发按钮 */}
+      <PageHeader eyebrow="Library" title="我的书架" description={`管理已导入的长篇文本${novels.length > 0 ? `，当前共 ${novels.length} 本作品` : "，从第一本作品开始建立故事记忆"}`} action={
         <NovelUploadDialog onUploadComplete={handleUploadComplete}>
-          <Button size="lg">+ {"导入小说"}</Button>
+          <Button size="lg" className="rounded-full px-5"><Plus className="mr-2 size-4" />导入小说</Button>
         </NovelUploadDialog>
-      </div>
+      } />
 
       {/* ========== 搜索栏和筛选/排序控件 ========== */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-6">
+      <div className="paper-surface flex flex-col gap-3 rounded-3xl p-3 sm:flex-row sm:items-center">
         {/* 搜索输入框 - 搜索标题和作者 */}
-        <div className="flex-1">
+        <div className="relative flex-1">
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder={"搜索小说标题、作者..."}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="h-10"
+            className="h-11 rounded-2xl border-0 bg-transparent pl-10 shadow-none focus-visible:ring-1"
           />
         </div>
 
         {/* 状态筛选和排序下拉框 */}
-        <div className="flex gap-2">
+        <div className="flex gap-2 border-t border-border/60 pt-3 sm:border-l sm:border-t-0 sm:pl-3 sm:pt-0">
+          <SlidersHorizontal className="mt-3 hidden size-4 text-muted-foreground sm:block" />
           {/* 状态筛选下拉框 */}
           <select
             value={filterStatus}
             onChange={(e) =>
               setFilterStatus(e.target.value as FilterStatus)
             }
-            className="h-10 rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring/50"
+            className="h-10 min-w-0 flex-1 cursor-pointer rounded-xl border border-border bg-card px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring/30 sm:flex-none"
           >
             {statusOptions.map((opt) => (
               <option key={opt.value} value={opt.value}>
@@ -197,7 +187,7 @@ export default function NovelsPage() {
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as SortOption)}
-            className="h-10 rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring/50"
+            className="h-10 min-w-0 flex-1 cursor-pointer rounded-xl border border-border bg-card px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring/30 sm:flex-none"
           >
             {sortOptions.map((opt) => (
               <option key={opt.value} value={opt.value}>
@@ -213,7 +203,7 @@ export default function NovelsPage() {
       {loading && novels.length === 0 && (
         <div className="flex items-center justify-center py-20">
           <div className="text-center">
-            <div className="text-4xl mb-4 animate-pulse">{"⏳"}</div>
+            <BookOpenText className="mx-auto mb-4 size-8 animate-pulse text-primary" />
             <p className="text-muted-foreground">{"加载中..."}</p>
           </div>
         </div>
@@ -223,7 +213,7 @@ export default function NovelsPage() {
       {/* 引导用户上传第一本小说 */}
       {!loading && novels.length === 0 && (
         <EmptyState
-          icon={"📚"}
+          icon={<BookOpenText className="size-6" />}
           title={"书架是空的"}
           description={
             "导入你的第一本小说，AI 将帮你深度理解和分析"
@@ -247,7 +237,7 @@ export default function NovelsPage() {
       {/* 有小说但搜索/筛选后无匹配结果时显示 */}
       {!loading && novels.length > 0 && filteredNovels.length === 0 && (
         <EmptyState
-          icon={"🔍"}
+          icon={<Search className="size-6" />}
           title={"没有找到匹配的小说"}
           description={"试试修改搜索条件或筛选器"}
         />
@@ -256,12 +246,12 @@ export default function NovelsPage() {
       {/* ========== 小说卡片网格 ========== */}
       {/* 响应式网格布局：1列(sm) -> 2列(md) -> 3列(lg) -> 4列(xl) */}
       {filteredNovels.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           {filteredNovels.map((novel) => (
             <NovelCard key={novel.id} novel={novel} />
           ))}
         </div>
       )}
-    </div>
+    </PageContainer>
   );
 }

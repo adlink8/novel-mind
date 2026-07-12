@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { novelsApi, type NovelUploadResponse } from "@/lib/api";
+import { CheckCircle2, FileText, UploadCloud, XCircle } from "lucide-react";
 
 interface NovelUploadDialogProps {
   children: React.ReactNode;
@@ -211,7 +212,7 @@ export function NovelUploadDialog({
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger render={children as React.ReactElement} />
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="rounded-[28px] sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{"导入小说"}</DialogTitle>
           <DialogDescription>{"上传 TXT 文件，AI 将自动解析小说内容"}</DialogDescription>
@@ -225,11 +226,11 @@ export function NovelUploadDialog({
             onDragLeave={handleDragLeave}
             onClick={() => inputRef.current?.click()}
             className={`
-              relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-8 cursor-pointer transition-colors
+              relative flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed p-8 transition-colors
               ${
                 dragOver
-                  ? "border-novel-500 bg-novel-50"
-                  : "border-border bg-muted/30 hover:border-novel-400 hover:bg-novel-50/50"
+                  ? "border-primary bg-primary/5"
+                  : "border-border bg-muted/30 hover:border-primary/50 hover:bg-primary/[0.03]"
               }
             `}
           >
@@ -240,9 +241,7 @@ export function NovelUploadDialog({
               onChange={handleInputChange}
               className="hidden"
             />
-            <div className="text-4xl mb-3">
-              {file ? "📄" : "📁"}
-            </div>
+            <div className="mb-3 grid size-14 place-items-center rounded-2xl bg-secondary text-primary">{file ? <FileText className="size-6" /> : <UploadCloud className="size-6" />}</div>
             {file ? (
               <div className="text-center">
                 <p className="font-medium text-sm">{file.name}</p>
@@ -263,7 +262,7 @@ export function NovelUploadDialog({
             <div className="space-y-2">
               <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
                 <div
-                  className="h-full bg-novel-500 rounded-full transition-all duration-300"
+                  className="h-full rounded-full bg-primary transition-all duration-300"
                   style={{ width: `${Math.min(progress, 100)}%` }}
                 />
               </div>
@@ -275,16 +274,16 @@ export function NovelUploadDialog({
 
           {/* 成功状态 */}
           {status === "success" && (
-            <div className="flex items-center justify-center gap-2 rounded-lg bg-green-50 border border-green-200 p-3 text-sm text-green-700">
-              <span>{"✅"}</span>
+            <div className="flex items-center justify-center gap-2 rounded-xl border border-green-200 bg-green-50 p-3 text-sm text-green-700">
+              <CheckCircle2 className="size-4" />
               <span>{"导入成功！"}</span>
             </div>
           )}
 
           {/* 错误状态 */}
           {status === "error" && errorMsg && (
-            <div className="flex items-center justify-center gap-2 rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">
-              <span>{"❌"}</span>
+            <div className="flex items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+              <XCircle className="size-4" />
               <span>{errorMsg}</span>
             </div>
           )}

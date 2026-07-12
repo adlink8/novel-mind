@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { searchApi, type SearchResult } from "@/lib/api";
+import { X } from "lucide-react";
 
 interface SearchPanelProps {
   novelId: number;
@@ -48,16 +49,19 @@ export function SearchPanel({
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  /** 面板打开时自动聚焦输入框，关闭时重置状态 */
+  /** 面板打开时重置上次搜索并自动聚焦输入框 */
   useEffect(() => {
-    if (isOpen) {
-      setTimeout(() => inputRef.current?.focus(), 100);
-    } else {
+    if (!isOpen) return;
+
+    const timer = setTimeout(() => {
       setQuery("");
       setResults([]);
       setError(null);
       setHasSearched(false);
-    }
+      inputRef.current?.focus();
+    }, 100);
+
+    return () => clearTimeout(timer);
   }, [isOpen]);
 
   /** Esc 关闭面板 */
@@ -134,7 +138,7 @@ export function SearchPanel({
             className="flex-1"
           />
           <Button variant="ghost" size="sm" onClick={onClose}>
-            {"✕"}
+            <X className="size-4" />
           </Button>
         </div>
 

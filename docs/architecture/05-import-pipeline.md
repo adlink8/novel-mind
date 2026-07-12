@@ -124,13 +124,11 @@ pending → uploading → detecting → parsing → chunking → embedding → r
 - `backend/tests/test_novels.py` — 导入端点测试
 - `backend/tests/test_security.py` — 上传安全测试
 
-## 已知局限
+## 当前边界与局限
 
-1. **同步执行**：当前导入是同步的，大文件（>5MB）可能超时
-2. **进度不可恢复**：服务重启后进程内进度字典丢失
-3. **无 worker/租约**：无分布式导入支持
-
-这些将在 `02-03` 持久化导入任务中解决。
+1. **请求内后台任务**：导入通过 FastAPI `BackgroundTasks` 执行并持久化进度，不是独立任务队列；进程完全退出时仍依赖租约恢复。
+2. **持久化状态机**：ImportJob、300 秒租约、幂等 hash、取消、重试和 stale job 恢复均已实现并测试。
+3. **大文件路径**：文件写入采用分块 I/O，但 >5MB 的完整生产压力与独立 worker 调度仍未验证。
 
 ## 修改后验证
 

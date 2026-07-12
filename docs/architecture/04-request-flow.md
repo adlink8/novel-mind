@@ -46,11 +46,11 @@ sequenceDiagram
 
 ### 认证中间件
 
-所有 API 请求（除 health/register/login/logout）都经过以下认证链：
+所有业务 API 请求（除 health/register/login/logout）都经过以下认证链：
 
 ```
 HTTP 请求
-  → dependencies.get_current_user
+  → core.security.get_current_user / require_user
     → 从 Cookie 中提取 access_token
     → 若 Cookie 不存在，从 Authorization: Bearer 提取
     → JWT 验证（签名、iss/aud、过期时间）
@@ -61,7 +61,7 @@ HTTP 请求
 ```
 
 **来源**:
-- `backend/app/api/dependencies.py` — `get_current_user`
+- `backend/app/api/dependencies.py` — `require_owned_novel`
 - `backend/app/core/security.py` — JWT 签发/验证
 - `backend/app/api/auth.py` — 注册/登录/注销端点
 
@@ -81,7 +81,7 @@ sequenceDiagram
     U->>F: 选择 TXT 文件并上传
     F->>B: POST /api/novels/upload (multipart/form-data)
     B->>B: 认证 + owner 提取
-    B->>S: upload_novel(file, owner_id)
+    B->>S: create_import_job + BackgroundTasks.process_import
 
     S->>S: 安全校验（文件类型 .txt、大小限制）
     S->>FS: 生成随机文件名，分块写入
@@ -99,9 +99,9 @@ sequenceDiagram
         S-->>B: 500 错误
     end
 
-    S-->>B: NovelImportResponse (novel_id, chapter_count, word_count)
-    B-->>F: 200 {novel, chapters_count, import_job}
-    F->>U: 显示导入成功
+    B-->>F: 200 {job_id, status=pending}
+    F->>B: 轮询 import-status
+    F->>U: 显示阶段进度与最终结果
 ```
 
 **来源**:
@@ -177,6 +177,10 @@ sequenceDiagram
         F->>U: 展示搜索结果
     end
 ```
+
+## RAG 评测边界
+
+`/api/eval` 全部强制认证，并通过 `EvalDataset/EvalRun -> Novel.owner_id` 进行资源隔离。API 层负责权限与输入校验，`eval_service` 只负责策略执行和指标持久化。当前 `POST /api/eval/runs` 会同步等待整次评测完成，长任务后台化仍是待办。
 
 **来源**:
 - `backend/app/api/rag.py` — RAG 端点

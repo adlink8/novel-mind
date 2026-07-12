@@ -12,8 +12,8 @@ export function ProgressBar({ current, total, chapterTitle }: ProgressBarProps) 
   const percent = total > 0 ? Math.round((current / total) * 100) : 0;
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur border-t border-border z-30">
-      <div className="max-w-3xl mx-auto px-4 py-2">
+    <div className="absolute inset-x-0 bottom-0 z-30 border-t border-border/70 bg-card/90 backdrop-blur-xl">
+      <div className="mx-auto max-w-3xl px-4 py-2.5">
         {/* 章节信息 */}
         <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
           <span className="truncate flex-1 mr-4">{chapterTitle}</span>

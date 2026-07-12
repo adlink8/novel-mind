@@ -10,7 +10,7 @@
 docker compose up -d db
 
 cd backend
-.\.venv311\Scripts\python.exe -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 
 cd ..\frontend
 npm run dev
@@ -35,13 +35,12 @@ docker compose --profile graph up -d neo4j
 
 ## Production Blockers
 
-- 无持久化 import job、worker、重启恢复和取消机制；
 - 无应用生产镜像、TLS ingress、限流和 CSRF 策略评审；
 - 开发数据库/Neo4j 默认凭据不可用于生产；
 - 数据服务端口当前映射到宿主机；
 - Chroma 使用未固定的 `latest` 镜像；
 - 无 secret manager、备份恢复演练、监控和告警；
-- RAG 与 AI 生成链路尚未实现。
+- RAG 检索与评测已实现，但 AI 分析、创作、编辑和导出链路尚未实现。
 
 ## Minimum Production Topology
 
@@ -59,8 +58,8 @@ TLS ingress
 
 ## Release Gate
 
-1. 完成 GSD `02-03` 持久化导入任务。
+1. 构建并验证 FastAPI、worker 与 Next.js 的生产镜像。
 2. PostgreSQL migration 从上一 revision 升级验证通过。
 3. 依赖、secret、镜像和应用安全扫描通过。
-4. 认证端到端、备份恢复和回滚演练通过。
+4. 认证端到端、任务重启恢复、备份恢复和回滚演练通过。
 5. TLS、限流、监控和告警配置有可重复部署证据。

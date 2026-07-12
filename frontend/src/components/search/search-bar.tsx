@@ -34,9 +34,6 @@ export function SearchBar() {
   // ========== 防抖搜索 ==========
   useEffect(() => {
     if (query.trim().length === 0) {
-      setResults([]);
-      setIsOpen(false);
-      setError(null);
       return;
     }
 
@@ -58,6 +55,15 @@ export function SearchBar() {
 
     return () => clearTimeout(timer);
   }, [query]);
+
+  const handleQueryChange = (value: string) => {
+    setQuery(value);
+    if (value.trim().length === 0) {
+      setResults([]);
+      setIsOpen(false);
+      setError(null);
+    }
+  };
 
   // ========== Command+K 快捷键 ==========
   useEffect(() => {
@@ -106,16 +112,7 @@ export function SearchBar() {
   };
 
   // ========== 高亮片段渲染 ==========
-  const renderSnippet = (html: string) => (
-    <span
-      dangerouslySetInnerHTML={{
-        __html: html.replace(
-          /<mark>/g,
-          '<mark class="bg-yellow-200 text-yellow-900 rounded-sm px-0.5 dark:bg-yellow-500/30 dark:text-yellow-200">'
-        ),
-      }}
-    />
-  );
+  const renderSnippet = (html: string) => html.replace(/<\/?mark>/gi, "");
 
   // ========== 下拉是否可见 ==========
   const showDropdown = isOpen && (results.length > 0 || loading || error);
@@ -128,7 +125,7 @@ export function SearchBar() {
             ref={inputRef}
             type="text"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => handleQueryChange(e.target.value)}
             onKeyDown={handleKeyDown}
             onFocus={() => {
               if (query.trim().length > 0 && results.length > 0) {
@@ -175,8 +172,8 @@ export function SearchBar() {
                   className="cursor-pointer px-4 py-3 transition-colors hover:bg-muted"
                   onClick={() => router.push(
                     result.chapter_id !== null
-                      ? `/novels/${result.novel_id}/read?chapter=${result.chapter_id}&chunk=${result.chunk_index}`
-                      : `/novels/${result.novel_id}/read?chunk=${result.chunk_index}`
+                      ? `/novels/${result.novel_id}?chapter=${result.chapter_id}&chunk=${result.chunk_index}`
+                      : `/novels/${result.novel_id}?chunk=${result.chunk_index}`
                   )}
                 >
                   <div className="flex items-center justify-between gap-2">

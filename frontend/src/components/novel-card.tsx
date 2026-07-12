@@ -21,6 +21,7 @@ import {
   Card, CardContent, CardHeader, CardTitle, CardDescription,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { ArrowUpRight, BookOpenText, FileText } from "lucide-react";
 import type { Novel } from "@/lib/api";
 
 interface NovelCardProps {
@@ -43,24 +44,20 @@ const statusStyles: Record<Novel["status"], string> = {
   analyzed: "bg-novel-100 text-novel-800",
 };
 
-/**
- * 根据标题生成确定性渐变色
- * 使用 DJB2 哈希算法，保证同一标题每次返回相同颜色
- */
-function getGradient(title: string): string {
-  const gradients = [
-    "from-novel-400 to-novel-600",
-    "from-purple-400 to-indigo-600",
-    "from-pink-400 to-rose-600",
-    "from-blue-400 to-cyan-600",
-    "from-emerald-400 to-teal-600",
-    "from-amber-400 to-orange-600",
+function getCoverTone(title: string): string {
+  const tones = [
+    "from-[#2d3431] to-[#59665f]",
+    "from-[#51352f] to-[#9b5d47]",
+    "from-[#27374d] to-[#526d82]",
+    "from-[#443c68] to-[#766a9c]",
+    "from-[#344d3f] to-[#6b806f]",
+    "from-[#5d4935] to-[#9b7b58]",
   ];
   let hash = 0;
   for (let i = 0; i < title.length; i++) {
     hash = title.charCodeAt(i) + ((hash << 5) - hash);
   }
-  return gradients[Math.abs(hash) % gradients.length];
+  return tones[Math.abs(hash) % tones.length];
 }
 
 /** 格式化字数显示（超过 1 万显示为 X.X 万字） */
@@ -73,17 +70,19 @@ function formatWordCount(count: number): string {
 
 export function NovelCard({ novel }: NovelCardProps) {
   return (
-    <Link href={`/novels/${novel.id}`}>
-      <Card className="h-full cursor-pointer hover:ring-2 hover:ring-novel-400/50 hover:shadow-lg transition-all">
-        {/* 渐变色封面占位 */}
-        <div
-          className={`h-32 bg-gradient-to-br ${getGradient(novel.title)} flex items-center justify-center`}
-        >
-          <span className="text-4xl text-white/80">{"📖"}</span>
+    <Link href={`/novels/${novel.id}`} className="group block h-full">
+      <Card className="paper-surface h-full cursor-pointer overflow-hidden rounded-3xl border-white/60 transition-all duration-300 group-hover:-translate-y-1 group-hover:border-primary/25 group-hover:shadow-[0_24px_60px_-35px_rgba(52,42,32,0.6)]">
+        <div className={`relative h-40 overflow-hidden bg-gradient-to-br ${getCoverTone(novel.title)} p-5 text-white`}>
+          <div className="absolute -right-8 -top-10 size-32 rounded-full border border-white/10" />
+          <div className="absolute -bottom-12 -left-6 size-28 rounded-full bg-white/[0.06]" />
+          <div className="relative flex h-full flex-col justify-between">
+            <div className="flex items-center justify-between"><BookOpenText className="size-5 text-white/70" /><ArrowUpRight className="size-4 text-white/60 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" /></div>
+            <p className="line-clamp-2 max-w-[85%] font-serif text-xl font-semibold leading-tight tracking-tight">{novel.title}</p>
+          </div>
         </div>
 
         <CardHeader>
-          <CardTitle className="line-clamp-1">{novel.title}</CardTitle>
+          <CardTitle className="line-clamp-1 font-serif text-lg">{novel.title}</CardTitle>
           <CardDescription className="line-clamp-1">
             {novel.author || "未知作者"}
           </CardDescription>
@@ -103,9 +102,9 @@ export function NovelCard({ novel }: NovelCardProps) {
             </span>
           </div>
 
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>{novel.chapter_count} 章</span>
-            <span>{formatWordCount(novel.word_count)}</span>
+          <div className="flex items-center justify-between border-t border-border/60 pt-3 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1.5"><BookOpenText className="size-3.5" />{novel.chapter_count} 章</span>
+            <span className="flex items-center gap-1.5"><FileText className="size-3.5" />{formatWordCount(novel.word_count)}</span>
           </div>
         </CardContent>
       </Card>

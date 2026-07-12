@@ -27,6 +27,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
+    from app.models.eval import EvalDataset, EvalRun
     from app.models.import_job import ImportJob
 
 
@@ -96,6 +97,16 @@ class Novel(TimestampMixin, Base):
     # - cascade: 删除 Novel 时级联删除所有 ImportJob
     import_jobs: Mapped[list["ImportJob"]] = relationship(
         back_populates="novel", cascade="all, delete-orphan"
+    )
+
+    # 评测数据集关系
+    eval_datasets: Mapped[list["EvalDataset"]] = relationship(
+        back_populates="novel", cascade="all, delete-orphan", lazy="selectin"
+    )
+
+    # 评测运行关系
+    eval_runs: Mapped[list["EvalRun"]] = relationship(
+        back_populates="novel", cascade="all, delete-orphan", lazy="selectin"
     )
 
 

@@ -17,17 +17,18 @@ export function ReaderContent({ chapter }: ReaderContentProps) {
   }
 
   return (
-    <article className="max-w-3xl mx-auto py-8 px-6">
+    <article className="mx-auto max-w-[760px] px-5 py-10 sm:px-8 sm:py-14">
       {/* 章节标题 */}
-      <header className="mb-8 text-center">
-        <h1 className="text-2xl font-bold mb-2">{chapter.title}</h1>
-        <p className="text-sm text-muted-foreground">
+      <header className="mb-10 border-b border-border/60 pb-8 text-center sm:mb-14">
+        <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-primary">Chapter</p>
+        <h1 className="mb-3 font-serif text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">{chapter.title}</h1>
+        <p className="text-xs text-muted-foreground">
           {chapter.word_count.toLocaleString()} {"字"}
         </p>
       </header>
 
       {/* 章节内容 */}
-      <div className="prose prose-lg max-w-none leading-loose text-foreground/90 whitespace-pre-wrap">
+      <div className="whitespace-pre-wrap font-reading text-[17px] leading-[2.05] tracking-[0.015em] text-foreground/90 sm:text-[18px]">
         {chapter.content}
       </div>
     </article>

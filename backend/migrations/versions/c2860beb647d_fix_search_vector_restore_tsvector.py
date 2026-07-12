@@ -24,7 +24,6 @@ def upgrade() -> None:
     op.drop_column('text_chunks', 'search_vector')
 
     # Step 2: Re-add as TSVECTOR
-    from sqlalchemy import Text, Computed
     from sqlalchemy.dialects.postgresql import TSVECTOR
     op.add_column('text_chunks',
         sa.Column('search_vector', TSVECTOR(),

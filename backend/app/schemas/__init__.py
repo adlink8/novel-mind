@@ -9,6 +9,8 @@ Pydantic Schema 统一导出包
   - timeline.py   : 时间线事件 CRUD
   - fanfiction.py : 同人文 & 章节
   - ai_model.py   : AI 模型配置 & 测试
+  - eval.py       : RAG 评测数据与报告
+  - knowledge.py  : 证据门控知识图谱候选、判断、审核契约
 
 使用方式:
   from app.schemas import NovelResponse, AIModelConfigCreate
@@ -76,7 +78,18 @@ from app.schemas.ai_model import (
     AIModelTestResponse,
 )
 
-# Knowledge graph
+# 评测
+from app.schemas.eval import (
+    EvalDatasetCreate,
+    EvalDatasetResponse,
+    EvalDatasetUpdate,
+    EvalRunCreate,
+    EvalRunResponse,
+    EvalResultResponse,
+    EvalReportResponse,
+)
+
+# 知识图谱
 from app.schemas.knowledge import (
     KnowledgeEntityCandidateCreate,
     KnowledgeEntityCandidateResponse,
@@ -143,7 +156,15 @@ __all__ = [
     "AIModelConfigUpdate",
     "AIModelTestRequest",
     "AIModelTestResponse",
-    # Knowledge graph
+    # 评测
+    "EvalDatasetCreate",
+    "EvalDatasetResponse",
+    "EvalDatasetUpdate",
+    "EvalRunCreate",
+    "EvalRunResponse",
+    "EvalResultResponse",
+    "EvalReportResponse",
+    # 知识图谱
     "KnowledgeExtractionRunCreate",
     "KnowledgeExtractionRunResponse",
     "KnowledgeEvidenceRefCreate",

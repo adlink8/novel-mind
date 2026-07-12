@@ -29,9 +29,8 @@ npm test -- --coverage
 |---|---|
 | `lib/api.test.ts` | API 客户端 — 请求参数、响应处理、错误状态 |
 | `lib/utils.test.ts` | 工具函数 — `cn()` 类名合并、日期格式化 |
-| `stores/*` | Zustand store — 状态更新、异步操作 |
-| `hooks/*` | 自定义 Hook — 数据获取、加载/错误状态 |
-| `components/*` | 组件渲染 — 基础 UI 行为 |
+
+当前未覆盖：`stores/`、`hooks/`、页面和组件交互。相关回归目前通过 ESLint、Next.js 生产构建和浏览器验收发现。
 
 ## CI
 

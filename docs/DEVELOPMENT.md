@@ -24,7 +24,7 @@
 
 ## GSD Workflow
 
-`.planning/` 是唯一 AI 读写状态目录（GSD 工作流）。当前 active milestone 是 v0.2 安全与架构修复；`02-01`、`02-02` 已完成，自动执行从 `02-03` 开始。
+`.planning/` 是唯一 AI 读写状态目录（GSD 工作流）。v0.3 当前为 active/gaps_found，`auto_start` 为 `null`；评测集人工校准完成后再建立关闭缺口的执行 plan。
 
 每个 task plan 必须包含 `Steps / Must-Haves / Verification`。每个 implementation slice 的最后一步必须是 `Test, Fix, and Confirm`。
 
@@ -32,12 +32,12 @@
 
 ```powershell
 cd backend
-.\.venv311\Scripts\python.exe -m alembic upgrade head
-.\.venv311\Scripts\python.exe -m alembic current
-.\.venv311\Scripts\python.exe -m alembic check
+.\.venv\Scripts\python.exe -m alembic upgrade head
+.\.venv\Scripts\python.exe -m alembic current
+.\.venv\Scripts\python.exe -m alembic check
 ```
 
-当前 PostgreSQL 16 验证 head 为 `a91c4d7e5f20`，三条命令均通过。
+当前 PostgreSQL 16 验证 head 为 `518675fa18f8`，三条命令均通过。
 
 ## Definition Of Done
 

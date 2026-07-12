@@ -24,8 +24,10 @@ NovelMind 是一个 AI 辅助小说理解与同人创作平台。用户上传小
 - 资源隔离：所有资源按 owner 过滤，跨用户返回 404
 - AI 模型配置：用户级 OpenAI-compatible 提供商 CRUD，API Key Fernet 加密
 - RAG 管线：语义分块、embedding、ChromaDB 向量存储、语义搜索 API
+- 混合搜索：PostgreSQL BM25 + ChromaDB 向量检索与加权融合
+- RAG 评测：数据集、运行记录、Recall/Precision/MRR/NDCG 指标与 ECharts 可视化
 - 安全防护：SSRF 白名单 + DNS/IP 校验、上传文件 containment、响应最小化
-- 测试基线：172 pytest + 22 Vitest，全部通过
+- 测试基线：239 pytest + 12 RAG e2e + 22 Vitest，全部通过
 - CI/静态检查：ESLint 0、Ruff 0、Bandit 中高风险 0、pip-audit 0、npm audit 0
 
 ### PARTIAL（部分实现，不完整）
@@ -37,7 +39,6 @@ NovelMind 是一个 AI 辅助小说理解与同人创作平台。用户上传小
 
 ### MISSING（未实现）
 
-- 混合语义搜索（向量 + 关键词）
 - AI 分析与创作（剧情分析、人物图谱、时间线、同人文生成 — 路由返回 501）
 - 富文本编辑与 EPUB/Markdown 导出
 
@@ -57,30 +58,31 @@ NovelMind 是一个 AI 辅助小说理解与同人创作平台。用户上传小
 - 账户体系、小说导入、基础阅读器
 - 前端脚手架、基础 CI
 
-### Phase 2（v0.2）— 当前
+### Phase 2（v0.2）— 已完成
 
 **02-01（已完成）**：安全修复 — owner 隔离、SSRF 防护、密钥加密、上传安全、响应最小化、ORM 漂移修复
 
 **02-02（已完成）**：RAG 管线核心 — 分块、embedding、ChromaDB 集成、语义搜索 API、索引进度追踪
 
-**02-03（待执行）**：持久化导入任务（worker/租约/幂等重试）、生产依赖审计收尾
+**02-03（已完成）**：持久化导入任务（租约/幂等重试/取消/恢复）、生产依赖审计收尾
 
-### Phase 3（v0.3）— 规划中
+### Phase 3（v0.3）— PARTIAL
 
-- 混合语义搜索
-- AI 剧情分析、人物图谱、时间线抽取
-- AI 同人文生成
-- 富文本编辑与多格式导出
+- 混合语义搜索与前端搜索体验
+- 阅读页内搜索
+- RAG 评测集、三策略评测与可视化
 
-## 当前验证快照（2026-06-12）
+AI 剧情分析、人物图谱、时间线抽取、同人文生成和富文本导出仍属于后续边界。
+
+## 当前验证快照（2026-06-13）
 
 | 检查项 | 结果 |
 |---|---|
-| Backend pytest | 172 passed |
+| Backend pytest | 239 non-e2e + 12 RAG e2e passed |
 | Frontend Vitest | 22 passed |
 | Frontend ESLint + Build | 0 errors, build passed |
 | Python pip-audit | 0 vulnerabilities |
 | Bandit | 中高风险 0 |
 | npm audit | 0 vulnerabilities |
-| Alembic | head `f3c8b7b2dbf7`，current/check passed |
+| Alembic | head `518675fa18f8`，current/check passed |
 | 导入集成测试 | 《龙族Ⅰ·火之晨曦》11 章 / 274,011 字导入成功 |
