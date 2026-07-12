@@ -1,0 +1,444 @@
+{
+  "schema_version": "rag-quality.v1",
+  "suite_type": "benchmark",
+  "domain": "fiction",
+  "snapshot": {
+    "snapshot_id": "snap-bench-fiction-v1",
+    "owner_id": 1,
+    "work_id": 10,
+    "version": "bench-v1",
+    "canonicalization_version": "rag-canon.v1",
+    "chunks": [
+      {
+        "content_hash": "03f19bf5117f3b8b97a7f1bb2ae453479e480580d25a04706a56d0df5c55df82",
+        "text_hash": "03f19bf5117f3b8b97a7f1bb2ae453479e480580d25a04706a56d0df5c55df82",
+        "length": 34,
+        "text": "路明非站在卡塞尔学院的门前，第一次看见青铜与火之王的传说写在石碑上。"
+      },
+      {
+        "content_hash": "e3233ef756b61f21fc09f1f9e311f1845c7858f058195b7bfa72bfd37a3c1bea",
+        "text_hash": "e3233ef756b61f21fc09f1f9e311f1845c7858f058195b7bfa72bfd37a3c1bea",
+        "length": 23,
+        "text": "恺撒·加图索拔出狄克推多，寒光映着雨夜的湖面。"
+      },
+      {
+        "content_hash": "617b809101fdf4cdb3e845eb92b56a1cdc6b009eee12325305b3152d86197ad1",
+        "text_hash": "617b809101fdf4cdb3e845eb92b56a1cdc6b009eee12325305b3152d86197ad1",
+        "length": 28,
+        "text": "无关天气描述：今夜的雨很大，街灯昏黄，行人匆匆走过广场。"
+      }
+    ],
+    "manifest_hash": "3e8afd1575fc2ff21995f32deb97fc3a078032887a9174f44941dc8b4ddcf87f",
+    "created_at": "2026-07-12T12:00:00+00:00",
+    "signature": "83b1af2501d895d10278c4ee3b704f459bc35f8f875633cd22fc50269b032d3b"
+  },
+  "cases": [
+    {
+      "case_id": "bench-answerable-001",
+      "schema_version": "rag-quality.v1",
+      "snapshot_hash": "3e8afd1575fc2ff21995f32deb97fc3a078032887a9174f44941dc8b4ddcf87f",
+      "question": "路明非第一次在哪里看见青铜与火之王的传说？",
+      "case_type": "answerable",
+      "claims": [
+        {
+          "claim_id": "c1",
+          "text": "路明非在卡塞尔学院门前石碑上第一次看见传说",
+          "critical": true,
+          "evidence_set_ids": [
+            "s1"
+          ]
+        }
+      ],
+      "equivalent_evidence_sets": [
+        {
+          "set_id": "s1",
+          "refs": [
+            {
+              "chunk_content_hash": "03f19bf5117f3b8b97a7f1bb2ae453479e480580d25a04706a56d0df5c55df82",
+              "start_offset": 14,
+              "end_offset": 28,
+              "quote_hash": "d74c3394ea16aaf54b8012bb6d4515b1524a3a2edfef6a024d6402f146b47026",
+              "quote_text": "第一次看见青铜与火之王的传说"
+            }
+          ]
+        }
+      ],
+      "reference_answer": "在卡塞尔学院门前的石碑上",
+      "generator_lineage": {
+        "provider": "ollama",
+        "model_family": "qwen",
+        "model_id": "qwen3.5:9b",
+        "weights/revision": "qwen3.5-9b-rev-aaa",
+        "endpoint_class": "offline_stub",
+        "prompt_hash": "1f919f8f978ce9ade68dd72e49990b15210a4a5739e6bfe6ed0fb6abdb53c605",
+        "prompt_version": "rag_fixture_generator.v1",
+        "schema_hash": "abbbaed9fb1b458af7e7e8af8b45e8dc835ae862d5c312b18ddb6004c2bd622a",
+        "decoding": {
+          "temperature": null,
+          "top_p": null,
+          "max_tokens": null,
+          "seed": null
+        },
+        "runtime": "offline",
+        "started_at": "2026-07-12T12:00:00Z"
+      },
+      "judge_lineage": {
+        "provider": "ollama",
+        "model_family": "gemma",
+        "model_id": "gemma4-local",
+        "weights/revision": "gemma4-local-rev-bbb",
+        "endpoint_class": "offline_stub",
+        "prompt_hash": "ba14dccd65be387acff0020f6300c4d98397a21647a1c3c72ebfbcf8d239a47e",
+        "prompt_version": "rag_fixture_judge.v1",
+        "schema_hash": "abbbaed9fb1b458af7e7e8af8b45e8dc835ae862d5c312b18ddb6004c2bd622a",
+        "decoding": {
+          "temperature": null,
+          "top_p": null,
+          "max_tokens": null,
+          "seed": null
+        },
+        "runtime": "offline",
+        "started_at": "2026-07-12T12:00:00Z"
+      },
+      "judge_fixture_verdict": {
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "stub_accept"
+        ],
+        "accepted": true
+      },
+      "deterministic_checks": {
+        "schema_ok": true,
+        "snapshot_hash_ok": true,
+        "offset_quote_ok": true,
+        "claims_ok": true,
+        "critical_claim_support_ok": true,
+        "equivalent_sets_ok": true,
+        "leak_ok": true,
+        "no_answer_ok": true,
+        "hard_negative_ok": true,
+        "details": [
+          {
+            "name": "schema",
+            "passed": true,
+            "detail": null
+          },
+          {
+            "name": "snapshot_hash",
+            "passed": true,
+            "detail": null
+          },
+          {
+            "name": "offset_quote",
+            "passed": true,
+            "detail": null
+          },
+          {
+            "name": "claims",
+            "passed": true,
+            "detail": null
+          },
+          {
+            "name": "critical_claim_support",
+            "passed": true,
+            "detail": null
+          },
+          {
+            "name": "equivalent_sets",
+            "passed": true,
+            "detail": null
+          },
+          {
+            "name": "leak",
+            "passed": true,
+            "detail": null
+          },
+          {
+            "name": "no_answer",
+            "passed": true,
+            "detail": null
+          },
+          {
+            "name": "hard_negative",
+            "passed": true,
+            "detail": null
+          }
+        ]
+      },
+      "fixture_hash": "53ca8a4fa381e3053184246aa67a4f7efb147247f7c3202b984ef0f30a819590",
+      "signature": "31ac1a1e8ddc8dcc9b7bce1195b415152d19471685cfc8bf60ef444884882136",
+      "status": "frozen",
+      "parent_case_id": null,
+      "attempt": 0,
+      "regeneration_reason": null,
+      "gold_chunk_db_ids": null
+    },
+    {
+      "case_id": "bench-noanswer-001",
+      "schema_version": "rag-quality.v1",
+      "snapshot_hash": "3e8afd1575fc2ff21995f32deb97fc3a078032887a9174f44941dc8b4ddcf87f",
+      "question": "路明非的银行账号余额是多少？",
+      "case_type": "no_answer",
+      "claims": [],
+      "equivalent_evidence_sets": [],
+      "reference_answer": "insufficient evidence",
+      "generator_lineage": {
+        "provider": "ollama",
+        "model_family": "qwen",
+        "model_id": "qwen3.5:9b",
+        "weights/revision": "qwen3.5-9b-rev-aaa",
+        "endpoint_class": "offline_stub",
+        "prompt_hash": "1f919f8f978ce9ade68dd72e49990b15210a4a5739e6bfe6ed0fb6abdb53c605",
+        "prompt_version": "rag_fixture_generator.v1",
+        "schema_hash": "abbbaed9fb1b458af7e7e8af8b45e8dc835ae862d5c312b18ddb6004c2bd622a",
+        "decoding": {
+          "temperature": null,
+          "top_p": null,
+          "max_tokens": null,
+          "seed": null
+        },
+        "runtime": "offline",
+        "started_at": "2026-07-12T12:00:00Z"
+      },
+      "judge_lineage": {
+        "provider": "ollama",
+        "model_family": "gemma",
+        "model_id": "gemma4-local",
+        "weights/revision": "gemma4-local-rev-bbb",
+        "endpoint_class": "offline_stub",
+        "prompt_hash": "ba14dccd65be387acff0020f6300c4d98397a21647a1c3c72ebfbcf8d239a47e",
+        "prompt_version": "rag_fixture_judge.v1",
+        "schema_hash": "abbbaed9fb1b458af7e7e8af8b45e8dc835ae862d5c312b18ddb6004c2bd622a",
+        "decoding": {
+          "temperature": null,
+          "top_p": null,
+          "max_tokens": null,
+          "seed": null
+        },
+        "runtime": "offline",
+        "started_at": "2026-07-12T12:00:00Z"
+      },
+      "judge_fixture_verdict": {
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "stub_accept"
+        ],
+        "accepted": true
+      },
+      "deterministic_checks": {
+        "schema_ok": true,
+        "snapshot_hash_ok": true,
+        "offset_quote_ok": true,
+        "claims_ok": true,
+        "critical_claim_support_ok": true,
+        "equivalent_sets_ok": true,
+        "leak_ok": true,
+        "no_answer_ok": true,
+        "hard_negative_ok": true,
+        "details": [
+          {
+            "name": "schema",
+            "passed": true,
+            "detail": null
+          },
+          {
+            "name": "snapshot_hash",
+            "passed": true,
+            "detail": null
+          },
+          {
+            "name": "offset_quote",
+            "passed": true,
+            "detail": null
+          },
+          {
+            "name": "claims",
+            "passed": true,
+            "detail": null
+          },
+          {
+            "name": "critical_claim_support",
+            "passed": true,
+            "detail": null
+          },
+          {
+            "name": "equivalent_sets",
+            "passed": true,
+            "detail": null
+          },
+          {
+            "name": "leak",
+            "passed": true,
+            "detail": null
+          },
+          {
+            "name": "no_answer",
+            "passed": true,
+            "detail": null
+          },
+          {
+            "name": "hard_negative",
+            "passed": true,
+            "detail": null
+          }
+        ]
+      },
+      "fixture_hash": "5b11d387d74b1a62decf46588b035abd79197d8d63808f608df491dce9beba88",
+      "signature": "95a4086c8fcd441122d49795461851998a99eb47eac86251e3bce7f8fdf601ca",
+      "status": "frozen",
+      "parent_case_id": null,
+      "attempt": 0,
+      "regeneration_reason": null,
+      "gold_chunk_db_ids": null
+    },
+    {
+      "case_id": "bench-hardneg-001",
+      "schema_version": "rag-quality.v1",
+      "snapshot_hash": "3e8afd1575fc2ff21995f32deb97fc3a078032887a9174f44941dc8b4ddcf87f",
+      "question": "恺撒是否在雨夜拔刀？",
+      "case_type": "hard_negative",
+      "claims": [
+        {
+          "claim_id": "hn1",
+          "text": "雨夜描述证明恺撒拔刀",
+          "critical": false,
+          "evidence_set_ids": []
+        }
+      ],
+      "equivalent_evidence_sets": [
+        {
+          "set_id": "near",
+          "refs": [
+            {
+              "chunk_content_hash": "617b809101fdf4cdb3e845eb92b56a1cdc6b009eee12325305b3152d86197ad1",
+              "start_offset": 7,
+              "end_offset": 13,
+              "quote_hash": "4da82e03355b624067f5202ad9e545faeeae2341b5c33defc7e6bdac532e9d28",
+              "quote_text": "今夜的雨很大"
+            }
+          ]
+        }
+      ],
+      "reference_answer": "hard negative — do not treat as support",
+      "generator_lineage": {
+        "provider": "ollama",
+        "model_family": "qwen",
+        "model_id": "qwen3.5:9b",
+        "weights/revision": "qwen3.5-9b-rev-aaa",
+        "endpoint_class": "offline_stub",
+        "prompt_hash": "1f919f8f978ce9ade68dd72e49990b15210a4a5739e6bfe6ed0fb6abdb53c605",
+        "prompt_version": "rag_fixture_generator.v1",
+        "schema_hash": "abbbaed9fb1b458af7e7e8af8b45e8dc835ae862d5c312b18ddb6004c2bd622a",
+        "decoding": {
+          "temperature": null,
+          "top_p": null,
+          "max_tokens": null,
+          "seed": null
+        },
+        "runtime": "offline",
+        "started_at": "2026-07-12T12:00:00Z"
+      },
+      "judge_lineage": {
+        "provider": "ollama",
+        "model_family": "gemma",
+        "model_id": "gemma4-local",
+        "weights/revision": "gemma4-local-rev-bbb",
+        "endpoint_class": "offline_stub",
+        "prompt_hash": "ba14dccd65be387acff0020f6300c4d98397a21647a1c3c72ebfbcf8d239a47e",
+        "prompt_version": "rag_fixture_judge.v1",
+        "schema_hash": "abbbaed9fb1b458af7e7e8af8b45e8dc835ae862d5c312b18ddb6004c2bd622a",
+        "decoding": {
+          "temperature": null,
+          "top_p": null,
+          "max_tokens": null,
+          "seed": null
+        },
+        "runtime": "offline",
+        "started_at": "2026-07-12T12:00:00Z"
+      },
+      "judge_fixture_verdict": {
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "stub_accept"
+        ],
+        "accepted": true
+      },
+      "deterministic_checks": {
+        "schema_ok": true,
+        "snapshot_hash_ok": true,
+        "offset_quote_ok": true,
+        "claims_ok": true,
+        "critical_claim_support_ok": true,
+        "equivalent_sets_ok": true,
+        "leak_ok": true,
+        "no_answer_ok": true,
+        "hard_negative_ok": true,
+        "details": [
+          {
+            "name": "schema",
+            "passed": true,
+            "detail": null
+          },
+          {
+            "name": "snapshot_hash",
+            "passed": true,
+            "detail": null
+          },
+          {
+            "name": "offset_quote",
+            "passed": true,
+            "detail": null
+          },
+          {
+            "name": "claims",
+            "passed": true,
+            "detail": null
+          },
+          {
+            "name": "critical_claim_support",
+            "passed": true,
+            "detail": null
+          },
+          {
+            "name": "equivalent_sets",
+            "passed": true,
+            "detail": null
+          },
+          {
+            "name": "leak",
+            "passed": true,
+            "detail": null
+          },
+          {
+            "name": "no_answer",
+            "passed": true,
+            "detail": null
+          },
+          {
+            "name": "hard_negative",
+            "passed": true,
+            "detail": null
+          }
+        ]
+      },
+      "fixture_hash": "4ee13f3f4dd97b27a625e176bb2229083594a0c57b9eb30635792e736ea4619f",
+      "signature": "9d54e86dd2e1d558d82ece570713c743c0f4e0110b6cfdc86b7ebf789ebfa435",
+      "status": "frozen",
+      "parent_case_id": null,
+      "attempt": 0,
+      "regeneration_reason": null,
+      "gold_chunk_db_ids": null
+    }
+  ],
+  "suite_hash": "c7cac226578fd3412350f110acaeb2a9b8ea967ae662ed69c058fcda55f4c8e0",
+  "signature": "e1577232a9c88a943400b762ab869cd239ebc6e95c5306c960b97af8d0e3b56a"
+}
