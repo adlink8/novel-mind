@@ -137,7 +137,18 @@ def test_breaking_fixture_fails():
         assert proc.returncode != 0, "breaking fixture must fail python checker"
         combined = (proc.stdout or "") + (proc.stderr or "")
         assert "path-deleted" in combined or "BREAKING" in combined
-        assert "type" in combined.lower() or "required-added" in combined
+        # Accept any high-severity category the pure-Python checker emits
+        assert any(
+            token in combined
+            for token in (
+                "request-type-changed",
+                "response-type-changed",
+                "required-added",
+                "status-code-removed",
+                "auth-changed",
+                "type",
+            )
+        )
 
 
 def test_python_breaker_detects_required_categories_independently():

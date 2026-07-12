@@ -38,11 +38,11 @@
 | v0.1 审计与启动修复 | 3/3 | Complete |
 | v0.2 安全与架构修复 | 3/3 | Complete |
 | v0.3 小说导入 + RAG 索引 | 4/5 | **Gaps Found** |
-| v0.5 自动质量与 CI 门禁 | 5/7 | Executing |
+| v0.5 自动质量与 CI 门禁 | 7/7 | **Complete** |
 
 ## Auto Start
 
-当前没有可自动执行的 plan。下一步需要人工校准 gold chunks 并确认评测题，完成后再运行三策略评测和关闭审计缺口。
+Phase 06 (v0.5 自动质量与 CI 门禁) 已完成。当前没有可自动执行的 plan。v0.3 评测质量缺口由自动 qualification 路径替代日常人工逐题确认；legacy gold 校准仍为可选迁移工作。
 
 ## Backlog
 

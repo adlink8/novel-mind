@@ -4,7 +4,7 @@
   "last_completed_milestone": "v0.2 - 安全与架构修复",
   "active_phase": "06-automated-quality-ci",
   "active_plan": null,
-  "status": "planned",
+  "status": "phase_complete",
   "canonical_dir": ".planning",
   "auto_start": null,
   "documentation_ownership": {
