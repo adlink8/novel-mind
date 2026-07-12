@@ -2,15 +2,14 @@
 gsd_state_version: 1.0
 milestone: v0.5
 milestone_name: Automated Quality and CI Gates
-status: planned
-last_updated: 2026-07-12T03:41:10.690Z
+status: executing
+last_updated: "2026-07-12T17:20:00.000Z"
 progress:
-  total_phases: 1
-  completed_phases: 0
-  total_plans: 7
-  completed_plans: 0
-  percent: 0
-stopped_at: Phase 6 planned; implementation explicitly not started
+  total_phases: 5
+  completed_phases: 2
+  total_plans: 17
+  completed_plans: 14
+  percent: 42
 ---
 
 # Project State
@@ -24,14 +23,13 @@ See `.planning/PROJECT.md` and `IMPLEMENTATION-STATUS.md`。<br>
 
 ## Current Position
 
-Phase: 06 (automated-quality-ci) — PLANNED
-Plan: 0 of 7 executed
+Phase: 06 (automated-quality-ci) — EXECUTING
+Plan: 2 of 7 (06-01 COMPLETE)
 
-- Milestone: **v0.3 - 小说导入 + RAG 索引** — GAPS FOUND
-- Phase: 03-01 RAG 评测集与自动化检索优化闭环 — PARTIAL
+- Milestone: **v0.5 - 自动质量与 CI 门禁**
 - Current branch: `feat/phase2-wave2-embedding`
-- Status: Phase 06 planning complete; no implementation, test execution, migration, build, CI run, or live model call has started.
-- Last activity: 2026-07-12 — Planned automated test/CI closure and dual-model RAG quality qualification in seven dependency-ordered plans.
+- Status: 06-01 complete — test taxonomy, fail-closed live semantics, coverage/timeout/flake policy locked and verified.
+- Last activity: 2026-07-12 — Executed 06-01 (classification + quality policy foundation).
 
 ## Auto Routing
 
@@ -138,5 +136,5 @@ Phase 06 is ready for plan verification and later explicit execution. Auto-start
 ### Session
 
 - Last session: 2026-07-12
-- Stopped At: Phase 06 GSD planning only; implementation not started
-- Resume File: None
+- Stopped At: Phase 06 plan 06-01 COMPLETE; next is 06-02 (PostgreSQL/Chroma services)
+- Resume File: `.planning/phases/06-automated-quality-ci/06-02-PLAN.md` (when started)
