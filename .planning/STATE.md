@@ -24,12 +24,12 @@ See `.planning/PROJECT.md` and `IMPLEMENTATION-STATUS.md`.<br>
 ## Current Position
 
 Phase: 06 (automated-quality-ci) — EXECUTING
-Plan: 6 of 7 (06-01..06-05 COMPLETE)
+Plan: 7 of 7 (06-01..06-06 COMPLETE; 06-07 pending)
 
 - Milestone: **v0.5 - 自动质量与 CI 门禁**
 - Current branch: `feat/phase2-wave2-embedding`
-- Status: 06-05 complete — OpenAPI contract, frontend eval/quality consumer tests, Playwright desktop+390px.
-- Last activity: 2026-07-12 — Executed 06-05 (OpenAPI + frontend + Playwright).
+- Status: 06-06 complete — unified CI producer DAG, fork safety, artifacts/retention, nightly baseline/alert.
+- Last activity: 2026-07-12 — Executed 06-06 (ci.yml + policy scripts + 49 CI tests).
 
 ## Auto Routing
 
@@ -110,14 +110,22 @@ Phase 06 is ready for plan verification and later explicit execution. Auto-start
 - Live dual-model test: Ollama outage → `blocked_dependency`, metrics=null
 - Tests: 16 scoring + 2 live + 31 worker/api/service
 
+### 06-06 COMPLETE
+
+- Unified `.github/workflows/ci.yml` producer DAG; legacy workflows disabled (no push/PR triggers)
+- Fork-safe: no pull_request_target; secret/self-hosted/write jobs gated off PR
+- Timeouts D-16; artifact retention D-17; isolated alert job D-18
+- Nightly self-hosted dual-model + signed promote-baseline (passed/qualified only)
+- actionlint v1.7.12 clean; pytest tests/ci → 49 passed
+
 ## Open Work
 
 - pgvector 双写备用路径
 - 大文件（>5MB）流式上传
-- 端到端 CI/CD 集成测试 (remaining 06-05..06-07)
+- 端到端 CI/CD 集成测试 (remaining 06-07 ci-gate + branch protection)
 - 将 90 条 candidate 完成人工确认/驳回，达到 100 条高质量 confirmed 的 issue 门槛
 - 校准 gold_chunks；当前 6 次运行 Recall/Precision/MRR/NDCG 均为 0
 
 ## Next Action
 
-Execute **06-05** (OpenAPI, frontend/component, Playwright) when scheduled. Do not auto-start.
+Execute **06-07** (ci-gate aggregate, branch protection, release gate) when scheduled. Do not auto-start.

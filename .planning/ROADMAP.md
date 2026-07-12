@@ -89,7 +89,7 @@ Plans:
 **Goal:** 补齐后端、前端、数据库、向量库、API、浏览器和 live AI 的自动化验证，并以冻结证据、双模型仲裁和确定性规则建立无需日常人工逐题确认的 RAG 质量门禁。
 **Requirements:** REQ-AUTO-01..10
 **Depends on:** Phase 3, Phase 5
-**Status:** Executing (06-01, 06-02 complete)
+**Status:** Executing (06-01..06-06 complete; 06-07 pending)
 **Plans:** 7 plans
 
 Plans:
@@ -97,6 +97,6 @@ Plans:
 - [x] 06-02 PostgreSQL and Chroma integration matrix
 - [x] 06-03 frozen fixtures, adversarial gates, and Judge calibration
 - [x] 06-04 RAG scoring, durable worker, and Eval API compatibility
-- [ ] 06-05 API contracts, frontend components, and browser journeys
-- [ ] 06-06 unified CI producer DAG, security, artifacts, and nightly qualification
+- [x] 06-05 API contracts, frontend components, and browser journeys
+- [x] 06-06 unified CI producer DAG, security, artifacts, and nightly qualification
 - [ ] 06-07 ci-gate aggregation, branch protection, and release gate
