@@ -3,6 +3,8 @@
 from pathlib import Path
 
 import pytest
+
+pytestmark = pytest.mark.unit
 from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession

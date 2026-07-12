@@ -6,6 +6,8 @@
 """
 
 import pytest
+
+pytestmark = pytest.mark.unit
 from httpx import AsyncClient
 
 

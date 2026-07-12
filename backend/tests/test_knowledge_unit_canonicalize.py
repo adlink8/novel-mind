@@ -1,5 +1,9 @@
 """Conservative canonicalization and lifecycle tests."""
 
+import pytest
+
+pytestmark = pytest.mark.unit
+
 from sqlalchemy import select
 
 from app.models.knowledge_unit import NarrativeUnit

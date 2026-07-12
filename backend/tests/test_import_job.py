@@ -14,6 +14,8 @@
 """
 
 import pytest
+
+pytestmark = pytest.mark.unit
 from datetime import datetime, timedelta, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 

@@ -7,6 +7,9 @@ from pathlib import Path
 
 import pytest
 
+# CLI subprocess smoke needs more than unit (5s) budget; classify as integration (30s).
+pytestmark = pytest.mark.integration
+
 BACKEND = Path(__file__).parents[1]
 SCRIPTS = (
     "build_narrative_units.py",

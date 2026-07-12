@@ -19,6 +19,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+pytestmark = pytest.mark.unit
+
 # 在 import vector_store 之前，mock 掉 chromadb 模块
 # 这样即使没有安装 chromadb 也能运行测试
 _mock_chromadb = MagicMock()

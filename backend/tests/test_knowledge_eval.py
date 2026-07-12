@@ -1,5 +1,9 @@
 """Offline knowledge graph fixture evaluation tests."""
 
+import pytest
+
+pytestmark = pytest.mark.unit
+
 import json
 import subprocess
 import sys

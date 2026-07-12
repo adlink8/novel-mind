@@ -8,6 +8,8 @@ from sqlalchemy import select
 
 import pytest
 
+pytestmark = pytest.mark.unit
+
 from app.models.knowledge_unit import (
     NarrativeActivePointer,
     NarrativeIndexBuild,
@@ -112,6 +114,7 @@ async def test_active_scope_fails_closed_and_selects_one_of_multiple_pointers(
     )
 
 
+@pytest.mark.integration
 def test_scoped_active_reconcile_subprocess_contract():
     result = subprocess.run(
         [

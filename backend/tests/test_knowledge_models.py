@@ -6,6 +6,8 @@ JSON persistence, strict Pydantic schemas, and evidence-first constraints.
 """
 
 import pytest
+
+pytestmark = pytest.mark.unit
 from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError

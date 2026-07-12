@@ -4,6 +4,8 @@ import json
 from types import SimpleNamespace
 
 import pytest
+
+pytestmark = pytest.mark.unit
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 

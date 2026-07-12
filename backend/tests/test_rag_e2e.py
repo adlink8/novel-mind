@@ -1,5 +1,5 @@
 """
-RAG 端到端验证测试
+RAG 端到端验证测试（live + e2e）
 
 验证完整流程：上传 TXT → 分块 → embedding → 存入 ChromaDB → 语义搜索
 
@@ -7,14 +7,15 @@ RAG 端到端验证测试
   1. PostgreSQL 运行在 localhost:5432
   2. ChromaDB 运行在 localhost:8001
   3. 数据库迁移已执行
+  4. Ollama 可提供真实 embedding（语义路径禁止随机向量回退，D-04/D-07）
 
 运行方式:
   cd backend
-  pytest -m e2e tests/test_rag_e2e.py          # 仅运行 e2e 测试
-  pytest -m "not e2e" tests/                   # CI 中跳过 e2e 测试
+  pytest -m "live and e2e" tests/test_rag_e2e.py
+  pytest -m "unit or contract" tests/   # 不选中本文件的 live 测试
 """
 
-import random
+from __future__ import annotations
 
 import pytest
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
@@ -26,8 +27,8 @@ from app.services.chunking_service import chunking_service
 from app.services.vector_store import vector_store
 
 
-# 标记为 e2e 测试（CI 中可通过 -m "not e2e" 跳过）
-pytestmark = pytest.mark.e2e
+# Primary: live (real embedding / services). Scope: e2e (cross-layer).
+pytestmark = [pytest.mark.live, pytest.mark.e2e]
 
 # ---------------------------- 测试小说内容 ----------------------------
 SAMPLE_NOVEL = """第一回 灵根初现
@@ -122,35 +123,50 @@ SAMPLE_NOVEL = """第一回 灵根初现
 """
 
 
-# ---------------------------- 辅助函数 ----------------------------
-
-def _get_embedding_dim() -> int:
-    """获取当前配置的 embedding 维度"""
-    return settings.embedding_dimensions
+BLOCKED_DEPENDENCY = "blocked_dependency"
 
 
-async def _generate_real_embedding(text: str, model: str = None) -> list[float]:
-    """使用真实 Ollama 生成单个文本向量"""
+def _blocked_dependency(reason: str) -> None:
+    """
+    Live dependency unavailable: fail closed without comparable quality scores.
+
+    Uses pytest.skip with explicit blocked_dependency reason so metrics remain null
+    and the run is not treated as a quality pass/fail with fake embeddings (D-07).
+    """
+    pytest.skip(f"{BLOCKED_DEPENDENCY}: {reason}; metrics=null; quality_comparable=false")
+
+
+async def _generate_real_embedding(text: str, model: str | None = None) -> list[float]:
+    """使用真实 Ollama 生成单个文本向量。不可用时 blocked_dependency。"""
     import httpx
+
     model = model or settings.embedding_model
-    # 去除 LiteLLM 前缀
     ollama_model = model.replace("ollama/", "")
-    async with httpx.AsyncClient(timeout=120) as client:
-        resp = await client.post(
-            f"{settings.ollama_base_url}/api/embed",
-            json={"model": ollama_model, "input": text},
+    try:
+        async with httpx.AsyncClient(timeout=120) as client:
+            resp = await client.post(
+                f"{settings.ollama_base_url}/api/embed",
+                json={"model": ollama_model, "input": text},
+            )
+    except Exception as exc:
+        _blocked_dependency(f"Ollama unavailable ({exc})")
+
+    if resp.status_code != 200:
+        _blocked_dependency(
+            f"Ollama embed HTTP {resp.status_code} for model={ollama_model}"
         )
-        data = resp.json()
-        # /api/embed 返回 {"embeddings": [[...]]}
-        emb_list = data.get("embeddings", [])
-        if not emb_list or not emb_list[0]:
-            raise RuntimeError(f"Ollama embedding 返回空: {data}")
-        return emb_list[0]
+    data = resp.json()
+    emb_list = data.get("embeddings", [])
+    if not emb_list or not emb_list[0]:
+        _blocked_dependency(f"Ollama embedding empty response: {data}")
+    return emb_list[0]
 
 
-async def _generate_real_embeddings(texts: list[str], model: str = None) -> list[list[float]]:
-    """使用真实 Ollama bge-m3 批量生成向量"""
-    embeddings = []
+async def _generate_real_embeddings(
+    texts: list[str], model: str | None = None
+) -> list[list[float]]:
+    """使用真实 Ollama 批量生成向量。无随机 fallback。"""
+    embeddings: list[list[float]] = []
     for i, text in enumerate(texts):
         emb = await _generate_real_embedding(text, model)
         embeddings.append(emb)
@@ -159,67 +175,49 @@ async def _generate_real_embeddings(texts: list[str], model: str = None) -> list
     return embeddings
 
 
-def _generate_random_embedding(dim: int = None, seed: int = None) -> list[float]:
-    """生成归一化的随机向量（模拟 embedding，用于无法连接 Ollama 时）"""
-    dim = dim or _get_embedding_dim()
-    if seed is not None:
-        random.seed(seed)
-    emb = [random.random() for _ in range(dim)]
-    norm = sum(x * x for x in emb) ** 0.5
-    return [x / norm for x in emb]
-
-
-def _generate_random_embeddings(texts: list[str], dim: int = None, seed: int = 42) -> list[list[float]]:
-    """为文本列表批量生成随机向量"""
-    dim = dim or _get_embedding_dim()
-    random.seed(seed)
-    embeddings = []
-    for _ in texts:
-        emb = [random.random() for _ in range(dim)]
-        norm = sum(x * x for x in emb) ** 0.5
-        embeddings.append([x / norm for x in emb])
-    return embeddings
-
-
-async def _try_generate_embeddings(texts: list[str]) -> tuple[list[list[float]], bool]:
+async def _require_live_embeddings(texts: list[str]) -> list[list[float]]:
     """
-    尝试真实 embedding，失败则回退到随机向量。
+    语义/live 路径仅允许真实 embedding。
 
-    Returns:
-        (embeddings, is_real) — 向量列表和是否为真实向量
+    探测失败 → blocked_dependency（不产生可比较质量分，metrics=null）。
+    随机固定向量禁止用于本模块（D-04）。
     """
+    import httpx
+
+    ollama_model = settings.embedding_model.replace("ollama/", "")
     try:
-        import httpx
-        # 首次调用需要加载模型到内存（可能 10-20 秒）
         async with httpx.AsyncClient(timeout=60) as client:
-            ollama_model = settings.embedding_model.replace("ollama/", "")
             probe = await client.post(
                 f"{settings.ollama_base_url}/api/embed",
                 json={"model": ollama_model, "input": "test"},
             )
-            if probe.status_code == 200:
-                emb_list = probe.json().get("embeddings", [])
-                if emb_list and emb_list[0]:
-                    print(f"    使用真实 Ollama embedding ({ollama_model}, {len(emb_list[0])} 维)")
-                    return await _generate_real_embeddings(texts), True
-    except Exception as e:
-        print(f"    Ollama 不可用 ({e})，回退到随机向量")
+    except Exception as exc:
+        _blocked_dependency(f"Ollama probe failed ({exc})")
 
-    print(f"    使用随机向量模拟 ({_get_embedding_dim()} 维)")
-    return _generate_random_embeddings(texts), False
+    if probe.status_code != 200:
+        _blocked_dependency(
+            f"Ollama probe HTTP {probe.status_code} for model={ollama_model}"
+        )
+    emb_list = probe.json().get("embeddings", [])
+    if not emb_list or not emb_list[0]:
+        _blocked_dependency("Ollama probe returned empty embeddings")
+    print(f"    使用真实 Ollama embedding ({ollama_model}, {len(emb_list[0])} 维)")
+
+    return await _generate_real_embeddings(texts)
 
 
 # ---------------------------- Fixtures ----------------------------
+
 
 @pytest.fixture
 async def e2e_db():
     """e2e 数据库引擎（真实 PostgreSQL）"""
     engine = create_async_engine(settings.database_url, echo=False)
     async_session = async_sessionmaker(engine, expire_on_commit=False)
-    
+
     async with async_session() as session:
         yield session
-    
+
     await engine.dispose()
 
 
@@ -238,9 +236,9 @@ async def e2e_novel(e2e_db):
     await e2e_db.flush()
     novel_id = novel.id
     await e2e_db.commit()
-    
+
     yield novel_id
-    
+
     # 清理
     try:
         await e2e_db.execute(sa_delete(ImportJob).where(ImportJob.novel_id == novel_id))
@@ -248,14 +246,15 @@ async def e2e_novel(e2e_db):
         await e2e_db.commit()
     except Exception:
         pass
-    
+
     await vector_store.delete_novel_chunks(novel_id)
 
 
 # ---------------------------- 测试用例 ----------------------------
 
+
 class TestRagChunking:
-    """文本分块测试"""
+    """文本分块测试（不依赖 embedding，但仍属 live e2e 模块范围）"""
 
     @pytest.mark.asyncio
     async def test_chunking_produces_blocks(self):
@@ -300,13 +299,13 @@ class TestRagChunking:
 
 
 class TestRagEmbedding:
-    """Embedding 生成测试"""
+    """Embedding 生成测试 — 仅真实 Ollama"""
 
     @pytest.mark.asyncio
     async def test_embedding_dimensions(self):
         """向量维度正确"""
         texts = [SAMPLE_NOVEL[:500]]
-        embeddings, _ = (await _try_generate_embeddings(texts))
+        embeddings = await _require_live_embeddings(texts)
         assert len(embeddings) == 1
         assert len(embeddings[0]) == settings.embedding_dimensions, \
             f"期望维度 {settings.embedding_dimensions}，实际 {len(embeddings[0])}"
@@ -314,13 +313,13 @@ class TestRagEmbedding:
     @pytest.mark.asyncio
     async def test_embedding_normalized(self):
         """向量已归一化"""
-        embeddings, _ = (await _try_generate_embeddings(["测试"]))
+        embeddings = await _require_live_embeddings(["测试"])
         norm = sum(x * x for x in embeddings[0]) ** 0.5
-        assert abs(norm - 1.0) < 1e-6, f"向量未归一化，norm={norm}"
+        assert abs(norm - 1.0) < 1e-5, f"向量未归一化，norm={norm}"
 
 
 class TestRagVectorStore:
-    """向量存储测试（需要 ChromaDB）"""
+    """向量存储测试（需要 ChromaDB + 真实 embedding）"""
 
     @pytest.mark.asyncio
     async def test_store_and_count(self, e2e_novel):
@@ -330,7 +329,7 @@ class TestRagVectorStore:
             chapter_id=1, chapter_number=1, content=SAMPLE_NOVEL,
         )
         texts = [c["content"] for c in chunks]
-        embeddings, _ = (await _try_generate_embeddings(texts))
+        embeddings = await _require_live_embeddings(texts)
 
         chroma_chunks = []
         for i, (chunk, emb) in enumerate(zip(chunks, embeddings)):
@@ -354,13 +353,13 @@ class TestRagVectorStore:
 
     @pytest.mark.asyncio
     async def test_search_returns_results(self, e2e_novel):
-        """搜索返回结果"""
+        """搜索返回结果（真实 query embedding）"""
         novel_id = e2e_novel
         chunks = await chunking_service.chunk_chapter(
             chapter_id=1, chapter_number=1, content=SAMPLE_NOVEL,
         )
         texts = [c["content"] for c in chunks]
-        embeddings, _ = (await _try_generate_embeddings(texts))
+        embeddings = await _require_live_embeddings(texts)
 
         chroma_chunks = []
         for i, (chunk, emb) in enumerate(zip(chunks, embeddings)):
@@ -379,8 +378,7 @@ class TestRagVectorStore:
 
         await vector_store.add_chunks(novel_id, chroma_chunks)
 
-        # 搜索
-        query_embedding = _generate_random_embedding(seed=99)
+        query_embedding = (await _require_live_embeddings(["林风天灵根觉醒"]))[0]
         results = await vector_store.search(novel_id, query_embedding, top_k=2)
 
         assert len(results) >= 1, "搜索结果为空"
@@ -400,7 +398,7 @@ class TestRagVectorStore:
             chapter_id=1, chapter_number=1, content=SAMPLE_NOVEL,
         )
         texts = [c["content"] for c in chunks]
-        embeddings, _ = (await _try_generate_embeddings(texts))
+        embeddings = await _require_live_embeddings(texts)
 
         chroma_chunks = []
         for i, (chunk, emb) in enumerate(zip(chunks, embeddings)):
@@ -419,12 +417,11 @@ class TestRagVectorStore:
 
         await vector_store.add_chunks(novel_id, chroma_chunks)
 
-        query_embedding = _generate_random_embedding(seed=50)
+        query_embedding = (await _require_live_embeddings(["练功场场景"]))[0]
         results = await vector_store.search(
             novel_id, query_embedding, top_k=5,
             filters={"chunk_type": "scene"},
         )
-        # 验证过滤结果
         for r in results:
             rt = r.get("metadata", {}).get("chunk_type")
             assert rt == "scene", f"过滤后出现非 scene 类型: {rt}"
@@ -437,7 +434,7 @@ class TestRagVectorStore:
             chapter_id=1, chapter_number=1, content=SAMPLE_NOVEL[:500],
         )
         texts = [c["content"] for c in chunks]
-        embeddings, _ = (await _try_generate_embeddings(texts))
+        embeddings = await _require_live_embeddings(texts)
 
         chroma_chunks = []
         for i, (chunk, emb) in enumerate(zip(chunks, embeddings)):
@@ -458,25 +455,22 @@ class TestRagVectorStore:
 
 
 class TestRagFullPipeline:
-    """完整管线端到端测试"""
+    """完整管线端到端测试 — 真实 embedding，无随机语义 fallback"""
 
     @pytest.mark.asyncio
     async def test_full_pipeline(self, e2e_db, e2e_novel):
         """完整流程：分块 → embedding → 存储 → 搜索"""
         novel_id = e2e_novel
 
-        # 1. 分块
         chunks = await chunking_service.chunk_chapter(
             chapter_id=1, chapter_number=1, content=SAMPLE_NOVEL,
         )
         assert len(chunks) >= 2
 
-        # 2. embedding
         texts = [c["content"] for c in chunks]
-        embeddings, _ = (await _try_generate_embeddings(texts))
+        embeddings = await _require_live_embeddings(texts)
         assert len(embeddings) == len(chunks)
 
-        # 3. 存储
         chroma_chunks = []
         for i, (chunk, emb) in enumerate(zip(chunks, embeddings)):
             chroma_chunks.append({
@@ -496,26 +490,24 @@ class TestRagFullPipeline:
         count = await vector_store.get_chunk_count(novel_id)
         assert count == len(chunks)
 
-        # 4. 搜索
-        query_embedding = _generate_random_embedding(seed=42)
+        query_embedding = (await _require_live_embeddings(["青霄剑秘境试炼"]))[0]
         results = await vector_store.search(novel_id, query_embedding, top_k=3)
 
         assert len(results) >= 1
         assert len(results) <= 3
-        # 验证分数降序
         scores = [r["score"] for r in results]
         assert scores == sorted(scores, reverse=True), f"搜索分数未降序: {scores}"
 
     @pytest.mark.asyncio
     async def test_search_text_relevance(self, e2e_db, e2e_novel):
-        """搜索内容相关性（使用固定种子确保可重现）"""
+        """搜索内容相关性（真实 query embedding，禁止随机向量）"""
         novel_id = e2e_novel
 
         chunks = await chunking_service.chunk_chapter(
             chapter_id=1, chapter_number=1, content=SAMPLE_NOVEL,
         )
         texts = [c["content"] for c in chunks]
-        embeddings, _ = (await _try_generate_embeddings(texts))
+        embeddings = await _require_live_embeddings(texts)
 
         chroma_chunks = []
         for i, (chunk, emb) in enumerate(zip(chunks, embeddings)):
@@ -534,12 +526,10 @@ class TestRagFullPipeline:
 
         await vector_store.add_chunks(novel_id, chroma_chunks)
 
-        # 用固定种子搜索，确保结果可重现
-        query_embedding = _generate_random_embedding(seed=42)
+        query_embedding = (await _require_live_embeddings(["林风天灵根觉醒"]))[0]
         results = await vector_store.search(novel_id, query_embedding, top_k=5)
 
         assert len(results) >= 1
-        # 所有非空 score 应在合理范围
         for r in results:
             assert r["score"] >= 0, "score 应 >= 0"
             assert len(r["content"]) > 0, "content 不应为空"

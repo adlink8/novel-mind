@@ -1,6 +1,8 @@
 """Deterministic gate tests for knowledge relation judgments."""
 
 import pytest
+
+pytestmark = pytest.mark.unit
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 

@@ -19,6 +19,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+pytestmark = pytest.mark.unit
+
 # mock 掉 chromadb，避免未安装时 import 失败
 _mock_chromadb = MagicMock()
 sys.modules.setdefault("chromadb", _mock_chromadb)

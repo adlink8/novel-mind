@@ -1,5 +1,9 @@
 """Candidate package tests for the knowledge graph middle layer."""
 
+import pytest
+
+pytestmark = pytest.mark.unit
+
 from app.services.knowledge.candidates import (
     CandidateRecallConfig,
     CandidateRecallService,

@@ -1,6 +1,8 @@
 """Projection tests for accepted knowledge graph judgments."""
 
 import pytest
+
+pytestmark = pytest.mark.unit
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 

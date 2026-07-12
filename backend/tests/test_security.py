@@ -6,6 +6,8 @@ import socket
 from unittest.mock import AsyncMock
 
 import pytest
+
+pytestmark = pytest.mark.unit
 from fastapi import HTTPException
 from httpx import AsyncClient
 from pydantic import ValidationError

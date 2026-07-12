@@ -1,5 +1,9 @@
 """Narrative unit/chunk retrieval mode and API boundary parity tests."""
 
+import pytest
+
+pytestmark = pytest.mark.unit
+
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 

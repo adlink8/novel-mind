@@ -1,0 +1,58 @@
+# NovelMind automated quality policy (Phase 06-01)
+# Locked decisions: D-04, D-09, D-10, D-16
+# Fail closed: missing fields, critical glob zero hits, low coverage, flake > 0 on PR
+
+version: 1
+
+tools:
+  pytest_cov: "7.1.0"
+  pytest_timeout: "2.4.0"
+  vitest: "4.1.10"
+  vitest_coverage_v8: "4.1.10"
+
+coverage:
+  backend:
+    overall:
+      line: 80
+      branch: 70
+    critical:
+      line: 90
+      branch: 85
+      # auth / security / import / promotion / rollback
+      globs:
+        - "app/core/security.py"
+        - "app/core/crypto.py"
+        - "app/core/url_security.py"
+        - "app/api/auth.py"
+        - "app/api/dependencies.py"
+        - "app/services/import_service.py"
+        - "app/services/knowledge_units/promotion.py"
+        - "app/services/knowledge_units/rollback.py"
+  frontend:
+    overall:
+      line: 75
+      branch: 65
+    critical:
+      line: 85
+      branch: 75
+      # hooks / store / API client
+      globs:
+        - "src/hooks/**"
+        - "src/stores/**"
+        - "src/lib/api.ts"
+        - "src/lib/**/api*.ts"
+  diff_coverage:
+    minimum: 90
+
+timeouts:
+  unit: 5
+  contract: 15
+  integration: 30
+  browser: 60
+  live: 180
+
+flake:
+  pr_max: 0
+  external_infra:
+    max_retry: 1
+    save_first_failure_evidence: true

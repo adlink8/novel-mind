@@ -6,6 +6,8 @@ from types import SimpleNamespace
 
 import pytest
 
+pytestmark = pytest.mark.unit
+
 from app.services.knowledge_units.eval import (
     NarrativeEvalError,
     evaluate_candidate,

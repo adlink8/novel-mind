@@ -3,6 +3,8 @@
 from sqlalchemy import func, select
 import pytest
 
+pytestmark = pytest.mark.unit
+
 from app.models.knowledge import KnowledgeRelationJudgment
 from app.models.knowledge_unit import (
     NarrativeIndexBuild,

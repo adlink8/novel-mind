@@ -1,5 +1,9 @@
 """Narrative unit materialization tests."""
 
+import pytest
+
+pytestmark = pytest.mark.unit
+
 from sqlalchemy import select
 
 from app.models.knowledge import (

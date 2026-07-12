@@ -1,6 +1,8 @@
 """Prepare/commit promotion journal tests."""
 
 import pytest
+
+pytestmark = pytest.mark.unit
 from sqlalchemy import select
 
 from app.models.knowledge_unit import NarrativeActivePointer, NarrativePromotionJournal

@@ -15,6 +15,8 @@ NovelService 单元测试
 import io
 
 import pytest
+
+pytestmark = pytest.mark.unit
 from fastapi import UploadFile
 
 from app.services.novel_service import novel_service

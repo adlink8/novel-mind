@@ -24,6 +24,8 @@ import io
 import os
 
 import pytest
+
+pytestmark = pytest.mark.unit
 from fastapi import UploadFile
 from httpx import AsyncClient
 

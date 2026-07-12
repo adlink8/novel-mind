@@ -18,6 +18,8 @@ import sys
 from unittest.mock import patch, AsyncMock, MagicMock
 
 import pytest
+
+pytestmark = pytest.mark.unit
 from httpx import AsyncClient
 
 # mock 掉 chromadb，避免未连接时 import 失败

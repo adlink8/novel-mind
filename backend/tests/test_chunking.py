@@ -17,6 +17,8 @@ ChunkingService 单元测试
 
 import pytest
 
+pytestmark = pytest.mark.unit
+
 from app.services.chunking_service import ChunkingService, Chapter
 
 

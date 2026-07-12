@@ -16,6 +16,8 @@ AI 模型配置 API 测试
 """
 
 import pytest
+
+pytestmark = pytest.mark.unit
 from httpx import AsyncClient
 
 

@@ -1,5 +1,9 @@
 """Immutable narrative candidate index tests."""
 
+import pytest
+
+pytestmark = pytest.mark.unit
+
 from sqlalchemy import select
 
 from app.models.knowledge_unit import NarrativeIndexBuild, NarrativeUnit
