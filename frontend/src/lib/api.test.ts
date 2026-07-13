@@ -110,8 +110,10 @@ describe("API 客户端", () => {
 
   describe("占位端点 API", () => {
     it("analysisApi.analyze 调用 POST /analysis/:id/analyze", async () => {
-      await analysisApi.analyze("1");
-      expect(mockPost).toHaveBeenCalledWith("/analysis/1/analyze");
+      await analysisApi.analyze("1", { analysis_type: "plot_summary" });
+      expect(mockPost).toHaveBeenCalledWith("/analysis/1/analyze", {
+        analysis_type: "plot_summary",
+      });
     });
 
     it("timelineApi.extractTimeline 调用 POST /timeline/:id/extract", async () => {

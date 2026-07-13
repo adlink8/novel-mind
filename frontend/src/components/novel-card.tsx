@@ -22,11 +22,12 @@ import {
   Trash2,
   LoaderCircle,
 } from "lucide-react";
-import type { Novel } from "@/lib/api";
+import { analysisApi, type Novel } from "@/lib/api";
 
 interface NovelCardProps {
   novel: Novel;
   onDelete?: (id: number) => Promise<void> | void;
+  onAnalyzed?: () => void;
 }
 
 /** 状态展示：导入 / 索引 / 分析 */
@@ -93,11 +94,38 @@ function formatWordCount(count: number): string {
   return `${count}字`;
 }
 
-export function NovelCard({ novel, onDelete }: NovelCardProps) {
+export function NovelCard({ novel, onDelete, onAnalyzed }: NovelCardProps) {
   const [deleting, setDeleting] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analyzeMsg, setAnalyzeMsg] = useState<string | null>(null);
   const meta = statusMeta(novel.status);
   const indexed = (novel.chunk_count ?? 0) > 0;
   const analyzed = novel.status === "analyzed";
+
+  const handleAnalyze = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (analyzing) return;
+    setAnalyzing(true);
+    setAnalyzeMsg(null);
+    try {
+      // Phase 07：先确保层级，再结构分析（LLM 可选，失败仍返回结构结果）
+      const res = await analysisApi.analyze(String(novel.id), {
+        analysis_type: "plot_summary",
+        use_llm: true,
+        rebuild_hierarchy: !analyzed,
+      });
+      const data = res.data.result_data || {};
+      const scenes = (data.scene_count as number) ?? 0;
+      const llm = data.llm_enriched ? " · 已 LLM 精炼" : " · 结构分析";
+      setAnalyzeMsg(`完成：${scenes} 场景${llm}`);
+      onAnalyzed?.();
+    } catch (err) {
+      setAnalyzeMsg(err instanceof Error ? err.message : "分析失败");
+    } finally {
+      setAnalyzing(false);
+    }
+  };
 
   const handleDelete = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -174,8 +202,8 @@ export function NovelCard({ novel, onDelete }: NovelCardProps) {
               <span
                 title={
                   analyzed
-                    ? "已完成剧情/人物等 AI 分析"
-                    : "未做剧情分析（当前产品分析功能多为占位）"
+                    ? "已完成剧情/层级分析（Phase 07 场景结构）"
+                    : "未做分析：可点击「分析」基于 Phase 07 场景层级生成结构摘要"
                 }
                 className={`inline-flex h-5 items-center rounded-4xl px-2 text-xs font-medium ${
                   analyzed
@@ -197,9 +225,30 @@ export function NovelCard({ novel, onDelete }: NovelCardProps) {
                 {formatWordCount(novel.word_count)}
               </span>
             </div>
+            {analyzeMsg && (
+              <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">
+                {analyzeMsg}
+              </p>
+            )}
           </CardContent>
         </Card>
       </Link>
+
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        disabled={analyzing}
+        onClick={handleAnalyze}
+        className="absolute bottom-3 right-3 z-10 h-8 rounded-full border-white/40 bg-black/35 px-2.5 text-white backdrop-blur hover:bg-violet-600/90 hover:text-white"
+        title="Phase 07 场景层级剧情分析"
+      >
+        {analyzing ? (
+          <LoaderCircle className="size-3.5 animate-spin" />
+        ) : (
+          "分析"
+        )}
+      </Button>
 
       {onDelete && (
         <Button
