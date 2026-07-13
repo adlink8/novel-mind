@@ -1,15 +1,15 @@
 ---
 gsd_state_version: 1.0
-milestone: v0.5+phase07
-milestone_name: Automated Quality CI + Semantic Hierarchical Chunking
-status: idle
+milestone: v0.6
+milestone_name: Versioned Novel Analysis and Timeline
+status: planned
 last_updated: "2026-07-13T02:45:46.703Z"
 progress:
-  total_phases: 7
-  completed_phases: 4
-  total_plans: 30
-  completed_plans: 28
-  percent: 57
+  total_phases: 8
+  completed_phases: 7
+  total_plans: 37
+  completed_plans: 31
+  percent: 84
 ---
 
 # Project State
@@ -23,15 +23,15 @@ See `.planning/PROJECT.md` and `IMPLEMENTATION-STATUS.md`.
 
 ## Current Position
 
-**Phase 06 COMPLETE** (09/09) · **Phase 07 COMPLETE** (06/06)
+**Phase 08 PLANNED** (00/06) - ready to execute 08-01
 
 - Branch: `feat/phase2-wave2-embedding`
-- Last activity: 2026-07-13 — Phase 07 计划文档与需求追踪同步；实现与 88 项相关测试已落地
-- Verification: `.planning/phases/07-semantic-hierarchical-chunking/07-VERIFICATION.md`
+- Last activity: 2026-07-13 — Phase 08 SPEC/CONTEXT/RESEARCH/AI-SPEC/VALIDATION and six plans passed independent review
+- Plan directory: `.planning/phases/08-versioned-novel-analysis-orchestration-and-interactive-timel/`
 
 ## Auto Routing
 
-无进行中 plan。`auto_start` 关闭。下一动作为产品接线 residual 或合并/发版，而非新 phase 自动执行。
+下一动作为执行 Phase 08 Plan 01。`auto_start` 保持关闭，必须显式启动执行。
 
 ## Phase 06 (v0.5) — COMPLETE
 
