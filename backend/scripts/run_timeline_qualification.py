@@ -12,11 +12,16 @@ import asyncio
 import hashlib
 import json
 import math
+import sys
+import uuid
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, Iterable
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 DEFAULT_CORPUS = ROOT / "evals" / "timeline_fiction.v1.json"
 REQUIRED_TEST_COMMANDS = [
     "cd backend; pytest tests/unit/timeline tests/integration/timeline tests/adversarial/test_timeline_evidence.py -x",
@@ -417,13 +422,173 @@ async def _run_cli(args) -> dict[str, Any]:
     )
 
 
+class _ControlledE2ETransport:
+    def __init__(self, *, pause_on_second_extraction: bool = False) -> None:
+        self.pause_on_second_extraction = pause_on_second_extraction
+        self.extractions = 0
+
+    async def complete(self, **kwargs: Any) -> dict[str, Any]:
+        schema_name = kwargs["response_format"].__name__
+        if schema_name == "TimelineExtraction":
+            self.extractions += 1
+            if self.pause_on_second_extraction and self.extractions == 2:
+                raise ConnectionError("controlled partial checkpoint")
+            payload = json.loads(kwargs["messages"][1]["content"])
+            chapter_id = payload["scope"]["chapter_id"]
+            evidence = payload["evidence"][0]
+            first_chapter = evidence["source_start"] == 0
+            content = {
+                "events": [{
+                    "candidate_id": f"browser-event-{chapter_id}",
+                    "title": "第一批事件" if first_chapter else "后章隐藏事件",
+                    "description": evidence["text"], "event_type": "plot",
+                    "narrative_chapter_number": chapter_id, "narrative_index": 0,
+                    "participants": [{"mention": "林墨" if first_chapter else "顾遥", "entity_id": None}],
+                    "story_time": {"precision": "unknown"},
+                    "evidence": [{
+                        "chapter_id": chapter_id, "evidence_id": evidence["evidence_id"],
+                        "source_start": evidence["source_start"], "source_end": evidence["source_end"],
+                        "content_hash": evidence["content_hash"],
+                    }],
+                    "confidence": 0.95,
+                }],
+                "story_time_constraints": [],
+            }
+        else:
+            content = {"duplicate_groups": [], "story_constraints": [], "causal_edges": []}
+        return {
+            "id": f"browser-request-{uuid.uuid4().hex}", "content": json.dumps(content),
+            "usage": {"input_tokens": 20, "output_tokens": 10},
+        }
+
+
+def _controlled_e2e_runtime(sessions, transport):
+    from app.services.timeline.model_gateway import ModelDeployment, PostgresCallRepository, TimelineModelGateway
+    from app.services.timeline.worker import TimelineWorkerRuntime
+
+    deployment = lambda model: ModelDeployment(
+        "controlled", model, "e2e-r1", True, Decimal("1"), Decimal("2"),
+    )
+    return TimelineWorkerRuntime(
+        sessions=sessions,
+        gateway=TimelineModelGateway(transport, persistence=PostgresCallRepository(sessions)),
+        extraction_deployment=deployment("balanced-browser"),
+        reconciliation_deployment=deployment("quality-browser"),
+    )
+
+
+async def seed_browser_partial(username: str) -> dict[str, Any]:
+    """Seed Phase 07 evidence and stop the production worker after one chapter."""
+    from sqlalchemy import select
+
+    from app.core.database import async_session_factory
+    from app.models.analysis import AnalysisRun
+    from app.models.chunk_build import ChunkActivePointer, ChunkBuild, ChunkHierarchyNode
+    from app.models.novel import Chapter, Novel
+    from app.models.user import User
+    from app.services.timeline.worker import run_timeline_worker
+
+    unique = uuid.uuid4().hex
+    async with async_session_factory.begin() as session:
+        owner = await session.scalar(select(User).where(User.username == username))
+        if owner is None:
+            raise ValueError(f"browser owner {username!r} does not exist")
+        novel = Novel(owner_id=owner.id, title=f"真实时间线 {unique[:8]}", status="ready")
+        session.add(novel)
+        await session.flush()
+        chapters = [
+            Chapter(novel_id=novel.id, chapter_number=2, title="第二章", content="林墨在雨夜发现线索。"),
+            Chapter(novel_id=novel.id, chapter_number=9, title="第九章", content="顾遥在后章揭示真相。"),
+        ]
+        session.add_all(chapters)
+        await session.flush()
+        novel.reading_progress = {"chapter_id": chapters[0].id, "progress_percent": 100}
+        build = ChunkBuild(
+            build_id=f"browser-{unique}", novel_id=novel.id, status="active",
+            source_snapshot_hash=_sha256({"novel": novel.id, "source": unique}),
+            manifest_checksum=_sha256({"novel": novel.id, "hierarchy": unique}),
+            chunker_name="browser-e2e", chunker_version="1",
+            chunker_config_hash=_sha256("browser-e2e"), collection_name="browser-e2e",
+            is_candidate=False, immutable=True,
+        )
+        session.add(build)
+        session.add(ChunkActivePointer(novel_id=novel.id, build_id=build.build_id, committed_at=datetime.now(UTC)))
+        for index, chapter in enumerate(chapters):
+            session.add(ChunkHierarchyNode(
+                build_id=build.build_id, novel_id=novel.id,
+                node_id=f"browser-evidence-{chapter.id}", level="evidence",
+                chapter_id=chapter.id, chapter_number=chapter.chapter_number,
+                parent_id=f"browser-scene-{chapter.id}", child_ids=[], content=chapter.content,
+                content_hash=hashlib.sha256(chapter.content.encode()).hexdigest(),
+                source_start=index * 100, source_end=index * 100 + len(chapter.content),
+                chunk_type="paragraph", decision_lineage=[], order_index=index,
+            ))
+        run = AnalysisRun(owner_id=owner.id, novel_id=novel.id, status="pending", active_key="active")
+        session.add(run)
+        await session.flush()
+        run_id, novel_id = run.id, novel.id
+
+    runtime = _controlled_e2e_runtime(
+        async_session_factory, _ControlledE2ETransport(pause_on_second_extraction=True),
+    )
+    await run_timeline_worker(run_id, runtime=runtime)
+    async with async_session_factory.begin() as session:
+        run = await session.get(AnalysisRun, run_id, with_for_update=True)
+        if run.status != "paused_dependency" or run.progress.get("completed_chapters") != 1:
+            raise RuntimeError(f"controlled partial worker did not pause after one chapter: {run.status} {run.progress}")
+        # Browser first-entry still calls start-or-resume. Hold a valid lease so its
+        # production deployment cannot race the controlled provider checkpoint.
+        run.lease_id = "browser-partial-hold"
+        run.lease_expires_at = datetime.now(UTC) + timedelta(minutes=10)
+    return {"novel_id": novel_id, "run_id": run_id, "title": f"真实时间线 {unique[:8]}"}
+
+
+async def resume_browser_timeline(run_id: int) -> dict[str, Any]:
+    """Resume the same durable run with a controlled provider and promote it."""
+    from app.core.database import async_session_factory
+    from app.models.analysis import AnalysisRun
+    from app.models.timeline import TimelineActivePointer
+    from app.services.timeline.worker import run_timeline_worker
+    from sqlalchemy import select
+
+    async with async_session_factory.begin() as session:
+        run = await session.get(AnalysisRun, run_id, with_for_update=True)
+        if run is None:
+            raise ValueError(f"browser run {run_id} does not exist")
+        run.status = "pending"
+        run.status_reason = None
+        run.lease_id = None
+        run.lease_expires_at = None
+    runtime = _controlled_e2e_runtime(async_session_factory, _ControlledE2ETransport())
+    await run_timeline_worker(run_id, runtime=runtime)
+    async with async_session_factory() as session:
+        run = await session.get(AnalysisRun, run_id)
+        pointer = await session.scalar(select(TimelineActivePointer).where(
+            TimelineActivePointer.owner_id == run.owner_id,
+            TimelineActivePointer.novel_id == run.novel_id,
+        ))
+        if run.status != "completed" or pointer is None or pointer.version_id != run.version_id:
+            raise RuntimeError(f"browser run failed to promote: {run.status}")
+        return {"novel_id": run.novel_id, "run_id": run.id, "version_id": run.version_id}
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Phase 08 production timeline qualification")
-    parser.add_argument("--run-id", type=int, required=True)
-    parser.add_argument("--expectations", type=Path, required=True)
+    parser.add_argument("--run-id", type=int)
+    parser.add_argument("--expectations", type=Path)
+    parser.add_argument("--e2e-seed-user")
+    parser.add_argument("--e2e-resume-run", type=int)
     parser.add_argument("--out", type=Path)
     parser.add_argument("--format", choices=("json", "markdown"), default="json")
     args = parser.parse_args(argv)
+    if args.e2e_seed_user:
+        print("E2E_RESULT=" + json.dumps(asyncio.run(seed_browser_partial(args.e2e_seed_user))))
+        return 0
+    if args.e2e_resume_run is not None:
+        print("E2E_RESULT=" + json.dumps(asyncio.run(resume_browser_timeline(args.e2e_resume_run))))
+        return 0
+    if args.run_id is None or args.expectations is None:
+        parser.error("--run-id and --expectations are required for qualification")
     report = asyncio.run(_run_cli(args))
     rendered = render_markdown(report) if args.format == "markdown" else json.dumps(report, ensure_ascii=False, sort_keys=True, indent=2) + "\n"
     if args.out:

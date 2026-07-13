@@ -57,6 +57,13 @@ def test_release_gate_requires_signed_production_artifacts_and_test_commands(tmp
     assert all(verdict["checks"].values()), verdict
 
 
+def test_real_browser_spec_does_not_mock_timeline_api():
+    source = (REPO / "frontend" / "e2e" / "timeline-real.spec.ts").read_text(encoding="utf-8")
+    assert "page.route" not in source
+    assert "route.fulfill" not in source
+    assert "--e2e-seed-user" in source and "--e2e-resume-run" in source
+
+
 @pytest.mark.parametrize("status", ["blocked_dependency", "paused_budget", "failed_policy"])
 def test_release_gate_rejects_non_success_live_status(tmp_path, status):
     q = _module()

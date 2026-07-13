@@ -43,6 +43,7 @@ async def resolve_version_id(
         AnalysisRun.owner_id == owner_id,
         AnalysisRun.novel_id == novel_id,
         AnalysisRun.active_key == "active",
+        AnalysisRun.status != "completed",
         AnalysisRun.version_id.is_not(None),
     ))
     if run is None or run.version_id is None:
