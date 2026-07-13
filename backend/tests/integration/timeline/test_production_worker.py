@@ -88,6 +88,14 @@ class InterruptOnceTransport(ProductionTransport):
         return await super().complete(**kwargs)
 
 
+class InvalidReconciliationTransport(ProductionTransport):
+    async def complete(self, **kwargs):
+        if kwargs["response_format"].__name__ == "ReconciliationOutputModel":
+            self.calls.append("ReconciliationOutputModel")
+            return {"id": "invalid-reconcile", "content": "{}", "usage": {}}
+        return await super().complete(**kwargs)
+
+
 def _deployment(model_id: str) -> ModelDeployment:
     return ModelDeployment(
         provider="test",
@@ -229,3 +237,42 @@ async def test_resume_skips_completed_chapter_after_interruption(
     db_session.expire_all()
     assert (await db_session.get(AnalysisRun, run_id)).status == "completed"
     assert transport.extraction_attempts == [chapter_ids[0], chapter_ids[1], chapter_ids[1]]
+
+
+@pytest.mark.asyncio
+async def test_invalid_reconciliation_never_promotes_partial_candidate(
+    db_session, auth_client, monkeypatch,
+):
+    owner, novel, _ = await _seed_hierarchy(db_session)
+    owner_id, novel_id = owner.id, novel.id
+    sessions = async_sessionmaker(db_session.bind, expire_on_commit=False)
+    transport = InvalidReconciliationTransport()
+    runtime = TimelineWorkerRuntime(
+        sessions=sessions,
+        gateway=TimelineModelGateway(
+            transport, persistence=PostgresCallRepository(sessions),
+        ),
+        extraction_deployment=_deployment("balanced-qualified"),
+        reconciliation_deployment=_deployment("quality-qualified"),
+    )
+
+    async def dispatch(run_id: int) -> None:
+        await run_timeline_worker(run_id, runtime=runtime)
+
+    monkeypatch.setattr(timeline_api, "dispatch_timeline_run", dispatch)
+    response = await auth_client.post(f"/api/timeline/{novel_id}/start-or-resume")
+    assert response.status_code == 200
+    run_id = response.json()["id"]
+    db_session.expire_all()
+    run = await db_session.get(AnalysisRun, run_id)
+    assert run.status == "paused_dependency"
+    assert await db_session.scalar(select(TimelineActivePointer.id).where(
+        TimelineActivePointer.owner_id == owner_id,
+        TimelineActivePointer.novel_id == novel_id,
+    )) is None
+    attempts = list((await db_session.scalars(select(ModelCallAttempt).where(
+        ModelCallAttempt.run_id == run_id,
+        ModelCallAttempt.stage_key == "cross_chapter_reconcile:book",
+    ).order_by(ModelCallAttempt.attempt_number))).all())
+    assert [attempt.status for attempt in attempts] == ["schema_rejected", "schema_rejected"]
+    assert transport.calls.count("ReconciliationOutputModel") == 2

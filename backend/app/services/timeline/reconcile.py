@@ -44,11 +44,9 @@ class ReconciliationCausalProposalModel(BaseModel):
 class ReconciliationOutputModel(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
-    duplicate_groups: list[list[str]] = Field(default_factory=list)
-    story_constraints: list[tuple[str, str, Literal["before", "after", "simultaneous"]]] = Field(
-        default_factory=list,
-    )
-    causal_edges: list[ReconciliationCausalProposalModel] = Field(default_factory=list)
+    duplicate_groups: list[list[str]]
+    story_constraints: list[tuple[str, str, Literal["before", "after", "simultaneous"]]]
+    causal_edges: list[ReconciliationCausalProposalModel]
 
     def as_input(self) -> ReconcileInput:
         return ReconcileInput(
