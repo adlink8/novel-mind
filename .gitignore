@@ -68,3 +68,7 @@ frontend/test-results/
 *.xml
 !**/coverage-policy.schema.json
 !**/openapi-baseline.json
+
+# local one-off scripts
+backend/_up*.py
+
