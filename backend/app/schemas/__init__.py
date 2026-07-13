@@ -57,6 +57,12 @@ from app.schemas.character import (
 
 # 时间线
 from app.schemas.timeline import (
+    EventCandidate,
+    EvidenceRef,
+    Participant,
+    StoryTime,
+    StoryTimeConstraint,
+    TimelineExtraction,
     TimelineEventCreate,
     TimelineEventResponse,
     TimelineEventUpdate,
@@ -143,6 +149,12 @@ __all__ = [
     "CharacterRelationResponse",
     "CharacterResponse",
     # 时间线
+    "EventCandidate",
+    "EvidenceRef",
+    "Participant",
+    "StoryTime",
+    "StoryTimeConstraint",
+    "TimelineExtraction",
     "TimelineEventCreate",
     "TimelineEventResponse",
     "TimelineEventUpdate",
