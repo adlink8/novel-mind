@@ -47,15 +47,39 @@ def validate_password_length(password: str) -> str:
     return password
 
 
+def _request_origin(request: Request) -> str | None:
+    """Best-effort browser origin from Origin, then Referer."""
+    origin = request.headers.get("origin")
+    if origin:
+        return origin.rstrip("/")
+    referer = request.headers.get("referer")
+    if not referer:
+        return None
+    # Referer: scheme://host[:port]/path → origin only
+    try:
+        from urllib.parse import urlsplit
+
+        parts = urlsplit(referer)
+        if not parts.scheme or not parts.netloc:
+            return None
+        return f"{parts.scheme}://{parts.netloc}".rstrip("/")
+    except Exception:
+        return None
+
+
 def validate_cookie_request_origin(request: Request) -> None:
     """Reject cross-site state changes authenticated only by the session cookie."""
     if request.method not in UNSAFE_METHODS:
         return
-    origin = request.headers.get("origin")
+    origin = _request_origin(request)
     allowed_origins = {value.rstrip("/") for value in settings.cors_origins}
-    if not origin or origin.rstrip("/") not in allowed_origins:
+    if not origin or origin not in allowed_origins:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="无效的请求来源"
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "无效的请求来源"
+                + (f"（origin={origin!r}）" if settings.debug else "")
+            ),
         )
 
 
