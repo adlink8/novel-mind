@@ -23,14 +23,35 @@ def _module():
 
 
 def _production_report(q):
+    evidence = [
+        {"id": 10, "event_id": 20, "chapter_id": 30, "evidence_id": "a", "source_start": 0, "source_end": 4, "content_hash": "b" * 64},
+        {"id": 11, "event_id": 21, "chapter_id": 31, "evidence_id": "b", "source_start": 50, "source_end": 54, "content_hash": "c" * 64},
+    ]
+    authority = {
+        "run_id": 1,
+        "run_status": "completed",
+        "version_id": 2,
+        "active_version_id": 2,
+        "manifest_checksum": "a" * 64,
+        "call_audit_ids": [40, 41, 42],
+        "call_audit_states": [
+            {"id": item, "status": "succeeded", "request_hash": "d" * 64, "response_hash": "e" * 64}
+            for item in (40, 41, 42)
+        ],
+        "evidence_ref_ids": [10, 11],
+        "raw_evidence_sha256": q._sha256(evidence),
+    }
     artifact = {
         "database_dialect": "postgresql",
+        "authority": authority,
         "run": {"id": 1, "status": "completed", "version_id": 2},
         "active_pointer": {"version_id": 2, "revision": 1, "manifest_checksum": "a" * 64},
         "counts": {"events": 2, "evidence_refs": 2, "model_attempts": 3, "completed_stages": 3},
         "events": [{"logical_event_id": "a"}, {"logical_event_id": "b"}],
         "attempts": [{"status": "succeeded"}] * 3,
+        "evidence_refs": evidence,
         "visible_default_event_ids": ["a"],
+        "visible_full_event_ids": ["a", "b"],
     }
     report = {
         "report_version": "timeline-production-qualification.v2",
@@ -46,12 +67,24 @@ def _production_report(q):
     return report
 
 
-def test_release_gate_requires_signed_production_artifacts_and_test_commands(tmp_path):
+def _command_results(q):
+    return [
+        {"command": command, "exit_code": 0, "output_sha256": "f" * 64}
+        for command in q.REQUIRED_TEST_COMMANDS
+    ]
+
+
+def test_release_gate_requires_observed_database_authority_and_command_output(tmp_path):
     q = _module()
     report = _production_report(q)
     path = tmp_path / "qualification.json"
     path.write_text(json.dumps(report), encoding="utf-8")
-    verdict = q.verify_release_evidence(REPO, path)
+    verdict = q.verify_release_evidence(
+        REPO,
+        path,
+        observed_authority=report["artifact"]["authority"],
+        command_results=_command_results(q),
+    )
     assert verdict["status"] == "qualified", verdict
     assert verdict["quality_comparable"] is True
     assert all(verdict["checks"].values()), verdict
@@ -72,7 +105,10 @@ def test_release_gate_rejects_non_success_live_status(tmp_path, status):
     report["report_sha256"] = q.report_digest(report)
     path = tmp_path / "qualification.json"
     path.write_text(json.dumps(report), encoding="utf-8")
-    verdict = q.verify_release_evidence(REPO, path, require_live=True)
+    verdict = q.verify_release_evidence(
+        REPO, path, observed_authority=report["artifact"]["authority"],
+        command_results=_command_results(q), require_live=True,
+    )
     assert verdict["status"] == "blocked_release"
     assert verdict["quality_comparable"] is False
 
@@ -83,7 +119,10 @@ def test_release_gate_rejects_tampered_or_spoiler_leaking_report(tmp_path):
     report["gates"]["spoiler_safety"] = False
     path = tmp_path / "qualification.json"
     path.write_text(json.dumps(report), encoding="utf-8")
-    verdict = q.verify_release_evidence(REPO, path)
+    verdict = q.verify_release_evidence(
+        REPO, path, observed_authority=report["artifact"]["authority"],
+        command_results=_command_results(q),
+    )
     assert verdict["status"] == "blocked_release"
     assert verdict["checks"]["report_signature"] is False
     assert verdict["checks"]["spoiler_safety"] is False
@@ -106,3 +145,18 @@ def test_release_gate_rejects_self_claimed_report_without_raw_artifact(tmp_path)
     assert verdict["status"] == "blocked_release"
     assert verdict["checks"]["production_artifact_signature"] is False
     assert verdict["checks"]["test_commands"] is False
+
+
+def test_self_hashed_synthetic_report_cannot_pass_without_external_observations(tmp_path):
+    q = _module()
+    report = _production_report(q)
+    path = tmp_path / "synthetic.json"
+    path.write_text(json.dumps(report), encoding="utf-8")
+
+    verdict = q.verify_release_evidence(REPO, path)
+
+    assert verdict["status"] == "blocked_release"
+    assert verdict["checks"]["production_artifact_signature"] is True
+    assert verdict["checks"]["report_signature"] is True
+    assert verdict["checks"]["database_authority"] is False
+    assert verdict["checks"]["command_output_attestation"] is False

@@ -24,6 +24,10 @@ from app.services.timeline.model_gateway import (
 )
 from app.services.timeline.worker import TimelineWorkerRuntime, run_timeline_worker
 from app.services.timeline import worker as worker_module
+from scripts.run_timeline_qualification import (
+    load_persisted_authority,
+    run_production_qualification,
+)
 
 pytestmark = pytest.mark.integration
 
@@ -298,3 +302,37 @@ async def test_real_api_serializes_persisted_source_start_and_orders_by_it(
         existing[1].title,
     ]
     assert [event["source_start"] for event in events] == [0, 80, 100]
+
+
+@pytest.mark.asyncio
+async def test_qualification_compares_default_and_full_queries_and_rechecks_db_authority(
+    db_session, auth_client,
+):
+    _, novel, run = await _seed_run(db_session)
+    chapter_ids = list((await db_session.scalars(select(Chapter.id).where(
+        Chapter.novel_id == novel.id,
+    ).order_by(Chapter.chapter_number))).all())
+    expected = [f"event-{chapter_id}" for chapter_id in chapter_ids]
+    runtime = _runtime(db_session, FinalGapTransport())
+
+    report = await run_production_qualification(
+        run.id,
+        runtime=runtime,
+        sessions=runtime.sessions,
+        expected_event_ids=expected,
+        expected_story_order=expected,
+    )
+
+    observation = report["artifact"]["spoiler_observation"]
+    assert observation["cutoff_chapter"] == 2
+    assert len(observation["default_event_ids"]) == 1
+    assert len(observation["full_event_ids"]) == 2
+    assert len(observation["future_event_ids"]) == 1
+    assert observation["leaked_event_ids"] == []
+    assert observation["leaked_edge_ids"] == []
+    assert observation["count_mismatches"] == []
+    assert report["metrics"]["spoiler_leaks"] == 0
+    assert report["artifact"]["visible_default_event_ids"] == [expected[0]]
+    assert report["artifact"]["visible_full_event_ids"] == expected
+    observed = await load_persisted_authority(runtime.sessions, report["artifact"]["authority"])
+    assert observed == report["artifact"]["authority"]

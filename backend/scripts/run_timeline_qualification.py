@@ -168,6 +168,68 @@ def _p95(values: Iterable[int | None]) -> float:
     return float(measured[max(0, math.ceil(len(measured) * 0.95) - 1)])
 
 
+def _spoiler_observation(default_view, full_view, cutoff: int | None) -> dict[str, Any]:
+    """Compare independently queried default/full views against persisted progress."""
+    default_ids = {event.id for event in (default_view.events if default_view else [])}
+    full_events = list(full_view.events if full_view else [])
+    future_ids = {
+        event.id for event in full_events
+        if cutoff is not None and event.narrative_chapter_number > cutoff
+    }
+    leaked_event_ids = sorted(default_ids & future_ids)
+    leaked_edge_ids = sorted(
+        [edge.source_event_id, edge.target_event_id]
+        for edge in (default_view.causal_edges if default_view else [])
+        if edge.source_event_id not in default_ids or edge.target_event_id not in default_ids
+    )
+    count_mismatches: list[str] = []
+    if default_view is not None:
+        participant_count = sum(len(event.participants) for event in default_view.events)
+        expected = {
+            "events": len(default_view.events),
+            "participants": participant_count,
+            "causal_edges": len(default_view.causal_edges),
+        }
+        actual = default_view.counts.model_dump()
+        count_mismatches = sorted(key for key, value in expected.items() if actual.get(key) != value)
+    return {
+        "cutoff_chapter": cutoff,
+        "default_event_ids": sorted(default_ids),
+        "full_event_ids": sorted(event.id for event in full_events),
+        "future_event_ids": sorted(future_ids),
+        "leaked_event_ids": leaked_event_ids,
+        "leaked_edge_ids": leaked_edge_ids,
+        "count_mismatches": count_mismatches,
+        "leak_count": len(leaked_event_ids) + len(leaked_edge_ids) + len(count_mismatches),
+    }
+
+
+def _evidence_rows(evidence) -> list[dict[str, Any]]:
+    return [{
+        "id": row.id,
+        "event_id": row.event_id,
+        "chapter_id": row.chapter_id,
+        "evidence_id": row.evidence_id,
+        "source_start": row.source_start,
+        "source_end": row.source_end,
+        "content_hash": row.content_hash,
+    } for row in evidence]
+
+
+def _command_results_valid(command_results: list[dict[str, Any]] | None) -> bool:
+    if not isinstance(command_results, list) or len(command_results) != len(REQUIRED_TEST_COMMANDS):
+        return False
+    by_command = {item.get("command"): item for item in command_results}
+    if set(by_command) != set(REQUIRED_TEST_COMMANDS):
+        return False
+    return all(
+        item.get("exit_code") == 0
+        and isinstance(item.get("output_sha256"), str)
+        and len(item["output_sha256"]) == 64
+        for item in by_command.values()
+    )
+
+
 async def run_production_qualification(
     run_id: int,
     *,
@@ -183,7 +245,7 @@ async def run_production_qualification(
     from app.models.novel import Novel
     from app.models.timeline import MachineTimelineEvent, TimelineActivePointer, TimelineEvidenceRef
     from app.schemas.timeline import TimelineOrdering, TimelineVersionSource
-    from app.services.timeline.query import build_version_view
+    from app.services.timeline.query import _chapter_cutoff, build_version_view
     from app.services.timeline.worker import run_timeline_worker
 
     await run_timeline_worker(run_id, runtime=runtime)
@@ -217,6 +279,19 @@ async def run_production_qualification(
             source=TimelineVersionSource.ACTIVE, ordering=TimelineOrdering.NARRATIVE,
             person=None, include_causal=True, request_full_book=False,
         ) if novel is not None else None
+        cutoff = await _chapter_cutoff(session, novel) if novel is not None else None
+        if novel is not None:
+            # Qualification needs both production query modes without persisting a
+            # disclosure preference to the user's novel. This session is rolled back.
+            novel.reading_progress = {**(novel.reading_progress or {}), "timeline_full_book": True}
+            await session.flush()
+            full_visible = await build_version_view(
+                session, novel=novel, owner_id=run.owner_id,
+                source=TimelineVersionSource.ACTIVE, ordering=TimelineOrdering.NARRATIVE,
+                person=None, include_causal=True, request_full_book=True,
+            )
+        else:
+            full_visible = None
 
         normalized_ids = [_candidate_id(event.logical_event_id) for event in events]
         expected = set(expected_event_ids)
@@ -231,22 +306,39 @@ async def run_production_qualification(
         )]
         evidence_event_ids = {row.event_id for row in evidence}
         visible_ids = [_candidate_id(event.logical_event_id) for event in (visible.events if visible else [])]
-        visible_chapters = [event.narrative_chapter_number for event in (visible.events if visible else [])]
-        cutoff = max(visible_chapters) if visible_chapters else None
-        spoiler_leaks = sum(1 for chapter in visible_chapters if cutoff is not None and chapter > cutoff)
+        full_visible_ids = [_candidate_id(event.logical_event_id) for event in (full_visible.events if full_visible else [])]
+        spoiler_observation = _spoiler_observation(visible, full_visible, cutoff)
         provider_attempts = [attempt for attempt in attempts if attempt.provider_request_id]
         metrics = {
             "event_precision": _ratio(len(matched), len(actual)),
             "event_recall": _ratio(len(matched), len(expected)),
             "story_pairwise_accuracy": _pairwise_accuracy(story_ids, expected_story_order),
             "evidence_coverage": _ratio(len(evidence_event_ids), len(events)),
-            "spoiler_leaks": spoiler_leaks,
+            "spoiler_leaks": spoiler_observation["leak_count"],
             "provider_calls": len(provider_attempts),
             "cost_usd_total": round(sum(float(attempt.cost_usd or Decimal("0")) for attempt in provider_attempts), 8),
             "latency_p95_ms": _p95(attempt.latency_ms for attempt in provider_attempts),
         }
+        raw_evidence = _evidence_rows(evidence)
+        authority = {
+            "run_id": run.id,
+            "run_status": run.status,
+            "version_id": run.version_id,
+            "active_version_id": pointer.version_id if pointer else None,
+            "manifest_checksum": version.manifest_checksum if version else None,
+            "call_audit_ids": [attempt.id for attempt in attempts],
+            "call_audit_states": [{
+                "id": attempt.id,
+                "status": attempt.status,
+                "request_hash": attempt.request_hash,
+                "response_hash": attempt.response_hash,
+            } for attempt in attempts],
+            "evidence_ref_ids": [row.id for row in evidence],
+            "raw_evidence_sha256": _sha256(raw_evidence),
+        }
         artifact = {
             "database_dialect": session.bind.dialect.name,
+            "authority": authority,
             "run": {"id": run.id, "status": run.status, "version_id": run.version_id, "progress": run.progress},
             "version": None if version is None else {
                 "id": version.id, "status": version.status,
@@ -271,11 +363,7 @@ async def run_production_qualification(
                 "narrative_index": event.narrative_index, "story_rank": event.story_rank,
                 "publication_status": event.publication_status,
             } for event in events],
-            "evidence_refs": [{
-                "event_id": row.event_id, "evidence_id": row.evidence_id,
-                "source_start": row.source_start, "source_end": row.source_end,
-                "content_hash": row.content_hash,
-            } for row in evidence],
+            "evidence_refs": raw_evidence,
             "attempts": [{
                 "id": attempt.id, "stage_key": attempt.stage_key,
                 "attempt_number": attempt.attempt_number, "status": attempt.status,
@@ -295,6 +383,8 @@ async def run_production_qualification(
                 "reserved_calls": ledger.reserved_calls,
             },
             "visible_default_event_ids": visible_ids,
+            "visible_full_event_ids": full_visible_ids,
+            "spoiler_observation": spoiler_observation,
         }
 
     gates = {
@@ -309,7 +399,8 @@ async def run_production_qualification(
         "budget_settled": ledger is not None and ledger.reserved_calls == 0
         and ledger.settled_calls == len(provider_attempts),
         "spoiler_safety": metrics["spoiler_leaks"] == 0
-        and len(visible_ids) < len(events) if len(events) > 1 else metrics["spoiler_leaks"] == 0,
+        and set(visible_ids) <= set(full_visible_ids)
+        and (len(visible_ids) < len(full_visible_ids) if len(events) > 1 else True),
         "quality_thresholds": metrics["event_precision"] >= 0.9
         and metrics["event_recall"] >= 0.9
         and metrics["story_pairwise_accuracy"] >= 0.9
@@ -330,7 +421,60 @@ async def run_production_qualification(
     return report
 
 
-def verify_release_evidence(repo_root: Path, report_path: Path, *, require_live: bool = False) -> dict[str, Any]:
+async def load_persisted_authority(sessions, authority_refs: dict[str, Any]) -> dict[str, Any]:
+    """Re-read qualification identity from the authoritative database."""
+    from sqlalchemy import select
+
+    from app.models.analysis import AnalysisRun, AnalysisVersion, ModelCallAttempt
+    from app.models.timeline import MachineTimelineEvent, TimelineActivePointer, TimelineEvidenceRef
+
+    run_id = int(authority_refs["run_id"])
+    version_id = int(authority_refs["version_id"])
+    async with sessions() as session:
+        run = await session.get(AnalysisRun, run_id)
+        version = await session.get(AnalysisVersion, version_id)
+        if run is None or version is None or run.version_id != version_id:
+            return {}
+        pointer = await session.scalar(select(TimelineActivePointer).where(
+            TimelineActivePointer.owner_id == run.owner_id,
+            TimelineActivePointer.novel_id == run.novel_id,
+        ))
+        attempts = list((await session.scalars(select(ModelCallAttempt).where(
+            ModelCallAttempt.run_id == run_id,
+        ).order_by(ModelCallAttempt.id))).all())
+        evidence = list((await session.scalars(
+            select(TimelineEvidenceRef)
+            .join(MachineTimelineEvent, MachineTimelineEvent.id == TimelineEvidenceRef.event_id)
+            .where(MachineTimelineEvent.version_id == version_id)
+            .order_by(TimelineEvidenceRef.event_id, TimelineEvidenceRef.id)
+        )).all())
+        raw_evidence = _evidence_rows(evidence)
+        return {
+            "run_id": run.id,
+            "run_status": run.status,
+            "version_id": version.id,
+            "active_version_id": pointer.version_id if pointer else None,
+            "manifest_checksum": version.manifest_checksum,
+            "call_audit_ids": [attempt.id for attempt in attempts],
+            "call_audit_states": [{
+                "id": attempt.id,
+                "status": attempt.status,
+                "request_hash": attempt.request_hash,
+                "response_hash": attempt.response_hash,
+            } for attempt in attempts],
+            "evidence_ref_ids": [row.id for row in evidence],
+            "raw_evidence_sha256": _sha256(raw_evidence),
+        }
+
+
+def verify_release_evidence(
+    repo_root: Path,
+    report_path: Path,
+    *,
+    observed_authority: dict[str, Any] | None = None,
+    command_results: list[dict[str, Any]] | None = None,
+    require_live: bool = False,
+) -> dict[str, Any]:
     report = json.loads(report_path.read_text(encoding="utf-8"))
     artifact = report.get("artifact")
     required_paths = {
@@ -343,11 +487,15 @@ def verify_release_evidence(repo_root: Path, report_path: Path, *, require_live:
     checks = {name: path.is_file() for name, path in required_paths.items()}
     counts = artifact.get("counts", {}) if isinstance(artifact, dict) else {}
     pointer = artifact.get("active_pointer") if isinstance(artifact, dict) else None
+    report_authority = artifact.get("authority") if isinstance(artifact, dict) else None
     checks.update({
         "production_report_version": report.get("report_version") == "timeline-production-qualification.v2",
         "production_artifact_signature": isinstance(artifact, dict)
         and report.get("artifact_sha256") == _sha256(artifact),
         "report_signature": report.get("report_sha256") == report_digest(report),
+        "database_authority": isinstance(report_authority, dict)
+        and observed_authority == report_authority,
+        "command_output_attestation": _command_results_valid(command_results),
         "worker_completed": isinstance(artifact, dict)
         and artifact.get("run", {}).get("status") == "completed",
         "postgresql_authority": isinstance(artifact, dict)
@@ -370,6 +518,28 @@ def verify_release_evidence(repo_root: Path, report_path: Path, *, require_live:
             and live.get("quality_comparable") is True and live.get("metrics") is not None
     qualified = all(checks.values())
     return {"status": "qualified" if qualified else "blocked_release", "quality_comparable": qualified, "checks": checks}
+
+
+async def verify_release_evidence_from_db(
+    repo_root: Path,
+    report_path: Path,
+    *,
+    sessions,
+    command_results: list[dict[str, Any]],
+    require_live: bool = False,
+) -> dict[str, Any]:
+    """Release entrypoint that independently resolves report references from DB."""
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    artifact = report.get("artifact") if isinstance(report, dict) else None
+    authority_refs = artifact.get("authority") if isinstance(artifact, dict) else None
+    observed = await load_persisted_authority(sessions, authority_refs) if authority_refs else None
+    return verify_release_evidence(
+        repo_root,
+        report_path,
+        observed_authority=observed,
+        command_results=command_results,
+        require_live=require_live,
+    )
 
 
 def render_markdown(report: dict[str, Any]) -> str:
