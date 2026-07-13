@@ -129,8 +129,8 @@ Plans:
 **Goal:** 以持久、版本化、证据约束的后台分析任务生成小说时间事件，并在全局分析工作台渐进展示防剧透的双顺序横向时间线。
 **Requirements**: REQ-TIME-01..10
 **Depends on:** Phase 7
-**Status:** GAP CLOSURE COMPLETE — 08-07/08-08 COMPLETE; PENDING INDEPENDENT RE-VERIFICATION
-**Plans:** 8/8 plans complete
+**Status:** GAP CLOSURE COMPLETE — 08-09 COMPLETE; PENDING INDEPENDENT RE-VERIFICATION
+**Plans:** 9/9 plans complete
 
 Plans:
 - [x] 08-01 durable analysis jobs and immutable version foundation
@@ -141,3 +141,4 @@ Plans:
 - [x] 08-06 frozen qualification, end-to-end verification, and release gate
 - [x] 08-07 production worker orchestration and PostgreSQL call boundaries
 - [x] 08-08 real ordering/source isolation and production qualification
+- [x] 08-09 final cancellation/cache/source-offset/qualification gap closure

@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v0.6
 milestone_name: Versioned Novel Analysis and Timeline
 status: in_progress
-last_updated: "2026-07-13T05:47:09.391Z"
+last_updated: "2026-07-13T06:22:06.522Z"
 progress:
   total_phases: 7
   completed_phases: 5
-  total_plans: 32
-  completed_plans: 36
+  total_plans: 33
+  completed_plans: 37
   percent: 71
 ---
 
@@ -24,11 +24,11 @@ See `.planning/PROJECT.md` and `IMPLEMENTATION-STATUS.md`.
 ## Current Position
 
 Phase: 08 (Versioned novel analysis orchestration and interactive timeline) — GAP CLOSURE COMPLETE, PENDING RE-VERIFICATION
-Plan: 8 of 8
-**Phase 08 gap plans 08-07 and 08-08 COMPLETE** — independent re-verification remains
+Plan: 9 of 9
+**Phase 08 gap plan 08-09 COMPLETE** — all second-round blockers closed; independent re-verification remains
 
 - Branch: `feat/phase2-wave2-embedding`
-- Last activity: 2026-07-13 — 08-08 real ordering/source isolation, PostgreSQL qualification, and unmocked browser E2E completed (65 backend, 68 frontend, 2 browser, 7 release-gate tests passed)
+- Last activity: 2026-07-13 — 08-09 cancellation, reconcile cache lineage, real source offsets, and observed qualification authority completed (74 backend, 68 frontend, 8 release-gate tests and build passed)
 - Plan directory: `.planning/phases/08-versioned-novel-analysis-orchestration-and-interactive-timel/`
 
 ## Auto Routing
@@ -44,6 +44,7 @@ Plan: 8 of 8
 - 08-06: 9min, 3 tasks, 6 files, backend 56 + controlled live 7 + CI 5 + frontend 66 tests and build passed.
 - 08-07: 26min, 3 tasks, 9 files, 63 timeline tests passed including real PostgreSQL concurrency coverage.
 - 08-08: 24min, 3 tasks, 9 files, backend 65 + frontend 68 + real desktop/mobile browser 2 + release gate 7 tests passed.
+- 08-09: 16min, 3 tasks, 10 files, backend 74 + frontend 68 + release gate 8 tests and production build passed.
 
 ## Phase 08 Decisions
 
@@ -64,6 +65,10 @@ Plan: 8 of 8
 - Narrative timeline projection orders by chapter, source offset/index, then event ID; participant controls derive only from the selected version.
 - Phase 08 release qualification requires signed PostgreSQL production-worker artifacts and measured visible-query output.
 - Timeline browser E2E uses real Next.js, FastAPI, PostgreSQL, and timeline APIs with only the provider transport controlled.
+- Running workers poll durable cancellation between every production stage and stop before later calls or promotion.
+- Reconciliation exact-cache identity binds version lineage plus hashes of the actual prompt and output schema.
+- Timeline `source_start` is required end-to-end and derives from persisted evidence offsets.
+- Release qualification requires independent DB authority observations and successful command-output digests; self-hashes prove integrity only.
 
 ## Phase 06 (v0.5) — COMPLETE
 
@@ -121,5 +126,5 @@ CLI：`backend/scripts/run_chunker_qualification.py`
 
 ## Next Action
 
-1. 由独立 verifier 复验 Phase 08 gaps 3-4；executor 未修改 `08-VERIFICATION.md`。
+1. 由独立 verifier 复验 Phase 08 四个最终 gap；executor 未修改 `08-VERIFICATION.md`。
 2. 保留本地 BGE / 阅读器 UX 等非 Phase 08 WIP，不纳入 Phase 08 提交。
