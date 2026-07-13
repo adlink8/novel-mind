@@ -3,6 +3,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import IntegrityError
 
 from app.api.dependencies import require_owned_novel
 from app.core.database import get_db
@@ -48,7 +49,17 @@ async def start_or_resume(novel: Novel = Depends(require_owned_novel), db: Async
         row = AnalysisRun(owner_id=current_user.id, novel_id=novel.id,
                           active_key="active", status="pending", progress={})
         db.add(row)
-        await db.flush()
+        try:
+            await db.flush()
+        except IntegrityError:
+            # The owner/novel/active_key unique constraint is the concurrency authority.
+            await db.rollback()
+            row = await db.scalar(select(AnalysisRun).where(
+                AnalysisRun.owner_id == current_user.id, AnalysisRun.novel_id == novel.id,
+                AnalysisRun.active_key == "active",
+            ))
+            if row is None:
+                raise
     await db.commit()
     await db.refresh(row)
     return _run_response(row)

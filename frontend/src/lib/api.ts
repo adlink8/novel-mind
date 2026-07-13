@@ -259,24 +259,93 @@ export const analysisApi = {
 
 // ==================== 时间线 API ====================
 
+export type TimelineVersionSource = "active" | "running_candidate";
+export type TimelineOrdering = "narrative" | "story";
+
+export interface TimelineParticipant {
+  mention: string;
+  entity_id?: number | null;
+}
+
 export interface TimelineEvent {
-  id: string;
-  novel_id: string;
-  event_title: string;
+  id: number;
+  logical_event_id: string;
+  title: string;
   description: string;
-  event_time: string;
-  chapter_id: string;
-  event_order: number;
   event_type: string;
-  importance: "high" | "medium" | "low";
-  characters_involved: string[];
+  narrative_chapter_number: number;
+  narrative_index: number;
+  story_rank?: number | null;
+  time_precision: "exact" | "relative" | "fuzzy" | "unknown";
+  time_expression?: string | null;
+  confidence: number;
+  participants: TimelineParticipant[];
+  provenance: Record<string, "machine" | "manual">;
+}
+
+export interface TimelineCausalEdge {
+  source_event_id: number;
+  target_event_id: number;
+  edge_type: string;
+  confidence: number;
+}
+
+export interface TimelineVersionView {
+  source: TimelineVersionSource;
+  version_id: number;
+  status: string;
+  progress: Record<string, unknown>;
+  events: TimelineEvent[];
+  causal_edges: TimelineCausalEdge[];
+  counts: { events: number; participants: number; causal_edges: number };
+  aggregates: Record<string, number>;
+  previews: string[];
+}
+
+export interface TimelineEnvelope {
+  active: TimelineVersionView | null;
+  running_candidate: TimelineVersionView | null;
+}
+
+export interface TimelineRun {
+  id: number;
+  novel_id: number;
+  version_id?: number | null;
+  status: string;
+  status_reason?: string | null;
+  progress: Record<string, unknown>;
+  cancel_requested: boolean;
+  updated_at?: string | null;
+}
+
+export interface TimelineQuery {
+  ordering?: TimelineOrdering;
+  person?: string;
+  causal?: boolean;
+  full_book?: boolean;
 }
 
 export const timelineApi = {
-  getTimeline: (novelId: string) => api.get<TimelineEvent[]>(`/timeline/${novelId}`),
-  extractTimeline: (novelId: string) => api.post<TimelineEvent[]>(`/timeline/${novelId}/extract`),
-  updateEvent: (eventId: string, data: Partial<TimelineEvent>) =>
-    api.put(`/timeline/events/${eventId}`, data),
+  startOrResume: (novelId: string) => api.post<TimelineRun>(`/timeline/${novelId}/start-or-resume`),
+  status: (novelId: string) => api.get<TimelineRun>(`/timeline/${novelId}/status`),
+  cancel: (novelId: string) => api.post<TimelineRun>(`/timeline/${novelId}/cancel`),
+  resume: (novelId: string) => api.post<TimelineRun>(`/timeline/${novelId}/resume`),
+  getTimeline: (novelId: string, params?: TimelineQuery) =>
+    api.get<TimelineEnvelope>(`/timeline/${novelId}`, { params }),
+  getVersion: (novelId: string, versionId: number, params?: TimelineQuery) =>
+    api.get<TimelineVersionView>(`/timeline/${novelId}/versions/${versionId}`, { params }),
+  rollback: (novelId: string, targetVersionId: number, expectedRevision: number) =>
+    api.post(`/timeline/${novelId}/rollback`, {
+      target_version_id: targetVersionId,
+      expected_revision: expectedRevision,
+    }),
+  updateEvent: (novelId: string, logicalEventId: string, fieldName: "title" | "description" | "event_type" | "time_expression", value: unknown) =>
+    api.put(`/timeline/${novelId}/events/${logicalEventId}`, { field_name: fieldName, value }),
+  setFullBookPreference: (novelId: string, fullBook: boolean) =>
+    api.put(`/timeline/${novelId}/preference`, { full_book: fullBook }),
+  /** @deprecated Use startOrResume. */
+  extractTimeline: (novelId: string) => api.post<TimelineRun>(`/timeline/${novelId}/extract`),
+  /** @deprecated Phase 08 edits require novel scope; retained for legacy callers only. */
   deleteEvent: (eventId: string) => api.delete(`/timeline/events/${eventId}`),
 };
 

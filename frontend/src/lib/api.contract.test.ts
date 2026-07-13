@@ -31,6 +31,7 @@ vi.mock("axios", () => ({
 
 import {
   evalApi,
+  timelineApi,
   QUALITY_STATUSES,
   QUALITY_TERMINAL_STATUSES,
   QUALITY_COMPARABLE_STATUSES,
@@ -39,6 +40,47 @@ import {
   qualityStatusTone,
   type DeprecationMeta,
 } from "./api";
+
+describe("timelineApi progressive spoiler-safe contract (08-04)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("keeps active/candidate reads parameterized without merging sources", async () => {
+    await timelineApi.getTimeline("7", {
+      ordering: "story", person: "阿宁", causal: true, full_book: false,
+    });
+    expect(mockGet).toHaveBeenCalledWith("/timeline/7", {
+      params: { ordering: "story", person: "阿宁", causal: true, full_book: false },
+    });
+    await timelineApi.getVersion("7", 12, { ordering: "narrative" });
+    expect(mockGet).toHaveBeenCalledWith("/timeline/7/versions/12", {
+      params: { ordering: "narrative" },
+    });
+  });
+
+  it("drives durable lifecycle and explicit full-book preference", async () => {
+    await timelineApi.startOrResume("7");
+    expect(mockPost).toHaveBeenCalledWith("/timeline/7/start-or-resume");
+    await timelineApi.status("7");
+    expect(mockGet).toHaveBeenCalledWith("/timeline/7/status");
+    await timelineApi.cancel("7");
+    expect(mockPost).toHaveBeenCalledWith("/timeline/7/cancel");
+    await timelineApi.resume("7");
+    expect(mockPost).toHaveBeenCalledWith("/timeline/7/resume");
+    await timelineApi.setFullBookPreference("7", true);
+    expect(mockPut).toHaveBeenCalledWith("/timeline/7/preference", { full_book: true });
+  });
+
+  it("sends scoped edits and revision-checked rollback", async () => {
+    await timelineApi.updateEvent("7", "event-a", "title", "人工标题");
+    expect(mockPut).toHaveBeenCalledWith("/timeline/7/events/event-a", {
+      field_name: "title", value: "人工标题",
+    });
+    await timelineApi.rollback("7", 4, 2);
+    expect(mockPost).toHaveBeenCalledWith("/timeline/7/rollback", {
+      target_version_id: 4, expected_revision: 2,
+    });
+  });
+});
 
 const SAMPLE_DEPRECATION: DeprecationMeta = {
   deprecated: true,
