@@ -23,17 +23,17 @@ See `.planning/PROJECT.md` and `IMPLEMENTATION-STATUS.md`.<br>
 
 ## Current Position
 
-Phase: 07 (semantic-hierarchical-chunking) — IN PROGRESS
-Plan: 2 of 6 complete; next **07-03**
+Phase: 07 (semantic-hierarchical-chunking) — **COMPLETE** (6/6)
+Plan: 6 of 6 complete
 
-- Milestone: Phase 06 v0.5 complete; Phase 07 started
+- Milestone: Phase 06 + Phase 07 complete on branch
 - Current branch: `feat/phase2-wave2-embedding`
-- Status: 07-01..07-02 complete; 07-03..07-06 pending.
-- Last activity: 2026-07-13 — Completed 07-02 rule proposals + candidate segmentation.
+- Status: 07-01..07-06 complete (baseline → rules → adjudicator → hierarchy → lifecycle → A/B release).
+- Last activity: 2026-07-13 — Completed remaining Phase 07 plans 03–06.
 
 ## Auto Routing
 
-Execute **07-03** next (depends on 07-02). Auto-start remains disabled.
+Phase 07 complete. Next: optional re-verify / ship or next roadmap item. Auto-start remains disabled.
 
 ## Verified In v0.3
 
@@ -160,8 +160,27 @@ Execute **07-03** next (depends on 07-02). Auto-start remains disabled.
 - AtomicSpan scanner + BoundaryProposal reason/confidence engine
 - CandidateSegmentation with pending adjudication queue
 - Hard constraints never llm_eligible; pure in-memory (no DB/index)
-- Tests: 16 passed (proposals + segmentation)
+
+### 07-03 COMPLETE
+
+- BoundaryDecision schema, BudgetLedger, BoundaryAdjudicator + adversarial fallback
+
+### 07-04 COMPLETE
+
+- chapter→scene→evidence HierarchyTree, scene expand, raw fallback
+
+### 07-05 COMPLETE
+
+- Immutable candidate builds, incremental delta, reconcile, promote, rollback
+
+### 07-06 COMPLETE
+
+- Same-snapshot A/B + release_verifier → QualifiedChunkerEvidence + CLI
+
+## Phase 07 test evidence
+
+- `pytest tests/unit/chunking tests/integration/chunking tests/integration/test_hierarchical_retrieval.py tests/adversarial/test_chunking_prompt_boundary.py tests/test_chunking.py` → **88 passed**
 
 ## Next Action
 
-Execute **07-03-PLAN.md** (LLM low-confidence boundary adjudication and fallback).
+Phase 07 done. Optionally commit remaining WIP (local BGE/UX) or start next milestone item.

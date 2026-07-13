@@ -230,3 +230,143 @@ class CandidateSegmentation(StrictModel):
     )
     rule_config_hash: str = Field(..., min_length=64, max_length=64)
     segmentation_checksum: str = Field(..., min_length=64, max_length=64)
+
+
+# ── Phase 07-03: LLM boundary decision contracts ─────────────────────
+
+BOUNDARY_DECISION_SCHEMA_VERSION = "boundary-decision.v1"
+
+
+class ContextPreserve(StrictModel):
+    """Limited context-preservation hint; IDs must belong to the proposal."""
+
+    keep_left_span_ids: list[str] = Field(default_factory=list, max_length=3)
+    keep_right_span_ids: list[str] = Field(default_factory=list, max_length=3)
+
+
+class BoundaryDecision(StrictModel):
+    """Strict LLM boundary classification output (no content/tools/publish)."""
+
+    schema_version: Literal["boundary-decision.v1"] = BOUNDARY_DECISION_SCHEMA_VERSION
+    boundary_id: str = Field(..., min_length=8)
+    decision: RuleDecision
+    reason_codes: list[ReasonCode] = Field(..., min_length=1)
+    left_span_id: str
+    right_span_id: str
+    confidence: float = Field(..., ge=0.0, le=1.0)
+    context_preserve: ContextPreserve = Field(default_factory=ContextPreserve)
+
+
+class DecisionAudit(StrictModel):
+    """Audit record for one adjudication attempt (success or fallback)."""
+
+    boundary_id: str
+    attempt: int = Field(..., ge=1, le=2)
+    resolved_by: Literal["llm", "rule_fallback", "budget_skip", "hard_rule"]
+    decision: RuleDecision
+    reason: str
+    raw_response_hash: str | None = None
+    model_revision: str | None = None
+    usage_tokens_in: int | None = None
+    usage_tokens_out: int | None = None
+    latency_ms: float | None = None
+    fallback: bool = False
+
+
+# ── Phase 07-04 hierarchy ────────────────────────────────────────────
+
+HierarchyLevel = Literal["chapter", "scene", "evidence"]
+
+
+class HierarchyNode(StrictModel):
+    node_id: str = Field(..., min_length=8)
+    level: HierarchyLevel
+    chapter_id: int
+    chapter_number: int
+    parent_id: str | None = None
+    child_ids: list[str] = Field(default_factory=list)
+    content: str
+    content_hash: str = Field(..., min_length=64, max_length=64)
+    source_start: int = Field(..., ge=0)
+    source_end: int = Field(..., ge=0)
+    chunk_type: str = "paragraph"
+    decision_lineage: list[str] = Field(default_factory=list)
+    order_index: int = Field(..., ge=0)
+
+
+class HierarchyTree(StrictModel):
+    schema_version: Literal["hierarchy.v1"] = "hierarchy.v1"
+    novel_id: int
+    chapter_id: int
+    chapter_number: int
+    source_snapshot_hash: str | None = None
+    nodes: list[HierarchyNode]
+    chapter_node_id: str
+    tree_checksum: str = Field(..., min_length=64, max_length=64)
+
+
+# ── Phase 07-05 build lifecycle + qualified evidence ─────────────────
+
+ChunkBuildStatus = Literal[
+    "pending",
+    "building",
+    "built",
+    "reconciled",
+    "qualified",
+    "prepared",
+    "committed",
+    "failed",
+    "rolled_back",
+]
+
+
+class QualifiedChunkerEvidence(StrictModel):
+    """Strict promotion evidence — produced only by 07-06 release verifier."""
+
+    schema_version: Literal["qualified-chunker-evidence.v1"] = (
+        "qualified-chunker-evidence.v1"
+    )
+    build_id: str = Field(..., min_length=8)
+    manifest_checksum: str = Field(..., min_length=64, max_length=64)
+    source_snapshot_hash: str = Field(..., min_length=64, max_length=64)
+    chunker_name: str
+    chunker_version: str
+    chunker_config_hash: str = Field(..., min_length=64, max_length=64)
+    chunk_manifest_hash: str = Field(..., min_length=64, max_length=64)
+    policy_hash: str = Field(..., min_length=64, max_length=64)
+    baseline_fingerprint: str | None = None
+    quality_run_id: str | None = None
+    quality_comparable: bool
+    status: Literal["qualified", "rejected", "blocked"]
+    report_signature: str = Field(..., min_length=16)
+    expires_at: str | None = None
+    metrics: dict[str, Any] = Field(default_factory=dict)
+    reasons: list[str] = Field(default_factory=list)
+
+
+class ChunkBuildRecord(StrictModel):
+    build_id: str
+    novel_id: int
+    status: ChunkBuildStatus
+    parent_build_id: str | None = None
+    source_snapshot_hash: str
+    manifest_checksum: str
+    chunker_name: str
+    chunker_version: str
+    chunker_config_hash: str
+    collection_name: str
+    is_candidate: bool = True
+    immutable: bool = True
+    changed_chapter_ids: list[int] = Field(default_factory=list)
+    journal: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class ReconcileReport(StrictModel):
+    build_id: str
+    expected_ids: list[str]
+    actual_ids: list[str]
+    missing: list[str] = Field(default_factory=list)
+    orphan: list[str] = Field(default_factory=list)
+    stale: list[str] = Field(default_factory=list)
+    clean: bool = False
+    checksum_ok: bool = False

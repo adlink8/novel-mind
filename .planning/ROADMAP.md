@@ -108,13 +108,13 @@ Plans:
 **Goal:** 在保留原始 chunk 证据底座的前提下，使用规则初切与 LLM 低置信边界判断建立可版本化、可评测、可回滚的 chapter → scene → evidence 层级切片，并由 Phase 06 自动质量门选择可发布 chunker。
 **Requirements:** REQ-CHUNK-01..08
 **Depends on:** Phase 06
-**Status:** IN PROGRESS (07-01..07-02 complete)
+**Status:** COMPLETE (07-01..07-06; REQ-CHUNK-01..08)
 **Plans:** 6 plans
 
 Plans:
 - [x] 07-01 chunker manifests, source lineage, and deterministic baseline
 - [x] 07-02 rule boundary confidence and candidate segmentation
-- [ ] 07-03 LLM low-confidence boundary adjudication and fallback
-- [ ] 07-04 hierarchical scene/evidence storage and retrieval
-- [ ] 07-05 candidate rebuild, incremental refresh, promotion, and rollback
-- [ ] 07-06 chunker A/B quality qualification and release verification
+- [x] 07-03 LLM low-confidence boundary adjudication and fallback
+- [x] 07-04 hierarchical scene/evidence storage and retrieval
+- [x] 07-05 candidate rebuild, incremental refresh, promotion, and rollback
+- [x] 07-06 chunker A/B quality qualification and release verification
