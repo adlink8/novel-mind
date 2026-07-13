@@ -42,3 +42,13 @@ async def test_cancel_and_resume_preserve_checkpoint():
     assert (await jobs.get(run.id)).status == "cancelled"
     await jobs.resume(run.id)
     assert (await jobs.get(run.id)).status == "pending"
+
+
+@pytest.mark.asyncio
+async def test_failed_run_allows_new_candidate_without_reusing_old_checkpoint():
+    store = InMemoryTimelineJobStore()
+    jobs = TimelineJobCoordinator(store)
+    failed = await jobs.start_on_first_entry(owner_id=5, novel_id=8)
+    await store.set_status(failed.id, "failed")
+    replacement = await jobs.start_on_first_entry(owner_id=5, novel_id=8)
+    assert replacement.id != failed.id

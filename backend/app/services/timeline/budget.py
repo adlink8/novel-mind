@@ -44,6 +44,8 @@ class BudgetGate:
         existing = self.reservations.get(key)
         if existing:
             return existing
+        if self.paused:
+            raise BudgetExceeded("budget is paused; no further calls are allowed")
         if input_price_per_million is None or output_price_per_million is None:
             self.paused = True
             raise UnknownPricing("provider pricing is unknown; cost cannot be reserved")

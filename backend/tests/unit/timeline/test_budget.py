@@ -36,3 +36,13 @@ def test_settle_and_release_are_single_transition():
     assert gate.settled_calls == 1
     with pytest.raises(ValueError):
         gate.release(reservation.key)
+
+
+def test_pause_is_fail_closed_for_all_later_calls():
+    gate = BudgetGate(BudgetPolicy(1, 1, 1, Decimal("0")))
+    with pytest.raises(BudgetExceeded):
+        gate.reserve("first", input_tokens=1, output_tokens=1,
+                     input_price_per_million=Decimal("1"), output_price_per_million=Decimal("1"))
+    with pytest.raises(BudgetExceeded):
+        gate.reserve("later", input_tokens=0, output_tokens=0,
+                     input_price_per_million=Decimal("0"), output_price_per_million=Decimal("0"))
