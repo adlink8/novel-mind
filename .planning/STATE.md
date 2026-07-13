@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v0.6
 milestone_name: Versioned Novel Analysis and Timeline
 status: planned
-last_updated: "2026-07-13T03:17:42.961Z"
+last_updated: "2026-07-13T03:29:54.860Z"
 progress:
   total_phases: 7
   completed_phases: 4
   total_plans: 30
-  completed_plans: 29
+  completed_plans: 30
   percent: 57
 ---
 
@@ -24,16 +24,26 @@ See `.planning/PROJECT.md` and `IMPLEMENTATION-STATUS.md`.
 ## Current Position
 
 Phase: 08 (Versioned novel analysis orchestration and interactive timeline) — EXECUTING
-Plan: 2 of 6
-**Phase 08 EXECUTING** (01/06) - ready to execute 08-02
+Plan: 3 of 6
+**Phase 08 EXECUTING** (02/06) - ready to execute 08-03
 
 - Branch: `feat/phase2-wave2-embedding`
-- Last activity: 2026-07-13 — Phase 08 SPEC/CONTEXT/RESEARCH/AI-SPEC/VALIDATION and six plans passed independent review
+- Last activity: 2026-07-13 — 08-02 strict schema, dedicated model gateway, and evidence-bound chapter extraction completed (23 tests passed)
 - Plan directory: `.planning/phases/08-versioned-novel-analysis-orchestration-and-interactive-timel/`
 
 ## Auto Routing
 
-下一动作为执行 Phase 08 Plan 01。`auto_start` 保持关闭，必须显式启动执行。
+下一动作为执行 Phase 08 Plan 03。`auto_start` 保持关闭，必须显式启动执行。
+
+## Phase 08 Execution Metrics
+
+- 08-02: 18min, 3 tasks, 11 files, 23 targeted tests passed.
+
+## Phase 08 Decisions
+
+- Timeline extraction keeps narrative position separate from four strict story-time precision shapes.
+- Timeline model calls allow one same-deployment repair with an independent budget reservation and no fallback.
+- Only evidence-valid complete output is cached and provisionally published.
 
 ## Phase 06 (v0.5) — COMPLETE
 
