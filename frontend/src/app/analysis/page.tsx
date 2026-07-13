@@ -3,13 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { BookOpen, RefreshCw } from "lucide-react";
 
+import { TimelineChart } from "@/components/timeline/timeline-chart";
 import { TimelineControls } from "@/components/timeline/timeline-controls";
 import { TimelineStatus } from "@/components/timeline/timeline-status";
 import { novelsApi, timelineApi, type Novel, type TimelineEnvelope, type TimelineOrdering, type TimelineRun, type TimelineVersionSource } from "@/lib/api";
-
-function TimelinePreview({ events }: { events: NonNullable<TimelineEnvelope["active"]>["events"] }) {
-  return <div data-testid="timeline-chart" className="grid gap-2 rounded-3xl border bg-card p-4">{events.map((event) => <div key={event.id} className="rounded-xl bg-muted p-3"><strong>{event.title}</strong><p className="text-sm text-muted-foreground">{event.description}</p></div>)}</div>;
-}
 
 export default function AnalysisPage() {
   const [novels, setNovels] = useState<Novel[]>([]);
@@ -83,7 +80,7 @@ export default function AnalysisPage() {
             {envelope.running_candidate && <button role="tab" aria-selected={source === "running_candidate"} onClick={() => setSource("running_candidate")} className={`whitespace-nowrap rounded-full px-4 py-2 text-sm ${source === 'running_candidate' ? 'bg-foreground text-background' : 'border bg-card'}`}><RefreshCw className="mr-1 inline size-3.5"/>正在生成 · v{envelope.running_candidate.version_id}</button>}
           </div>
           {error && <p role="alert" className="rounded-xl bg-destructive/10 p-4 text-sm text-destructive">{error}</p>}
-          {loading ? <div className="h-80 animate-pulse rounded-3xl bg-muted" aria-label="正在加载时间线"/> : view ? <TimelinePreview events={view.events} /> : <div className="grid min-h-64 place-items-center rounded-3xl border border-dashed text-center text-muted-foreground">分析已启动，第一批事件生成后会显示在这里。</div>}
+          {loading ? <div className="h-80 animate-pulse rounded-3xl bg-muted" aria-label="正在加载时间线"/> : view ? <TimelineChart events={view.events} causalEdges={causal ? view.causal_edges : []} ordering={ordering} novelId={novelId} /> : <div className="grid min-h-64 place-items-center rounded-3xl border border-dashed text-center text-muted-foreground">分析已启动，第一批事件生成后会显示在这里。</div>}
         </>
       )}
 
