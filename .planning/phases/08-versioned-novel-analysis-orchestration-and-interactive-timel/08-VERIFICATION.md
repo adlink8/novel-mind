@@ -1,199 +1,192 @@
 ---
 phase: 08-versioned-novel-analysis-orchestration-and-interactive-timel
-verified: 2026-07-13T06:33:15Z
-status: gaps_found
-score: 32/33 must-haves verified
+verified: 2026-07-13T07:01:25Z
+status: passed
+score: 35/35 must-haves verified
 overrides_applied: 0
 re_verification:
   previous_status: gaps_found
-  previous_score: 29/32
+  previous_score: 32/33
   gaps_closed:
-    - "REQ-TIME-01: production workers now re-read durable cancel_requested at stage boundaries and stop before later calls or promotion"
-    - "D-15: reconciliation exact-cache identity now binds the actual prompt and Pydantic output-schema hashes"
-    - "D-05: persisted evidence source_start now flows through the real API and required TypeScript contract into frontend ordering"
-    - "Qualification spoiler measurement now compares default/full production queries against the persisted reading cutoff"
-  gaps_remaining:
-    - "Release authority is not wired to an independent DB-and-command observer; the positive gate still accepts caller-supplied synthetic observations and fake output digests"
+    - "The executable release gate now owns fixed command execution, internally hashes captured output, independently re-reads PostgreSQL authority, and is exercised by CI."
+  gaps_remaining: []
   regressions: []
-gaps:
-  - truth: "Phase 08 release authority requires independently re-read PostgreSQL evidence and actual successful command output, and rejects a synthetic self-hashed artifact even when the caller repeats its claims"
-    status: failed
-    reason: "A safe DB-rechecking helper exists, but no CI, CLI, or other release entrypoint calls it. The only positive release-gate test calls the lower-level verifier with observed_authority copied from the synthetic report and command results containing fabricated 64-character digests; this returns qualified. Command digests are checked only for length and exit_code, not produced by executing or binding actual commands."
-    artifacts:
-      - path: "backend/scripts/run_timeline_qualification.py"
-        issue: "verify_release_evidence_from_db is orphaned; main() only generates reports. _command_results_valid accepts arbitrary 64-character strings and never executes or cryptographically binds command output."
-      - path: "tests/ci/test_timeline_release_gate.py"
-        issue: "The positive test builds a synthetic report, passes its own authority back as observed_authority, and uses 'f' * 64 for every output digest; no test invokes verify_release_evidence_from_db against PostgreSQL or captures real command output."
-      - path: ".github/workflows/ci.yml"
-        issue: "No Phase 08 release-authority command or DB-backed verification entrypoint is wired into CI."
-    missing:
-      - "A real release command/CI entrypoint that executes required checks, captures exit codes and output digests itself, then calls verify_release_evidence_from_db with a live PostgreSQL session."
-      - "An integration/CI test proving a self-hashed synthetic report cannot qualify even when it supplies matching caller-controlled authority and fabricated command digests."
 ---
 
 # Phase 8: Versioned Novel Analysis Orchestration and Interactive Timeline Verification Report
 
 **Phase Goal:** 以持久、版本化、证据约束的后台分析任务生成小说时间事件，并在全局分析工作台渐进展示防剧透的双顺序横向时间线。
-**Verified:** 2026-07-13T06:33:15Z
-**Status:** gaps_found
-**Re-verification:** Yes — third independent verification after 08-09
+**Verified:** 2026-07-13T07:01:25Z
+**Status:** passed
+**Re-verification:** Yes — final independent verification after 08-10
 
 ## Goal Achievement
 
-The production timeline path itself is now substantive and working: durable cancellation, prompt/schema-bound reconciliation caching, evidence-derived source ordering, progressive active/candidate APIs, spoiler-safe queries, and the real desktop/mobile browser journey all passed. Phase 08 still cannot pass because the release-authority must-have is not connected to an independent observer. The repository can qualify a synthetic report when a caller repeats the report's own authority and supplies fake 64-character command digests.
+Phase 08 is achieved in the current codebase. The previous release-authority blocker is closed by an executable CLI path that owns both evidence producers: fixed subprocess execution with output-bound SHA-256 attestations and a fresh PostgreSQL authority read. The complete production timeline, cancellation, cache lineage, source ordering, spoiler boundary, API/UI, qualification, and release paths passed independent execution.
 
-### Previous Blocker Re-check
+### Observable Truths
 
-| Previous blocker | Status | Code and executed evidence |
+| # | Truth | Status | Evidence |
+|---:|---|---|---|
+| 1 | REQ-TIME-01 durable, recoverable, cancellable, progressive jobs | ✓ VERIFIED | `worker.py:127-185`; five cancellation boundaries and restart/checkpoint suites passed. |
+| 2 | REQ-TIME-02 immutable versions, validated promotion, overrides, rollback | ✓ VERIFIED | PostgreSQL lifecycle/CAS/rollback tests passed in the 77-test backend suite. |
+| 3 | REQ-TIME-03 deep work starts on first analysis entry, not import | ✓ VERIFIED | API dispatches the production worker; production-worker/idempotent-start tests passed. |
+| 4 | REQ-TIME-04 dual order and exact/relative/fuzzy/unknown precision | ✓ VERIFIED | Strict schemas, reconciliation, real API source ordering, and frontend contracts passed. |
+| 5 | REQ-TIME-05 evidence-bound publication and protected manual corrections | ✓ VERIFIED | Evidence adversarial tests and override lifecycle tests passed. |
+| 6 | REQ-TIME-06 person/order/causal controls | ✓ VERIFIED | Query and frontend tests cover selected-version participants, ordering, and opt-in causal edges. |
+| 7 | REQ-TIME-07 progressive global analysis workspace | ✓ VERIFIED | 68 frontend tests, production build, and real desktop/mobile browser flow passed. |
+| 8 | REQ-TIME-08 server-side spoiler protection | ✓ VERIFIED | Default/full PostgreSQL query comparison, spoiler tests, and real browser disclosure flow passed. |
+| 9 | REQ-TIME-09 tiered routing and deterministic budget pause | ✓ VERIFIED | Persistent call-boundary, budget, capability, no-fallback, and cache tests passed. |
+| 10 | REQ-TIME-10 fiction-only scope | ✓ VERIFIED | New contracts/UI/fixtures remain timeline-only; deferred products are absent. |
+| 11 | D-01 global `/analysis` is primary and `/search` remains available | ✓ VERIFIED | Production build generated both routes; app shell and evidence links are wired. |
+| 12 | D-02 only timeline is exposed, not six intermediates | ✓ VERIFIED | Analysis page and browser/unit tests expose no intermediate-mode menu. |
+| 13 | D-03 responsive zoomable horizontal timeline | ✓ VERIFIED | ECharts dataZoom plus companion list passed desktop and 390px real E2E. |
+| 14 | D-04 one unified timeline supports participant filtering | ✓ VERIFIED | Selected-source participant/query tests passed. |
+| 15 | D-05 story and narrative order are distinct and source-backed | ✓ VERIFIED | DB evidence `source_start` reaches API/type/comparator; real order regression passed. |
+| 16 | D-06 four strict time precision shapes do not invent dates | ✓ VERIFIED | Schema and adversarial suites passed. |
+| 17 | D-07 typed causal overlay is optional | ✓ VERIFIED | Query returns edges only when requested and both endpoints are visible. |
+| 18 | D-08 evidence-valid events publish without mandatory review | ✓ VERIFIED | Worker persists provisional chapter events after validation. |
+| 19 | D-09 events retain source/evidence/model lineage | ✓ VERIFIED | ORM, worker persistence, qualification artifact, and evidence tests verify lineage. |
+| 20 | D-10 append-only overrides survive/relink across reanalysis | ✓ VERIFIED | Override and PostgreSQL lifecycle tests passed. |
+| 21 | D-11 immutable candidate/active/history/rollback lifecycle | ✓ VERIFIED | Stale CAS, failed candidate, manifest, journal, and rollback tests passed. |
+| 22 | D-12 first entry triggers deep work; import does not | ✓ VERIFIED | API → background worker wiring and production worker tests passed. |
+| 23 | D-13 chapter results/checkpoints publish progressively | ✓ VERIFIED | Chapter artifact, evidence, and checkpoint commit path is substantive and tested. |
+| 24 | D-14 frozen balanced extraction and quality reconciliation | ✓ VERIFIED | Production runtime and strict gateway enforce separate deployments without fallback. |
+| 25 | D-15 budget/cache identity includes actual contract lineage | ✓ VERIFIED | `reconciliation_contract_hashes()` feeds the cache key; prompt/schema mutation tests passed. |
+| 26 | D-16 visible IDs precede overlays, edges, counts, aggregates, previews | ✓ VERIFIED | `query.py` visible-set-first flow and spoiler tests passed. |
+| 27 | D-17 full-book disclosure is explicit and persisted per novel | ✓ VERIFIED | API preference and real browser confirmation flow passed. |
+| 28 | D-18 fiction-only contracts and UI | ✓ VERIFIED | No history additions in Phase 08 artifacts. |
+| 29 | D-19 relationship graph, reader AI, and clue tracking remain deferred | ✓ VERIFIED | No Phase 08 implementation/routes for these products. |
+| 30 | D-20 missing progress exposes first chapter only | ✓ VERIFIED | `_chapter_cutoff` and spoiler tests enforce first chapter/empty novel behavior. |
+| 31 | D-21 active and running-candidate data remain source-isolated | ✓ VERIFIED | API and frontend source-isolation tests passed. |
+| 32 | D-22 unknown pricing pauses before provider transport | ✓ VERIFIED | Gateway/budget tests prove zero calls and `paused_budget`. |
+| 33 | Release CLI independently re-reads PostgreSQL authority | ✓ VERIFIED | CLI imports `async_session_factory` internally (`run_timeline_qualification.py:703-710`), calls DB verifier (`635-640`), and a separate observer engine qualifies in `test_real_qualification.py:244-266`. |
+| 34 | Release CLI executes fixed commands and hashes captured output bytes itself | ✓ VERIFIED | Code-owned `CommandSpec` set (`27-63`), direct `subprocess.run` (`66-85`), digest recomputation (`273-285`), and collector tests passed. |
+| 35 | Real DB + successful commands qualify; command/DB/report failures block | ✓ VERIFIED | PostgreSQL positive, exit-9, and manifest-mismatch entry tests passed; forged digest, tampered report, missing report, and non-success policy tests fail closed. |
+
+**Score:** 35/35 truths verified
+
+## Previous Blocker Closure
+
+| Required condition | Status | Independent evidence |
 |---|---|---|
-| Worker polls persisted cancellation between production stages | ✓ VERIFIED | `worker.py` re-reads `AnalysisRun.cancel_requested` after preparation, before extraction transport, after extraction, after chapter persistence, before/after reconciliation, and before promotion. Five PostgreSQL boundary cases passed in `test_final_gaps.py`. |
-| Reconcile cache binds actual prompt/schema/version lineage | ✓ VERIFIED | `reconciliation_contract_hashes()` hashes `RECONCILIATION_PROMPT` and `ReconciliationOutputModel.model_json_schema()`; both enter the durable cache key. Prompt/schema mutation cases each caused a cache miss and audited call. |
-| `source_start` flows DB → API → TS → frontend sort | ✓ VERIFIED | `query.py` takes the minimum persisted `TimelineEvidenceRef.source_start`; `TimelineVisibleEvent` and `TimelineEvent` require it; comparator is chapter → source_start → event ID. Real authenticated API serialization/order test passed. |
-| Spoiler metric and release authority are independently observed | ✗ FAILED | Default/full query comparison is fixed and passed, but DB authority and command attestations remain caller-supplied. The DB wrapper is uncalled and fake command digests qualify in the positive contract test. |
-
-### Requirements — REQ-TIME-01..10
-
-| Requirement | Status | Evidence |
-|---|---|---|
-| REQ-TIME-01 durable/recoverable/cancellable/progressive jobs | ✓ VERIFIED | PostgreSQL lease/checkpoint/resume, atomic chapter publication, and five mid-run cancellation boundaries passed; cancelled runs do not promote. |
-| REQ-TIME-02 immutable versioning/validation/override/rollback | ✓ VERIFIED | Version lifecycle suite proves immutable candidates, stale-CAS rejection, failed-candidate isolation, override relink, and byte-identical rollback manifests. |
-| REQ-TIME-03 first analysis entry triggers deep analysis only | ✓ VERIFIED | Owner-scoped start/resume dispatches the production worker idempotently; completed stages are reused and import has no timeline-worker call. |
-| REQ-TIME-04 dual order and four precision classes | ✓ VERIFIED | Strict schemas and persistence cover exact/relative/fuzzy/unknown; narrative and story order remain separate; source-offset API ordering passed. |
-| REQ-TIME-05 evidence-bound publication/manual protection | ✓ VERIFIED | Production events require persisted Phase 07 evidence offsets/hashes and lineage; invalid evidence fails; append-only manual overlays survive reanalysis. |
-| REQ-TIME-06 person/order/causal controls | ✓ VERIFIED | Selected-version person filtering, story/narrative switch, and opt-in evidence-backed causal edges pass backend/frontend tests. |
-| REQ-TIME-07 progressive global workspace | ✓ VERIFIED | `/analysis` displays separate active/candidate lifecycle, progress/errors/update state, zoomable chart and accessible list; real desktop/mobile journey passed. |
-| REQ-TIME-08 server-side spoiler protection | ✓ VERIFIED | Visible-set-first PostgreSQL queries enforce persisted cutoff, first-chapter default, explicit full-book preference, endpoint-safe edges/counts/previews; default/full observation passed. |
-| REQ-TIME-09 tiered routing and deterministic budget pause | ✓ VERIFIED | Frozen balanced/quality deployments, strict no-fallback gateway, PostgreSQL reserve/settle, unknown-price pause and exact-cache audits passed. |
-| REQ-TIME-10 fiction-only scope | ✓ VERIFIED | Timeline UI/corpus remain fiction-only; relationship graph, reader AI, clue lifecycle, history and six intermediate UI modes are absent. |
-
-**Requirement score:** 10/10 verified
-
-### Decision Verification — D-01..D-22
-
-| Decision | Status | Evidence |
-|---|---|---|
-| D-01 | ✓ VERIFIED | Global `/analysis` is primary; `/search` remains available. |
-| D-02 | ✓ VERIFIED | Workspace exposes timeline only, not analysis intermediates. |
-| D-03 | ✓ VERIFIED | ECharts horizontal zoom/pan plus companion list passed desktop and 390px Playwright. |
-| D-04 | ✓ VERIFIED | Unified timeline is filtered by selected participant. |
-| D-05 | ✓ VERIFIED | Dual order persists; narrative projection is chapter → persisted evidence source_start → ID end to end. |
-| D-06 | ✓ VERIFIED | Four strict precision shapes reject fabricated/incomplete time forms. |
-| D-07 | ✓ VERIFIED | Typed causal overlay is hidden by default and explicitly toggled. |
-| D-08 | ✓ VERIFIED | Evidence-valid LLM events publish provisionally without a mandatory review queue. |
-| D-09 | ✓ VERIFIED | Events retain chapter, offsets/hash, confidence, timestamps and prompt/schema/model lineage. |
-| D-10 | ✓ VERIFIED | Field-level append-only overrides survive or become explicit `needs_relink`. |
-| D-11 | ✓ VERIFIED | Candidate/active pointer, validation, CAS promotion, history and rollback are PostgreSQL-backed. |
-| D-12 | ✓ VERIFIED | Deep work starts on analysis entry; import does not trigger timeline LLM work. |
-| D-13 | ✓ VERIFIED | Chapter artifact/evidence/checkpoint commit progressively; partial and active views remain distinct. |
-| D-14 | ✓ VERIFIED | Extraction uses frozen balanced deployment; reconciliation uses frozen quality deployment. |
-| D-15 | ✓ VERIFIED | Budget/checkpoint/cache lineage includes source, hierarchy, actual prompt/schema, model, decoding and config. |
-| D-16 | ✓ VERIFIED | API filters visible IDs before overrides, edges, filters, counts, aggregates and previews. |
-| D-17 | ✓ VERIFIED | Full-book disclosure requires confirmation and persisted per-novel preference. |
-| D-18 | ✓ VERIFIED | New contracts, fixtures and UI are fiction-only. |
-| D-19 | ✓ VERIFIED | Relationship graph, reader selected-text AI and clue tracking remain absent/deferred. |
-| D-20 | ✓ VERIFIED | Missing progress exposes only the first chapter; no chapter means no events. |
-| D-21 | ✓ VERIFIED | Active/running-candidate envelopes, events, people and aggregates are source-isolated. |
-| D-22 | ✓ VERIFIED | Unknown pricing pauses before transport and no later provider call is authorized. |
-
-**Decision score:** 22/22 verified
-
-### Additional Plan Must-Have
-
-| Must-have | Status | Evidence |
-|---|---|---|
-| Release authority requires independent DB observations and real command outputs; synthetic self-hash artifacts are rejected | ✗ FAILED | `verify_release_evidence_from_db()` has no call site. `main()` only generates reports. Positive release test qualifies a synthetic report with copied authority and `'f' * 64` output hashes. |
-
-**Combined score:** 32/33 unique must-haves verified
+| `verify_release_evidence_from_db()` has an executable CLI caller and enters CI | ✓ VERIFIED | `run_release_verification()` calls it; `--verify-release` reaches that entry; CI integration command includes `test_real_qualification.py` at `.github/workflows/ci.yml:444`. |
+| Positive production path creates its own DB observer | ✓ VERIFIED | CLI imports the production factory internally; positive integration creates a separate SQLAlchemy engine/session factory and re-reads rows. |
+| Structured fixed commands are really executed and exact combined output is hashed | ✓ VERIFIED | No shell interpolation; fixed cwd/argv specs feed `subprocess.run`, stdout+stderr bytes are retained, SHA-256 is computed and recomputed before acceptance. |
+| CLI cannot inject authority, command results, digest, or arbitrary command list | ✓ VERIFIED | Parser help exposes report/policy/output and qualification/E2E modes only; forbidden argument contract passed. |
+| Positive test does not copy authority, use pseudo-digests, or monkeypatch success | ✓ VERIFIED | Positive PostgreSQL test passes only observer sessions and genuinely executed `CommandSpec`s. Copied authority and `'f' * 64` occur only in a negative test asserting `blocked_release`. |
+| Non-zero command, DB mismatch, missing/tampered report fail closed | ✓ VERIFIED | Exit 9 and mutated manifest tests block; tamper contracts block; missing report CLI emitted `blocked_release`, `quality_comparable=false`, exit 1. |
 
 ## Required Artifacts
 
-| Artifact | L1/L2/L3/L4 status | Details |
-|---|---|---|
-| `backend/app/services/timeline/worker.py` | ✓ VERIFIED | Substantive production Phase 07 → extraction → persistence → reconcile → validate/promote pipeline; API dispatches it; DB evidence and checkpoints flow. |
-| `backend/app/services/timeline/model_gateway.py` | ✓ VERIFIED | Strict persistent capability/budget/attempt/repair/cache boundary used by both production stages. |
-| `backend/app/services/timeline/reconcile.py` | ✓ VERIFIED | Actual prompt/schema contract is shared by transport and cache hashing; deterministic topology/causal materialization is wired. |
-| `backend/app/services/timeline/query.py` | ✓ VERIFIED | PostgreSQL visible-set-first projection derives source_start from evidence and returns real active/candidate data. |
-| `backend/app/api/timeline.py` | ✓ VERIFIED | Owner-scoped lifecycle, dispatch, query, edit, preference and rollback endpoints are wired. |
-| `frontend/src/app/analysis/page.tsx` | ✓ VERIFIED | Real API polling and selected-source state feed timeline controls/chart/status. |
-| `frontend/src/components/timeline/timeline-chart.tsx` | ✓ VERIFIED | Required typed source_start drives stable narrative ordering and real browser rendering. |
-| `backend/scripts/run_timeline_qualification.py` | ⚠ PARTIAL | Production qualification and spoiler observation are real, but release verification's independent-observer wrapper is orphaned and command attestations are not produced by execution. |
-| `tests/ci/test_timeline_release_gate.py` | ✗ INCOMPLETE WIRING | Negative self-hash case exists, but positive gate uses synthetic copied authority and fabricated hashes instead of DB-backed/output-backed observations. |
-| `frontend/e2e/timeline-real.spec.ts` | ✓ VERIFIED | Real Next.js/FastAPI/PostgreSQL/API path; no timeline interception; desktop/mobile passed. |
+| Artifact | Expected | Status | Details |
+|---|---|---|---|
+| `backend/app/services/timeline/worker.py` | Production durable orchestration | ✓ VERIFIED | 606 substantive lines; API dispatches it; real PostgreSQL artifacts flow through it. |
+| `backend/app/services/timeline/model_gateway.py` | Strict persistent model-call boundary | ✓ VERIFIED | 457 lines; budget, capability, repair, audit, exact-cache behavior tested. |
+| `backend/app/services/timeline/reconcile.py` | Contract-bound reconciliation | ✓ VERIFIED | 240 lines; real prompt/schema hashes and explicit conflict handling. |
+| `backend/app/services/timeline/query.py` | Spoiler-safe source-isolated projection | ✓ VERIFIED | 177 lines; DB events/evidence drive visible output. |
+| `backend/app/api/timeline.py` | Owner-scoped lifecycle/query API | ✓ VERIFIED | 183 lines; routes dispatch/query/edit/preference/rollback services. |
+| `frontend/src/app/analysis/page.tsx` | Global progressive timeline workspace | ✓ VERIFIED | 109 lines; real typed API state feeds version-isolated controls/chart. |
+| `frontend/src/components/timeline/timeline-chart.tsx` | Dual-order accessible timeline | ✓ VERIFIED | 71 lines; required `source_start`, zoom, list, and interaction are wired. |
+| `backend/scripts/run_timeline_qualification.py` | Executable self-observing release gate | ✓ VERIFIED | 911 lines; qualification, command collector, DB observer, CLI verdict all wired. |
+| `tests/ci/test_timeline_release_gate.py` | Forgery and CLI contracts | ✓ VERIFIED | 204 lines; negative-only synthetic authority/digest use. |
+| `backend/tests/integration/timeline/test_real_qualification.py` | PostgreSQL positive/fail-closed entry proof | ✓ VERIFIED | 323 lines; independent observer and real subprocesses. |
+| `.github/workflows/ci.yml` | CI execution of PostgreSQL release entry tests | ✓ VERIFIED | Integration job runs the real qualification test after migration. |
+
+`gsd-sdk verify.artifacts` independently reported 4/4 08-10 artifacts present and substantive. Its key-link parser returned `Source file not found` because PLAN `from` fields are descriptive labels rather than literal paths; the links were therefore verified manually by call-site and executed-test evidence above.
 
 ## Key Link Verification
 
 | From | To | Via | Status | Details |
 |---|---|---|---|---|
-| Start/resume API | production worker | `BackgroundTasks` → `dispatch_timeline_run` | ✓ WIRED | Real API/browser and production-worker tests reach progressive candidate and promotion. |
-| Worker | Phase 07 hierarchy | active build + evidence-node queries | ✓ WIRED | Evidence offsets/hashes become persisted event refs. |
-| Worker | cancellation state | fresh DB read at stage boundaries | ✓ WIRED | Five boundary cases end `cancelled`, suppress later calls and active pointer. |
-| Worker | strict model gateway | extraction and reconciliation `generate()` | ✓ WIRED | Durable attempts, reservation, settlement and exact cache are observed. |
-| Reconcile cache | actual contract lineage | canonical prompt + Pydantic JSON schema hashes | ✓ WIRED | Either hash mutation causes one new provider call. |
-| Evidence refs | API event | minimum persisted source_start | ✓ WIRED | Real authenticated response returns ordered `[0, 80, 100]`. |
-| API event | frontend comparator | required `TimelineEvent.source_start` | ✓ WIRED | No optional cast/fallback remains in TS comparator. |
-| Default/full query | spoiler metric | persisted cutoff + event/edge/count set comparison | ✓ WIRED | Non-tautological observation passed against PostgreSQL. |
-| Release report | independent DB/command authority | DB wrapper + command execution | ✗ NOT WIRED | Wrapper has zero call sites; command output is never executed/captured by the gate. |
+| CLI `--verify-release` | `run_release_verification` | `_run_release_cli` with internally imported factory | ✓ WIRED | Machine-readable verdict; non-qualified returns exit 1. |
+| Release entry | fixed command set | code-owned cwd/argv → direct subprocess | ✓ WIRED | No caller CLI command list or shell text. |
+| Command collector | release checker | captured bytes + exit code + recomputed SHA-256 | ✓ WIRED | Fabricated 64-char strings cannot satisfy bytes/digest validation. |
+| Release entry | PostgreSQL authority | `verify_release_evidence_from_db` → fresh session | ✓ WIRED | Run/version/pointer/attempt/evidence authority is independently reconstructed. |
+| CI integration job | real release-entry tests | pytest against locked PostgreSQL service | ✓ WIRED | Workflow line 444; workflow policy suites passed. |
+| API start/resume | production worker | background dispatch | ✓ WIRED | Production-worker and real browser paths passed. |
+| Worker | Phase 07 hierarchy/model gateway/promotion | DB evidence → strict calls → persisted candidate → CAS | ✓ WIRED | Complete backend suite passed. |
+| Evidence refs | API/frontend order | minimum `source_start` → required TS field → comparator | ✓ WIRED | Real authenticated response/order regression passed. |
+| Reading progress | default/full projection | server cutoff before derived fields | ✓ WIRED | Spoiler and browser tests passed. |
 
 ## Data-Flow Trace (Level 4)
 
-| Artifact | Data variable | Source | Produces real data | Status |
+| Artifact | Data Variable | Source | Produces Real Data | Status |
 |---|---|---|---|---|
-| Worker | evidence package/checkpoint | Phase 07 PostgreSQL hierarchy | Yes | ✓ FLOWING |
-| Reconciliation | output/cache identity | strict quality gateway + actual prompt/schema lineage | Yes | ✓ FLOWING |
-| Timeline query/chart | `source_start`, events, people, edges | persisted event/evidence rows through API | Yes | ✓ FLOWING |
-| Spoiler qualification | default/full IDs, edges, counts, cutoff | two production queries + reading progress | Yes | ✓ FLOWING |
-| Release authority | observed DB rows and command outputs | caller-supplied values; safe DB wrapper unused | No authoritative producer wired | ✗ DISCONNECTED |
+| Worker | chapter package/events/checkpoints | Phase 07 PostgreSQL hierarchy/evidence | Yes | ✓ FLOWING |
+| Reconciliation | output/cache identity | persisted candidates + strict quality gateway + actual contract hashes | Yes | ✓ FLOWING |
+| Timeline query/UI | events, people, edges, counts, `source_start` | PostgreSQL → API → typed frontend | Yes | ✓ FLOWING |
+| Spoiler qualification | default/full IDs, edges, counts | two production queries + persisted cutoff | Yes | ✓ FLOWING |
+| Release authority | observed authority | new PostgreSQL observer session | Yes | ✓ FLOWING |
+| Release command evidence | exit/digest | internally executed fixed subprocess output bytes | Yes | ✓ FLOWING |
 
 ## Behavioral Spot-Checks
 
 | Behavior | Command | Result | Status |
 |---|---|---|---|
-| Four final gap regressions | `backend/.venv/Scripts/python.exe -m pytest tests/integration/timeline/test_final_gaps.py -q` | 9 passed | ✓ PASS |
-| Full Phase 08 backend suite | `backend/.venv/Scripts/python.exe -m pytest tests/unit/timeline tests/integration/timeline tests/adversarial/test_timeline_evidence.py -q` | 74 passed | ✓ PASS |
-| Release-gate contracts | `backend/.venv/Scripts/python.exe -m pytest tests/ci/test_timeline_release_gate.py -q` | 8 passed; positive test is synthetic and demonstrates the remaining wiring gap | ⚠ PARTIAL |
+| PostgreSQL release authority | `backend/.venv/Scripts/python.exe -m pytest tests/integration/timeline/test_real_qualification.py -q` | 5 passed | ✓ PASS |
+| Release/workflow/CI policy | `backend/.venv/Scripts/python.exe -m pytest tests/ci/test_timeline_release_gate.py tests/ci/test_workflow_security.py tests/ci/test_ci_gate.py -q` | 47 passed | ✓ PASS |
+| Cancellation/cache/source/spoiler regressions | `backend/.venv/Scripts/python.exe -m pytest tests/integration/timeline/test_final_gaps.py -q` | 9 passed | ✓ PASS |
+| Full Phase 08 backend | `backend/.venv/Scripts/python.exe -m pytest tests/unit/timeline tests/integration/timeline tests/adversarial/test_timeline_evidence.py -q` | 77 passed | ✓ PASS |
 | Frontend unit/contracts | `npm test -- --run` | 68 passed | ✓ PASS |
-| Frontend production build | `npm run build` | Compiled/typed; `/analysis` and `/search` generated | ✓ PASS |
-| Real desktop/mobile user flow | `npm run test:e2e -- timeline-real.spec.ts` | exit 0; 2 projects through real Next.js/FastAPI/PostgreSQL APIs | ✓ PASS |
-| Migration head | `backend/.venv/Scripts/python.exe -m alembic current` | `10analysistime01 (head)` | ✓ PASS |
-| Schema drift | `backend/.venv/Scripts/python.exe -m alembic check` | Phase 07 add/remove index drift remains | ⚠ WARNING, pre-existing/non-Phase-08 |
+| Frontend production build | `npm run build` | passed; `/analysis` and `/search` generated | ✓ PASS |
+| Real desktop/mobile flow | `npm run test:e2e -- timeline-real.spec.ts` | exit 0; 2 Playwright projects | ✓ PASS |
+| Missing report fail-closed | `python scripts/run_timeline_qualification.py --verify-release --report does-not-exist.json` | `blocked_release`, non-comparable, exit 1 | ✓ PASS |
+| Migration head | `python -m alembic current` | `10analysistime01 (head)` | ✓ PASS |
+| Schema drift | `python -m alembic check` | Phase 07 index drift remains | ⚠ WARNING |
+
+Pytest emitted only the known unavailable `pytest-timeout` configuration/marker warnings; no tests were skipped or failed in the full Phase 08 suite.
 
 ## Probe Execution
 
-No Phase 08 plan declares a probe and no `scripts/**/probe-*.sh` file was found. Step 7c is not applicable.
+No Phase 08 PLAN declares a probe and no `scripts/**/probe-*.sh` path exists. Step 7c is not applicable.
 
 ## Requirements Coverage
 
-All `REQ-TIME-01..10` occur in Phase 08 plan frontmatter and `.planning/REQUIREMENTS.md`; none is orphaned. All ten are satisfied by current implementation and executed tests. The distinct release-authority must-have comes from 08-06/08-09 qualification plans and remains blocking despite the product requirements passing.
+| Requirement | Source Plans | Description | Status | Evidence |
+|---|---|---|---|---|
+| REQ-TIME-01 | 01, 04, 06, 07, 09, 10 | Durable/recoverable/cancellable/progressive jobs | ✓ SATISFIED | Worker, cancellation, checkpoint, API and release tests. |
+| REQ-TIME-02 | 01, 03, 06, 07, 10 | Immutable version/promotion/rollback | ✓ SATISFIED | PostgreSQL lifecycle and qualification authority. |
+| REQ-TIME-03 | 01, 04, 07 | First-entry deep analysis | ✓ SATISFIED | API-to-worker production tests. |
+| REQ-TIME-04 | 02, 03, 06, 08, 09 | Dual order/four precision | ✓ SATISFIED | Schema, reconciliation, source offset, UI tests. |
+| REQ-TIME-05 | 02, 03, 06, 07, 10 | Evidence/lineage/override | ✓ SATISFIED | Adversarial, persistence, override, release evidence. |
+| REQ-TIME-06 | 03, 04, 05, 06, 08 | Person/order/causal UI/API | ✓ SATISFIED | Backend/frontend/browser coverage. |
+| REQ-TIME-07 | 05, 06, 08, 09 | Progressive global workspace | ✓ SATISFIED | Build and real browser flow. |
+| REQ-TIME-08 | 04, 05, 06, 08, 09 | Spoiler protection | ✓ SATISFIED | Visible-set tests and default/full production observation. |
+| REQ-TIME-09 | 02, 03, 06, 07, 09, 10 | Routing/budget/cache | ✓ SATISFIED | Gateway, persistence, qualification, release checks. |
+| REQ-TIME-10 | 05, 06, 08 | Fiction-only boundary | ✓ SATISFIED | Scope scan and UI/fixture evidence. |
 
-## Anti-Patterns and Disconfirmation Pass
+All REQ-TIME-01..10 appear in PLAN frontmatter and `.planning/REQUIREMENTS.md`; no Phase 08 requirement is orphaned.
 
-| File | Pattern | Severity | Impact |
-|---|---|---|---|
-| `backend/scripts/run_timeline_qualification.py:219-229` | Command evidence validates only command names, `exit_code == 0`, and string length 64 | 🛑 BLOCKER | Fabricated digests satisfy the release gate; no real output binding. |
-| `backend/scripts/run_timeline_qualification.py:523-542` | DB-backed verifier has no repository call site | 🛑 BLOCKER | Independent authority exists as an orphaned helper, not a release path. |
-| `tests/ci/test_timeline_release_gate.py:25-88` | Synthetic positive report, copied authority, `'f' * 64` command digests | 🛑 BLOCKER | Green test does not prove independent DB evidence or actual commands. |
+## Anti-Patterns Found
 
-No unreferenced `TBD`, `FIXME`, or `XXX` marker exists in Phase 08-owned implementation files. The apparent `return {}` matches an intentional failed authority lookup; the reconcile empty mapping is paired with an explicit chronology conflict and is not a stub.
+| File | Line | Pattern | Severity | Impact |
+|---|---:|---|---|---|
+| `backend/scripts/run_timeline_qualification.py` | 493 | `return {}` | ℹ INFO | Intentional missing-authority result; equality check fails closed. |
+| `backend/app/services/timeline/reconcile.py` | 239 | `return {}, [conflict]` | ℹ INFO | Intentional contradictory chronology result; conflict is preserved instead of fabricating order. |
+| Repository migration state | — | Phase 07 index drift | ⚠ WARNING | `ix_chunk_hierarchy_nodes_build_id` add and `idx_text_chunks_hierarchy_node` remove remain outside Phase 08 ownership; Phase 08 head and tests pass. |
 
-Disconfirmation checks:
+No Phase 08-owned implementation file contains unreferenced `TBD`, `FIXME`, or `XXX`. No placeholder UI, console-only handler, orphaned Phase 08 artifact, or hardcoded empty dynamic source was found.
 
-- Partial requirement: none among REQ-TIME-01..10; the separate release-authority must-have is incomplete.
-- Misleading green test: the positive release test accepts caller-controlled synthetic observations while claiming independent authority.
-- Uncovered error path: no integration test invokes the DB-backed release wrapper and proves forged caller observations cannot bypass it.
+Disconfirmation pass:
 
-## Deferred Items
-
-No later roadmap phase specifically owns this release-authority wiring. Relationship graph, reader AI and clue tracking are intentional future scope and are not Phase 08 gaps.
+- Partial requirement: none among the 35 final must-haves.
+- Misleading green test: synthetic copied authority and `'f' * 64` remain only in a negative contract that now expects `blocked_release`; the positive test uses a fresh DB observer and executed subprocesses.
+- Uncovered error path: malformed/missing/tampered report, non-zero command, DB mismatch, blocked live policy, spoiler failure, and missing production output all have code or executed test evidence.
 
 ## Human Verification Required
 
-None for this verdict. The remaining failure is programmatically observable and requires wiring/test changes, not subjective UAT.
+None. The visual/responsive and real-time progression requirements have deterministic desktop/mobile Playwright coverage against real Next.js, FastAPI, PostgreSQL, and timeline APIs.
+
+## Deferred Items
+
+No failed item required deferred filtering. Relationship graph, reader AI, clue tracking, and history support are explicit non-goals rather than Phase 08 gaps.
 
 ## Gaps Summary
 
-08-09 closes the prior cancellation, reconciliation-cache, source-offset and spoiler-measurement defects. The phase remains blocked at the release gate: independent PostgreSQL observation and real command-output production are implemented only as an unused helper/parameter contract, while the actual positive test can qualify synthetic caller-controlled evidence. Under goal-backward verification, an orphaned safety function is not a working release authority.
+No blocking or warning-class must-have gap remains. The sole previous blocker is closed. The pre-existing Phase 07 Alembic index drift is recorded as a repository warning and does not contradict a Phase 08 truth, artifact, or key link.
 
 ---
 
-_Verified: 2026-07-13T06:33:15Z_
+_Verified: 2026-07-13T07:01:25Z_
 _Verifier: the agent (gsd-verifier)_
