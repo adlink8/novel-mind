@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v0.6
 milestone_name: Versioned Novel Analysis and Timeline
 status: in_progress
-last_updated: "2026-07-13T05:16:30.733Z"
+last_updated: "2026-07-13T05:47:09.391Z"
 progress:
   total_phases: 7
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 32
-  completed_plans: 35
-  percent: 57
+  completed_plans: 36
+  percent: 71
 ---
 
 # Project State
@@ -23,17 +23,17 @@ See `.planning/PROJECT.md` and `IMPLEMENTATION-STATUS.md`.
 
 ## Current Position
 
-Phase: 08 (Versioned novel analysis orchestration and interactive timeline) — GAP CLOSURE IN PROGRESS
-Plan: 7 of 8
-**Phase 08 gap plan 08-07 COMPLETE** — 08-08 remains pending and was not executed
+Phase: 08 (Versioned novel analysis orchestration and interactive timeline) — GAP CLOSURE COMPLETE, PENDING RE-VERIFICATION
+Plan: 8 of 8
+**Phase 08 gap plans 08-07 and 08-08 COMPLETE** — independent re-verification remains
 
 - Branch: `feat/phase2-wave2-embedding`
-- Last activity: 2026-07-13 — 08-07 production worker orchestration and PostgreSQL model-call boundaries completed (63 timeline tests passed)
+- Last activity: 2026-07-13 — 08-08 real ordering/source isolation, PostgreSQL qualification, and unmocked browser E2E completed (65 backend, 68 frontend, 2 browser, 7 release-gate tests passed)
 - Plan directory: `.planning/phases/08-versioned-novel-analysis-orchestration-and-interactive-timel/`
 
 ## Auto Routing
 
-下一动作为 08-08 gap plan；本次执行明确停止于 08-07，不自动启动 08-08。`auto_start` 保持关闭。
+下一动作为独立 verifier 复验 Phase 08 gaps；不由 executor 创建或修改 `08-VERIFICATION.md`。`auto_start` 保持关闭。
 
 ## Phase 08 Execution Metrics
 
@@ -43,6 +43,7 @@ Plan: 7 of 8
 - 08-05: 11min, 3 tasks, 7 files, frontend 66 unit tests plus desktop/mobile Playwright passed.
 - 08-06: 9min, 3 tasks, 6 files, backend 56 + controlled live 7 + CI 5 + frontend 66 tests and build passed.
 - 08-07: 26min, 3 tasks, 9 files, 63 timeline tests passed including real PostgreSQL concurrency coverage.
+- 08-08: 24min, 3 tasks, 9 files, backend 65 + frontend 68 + real desktop/mobile browser 2 + release gate 7 tests passed.
 
 ## Phase 08 Decisions
 
@@ -60,6 +61,9 @@ Plan: 7 of 8
 - Production timeline work is driven by durable background workers over the active Phase 07 hierarchy and resumes from completed chapter/stage checkpoints.
 - Gateway budget reservations, call attempts, outcomes, and exact cache recovery are PostgreSQL-backed and auditable across process restarts.
 - Production extraction and reconciliation use fixed no-fallback deployments; unsupported capability, unknown pricing, or budget rejection pauses before a provider call.
+- Narrative timeline projection orders by chapter, source offset/index, then event ID; participant controls derive only from the selected version.
+- Phase 08 release qualification requires signed PostgreSQL production-worker artifacts and measured visible-query output.
+- Timeline browser E2E uses real Next.js, FastAPI, PostgreSQL, and timeline APIs with only the provider transport controlled.
 
 ## Phase 06 (v0.5) — COMPLETE
 
@@ -117,6 +121,5 @@ CLI：`backend/scripts/run_chunker_qualification.py`
 
 ## Next Action
 
-1. 08-08 仍待单独执行；本次不进入该计划。
-2. 08-08 完成后再由独立 verifier 复验 Phase 08 gaps。
-3. 保留本地 BGE / 阅读器 UX 等非 Phase 08 WIP，不纳入 Phase 08 提交。
+1. 由独立 verifier 复验 Phase 08 gaps 3-4；executor 未修改 `08-VERIFICATION.md`。
+2. 保留本地 BGE / 阅读器 UX 等非 Phase 08 WIP，不纳入 Phase 08 提交。
