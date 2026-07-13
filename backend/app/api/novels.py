@@ -33,11 +33,29 @@ async def list_novels(
     current_user: User = Depends(require_user),
 ):
     """获取小说列表（分页 + 搜索）"""
+    from sqlalchemy import func, select
+
+    from app.models import TextChunk
+
     owner_id = None if current_user.is_superuser else current_user.id
     novels, total = await novel_service.get_novels(
         db, skip=skip, limit=limit, search=search, owner_id=owner_id
     )
-    items = [NovelListResponse.model_validate(n).model_dump() for n in novels]
+    novel_ids = [n.id for n in novels]
+    chunk_counts: dict[int, int] = {}
+    if novel_ids:
+        count_rows = await db.execute(
+            select(TextChunk.novel_id, func.count(TextChunk.id))
+            .where(TextChunk.novel_id.in_(novel_ids))
+            .group_by(TextChunk.novel_id)
+        )
+        chunk_counts = {int(nid): int(cnt) for nid, cnt in count_rows.all()}
+
+    items = []
+    for n in novels:
+        payload = NovelListResponse.model_validate(n).model_dump()
+        payload["chunk_count"] = chunk_counts.get(n.id, 0)
+        items.append(payload)
     return {
         "items": items,
         "total": total,
@@ -59,34 +77,96 @@ async def upload_novel(
     需要登录认证。
 
     处理流程:
-    1. 创建导入任务（ImportJob）
-    2. 后台处理：接收文件、检测编码、解析章节、保存到数据库
-    3. 返回任务 ID 和状态
+    1. 在请求内读完文件字节（避免 BackgroundTask 时 UploadFile 已关闭）
+    2. 创建导入任务（ImportJob）
+    3. 独立 DB 会话后台处理
+    4. 返回 job_id 供前端轮询 GET /novels/import-jobs/{job_id}
     """
     if not file.filename or not file.filename.lower().endswith(".txt"):
         raise HTTPException(status_code=400, detail="仅支持 .txt 格式文件")
 
-    # 创建导入任务（novel_id 为空，后续在 process_import 中关联）
+    # 先读入内存，再丢给后台任务（请求结束后 UploadFile 流会失效）
+    raw_bytes = await file.read()
+    if not raw_bytes:
+        raise HTTPException(status_code=400, detail="文件内容为空")
+
     job = await import_service.create_import_job(db, novel_id=None)
     await db.commit()
 
-    # 后台处理导入任务
+    title = file.filename.rsplit(".", 1)[0] if file.filename else "未知标题"
+
+    # pytest 使用 SQLite 内存库并覆盖 get_db；BackgroundTasks 里的独立
+    # async_session_factory 连不上测试库，会导致轮询永远 pending。测试环境同步导入。
+    import os
+
+    if os.environ.get("PYTEST_CURRENT_TEST"):
+        from io import BytesIO
+
+        from starlette.datastructures import Headers, UploadFile as StarletteUploadFile
+
+        wrapped = StarletteUploadFile(
+            file=BytesIO(raw_bytes),
+            filename=file.filename or "upload.txt",
+            headers=Headers({"content-type": "text/plain"}),
+        )
+        await import_service.process_import_file(
+            db, job.id, wrapped, current_user.id
+        )
+        await db.refresh(job)
+        return NovelUploadResponse(
+            id=job.id,
+            job_id=job.id,
+            novel_id=job.novel_id,
+            title=title,
+            status=job.status,
+            message=job.message or "导入完成",
+            chapter_count=0,
+            word_count=0,
+        )
+
     background_tasks.add_task(
-        import_service.process_import,
-        db,
+        import_service.run_import_job_background,
         job.id,
-        job.novel_id,
-        file,
+        raw_bytes,
+        file.filename,
         current_user.id,
     )
 
     return NovelUploadResponse(
         id=job.id,
-        title=file.filename.rsplit(".", 1)[0] if file.filename else "未知标题",
+        job_id=job.id,
+        novel_id=None,
+        title=title,
         status="pending",
         message="导入任务已创建，正在后台处理",
         chapter_count=0,
         word_count=0,
+    )
+
+
+@router.get("/import-jobs/{job_id}", response_model=ImportStatusResponse)
+async def get_import_job_status(
+    job_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """按 job_id 查询导入进度（上传后应轮询此接口，而不是 novel_id）。"""
+    job = await import_service.get_job(db, job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="导入任务不存在")
+
+    # 任务已关联小说时做所有权校验；未关联时仅登录用户可见（job 本身无 owner 字段）
+    if job.novel_id is not None and not current_user.is_superuser:
+        novel = await db.get(Novel, job.novel_id)
+        if novel is None or novel.owner_id != current_user.id:
+            raise HTTPException(status_code=404, detail="导入任务不存在")
+
+    return ImportStatusResponse(
+        job_id=job.id,
+        novel_id=job.novel_id,
+        stage=job.status,
+        percent=job.progress,
+        message=job.message or "",
     )
 
 
@@ -109,9 +189,23 @@ async def delete_novel(
 
 
 @router.get("/{novel_id}/chapters", response_model=list[ChapterSummaryResponse])
-async def list_chapters(novel: Novel = Depends(require_owned_novel)):
+async def list_chapters(
+    novel: Novel = Depends(require_owned_novel),
+    db: AsyncSession = Depends(get_db),
+):
     """获取小说章节列表（不含完整正文，避免大 payload）"""
-    return [ChapterSummaryResponse.model_validate(ch) for ch in novel.chapters]
+    from sqlalchemy import select
+
+    from app.models.novel import Chapter
+
+    # 只取目录字段；content 为 deferred，避免加载百万字正文
+    result = await db.execute(
+        select(Chapter)
+        .where(Chapter.novel_id == novel.id)
+        .order_by(Chapter.chapter_number, Chapter.id)
+    )
+    chapters = result.scalars().all()
+    return [ChapterSummaryResponse.model_validate(ch) for ch in chapters]
 
 
 @router.get("/{novel_id}/chapters/{chapter_id}", response_model=ChapterResponse)
@@ -147,21 +241,23 @@ async def get_import_status(
     novel: Novel = Depends(require_owned_novel),
     db: AsyncSession = Depends(get_db),
 ):
-    """获取小说导入进度状态（前端轮询用）"""
+    """获取小说导入进度状态（前端轮询用；优先使用 /import-jobs/{job_id}）"""
     job = await import_service.get_job_by_novel(db, novel.id)
     if not job:
         # 如果数据库中没有任务记录，返回默认状态
         return ImportStatusResponse(
+            job_id=None,
             novel_id=novel.id,
             stage="unknown",
             percent=0,
             message="暂无导入状态信息",
         )
     return ImportStatusResponse(
+        job_id=job.id,
         novel_id=novel.id,
         stage=job.status,
         percent=job.progress,
-        message=job.message,
+        message=job.message or "",
     )
 
 

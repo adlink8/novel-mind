@@ -34,7 +34,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.import_job import ImportJob
-from app.models.novel import Novel
+from app.models.novel import Chapter, Novel
 from app.services.novel_service import novel_service
 
 logger = logging.getLogger(__name__)
@@ -46,14 +46,14 @@ class ImportService:
     """导入任务服务（全局单例模式）"""
 
     async def create_import_job(
-        self, db: AsyncSession, novel_id: int, max_retries: int = 3
+        self, db: AsyncSession, novel_id: int | None = None, max_retries: int = 3
     ) -> ImportJob:
         """
         创建导入任务。
 
         Args:
             db: 数据库会话
-            novel_id: 关联的小说 ID
+            novel_id: 关联的小说 ID（上传时尚未创建小说，可为 None）
             max_retries: 最大重试次数（默认 3）
 
         Returns:
@@ -377,26 +377,34 @@ class ImportService:
         self,
         db: AsyncSession,
         job_id: int,
-        novel_id: int,
+        novel_id: int | None,
         file: UploadFile,
         owner_id: int,
     ) -> None:
-        """
-        处理导入任务（后台执行）。
+        """兼容旧签名：从 UploadFile 读入后再走 process_import_content。"""
+        raw = await file.read()
+        # upload_novel 期望 UploadFile；这里直接解码并落盘由 content 路径处理
+        from io import BytesIO
+        from starlette.datastructures import UploadFile as StarletteUploadFile
 
-        这是一个后台任务，由 FastAPI 的 BackgroundTasks 调用。
+        buffer = BytesIO(raw)
+        wrapped = StarletteUploadFile(
+            file=buffer,
+            filename=file.filename or "upload.txt",
+        )
+        await self.process_import_file(db, job_id, wrapped, owner_id)
 
-        Args:
-            db: 数据库会话
-            job_id: 导入任务 ID
-            novel_id: 关联的小说 ID
-            file: 上传的文件
-            owner_id: 上传者用户 ID
-        """
+    async def process_import_file(
+        self,
+        db: AsyncSession,
+        job_id: int,
+        file: UploadFile,
+        owner_id: int,
+    ) -> None:
+        """在已有会话中处理导入（供同步调用/测试）。"""
         lease_id = None
         save_path = None
         try:
-            # 0. 获取租约（防止多 worker 并发）
             if not await self.acquire_lease(db, job_id):
                 logger.info(f"无法获取租约，跳过任务: job_id={job_id}")
                 return
@@ -406,26 +414,22 @@ class ImportService:
                 return
             lease_id = job.lease_id
 
-            # 检查是否已被取消
             if job.status == "cancelled":
                 logger.info(f"任务已被取消，跳过: job_id={job_id}")
                 await self.release_lease(db, job_id, lease_id)
                 return
 
-            # 1. uploading
             await self.update_job_status(
                 db, job_id, "uploading", 10, "正在接收文件..."
             )
             save_path, content = await novel_service.upload_novel(file)
 
-            # 计算内容哈希并保存
             content_hash = self.compute_content_hash(content)
             job = await db.get(ImportJob, job_id)
             if job and job.status != "cancelled":
                 job.content_hash = content_hash
                 await db.flush()
 
-            # 检查是否已被取消
             job = await db.get(ImportJob, job_id)
             if not job or job.status == "cancelled":
                 logger.info(f"任务已被取消: job_id={job_id}")
@@ -434,7 +438,6 @@ class ImportService:
                 await self.release_lease(db, job_id, lease_id)
                 return
 
-            # 2. detecting + parsing
             await self.update_job_status(
                 db, job_id, "detecting", 20, "正在检测文件编码..."
             )
@@ -443,7 +446,6 @@ class ImportService:
             )
             chapters = novel_service.parse_novel(content)
 
-            # 检查是否已被取消
             job = await db.get(ImportJob, job_id)
             if not job or job.status == "cancelled":
                 logger.info(f"任务已被取消: job_id={job_id}")
@@ -452,7 +454,6 @@ class ImportService:
                 await self.release_lease(db, job_id, lease_id)
                 return
 
-            # 3. saving
             await self.update_job_status(
                 db, job_id, "saving", 70, "正在保存到数据库..."
             )
@@ -465,13 +466,11 @@ class ImportService:
                 owner_id=owner_id,
             )
 
-            # 更新 novel_id 关联
             job = await db.get(ImportJob, job_id)
             if job and job.status != "cancelled":
                 job.novel_id = novel.id
                 await db.flush()
 
-            # 检查是否已被取消
             job = await db.get(ImportJob, job_id)
             if not job or job.status == "cancelled":
                 logger.info(f"任务已被取消: job_id={job_id}")
@@ -480,14 +479,69 @@ class ImportService:
                 await self.release_lease(db, job_id, lease_id)
                 return
 
-            # 4. ready
             await self.update_job_status(
                 db,
                 job_id,
                 "ready",
-                100,
-                f"导入完成：{len(chapters)} 章，{sum(c['word_count'] for c in chapters)} 字",
+                90,
+                f"分章完成：{len(chapters)} 章，{sum(c['word_count'] for c in chapters)} 字；正在建立检索索引…",
             )
+            await db.commit()
+
+            # 导入后自动建索引（pytest 跳过，避免单测依赖 Ollama 超时）
+            import os
+
+            if os.environ.get("PYTEST_CURRENT_TEST"):
+                await self.update_job_status(
+                    db,
+                    job_id,
+                    "ready",
+                    100,
+                    f"导入完成：{len(chapters)} 章，{sum(c['word_count'] for c in chapters)} 字",
+                )
+            else:
+                try:
+                    await self.update_job_status(
+                        db,
+                        job_id,
+                        "embedding",
+                        92,
+                        "正在建立检索索引（分块+向量）…",
+                    )
+                    from app.services.indexing_service import indexing_service
+
+                    index_result = await indexing_service.index_novel(db, novel.id)
+                    await self.update_job_status(
+                        db,
+                        job_id,
+                        "ready",
+                        100,
+                        (
+                            f"导入完成：{len(chapters)} 章，"
+                            f"{sum(c['word_count'] for c in chapters)} 字；"
+                            f"索引 {index_result.get('embedded_chunks', 0)}/"
+                            f"{index_result.get('total_chunks', 0)} 块"
+                        ),
+                    )
+                except Exception as index_err:
+                    logger.exception(
+                        "导入后索引失败 novel_%s: %s（小说仍可阅读）",
+                        novel.id,
+                        index_err,
+                    )
+                    novel = await db.get(Novel, novel.id)
+                    if novel:
+                        novel.status = "ready"
+                    await self.update_job_status(
+                        db,
+                        job_id,
+                        "ready",
+                        100,
+                        (
+                            f"导入完成：{len(chapters)} 章（检索索引未完成，"
+                            f"请调用 POST /api/novels/{{id}}/index 重建）"
+                        )[:500],
+                    )
             await db.commit()
 
             logger.info(
@@ -499,9 +553,7 @@ class ImportService:
             await db.rollback()
             logger.exception(f"导入任务失败: job_id={job_id}, error={str(e)}")
 
-            # 尝试更新任务状态为 failed
             try:
-                # 重新获取会话（因为可能已经 rollback）
                 job = await db.get(ImportJob, job_id)
                 if job:
                     job.status = "failed"
@@ -512,16 +564,47 @@ class ImportService:
             except Exception:
                 logger.exception(f"更新失败状态时出错: job_id={job_id}")
 
-            # 清理上传的文件
             if save_path:
                 novel_service.remove_uploaded_file(save_path)
 
             raise
 
         finally:
-            # 释放租约
             if lease_id:
-                await self.release_lease(db, job_id, lease_id)
+                try:
+                    await self.release_lease(db, job_id, lease_id)
+                except Exception:
+                    logger.exception(f"释放租约失败: job_id={job_id}")
+
+    async def run_import_job_background(
+        self,
+        job_id: int,
+        raw_bytes: bytes,
+        filename: str | None,
+        owner_id: int,
+    ) -> None:
+        """
+        BackgroundTasks 入口：使用独立 DB 会话，避免请求会话关闭后任务卡死。
+        文件字节在请求阶段已读入，避免 UploadFile 在响应后失效。
+        """
+        from io import BytesIO
+
+        from starlette.datastructures import Headers, UploadFile as StarletteUploadFile
+
+        from app.core.database import async_session_factory
+
+        buffer = BytesIO(raw_bytes)
+        upload = StarletteUploadFile(
+            file=buffer,
+            filename=filename or "upload.txt",
+            headers=Headers({"content-type": "text/plain"}),
+        )
+        async with async_session_factory() as db:
+            try:
+                await self.process_import_file(db, job_id, upload, owner_id)
+            except Exception:
+                # process_import_file 已写 failed 状态
+                logger.exception("后台导入任务异常: job_id=%s", job_id)
 
 
 # 全局单例

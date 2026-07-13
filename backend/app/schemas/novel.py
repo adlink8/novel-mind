@@ -122,6 +122,9 @@ class NovelListResponse(BaseModel):
     chapter_count: int = 0
     word_count: int = 0
     status: str
+    chunk_count: int = Field(
+        default=0, description="检索分块数；0 表示尚未建立搜索索引"
+    )
     created_at: datetime
     updated_at: datetime
 
@@ -129,10 +132,14 @@ class NovelListResponse(BaseModel):
 class NovelUploadResponse(BaseModel):
     """小说上传结果响应（含处理状态和统计信息）"""
 
-    id: int  # 新创建的小说 ID
+    id: int = Field(..., description="导入任务 job_id（兼容字段，用于轮询）")
+    job_id: int = Field(..., description="导入任务 ID")
+    novel_id: Optional[int] = Field(
+        None, description="小说 ID（任务完成前可能为 null）"
+    )
     title: str  # 小说标题（从文件名提取）
     status: str = Field(
-        ..., description="处理状态: importing / chunking / embedding / ready"
+        ..., description="处理状态: pending / importing / ready / failed"
     )
     message: str = Field(default="文件已上传，正在处理中...")
     chapter_count: int = 0  # 解析出的章节数
@@ -161,10 +168,13 @@ class ReadingProgressResponse(BaseModel):
 class ImportStatusResponse(BaseModel):
     """小说导入状态响应（用于前端轮询进度）"""
 
-    novel_id: int
+    job_id: Optional[int] = Field(None, description="导入任务 ID")
+    novel_id: Optional[int] = Field(
+        None, description="小说 ID（创建前可能为 null）"
+    )
     stage: str = Field(
         ...,
-        description="当前阶段: uploading / detecting / parsing / saving / ready / error",
+        description="当前阶段: uploading / detecting / parsing / saving / ready / failed / error",
     )
     percent: int = Field(..., ge=0, le=100, description="进度百分比 0-100")
     message: str = Field(default="", description="阶段描述信息")

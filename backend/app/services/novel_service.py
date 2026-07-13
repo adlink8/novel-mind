@@ -37,73 +37,142 @@ logger = logging.getLogger(__name__)
 # 格式: {novel_id: {"stage": "uploading", "percent": 10, "message": "..."}}
 _import_status: Dict[int, dict] = {}
 
-# 扩展编码回退链（覆盖中文繁体、日文、西欧编码）
-_ENCODING_FALLBACKS = (
-    "gb18030",  # 国标扩展（兼容 GBK、GB2312，覆盖全部中文生僻字）
-    "gbk",  # 国标扩展（Windows 中文默认）
-    "gb2312",  # 简体中文
-    "big5",  # 繁体中文（中国台湾、香港常用）
-    "shift_jis",  # 日文
-    "euc-jp",  # 日文 EUC
-    "utf-8-sig",  # 带 BOM 的 UTF-8
-    "utf-8",  # 标准 UTF-8
-    "iso-8859-1",  # 西欧单字节编码（兜底）
+# 候选编码（按中文网文常见顺序）。禁止用 iso-8859-1 盲解中文小说（会“成功”成乱码）。
+_ENCODING_CANDIDATES = (
+    "utf-8-sig",
+    "utf-8",
+    "utf-16",  # 自动处理 BOM
+    "utf-16-le",
+    "utf-16-be",
+    "gb18030",
+    "gbk",
+    "big5",
+    "shift_jis",
+    "euc-jp",
 )
 
+# 单章过大时按此字数切分（避免浏览器一次渲染数百万字卡死）
+_MAX_CHAPTER_CHARS = 12_000
+_MIN_CHAPTER_CHARS = 2_000
 
-def _detect_encoding(raw: bytes) -> Tuple[str, float]:
+
+def _cjk_ratio(text: str) -> float:
+    """统计汉字（CJK Unified Ideographs）占比，用于编码打分。"""
+    if not text:
+        return 0.0
+    sample = text if len(text) <= 50_000 else text[:50_000]
+    cjk = sum(1 for ch in sample if "\u4e00" <= ch <= "\u9fff")
+    return cjk / max(len(sample), 1)
+
+
+def _replacement_ratio(text: str) -> float:
+    if not text:
+        return 1.0
+    sample = text if len(text) <= 50_000 else text[:50_000]
+    return sample.count("\ufffd") / max(len(sample), 1)
+
+
+def _score_decoded_text(text: str) -> float:
     """
-    检测字节流编码。
+    对解码结果打分：越高越好。
 
-    先用 chardet 统计检测，若置信度低则按回退链逐个尝试。
-
-    Returns:
-        (编码名称, 置信度 0-1)
+    优先高汉字比例；惩罚替换符和“几乎无汉字”的长文本（典型乱码）。
     """
-    detected = chardet.detect(raw)
-    encoding = detected.get("encoding") or "utf-8"
-    confidence = detected.get("confidence", 0)
-
-    # chardet 对中文检测常返回 GB2312，但 GB18030 更兼容
-    if encoding and encoding.lower() in ("gb2312", "gbk"):
-        encoding = "gb18030"
-        confidence = max(confidence, 0.7)
-
-    return encoding, confidence
+    if not text or not text.strip():
+        return -1.0
+    cjk = _cjk_ratio(text)
+    repl = _replacement_ratio(text)
+    # 可打印比例粗略估计
+    sample = text[:20_000]
+    printable = sum(1 for ch in sample if ch.isprintable() or ch in "\n\r\t") / max(
+        len(sample), 1
+    )
+    score = cjk * 10.0 + printable * 0.5 - repl * 8.0
+    # 长文却几乎无汉字 → 极可能编码错误
+    if len(text) > 5_000 and cjk < 0.02:
+        score -= 5.0
+    return score
 
 
 def _decode_with_fallback(raw: bytes) -> str:
     """
-    使用检测到的编码或回退链解码字节流。
-
-    Args:
-        raw: 原始字节
-
-    Returns:
-        解码后的字符串
+    用 BOM + chardet + 多编码候选打分，选择最像中文网文的解码结果。
 
     Raises:
-        ValueError: 所有编码均无法解码
+        ValueError: 所有编码均无法得到可用文本
     """
-    encoding, confidence = _detect_encoding(raw)
-    logger.info(f"检测到文件编码: {encoding} (置信度 {confidence:.2f})")
+    if not raw:
+        raise ValueError("文件内容为空")
 
-    # 先尝试检测到的编码
-    try:
-        return raw.decode(encoding)
-    except (UnicodeDecodeError, LookupError):
-        pass
+    candidates: list[tuple[str, str]] = []
 
-    # 按回退链逐个尝试
-    for fallback in _ENCODING_FALLBACKS:
+    # 1) BOM 优先
+    if raw.startswith(b"\xff\xfe") or raw.startswith(b"\xfe\xff"):
+        for enc in ("utf-16", "utf-16-le", "utf-16-be"):
+            try:
+                candidates.append((enc, raw.decode(enc)))
+            except UnicodeDecodeError:
+                continue
+    if raw.startswith(b"\xef\xbb\xbf"):
         try:
-            text = raw.decode(fallback)
-            logger.info(f"使用回退编码: {fallback}")
-            return text
+            candidates.append(("utf-8-sig", raw.decode("utf-8-sig")))
         except UnicodeDecodeError:
-            continue
+            pass
 
-    raise ValueError("无法识别文件编码，请使用 UTF-8 或 GBK 编码")
+    # 2) chardet 提示
+    sample = raw if len(raw) <= 200_000 else raw[:200_000]
+    detected = chardet.detect(sample)
+    det_enc = (detected.get("encoding") or "").lower().replace("_", "-")
+    det_conf = float(detected.get("confidence") or 0)
+    if det_enc in ("gb2312", "gbk"):
+        det_enc = "gb18030"
+    if det_enc in ("utf-16le",):
+        det_enc = "utf-16-le"
+    if det_enc in ("utf-16be",):
+        det_enc = "utf-16-be"
+    logger.info("chardet 检测: %s (置信度 %.2f)", det_enc or "?", det_conf)
+
+    ordered: list[str] = []
+    # chardet 对文库 TXT 常误判为 cp1006 等（置信度很低），低置信度结果不优先
+    if det_enc and det_conf >= 0.55:
+        ordered.append(det_enc)
+    for enc in _ENCODING_CANDIDATES:
+        if enc not in ordered:
+            ordered.append(enc)
+    # 低置信度检测结果仍放入候选末尾，靠打分淘汰乱码
+    if det_enc and det_enc not in ordered:
+        ordered.append(det_enc)
+
+    for enc in ordered:
+        try:
+            # 中文网文禁用 errors=replace，避免静默吞错误
+            text = raw.decode(enc)
+        except (UnicodeDecodeError, LookupError):
+            continue
+        candidates.append((enc, text))
+
+    if not candidates:
+        raise ValueError("无法识别文件编码，请使用 UTF-8 / GBK / UTF-16 编码的 TXT")
+
+    best_enc, best_text, best_score = "", "", -1e9
+    for enc, text in candidates:
+        score = _score_decoded_text(text)
+        if score > best_score:
+            best_enc, best_text, best_score = enc, text, score
+
+    cjk = _cjk_ratio(best_text)
+    logger.info(
+        "选用编码 %s (score=%.2f, cjk_ratio=%.3f, chars=%d)",
+        best_enc,
+        best_score,
+        cjk,
+        len(best_text),
+    )
+    if len(best_text) > 20_000 and cjk < 0.01:
+        raise ValueError(
+            "文本解码后几乎不含中文，疑似编码错误。请将文件另存为 UTF-8 或 GBK 后再上传"
+        )
+    return best_text
 
 
 # ────────────────────── 章节分割正则模式 ──────────────────────
@@ -256,15 +325,11 @@ class NovelService:
         chapters: List[dict] = []
 
         if not matches:
-            # 未检测到章节标记 → 全文作为单章
-            logger.info("未检测到章节标记，全文作为单章处理")
-            chapters.append(
-                {
-                    "chapter_number": 1,
-                    "title": "全文",
-                    "content": content.strip(),
-                }
+            # 未检测到章节标记 → 按固定字数切分，避免「全文一章」卡死阅读器
+            logger.info(
+                "未检测到章节标记，按约 %d 字切分全文", _MAX_CHAPTER_CHARS
             )
+            chapters = self._split_by_size(content.strip(), title_prefix="第")
         else:
             # 处理第一个章节标题前的前言部分（如有）
             preamble = content[: matches[0].start()].strip()
@@ -295,12 +360,78 @@ class NovelService:
                     }
                 )
 
-        # 计算每章字数
+            # 标题识别成功但单章过大（正则过粗）→ 二次按字数切开
+            chapters = self._split_oversized_chapters(chapters)
+
+        # 计算字数并顺序编号（前言保持 0）
+        next_num = 1
         for ch in chapters:
-            ch["word_count"] = len(ch["content"])
+            ch["word_count"] = len(ch.get("content") or "")
+            if ch.get("title") == "前言" and ch.get("chapter_number") == 0:
+                continue
+            ch["chapter_number"] = next_num
+            next_num += 1
 
         logger.info(f"章节分割完成: 共 {len(chapters)} 章")
         return chapters
+
+    def _split_by_size(
+        self, content: str, title_prefix: str = "分段"
+    ) -> List[dict]:
+        """将无标题长文按段落边界切成可读小段。"""
+        text = content.strip()
+        if not text:
+            return [{"chapter_number": 1, "title": f"{title_prefix}1", "content": ""}]
+        if len(text) <= _MAX_CHAPTER_CHARS:
+            return [
+                {
+                    "chapter_number": 1,
+                    "title": f"{title_prefix}1（全文）",
+                    "content": text,
+                }
+            ]
+
+        chunks: List[str] = []
+        start = 0
+        n = len(text)
+        while start < n:
+            end = min(start + _MAX_CHAPTER_CHARS, n)
+            if end < n:
+                # 优先在段落边界切开
+                window = text[start:end]
+                split_at = max(window.rfind("\n\n"), window.rfind("\n"))
+                if split_at >= _MIN_CHAPTER_CHARS:
+                    end = start + split_at + 1
+            piece = text[start:end].strip()
+            if piece:
+                chunks.append(piece)
+            start = end if end > start else start + _MAX_CHAPTER_CHARS
+
+        return [
+            {
+                "chapter_number": i + 1,
+                "title": f"{title_prefix}{i + 1}",
+                "content": piece,
+            }
+            for i, piece in enumerate(chunks)
+        ]
+
+    def _split_oversized_chapters(self, chapters: List[dict]) -> List[dict]:
+        """将超过阈值的章再切分，防止单章百万字。"""
+        result: List[dict] = []
+        for ch in chapters:
+            body = ch.get("content") or ""
+            if len(body) <= _MAX_CHAPTER_CHARS * 2:
+                result.append(ch)
+                continue
+            title = ch.get("title") or "章节"
+            parts = self._split_by_size(body, title_prefix=f"{title}·")
+            for i, part in enumerate(parts):
+                part["title"] = (
+                    title if len(parts) == 1 else f"{title}（{i + 1}/{len(parts)}）"
+                )
+                result.append(part)
+        return result
 
     # ─────────── 数据库 CRUD ───────────
 
@@ -473,8 +604,14 @@ class NovelService:
         return True
 
     async def get_chapter(self, db: AsyncSession, chapter_id: int) -> Optional[Chapter]:
-        """获取单个章节"""
-        result = await db.execute(select(Chapter).where(Chapter.id == chapter_id))
+        """获取单个章节（显式加载 deferred 正文）"""
+        from sqlalchemy.orm import undefer
+
+        result = await db.execute(
+            select(Chapter)
+            .options(undefer(Chapter.content))
+            .where(Chapter.id == chapter_id)
+        )
         return result.scalar_one_or_none()
 
     async def update_reading_progress(

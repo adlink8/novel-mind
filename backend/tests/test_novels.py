@@ -30,21 +30,37 @@ from fastapi import UploadFile
 from httpx import AsyncClient
 
 
-async def _wait_for_import(auth_client: AsyncClient, novel_id: int, timeout: float = 5.0):
-    """等待导入任务完成"""
+async def _wait_for_import_job(
+    auth_client: AsyncClient, job_id: int, timeout: float = 10.0
+):
+    """按 job_id 等待导入任务完成，返回含 novel_id 的状态。"""
     elapsed = 0.0
     interval = 0.1
     while elapsed < timeout:
-        try:
-            resp = await auth_client.get(f"/api/novels/{novel_id}/import-status")
-            if resp.status_code == 200:
-                status = resp.json()
-                if status.get("stage") == "ready":
-                    return status
-                if status.get("stage") == "failed":
-                    raise AssertionError(f"导入失败: {status.get('message')}")
-        except Exception:
-            pass
+        resp = await auth_client.get(f"/api/novels/import-jobs/{job_id}")
+        if resp.status_code == 200:
+            status = resp.json()
+            if status.get("stage") == "ready":
+                return status
+            if status.get("stage") in ("failed", "error"):
+                raise AssertionError(f"导入失败: {status.get('message')}")
+        await asyncio.sleep(interval)
+        elapsed += interval
+    raise AssertionError(f"导入超时 ({timeout}s), job_id={job_id}")
+
+
+async def _wait_for_import(auth_client: AsyncClient, novel_id: int, timeout: float = 5.0):
+    """兼容旧调用：按 novel_id 等待（仅当任务已关联小说时可用）。"""
+    elapsed = 0.0
+    interval = 0.1
+    while elapsed < timeout:
+        resp = await auth_client.get(f"/api/novels/{novel_id}/import-status")
+        if resp.status_code == 200:
+            status = resp.json()
+            if status.get("stage") == "ready":
+                return status
+            if status.get("stage") == "failed":
+                raise AssertionError(f"导入失败: {status.get('message')}")
         await asyncio.sleep(interval)
         elapsed += interval
     raise AssertionError(f"导入超时 ({timeout}s)")
@@ -131,17 +147,12 @@ async def test_upload_novel_with_chapters(auth_client: AsyncClient):
     assert response.status_code == 200
     data = response.json()
     assert data["title"] == "test_novel"
-    assert data["status"] == "pending"
+    assert data["status"] in ("pending", "ready")
+    job_id = data["job_id"]
 
-    # 等待导入完成
-    await asyncio.sleep(0.5)
-
-    # 查询小说列表获取导入的小说
-    novels_resp = await auth_client.get("/api/novels")
-    novels = novels_resp.json()["items"]
-    novel = next((n for n in novels if n["title"] == "test_novel"), None)
-    assert novel is not None
-    novel_id = novel["id"]
+    status = await _wait_for_import_job(auth_client, job_id)
+    novel_id = status["novel_id"]
+    assert novel_id is not None
 
     # 验证章节列表
     chapters_resp = await auth_client.get(f"/api/novels/{novel_id}/chapters")
@@ -151,13 +162,6 @@ async def test_upload_novel_with_chapters(auth_client: AsyncClient):
     assert chapters[0]["title"] == "第一章 初入江湖"
     assert chapters[1]["title"] == "第二章 拜师学艺"
     assert chapters[2]["title"] == "第三章 下山历练"
-
-    # 清理上传的测试文件
-    from app.config import settings
-
-    test_path = os.path.join(settings.upload_dir, "test_novel.txt")
-    if os.path.exists(test_path):
-        os.remove(test_path)
 
 
 @pytest.mark.asyncio
@@ -173,22 +177,10 @@ async def test_upload_novel_without_chapters(auth_client: AsyncClient):
 
     assert response.status_code == 200
     data = response.json()
-    assert data["status"] == "pending"
-
-    # 等待导入完成
-    await asyncio.sleep(0.5)
-
-    # 查询小说列表获取导入的小说
-    novels_resp = await auth_client.get("/api/novels")
-    novels = novels_resp.json()["items"]
-    novel = next((n for n in novels if n["title"] == "plain"), None)
-    assert novel is not None
-
-    from app.config import settings
-
-    test_path = os.path.join(settings.upload_dir, "plain.txt")
-    if os.path.exists(test_path):
-        os.remove(test_path)
+    assert data["status"] in ("pending", "ready")
+    status = await _wait_for_import_job(auth_client, data["job_id"])
+    assert status["novel_id"] is not None
+    assert status["stage"] == "ready"
 
 
 @pytest.mark.asyncio
@@ -215,7 +207,7 @@ async def test_upload_gbk_encoding(auth_client: AsyncClient):
 
     assert response.status_code == 200
     data = response.json()
-    assert data["status"] == "pending"
+    assert data["status"] in ("pending", "ready")
 
     from app.config import settings
 
@@ -241,7 +233,7 @@ async def test_upload_gb18030_encoding(auth_client: AsyncClient):
 
     assert response.status_code == 200
     data = response.json()
-    assert data["status"] == "pending"
+    assert data["status"] in ("pending", "ready")
 
     from app.config import settings
 
@@ -263,7 +255,7 @@ async def test_upload_big5_encoding(auth_client: AsyncClient):
 
     assert response.status_code == 200
     data = response.json()
-    assert data["status"] == "pending"
+    assert data["status"] in ("pending", "ready")
 
     from app.config import settings
 
@@ -331,16 +323,10 @@ async def test_novel_full_lifecycle(auth_client: AsyncClient):
         },
     )
     assert upload_resp.status_code == 200
-
-    # 等待导入完成
-    await asyncio.sleep(0.5)
-
-    # 查询小说列表获取导入的小说
-    novels_resp = await auth_client.get("/api/novels")
-    novels = novels_resp.json()["items"]
-    novel = next((n for n in novels if n["title"] == "lifecycle"), None)
-    assert novel is not None
-    novel_id = novel["id"]
+    job_id = upload_resp.json()["job_id"]
+    status = await _wait_for_import_job(auth_client, job_id)
+    novel_id = status["novel_id"]
+    assert novel_id is not None
 
     # 查询详情
     detail_resp = await auth_client.get(f"/api/novels/{novel_id}")
@@ -374,12 +360,6 @@ async def test_novel_full_lifecycle(auth_client: AsyncClient):
     not_found = await auth_client.get(f"/api/novels/{novel_id}")
     assert not_found.status_code == 404
 
-    from app.config import settings
-
-    test_path = os.path.join(settings.upload_dir, "lifecycle.txt")
-    if os.path.exists(test_path):
-        os.remove(test_path)
-
 
 # ─────────── 搜索测试 ───────────
 
@@ -390,13 +370,11 @@ async def test_novels_search(auth_client: AsyncClient):
     # 先上传两本小说
     for title, author in [("search_test_a.txt", None), ("search_test_b.txt", None)]:
         content = f"第一章 {title}\n\n内容。"
-        await auth_client.post(
+        up = await auth_client.post(
             "/api/novels/upload",
             files={"file": (title, io.BytesIO(content.encode("utf-8")), "text/plain")},
         )
-
-    # 等待导入完成
-    await asyncio.sleep(0.5)
+        await _wait_for_import_job(auth_client, up.json()["job_id"])
 
     # 搜索
     resp = await auth_client.get("/api/novels?search=search_test_a")
@@ -404,14 +382,6 @@ async def test_novels_search(auth_client: AsyncClient):
     data = resp.json()
     assert data["total"] >= 1
     assert any("search_test_a" in item["title"] for item in data["items"])
-
-    # 清理
-    from app.config import settings
-
-    for fname in ["search_test_a.txt", "search_test_b.txt"]:
-        path = os.path.join(settings.upload_dir, fname)
-        if os.path.exists(path):
-            os.remove(path)
 
 
 # ─────────── 阅读进度测试 ───────────
@@ -432,16 +402,9 @@ async def test_update_reading_progress_success(auth_client: AsyncClient):
         },
     )
     assert upload_resp.status_code == 200
-
-    # 等待导入完成
-    await asyncio.sleep(0.5)
-
-    # 查询小说列表获取导入的小说
-    novels_resp = await auth_client.get("/api/novels")
-    novels = novels_resp.json()["items"]
-    novel = next((n for n in novels if n["title"] == "progress_test"), None)
-    assert novel is not None
-    novel_id = novel["id"]
+    novel_id = (
+        await _wait_for_import_job(auth_client, upload_resp.json()["job_id"])
+    )["novel_id"]
 
     # 获取章节ID
     chapters_resp = await auth_client.get(f"/api/novels/{novel_id}/chapters")
@@ -464,13 +427,6 @@ async def test_update_reading_progress_success(auth_client: AsyncClient):
     detail = await auth_client.get(f"/api/novels/{novel_id}")
     assert detail.json()["reading_progress"]["chapter_id"] == chapter_id
 
-    # 清理
-    from app.config import settings
-
-    test_path = os.path.join(settings.upload_dir, "progress_test.txt")
-    if os.path.exists(test_path):
-        os.remove(test_path)
-
 
 @pytest.mark.asyncio
 async def test_update_reading_progress_novel_not_found(auth_client: AsyncClient):
@@ -486,21 +442,17 @@ async def test_update_reading_progress_novel_not_found(auth_client: AsyncClient)
 async def test_update_reading_progress_chapter_not_belong(auth_client: AsyncClient):
     """更新不属于该小说的章节进度返回 404"""
     # 上传两本小说
+    novel_ids = []
     for fname in ["prog_a.txt", "prog_b.txt"]:
         content = "第一章 测试\n\n内容。"
-        await auth_client.post(
+        up = await auth_client.post(
             "/api/novels/upload",
             files={"file": (fname, io.BytesIO(content.encode("utf-8")), "text/plain")},
         )
+        st = await _wait_for_import_job(auth_client, up.json()["job_id"])
+        novel_ids.append(st["novel_id"])
 
-    # 等待导入完成
-    await asyncio.sleep(0.5)
-
-    # 获取小说A的ID和小说B的章节ID
-    novels_resp = await auth_client.get("/api/novels")
-    novels = novels_resp.json()["items"]
-    novel_a_id = novels[0]["id"]
-    novel_b_id = novels[1]["id"]
+    novel_a_id, novel_b_id = novel_ids[0], novel_ids[1]
 
     chapters_b = await auth_client.get(f"/api/novels/{novel_b_id}/chapters")
     chapter_b_id = chapters_b.json()[0]["id"]
@@ -511,11 +463,3 @@ async def test_update_reading_progress_chapter_not_belong(auth_client: AsyncClie
         json={"chapter_id": chapter_b_id, "progress_percent": 50},
     )
     assert resp.status_code == 404
-
-    # 清理
-    from app.config import settings
-
-    for fname in ["prog_a.txt", "prog_b.txt"]:
-        path = os.path.join(settings.upload_dir, fname)
-        if os.path.exists(path):
-            os.remove(path)

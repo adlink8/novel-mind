@@ -22,7 +22,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from sqlalchemy import ForeignKey, Integer, String, Text, JSON
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, deferred, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
 
@@ -138,8 +138,9 @@ class Chapter(TimestampMixin, Base):
     title: Mapped[str] = mapped_column(
         String(200), default=""
     )  # 章节标题（如 "第一章 初入江湖"）
-    content: Mapped[str] = mapped_column(
-        Text, nullable=False
+    # deferred：列表/目录查询不预加载正文，避免 9MB 章节把打开小说请求卡死
+    content: Mapped[str] = deferred(
+        mapped_column(Text, nullable=False)
     )  # 章节正文内容（完整文本）
     word_count: Mapped[int] = mapped_column(Integer, default=0)  # 本章字数
 

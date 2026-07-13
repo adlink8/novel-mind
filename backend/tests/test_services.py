@@ -60,12 +60,20 @@ class TestParseNovel:
         assert chapters[1]["title"] == "2. 正文"
 
     def test_parse_no_chapters(self):
-        """无章节标记时作为单章处理"""
+        """无章节标记时按字数切分（短文仍为单段）"""
         content = "这是一段没有任何章节标记的纯文本内容。"
         chapters = novel_service.parse_novel(content)
         assert len(chapters) == 1
         assert chapters[0]["chapter_number"] == 1
-        assert chapters[0]["title"] == "全文"
+        assert "全文" in chapters[0]["title"] or chapters[0]["title"].startswith("第")
+
+    def test_parse_no_chapters_splits_long_text(self):
+        """无章节标记的长文自动切成多段，避免单章过大"""
+        content = ("这是一段测试文本，用于验证超长无标题切分。" * 400) + "\n\n"
+        content = content * 20  # ~数万字
+        chapters = novel_service.parse_novel(content)
+        assert len(chapters) > 1
+        assert all(ch["word_count"] <= 20_000 for ch in chapters)
 
     def test_parse_with_preamble(self):
         """前言超过 100 字时单独成章"""
