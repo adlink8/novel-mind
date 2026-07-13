@@ -22,8 +22,8 @@ vi.mock("@/lib/api", () => ({
   },
 }));
 
-vi.mock("@/components/timeline/timeline-chart", () => ({
-  TimelineChart: ({ events }: { events: Array<{ title: string }> }) => <div data-testid="timeline-chart">{events.map((event) => <span key={event.title}>{event.title}</span>)}</div>,
+vi.mock("echarts-for-react/lib/core", () => ({
+  default: () => <div data-testid="timeline-canvas" />,
 }));
 
 const active = {
@@ -36,7 +36,7 @@ const active = {
 };
 const candidate = {
   ...active, source: "running_candidate", version_id: 8, status: "running",
-  events: [{ ...active.events[0], id: 2, logical_event_id: "b", title: "候选事件" }], previews: ["候选事件"],
+  events: [{ ...active.events[0], id: 2, logical_event_id: "b", title: "候选事件", participants: [{ mention: "顾遥" }] }], previews: ["候选事件"],
 };
 
 describe("global analysis timeline workspace", () => {
@@ -60,6 +60,35 @@ describe("global analysis timeline workspace", () => {
     expect(screen.getByText("候选事件")).toBeInTheDocument();
     expect(screen.queryByText("旧版事件")).not.toBeInTheDocument();
     expect(screen.getByText(/无阅读进度.*第一章/)).toBeInTheDocument();
+  });
+
+  it("orders non-contiguous chapters by chapter, source offset and event id", async () => {
+    const laterChapter = { ...active.events[0], id: 4, logical_event_id: "later", title: "第九章事件", narrative_chapter_number: 9, narrative_index: 0, source_start: 10 };
+    const laterOffset = { ...active.events[0], id: 8, logical_event_id: "later-offset", title: "第二章后事件", narrative_chapter_number: 2, narrative_index: 0, source_start: 80 };
+    const earlierOffset = { ...active.events[0], id: 7, logical_event_id: "earlier-offset", title: "第二章前事件", narrative_chapter_number: 2, narrative_index: 9, source_start: 20 };
+    mocks.getTimeline.mockResolvedValue({
+      data: { active: { ...active, events: [laterChapter, laterOffset, earlierOffset] }, running_candidate: candidate },
+    });
+
+    render(<AnalysisPage />);
+    fireEvent.change(await screen.findByLabelText("选择小说"), { target: { value: "11" } });
+    await screen.findByText("第九章事件");
+
+    const titles = screen.getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent);
+    expect(titles).toEqual(["第二章前事件", "第二章后事件", "第九章事件"]);
+  });
+
+  it("derives participant filters only from the selected version", async () => {
+    render(<AnalysisPage />);
+    fireEvent.change(await screen.findByLabelText("选择小说"), { target: { value: "11" } });
+    await screen.findByText("旧版事件");
+
+    expect(screen.getByRole("option", { name: "林墨" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "顾遥" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: /正在生成/ }));
+    expect(screen.getByRole("option", { name: "顾遥" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "林墨" })).not.toBeInTheDocument();
   });
 
   it("queries dual ordering, person and causal controls without intermediate modes", async () => {
