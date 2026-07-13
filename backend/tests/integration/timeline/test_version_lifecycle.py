@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.models.analysis import AnalysisVersion
-from app.models.novel import Novel
+from app.models.novel import Chapter, Novel
 from app.models.timeline import (
     MachineTimelineEvent,
     TimelineActivePointer,
@@ -27,7 +27,7 @@ pytestmark = pytest.mark.integration
 
 
 async def _candidate(session, owner_id: int, novel_id: int, key: str,
-                     logical_id: str, evidence_id: str) -> AnalysisVersion:
+                     logical_id: str, evidence_id: str, chapter_id: int) -> AnalysisVersion:
     version = AnalysisVersion(
         owner_id=owner_id, novel_id=novel_id, version_key=key, status="candidate",
         source_snapshot_hash="a" * 64, hierarchy_build_id="build", hierarchy_checksum="b" * 64,
@@ -48,7 +48,7 @@ async def _candidate(session, owner_id: int, novel_id: int, key: str,
     session.add(event)
     await session.flush()
     session.add(TimelineParticipant(event_id=event.id, mention="阿宁"))
-    session.add(TimelineEvidenceRef(event_id=event.id, chapter_id=1, evidence_id=evidence_id,
+    session.add(TimelineEvidenceRef(event_id=event.id, chapter_id=chapter_id, evidence_id=evidence_id,
                                     source_start=0, source_end=2, content_hash="9" * 64))
     await session.flush()
     manifest, checksum = await snapshot_manifest(session, version.id)
@@ -69,9 +69,12 @@ async def test_postgres_stale_cas_failed_candidate_and_byte_identical_rollback(p
         novel = Novel(owner_id=user.id, title=f"timeline-{suffix}", status="ready")
         setup.add(novel)
         await setup.flush()
-        v1 = await _candidate(setup, user.id, novel.id, f"v1-{suffix}", "old", "ev-stable")
-        v2 = await _candidate(setup, user.id, novel.id, f"v2-{suffix}", "new", "ev-stable")
-        bad = await _candidate(setup, user.id, novel.id, f"bad-{suffix}", "bad", "ev-bad")
+        chapter = Chapter(novel_id=novel.id, chapter_number=1, title="第一章", content="正文")
+        setup.add(chapter)
+        await setup.flush()
+        v1 = await _candidate(setup, user.id, novel.id, f"v1-{suffix}", "old", "ev-stable", chapter.id)
+        v2 = await _candidate(setup, user.id, novel.id, f"v2-{suffix}", "new", "ev-stable", chapter.id)
+        bad = await _candidate(setup, user.id, novel.id, f"bad-{suffix}", "bad", "ev-bad", chapter.id)
         bad.manifest_checksum = "0" * 64
         setup.add(TimelineOverride(owner_id=user.id, novel_id=novel.id, logical_event_id="old",
                                    field_name="title", value={"value": "人工标题"}))
@@ -110,7 +113,8 @@ async def test_postgres_stale_cas_failed_candidate_and_byte_identical_rollback(p
         assert journal.manifest == version.manifest
         override = (await session.scalars(select(TimelineOverride).where(
             TimelineOverride.owner_id == owner_id))).one()
-        assert override.logical_event_id == "new" or override.needs_relink is True
+        assert override.logical_event_id == "old"
+        assert override.needs_relink is False
         active = (await session.scalars(select(TimelineActivePointer).where(
             TimelineActivePointer.owner_id == owner_id))).one()
         assert active.version_id == v1_id
