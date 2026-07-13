@@ -551,7 +551,10 @@ async def _update_progress(sessions, run_id, completed, total, stage) -> None:
             progress["total_chapters"] = total
         progress["stage"] = stage
         run.progress = progress
-        run.heartbeat_at = datetime.now(UTC)
+        now = datetime.now(UTC)
+        run.heartbeat_at = now
+        if run.status == "running" and run.lease_id:
+            run.lease_expires_at = now + timedelta(minutes=5)
 
 
 async def _finish_run(sessions, run_id: int, status: str, reason: str | None) -> None:
