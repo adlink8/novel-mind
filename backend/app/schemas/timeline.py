@@ -216,6 +216,7 @@ class TimelineVersionView(StrictTimelineModel):
     causal_edges: list[TimelineVisibleEdge] = Field(default_factory=list)
     counts: TimelineCounts = Field(default_factory=TimelineCounts)
     aggregates: dict[str, int] = Field(default_factory=dict)
+    previews: list[str] = Field(default_factory=list)
 
 
 class TimelineEnvelope(StrictTimelineModel):

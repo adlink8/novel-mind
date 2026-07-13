@@ -159,4 +159,5 @@ async def build_version_view(
         events=events, causal_edges=edges,
         counts=TimelineCounts(events=len(events), participants=len(participant_mentions), causal_edges=len(edges)),
         aggregates=aggregates,
+        previews=[event.title for event in events[:5]],
     )
