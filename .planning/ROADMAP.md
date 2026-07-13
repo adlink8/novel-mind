@@ -43,10 +43,11 @@
 | v0.5 / Phase 6 自动质量与 CI 门禁 | 9/9 | **Complete** (REQ-AUTO-11 closed) |
 | Phase 7 语义/层级分块 | 6/6 | **Complete** (logic+tests+PG/indexing wiring) |
 | Phase 8 版本化小说分析与时间线 | 10/10 | **Complete** (35/35 must-haves verified) |
+| v0.7 / Phase 9-11 叙事关系、阅读问答与线索追踪 | 0/3 phases planned | **Planning** (implementation not started) |
 
 ## Auto Start
 
-Phase 06、Phase 07 与 Phase 08 均已完成。auto-start 保持关闭。
+Phase 06、Phase 07 与 Phase 08 均已完成。Phase 09-11 仅完成方案规划，尚未开始实现。auto-start 保持关闭。
 验证：`.planning/phases/06-automated-quality-ci/` SUMMARYs；`.planning/phases/07-semantic-hierarchical-chunking/07-VERIFICATION.md`；Phase 08 `08-VERIFICATION.md`。
 
 ## Backlog
@@ -143,3 +144,24 @@ Plans:
 - [x] 08-08 real ordering/source isolation and production qualification
 - [x] 08-09 final cancellation/cache/source-offset/qualification gap closure
 - [x] 08-10 executable DB-and-command release authority gap closure
+
+### Phase 9: Dynamic Character Relationship Graph
+
+**Goal:** 基于已证据门控的人物关系事实和时间线版本，生成可按叙事进度演化、默认防剧透的小说人物关系图。
+**Requirements:** REQ-REL-01..06
+**Depends on:** Phase 04, Phase 08
+**Status:** PLANNED ONLY — implementation not started
+
+### Phase 10: Reader Text-Selection AI and Multi-Session Conversations
+
+**Goal:** 让读者从阅读器选取原文后，在同一本小说的多个持久会话中进行证据受限、防剧透的 AI 对话。
+**Requirements:** REQ-CHAT-01..07
+**Depends on:** Phase 08, Phase 09
+**Status:** PLANNED ONLY — implementation not started
+
+### Phase 11: Clue and Foreshadow Tracking
+
+**Goal:** 以证据、版本和人工可控的五状态生命周期，发现、追踪、核验小说中的线索、伏笔及其回收。
+**Requirements:** REQ-CLUE-01..07
+**Depends on:** Phase 08, Phase 09, Phase 10
+**Status:** PLANNED ONLY — implementation not started

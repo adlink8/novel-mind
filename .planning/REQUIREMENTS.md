@@ -67,6 +67,26 @@
 | REQ-TIME-08 | 默认按阅读进度隐藏未来事件，用户显式切换全书分析后才能查看未读章节内容 | P0 | VERIFIED |
 | REQ-TIME-09 | LLM 使用章节级低成本抽取与跨章节高质量归并的分级路由，并执行单书 token/费用/调用预算和确定性暂停 | P0 | VERIFIED |
 | REQ-TIME-10 | Phase 08 仅支持小说时间线；人物关系图、阅读 AI、线索伏笔与历史文本支持明确延期或移除 | P1 | VERIFIED |
+| REQ-REL-01 | 人物关系图只投影经 evidence/threshold/conflict 门控接受的小说人物关系，任何候选、LLM 判断和图边均保留来源与版本 lineage | P0 | PLANNED |
+| REQ-REL-02 | 人物关系以追加式观察和有效叙事区间保存，用户可按章节/阅读进度查看关系随故事推进的变化而不覆盖历史状态 | P0 | PLANNED |
+| REQ-REL-03 | 人物关系 API 按 owner、novel、analysis version 和阅读进度过滤；默认不会返回未读章节的节点、边、标签或统计信息 | P0 | PLANNED |
+| REQ-REL-04 | 分析工作台提供可缩放、可筛选、可定位证据的动态人物关系图；用户可按人物、关系类型和叙事位置查看子图 | P1 | PLANNED |
+| REQ-REL-05 | 人工对人物合并、关系类型、有效区间的修正作为保护性 override 保存，后续分析不得静默覆盖 | P1 | PLANNED |
+| REQ-REL-06 | 人物图构建、投影、缓存和前端交互具备版本化评测、owner/spoiler/adversarial 与浏览器验证；Neo4j 仅为可重放投影 | P1 | PLANNED |
+| REQ-CHAT-01 | 阅读器选区必须以 chapter/source offsets/evidence refs 持久化，AI 只能引用选区与经权限和剧透边界过滤的上下文 | P0 | PLANNED |
+| REQ-CHAT-02 | 用户可在每本小说下创建、重命名、切换、归档和删除多个 owner-scoped 持久会话，消息顺序和引用可重放 | P0 | PLANNED |
+| REQ-CHAT-03 | 默认聊天严格按阅读进度防剧透；全书上下文只能使用既有的明确 per-novel 全书开关，且响应必须标注可核验来源 | P0 | PLANNED |
+| REQ-CHAT-04 | LLM 仅产生受限回答、澄清问题和结构化建议；它不得直接修改时间线、人物关系或线索事实，任何写入都需用户确认的显式动作 | P0 | PLANNED |
+| REQ-CHAT-05 | 会话调用保存模型/prompt/context/usage/成本/失败状态并执行每会话与每小说预算；依赖、预算或校验失败必须可恢复且 fail closed | P0 | PLANNED |
+| REQ-CHAT-06 | 阅读器提供不遮挡正文的选区入口与可收起小窗；会话历史、引用跳转、加载、取消和错误状态在桌面与移动端可用 | P1 | PLANNED |
+| REQ-CHAT-07 | 选区、权限、剧透、引用完整性、并发会话、取消恢复及真实浏览器链路均有自动化验证 | P1 | PLANNED |
+| REQ-CLUE-01 | 线索候选只能由脚本构造的跨章节证据包触发，LLM 只做语义判断；缺少早期线索、后续证据或可追溯引用时不得发布 | P0 | PLANNED |
+| REQ-CLUE-02 | 每条线索以 candidate、active、reinforced、paid_off、dismissed 五状态追加式演化，并保存首现、强化、回收和人工处置的版本 lineage | P0 | PLANNED |
+| REQ-CLUE-03 | 线索可关联人物、时间事件和关系观察，但这些关联必须是证据引用，不得把相似度或聊天内容直接写为事实 | P0 | PLANNED |
+| REQ-CLUE-04 | 默认线索视图和 API 按阅读进度隐藏未来伏笔、强化和回收；全书披露沿用明确的 per-novel 开关 | P0 | PLANNED |
+| REQ-CLUE-05 | 用户可确认、驳回、补充说明或调整线索关联；人工决策形成保护性 override，重分析仅产生需对比的新版本 | P1 | PLANNED |
+| REQ-CLUE-06 | 分析工作台提供线索时间带、证据面板、状态筛选和回收链路，而非把后端剧情摘要中间结果暴露成新菜单 | P1 | PLANNED |
+| REQ-CLUE-07 | 冻结小说 fixture、对抗性假阳性/剧透/跨版本测试、成本延迟和浏览器验证共同构成发布门禁 | P1 | PLANNED |
 
 ## Traceability
 
