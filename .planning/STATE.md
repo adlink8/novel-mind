@@ -24,16 +24,16 @@ See `.planning/PROJECT.md` and `IMPLEMENTATION-STATUS.md`.<br>
 ## Current Position
 
 Phase: 07 (semantic-hierarchical-chunking) — IN PROGRESS
-Plan: 1 of 6 complete; next **07-02**
+Plan: 2 of 6 complete; next **07-03**
 
 - Milestone: Phase 06 v0.5 complete; Phase 07 started
 - Current branch: `feat/phase2-wave2-embedding`
-- Status: 07-01 complete (baseline manifests + offsets); 07-02..07-06 pending.
-- Last activity: 2026-07-13 — Completed 07-01 deterministic baseline chunker lineage.
+- Status: 07-01..07-02 complete; 07-03..07-06 pending.
+- Last activity: 2026-07-13 — Completed 07-02 rule proposals + candidate segmentation.
 
 ## Auto Routing
 
-Execute **07-02** next (depends on 07-01). Auto-start remains disabled.
+Execute **07-03** next (depends on 07-02). Auto-start remains disabled.
 
 ## Verified In v0.3
 
@@ -155,6 +155,13 @@ Execute **07-02** next (depends on 07-01). Auto-start remains disabled.
 - Unicode offsets + deterministic manifest checksum
 - Tests: 41 passed (unit + integration + legacy chunking)
 
+### 07-02 COMPLETE
+
+- AtomicSpan scanner + BoundaryProposal reason/confidence engine
+- CandidateSegmentation with pending adjudication queue
+- Hard constraints never llm_eligible; pure in-memory (no DB/index)
+- Tests: 16 passed (proposals + segmentation)
+
 ## Next Action
 
-Execute **07-02-PLAN.md** (rule boundary confidence and candidate segmentation).
+Execute **07-03-PLAN.md** (LLM low-confidence boundary adjudication and fallback).
