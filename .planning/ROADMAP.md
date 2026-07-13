@@ -42,12 +42,12 @@
 | Phase 5 叙事知识单元层 | 5/5 | Complete |
 | v0.5 / Phase 6 自动质量与 CI 门禁 | 9/9 | **Complete** (REQ-AUTO-11 closed) |
 | Phase 7 语义/层级分块 | 6/6 | **Complete** (logic+tests+PG/indexing wiring) |
-| Phase 8 版本化小说分析与时间线 | 8/8 | **Gap Closure Complete** (pending independent re-verification) |
+| Phase 8 版本化小说分析与时间线 | 10/10 | **Gap Closure Complete** (pending independent re-verification) |
 
 ## Auto Start
 
-Phase 06 与 Phase 07 均已完成。Phase 08 的 08-07/08-08 gap plans 已完成，等待独立 re-verification。auto-start 保持关闭。
-验证：`.planning/phases/06-automated-quality-ci/` SUMMARYs；`.planning/phases/07-semantic-hierarchical-chunking/07-VERIFICATION.md`；Phase 08 `08-07-SUMMARY.md`、`08-08-SUMMARY.md`。
+Phase 06 与 Phase 07 均已完成。Phase 08 的 08-07..08-10 gap plans 已完成，等待独立 re-verification。auto-start 保持关闭。
+验证：`.planning/phases/06-automated-quality-ci/` SUMMARYs；`.planning/phases/07-semantic-hierarchical-chunking/07-VERIFICATION.md`；Phase 08 `08-07-SUMMARY.md`..`08-10-SUMMARY.md`。
 
 ## Backlog
 
@@ -129,8 +129,8 @@ Plans:
 **Goal:** 以持久、版本化、证据约束的后台分析任务生成小说时间事件，并在全局分析工作台渐进展示防剧透的双顺序横向时间线。
 **Requirements**: REQ-TIME-01..10
 **Depends on:** Phase 7
-**Status:** GAP CLOSURE COMPLETE — 08-09 COMPLETE; PENDING INDEPENDENT RE-VERIFICATION
-**Plans:** 9/9 plans complete
+**Status:** GAP CLOSURE COMPLETE — 08-10 COMPLETE; PENDING INDEPENDENT RE-VERIFICATION
+**Plans:** 10/10 plans complete
 
 Plans:
 - [x] 08-01 durable analysis jobs and immutable version foundation
@@ -142,3 +142,4 @@ Plans:
 - [x] 08-07 production worker orchestration and PostgreSQL call boundaries
 - [x] 08-08 real ordering/source isolation and production qualification
 - [x] 08-09 final cancellation/cache/source-offset/qualification gap closure
+- [x] 08-10 executable DB-and-command release authority gap closure

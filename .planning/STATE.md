@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v0.6
 milestone_name: Versioned Novel Analysis and Timeline
 status: in_progress
-last_updated: "2026-07-13T06:22:06.522Z"
+last_updated: "2026-07-13T06:50:51.397Z"
 progress:
   total_phases: 7
   completed_phases: 5
-  total_plans: 33
-  completed_plans: 37
+  total_plans: 34
+  completed_plans: 38
   percent: 71
 ---
 
@@ -24,11 +24,11 @@ See `.planning/PROJECT.md` and `IMPLEMENTATION-STATUS.md`.
 ## Current Position
 
 Phase: 08 (Versioned novel analysis orchestration and interactive timeline) — GAP CLOSURE COMPLETE, PENDING RE-VERIFICATION
-Plan: 9 of 9
-**Phase 08 gap plan 08-09 COMPLETE** — all second-round blockers closed; independent re-verification remains
+Plan: 10 of 10
+**Phase 08 gap plan 08-10 COMPLETE** — executable release authority gap closed; independent re-verification remains
 
 - Branch: `feat/phase2-wave2-embedding`
-- Last activity: 2026-07-13 — 08-09 cancellation, reconcile cache lineage, real source offsets, and observed qualification authority completed (74 backend, 68 frontend, 8 release-gate tests and build passed)
+- Last activity: 2026-07-13 — 08-10 fixed-command release CLI, internally captured SHA-256 evidence, fresh PostgreSQL authority observation, and CI integration completed (5 PostgreSQL + 47 CI/policy tests passed)
 - Plan directory: `.planning/phases/08-versioned-novel-analysis-orchestration-and-interactive-timel/`
 
 ## Auto Routing
@@ -45,6 +45,7 @@ Plan: 9 of 9
 - 08-07: 26min, 3 tasks, 9 files, 63 timeline tests passed including real PostgreSQL concurrency coverage.
 - 08-08: 24min, 3 tasks, 9 files, backend 65 + frontend 68 + real desktop/mobile browser 2 + release gate 7 tests passed.
 - 08-09: 16min, 3 tasks, 10 files, backend 74 + frontend 68 + release gate 8 tests and production build passed.
+- 08-10: 7min, 2 tasks, 4 files, PostgreSQL qualification 5 + release/workflow/CI-gate 47 tests passed.
 
 ## Phase 08 Decisions
 
@@ -69,6 +70,8 @@ Plan: 9 of 9
 - Reconciliation exact-cache identity binds version lineage plus hashes of the actual prompt and output schema.
 - Timeline `source_start` is required end-to-end and derives from persisted evidence offsets.
 - Release qualification requires independent DB authority observations and successful command-output digests; self-hashes prove integrity only.
+- The executable release CLI owns fixed argv/cwd commands and the PostgreSQL session factory; command digests are recomputed from internally captured combined output bytes.
+- Release verdicts expose command, exit code, and digest without exposing captured test or service output.
 
 ## Phase 06 (v0.5) — COMPLETE
 
@@ -126,5 +129,5 @@ CLI：`backend/scripts/run_chunker_qualification.py`
 
 ## Next Action
 
-1. 由独立 verifier 复验 Phase 08 四个最终 gap；executor 未修改 `08-VERIFICATION.md`。
+1. 由独立 verifier 复验 Phase 08 release-authority gap；executor 未修改 `08-VERIFICATION.md`。
 2. 保留本地 BGE / 阅读器 UX 等非 Phase 08 WIP，不纳入 Phase 08 提交。
