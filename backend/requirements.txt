@@ -24,6 +24,10 @@ litellm>=1.83.10
 pgvector>=0.3
 chromadb==1.5.9
 httpx>=0.28
+# 本地 embedding（与数据分析项目一致：bge-small-zh-v1.5）
+sentence-transformers>=3.0
+# torch 由 sentence-transformers 拉取；有 GPU 时可用官方 CUDA 轮子覆盖
+
 
 # Security
 cryptography>=42.0

@@ -27,10 +27,16 @@ class Settings(BaseSettings):
     cors_origins: list[str] = [  # 允许的跨域来源（前端开发服务器地址）
         "http://localhost:3000",  # Next.js 默认端口
         "http://localhost:3001",  # 备用前端端口
-        "http://localhost:3002",  # 备用前端端口
+        "http://localhost:3002",
+        "http://localhost:3003",
+        "http://localhost:3004",
+        "http://localhost:3005",  # 3000 被占用时的开发端口
         "http://127.0.0.1:3000",
         "http://127.0.0.1:3001",
         "http://127.0.0.1:3002",
+        "http://127.0.0.1:3003",
+        "http://127.0.0.1:3004",
+        "http://127.0.0.1:3005",
     ]
 
     # ── 数据库 ──
@@ -55,13 +61,17 @@ class Settings(BaseSettings):
     )  # 流式读取阈值: 5MB（超过此大小使用分块读取）
 
     # ── Embedding 配置 ──
-    # 用于 RAG 向量检索的文本嵌入模型
-    # 默认使用 Ollama nomic-embed-text（轻量级，274MB，768 维）
-    # 备选: bge-m3 (Ollama 本地，1.2GB，1024 维，中文更佳)
-    # 云备选: text-embedding-3-small (OpenAI API，1536 维)
-    embedding_model: str = "nomic-embed-text"  # Ollama 模型名
-    embedding_provider: str = "ollama"          # 提供商: ollama / openai
-    embedding_dimensions: int = 768             # nomic-embed-text: 768, bge-m3: 1024, text-embedding-3-small: 1536
+    # 与「数据分析」对齐：默认本地 sentence-transformers + bge-small-zh-v1.5（512 维）
+    # provider:
+    #   local_st — 本机 ST 模型（推荐，不依赖 Ollama）
+    #   ollama   — HTTP 调 Ollama /api/embed
+    #   openai   — LiteLLM aembedding
+    embedding_provider: str = "local_st"
+    embedding_model: str = "bge-small-zh-v1.5"
+    embedding_model_path: str = r"D:\models\bge-small-zh-v1.5"
+    embedding_dimensions: int = 512
+    embedding_device: str = "cpu"  # cuda / cpu；无 CUDA torch 时自动回退 cpu
+    embedding_batch_size: int = 64
 
     # ── 认证与敏感数据保护 ──
     secret_key: str = DEV_JWT_SECRET

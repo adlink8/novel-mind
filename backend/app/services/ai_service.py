@@ -75,23 +75,42 @@ class AIService:
         """
         生成文本向量（embedding）。
 
-        支持两种模式:
-          - Ollama 本地: 直接调用 ollama API（避免 LiteLLM 包装问题）
-          - OpenAI/其他: 通过 LiteLLM aembedding
+        支持三种模式（由 settings.embedding_provider 控制）:
+          - local_st: 本机 sentence-transformers + BGE（与「数据分析」相同，默认）
+          - ollama:   HTTP 调 Ollama /api/embed
+          - openai:   LiteLLM aembedding
 
         Args:
             texts: 待向量化的文本列表
-            model: 嵌入模型标识（默认使用 settings.embedding_model）
+            model: 嵌入模型标识（local_st 下可忽略，使用 model_path）
 
         Returns:
             向量列表，每个元素是 float 数组（维度由模型决定）
         """
+        provider = (settings.embedding_provider or "local_st").lower()
         model = model or settings.embedding_model
 
-        # Ollama 本地模型：直接调用 Ollama API
-        if settings.embedding_provider == "ollama":
+        # 1) 本地 ST（默认，对齐数据分析）
+        if provider in ("local_st", "local", "sentence_transformers", "bge"):
+            from app.services.local_embed import aembed_batch
+
+            # 允许通过环境覆盖 device（local_embed 读取）
+            if getattr(settings, "embedding_device", None):
+                import os
+
+                os.environ.setdefault(
+                    "NOVELMIND_EMBED_DEVICE", settings.embedding_device
+                )
+            return await aembed_batch(
+                texts,
+                batch_size=getattr(settings, "embedding_batch_size", 64) or 64,
+                model_path=getattr(settings, "embedding_model_path", None),
+            )
+
+        # 2) Ollama HTTP
+        if provider == "ollama":
             import httpx
-            # 去除 LiteLLM 前缀（ollama/nomic-embed-text → nomic-embed-text）
+
             model = model.replace("ollama/", "")
             embeddings = []
             async with httpx.AsyncClient(timeout=120) as client:
@@ -100,8 +119,15 @@ class AIService:
                         f"{settings.ollama_base_url}/api/embed",
                         json={"model": model, "input": text},
                     )
+                    if resp.status_code >= 400:
+                        raise RuntimeError(
+                            f"Ollama embedding HTTP {resp.status_code}: {resp.text[:200]}"
+                        )
+                    if not resp.content:
+                        raise RuntimeError(
+                            "Ollama embedding 返回空响应（服务可能未启动或 502）"
+                        )
                     data = resp.json()
-                    # Ollama /api/embed 返回 {"embeddings": [[...]]}
                     emb_list = data.get("embeddings", [])
                     if emb_list and emb_list[0]:
                         embeddings.append(emb_list[0])
@@ -112,7 +138,7 @@ class AIService:
                         )
             return embeddings
 
-        # OpenAI / LiteLLM 模式
+        # 3) OpenAI / LiteLLM
         response = await litellm.aembedding(
             model=model,
             input=texts,
