@@ -10,7 +10,7 @@
 
 from datetime import datetime
 from enum import StrEnum
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -155,3 +155,83 @@ class TimelineEventResponse(BaseModel):
     time_reference: Optional[str] = None
     created_at: datetime
     updated_at: datetime
+
+
+class TimelineVersionSource(StrEnum):
+    ACTIVE = "active"
+    RUNNING_CANDIDATE = "running_candidate"
+
+
+class TimelineOrdering(StrEnum):
+    NARRATIVE = "narrative"
+    STORY = "story"
+
+
+class TimelineRunResponse(StrictTimelineModel):
+    id: int
+    novel_id: int
+    version_id: int | None = None
+    status: str
+    status_reason: str | None = None
+    progress: dict[str, Any] = Field(default_factory=dict)
+    cancel_requested: bool = False
+    updated_at: datetime | None = None
+
+
+class TimelineVisibleEvent(StrictTimelineModel):
+    id: int
+    logical_event_id: str
+    title: str
+    description: str
+    event_type: str
+    narrative_chapter_number: int
+    narrative_index: int
+    story_rank: int | None = None
+    time_precision: TimePrecision
+    time_expression: str | None = None
+    confidence: float
+    participants: list[Participant] = Field(default_factory=list)
+    provenance: dict[str, Literal["machine", "manual"]] = Field(default_factory=dict)
+
+
+class TimelineVisibleEdge(StrictTimelineModel):
+    source_event_id: int
+    target_event_id: int
+    edge_type: str
+    confidence: float
+
+
+class TimelineCounts(StrictTimelineModel):
+    events: int = 0
+    participants: int = 0
+    causal_edges: int = 0
+
+
+class TimelineVersionView(StrictTimelineModel):
+    source: TimelineVersionSource
+    version_id: int
+    status: str
+    progress: dict[str, Any] = Field(default_factory=dict)
+    events: list[TimelineVisibleEvent] = Field(default_factory=list)
+    causal_edges: list[TimelineVisibleEdge] = Field(default_factory=list)
+    counts: TimelineCounts = Field(default_factory=TimelineCounts)
+    aggregates: dict[str, int] = Field(default_factory=dict)
+
+
+class TimelineEnvelope(StrictTimelineModel):
+    active: TimelineVersionView | None = None
+    running_candidate: TimelineVersionView | None = None
+
+
+class TimelineRollbackRequest(StrictTimelineModel):
+    target_version_id: int
+    expected_revision: int = Field(ge=0)
+
+
+class TimelineEditRequest(StrictTimelineModel):
+    field_name: Literal["title", "description", "event_type", "time_expression"]
+    value: Any
+
+
+class TimelinePreferenceRequest(StrictTimelineModel):
+    full_book: bool

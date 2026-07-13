@@ -1,3 +1,5 @@
+import pytest
+
 from app.api.timeline import router
 from app.schemas.timeline import TimelineEnvelope, TimelineVersionSource
 
@@ -31,3 +33,4 @@ def test_timeline_schema_does_not_merge_version_counts_or_progress():
     assert "events" not in properties
     assert "counts" not in properties
     assert "progress" not in properties
+pytestmark = pytest.mark.unit
