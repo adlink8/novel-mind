@@ -1,23 +1,34 @@
-"""Deterministic Phase 08 timeline qualification CLI.
+"""Production-backed Phase 08 timeline qualification.
 
-Offline qualification is intentionally network-free.  Live evidence is a separate
-profile and can never be replaced by an outage or a blocked dependency result.
+Release qualification starts the production worker, reads its durable database
+artifacts, and measures the spoiler-safe production query. Frozen corpus helpers
+remain diagnostics only and cannot satisfy the release evidence gate.
 """
 
 from __future__ import annotations
 
 import argparse
+import asyncio
 import hashlib
 import json
+import math
+from decimal import Decimal
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CORPUS = ROOT / "evals" / "timeline_fiction.v1.json"
+REQUIRED_TEST_COMMANDS = [
+    "cd backend; pytest tests/unit/timeline tests/integration/timeline tests/adversarial/test_timeline_evidence.py -x",
+    "cd frontend; npm test -- --run",
+    "cd frontend; npm run build",
+    "cd frontend; npm run test:e2e -- timeline-real.spec.ts",
+    "pytest tests/ci/test_timeline_release_gate.py -x",
+]
 
 
 def _canonical(value: Any) -> bytes:
-    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
 
 
 def _sha256(value: Any) -> str:
@@ -25,9 +36,7 @@ def _sha256(value: Any) -> str:
 
 
 def report_digest(report: dict[str, Any]) -> str:
-    """Digest a report without trusting its embedded digest field."""
-    unsigned = {key: value for key, value in report.items() if key != "report_sha256"}
-    return _sha256(unsigned)
+    return _sha256({key: value for key, value in report.items() if key != "report_sha256"})
 
 
 def load_corpus(path: Path = DEFAULT_CORPUS) -> dict[str, Any]:
@@ -45,93 +54,64 @@ def load_corpus(path: Path = DEFAULT_CORPUS) -> dict[str, Any]:
     return corpus
 
 
-def _gates(corpus: dict[str, Any], controls: dict[str, Any]) -> dict[str, bool]:
-    ops = corpus["operational_expectations"]
+def run_offline_qualification(path: Path = DEFAULT_CORPUS, *, controls: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Validate frozen-corpus structure; this report is never release evidence."""
+    corpus = load_corpus(path)
+    controls = controls or {}
     cases = corpus["cases"]
-    return {
+    groups = corpus["cross_chapter_groups"]
+    case_ids = {case["id"] for case in cases}
+    evidence_ratio = sum(bool(case.get("evidence")) for case in cases) / len(cases)
+    order_ratio = sum(
+        (not group.get("story_order")
+        or set(group.get("story_order", ())) <= set(group.get("members", ())))
+        and set(group.get("members", ())) <= case_ids
+        for group in groups
+    ) / len(groups)
+    gates = {
         "schema_validity": controls.get("schema_valid", True),
-        "evidence_validity": controls.get("evidence_valid", True) and all(c["evidence"] for c in cases),
-        "restart_idempotency": ops["restart_next_chapter"] and ops["duplicate_completed_calls"] == 0,
-        "budget_complete": controls.get("budget_status", "completed") == "completed"
-        and ops["calls_after_budget_pause"] == 0,
-        "version_safety": ops["stale_cas_rejected"] and ops["rollback_byte_identical"],
-        "override_preservation": ops["override_relink"] == "stable_evidence_only",
-        "spoiler_safety": controls.get("spoiler_leaks", 0) == 0 and ops["visible_set_first"],
-        "version_separation": not controls.get("active_candidate_merged", False)
-        and ops["active_candidate_separate"],
-        "exact_cache_audit": ops["exact_cache_audit"],
-        "fiction_only": corpus["domain"] == "fiction"
-        and "history_corpus" in corpus["deferred_products_absent"],
+        "evidence_validity": controls.get("evidence_valid", True) and evidence_ratio == 1,
+        "budget_complete": controls.get("budget_status", "completed") == "completed",
+        "spoiler_safety": controls.get("spoiler_leaks", 0) == 0,
+        "version_separation": not controls.get("active_candidate_merged", False),
+        "fiction_only": corpus["domain"] == "fiction",
         "deferred_products_absent": set(corpus["deferred_products_absent"])
         == {"relationship_graph", "reader_ai", "clue_tracker", "history_corpus"},
     }
-
-
-def run_offline_qualification(path: Path = DEFAULT_CORPUS, *,
-                              controls: dict[str, Any] | None = None) -> dict[str, Any]:
-    corpus = load_corpus(path)
-    controls = controls or {}
-    gates = _gates(corpus, controls)
     qualified = all(gates.values())
     metrics = {
-        "event_precision": 1.0,
-        "story_pairwise_accuracy": 1.0,
-        "duplicate_f1": 1.0,
-        "causal_precision": 1.0,
-        "unsupported_critical_events": 0,
-        "fake_exact_dates": 0,
-        "spoiler_leaks": 0,
-        "duplicate_completed_calls": 0,
-        "calls_after_budget_pause": 0,
-        "cost_usd_total": 0.0,
-        "latency_p95_ms": 0.0,
-    }
-    lineage = {
-        key: corpus[key] for key in (
-            "source_snapshot_hash", "hierarchy_build_id", "hierarchy_checksum",
-            "prompt_hash", "schema_hash", "model_lineage", "version_lineage"
-        )
+        "event_precision": evidence_ratio,
+        "story_pairwise_accuracy": order_ratio,
+        "duplicate_f1": sum("duplicate" in group for group in groups) / len(groups),
+        "causal_precision": sum("causal" in case for case in cases) / len(cases),
     }
     report: dict[str, Any] = {
-        "report_version": "timeline-qualification.v1",
+        "report_version": "timeline-corpus-diagnostic.v1",
         "dataset_version": corpus["dataset_version"],
         "fixture_sha256": _sha256(path.read_bytes()),
-        "lineage": lineage,
+        "lineage": {key: corpus[key] for key in (
+            "source_snapshot_hash", "hierarchy_build_id", "hierarchy_checksum",
+            "prompt_hash", "schema_hash", "model_lineage", "version_lineage",
+        )},
         "status": "qualified" if qualified else "failed_policy",
         "quality_comparable": qualified,
         "gates": gates,
         "metrics": metrics if qualified else None,
-        "case_count": len(corpus["cases"]),
-        "cross_chapter_group_count": len(corpus["cross_chapter_groups"]),
     }
     report["report_sha256"] = report_digest(report)
     return report
 
 
-def run_live_qualification(path: Path = DEFAULT_CORPUS, *, chapter_runner=None,
-                           reconcile_runner=None) -> dict[str, Any]:
-    """Run controlled balanced+quality profiles without allowing fallback.
-
-    Callers own transport/auth.  Missing runners and provider outages are explicit
-    blocked dependencies and intentionally carry no comparable metrics.
-    """
-    corpus = load_corpus(path)
+def run_live_qualification(path: Path = DEFAULT_CORPUS, *, chapter_runner=None, reconcile_runner=None) -> dict[str, Any]:
+    """Legacy transport diagnostic; production release evidence comes from persisted attempts."""
+    fixture_sha = _sha256(path.read_bytes())
     if chapter_runner is None or reconcile_runner is None:
-        return {
-            "status": "blocked_dependency", "quality_comparable": False,
-            "metrics": None, "deployments": [], "fixture_sha256": _sha256(path.read_bytes()),
-        }
+        return {"status": "blocked_dependency", "quality_comparable": False, "metrics": None, "deployments": [], "fixture_sha256": fixture_sha}
     try:
         deployments = [chapter_runner(), reconcile_runner()]
     except (ConnectionError, TimeoutError, OSError) as exc:
-        return {
-            "status": "blocked_dependency", "quality_comparable": False,
-            "metrics": None, "deployments": [], "reason": type(exc).__name__,
-            "fixture_sha256": _sha256(path.read_bytes()),
-        }
-    tiers_ok = [item.get("tier") for item in deployments] == ["balanced", "quality"]
-    outage = any(item.get("status") in {"outage", "timeout", "unavailable"} for item in deployments)
-    valid = tiers_ok and all(
+        return {"status": "blocked_dependency", "quality_comparable": False, "metrics": None, "deployments": [], "reason": type(exc).__name__, "fixture_sha256": fixture_sha}
+    valid = [item.get("tier") for item in deployments] == ["balanced", "quality"] and all(
         item.get("status") == "completed"
         and item.get("schema_valid") is True
         and item.get("evidence_valid") is True
@@ -140,158 +120,318 @@ def run_live_qualification(path: Path = DEFAULT_CORPUS, *, chapter_runner=None,
         and all(item.get(key) for key in ("provider", "model", "revision"))
         for item in deployments
     )
+    outage = any(item.get("status") in {"outage", "timeout", "unavailable"} for item in deployments)
     if not valid:
-        return {
-            "status": "blocked_dependency" if outage else "failed_policy",
-            "quality_comparable": False, "metrics": None, "deployments": deployments,
-            "fixture_sha256": _sha256(path.read_bytes()),
-        }
-    metrics = {
-        "calls": len(deployments),
-        "tokens": sum(int(item["tokens"]) for item in deployments),
-        "cost_usd_total": round(sum(float(item["cost_usd"]) for item in deployments), 8),
-        "latency_p95_ms": max(float(item["latency_ms"]) for item in deployments),
-    }
+        return {"status": "blocked_dependency" if outage else "failed_policy", "quality_comparable": False, "metrics": None, "deployments": deployments, "fixture_sha256": fixture_sha}
     return {
-        "status": "qualified", "quality_comparable": True, "metrics": metrics,
-        "deployments": deployments, "fixture_sha256": _sha256(path.read_bytes()),
-        "dataset_version": corpus["dataset_version"],
+        "status": "qualified", "quality_comparable": True, "deployments": deployments,
+        "metrics": {
+            "calls": len(deployments),
+            "tokens": sum(int(item["tokens"]) for item in deployments),
+            "cost_usd_total": round(sum(float(item["cost_usd"]) for item in deployments), 8),
+            "latency_p95_ms": max(float(item["latency_ms"]) for item in deployments),
+        },
+        "fixture_sha256": fixture_sha,
     }
 
 
-def verify_release_evidence(repo_root: Path, report_path: Path, *,
-                            require_live: bool = False) -> dict[str, Any]:
-    """Verify local Phase 08 release evidence without creating verification artifacts."""
+def _candidate_id(logical_event_id: str) -> str:
+    return logical_event_id.split(":", 1)[-1]
+
+
+def _ratio(numerator: int, denominator: int) -> float:
+    return round(numerator / denominator, 6) if denominator else 0.0
+
+
+def _pairwise_accuracy(actual: list[str], expected: list[str]) -> float:
+    if len(expected) < 2:
+        return 1.0 if actual == expected else 0.0
+    positions = {item: index for index, item in enumerate(actual)}
+    correct = total = 0
+    for left_index, left in enumerate(expected):
+        for right in expected[left_index + 1:]:
+            total += 1
+            if left in positions and right in positions and positions[left] < positions[right]:
+                correct += 1
+    return _ratio(correct, total)
+
+
+def _p95(values: Iterable[int | None]) -> float:
+    measured = sorted(int(value) for value in values if value is not None)
+    if not measured:
+        return 0.0
+    return float(measured[max(0, math.ceil(len(measured) * 0.95) - 1)])
+
+
+async def run_production_qualification(
+    run_id: int,
+    *,
+    runtime,
+    sessions,
+    expected_event_ids: list[str],
+    expected_story_order: list[str],
+) -> dict[str, Any]:
+    """Execute the production worker and score only persisted/query artifacts."""
+    from sqlalchemy import func, select
+
+    from app.models.analysis import AnalysisBudgetLedger, AnalysisChapterStage, AnalysisRun, AnalysisVersion, ModelCallAttempt
+    from app.models.novel import Novel
+    from app.models.timeline import MachineTimelineEvent, TimelineActivePointer, TimelineEvidenceRef
+    from app.schemas.timeline import TimelineOrdering, TimelineVersionSource
+    from app.services.timeline.query import build_version_view
+    from app.services.timeline.worker import run_timeline_worker
+
+    await run_timeline_worker(run_id, runtime=runtime)
+    async with sessions() as session:
+        run = await session.get(AnalysisRun, run_id)
+        if run is None:
+            raise ValueError(f"analysis run {run_id} does not exist")
+        novel = await session.get(Novel, run.novel_id)
+        version = await session.get(AnalysisVersion, run.version_id) if run.version_id else None
+        pointer = await session.scalar(select(TimelineActivePointer).where(
+            TimelineActivePointer.owner_id == run.owner_id,
+            TimelineActivePointer.novel_id == run.novel_id,
+        ))
+        events = list((await session.scalars(select(MachineTimelineEvent).where(
+            MachineTimelineEvent.version_id == run.version_id,
+        ).order_by(MachineTimelineEvent.narrative_chapter_number, MachineTimelineEvent.narrative_index, MachineTimelineEvent.id))).all()) if run.version_id else []
+        event_ids = [event.id for event in events]
+        evidence = list((await session.scalars(select(TimelineEvidenceRef).where(
+            TimelineEvidenceRef.event_id.in_(event_ids),
+        ).order_by(TimelineEvidenceRef.event_id, TimelineEvidenceRef.id))).all()) if event_ids else []
+        attempts = list((await session.scalars(select(ModelCallAttempt).where(
+            ModelCallAttempt.run_id == run.id,
+        ).order_by(ModelCallAttempt.id))).all())
+        stages = list((await session.scalars(select(AnalysisChapterStage).where(
+            AnalysisChapterStage.run_id == run.id,
+            AnalysisChapterStage.status == "completed",
+        ).order_by(AnalysisChapterStage.id))).all())
+        ledger = await session.scalar(select(AnalysisBudgetLedger).where(AnalysisBudgetLedger.run_id == run.id))
+        visible = await build_version_view(
+            session, novel=novel, owner_id=run.owner_id,
+            source=TimelineVersionSource.ACTIVE, ordering=TimelineOrdering.NARRATIVE,
+            person=None, include_causal=True, request_full_book=False,
+        ) if novel is not None else None
+
+        normalized_ids = [_candidate_id(event.logical_event_id) for event in events]
+        expected = set(expected_event_ids)
+        actual = set(normalized_ids)
+        matched = actual & expected
+        story_ids = [_candidate_id(event.logical_event_id) for event in sorted(
+            events,
+            key=lambda event: (
+                event.story_rank is None, event.story_rank,
+                event.narrative_chapter_number, event.narrative_index, event.id,
+            ),
+        )]
+        evidence_event_ids = {row.event_id for row in evidence}
+        visible_ids = [_candidate_id(event.logical_event_id) for event in (visible.events if visible else [])]
+        visible_chapters = [event.narrative_chapter_number for event in (visible.events if visible else [])]
+        cutoff = max(visible_chapters) if visible_chapters else None
+        spoiler_leaks = sum(1 for chapter in visible_chapters if cutoff is not None and chapter > cutoff)
+        provider_attempts = [attempt for attempt in attempts if attempt.provider_request_id]
+        metrics = {
+            "event_precision": _ratio(len(matched), len(actual)),
+            "event_recall": _ratio(len(matched), len(expected)),
+            "story_pairwise_accuracy": _pairwise_accuracy(story_ids, expected_story_order),
+            "evidence_coverage": _ratio(len(evidence_event_ids), len(events)),
+            "spoiler_leaks": spoiler_leaks,
+            "provider_calls": len(provider_attempts),
+            "cost_usd_total": round(sum(float(attempt.cost_usd or Decimal("0")) for attempt in provider_attempts), 8),
+            "latency_p95_ms": _p95(attempt.latency_ms for attempt in provider_attempts),
+        }
+        artifact = {
+            "database_dialect": session.bind.dialect.name,
+            "run": {"id": run.id, "status": run.status, "version_id": run.version_id, "progress": run.progress},
+            "version": None if version is None else {
+                "id": version.id, "status": version.status,
+                "source_snapshot_hash": version.source_snapshot_hash,
+                "hierarchy_build_id": version.hierarchy_build_id,
+                "hierarchy_checksum": version.hierarchy_checksum,
+                "prompt_hash": version.prompt_hash, "schema_hash": version.schema_hash,
+                "model_lineage": version.model_lineage,
+                "manifest_checksum": version.manifest_checksum,
+            },
+            "active_pointer": None if pointer is None else {
+                "version_id": pointer.version_id, "revision": pointer.revision,
+                "manifest_checksum": pointer.manifest_checksum,
+            },
+            "counts": {
+                "events": len(events), "evidence_refs": len(evidence),
+                "model_attempts": len(attempts), "completed_stages": len(stages),
+            },
+            "events": [{
+                "id": event.id, "logical_event_id": _candidate_id(event.logical_event_id),
+                "chapter_number": event.narrative_chapter_number,
+                "narrative_index": event.narrative_index, "story_rank": event.story_rank,
+                "publication_status": event.publication_status,
+            } for event in events],
+            "evidence_refs": [{
+                "event_id": row.event_id, "evidence_id": row.evidence_id,
+                "source_start": row.source_start, "source_end": row.source_end,
+                "content_hash": row.content_hash,
+            } for row in evidence],
+            "attempts": [{
+                "id": attempt.id, "stage_key": attempt.stage_key,
+                "attempt_number": attempt.attempt_number, "status": attempt.status,
+                "provider_request_id": attempt.provider_request_id,
+                "request_hash": attempt.request_hash, "response_hash": attempt.response_hash,
+                "usage": attempt.usage, "cost_usd": str(attempt.cost_usd or 0),
+                "latency_ms": attempt.latency_ms,
+            } for attempt in attempts],
+            "stages": [{
+                "stage_key": stage.stage_key, "artifact_checksum": stage.artifact_checksum,
+            } for stage in stages],
+            "budget": None if ledger is None else {
+                "settled_calls": ledger.settled_calls,
+                "settled_input_tokens": ledger.settled_input_tokens,
+                "settled_output_tokens": ledger.settled_output_tokens,
+                "settled_cost_usd": str(ledger.settled_cost_usd),
+                "reserved_calls": ledger.reserved_calls,
+            },
+            "visible_default_event_ids": visible_ids,
+        }
+
+    gates = {
+        "worker_completed": artifact["run"]["status"] == "completed",
+        "active_promoted": artifact["active_pointer"] is not None
+        and artifact["active_pointer"]["version_id"] == artifact["run"]["version_id"],
+        "production_artifacts": artifact["database_dialect"] == "postgresql"
+        and bool(events) and len(evidence_event_ids) == len(events)
+        and bool(stages) and bool(attempts) and ledger is not None,
+        "call_audit": bool(provider_attempts)
+        and all(attempt.status == "succeeded" and attempt.response_hash for attempt in provider_attempts),
+        "budget_settled": ledger is not None and ledger.reserved_calls == 0
+        and ledger.settled_calls == len(provider_attempts),
+        "spoiler_safety": metrics["spoiler_leaks"] == 0
+        and len(visible_ids) < len(events) if len(events) > 1 else metrics["spoiler_leaks"] == 0,
+        "quality_thresholds": metrics["event_precision"] >= 0.9
+        and metrics["event_recall"] >= 0.9
+        and metrics["story_pairwise_accuracy"] >= 0.9
+        and metrics["evidence_coverage"] == 1.0,
+    }
+    qualified = all(gates.values())
+    report: dict[str, Any] = {
+        "report_version": "timeline-production-qualification.v2",
+        "status": "qualified" if qualified else "failed_policy",
+        "quality_comparable": qualified,
+        "artifact": artifact,
+        "artifact_sha256": _sha256(artifact),
+        "gates": gates,
+        "metrics": metrics,
+        "test_commands": REQUIRED_TEST_COMMANDS,
+    }
+    report["report_sha256"] = report_digest(report)
+    return report
+
+
+def verify_release_evidence(repo_root: Path, report_path: Path, *, require_live: bool = False) -> dict[str, Any]:
     report = json.loads(report_path.read_text(encoding="utf-8"))
-    fixture = repo_root / "backend" / "evals" / "timeline_fiction.v1.json"
+    artifact = report.get("artifact")
     required_paths = {
         "migration": repo_root / "backend" / "migrations" / "versions" / "10_analysis_timeline_versions.py",
+        "worker": repo_root / "backend" / "app" / "services" / "timeline" / "worker.py",
         "api": repo_root / "backend" / "app" / "api" / "timeline.py",
         "frontend": repo_root / "frontend" / "src" / "app" / "analysis" / "page.tsx",
-        "fixture": fixture,
+        "real_qualification": repo_root / "backend" / "tests" / "integration" / "timeline" / "test_real_qualification.py",
     }
     checks = {name: path.is_file() for name, path in required_paths.items()}
+    counts = artifact.get("counts", {}) if isinstance(artifact, dict) else {}
+    pointer = artifact.get("active_pointer") if isinstance(artifact, dict) else None
     checks.update({
-        "fixture_signature": fixture.is_file()
-        and report.get("fixture_sha256") == _sha256(fixture.read_bytes()),
+        "production_report_version": report.get("report_version") == "timeline-production-qualification.v2",
+        "production_artifact_signature": isinstance(artifact, dict)
+        and report.get("artifact_sha256") == _sha256(artifact),
         "report_signature": report.get("report_sha256") == report_digest(report),
+        "worker_completed": isinstance(artifact, dict)
+        and artifact.get("run", {}).get("status") == "completed",
+        "postgresql_authority": isinstance(artifact, dict)
+        and artifact.get("database_dialect") == "postgresql",
+        "active_promoted": bool(pointer)
+        and pointer.get("version_id") == artifact.get("run", {}).get("version_id"),
+        "persisted_rows": all(int(counts.get(key, 0)) > 0 for key in (
+            "events", "evidence_refs", "model_attempts", "completed_stages",
+        )),
         "offline_qualified": report.get("status") == "qualified"
         and report.get("quality_comparable") is True and report.get("metrics") is not None,
-        "spoiler_safety": report.get("gates", {}).get("spoiler_safety") is True,
-        "fiction_only": report.get("gates", {}).get("fiction_only") is True,
-        "deferred_products_absent": report.get("gates", {}).get("deferred_products_absent") is True,
+        "spoiler_safety": report.get("gates", {}).get("spoiler_safety") is True
+        and report.get("metrics", {}).get("spoiler_leaks") == 0,
+        "quality_thresholds": report.get("gates", {}).get("quality_thresholds") is True,
+        "test_commands": report.get("test_commands") == REQUIRED_TEST_COMMANDS,
     })
     if require_live:
         live = report.get("live", {})
         checks["live_dual_model"] = live.get("status") == "qualified" \
             and live.get("quality_comparable") is True and live.get("metrics") is not None
     qualified = all(checks.values())
-    return {
-        "status": "qualified" if qualified else "blocked_release",
-        "quality_comparable": qualified,
-        "checks": checks,
-    }
-
-
-def controlled_live_qualification(path: Path = DEFAULT_CORPUS) -> dict[str, Any]:
-    """Exercise the live orchestration boundary with deterministic provider doubles."""
-    def result(tier: str) -> dict[str, Any]:
-        return {
-            "status": "completed", "tier": tier, "schema_valid": True,
-            "evidence_valid": True, "spoiler_leaks": 0, "budget_status": "completed",
-            "tokens": 100, "cost_usd": 0.001, "latency_ms": 10.0,
-            "provider": "controlled", "model": f"{tier}-fixture", "revision": "v1",
-        }
-    return run_live_qualification(
-        path, chapter_runner=lambda: result("balanced"),
-        reconcile_runner=lambda: result("quality"),
-    )
-
-
-def compose_qualification(path: Path = DEFAULT_CORPUS, *, controlled_live: bool = False) -> dict[str, Any]:
-    report = run_offline_qualification(path)
-    report["live"] = controlled_live_qualification(path) if controlled_live else run_live_qualification(path)
-    report["release_status"] = (
-        "qualified" if report["status"] == "qualified"
-        and report["live"]["status"] == "qualified" else "blocked_release"
-    )
-    report["report_sha256"] = report_digest(report)
-    return report
+    return {"status": "qualified" if qualified else "blocked_release", "quality_comparable": qualified, "checks": checks}
 
 
 def render_markdown(report: dict[str, Any]) -> str:
-    status = report["release_status"].upper()
-    requirements = {
-        "REQ-TIME-01": "durable restart/checkpoint and zero duplicate completed calls",
-        "REQ-TIME-02": "immutable lineage, stale CAS rejection, byte-identical rollback",
-        "REQ-TIME-03": "first-entry trigger remains API-owned and idempotent",
-        "REQ-TIME-04": "four strict time shapes, participants, evidence, and causality",
-        "REQ-TIME-05": "quality reconciliation, override preservation, conflict retention",
-        "REQ-TIME-06": "progressive active/candidate envelopes remain separate",
-        "REQ-TIME-07": "global responsive timeline frontend suite and build",
-        "REQ-TIME-08": "visible-set-first spoiler policy and explicit full-book preference",
-        "REQ-TIME-09": "exact cache, balanced/quality tiers, priced fail-closed budgets",
-        "REQ-TIME-10": "accessible narrative/story ordering and causal controls",
-    }
-    decision_evidence = {
-        "D-01..D-03": "global /analysis fiction timeline; frontend unit/build gates",
-        "D-04..D-07": "person filter, dual order, four precisions, typed causal overlay",
-        "D-08..D-11": "automatic evidence gate, immutable candidates, overrides, rollback",
-        "D-12..D-15": "first-entry jobs, progressive chapters, dual tiers, exact cache/budget",
-        "D-16..D-17": "API spoiler filtering and persisted full-book preference",
-        "D-18..D-19": "fiction-only corpus; relationship graph, reader AI, clues, history absent",
-        "D-20..D-22": "first-chapter default, source isolation, unknown-price pause",
-    }
+    artifact = report["artifact"]
+    metrics = report["metrics"]
     lines = [
-        "# Phase 08 Qualification", "", f"**Release status: {status}**", "",
-        f"- Dataset: `{report['dataset_version']}` ({report['case_count']} cases, "
-        f"{report['cross_chapter_group_count']} cross-chapter groups)",
-        f"- Fixture SHA-256: `{report['fixture_sha256']}`",
-        f"- Report SHA-256: `{report['report_sha256']}`",
-        f"- Offline: `{report['status']}`; controlled dual-model: `{report['live']['status']}`",
-        "- Live outage/block policy: `blocked_dependency`, `metrics=null`, never success",
-        "", "## Requirement Scorecard", "", "| Requirement | Status | Evidence |",
-        "|---|---|---|",
+        "# Phase 08 Qualification", "",
+        f"**Release status: {report['status'].upper()}**", "",
+        "Production worker and persisted PostgreSQL/SQLAlchemy artifacts are the qualification authority.", "",
+        f"- Run: `{artifact['run']['id']}` / version `{artifact['run']['version_id']}` / `{artifact['run']['status']}`",
+        f"- Artifact SHA-256: `{report['artifact_sha256']}`",
+        f"- Report SHA-256: `{report['report_sha256']}`", "",
+        "## Measured Production Artifacts", "",
+        "| Artifact | Count |", "|---|---:|",
+        f"| Persisted events | {artifact['counts']['events']} |",
+        f"| Evidence refs | {artifact['counts']['evidence_refs']} |",
+        f"| Model attempts | {artifact['counts']['model_attempts']} |",
+        f"| Completed stages | {artifact['counts']['completed_stages']} |", "",
+        "## Measured Metrics", "", "| Metric | Value |", "|---|---:|",
+        f"| Event precision | {metrics['event_precision']:.3f} |",
+        f"| Event recall | {metrics['event_recall']:.3f} |",
+        f"| Story pairwise accuracy | {metrics['story_pairwise_accuracy']:.3f} |",
+        f"| Evidence coverage | {metrics['evidence_coverage']:.3f} |",
+        f"| Spoiler leaks | {metrics['spoiler_leaks']} |",
+        f"| Provider calls | {metrics['provider_calls']} |",
+        f"| Settled cost | ${metrics['cost_usd_total']:.8f} |",
+        f"| p95 latency | {metrics['latency_p95_ms']:.1f} ms |", "",
+        "## Gates", "",
     ]
-    lines.extend(f"| {req} | PASS | {evidence} |" for req, evidence in requirements.items())
-    lines.extend(["", "## Decision Scorecard", "", "| Decisions | Status | Evidence |", "|---|---|---|"])
-    lines.extend(f"| {decision} | PASS | {evidence} |" for decision, evidence in decision_evidence.items())
+    lines.extend(f"- {'PASS' if passed else 'FAIL'} — `{name}`" for name, passed in report["gates"].items())
+    lines.extend(["", "## Required Test Commands", ""])
+    lines.extend(f"- `{command}`" for command in report["test_commands"])
     lines.extend([
-        "", "## Quality, Cost, and Latency", "",
-        "| Metric | Result | Gate |", "|---|---:|---:|",
-        f"| Event precision | {report['metrics']['event_precision']:.2f} | >= 0.90 |",
-        f"| Story pairwise accuracy | {report['metrics']['story_pairwise_accuracy']:.2f} | >= 0.90 |",
-        f"| Duplicate F1 | {report['metrics']['duplicate_f1']:.2f} | >= 0.90 |",
-        f"| Causal precision | {report['metrics']['causal_precision']:.2f} | >= 0.90 |",
-        f"| Controlled calls | {report['live']['metrics']['calls']} | exactly 2 |",
-        f"| Controlled cost | ${report['live']['metrics']['cost_usd_total']:.6f} | recorded |",
-        f"| Controlled p95 latency | {report['live']['metrics']['latency_p95_ms']:.1f} ms | recorded |",
-        "", "## Executed Gates", "",
-        "- Backend timeline unit/integration/adversarial: **56 passed**.",
-        "- Controlled live dual-model and fail-closed negatives: **7 passed**.",
-        "- Timeline release gate: **5 passed**.",
-        "- Frontend unit suite: **66 passed**; Next.js production build passed.",
-        "- No `08-VERIFICATION.md` was created or modified.", "",
+        "", "## Signed Raw Artifact", "",
+        "The canonical JSON below hashes to the artifact SHA-256 above.", "",
+        "```json", json.dumps(artifact, ensure_ascii=False, sort_keys=True, indent=2), "```", "",
     ])
     return "\n".join(lines)
 
 
+async def _run_cli(args) -> dict[str, Any]:
+    from app.core.database import async_session_factory
+    from app.services.timeline.worker import production_runtime
+
+    expectations = json.loads(args.expectations.read_text(encoding="utf-8"))
+    return await run_production_qualification(
+        args.run_id, runtime=production_runtime(), sessions=async_session_factory,
+        expected_event_ids=expectations["expected_event_ids"],
+        expected_story_order=expectations["expected_story_order"],
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Phase 08 frozen timeline qualification")
-    parser.add_argument("--corpus", type=Path, default=DEFAULT_CORPUS)
+    parser = argparse.ArgumentParser(description="Phase 08 production timeline qualification")
+    parser.add_argument("--run-id", type=int, required=True)
+    parser.add_argument("--expectations", type=Path, required=True)
     parser.add_argument("--out", type=Path)
     parser.add_argument("--format", choices=("json", "markdown"), default="json")
-    parser.add_argument("--controlled-live", action="store_true")
     args = parser.parse_args(argv)
-    report = compose_qualification(args.corpus, controlled_live=args.controlled_live)
-    rendered = (render_markdown(report) if args.format == "markdown" else
-                json.dumps(report, ensure_ascii=False, sort_keys=True, indent=2) + "\n")
+    report = asyncio.run(_run_cli(args))
+    rendered = render_markdown(report) if args.format == "markdown" else json.dumps(report, ensure_ascii=False, sort_keys=True, indent=2) + "\n"
     if args.out:
         args.out.parent.mkdir(parents=True, exist_ok=True)
         args.out.write_text(rendered, encoding="utf-8")
     else:
         print(rendered, end="")
-    return 0 if report["release_status"] == "qualified" else 1
+    return 0 if report["status"] == "qualified" else 1
 
 
 if __name__ == "__main__":

@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import json
+import os
+import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
+from pathlib import Path
 
 import pytest
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import async_sessionmaker
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.models.analysis import AnalysisRun
 from app.models.chunk_build import ChunkActivePointer, ChunkBuild, ChunkHierarchyNode
@@ -16,7 +19,7 @@ from app.models.novel import Chapter, Novel
 from app.models.user import User
 from app.services.timeline.model_gateway import ModelDeployment, PostgresCallRepository, TimelineModelGateway
 from app.services.timeline.worker import TimelineWorkerRuntime
-from scripts.run_timeline_qualification import run_production_qualification
+from scripts.run_timeline_qualification import render_markdown, run_production_qualification
 
 pytestmark = pytest.mark.integration
 
@@ -66,31 +69,37 @@ def _deployment(model_id: str) -> ModelDeployment:
     return ModelDeployment("controlled", model_id, "r1", True, Decimal("1"), Decimal("2"))
 
 
-async def _seed_run(db_session):
-    owner = await db_session.scalar(select(User).where(User.username == "testuser"))
-    novel = Novel(owner_id=owner.id, title="Qualification novel", status="ready")
-    db_session.add(novel)
-    await db_session.flush()
+async def _seed_run(session):
+    unique = uuid.uuid4().hex
+    owner = User(
+        username=f"qualification-{unique}", email=f"qualification-{unique}@example.test",
+        hashed_password="not-used-by-qualification",
+    )
+    session.add(owner)
+    await session.flush()
+    novel = Novel(owner_id=owner.id, title=f"Qualification novel {unique}", status="ready")
+    session.add(novel)
+    await session.flush()
     chapters = [
         Chapter(novel_id=novel.id, chapter_number=2, title="Two", content="Mira wakes."),
         Chapter(novel_id=novel.id, chapter_number=9, title="Nine", content="Mira leaves."),
     ]
-    db_session.add_all(chapters)
-    await db_session.flush()
+    session.add_all(chapters)
+    await session.flush()
     novel.reading_progress = {"chapter_id": chapters[0].id, "progress_percent": 100}
     build = ChunkBuild(
-        build_id="qualification-build", novel_id=novel.id, status="active",
+        build_id=f"qualification-{unique}", novel_id=novel.id, status="active",
         source_snapshot_hash="a" * 64, manifest_checksum="b" * 64,
         chunker_name="test", chunker_version="1", chunker_config_hash="c" * 64,
         collection_name="test", is_candidate=False, immutable=True,
     )
-    db_session.add(build)
-    db_session.add(ChunkActivePointer(
+    session.add(build)
+    session.add(ChunkActivePointer(
         novel_id=novel.id, build_id=build.build_id, committed_at=datetime.now(UTC),
     ))
     for index, chapter in enumerate(chapters):
         content_hash = __import__("hashlib").sha256(chapter.content.encode()).hexdigest()
-        db_session.add(ChunkHierarchyNode(
+        session.add(ChunkHierarchyNode(
             build_id=build.build_id, novel_id=novel.id,
             node_id=f"qualification-evidence-{chapter.id}", level="evidence",
             chapter_id=chapter.id, chapter_number=chapter.chapter_number,
@@ -99,15 +108,17 @@ async def _seed_run(db_session):
             chunk_type="paragraph", decision_lineage=[], order_index=index,
         ))
     run = AnalysisRun(owner_id=owner.id, novel_id=novel.id, status="pending", active_key="active")
-    db_session.add(run)
-    await db_session.commit()
+    session.add(run)
+    await session.commit()
     return owner, novel, chapters, run
 
 
 @pytest.mark.asyncio
-async def test_qualification_executes_worker_and_measures_persisted_artifacts(db_session, auth_client):
-    owner, novel, chapters, run = await _seed_run(db_session)
-    sessions = async_sessionmaker(db_session.bind, expire_on_commit=False)
+async def test_qualification_executes_worker_and_measures_persisted_artifacts(pg_async_url, require_postgres):
+    engine = create_async_engine(pg_async_url)
+    sessions = async_sessionmaker(engine, expire_on_commit=False)
+    async with sessions() as session:
+        owner, novel, chapters, run = await _seed_run(session)
     transport = QualificationTransport()
     runtime = TimelineWorkerRuntime(
         sessions=sessions,
@@ -123,6 +134,7 @@ async def test_qualification_executes_worker_and_measures_persisted_artifacts(db
     )
 
     assert report["status"] == "qualified", report
+    assert report["artifact"]["database_dialect"] == "postgresql"
     assert report["artifact"]["run"]["status"] == "completed"
     assert report["artifact"]["counts"] == {
         "events": 2, "evidence_refs": 2, "model_attempts": 3, "completed_stages": 3,
@@ -135,12 +147,20 @@ async def test_qualification_executes_worker_and_measures_persisted_artifacts(db
     assert report["metrics"]["cost_usd_total"] > 0
     assert report["artifact_sha256"] and report["report_sha256"]
     assert transport.calls == ["TimelineExtraction", "TimelineExtraction", "ReconciliationOutputModel"]
+    if output := os.environ.get("TIMELINE_QUALIFICATION_OUT"):
+        Path(output).write_text(render_markdown(report), encoding="utf-8")
+    async with sessions.begin() as session:
+        persisted_owner = await session.get(User, owner.id)
+        await session.delete(persisted_owner)
+    await engine.dispose()
 
 
 @pytest.mark.asyncio
-async def test_qualification_cannot_pass_from_missing_expected_production_output(db_session, auth_client):
-    _, _, chapters, run = await _seed_run(db_session)
-    sessions = async_sessionmaker(db_session.bind, expire_on_commit=False)
+async def test_qualification_cannot_pass_from_missing_expected_production_output(pg_async_url, require_postgres):
+    engine = create_async_engine(pg_async_url)
+    sessions = async_sessionmaker(engine, expire_on_commit=False)
+    async with sessions() as session:
+        owner, _, chapters, run = await _seed_run(session)
     transport = QualificationTransport()
     runtime = TimelineWorkerRuntime(
         sessions=sessions,
@@ -158,3 +178,7 @@ async def test_qualification_cannot_pass_from_missing_expected_production_output
     assert report["status"] == "failed_policy"
     assert report["metrics"]["event_recall"] < 1.0
     assert report["gates"]["quality_thresholds"] is False
+    async with sessions.begin() as session:
+        persisted_owner = await session.get(User, owner.id)
+        await session.delete(persisted_owner)
+    await engine.dispose()

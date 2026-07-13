@@ -24,6 +24,7 @@ def _module():
 
 def _production_report(q):
     artifact = {
+        "database_dialect": "postgresql",
         "run": {"id": 1, "status": "completed", "version_id": 2},
         "active_pointer": {"version_id": 2, "revision": 1, "manifest_checksum": "a" * 64},
         "counts": {"events": 2, "evidence_refs": 2, "model_attempts": 3, "completed_stages": 3},
