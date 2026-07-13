@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v0.6
 milestone_name: Versioned Novel Analysis and Timeline
 status: planned
-last_updated: "2026-07-13T03:57:17.947Z"
+last_updated: "2026-07-13T04:13:35.422Z"
 progress:
   total_phases: 7
   completed_phases: 4
   total_plans: 30
-  completed_plans: 32
+  completed_plans: 33
   percent: 57
 ---
 
@@ -24,22 +24,23 @@ See `.planning/PROJECT.md` and `IMPLEMENTATION-STATUS.md`.
 ## Current Position
 
 Phase: 08 (Versioned novel analysis orchestration and interactive timeline) — EXECUTING
-Plan: 5 of 6
-**Phase 08 EXECUTING** (04/06) - ready to execute 08-05
+Plan: 6 of 6
+**Phase 08 EXECUTING** (05/06) - ready to execute 08-06
 
 - Branch: `feat/phase2-wave2-embedding`
-- Last activity: 2026-07-13 — 08-04 owner-scoped progressive API and visible-set-first spoiler boundary completed (backend 5 passed; frontend contract 12 passed)
+- Last activity: 2026-07-13 — 08-05 global progressive timeline UI completed (frontend 66 unit tests, build, desktop + 390px Playwright passed)
 - Plan directory: `.planning/phases/08-versioned-novel-analysis-orchestration-and-interactive-timel/`
 
 ## Auto Routing
 
-下一动作为执行 Phase 08 Plan 05。`auto_start` 保持关闭，必须显式启动执行。
+下一动作为执行 Phase 08 Plan 06。`auto_start` 保持关闭，必须显式启动执行。
 
 ## Phase 08 Execution Metrics
 
 - 08-02: 18min, 3 tasks, 11 files, 23 targeted tests passed.
 - 08-03: 9min, 3 tasks, 7 files, 9 targeted tests passed including real PostgreSQL lifecycle coverage.
 - 08-04: 11min, 3 tasks, 7 files, backend 5 tests and frontend 12 contract tests passed.
+- 08-05: 11min, 3 tasks, 7 files, frontend 66 unit tests plus desktop/mobile Playwright passed.
 
 ## Phase 08 Decisions
 
@@ -50,6 +51,8 @@ Plan: 5 of 6
 - Promotion and rollback require recomputed graph manifests and row-locked expected-revision CAS.
 - Missing reading progress exposes only the first chapter; full-book access requires an explicit persisted per-novel preference.
 - Active and running candidate responses keep independent progress, events, counts, aggregates, previews, and edges.
+- Canvas and keyboard companion list expose the same visible event set; active and candidate views remain source-isolated.
+- Full-book disclosure requires confirmation before persisting the per-novel preference.
 
 ## Phase 06 (v0.5) — COMPLETE
 
@@ -107,5 +110,5 @@ CLI：`backend/scripts/run_chunker_qualification.py`
 
 ## Next Action
 
-1. 执行 Phase 08 Plan 05：global analysis workspace and interactive timeline。  
+1. 执行 Phase 08 Plan 06：frozen qualification, end-to-end verification, and release gate。  
 2. 保留本地 BGE / 阅读器 UX 等非 Phase 08 WIP，不纳入当前计划提交。  
