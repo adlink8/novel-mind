@@ -42,6 +42,7 @@
 | Phase 5 叙事知识单元层 | 5/5 | Complete |
 | v0.5 / Phase 6 自动质量与 CI 门禁 | 9/9 | **Complete** (REQ-AUTO-11 closed) |
 | Phase 7 语义/层级分块 | 6/6 | **Complete** (logic+tests+PG/indexing wiring) |
+| Phase 8 版本化小说分析与时间线 | 6/6 | **Implemented** (independent verification pending) |
 
 ## Auto Start
 
@@ -128,8 +129,8 @@ Plans:
 **Goal:** 以持久、版本化、证据约束的后台分析任务生成小说时间事件，并在全局分析工作台渐进展示防剧透的双顺序横向时间线。
 **Requirements**: REQ-TIME-01..10
 **Depends on:** Phase 7
-**Status:** PLANNED
-**Plans:** 5/6 plans executed
+**Status:** IMPLEMENTED — READY FOR INDEPENDENT VERIFICATION
+**Plans:** 6/6 plans complete
 
 Plans:
 - [x] 08-01 durable analysis jobs and immutable version foundation
@@ -137,4 +138,4 @@ Plans:
 - [x] 08-03 cross-chapter reconciliation, overrides, budget, and promotion
 - [x] 08-04 progressive owner-scoped API and spoiler boundary
 - [x] 08-05 global analysis workspace and interactive ECharts timeline
-- [ ] 08-06 frozen qualification, end-to-end verification, and release gate
+- [x] 08-06 frozen qualification, end-to-end verification, and release gate

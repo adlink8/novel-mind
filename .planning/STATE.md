@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v0.6
 milestone_name: Versioned Novel Analysis and Timeline
-status: planned
-last_updated: "2026-07-13T04:13:35.422Z"
+status: ready_for_verification
+last_updated: "2026-07-13T04:26:50.590Z"
 progress:
   total_phases: 7
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 30
-  completed_plans: 33
-  percent: 57
+  completed_plans: 34
+  percent: 71
 ---
 
 # Project State
@@ -23,17 +23,17 @@ See `.planning/PROJECT.md` and `IMPLEMENTATION-STATUS.md`.
 
 ## Current Position
 
-Phase: 08 (Versioned novel analysis orchestration and interactive timeline) — EXECUTING
+Phase: 08 (Versioned novel analysis orchestration and interactive timeline) — IMPLEMENTED
 Plan: 6 of 6
-**Phase 08 EXECUTING** (05/06) - ready to execute 08-06
+**Phase 08 IMPLEMENTED** (06/06) - ready for independent verification
 
 - Branch: `feat/phase2-wave2-embedding`
-- Last activity: 2026-07-13 — 08-05 global progressive timeline UI completed (frontend 66 unit tests, build, desktop + 390px Playwright passed)
+- Last activity: 2026-07-13 — 08-06 frozen qualification and release gate completed (backend 56, live 7, CI 5, frontend 66, build passed)
 - Plan directory: `.planning/phases/08-versioned-novel-analysis-orchestration-and-interactive-timel/`
 
 ## Auto Routing
 
-下一动作为执行 Phase 08 Plan 06。`auto_start` 保持关闭，必须显式启动执行。
+下一动作为独立验证 Phase 08；`08-VERIFICATION.md` 仅由 verifier 创建。`auto_start` 保持关闭。
 
 ## Phase 08 Execution Metrics
 
@@ -41,6 +41,7 @@ Plan: 6 of 6
 - 08-03: 9min, 3 tasks, 7 files, 9 targeted tests passed including real PostgreSQL lifecycle coverage.
 - 08-04: 11min, 3 tasks, 7 files, backend 5 tests and frontend 12 contract tests passed.
 - 08-05: 11min, 3 tasks, 7 files, frontend 66 unit tests plus desktop/mobile Playwright passed.
+- 08-06: 9min, 3 tasks, 6 files, backend 56 + controlled live 7 + CI 5 + frontend 66 tests and build passed.
 
 ## Phase 08 Decisions
 
@@ -53,6 +54,8 @@ Plan: 6 of 6
 - Active and running candidate responses keep independent progress, events, counts, aggregates, previews, and edges.
 - Canvas and keyboard companion list expose the same visible event set; active and candidate views remain source-isolated.
 - Full-book disclosure requires confirmation before persisting the per-novel preference.
+- Blocked or unavailable live timeline dependencies produce `metrics=null` and cannot satisfy the release gate.
+- Phase 08 qualification is fiction-only and proves deferred relationship graph, reader AI, clue tracking, and history products are absent.
 
 ## Phase 06 (v0.5) — COMPLETE
 
@@ -110,5 +113,5 @@ CLI：`backend/scripts/run_chunker_qualification.py`
 
 ## Next Action
 
-1. 执行 Phase 08 Plan 06：frozen qualification, end-to-end verification, and release gate。  
-2. 保留本地 BGE / 阅读器 UX 等非 Phase 08 WIP，不纳入当前计划提交。  
+1. 由独立 verifier 执行 Phase 08 verification，并独占创建 `08-VERIFICATION.md`。  
+2. 保留本地 BGE / 阅读器 UX 等非 Phase 08 WIP，不纳入 Phase 08 提交。  
