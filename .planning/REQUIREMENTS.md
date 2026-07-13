@@ -57,6 +57,16 @@
 | REQ-CHUNK-06 | 源章节或 chunker 变化只重切受影响范围，可恢复、可回滚且不残留旧向量 | P0 | VERIFIED |
 | REQ-CHUNK-07 | LLM 不可用、schema 非法或预算耗尽时回退到规则切片，并在 lineage 中明确标记 fallback | P1 | VERIFIED |
 | REQ-CHUNK-08 | chunker A/B 必须用同一冻结语料、同一质量 policy 和 Phase 06 自动评测比较质量、成本和延迟 | P0 | VERIFIED |
+| REQ-TIME-01 | 小说分析使用可恢复、可取消、可渐进展示的持久后台任务；章节结果完成即发布，失败后按 checkpoint 续跑 | P0 | MISSING |
+| REQ-TIME-02 | 分析产物按 source snapshot、prompt/schema/model 版本化，新版本完整验证后切换 active，人工修正独立保留且可回滚 | P0 | MISSING |
+| REQ-TIME-03 | 导入后只自动执行切片、场景层级和低成本结构分析；时间线深度分析在首次进入分析页时启动 | P0 | MISSING |
+| REQ-TIME-04 | 时间事件同时保存故事内顺序与章节叙述顺序，支持明确、相对、模糊、未知四种时间精度及推断证据 | P0 | MISSING |
+| REQ-TIME-05 | 时间事件自动发布并绑定章节、原文 offsets/evidence refs、置信度、模型 lineage；人工编辑后不得被重分析覆盖 | P0 | MISSING |
+| REQ-TIME-06 | 时间线支持人物筛选、故事时间/叙述顺序切换，以及按需显示导致、触发、回应、阻断因果关系 | P1 | MISSING |
+| REQ-TIME-07 | 全局分析页先选择小说，以可缩放横向时间轴渐进展示事件、进度、错误和最后更新时间 | P0 | MISSING |
+| REQ-TIME-08 | 默认按阅读进度隐藏未来事件，用户显式切换全书分析后才能查看未读章节内容 | P0 | MISSING |
+| REQ-TIME-09 | LLM 使用章节级低成本抽取与跨章节高质量归并的分级路由，并执行单书 token/费用/调用预算和确定性暂停 | P0 | MISSING |
+| REQ-TIME-10 | Phase 08 仅支持小说时间线；人物关系图、阅读 AI、线索伏笔与历史文本支持明确延期或移除 | P1 | MISSING |
 
 ## Traceability
 
@@ -75,6 +85,7 @@
 | REQ-AUTO-11 | 06-08..06-09 completed | `06-08/06-09-SUMMARY.md`; `QualityRun` + `BaselineCandidate`; Alembic `07qualityruns01` / `08baselinecand01` |
 | REQ-CHUNK-01..03,07,08 | 07-01..03,07-06 completed | `07-VERIFICATION.md`; `backend/app/services/chunking/*`; 88 related tests |
 | REQ-CHUNK-04..06 | 07-04..05 + PG wiring | `chunk_builds` / `chunk_hierarchy_nodes` / active pointer; `indexing_service` + `hybrid_search` hooks; `test_pg_hierarchy_wiring.py` |
+| REQ-TIME-01..10 | 08 planned | `.planning/phases/08-versioned-novel-analysis-orchestration-and-interactive-timel/` |
 
 ## Current Evidence
 

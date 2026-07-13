@@ -122,3 +122,19 @@ Plans:
 - [x] 07-04 hierarchical scene/evidence storage and retrieval
 - [x] 07-05 candidate rebuild, incremental refresh, promotion, and rollback
 - [x] 07-06 chunker A/B quality qualification and release verification
+
+### Phase 8: Versioned novel analysis orchestration and interactive timeline
+
+**Goal:** 以持久、版本化、证据约束的后台分析任务生成小说时间事件，并在全局分析工作台渐进展示防剧透的双顺序横向时间线。
+**Requirements**: REQ-TIME-01..10
+**Depends on:** Phase 7
+**Status:** PLANNED
+**Plans:** 6 plans
+
+Plans:
+- [ ] 08-01 durable analysis jobs and immutable version foundation
+- [ ] 08-02 strict timeline schema and evidence-bound chapter extraction
+- [ ] 08-03 cross-chapter reconciliation, overrides, budget, and promotion
+- [ ] 08-04 progressive owner-scoped API and spoiler boundary
+- [ ] 08-05 global analysis workspace and interactive ECharts timeline
+- [ ] 08-06 frozen qualification, end-to-end verification, and release gate
