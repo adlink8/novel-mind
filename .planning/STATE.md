@@ -2,14 +2,15 @@
 gsd_state_version: 1.0
 milestone: v0.6
 milestone_name: Versioned Novel Analysis and Timeline
-status: in_progress
-last_updated: "2026-07-13T06:50:51.397Z"
+status: ready_to_plan
+last_updated: 2026-07-13T07:05:28.045Z
 progress:
-  total_phases: 7
-  completed_phases: 5
-  total_plans: 34
-  completed_plans: 38
-  percent: 71
+  total_phases: 8
+  completed_phases: 7
+  total_plans: 41
+  completed_plans: 41
+  percent: 88
+stopped_at: Phase 08 complete (10/10) — ready to discuss Phase 999.1
 ---
 
 # Project State
@@ -23,17 +24,17 @@ See `.planning/PROJECT.md` and `IMPLEMENTATION-STATUS.md`.
 
 ## Current Position
 
-Phase: 08 (Versioned novel analysis orchestration and interactive timeline) — GAP CLOSURE COMPLETE, PENDING RE-VERIFICATION
-Plan: 10 of 10
-**Phase 08 gap plan 08-10 COMPLETE** — executable release authority gap closed; independent re-verification remains
+Phase: 999.1
+Plan: Not started
+**Phase 08 COMPLETE** — 10/10 plans executed and independently verified (35/35 must-haves)
 
 - Branch: `feat/phase2-wave2-embedding`
-- Last activity: 2026-07-13 — 08-10 fixed-command release CLI, internally captured SHA-256 evidence, fresh PostgreSQL authority observation, and CI integration completed (5 PostgreSQL + 47 CI/policy tests passed)
+- Last activity: 2026-07-13 — Phase 08 independently verified: 35/35 must-haves, 77 backend tests, 68 frontend tests, production build, and 2 real browser tests passed
 - Plan directory: `.planning/phases/08-versioned-novel-analysis-orchestration-and-interactive-timel/`
 
 ## Auto Routing
 
-下一动作为独立 verifier 复验 Phase 08 gaps；不由 executor 创建或修改 `08-VERIFICATION.md`。`auto_start` 保持关闭。
+Phase 08 已完成；`auto_start` 保持关闭。下一阶段需单独讨论和规划。
 
 ## Phase 08 Execution Metrics
 
@@ -129,5 +130,5 @@ CLI：`backend/scripts/run_chunker_qualification.py`
 
 ## Next Action
 
-1. 由独立 verifier 复验 Phase 08 release-authority gap；executor 未修改 `08-VERIFICATION.md`。
-2. 保留本地 BGE / 阅读器 UX 等非 Phase 08 WIP，不纳入 Phase 08 提交。
+1. Phase 08 无剩余执行项；后续功能进入新阶段前先讨论和规划。
+2. 保留本地 Vertex/BGE/阅读器 UX 等非 Phase 08 WIP，不纳入 Phase 08 提交。
