@@ -12,12 +12,13 @@ import asyncio
 import hashlib
 import json
 import math
+import subprocess
 import sys
 import uuid
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterable, NamedTuple
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -30,6 +31,59 @@ REQUIRED_TEST_COMMANDS = [
     "cd frontend; npm run test:e2e -- timeline-real.spec.ts",
     "pytest tests/ci/test_timeline_release_gate.py -x",
 ]
+
+
+class CommandSpec(NamedTuple):
+    """Code-owned subprocess definition; ``display`` is the report contract."""
+
+    display: str
+    cwd: Path
+    argv: tuple[str, ...]
+
+
+def _required_command_specs(repo_root: Path) -> tuple[CommandSpec, ...]:
+    npm = "npm.cmd" if sys.platform == "win32" else "npm"
+    backend = repo_root / "backend"
+    frontend = repo_root / "frontend"
+    return (
+        CommandSpec(
+            REQUIRED_TEST_COMMANDS[0], backend,
+            (sys.executable, "-m", "pytest", "tests/unit/timeline", "tests/integration/timeline", "tests/adversarial/test_timeline_evidence.py", "-x"),
+        ),
+        CommandSpec(REQUIRED_TEST_COMMANDS[1], frontend, (npm, "test", "--", "--run")),
+        CommandSpec(REQUIRED_TEST_COMMANDS[2], frontend, (npm, "run", "build")),
+        CommandSpec(
+            REQUIRED_TEST_COMMANDS[3], frontend,
+            (npm, "run", "test:e2e", "--", "timeline-real.spec.ts"),
+        ),
+        CommandSpec(
+            REQUIRED_TEST_COMMANDS[4], repo_root,
+            (sys.executable, "-m", "pytest", "tests/ci/test_timeline_release_gate.py", "-x"),
+        ),
+    )
+
+
+def collect_command_results(command_specs: Iterable[CommandSpec]) -> list[dict[str, Any]]:
+    """Execute argv directly and bind each result to its exact combined output."""
+    results: list[dict[str, Any]] = []
+    for spec in command_specs:
+        try:
+            completed = subprocess.run(
+                list(spec.argv), cwd=spec.cwd, stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT, check=False,
+            )
+            output = completed.stdout
+            exit_code = completed.returncode
+        except OSError as exc:
+            output = f"{type(exc).__name__}: {exc}".encode("utf-8", errors="replace")
+            exit_code = 127
+        results.append({
+            "command": spec.display,
+            "exit_code": exit_code,
+            "output": output,
+            "output_sha256": hashlib.sha256(output).hexdigest(),
+        })
+    return results
 
 
 def _canonical(value: Any) -> bytes:
@@ -224,8 +278,10 @@ def _command_results_valid(command_results: list[dict[str, Any]] | None) -> bool
         return False
     return all(
         item.get("exit_code") == 0
+        and isinstance(item.get("output"), bytes)
         and isinstance(item.get("output_sha256"), str)
         and len(item["output_sha256"]) == 64
+        and item["output_sha256"] == hashlib.sha256(item["output"]).hexdigest()
         for item in by_command.values()
     )
 
@@ -542,6 +598,58 @@ async def verify_release_evidence_from_db(
     )
 
 
+def _public_command_evidence(command_results: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Expose attestations without leaking captured test or service output."""
+    return [{
+        "command": item["command"],
+        "exit_code": item["exit_code"],
+        "output_sha256": item["output_sha256"],
+    } for item in command_results]
+
+
+async def run_release_verification(
+    repo_root: Path,
+    report_path: Path,
+    *,
+    sessions,
+    command_specs: Iterable[CommandSpec] | None = None,
+    require_live: bool = False,
+) -> dict[str, Any]:
+    """Run commands and independently observe DB authority for one release verdict."""
+    try:
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+        if not isinstance(report, dict) or not isinstance(report.get("artifact"), dict):
+            raise ValueError("release report must contain an artifact object")
+    except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as exc:
+        return {
+            "status": "blocked_release",
+            "quality_comparable": False,
+            "checks": {"well_formed_report": False},
+            "command_results": [],
+            "error": type(exc).__name__,
+        }
+
+    specs = tuple(command_specs) if command_specs is not None else _required_command_specs(repo_root)
+    command_results = await asyncio.to_thread(collect_command_results, specs)
+    try:
+        verdict = await verify_release_evidence_from_db(
+            repo_root,
+            report_path,
+            sessions=sessions,
+            command_results=command_results,
+            require_live=require_live,
+        )
+    except (KeyError, TypeError, ValueError, OSError, json.JSONDecodeError) as exc:
+        verdict = {
+            "status": "blocked_release",
+            "quality_comparable": False,
+            "checks": {"well_formed_report": False},
+            "error": type(exc).__name__,
+        }
+    verdict["command_results"] = _public_command_evidence(command_results)
+    return verdict
+
+
 def render_markdown(report: dict[str, Any]) -> str:
     artifact = report["artifact"]
     metrics = report["metrics"]
@@ -589,6 +697,17 @@ async def _run_cli(args) -> dict[str, Any]:
         args.run_id, runtime=production_runtime(), sessions=async_session_factory,
         expected_event_ids=expectations["expected_event_ids"],
         expected_story_order=expectations["expected_story_order"],
+    )
+
+
+async def _run_release_cli(args) -> dict[str, Any]:
+    from app.core.database import async_session_factory
+
+    return await run_release_verification(
+        ROOT.parent,
+        args.report,
+        sessions=async_session_factory,
+        require_live=args.require_live,
     )
 
 
@@ -742,14 +861,22 @@ async def resume_browser_timeline(run_id: int) -> dict[str, Any]:
         return {"novel_id": run.novel_id, "run_id": run.id, "version_id": run.version_id}
 
 
-def main(argv: list[str] | None = None) -> int:
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Phase 08 production timeline qualification")
     parser.add_argument("--run-id", type=int)
     parser.add_argument("--expectations", type=Path)
+    parser.add_argument("--verify-release", action="store_true")
+    parser.add_argument("--report", type=Path)
+    parser.add_argument("--require-live", action="store_true")
     parser.add_argument("--e2e-seed-user")
     parser.add_argument("--e2e-resume-run", type=int)
     parser.add_argument("--out", type=Path)
     parser.add_argument("--format", choices=("json", "markdown"), default="json")
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = build_parser()
     args = parser.parse_args(argv)
     if args.e2e_seed_user:
         print("E2E_RESULT=" + json.dumps(asyncio.run(seed_browser_partial(args.e2e_seed_user))))
@@ -757,6 +884,17 @@ def main(argv: list[str] | None = None) -> int:
     if args.e2e_resume_run is not None:
         print("E2E_RESULT=" + json.dumps(asyncio.run(resume_browser_timeline(args.e2e_resume_run))))
         return 0
+    if args.verify_release:
+        if args.report is None:
+            parser.error("--report is required with --verify-release")
+        verdict = asyncio.run(_run_release_cli(args))
+        rendered = json.dumps(verdict, ensure_ascii=False, sort_keys=True, indent=2) + "\n"
+        if args.out:
+            args.out.parent.mkdir(parents=True, exist_ok=True)
+            args.out.write_text(rendered, encoding="utf-8")
+        else:
+            print(rendered, end="")
+        return 0 if verdict["status"] == "qualified" else 1
     if args.run_id is None or args.expectations is None:
         parser.error("--run-id and --expectations are required for qualification")
     report = asyncio.run(_run_cli(args))
