@@ -38,16 +38,25 @@
 | REQ-NU-06 | candidate 必须通过 fiction/history frozen A/B、faithfulness、延迟和 canary 门禁才能 promote | P0 | VERIFIED |
 | REQ-NU-07 | promotion 使用 prepare/commit journal，失败可联合回滚 DB、collection、pointer 和 manifest | P0 | VERIFIED |
 | REQ-NU-08 | 增量刷新只处理受影响 evidence/subjects，删除与失效零残留，无变化时 LLM/index 写入为零 | P1 | VERIFIED |
-| REQ-AUTO-01 | 测试必须显式分类为 unit、integration、contract、browser 或 live，禁止默认 marker 隐式排除关键链路 | P0 | MISSING |
-| REQ-AUTO-02 | 后端、前端和修改代码具备版本化 coverage、timeout、flake、JUnit 与 artifact 门禁 | P0 | MISSING |
-| REQ-AUTO-03 | PostgreSQL 16 自动验证迁移、tsvector、约束、事务、并发和历史版本升级 | P0 | MISSING |
-| REQ-AUTO-04 | 固定版本 Chroma 具备健康检查、契约、故障注入、恢复和 DB/collection 一致性验证 | P0 | MISSING |
-| REQ-AUTO-05 | RAG fixture 从冻结源证据自动生成，经不同模型族的 Generator/Judge 与确定性 arbiter 自动取得资格，不依赖人工 confirmed | P0 | MISSING |
-| REQ-AUTO-06 | RAG 自动评测覆盖 faithfulness、answer relevance、context precision/recall、重复性、漂移、成本和延迟，所有依赖故障 fail closed | P0 | MISSING |
-| REQ-AUTO-07 | Judge revision 必须先通过独立 calibration，critical false-accept 为零且一致率达标 | P0 | MISSING |
-| REQ-AUTO-08 | OpenAPI、前端 consumer、组件和双 viewport Playwright 覆盖核心用户流程、权限和错误状态 | P1 | MISSING |
-| REQ-AUTO-09 | CI 收敛为 secretless PR、main integration、受控 nightly 三层 DAG，并以唯一 ci-gate 作为 required check | P0 | MISSING |
-| REQ-AUTO-10 | baseline promotion、分支保护、告警、权限、制品、可靠性和回归证据均自动化且可审计 | P1 | MISSING |
+| REQ-AUTO-01 | 测试必须显式分类为 unit、integration、contract、browser 或 live，禁止默认 marker 隐式排除关键链路 | P0 | VERIFIED |
+| REQ-AUTO-02 | 后端、前端和修改代码具备版本化 coverage、timeout、flake、JUnit 与 artifact 门禁 | P0 | VERIFIED |
+| REQ-AUTO-03 | PostgreSQL 16 自动验证迁移、tsvector、约束、事务、并发和历史版本升级 | P0 | VERIFIED |
+| REQ-AUTO-04 | 固定版本 Chroma 具备健康检查、契约、故障注入、恢复和 DB/collection 一致性验证 | P0 | VERIFIED |
+| REQ-AUTO-05 | RAG fixture 从冻结源证据自动生成，经不同模型族的 Generator/Judge 与确定性 arbiter 自动取得资格，不依赖人工 confirmed | P0 | VERIFIED |
+| REQ-AUTO-06 | RAG 自动评测覆盖 faithfulness、answer relevance、context precision/recall、重复性、漂移、成本和延迟，所有依赖故障 fail closed | P0 | VERIFIED |
+| REQ-AUTO-07 | Judge revision 必须先通过独立 calibration，critical false-accept 为零且一致率达标 | P0 | VERIFIED |
+| REQ-AUTO-08 | OpenAPI、前端 consumer、组件和双 viewport Playwright 覆盖核心用户流程、权限和错误状态 | P1 | VERIFIED |
+| REQ-AUTO-09 | CI 收敛为 secretless PR、main integration、受控 nightly 三层 DAG，并以唯一 ci-gate 作为 required check | P0 | VERIFIED |
+| REQ-AUTO-10 | baseline promotion、分支保护、告警、权限、制品、可靠性和回归证据均自动化且可审计 | P1 | VERIFIED |
+| REQ-AUTO-11 | 每份可比较 RAG 质量报告必须绑定 chunker 名称、版本、配置 hash、chunk manifest hash 与父级 source snapshot | P0 | VERIFIED |
+| REQ-CHUNK-01 | 分块策略以版本化 manifest 表示，原始 chunk、scene 和 evidence chunk 均可回链到章节与原文 offset | P0 | VERIFIED |
+| REQ-CHUNK-02 | 规则式初切必须产生边界置信度和原因码，低置信边界才允许进入 LLM 判断队列 | P0 | VERIFIED |
+| REQ-CHUNK-03 | LLM 只输出严格 schema 的边界判断与上下文保留建议，脚本负责长度、重叠、证据和写库约束 | P0 | VERIFIED |
+| REQ-CHUNK-04 | 系统支持 chapter → scene → evidence 的层级检索表示，并保持 chunks 原始证据回退 | P0 | PARTIAL |
+| REQ-CHUNK-05 | 新 chunker 先构建 immutable candidate，不移动 active index；仅通过 Phase 06 质量门才可 promotion | P0 | PARTIAL |
+| REQ-CHUNK-06 | 源章节或 chunker 变化只重切受影响范围，可恢复、可回滚且不残留旧向量 | P0 | PARTIAL |
+| REQ-CHUNK-07 | LLM 不可用、schema 非法或预算耗尽时回退到规则切片，并在 lineage 中明确标记 fallback | P1 | VERIFIED |
+| REQ-CHUNK-08 | chunker A/B 必须用同一冻结语料、同一质量 policy 和 Phase 06 自动评测比较质量、成本和延迟 | P0 | VERIFIED |
 
 ## Traceability
 
@@ -62,14 +71,18 @@
 | REQ-EVAL-02..03 | 03-01 | 当前 10 confirmed / 90 candidate；6 次运行检索指标为 0 |
 | REQ-KG-01..06 | 04-01..04-04 completed | `.planning/phases/04-llm/04-*-SUMMARY.md`; `backend/tests/test_knowledge_eval.py`; knowledge graph gate/projection tests |
 | REQ-NU-01..08 | 05-01..05-05 completed | `.planning/phases/05-narrative-knowledge-unit-layer/05-VERIFICATION.md`; all 8 requirements independently verified |
-| REQ-AUTO-01..10 | 06-01..06-07 planned | `.planning/phases/06-automated-quality-ci/06-*-PLAN.md`; `06-AI-SPEC.md` |
+| REQ-AUTO-01..10 | 06-01..06-07 completed | `.planning/phases/06-automated-quality-ci/06-VERIFICATION.md` |
+| REQ-AUTO-11 | 06-08..06-09 completed | `06-08/06-09-SUMMARY.md`; `QualityRun` + `BaselineCandidate`; Alembic `07qualityruns01` / `08baselinecand01` |
+| REQ-CHUNK-01..03,07,08 | 07-01..03,07-06 completed | `07-VERIFICATION.md`; `backend/app/services/chunking/*`; 88 related tests |
+| REQ-CHUNK-04..06 | 07-04..05 completed (PARTIAL) | Hierarchy/build lifecycle verified in-process (`InMemoryBuildStore`); production PG + index wiring residual |
 
 ## Current Evidence
 
-- 236 backend tests and 22 frontend tests pass.
-- pip-audit and npm audit report zero known vulnerabilities.
-- Bandit medium/high, Ruff and ESLint report zero findings.
-- PostgreSQL `upgrade/current/check` passes at `518675fa18f8`.
+- Phase 06 quality durable jobs + baseline prepare/commit + cross-chunker reports delivered.
+- Phase 07 chunking pipeline packages under `backend/app/services/chunking/` with SUMMARYs 07-01..07-06.
+- Related automated suite: **88 passed** (`unit/integration chunking` + adversarial + legacy `test_chunking`).
+- Alembic head includes quality run/baseline tables (`08baselinecand01`).
 - Import progress is persisted through `ImportJob`; lease control, retry, cancellation and restart recovery are verified.
 - Phase 04 knowledge graph fixture eval has 20 labeled fiction/history examples and deterministic offline tests.
-- `backend/scripts/run_knowledge_graph_eval.py` reports recall signal quality separately from accepted graph fact quality, with cost/latency fields present.
+- Phase 07 residual: promote hierarchy/build stores from in-memory contracts to PostgreSQL + production retrieval wiring.
+- Branch may still carry local BGE/reader UX WIP outside Phase 06/07 plan commits.

@@ -1,5 +1,8 @@
 # Phase 07 Context — Semantic and Hierarchical Chunking
 
+**Status:** COMPLETE (2026-07-13) — plans 07-01..07-06 executed; see `07-VERIFICATION.md`.  
+**Residuals:** production PostgreSQL hierarchy/build tables and full `indexing_service` / `hybrid_search` wiring (logic covered by `InMemoryBuildStore` + unit/integration tests).
+
 ## Goal
 
 在保留原始规则 chunk 和原文证据底座的前提下，把现有 `ChunkingService` 演进为可审计的 semantic/hierarchical candidate pipeline：规则负责完整初切、边界置信度、硬约束和 fallback；LLM 仅裁决低置信边界；确定性服务负责 chapter → scene → evidence 组装、不可变 candidate、增量刷新、索引 reconcile、质量资格、promotion 与 rollback。

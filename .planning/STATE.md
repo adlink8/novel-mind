@@ -1,186 +1,88 @@
 ---
 gsd_state_version: 1.0
-milestone: v0.5
-milestone_name: Automated Quality and CI Gates
-status: executing
-last_updated: "2026-07-13T00:00:00.000Z"
+milestone: v0.5+phase07
+milestone_name: Automated Quality CI + Semantic Hierarchical Chunking
+status: idle
+last_updated: "2026-07-13T12:00:00.000Z"
 progress:
-  total_phases: 6
-  completed_phases: 4
-  total_plans: 33
-  completed_plans: 27
-  percent: 82
+  total_phases: 7
+  completed_phases: 7
+  total_plans: 39
+  completed_plans: 39
+  percent: 100
 ---
 
 # Project State
 
 ## Project Reference
 
-See `.planning/PROJECT.md` and `IMPLEMENTATION-STATUS.md`.<br>
+See `.planning/PROJECT.md` and `IMPLEMENTATION-STATUS.md`.  
 系统结构以 `docs/architecture/` 为准。
 
 **Core value:** 先建立可信、安全、可迁移的实现基线，再扩展 RAG。
 
 ## Current Position
 
-Phase: 07 (semantic-hierarchical-chunking) — **COMPLETE** (6/6)
-Plan: 6 of 6 complete
+**Phase 06 COMPLETE** (09/09) · **Phase 07 COMPLETE** (06/06)
 
-- Milestone: Phase 06 + Phase 07 complete on branch
-- Current branch: `feat/phase2-wave2-embedding`
-- Status: 07-01..07-06 complete (baseline → rules → adjudicator → hierarchy → lifecycle → A/B release).
-- Last activity: 2026-07-13 — Completed remaining Phase 07 plans 03–06.
+- Branch: `feat/phase2-wave2-embedding`
+- Last activity: 2026-07-13 — Phase 07 计划文档与需求追踪同步；实现与 88 项相关测试已落地
+- Verification: `.planning/phases/07-semantic-hierarchical-chunking/07-VERIFICATION.md`
 
 ## Auto Routing
 
-Phase 07 complete. Next: optional re-verify / ship or next roadmap item. Auto-start remains disabled.
+无进行中 plan。`auto_start` 关闭。下一动作为产品接线 residual 或合并/发版，而非新 phase 自动执行。
 
-## Verified In v0.3
+## Phase 06 (v0.5) — COMPLETE
+
+REQ-AUTO-01..11 已交付（含 06-08 QualityRun 持久化、06-09 BaselineCandidate prepare/commit 与跨 chunker 报告）。
+
+关键产物：
+
+- `backend/app/models/eval.py` — `QualityRun` / `BaselineCandidate` / `ActiveBaseline`
+- Alembic: `07qualityruns01`, `08baselinecand01`
+- API: `/api/eval/quality/runs*`, `/api/eval/quality/baseline/*`, `/api/eval/quality/reports/cross-chunker`
+
+## Phase 07 — COMPLETE (logic + tests; PG wiring residual)
+
+| Plan | 交付 |
+|---|---|
+| 07-01 | baseline manifest、unicode offsets、`chunking/{schemas,manifests,baseline}` |
+| 07-02 | AtomicSpan、BoundaryProposal、CandidateSegmentation |
+| 07-03 | BoundaryAdjudicator、BudgetLedger、adversarial fallback |
+| 07-04 | HierarchyTree chapter→scene→evidence、scene expand / raw fallback |
+| 07-05 | InMemoryBuildStore 不可变构建、增量、reconcile、promote、rollback |
+| 07-06 | 同 snapshot A/B、`QualifiedChunkerEvidence`、release verifier、CLI |
+
+包路径：`backend/app/services/chunking/`  
+CLI：`backend/scripts/run_chunker_qualification.py`  
+测试：`tests/unit|integration/chunking` + adversarial + legacy `test_chunking` → **88 passed**
+
+### Residuals
+
+- Hierarchy / build lifecycle 当前以服务层 + InMemory 契约验证为主；生产 PostgreSQL 迁移与 `indexing_service` / `hybrid_search` 全量接线列为 follow-up。
+- 分支上仍有本地 BGE / 阅读器 UX 等非 Phase 07 WIP 未提交。
+
+## Verified In v0.3 (historical snapshot)
 
 ### 混合搜索后端
 
-- BM25 全文搜索（PostgreSQL tsvector + ginseng 索引）
-- 向量语义搜索（ChromaDB + Ollama nomic-embed-text）
-- 加权融合排序（vector 0.5 + bm25 0.5）
-- 全局搜索 API：POST /api/search
-- 小说内搜索 API：POST /api/search/novels/{novel_id}
+- BM25 全文搜索（PostgreSQL tsvector）
+- 向量语义搜索（ChromaDB；默认 embedding 已改为本地 BGE 路径，见运行配置）
+- 加权融合排序
+- 全局 / 小说内搜索 API
 
 ### 前端搜索 UI
 
-- 全局搜索栏（防抖 300ms、Command+K 唤起、下拉预览）
-- 搜索结果页：/search?q=xxx（含骨架屏、空状态、错误状态）
-- 搜索结果卡片（高亮片段、相关度百分比、点击跳转）
-- 阅读页内搜索面板（右侧抽屉、Ctrl+F 唤起、Esc 关闭）
+- 全局搜索栏、结果页、阅读页内搜索
 
 ### RAG 评测基础设施
 
-- ORM：EvalDataset / EvalRun / EvalResult 三表 + Alembic 迁移
-- 评测引擎：3 种策略（bm25 / baseline_vector / hybrid_search）
-- 指标：recall@k, precision@k, MRR, NDCG@k + error_case 标记
-- API：POST /api/eval/runs, GET /api/eval/runs/{id}, GET /api/eval/datasets, PATCH /api/eval/datasets/{id}
-- CLI：scripts/run_rag_eval.py（JSON + Markdown 报告）
-- 数据库测试题：100 条（5 类 × 20），其中 10 confirmed / 90 candidate
-- 前端：/eval 页面含上边栏导航 + ECharts 可视化（指标对比柱状图 + 趋势折线图 + 延迟趋势）
-- Ollama 模型：D:\Ollama\models（bge-m3, nomic-embed-text, qwen3.5:9b, gemma4-local）
-
-### 前端 UI/UX 重构
-
-- 文学编辑台 + AI 研究工作区视觉系统
-- 响应式 AppShell：桌面浮动侧栏、移动顶部品牌栏与六项底部导航
-- 登录、工作台、书架、阅读器、搜索、评测、设置和创作页统一重构
-- 搜索结果高亮移除 `dangerouslySetInnerHTML`，跳转对齐 `/novels/[id]`
-- 1280px 桌面与 390px 移动端浏览器验收通过，控制台无错误
-
-## Phase 06 Progress
-
-### 06-01 COMPLETE
-
-- pytest markers unit/integration/contract/live (+ e2e scope), fail-closed classification gate
-- marker timeouts D-16; live embeddings no random fallback
-- coverage/timeout/flake policy locked
-
-### 06-02 COMPLETE
-
-- `docker-compose.ci.yml` + `.github/ci/service-lock.json`
-- Postgres `16.10@sha256:21f6013…` on :5433 / `novelmind_ci`
-- Chroma `1.5.9@sha256:abcce7c…` on :8002, health `/api/v2/heartbeat`, client `chromadb==1.5.9`
-- Integration tests: 12 postgres + 8 chroma passed against real services
-
-### 06-03 COMPLETE
-
-- Content-hash `SourceSnapshot` + signed `EvalCase` freeze pipeline (regenerate≤2 → quarantine)
-- G/J isolation: different model_family AND weights/revision; offline stub generator/judge
-- Adversarial suite fail-closed (`invalid_fixture`/`failed_policy`, metrics=null)
-- Independent signed Judge calibration (3-repeat, CFA=0, consistency≥0.80); domain/hash isolated from benchmark
-- Alembic head `f6a0303ragfix`; tests 26 fixture + 8 calibration passed
-
-### 06-04 COMPLETE
-
-- SUT retrieve+answer scoring; faithfulness/relevance/context precision/recall@5
-- Deterministic arbiter with locked D-08 thresholds; fail-closed on missing policy/baseline/health/lineage
-
-### 06-05 COMPLETE
-
-- OpenAPI export + frozen baseline + oasdiff v1.17.0 (Python fallback); pos/neg fixtures
-- Frontend `evalApi` / `use-eval` / eval store consume legacy + all quality statuses + deprecation
-- Playwright 1.61.1: chromium-desktop + chromium-mobile-390; core + error/isolation journeys
-- Verified: contract 7 passed; vitest 54 passed; playwright 10 passed
-- Durable quality worker: lease/heartbeat/checkpoint/resume/cancel + stage-cache idempotency
-- Legacy Eval API compatibility fields + `/api/eval/quality/*` durable endpoints
-- Live dual-model test: Ollama outage → `blocked_dependency`, metrics=null
-- Tests: 16 scoring + 2 live + 31 worker/api/service
-
-### 06-06 COMPLETE
-
-- Unified `.github/workflows/ci.yml` producer DAG; legacy workflows disabled (no push/PR triggers)
-- Fork-safe: no pull_request_target; secret/self-hosted/write jobs gated off PR
-- Timeouts D-16; artifact retention D-17; isolated alert job D-18
-- Nightly self-hosted dual-model + signed promote-baseline (passed/qualified only)
-- actionlint v1.7.12 clean; pytest tests/ci → 49 passed
-
-### 06-07 COMPLETE
-
-- Fail-closed aggregate job `ci-gate` (always()) over event-aware producer matrix
-- Branch protection on `adlink8/novel-mind` default `master`: required contexts exactly `["ci-gate"]` (live GET readback)
-- Release gate verifier: seven SUMMARYs + policy/signed evidence + remote protection
-- Tests: test_ci_gate / test_branch_protection / test_release_gate; full tests/ci green
-
-### 06-08 COMPLETE
-
-- `QualityRun` ORM + Alembic `07qualityruns01` (after `f6a0303ragfix`)
-- `QualityRunRepository` CAS leases/checkpoint/stage_cache; API injects AsyncSession
-- Five-tuple lineage in input_hash, stage-cache keys, output_hash, report_signature
-- Legacy incomplete rows: `quality_comparable=false`, reason `legacy_incomparable` (no invented hashes)
-- Tests: models + worker + scoring + eval API → 49 passed
-
-### 06-09 COMPLETE
-
-- BaselineCandidate + ActiveBaseline; Alembic `08baselinecand01`
-- prepare/commit revalidate current QualityRun lineage/hashes/signature/metrics
-- Cross-chunker report by `source_snapshot_hash` with explicit exclusions
-- Additive APIs: `/api/eval/quality/baseline/*`, `/api/eval/quality/reports/cross-chunker`
-- Tests: baseline + models + scoring + eval API → 45 related passed
-
-## Open Work
-
-- Phase 07 semantic hierarchical chunking (07-01..07-06)
-- pgvector 双写备用路径
-- 大文件（>5MB）流式上传
-- 将 90 条 candidate 完成人工确认/驳回，达到 100 条高质量 confirmed 的 issue 门槛
-- 校准 gold_chunks；当前 6 次运行 Recall/Precision/MRR/NDCG 均为 0
-
-### 07-01 COMPLETE
-
-- `chunking/schemas|manifests|baseline` packages
-- Unicode offsets + deterministic manifest checksum
-- Tests: 41 passed (unit + integration + legacy chunking)
-
-### 07-02 COMPLETE
-
-- AtomicSpan scanner + BoundaryProposal reason/confidence engine
-- CandidateSegmentation with pending adjudication queue
-- Hard constraints never llm_eligible; pure in-memory (no DB/index)
-
-### 07-03 COMPLETE
-
-- BoundaryDecision schema, BudgetLedger, BoundaryAdjudicator + adversarial fallback
-
-### 07-04 COMPLETE
-
-- chapter→scene→evidence HierarchyTree, scene expand, raw fallback
-
-### 07-05 COMPLETE
-
-- Immutable candidate builds, incremental delta, reconcile, promote, rollback
-
-### 07-06 COMPLETE
-
-- Same-snapshot A/B + release_verifier → QualifiedChunkerEvidence + CLI
-
-## Phase 07 test evidence
-
-- `pytest tests/unit/chunking tests/integration/chunking tests/integration/test_hierarchical_retrieval.py tests/adversarial/test_chunking_prompt_boundary.py tests/test_chunking.py` → **88 passed**
+- EvalDataset / EvalRun / EvalResult + quality durable jobs
+- Phase 06 自动质量门与 baseline 晋升
 
 ## Next Action
 
-Phase 07 done. Optionally commit remaining WIP (local BGE/UX) or start next milestone item.
+1. （可选）将 Phase 07 hierarchy/build 接到 PostgreSQL + 生产索引/检索路径  
+2. （可选）提交并 push 本地 BGE / UX WIP  
+3. 或开启下一里程碑（无 active plan）

@@ -33,16 +33,20 @@
 
 ## Progress
 
-| Milestone | Plans Complete | Status |
+| Milestone / Phase | Plans Complete | Status |
 |---|---:|---|
 | v0.1 审计与启动修复 | 3/3 | Complete |
 | v0.2 安全与架构修复 | 3/3 | Complete |
-| v0.3 小说导入 + RAG 索引 | 4/5 | **Gaps Found** |
-| v0.5 自动质量与 CI 门禁 | 8/9 | **Gap Closure In Progress** |
+| v0.3 小说导入 + RAG 索引 | 4/5 | Gaps Found (eval gold 质量) |
+| Phase 4 知识图谱 LLM 门控 | 4/4 | Complete |
+| Phase 5 叙事知识单元层 | 5/5 | Complete |
+| v0.5 / Phase 6 自动质量与 CI 门禁 | 9/9 | **Complete** (REQ-AUTO-11 closed) |
+| Phase 7 语义/层级分块 | 6/6 | **Complete** (logic+tests; PG wiring residual) |
 
 ## Auto Start
 
-Phase 06 已完成（含 REQ-AUTO-11）。下一步 Phase 07 语义/层级分块。auto-start 保持关闭。
+Phase 06 与 Phase 07 均已完成。当前无自动执行 plan。auto-start 保持关闭。  
+验证：`.planning/phases/06-automated-quality-ci/` SUMMARYs；`.planning/phases/07-semantic-hierarchical-chunking/07-VERIFICATION.md`。
 
 ## Backlog
 

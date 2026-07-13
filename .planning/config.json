@@ -1,10 +1,11 @@
 {
   "project": "novel-mind",
-  "active_milestone": "v0.5 - 自动质量与 CI 门禁",
-  "last_completed_milestone": "v0.2 - 安全与架构修复",
-  "active_phase": "07-semantic-hierarchical-chunking",
+  "active_milestone": null,
+  "last_completed_milestone": "v0.5 - 自动质量与 CI 门禁",
+  "last_completed_phase": "07-semantic-hierarchical-chunking",
+  "active_phase": null,
   "active_plan": null,
-  "status": "complete",
+  "status": "idle",
   "canonical_dir": ".planning",
   "auto_start": null,
   "documentation_ownership": {
@@ -33,5 +34,9 @@
   "workflow": {
     "_auto_chain_active": false,
     "use_worktrees": false
+  },
+  "notes": {
+    "phase_06": "COMPLETE 06-01..06-09 REQ-AUTO-11",
+    "phase_07": "COMPLETE 07-01..07-06; see phases/07-semantic-hierarchical-chunking/07-VERIFICATION.md"
   }
 }
