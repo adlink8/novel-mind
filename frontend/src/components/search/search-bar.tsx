@@ -2,12 +2,15 @@
  * 全局搜索栏
  * - 可选指定小说（全部 / 某本）
  * - 防抖预览、回车跳转 /search?q=...&novel=...
+ *
+ * URL 回填通过 initialQuery/initialNovelId + 父级 key remount，
+ * 避免在 useEffect 内同步 setState。
  */
 
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { novelsApi, searchApi, type Novel, type SearchResult } from "@/lib/api";
@@ -30,7 +33,6 @@ export function SearchBar({
   className = "",
 }: SearchBarProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   const [query, setQuery] = useState(initialQuery);
   const [novelId, setNovelId] = useState(initialNovelId);
@@ -42,14 +44,6 @@ export function SearchBar({
 
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-
-  // URL 变化时同步
-  useEffect(() => {
-    const q = searchParams.get("q") ?? "";
-    const n = searchParams.get("novel") ?? "";
-    setQuery(q);
-    setNovelId(n);
-  }, [searchParams]);
 
   // 加载用户书架供选择
   useEffect(() => {
@@ -68,15 +62,16 @@ export function SearchBar({
     };
   }, [showNovelSelect]);
 
-  // 防抖预览搜索
+  // 防抖预览搜索（状态更新均在 timer 回调中）
   useEffect(() => {
-    if (query.trim().length === 0) {
-      setResults([]);
-      setIsOpen(false);
-      return;
-    }
-
-    const timer = setTimeout(async () => {
+    const delay = query.trim().length === 0 ? 0 : 300;
+    const timer = window.setTimeout(async () => {
+      if (query.trim().length === 0) {
+        setResults([]);
+        setIsOpen(false);
+        setLoading(false);
+        return;
+      }
       setLoading(true);
       setError(null);
       try {
@@ -92,9 +87,9 @@ export function SearchBar({
       } finally {
         setLoading(false);
       }
-    }, 300);
+    }, delay);
 
-    return () => clearTimeout(timer);
+    return () => window.clearTimeout(timer);
   }, [query, novelId]);
 
   useEffect(() => {
@@ -125,15 +120,12 @@ export function SearchBar({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const buildSearchUrl = useCallback(
-    (q: string, n: string) => {
-      const params = new URLSearchParams();
-      params.set("q", q);
-      if (n) params.set("novel", n);
-      return `/search?${params.toString()}`;
-    },
-    []
-  );
+  const buildSearchUrl = useCallback((q: string, n: string) => {
+    const params = new URLSearchParams();
+    params.set("q", q);
+    if (n) params.set("novel", n);
+    return `/search?${params.toString()}`;
+  }, []);
 
   const handleSearch = useCallback(() => {
     const trimmed = query.trim();

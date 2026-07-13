@@ -18,6 +18,10 @@ vi.mock("axios", () => ({
       patch: mockPatch,
       delete: mockDelete,
       defaults: { baseURL: "/api", timeout: 30000 },
+      interceptors: {
+        request: { use: vi.fn(), eject: vi.fn() },
+        response: { use: vi.fn(), eject: vi.fn() },
+      },
     })),
   },
 }));
@@ -47,13 +51,13 @@ describe("API 客户端", () => {
       expect(mockGet).toHaveBeenCalledWith("/novels/1");
     });
 
-    it("upload 使用 multipart/form-data", async () => {
+    it("upload 使用 multipart FormData 与长超时", async () => {
       const file = new File(["test"], "test.txt", { type: "text/plain" });
       await novelsApi.upload(file);
       expect(mockPost).toHaveBeenCalledWith(
         "/novels/upload",
         expect.any(FormData),
-        { headers: { "Content-Type": "multipart/form-data" } }
+        { timeout: 600000 }
       );
     });
 

@@ -63,7 +63,11 @@ export default function NovelReaderPage() {
   const [currentChapterId, setCurrentChapterId] = useState<number>(0);
   const [chapterContent, setChapterContent] = useState<Chapter | null>(null);
   // 桌面默认展开目录，移动默认收起
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  // 桌面默认展开；移动端默认收起（惰性初始，避免 effect 同步 setState）
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return window.innerWidth >= 1024;
+  });
   const [searchOpen, setSearchOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -74,13 +78,6 @@ export default function NovelReaderPage() {
   useEffect(() => {
     chaptersRef.current = chapters;
   }, [chapters]);
-
-  // 移动端默认收起侧栏
-  useEffect(() => {
-    if (typeof window !== "undefined" && window.innerWidth < 1024) {
-      setSidebarOpen(false);
-    }
-  }, []);
 
   useEffect(() => {
     async function loadNovel() {

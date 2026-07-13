@@ -21,6 +21,10 @@ vi.mock("axios", () => ({
       patch: mockPatch,
       delete: mockDelete,
       defaults: { baseURL: "/api", timeout: 30000 },
+      interceptors: {
+        request: { use: vi.fn(), eject: vi.fn() },
+        response: { use: vi.fn(), eject: vi.fn() },
+      },
     })),
   },
 }));

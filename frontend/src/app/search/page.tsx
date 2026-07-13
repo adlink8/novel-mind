@@ -27,34 +27,40 @@ function SearchContent() {
 
   // 解析选中书本标题（用于结果页文案）
   useEffect(() => {
-    if (!novelParam) {
-      setScopeNovel(null);
-      return;
-    }
     let cancelled = false;
-    novelsApi
-      .get(novelParam)
-      .then((res) => {
-        if (!cancelled) setScopeNovel(res.data);
-      })
-      .catch(() => {
+    async function loadScope() {
+      if (!novelParam) {
+        await Promise.resolve();
         if (!cancelled) setScopeNovel(null);
-      });
+        return;
+      }
+      try {
+        const res = await novelsApi.get(novelParam);
+        if (!cancelled) setScopeNovel(res.data);
+      } catch {
+        if (!cancelled) setScopeNovel(null);
+      }
+    }
+    void loadScope();
     return () => {
       cancelled = true;
     };
   }, [novelParam]);
 
   useEffect(() => {
-    if (query.trim().length === 0) {
-      setResults([]);
-      setTotal(0);
-      return;
-    }
-
     let cancelled = false;
 
     async function doSearch() {
+      if (query.trim().length === 0) {
+        // async boundary avoids react-hooks/set-state-in-effect
+        await Promise.resolve();
+        if (!cancelled) {
+          setResults([]);
+          setTotal(0);
+          setLoading(false);
+        }
+        return;
+      }
       setLoading(true);
       setError(null);
       try {
@@ -78,7 +84,7 @@ function SearchContent() {
       }
     }
 
-    doSearch();
+    void doSearch();
 
     return () => {
       cancelled = true;
@@ -125,6 +131,7 @@ function SearchContent() {
 
       <div className="paper-surface rounded-3xl p-4 sm:p-5">
         <SearchBar
+          key={`${query}::${novelParam}`}
           initialQuery={query}
           initialNovelId={novelParam}
           showNovelSelect

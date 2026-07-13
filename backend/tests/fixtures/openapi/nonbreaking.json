@@ -821,11 +821,6 @@
             ],
             "title": "Precision At K"
           },
-          "quality_note": {
-            "description": "optional nonbreaking note",
-            "nullable": true,
-            "type": "string"
-          },
           "recall_at_k": {
             "title": "Recall At K",
             "type": "number"
@@ -953,6 +948,18 @@
       "ImportStatusResponse": {
         "description": "小说导入状态响应（用于前端轮询进度）",
         "properties": {
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "导入任务 ID",
+            "title": "Job Id"
+          },
           "message": {
             "default": "",
             "description": "阶段描述信息",
@@ -960,8 +967,16 @@
             "type": "string"
           },
           "novel_id": {
-            "title": "Novel Id",
-            "type": "integer"
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "小说 ID（创建前可能为 null）",
+            "title": "Novel Id"
           },
           "percent": {
             "description": "进度百分比 0-100",
@@ -971,13 +986,12 @@
             "type": "integer"
           },
           "stage": {
-            "description": "当前阶段: uploading / detecting / parsing / saving / ready / error",
+            "description": "当前阶段: uploading / detecting / parsing / saving / ready / failed / error",
             "title": "Stage",
             "type": "string"
           }
         },
         "required": [
-          "novel_id",
           "stage",
           "percent"
         ],
@@ -1761,7 +1775,13 @@
             "type": "integer"
           },
           "id": {
+            "description": "导入任务 job_id（兼容字段，用于轮询）",
             "title": "Id",
+            "type": "integer"
+          },
+          "job_id": {
+            "description": "导入任务 ID",
+            "title": "Job Id",
             "type": "integer"
           },
           "message": {
@@ -1769,8 +1789,20 @@
             "title": "Message",
             "type": "string"
           },
+          "novel_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "小说 ID（任务完成前可能为 null）",
+            "title": "Novel Id"
+          },
           "status": {
-            "description": "处理状态: importing / chunking / embedding / ready",
+            "description": "处理状态: pending / importing / ready / failed",
             "title": "Status",
             "type": "string"
           },
@@ -1786,6 +1818,7 @@
         },
         "required": [
           "id",
+          "job_id",
           "title",
           "status"
         ],
@@ -1827,6 +1860,18 @@
             "minItems": 1,
             "title": "Cases",
             "type": "array"
+          },
+          "chunker_lineage": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chunker Lineage"
           },
           "generator_lineage": {
             "anyOf": [
@@ -3000,6 +3045,187 @@
         ]
       }
     },
+    "/api/eval/quality/baseline/active": {
+      "get": {
+        "operationId": "get_quality_active_baseline_api_eval_quality_baseline_active_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Quality Active Baseline Api Eval Quality Baseline Active Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Quality Active Baseline",
+        "tags": [
+          "评测"
+        ]
+      }
+    },
+    "/api/eval/quality/baseline/commit": {
+      "post": {
+        "description": "Commit prepared candidate after reloading QualityRun lineage/hashes.",
+        "operationId": "commit_quality_baseline_api_eval_quality_baseline_commit_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "title": "Body",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Commit Quality Baseline Api Eval Quality Baseline Commit Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Commit Quality Baseline",
+        "tags": [
+          "评测"
+        ]
+      }
+    },
+    "/api/eval/quality/baseline/prepare": {
+      "post": {
+        "description": "Prepare baseline candidate from a durable QualityRun (DB revalidated).",
+        "operationId": "prepare_quality_baseline_api_eval_quality_baseline_prepare_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "title": "Body",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Prepare Quality Baseline Api Eval Quality Baseline Prepare Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Prepare Quality Baseline",
+        "tags": [
+          "评测"
+        ]
+      }
+    },
+    "/api/eval/quality/reports/cross-chunker": {
+      "post": {
+        "description": "Same-snapshot multi-chunker comparable report with explicit exclusions.",
+        "operationId": "cross_chunker_quality_report_api_eval_quality_reports_cross_chunker_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "title": "Body",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Cross Chunker Quality Report Api Eval Quality Reports Cross Chunker Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Cross Chunker Quality Report",
+        "tags": [
+          "评测"
+        ]
+      }
+    },
     "/api/eval/quality/runs": {
       "get": {
         "operationId": "list_quality_runs_api_eval_quality_runs_get",
@@ -3031,7 +3257,7 @@
         ]
       },
       "post": {
-        "description": "Create (and optionally run) a durable quality job.",
+        "description": "Create (and optionally run) a durable quality job backed by QualityRun.",
         "operationId": "create_quality_run_api_eval_quality_runs_post",
         "requestBody": {
           "content": {
@@ -3549,32 +3775,6 @@
           }
         },
         "summary": "Health Check"
-      }
-    },
-    "/api/health/extended": {
-      "get": {
-        "operationId": "extended_health_nonbreaking",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "properties": {
-                    "status": {
-                      "type": "string"
-                    }
-                  },
-                  "type": "object"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "summary": "Extended health (nonbreaking addition)",
-        "tags": [
-          "health"
-        ]
       }
     },
     "/api/knowledge/judgments/{judgment_id}/accept": {
@@ -4422,9 +4622,57 @@
         ]
       }
     },
+    "/api/novels/import-jobs/{job_id}": {
+      "get": {
+        "description": "按 job_id 查询导入进度（上传后应轮询此接口，而不是 novel_id）。",
+        "operationId": "get_import_job_status_api_novels_import_jobs__job_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportStatusResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Import Job Status",
+        "tags": [
+          "小说管理"
+        ]
+      }
+    },
     "/api/novels/upload": {
       "post": {
-        "description": "上传并解析小说 TXT 文件（支持多编码自动检测和大文件）。\n\n需要登录认证。\n\n处理流程:\n1. 创建导入任务（ImportJob）\n2. 后台处理：接收文件、检测编码、解析章节、保存到数据库\n3. 返回任务 ID 和状态",
+        "description": "上传并解析小说 TXT 文件（支持多编码自动检测和大文件）。\n\n需要登录认证。\n\n处理流程:\n1. 在请求内读完文件字节（避免 BackgroundTask 时 UploadFile 已关闭）\n2. 创建导入任务（ImportJob）\n3. 独立 DB 会话后台处理\n4. 返回 job_id 供前端轮询 GET /novels/import-jobs/{job_id}",
         "operationId": "upload_novel_api_novels_upload_post",
         "requestBody": {
           "content": {
@@ -4766,7 +5014,7 @@
     },
     "/api/novels/{novel_id}/import-status": {
       "get": {
-        "description": "获取小说导入进度状态（前端轮询用）",
+        "description": "获取小说导入进度状态（前端轮询用；优先使用 /import-jobs/{job_id}）",
         "operationId": "get_import_status_api_novels__novel_id__import_status_get",
         "parameters": [
           {

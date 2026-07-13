@@ -48,10 +48,14 @@ export function ReaderContent({
     [chapter?.id, chapter?.content]
   );
 
+  // 换章时重置页码（异步调度，避免 effect 同步 setState）
   useEffect(() => {
-    setPageIndex(0);
-    onChapterProgress?.(0);
-  }, [chapter?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+    const t = window.setTimeout(() => {
+      setPageIndex(0);
+      onChapterProgress?.(0);
+    }, 0);
+    return () => window.clearTimeout(t);
+  }, [chapter?.id, onChapterProgress]);
 
   // 单页模式：根据滚动位置计算本章进度
   useEffect(() => {

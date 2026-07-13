@@ -476,7 +476,12 @@ class TestErrorHandling:
                 # 第二批失败
                 raise RuntimeError("Rate limited")
 
-        with patch("app.services.indexing_service.ai_service") as mock_ai:
+        with patch("app.services.indexing_service.ai_service") as mock_ai, patch(
+            "app.services.indexing_service.settings"
+        ) as mock_settings:
+            # Force ollama path so batch_size stays 100 (local_st uses 64)
+            mock_settings.embedding_provider = "ollama"
+            mock_settings.embedding_batch_size = 64
             mock_ai.embedding = AsyncMock(side_effect=mock_embedding)
 
             result = await indexing_service.index_novel(mock_db, novel_id=1)
