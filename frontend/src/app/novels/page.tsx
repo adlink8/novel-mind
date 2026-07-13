@@ -50,7 +50,7 @@ import { PageContainer, PageHeader } from "@/components/page-header";
 type SortOption = "date" | "title" | "wordCount";
 
 /** 筛选状态类型：全部或特定小说状态 */
-type FilterStatus = "all" | Novel["status"];
+type FilterStatus = "all" | string;
 
 /**
  * 书架页面组件
@@ -62,7 +62,7 @@ type FilterStatus = "all" | Novel["status"];
  */
 export default function NovelsPage() {
   // 从 Hook 获取小说列表、加载状态和刷新方法
-  const { novels, loading, fetchNovels } = useNovels();
+  const { novels, loading, fetchNovels, deleteNovel } = useNovels();
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<SortOption>("date");
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("all");
@@ -131,10 +131,16 @@ export default function NovelsPage() {
   const statusOptions: { value: FilterStatus; label: string }[] = [
     { value: "all", label: "全部状态" },
     { value: "importing", label: "导入中" },
-    { value: "ready", label: "就绪" },
+    { value: "chunking", label: "建索引中" },
+    { value: "embedding", label: "向量化中" },
+    { value: "ready", label: "可阅读" },
     { value: "analyzing", label: "分析中" },
     { value: "analyzed", label: "已分析" },
   ];
+
+  const handleDelete = async (id: number) => {
+    await deleteNovel(String(id));
+  };
 
   /** 排序下拉框选项 */
   const sortOptions: { value: SortOption; label: string }[] = [
@@ -248,7 +254,7 @@ export default function NovelsPage() {
       {filteredNovels.length > 0 && (
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           {filteredNovels.map((novel) => (
-            <NovelCard key={novel.id} novel={novel} />
+            <NovelCard key={novel.id} novel={novel} onDelete={handleDelete} />
           ))}
         </div>
       )}

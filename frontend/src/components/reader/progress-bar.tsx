@@ -3,30 +3,39 @@
 import React from "react";
 
 interface ProgressBarProps {
-  current: number;
-  total: number;
+  /** 本章内阅读进度 0-100 */
+  chapterPercent: number;
   chapterTitle: string;
+  /** 全书位置：第几章 / 共几章（辅助信息） */
+  chapterIndex: number;
+  chapterTotal: number;
 }
 
-export function ProgressBar({ current, total, chapterTitle }: ProgressBarProps) {
-  const percent = total > 0 ? Math.round((current / total) * 100) : 0;
+export function ProgressBar({
+  chapterPercent,
+  chapterTitle,
+  chapterIndex,
+  chapterTotal,
+}: ProgressBarProps) {
+  const pct = Math.min(100, Math.max(0, Math.round(chapterPercent)));
 
   return (
     <div className="absolute inset-x-0 bottom-0 z-30 border-t border-border/70 bg-card/90 backdrop-blur-xl">
       <div className="mx-auto max-w-3xl px-4 py-2.5">
-        {/* 章节信息 */}
-        <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
-          <span className="truncate flex-1 mr-4">{chapterTitle}</span>
-          <span>
-            {current} / {total} {"章"} ({percent}%)
+        <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
+          <span className="mr-4 flex-1 truncate">{chapterTitle}</span>
+          <span className="shrink-0 tabular-nums">
+            本章 {pct}%
+            {chapterTotal > 0
+              ? ` · 第 ${chapterIndex}/${chapterTotal} 章`
+              : null}
           </span>
         </div>
 
-        {/* 进度条 */}
-        <div className="h-1 bg-muted rounded-full overflow-hidden">
+        <div className="h-1 overflow-hidden rounded-full bg-muted">
           <div
-            className="h-full bg-primary transition-all duration-300"
-            style={{ width: `${percent}%` }}
+            className="h-full bg-primary transition-all duration-150"
+            style={{ width: `${pct}%` }}
           />
         </div>
       </div>

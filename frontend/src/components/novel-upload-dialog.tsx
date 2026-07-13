@@ -37,14 +37,22 @@ type UploadStatus = "idle" | "uploading" | "success" | "error";
 
 /** 导入阶段中文映射 */
 const STAGE_LABELS: Record<string, string> = {
+  pending: "等待处理...",
   uploading: "正在接收文件...",
   detecting: "正在检测编码...",
   parsing: "正在解析章节...",
   saving: "正在保存到数据库...",
+  chunking: "正在分块...",
+  embedding: "正在建立索引...",
   ready: "导入完成",
+  failed: "导入失败",
   error: "导入失败",
+  cancelled: "已取消",
   unknown: "处理中...",
 };
+
+const TERMINAL_OK = new Set(["ready"]);
+const TERMINAL_FAIL = new Set(["failed", "error", "cancelled"]);
 
 export function NovelUploadDialog({
   children,
@@ -141,31 +149,61 @@ export function NovelUploadDialog({
     [handleFileSelect]
   );
 
-  /** 轮询导入进度 */
-  const startPolling = useCallback((id: string) => {
+  /** 按 job_id 轮询导入进度（不是 novel_id） */
+  const startPolling = useCallback((jobId: string) => {
     clearPollTimer();
+    let ticks = 0;
     pollTimerRef.current = setInterval(async () => {
+      ticks += 1;
       try {
-        const res = await novelsApi.getImportStatus(id);
+        const res = await novelsApi.getImportJobStatus(jobId);
         const data = res.data;
-        setProgress(data.percent);
+        setProgress(data.percent || 0);
         setStageMessage(STAGE_LABELS[data.stage] || data.message || "处理中...");
+        if (data.novel_id != null) {
+          setNovelId(String(data.novel_id));
+        }
 
-        if (data.stage === "ready" || data.stage === "error") {
+        if (TERMINAL_OK.has(data.stage)) {
           clearPollTimer();
-          if (data.stage === "ready") {
-            setStatus("success");
-            setTimeout(() => {
-              setOpen(false);
-              reset();
-            }, 800);
-          }
+          setStatus("success");
+          setProgress(100);
+          setTimeout(() => {
+            setOpen(false);
+            reset();
+            // 通知父组件刷新书架
+            onUploadComplete?.({
+              id: data.novel_id ?? Number(jobId),
+              job_id: Number(jobId),
+              novel_id: data.novel_id ?? null,
+              title: "",
+              status: "ready",
+              message: data.message || "导入完成",
+              chapter_count: 0,
+              word_count: 0,
+            });
+          }, 800);
+          return;
+        }
+
+        if (TERMINAL_FAIL.has(data.stage)) {
+          clearPollTimer();
+          setStatus("error");
+          setErrorMsg(data.message || "导入失败，请重试");
+          return;
+        }
+
+        // 大文件解析可能较久：超过 ~10 分钟仍未结束则提示
+        if (ticks > 1200) {
+          clearPollTimer();
+          setStatus("error");
+          setErrorMsg("导入耗时过长，请稍后刷新书架查看是否已完成");
         }
       } catch {
-        // 轮询失败不中断，继续尝试
+        // 短暂网络错误不中断；持续失败超过阈值仍保留轮询
       }
     }, 500);
-  }, [clearPollTimer, reset]);
+  }, [clearPollTimer, reset, onUploadComplete]);
 
   /** 执行上传 */
   const handleUpload = useCallback(async () => {
@@ -173,17 +211,18 @@ export function NovelUploadDialog({
     setStatus("uploading");
     setProgress(5);
     setStageMessage(STAGE_LABELS.uploading);
+    setErrorMsg("");
 
     try {
       const res = await novelsApi.upload(file);
       const data = res.data;
-      setNovelId(String(data.id));
-      setProgress(50);
-      setStageMessage(STAGE_LABELS.parsing);
+      const jobId = String(data.job_id ?? data.id);
+      setNovelId(jobId);
+      setProgress(Math.max(data ? 10 : 5, 10));
+      setStageMessage(STAGE_LABELS.pending);
 
-      // 上传完成后开始轮询后端实际进度
-      startPolling(String(data.id));
-      onUploadComplete?.(data);
+      // 用 job_id 轮询（upload 返回的 id 是 job_id，不是 novel_id）
+      startPolling(jobId);
     } catch (err) {
       clearPollTimer();
       const message = err instanceof Error ? err.message : "上传失败，请重试";
@@ -191,7 +230,7 @@ export function NovelUploadDialog({
       setStatus("error");
       setProgress(0);
     }
-  }, [file, onUploadComplete, clearPollTimer, startPolling]);
+  }, [file, clearPollTimer, startPolling]);
 
   /** 对话框开关控制（关闭时重置状态） */
   const handleOpenChange = useCallback(

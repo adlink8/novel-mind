@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ChapterSidebar } from "@/components/reader/chapter-sidebar";
@@ -8,33 +8,48 @@ import { ReaderContent } from "@/components/reader/reader-content";
 import { ProgressBar } from "@/components/reader/progress-bar";
 import { SearchPanel } from "@/components/reader/search-panel";
 import { novelsApi, type Novel, type Chapter } from "@/lib/api";
-import { ArrowLeft, ChevronLeft, ChevronRight, LoaderCircle, Menu, Search } from "lucide-react";
+import {
+  ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
+  LoaderCircle,
+  Menu,
+  PanelLeft,
+  Search,
+} from "lucide-react";
 
-/** 阅读进度 localStorage 键名 */
 function getStorageKey(novelId: string): string {
   return `novelmind:reading:${novelId}`;
 }
 
-/** 从 localStorage 读取阅读进度 */
-function loadProgress(novelId: string): { chapterId: number; progressPercent: number } | null {
+function loadProgress(
+  novelId: string
+): { chapterId: number; chapterPercent?: number } | null {
   try {
     const raw = localStorage.getItem(getStorageKey(novelId));
     if (raw) return JSON.parse(raw);
   } catch {
-    // 忽略解析错误
+    /* ignore */
   }
   return null;
 }
 
-/** 保存阅读进度到 localStorage */
-function saveProgress(novelId: string, chapterId: number, progressPercent: number): void {
+function saveProgress(
+  novelId: string,
+  chapterId: number,
+  chapterPercent: number
+): void {
   try {
     localStorage.setItem(
       getStorageKey(novelId),
-      JSON.stringify({ chapterId, progressPercent, updatedAt: Date.now() })
+      JSON.stringify({
+        chapterId,
+        chapterPercent,
+        updatedAt: Date.now(),
+      })
     );
   } catch {
-    // 忽略写入错误
+    /* ignore */
   }
 }
 
@@ -47,12 +62,26 @@ export default function NovelReaderPage() {
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [currentChapterId, setCurrentChapterId] = useState<number>(0);
   const [chapterContent, setChapterContent] = useState<Chapter | null>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  // 桌面默认展开目录，移动默认收起
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [searchOpen, setSearchOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [chapterPercent, setChapterPercent] = useState(0);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const chaptersRef = useRef<Chapter[]>([]);
 
-  /** 加载小说详情和章节列表 */
+  useEffect(() => {
+    chaptersRef.current = chapters;
+  }, [chapters]);
+
+  // 移动端默认收起侧栏
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.innerWidth < 1024) {
+      setSidebarOpen(false);
+    }
+  }, []);
+
   useEffect(() => {
     async function loadNovel() {
       try {
@@ -60,34 +89,39 @@ export default function NovelReaderPage() {
         const res = await novelsApi.get(novelId);
         setNovel(res.data);
 
-        // 加载章节列表
         const chaptersRes = await novelsApi.getChapters(novelId);
         const chapterList = chaptersRes.data;
         setChapters(chapterList);
 
-        // 确定初始章节：localStorage > 第一章
+        // 恢复：localStorage > 服务端 reading_progress > 第一章
         const saved = loadProgress(novelId);
-        let initialChapterId: number;
-        if (saved && chapterList.find((c) => c.id === saved.chapterId)) {
+        let initialChapterId = 0;
+        if (saved?.chapterId && chapterList.some((c) => c.id === saved.chapterId)) {
           initialChapterId = saved.chapterId;
-        } else if (chapterList.length > 0) {
-          initialChapterId = chapterList[0].id;
+          setChapterPercent(saved.chapterPercent ?? 0);
         } else {
-          initialChapterId = 0;
+          const serverChapterId = (res.data as Novel & {
+            reading_progress?: { chapter_id?: number };
+          }).reading_progress?.chapter_id;
+          if (
+            serverChapterId &&
+            chapterList.some((c) => c.id === serverChapterId)
+          ) {
+            initialChapterId = serverChapterId;
+          } else if (chapterList.length > 0) {
+            initialChapterId = chapterList[0].id;
+          }
         }
-
         setCurrentChapterId(initialChapterId);
-      } catch (err) {
+      } catch {
         setError("加载小说失败，请重试");
       } finally {
         setLoading(false);
       }
     }
-
     loadNovel();
   }, [novelId]);
 
-  /** 切换章节时加载章节内容 */
   useEffect(() => {
     if (!currentChapterId) return;
 
@@ -95,41 +129,57 @@ export default function NovelReaderPage() {
       try {
         const res = await novelsApi.getChapter(novelId, String(currentChapterId));
         setChapterContent(res.data);
+        scrollRef.current?.scrollTo({ top: 0 });
 
-        // 保存阅读进度到 localStorage
-        const chapterIndex = chapters.findIndex((c) => c.id === currentChapterId);
-        const progressPercent = chapters.length > 0
-          ? ((chapterIndex + 1) / chapters.length) * 100
-          : 0;
-        saveProgress(novelId, currentChapterId, progressPercent);
+        // 持久化当前章节（本章进度由滚动/分页回调更新）
+        const saved = loadProgress(novelId);
+        const pct =
+          saved?.chapterId === currentChapterId ? (saved.chapterPercent ?? 0) : 0;
+        setChapterPercent(pct);
+        saveProgress(novelId, currentChapterId, pct);
+
+        // 同步到服务端（整书章节位置）
+        try {
+          await novelsApi.updateProgress(novelId, currentChapterId, pct);
+        } catch {
+          /* 后端进度失败不影响阅读 */
+        }
       } catch {
         setChapterContent(null);
       }
     }
 
     loadChapter();
-  }, [currentChapterId, novelId, chapters]);
+  }, [currentChapterId, novelId]);
 
-  /** 选择章节 */
+  const handleChapterProgress = useCallback(
+    (percent: number) => {
+      setChapterPercent(percent);
+      if (currentChapterId) {
+        saveProgress(novelId, currentChapterId, percent);
+      }
+    },
+    [currentChapterId, novelId]
+  );
+
   const handleSelectChapter = useCallback((chapterId: number) => {
     setCurrentChapterId(chapterId);
-    window.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
 
-  /** 上一章 / 下一章 */
   const handlePrevChapter = useCallback(() => {
-    const idx = chapters.findIndex((c) => c.id === currentChapterId);
-    if (idx > 0) handleSelectChapter(chapters[idx - 1].id);
-  }, [chapters, currentChapterId, handleSelectChapter]);
+    const list = chaptersRef.current;
+    const idx = list.findIndex((c) => c.id === currentChapterId);
+    if (idx > 0) handleSelectChapter(list[idx - 1].id);
+  }, [currentChapterId, handleSelectChapter]);
 
   const handleNextChapter = useCallback(() => {
-    const idx = chapters.findIndex((c) => c.id === currentChapterId);
-    if (idx >= 0 && idx < chapters.length - 1) {
-      handleSelectChapter(chapters[idx + 1].id);
+    const list = chaptersRef.current;
+    const idx = list.findIndex((c) => c.id === currentChapterId);
+    if (idx >= 0 && idx < list.length - 1) {
+      handleSelectChapter(list[idx + 1].id);
     }
-  }, [chapters, currentChapterId, handleSelectChapter]);
+  }, [currentChapterId, handleSelectChapter]);
 
-  /** Ctrl+F 快捷键打开搜索面板 */
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "f") {
@@ -141,25 +191,32 @@ export default function NovelReaderPage() {
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
-  // 加载中
+  // 离开页面前再存一次
+  useEffect(() => {
+    return () => {
+      if (currentChapterId) {
+        saveProgress(novelId, currentChapterId, chapterPercent);
+      }
+    };
+  }, [novelId, currentChapterId, chapterPercent]);
+
   if (loading) {
     return (
       <div className="flex min-h-[70vh] items-center justify-center">
         <div className="text-center">
           <LoaderCircle className="mx-auto mb-4 size-7 animate-spin text-primary" />
-          <p className="text-muted-foreground">{"加载中..."}</p>
+          <p className="text-muted-foreground">加载中...</p>
         </div>
       </div>
     );
   }
 
-  // 错误
   if (error || !novel) {
     return (
       <div className="flex min-h-[70vh] items-center justify-center">
         <div className="text-center">
-          <p className="text-muted-foreground mb-4">{error || "小说不存在"}</p>
-          <Button onClick={() => router.push("/novels")}>{"返回书架"}</Button>
+          <p className="mb-4 text-muted-foreground">{error || "小说不存在"}</p>
+          <Button onClick={() => router.push("/novels")}>返回书架</Button>
         </div>
       </div>
     );
@@ -170,31 +227,47 @@ export default function NovelReaderPage() {
 
   return (
     <div className="relative flex h-[calc(100vh-4rem)] overflow-hidden bg-[#f6f1e8]/70 lg:h-screen lg:p-4 lg:pl-0">
-      {/* 章节侧边栏 */}
       <ChapterSidebar
         chapters={chapters}
         currentChapterId={currentChapterId}
         onSelectChapter={handleSelectChapter}
         isOpen={sidebarOpen}
-        onToggle={() => setSidebarOpen(!sidebarOpen)}
+        onToggle={() => setSidebarOpen((v) => !v)}
       />
 
-      {/* 主内容区 */}
       <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden lg:rounded-[28px] lg:border lg:border-white/60 lg:bg-card/75 lg:shadow-[0_25px_70px_-45px_rgba(52,42,32,0.55)]">
-        {/* 顶栏 */}
         <header className="z-20 flex items-center justify-between border-b border-border/70 bg-card/80 px-3 py-3 backdrop-blur-xl sm:px-5">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setSidebarOpen(true)}
-              className="lg:hidden"
+              onClick={() => setSidebarOpen((v) => !v)}
+              title={sidebarOpen ? "收起目录" : "展开目录"}
             >
-              <Menu className="size-4" />
+              {sidebarOpen ? (
+                <PanelLeft className="size-4" />
+              ) : (
+                <Menu className="size-4" />
+              )}
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => router.push("/novels")} className="hidden sm:inline-flex"><ArrowLeft className="size-4" />书架</Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                if (currentChapterId) {
+                  saveProgress(novelId, currentChapterId, chapterPercent);
+                }
+                router.push("/novels");
+              }}
+              className="hidden sm:inline-flex"
+            >
+              <ArrowLeft className="size-4" />
+              书架
+            </Button>
             <div className="h-5 w-px bg-border/80" />
-            <h1 className="max-w-[150px] truncate font-serif text-base font-semibold sm:max-w-md sm:text-lg">{novel.title}</h1>
+            <h1 className="max-w-[150px] truncate font-serif text-base font-semibold sm:max-w-md sm:text-lg">
+              {novel.title}
+            </h1>
           </div>
 
           <div className="flex items-center gap-2">
@@ -202,7 +275,7 @@ export default function NovelReaderPage() {
               variant="ghost"
               size="sm"
               onClick={() => setSearchOpen(true)}
-              title="搜索 (Ctrl+F)"
+              title="本书内搜索 (Ctrl+F)"
             >
               <Search className="size-4" />
             </Button>
@@ -212,33 +285,37 @@ export default function NovelReaderPage() {
               onClick={handlePrevChapter}
               disabled={currentIndex <= 0}
             >
-              <ChevronLeft className="size-4" /><span className="hidden sm:inline">上一章</span>
+              <ChevronLeft className="size-4" />
+              <span className="hidden sm:inline">上一章</span>
             </Button>
             <Button
               variant="outline"
               size="sm"
               onClick={handleNextChapter}
-              disabled={currentIndex >= chapters.length - 1}
+              disabled={currentIndex < 0 || currentIndex >= chapters.length - 1}
             >
-              <span className="hidden sm:inline">下一章</span><ChevronRight className="size-4" />
+              <span className="hidden sm:inline">下一章</span>
+              <ChevronRight className="size-4" />
             </Button>
           </div>
         </header>
 
-        {/* 阅读区 */}
-        <div className="flex-1 overflow-y-auto pb-16">
-          <ReaderContent chapter={chapterContent} />
+        <div ref={scrollRef} className="flex-1 overflow-y-auto pb-16">
+          <ReaderContent
+            chapter={chapterContent}
+            onChapterProgress={handleChapterProgress}
+            scrollContainerRef={scrollRef}
+          />
         </div>
 
-        {/* 底部进度条 */}
         <ProgressBar
-          current={currentIndex + 1}
-          total={chapters.length}
+          chapterPercent={chapterPercent}
           chapterTitle={currentChapterTitle}
+          chapterIndex={currentIndex >= 0 ? currentIndex + 1 : 0}
+          chapterTotal={chapters.length}
         />
       </main>
 
-      {/* 搜索面板 */}
       <SearchPanel
         novelId={Number(novelId)}
         isOpen={searchOpen}

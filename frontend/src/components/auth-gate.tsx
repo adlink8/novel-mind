@@ -6,6 +6,39 @@ import { BookOpenText, LogIn, LogOut, Sparkles, UserPlus } from "lucide-react";
 import { authApi, type AuthUser } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import axios from "axios";
+
+function extractApiError(err: unknown): string {
+  if (axios.isAxiosError(err)) {
+    const data = err.response?.data as { detail?: unknown } | undefined;
+    const detail = data?.detail;
+    if (typeof detail === "string" && detail.trim()) {
+      return detail;
+    }
+    if (Array.isArray(detail)) {
+      // FastAPI validation errors: [{loc, msg, type}, ...]
+      return detail
+        .map((item) => {
+          if (item && typeof item === "object" && "msg" in item) {
+            return String((item as { msg: string }).msg);
+          }
+          return String(item);
+        })
+        .filter(Boolean)
+        .join("；");
+    }
+    if (err.response?.status === 403) {
+      return "请求来源不被允许（CORS/CSRF）。请确认从当前前端地址访问。";
+    }
+    if (err.response?.status === 401) {
+      return "用户名或密码错误";
+    }
+  }
+  if (err instanceof Error && err.message) {
+    return err.message;
+  }
+  return "";
+}
 
 export function AuthGate({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -24,17 +57,24 @@ export function AuthGate({ children }: { children: ReactNode }) {
     event.preventDefault();
     setError("");
     const form = new FormData(event.currentTarget);
-    const username = String(form.get("username") || "");
+    const username = String(form.get("username") || "").trim();
     const password = String(form.get("password") || "");
+    const email = String(form.get("email") || "").trim();
     try {
       if (registerMode) {
-        await authApi.register(username, String(form.get("email") || ""), password);
+        await authApi.register(username, email, password);
       }
       await authApi.login(username, password);
       const response = await authApi.me();
       setUser(response.data);
-    } catch {
-      setError(registerMode ? "注册或登录失败，请检查输入" : "用户名或密码错误");
+    } catch (err: unknown) {
+      // Surface backend detail (400 username taken, 401 bad password, 403 origin, etc.)
+      const detail = extractApiError(err);
+      if (registerMode) {
+        setError(detail || "注册或登录失败，请检查用户名/邮箱是否已被占用，密码至少 8 位");
+      } else {
+        setError(detail || "用户名或密码错误");
+      }
     }
   }
 

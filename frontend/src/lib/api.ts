@@ -20,12 +20,43 @@
 import axios from "axios";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "/api";
+const AUTH_TOKEN_KEY = "novelmind_access_token";
 
 export const api = axios.create({
   baseURL: API_BASE,
   timeout: 30000,
   withCredentials: true,
   headers: { "Content-Type": "application/json" },
+});
+
+/** Persist JWT so API calls can use Bearer (avoids cookie CSRF Origin mismatches). */
+export function setAccessToken(token: string | null) {
+  if (typeof window === "undefined") return;
+  if (token) {
+    window.sessionStorage.setItem(AUTH_TOKEN_KEY, token);
+  } else {
+    window.sessionStorage.removeItem(AUTH_TOKEN_KEY);
+  }
+}
+
+export function getAccessToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return window.sessionStorage.getItem(AUTH_TOKEN_KEY);
+}
+
+api.interceptors.request.use((config) => {
+  const token = getAccessToken();
+  if (token) {
+    config.headers = config.headers ?? {};
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  // Let the browser set multipart boundary; a fixed Content-Type breaks uploads.
+  if (typeof FormData !== "undefined" && config.data instanceof FormData) {
+    if (config.headers && "Content-Type" in config.headers) {
+      delete (config.headers as Record<string, unknown>)["Content-Type"];
+    }
+  }
+  return config;
 });
 
 export interface AuthUser {
@@ -35,13 +66,29 @@ export interface AuthUser {
   is_active: boolean;
 }
 
+export interface LoginResponse {
+  access_token: string;
+  token_type: string;
+  user_id: number;
+  username: string;
+}
+
 export const authApi = {
   me: () => api.get<AuthUser>("/auth/me"),
-  login: (username: string, password: string) =>
-    api.post("/auth/login", { username, password }),
+  login: async (username: string, password: string) => {
+    const res = await api.post<LoginResponse>("/auth/login", { username, password });
+    setAccessToken(res.data.access_token);
+    return res;
+  },
   register: (username: string, email: string, password: string) =>
     api.post<AuthUser>("/auth/register", { username, email, password }),
-  logout: () => api.post("/auth/logout"),
+  logout: async () => {
+    try {
+      await api.post("/auth/logout");
+    } finally {
+      setAccessToken(null);
+    }
+  },
 };
 
 // ==================== 小说 API ====================
@@ -55,7 +102,14 @@ export interface Novel {
   genre: string | null;
   word_count: number;
   chapter_count: number;
-  status: "importing" | "ready" | "analyzing" | "analyzed";
+  /** importing | ready | chunking | embedding | analyzing | analyzed */
+  status: string;
+  /** 检索分块数量；0 表示尚未建索引 */
+  chunk_count?: number;
+  reading_progress?: {
+    chapter_id?: number;
+    progress_percent?: number;
+  } | null;
   created_at: string;
   updated_at: string;
 }
@@ -83,9 +137,12 @@ export interface NovelListResponse {
 
 /** 小说上传响应 */
 export interface NovelUploadResponse {
+  /** 兼容字段：实际为 job_id，用于轮询导入进度 */
   id: number;
+  job_id: number;
+  novel_id: number | null;
   title: string;
-  status: Novel["status"];
+  status: string;
   message: string;
   chapter_count: number;
   word_count: number;
@@ -93,8 +150,9 @@ export interface NovelUploadResponse {
 
 /** 导入进度状态 */
 export interface ImportStatus {
-  novel_id: number;
-  stage: string;       // uploading / detecting / parsing / saving / ready / error
+  job_id?: number | null;
+  novel_id?: number | null;
+  stage: string;       // uploading / detecting / parsing / saving / ready / failed / error
   percent: number;     // 0-100
   message: string;
 }
@@ -105,8 +163,10 @@ export const novelsApi = {
   upload: (file: File) => {
     const formData = new FormData();
     formData.append("file", file);
+    // Do not set Content-Type manually — axios/browser must add multipart boundary.
+    // Large novels can take minutes to parse; extend timeout beyond default 30s.
     return api.post<NovelUploadResponse>("/novels/upload", formData, {
-      headers: { "Content-Type": "multipart/form-data" },
+      timeout: 10 * 60 * 1000,
     });
   },
   delete: (id: string) => api.delete(`/novels/${id}`),
@@ -115,7 +175,10 @@ export const novelsApi = {
     api.get<Chapter>(`/novels/${novelId}/chapters/${chapterId}`),
   updateProgress: (novelId: string, chapterId: number, progressPercent: number) =>
     api.patch(`/novels/${novelId}/progress`, { chapter_id: chapterId, progress_percent: progressPercent }),
+  /** @deprecated 上传后应使用 getImportJobStatus(job_id) */
   getImportStatus: (novelId: string) => api.get<ImportStatus>(`/novels/${novelId}/import-status`),
+  getImportJobStatus: (jobId: string | number) =>
+    api.get<ImportStatus>(`/novels/import-jobs/${jobId}`),
 };
 
 // ==================== 分析 API ====================
