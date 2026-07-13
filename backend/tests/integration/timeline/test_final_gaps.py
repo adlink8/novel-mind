@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 from app.models.analysis import AnalysisRun, ModelCallAttempt
 from app.models.chunk_build import ChunkActivePointer, ChunkBuild, ChunkHierarchyNode
 from app.models.novel import Chapter, Novel
-from app.models.timeline import TimelineActivePointer
+from app.models.timeline import MachineTimelineEvent, TimelineActivePointer, TimelineEvidenceRef
 from app.models.user import User
 from app.services.timeline.model_gateway import (
     ModelDeployment,
@@ -234,3 +234,67 @@ async def test_reconciliation_cache_misses_after_lineage_hash_change(
     ))).all())
     assert [attempt.status for attempt in attempts] == ["succeeded"]
     assert transport.calls[call_start:].count("ReconciliationOutputModel") == 1
+
+
+@pytest.mark.asyncio
+async def test_real_api_serializes_persisted_source_start_and_orders_by_it(
+    db_session, auth_client,
+):
+    _, novel, run = await _seed_run(db_session)
+    novel_id, run_id = novel.id, run.id
+    transport = FinalGapTransport()
+    runtime = _runtime(db_session, transport)
+    await run_timeline_worker(run_id, runtime=runtime)
+
+    db_session.expire_all()
+    persisted_run = await db_session.get(AnalysisRun, run_id)
+    assert persisted_run.status == "completed"
+    existing = list((await db_session.scalars(select(MachineTimelineEvent).where(
+        MachineTimelineEvent.version_id == persisted_run.version_id,
+    ).order_by(MachineTimelineEvent.narrative_chapter_number))).all())
+    first_evidence = await db_session.scalar(select(TimelineEvidenceRef).where(
+        TimelineEvidenceRef.event_id == existing[0].id,
+    ))
+    existing[0].narrative_index = 9
+    later_offset = MachineTimelineEvent(
+        version_id=persisted_run.version_id,
+        owner_id=persisted_run.owner_id,
+        novel_id=novel_id,
+        logical_event_id="same-chapter-later-offset",
+        title="Same chapter later offset",
+        description="Persisted after the first event",
+        event_type="plot",
+        time_precision="unknown",
+        narrative_chapter_number=existing[0].narrative_chapter_number,
+        narrative_index=0,
+        story_rank=None,
+        story_constraints=[],
+        confidence=0.9,
+        prompt_hash="c" * 64,
+        schema_hash="d" * 64,
+        model_lineage={},
+        publication_status="published",
+    )
+    db_session.add(later_offset)
+    await db_session.flush()
+    db_session.add(TimelineEvidenceRef(
+        event_id=later_offset.id,
+        chapter_id=first_evidence.chapter_id,
+        evidence_id="later-offset-evidence",
+        source_start=80,
+        source_end=90,
+        content_hash="e" * 64,
+    ))
+    persisted_novel = await db_session.get(Novel, novel_id)
+    persisted_novel.reading_progress = {"timeline_full_book": True}
+    await db_session.commit()
+
+    response = await auth_client.get(f"/api/timeline/{novel_id}?ordering=narrative&full_book=true")
+    assert response.status_code == 200
+    events = response.json()["active"]["events"]
+    assert [event["title"] for event in events] == [
+        existing[0].title,
+        "Same chapter later offset",
+        existing[1].title,
+    ]
+    assert [event["source_start"] for event in events] == [0, 80, 100]
