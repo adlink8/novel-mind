@@ -60,6 +60,7 @@ class GatewayAttempt:
     request_hash: str
     response_hash: str | None = None
     usage: dict[str, int] = field(default_factory=dict)
+    cost_usd: Decimal | None = None
     error_code: str | None = None
     latency_ms: int | None = None
 
@@ -156,7 +157,7 @@ class TimelineModelGateway:
                 response_hash = _canonical_hash(response)
                 attempts.append(GatewayAttempt(
                     attempt_number, "schema_rejected", reservation_key, request_hash,
-                    response_hash, usage, type(exc).__name__,
+                    response_hash, usage, actual_cost, type(exc).__name__,
                     int((time.perf_counter() - started) * 1000),
                 ))
                 if attempt_number == 2:
@@ -169,7 +170,8 @@ class TimelineModelGateway:
 
             attempts.append(GatewayAttempt(
                 attempt_number, "succeeded", reservation_key, request_hash,
-                _canonical_hash(response), usage, latency_ms=int((time.perf_counter() - started) * 1000),
+                _canonical_hash(response), usage, actual_cost,
+                latency_ms=int((time.perf_counter() - started) * 1000),
             ))
             return GatewayResult(output, attempts, deployment)
 

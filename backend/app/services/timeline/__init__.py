@@ -8,6 +8,8 @@ from app.services.timeline.model_gateway import (
     StructuredOutputRejected,
     TimelineModelGateway,
 )
+from app.services.timeline.evidence import EvidencePackage, EvidenceScopeError, EvidenceUnit
+from app.services.timeline.extraction import ExactCacheKey, TimelineChapterExtractor
 
 __all__ = [
     "DependencyPaused",
@@ -16,4 +18,9 @@ __all__ = [
     "ModelDeployment",
     "StructuredOutputRejected",
     "TimelineModelGateway",
+    "EvidencePackage",
+    "EvidenceScopeError",
+    "EvidenceUnit",
+    "ExactCacheKey",
+    "TimelineChapterExtractor",
 ]

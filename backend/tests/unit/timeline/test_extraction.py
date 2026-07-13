@@ -58,6 +58,7 @@ async def test_valid_candidate_is_automatically_published_as_partial():
     assert result.events[0].owner_id == 3 and result.events[0].novel_id == 8
     assert store.published[2][0].candidate.candidate_id == "c5:e1"
     assert store.audits[0].status == "succeeded"
+    assert store.audits[0].gateway_attempt.cost_usd == Decimal("0.000030")
 
 
 @pytest.mark.asyncio

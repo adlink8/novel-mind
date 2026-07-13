@@ -59,6 +59,7 @@ async def test_structured_call_disables_hidden_retry_stream_and_fallback():
     assert call["timeout"] == 12 and call["num_retries"] == 0 and call["stream"] is False
     assert call["model"] == "openai/gpt-test"
     assert len(result.attempts) == 1 and result.attempts[0].status == "succeeded"
+    assert result.attempts[0].cost_usd == Decimal("0.000030")
 
 
 @pytest.mark.asyncio

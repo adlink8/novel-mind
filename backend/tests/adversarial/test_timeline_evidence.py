@@ -5,7 +5,7 @@ import pytest
 from app.schemas.timeline import TimelineExtraction
 from app.services.timeline.evidence import EvidencePackage, EvidenceScopeError, EvidenceUnit, validate_extraction
 
-pytestmark = pytest.mark.adversarial
+pytestmark = pytest.mark.unit
 
 
 def package():
