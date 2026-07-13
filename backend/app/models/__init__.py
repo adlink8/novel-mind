@@ -38,8 +38,10 @@ from app.models.base import Base
 from app.models.user import User
 from app.models.novel import Novel, Chapter
 from app.models.import_job import ImportJob
-from app.models.analysis import AnalysisResult
-from app.models.timeline import TimelineEvent
+from app.models.analysis import (AnalysisResult, AnalysisRun, AnalysisVersion, AnalysisChapterStage,
+    ModelCallAttempt, AnalysisBudgetLedger, AnalysisBudgetReservation)
+from app.models.timeline import (TimelineEvent, MachineTimelineEvent, TimelineParticipant,
+    TimelineEvidenceRef, TimelineCausalEdge, TimelineOverride, TimelineActivePointer, TimelinePointerJournal)
 from app.models.character import Character, CharacterRelation
 from app.models.fanfiction import FanFiction
 from app.models.fanfiction_chapter import FanFictionChapter
@@ -91,6 +93,10 @@ __all__ = [
     "ImportJob",
     "AnalysisResult",
     "TimelineEvent",
+    "AnalysisRun", "AnalysisVersion", "AnalysisChapterStage", "ModelCallAttempt",
+    "AnalysisBudgetLedger", "AnalysisBudgetReservation", "MachineTimelineEvent",
+    "TimelineParticipant", "TimelineEvidenceRef", "TimelineCausalEdge", "TimelineOverride",
+    "TimelineActivePointer", "TimelinePointerJournal",
     "Character",
     "CharacterRelation",
     "FanFiction",

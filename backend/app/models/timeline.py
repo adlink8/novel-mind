@@ -12,7 +12,8 @@
   AI 提取时按文本位置自动排序，用户可手动调整。
 """
 
-from sqlalchemy import ForeignKey, Integer, String, Text, Float
+from datetime import datetime
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Integer, String, Text, Float, JSON, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin
@@ -61,3 +62,103 @@ class TimelineEvent(TimestampMixin, Base):
     time_reference: Mapped[str | None] = mapped_column(
         String(200)
     )  # 时间参考（"第3天", "一年后"）
+
+
+class MachineTimelineEvent(TimestampMixin, Base):
+    __tablename__ = "machine_timeline_events"
+    __table_args__ = (
+        UniqueConstraint("version_id", "logical_event_id", name="uq_machine_timeline_event"),
+        CheckConstraint("time_precision IN ('exact','relative','fuzzy','unknown')", name="ck_machine_event_time_precision"),
+    )
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    version_id: Mapped[int] = mapped_column(ForeignKey("analysis_versions.id", ondelete="CASCADE"), nullable=False)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    novel_id: Mapped[int] = mapped_column(ForeignKey("novels.id", ondelete="CASCADE"), nullable=False)
+    logical_event_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    event_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    time_precision: Mapped[str] = mapped_column(String(16), nullable=False)
+    time_expression: Mapped[str | None] = mapped_column(String(120))
+    exact_time: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    relative_anchor_event_id: Mapped[str | None] = mapped_column(String(80))
+    relative_relation: Mapped[str | None] = mapped_column(String(24))
+    fuzzy_start: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    fuzzy_end: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    narrative_chapter_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    narrative_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    story_rank: Mapped[int | None] = mapped_column(Integer)
+    story_constraints: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    confidence: Mapped[float] = mapped_column(Float, nullable=False)
+    prompt_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    schema_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    model_lineage: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    publication_status: Mapped[str] = mapped_column(String(24), nullable=False, default="provisional")
+
+
+class TimelineParticipant(Base):
+    __tablename__ = "timeline_participants"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    event_id: Mapped[int] = mapped_column(ForeignKey("machine_timeline_events.id", ondelete="CASCADE"), nullable=False)
+    entity_id: Mapped[int | None] = mapped_column(ForeignKey("characters.id", ondelete="SET NULL"))
+    mention: Mapped[str] = mapped_column(String(100), nullable=False)
+
+
+class TimelineEvidenceRef(Base):
+    __tablename__ = "timeline_evidence_refs"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    event_id: Mapped[int] = mapped_column(ForeignKey("machine_timeline_events.id", ondelete="CASCADE"), nullable=False)
+    chapter_id: Mapped[int] = mapped_column(ForeignKey("chapters.id", ondelete="CASCADE"), nullable=False)
+    evidence_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    source_start: Mapped[int] = mapped_column(Integer, nullable=False)
+    source_end: Mapped[int] = mapped_column(Integer, nullable=False)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+
+
+class TimelineCausalEdge(Base):
+    __tablename__ = "timeline_causal_edges"
+    __table_args__ = (UniqueConstraint("version_id", "source_event_id", "target_event_id", "edge_type", name="uq_timeline_causal_edge"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    version_id: Mapped[int] = mapped_column(ForeignKey("analysis_versions.id", ondelete="CASCADE"), nullable=False)
+    source_event_id: Mapped[int] = mapped_column(ForeignKey("machine_timeline_events.id", ondelete="CASCADE"), nullable=False)
+    target_event_id: Mapped[int] = mapped_column(ForeignKey("machine_timeline_events.id", ondelete="CASCADE"), nullable=False)
+    edge_type: Mapped[str] = mapped_column(String(24), nullable=False)
+    confidence: Mapped[float] = mapped_column(Float, nullable=False)
+    evidence_refs: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+
+
+class TimelineOverride(TimestampMixin, Base):
+    __tablename__ = "timeline_overrides"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    novel_id: Mapped[int] = mapped_column(ForeignKey("novels.id", ondelete="CASCADE"), nullable=False)
+    logical_event_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    field_name: Mapped[str] = mapped_column(String(80), nullable=False)
+    value: Mapped[dict] = mapped_column(JSON, nullable=False)
+    supersedes_id: Mapped[int | None] = mapped_column(ForeignKey("timeline_overrides.id", ondelete="SET NULL"))
+    status: Mapped[str] = mapped_column(String(24), nullable=False, default="active")
+    needs_relink: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+
+class TimelineActivePointer(TimestampMixin, Base):
+    __tablename__ = "timeline_active_pointers"
+    __table_args__ = (UniqueConstraint("owner_id", "novel_id", name="uq_timeline_active_pointer"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    novel_id: Mapped[int] = mapped_column(ForeignKey("novels.id", ondelete="CASCADE"), nullable=False)
+    version_id: Mapped[int] = mapped_column(ForeignKey("analysis_versions.id", ondelete="RESTRICT"), nullable=False)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    manifest_checksum: Mapped[str] = mapped_column(String(64), nullable=False)
+
+
+class TimelinePointerJournal(TimestampMixin, Base):
+    __tablename__ = "timeline_pointer_journal"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    novel_id: Mapped[int] = mapped_column(ForeignKey("novels.id", ondelete="CASCADE"), nullable=False)
+    from_version_id: Mapped[int | None] = mapped_column(ForeignKey("analysis_versions.id", ondelete="RESTRICT"))
+    to_version_id: Mapped[int] = mapped_column(ForeignKey("analysis_versions.id", ondelete="RESTRICT"), nullable=False)
+    action: Mapped[str] = mapped_column(String(24), nullable=False)
+    expected_revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    resulting_revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    manifest: Mapped[dict] = mapped_column(JSON, nullable=False)

@@ -13,7 +13,7 @@
 """
 
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -61,5 +61,25 @@ class ChapterAnalysisResponse(BaseModel):
     model_used: Optional[str] = None
     prompt_tokens: Optional[int] = None
     completion_tokens: Optional[int] = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class TimelineRunResponse(BaseModel):
+    """Durable Phase 08 run state exposed without legacy lineage fabrication."""
+
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
+    id: int
+    owner_id: int
+    novel_id: int
+    version_id: int | None = None
+    status: Literal[
+        "pending", "running", "paused_budget", "paused_dependency",
+        "cancelled", "completed", "failed",
+    ]
+    status_reason: str | None = None
+    checkpoint: Dict[str, Any] = Field(default_factory=dict)
+    progress: Dict[str, Any] = Field(default_factory=dict)
+    cancel_requested: bool = False
     created_at: datetime
     updated_at: datetime
