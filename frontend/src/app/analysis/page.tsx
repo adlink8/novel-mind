@@ -75,7 +75,12 @@ export default function AnalysisPage() {
 
   const selectedNovel = novels.find((novel) => String(novel.id) === novelId);
   const view = envelope[source];
-  const people = useMemo(() => Array.from(new Set([...(envelope.active?.events ?? []), ...(envelope.running_candidate?.events ?? [])].flatMap((event) => event.participants.map((item) => item.mention)))).sort(), [envelope]);
+  const people = useMemo(() => Array.from(new Set((view?.events ?? []).flatMap((event) => event.participants.map((item) => item.mention)))).sort(), [view]);
+
+  function selectSource(nextSource: TimelineVersionSource) {
+    setSource(nextSource);
+    if (person) void updateQuery({ person: "" });
+  }
 
   return (
     <div className="mx-auto grid w-full max-w-[1500px] gap-5 px-4 py-6 sm:px-6 lg:px-8">
@@ -90,8 +95,8 @@ export default function AnalysisPage() {
           {!selectedNovel?.reading_progress && !fullBook && <p className="rounded-xl border border-amber-300/70 bg-amber-50 px-4 py-3 text-sm text-amber-950">无阅读进度：为避免剧透，当前仅显示第一章 cutoff。</p>}
           <TimelineControls ordering={ordering} onOrderingChange={(value) => void updateQuery({ ordering: value })} people={people} person={person} onPersonChange={(value) => void updateQuery({ person: value })} causal={causal} onCausalChange={(value) => void updateQuery({ causal: value })} fullBook={fullBook} onFullBookRequest={(value) => value ? setConfirmFullBook(true) : void timelineApi.setFullBookPreference(novelId, false).then(() => updateQuery({ fullBook: false }))} />
           <div role="tablist" aria-label="分析版本" className="flex gap-2 overflow-x-auto">
-            {envelope.active && <button role="tab" aria-selected={source === "active"} onClick={() => setSource("active")} className={`whitespace-nowrap rounded-full px-4 py-2 text-sm ${source === 'active' ? 'bg-foreground text-background' : 'border bg-card'}`}>当前版本 · v{envelope.active.version_id}</button>}
-            {envelope.running_candidate && <button role="tab" aria-selected={source === "running_candidate"} onClick={() => setSource("running_candidate")} className={`whitespace-nowrap rounded-full px-4 py-2 text-sm ${source === 'running_candidate' ? 'bg-foreground text-background' : 'border bg-card'}`}><RefreshCw className="mr-1 inline size-3.5"/>正在生成 · v{envelope.running_candidate.version_id}</button>}
+            {envelope.active && <button role="tab" aria-selected={source === "active"} onClick={() => selectSource("active")} className={`whitespace-nowrap rounded-full px-4 py-2 text-sm ${source === 'active' ? 'bg-foreground text-background' : 'border bg-card'}`}>当前版本 · v{envelope.active.version_id}</button>}
+            {envelope.running_candidate && <button role="tab" aria-selected={source === "running_candidate"} onClick={() => selectSource("running_candidate")} className={`whitespace-nowrap rounded-full px-4 py-2 text-sm ${source === 'running_candidate' ? 'bg-foreground text-background' : 'border bg-card'}`}><RefreshCw className="mr-1 inline size-3.5"/>正在生成 · v{envelope.running_candidate.version_id}</button>}
           </div>
           {error && <p role="alert" className="rounded-xl bg-destructive/10 p-4 text-sm text-destructive">{error}</p>}
           {loading ? <div className="h-80 animate-pulse rounded-3xl bg-muted" aria-label="正在加载时间线"/> : view ? <TimelineChart events={view.events} causalEdges={causal ? view.causal_edges : []} ordering={ordering} novelId={novelId} /> : <div className="grid min-h-64 place-items-center rounded-3xl border border-dashed text-center text-muted-foreground">分析已启动，第一批事件生成后会显示在这里。</div>}

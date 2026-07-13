@@ -15,13 +15,28 @@ echarts.use([ScatterChart, LineChart, DataZoomComponent, GridComponent, TooltipC
 
 type Props = { events: TimelineEvent[]; causalEdges: TimelineCausalEdge[]; ordering: TimelineOrdering; novelId: string };
 
-function position(event: TimelineEvent, ordering: TimelineOrdering) {
-  return ordering === "story" ? (event.story_rank ?? event.narrative_index) : event.narrative_index;
+type TimelineEventWithSourceOffset = TimelineEvent & { source_start?: number | null };
+
+function compareNarrative(a: TimelineEvent, b: TimelineEvent) {
+  const sourceStart = (event: TimelineEvent) => (event as TimelineEventWithSourceOffset).source_start ?? event.narrative_index;
+  return a.narrative_chapter_number - b.narrative_chapter_number
+    || sourceStart(a) - sourceStart(b)
+    || a.id - b.id;
+}
+
+export function compareTimelineEvents(a: TimelineEvent, b: TimelineEvent, ordering: TimelineOrdering) {
+  if (ordering === "story") {
+    if (a.story_rank == null && b.story_rank != null) return 1;
+    if (a.story_rank != null && b.story_rank == null) return -1;
+    if (a.story_rank != null && b.story_rank != null && a.story_rank !== b.story_rank) return a.story_rank - b.story_rank;
+  }
+  return compareNarrative(a, b);
 }
 
 export function TimelineChart({ events, causalEdges, ordering, novelId }: Props) {
   const [selected, setSelected] = useState<TimelineEvent | null>(null);
-  const sorted = useMemo(() => [...events].sort((a, b) => position(a, ordering) - position(b, ordering)), [events, ordering]);
+  const sorted = useMemo(() => [...events].sort((a, b) => compareTimelineEvents(a, b, ordering)), [events, ordering]);
+  const positions = useMemo(() => new Map(sorted.map((event, index) => [event.id, index])), [sorted]);
   const option = useMemo<echarts.EChartsCoreOption>(() => ({
     animation: false,
     grid: { left: 30, right: 24, top: 36, bottom: 76, containLabel: true },
@@ -36,11 +51,11 @@ export function TimelineChart({ events, causalEdges, ordering, novelId }: Props)
       ...causalEdges.flatMap((edge) => {
         const from = events.find((event) => event.id === edge.source_event_id);
         const to = events.find((event) => event.id === edge.target_event_id);
-        return from && to ? [{ type: "line" as const, data: [[position(from, ordering), 0], [position(to, ordering), 0]], symbol: ["none", "arrow"], lineStyle: { color: "#a16207", type: "dashed", width: 2 }, silent: true }] : [];
+        return from && to ? [{ type: "line" as const, data: [[positions.get(from.id), 0], [positions.get(to.id), 0]], symbol: ["none", "arrow"], lineStyle: { color: "#a16207", type: "dashed", width: 2 }, silent: true }] : [];
       }),
-      { type: "scatter", symbolSize: 18, data: sorted.map((event, index) => ({ value: [position(event, ordering), index % 2 ? 0.22 : -0.22], event, itemStyle: { color: event.provenance.title === "manual" ? "#b45309" : "#4f6f52" }, label: { show: true, position: index % 2 ? "top" : "bottom", formatter: event.title, width: 120, overflow: "truncate", fontSize: 12 } })) },
+      { type: "scatter", symbolSize: 18, data: sorted.map((event, index) => ({ value: [index, index % 2 ? 0.22 : -0.22], event, itemStyle: { color: event.provenance.title === "manual" ? "#b45309" : "#4f6f52" }, label: { show: true, position: index % 2 ? "top" : "bottom", formatter: event.title, width: 120, overflow: "truncate", fontSize: 12 } })) },
     ],
-  }), [causalEdges, events, ordering, sorted]);
+  }), [causalEdges, events, ordering, positions, sorted]);
 
   if (!events.length) return <div className="grid min-h-64 place-items-center rounded-3xl border border-dashed text-sm text-muted-foreground">当前筛选没有可见事件。</div>;
 
