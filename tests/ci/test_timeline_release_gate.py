@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import importlib.util
+import hashlib
 import json
+import sys
 from pathlib import Path
 
 import pytest
@@ -67,14 +69,14 @@ def _production_report(q):
     return report
 
 
-def _command_results(q):
+def _forged_command_results(q):
     return [
         {"command": command, "exit_code": 0, "output_sha256": "f" * 64}
         for command in q.REQUIRED_TEST_COMMANDS
     ]
 
 
-def test_release_gate_requires_observed_database_authority_and_command_output(tmp_path):
+def test_release_gate_rejects_copied_authority_and_forged_digests(tmp_path):
     q = _module()
     report = _production_report(q)
     path = tmp_path / "qualification.json"
@@ -83,11 +85,51 @@ def test_release_gate_requires_observed_database_authority_and_command_output(tm
         REPO,
         path,
         observed_authority=report["artifact"]["authority"],
-        command_results=_command_results(q),
+        command_results=_forged_command_results(q),
     )
-    assert verdict["status"] == "qualified", verdict
-    assert verdict["quality_comparable"] is True
-    assert all(verdict["checks"].values()), verdict
+    assert verdict["status"] == "blocked_release", verdict
+    assert verdict["quality_comparable"] is False
+    assert verdict["checks"]["database_authority"] is True
+    assert verdict["checks"]["command_output_attestation"] is False
+
+
+def test_command_collector_hashes_exact_output_and_records_failure(tmp_path):
+    q = _module()
+    success = q.CommandSpec(
+        display=q.REQUIRED_TEST_COMMANDS[0],
+        cwd=tmp_path,
+        argv=(sys.executable, "-c", "import sys; sys.stdout.buffer.write(b'exact-output')"),
+    )
+    changed = q.CommandSpec(
+        display=q.REQUIRED_TEST_COMMANDS[1],
+        cwd=tmp_path,
+        argv=(sys.executable, "-c", "import sys; sys.stdout.buffer.write(b'changed-output')"),
+    )
+    failed = q.CommandSpec(
+        display=q.REQUIRED_TEST_COMMANDS[2],
+        cwd=tmp_path,
+        argv=(sys.executable, "-c", "import sys; sys.stderr.buffer.write(b'failed-output'); raise SystemExit(7)"),
+    )
+
+    results = q.collect_command_results((success, changed, failed))
+
+    assert results[0]["exit_code"] == 0
+    assert results[0]["output"] == b"exact-output"
+    assert results[0]["output_sha256"] == hashlib.sha256(b"exact-output").hexdigest()
+    assert results[1]["output_sha256"] != results[0]["output_sha256"]
+    assert results[2]["exit_code"] == 7
+    assert results[2]["output"] == b"failed-output"
+
+
+def test_cli_release_mode_exposes_no_observation_or_digest_injection():
+    q = _module()
+
+    help_text = q.build_parser().format_help()
+
+    assert "--verify-release" in help_text
+    assert "--report" in help_text
+    for forbidden in ("observed-authority", "command-results", "output-digest", "command-list"):
+        assert forbidden not in help_text
 
 
 def test_real_browser_spec_does_not_mock_timeline_api():
@@ -107,7 +149,7 @@ def test_release_gate_rejects_non_success_live_status(tmp_path, status):
     path.write_text(json.dumps(report), encoding="utf-8")
     verdict = q.verify_release_evidence(
         REPO, path, observed_authority=report["artifact"]["authority"],
-        command_results=_command_results(q), require_live=True,
+        command_results=_forged_command_results(q), require_live=True,
     )
     assert verdict["status"] == "blocked_release"
     assert verdict["quality_comparable"] is False
@@ -121,7 +163,7 @@ def test_release_gate_rejects_tampered_or_spoiler_leaking_report(tmp_path):
     path.write_text(json.dumps(report), encoding="utf-8")
     verdict = q.verify_release_evidence(
         REPO, path, observed_authority=report["artifact"]["authority"],
-        command_results=_command_results(q),
+        command_results=_forged_command_results(q),
     )
     assert verdict["status"] == "blocked_release"
     assert verdict["checks"]["report_signature"] is False
