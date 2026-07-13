@@ -41,7 +41,7 @@
 | Phase 4 知识图谱 LLM 门控 | 4/4 | Complete |
 | Phase 5 叙事知识单元层 | 5/5 | Complete |
 | v0.5 / Phase 6 自动质量与 CI 门禁 | 9/9 | **Complete** (REQ-AUTO-11 closed) |
-| Phase 7 语义/层级分块 | 6/6 | **Complete** (logic+tests; PG wiring residual) |
+| Phase 7 语义/层级分块 | 6/6 | **Complete** (logic+tests+PG/indexing wiring) |
 
 ## Auto Start
 

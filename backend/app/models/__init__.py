@@ -46,6 +46,11 @@ from app.models.fanfiction_chapter import FanFictionChapter
 from app.models.ai_model import AIModelConfig
 from app.models.ai_usage_log import AIUsageLog
 from app.models.text_chunk import TextChunk
+from app.models.chunk_build import (
+    ChunkActivePointer,
+    ChunkBuild,
+    ChunkHierarchyNode,
+)
 from app.models.eval import (
     ActiveBaseline,
     BaselineCandidate,
@@ -93,6 +98,9 @@ __all__ = [
     "AIModelConfig",
     "AIUsageLog",
     "TextChunk",
+    "ChunkBuild",
+    "ChunkActivePointer",
+    "ChunkHierarchyNode",
     "EvalDataset",
     "EvalRun",
     "EvalResult",

@@ -52,9 +52,9 @@
 | REQ-CHUNK-01 | 分块策略以版本化 manifest 表示，原始 chunk、scene 和 evidence chunk 均可回链到章节与原文 offset | P0 | VERIFIED |
 | REQ-CHUNK-02 | 规则式初切必须产生边界置信度和原因码，低置信边界才允许进入 LLM 判断队列 | P0 | VERIFIED |
 | REQ-CHUNK-03 | LLM 只输出严格 schema 的边界判断与上下文保留建议，脚本负责长度、重叠、证据和写库约束 | P0 | VERIFIED |
-| REQ-CHUNK-04 | 系统支持 chapter → scene → evidence 的层级检索表示，并保持 chunks 原始证据回退 | P0 | PARTIAL |
-| REQ-CHUNK-05 | 新 chunker 先构建 immutable candidate，不移动 active index；仅通过 Phase 06 质量门才可 promotion | P0 | PARTIAL |
-| REQ-CHUNK-06 | 源章节或 chunker 变化只重切受影响范围，可恢复、可回滚且不残留旧向量 | P0 | PARTIAL |
+| REQ-CHUNK-04 | 系统支持 chapter → scene → evidence 的层级检索表示，并保持 chunks 原始证据回退 | P0 | VERIFIED |
+| REQ-CHUNK-05 | 新 chunker 先构建 immutable candidate，不移动 active index；仅通过 Phase 06 质量门才可 promotion | P0 | VERIFIED |
+| REQ-CHUNK-06 | 源章节或 chunker 变化只重切受影响范围，可恢复、可回滚且不残留旧向量 | P0 | VERIFIED |
 | REQ-CHUNK-07 | LLM 不可用、schema 非法或预算耗尽时回退到规则切片，并在 lineage 中明确标记 fallback | P1 | VERIFIED |
 | REQ-CHUNK-08 | chunker A/B 必须用同一冻结语料、同一质量 policy 和 Phase 06 自动评测比较质量、成本和延迟 | P0 | VERIFIED |
 
@@ -74,7 +74,7 @@
 | REQ-AUTO-01..10 | 06-01..06-07 completed | `.planning/phases/06-automated-quality-ci/06-VERIFICATION.md` |
 | REQ-AUTO-11 | 06-08..06-09 completed | `06-08/06-09-SUMMARY.md`; `QualityRun` + `BaselineCandidate`; Alembic `07qualityruns01` / `08baselinecand01` |
 | REQ-CHUNK-01..03,07,08 | 07-01..03,07-06 completed | `07-VERIFICATION.md`; `backend/app/services/chunking/*`; 88 related tests |
-| REQ-CHUNK-04..06 | 07-04..05 completed (PARTIAL) | Hierarchy/build lifecycle verified in-process (`InMemoryBuildStore`); production PG + index wiring residual |
+| REQ-CHUNK-04..06 | 07-04..05 + PG wiring | `chunk_builds` / `chunk_hierarchy_nodes` / active pointer; `indexing_service` + `hybrid_search` hooks; `test_pg_hierarchy_wiring.py` |
 
 ## Current Evidence
 

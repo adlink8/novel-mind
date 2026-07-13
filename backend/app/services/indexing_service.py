@@ -28,6 +28,7 @@ from typing import Any, Callable, Awaitable
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.models.novel import Novel, Chapter
 from app.models.text_chunk import TextChunk
 from app.services.ai_service import ai_service
@@ -86,8 +87,11 @@ class IndexingService:
         if not novel:
             raise IndexingError(f"小说不存在: novel_id={novel_id}")
 
+        from sqlalchemy.orm import undefer
+
         chapters_result = await db.execute(
             select(Chapter)
+            .options(undefer(Chapter.content))
             .where(Chapter.novel_id == novel_id)
             .order_by(Chapter.chapter_number)
         )
@@ -95,6 +99,16 @@ class IndexingService:
 
         if not chapters:
             raise IndexingError(f"小说没有章节内容: novel_id={novel_id}")
+
+        # 在 commit 前取出正文，避免 deferred 列在 session 刷新后触发 MissingGreenlet
+        chapter_payload = [
+            {
+                "id": ch.id,
+                "chapter_number": ch.chapter_number,
+                "content": ch.content or "",
+            }
+            for ch in chapters
+        ]
 
         # 2. 更新状态为 chunking
         novel.status = "chunking"
@@ -108,11 +122,11 @@ class IndexingService:
 
         chunk_chapters = [
             ChunkChapter(
-                id=ch.id,
-                chapter_number=ch.chapter_number,
-                content=ch.content,
+                id=item["id"],
+                chapter_number=item["chapter_number"],
+                content=item["content"],
             )
-            for ch in chapters
+            for item in chapter_payload
         ]
         raw_chunks = await self.chunking_service.chunk_novel(
             novel_id=novel_id, chapters=chunk_chapters
@@ -129,7 +143,17 @@ class IndexingService:
                 "status": "ready",
             }
 
-        # 4. 将分块写入 text_chunks 表
+        # 4. 清理旧分块与旧向量（维度/模型切换后必须重建，避免 768/512 混用）
+        from sqlalchemy import delete as sa_delete
+
+        await db.execute(sa_delete(TextChunk).where(TextChunk.novel_id == novel_id))
+        await db.commit()
+        try:
+            await self.vector_store.delete_novel_chunks(novel_id)
+        except Exception as e:
+            logger.warning("清理旧 Chroma collection 失败 novel_%d: %s（将继续重建）", novel_id, e)
+
+        # 5. 将分块写入 text_chunks 表
         chunk_records = []
         for chunk in raw_chunks:
             metadata = chunk.get("metadata_json", {})
@@ -152,7 +176,7 @@ class IndexingService:
         for record in chunk_records:
             await db.refresh(record)
 
-        # 5. 更新状态为 embedding
+        # 6. 更新状态为 embedding
         novel.status = "embedding"
         await db.commit()
 
@@ -161,13 +185,23 @@ class IndexingService:
         if progress_callback:
             await progress_callback(novel_id, 0, total, "embedding")
 
-        # 6 & 7 & 8. 批量 embedding + 写入向量 + 更新状态
+        # 7 & 8 & 9. 批量 embedding + 写入向量 + 更新状态
         embedded_count = 0
         failed_count = 0
         failed_chunk_ids: list[int] = []
 
-        for i in range(0, total, 100):
-            batch = chunk_records[i : i + 100]
+        # local_st 可用更大 batch；ollama 仍用较小批避免超时
+        batch_size = 100
+        if getattr(settings, "embedding_provider", "").lower() in (
+            "local_st",
+            "local",
+            "sentence_transformers",
+            "bge",
+        ):
+            batch_size = max(16, int(getattr(settings, "embedding_batch_size", 64) or 64))
+
+        for i in range(0, total, batch_size):
+            batch = chunk_records[i : i + batch_size]
             batch_texts = [r.content for r in batch]
 
             try:
@@ -175,7 +209,7 @@ class IndexingService:
             except Exception as e:
                 logger.error(
                     "批量 embedding 失败 novel_%d batch_%d: %s",
-                    novel_id, i // 100, e,
+                    novel_id, i // batch_size, e,
                 )
                 # 标记整个批次为失败
                 for record in batch:
@@ -243,9 +277,26 @@ class IndexingService:
         if progress_callback:
             await progress_callback(novel_id, total, total, final_status)
 
+        # Phase 07: persist hierarchical build + active pointer (raw chunks remain)
+        hierarchy_build_id: str | None = None
+        try:
+            hierarchy_build_id = await self._persist_hierarchy_build(
+                db, novel_id=novel_id, chapter_payload=chapter_payload
+            )
+        except Exception as e:
+            logger.warning(
+                "层级 build 持久化失败 novel_%d: %s（raw 索引仍可用）",
+                novel_id,
+                e,
+            )
+
         logger.info(
-            "小说索引完成 novel_%d: total=%d, embedded=%d, failed=%d",
-            novel_id, total, embedded_count, failed_count,
+            "小说索引完成 novel_%d: total=%d, embedded=%d, failed=%d hierarchy=%s",
+            novel_id,
+            total,
+            embedded_count,
+            failed_count,
+            hierarchy_build_id,
         )
 
         return {
@@ -255,7 +306,37 @@ class IndexingService:
             "failed_chunks": failed_count,
             "failed_chunk_ids": failed_chunk_ids,
             "status": final_status,
+            "hierarchy_build_id": hierarchy_build_id,
         }
+
+    async def _persist_hierarchy_build(
+        self,
+        db: AsyncSession,
+        *,
+        novel_id: int,
+        chapter_payload: list[dict[str, Any]],
+    ) -> str:
+        """Build chapter→scene→evidence tree, persist to PG, set active pointer."""
+        from app.services.chunking.pg_store import create_and_persist_hierarchy_build
+
+        chapters = [
+            {
+                "chapter_id": item["id"],
+                "id": item["id"],
+                "chapter_number": item["chapter_number"],
+                "content": item["content"] or "",
+            }
+            for item in chapter_payload
+        ]
+        rec = await create_and_persist_hierarchy_build(
+            db,
+            novel_id=novel_id,
+            chapters=chapters,
+            promote_active=True,
+            force_full=True,
+        )
+        await db.commit()
+        return rec.build_id
 
     async def search_similar(
         self,

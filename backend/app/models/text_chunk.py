@@ -82,6 +82,16 @@ class TextChunk(TimestampMixin, Base):
         String(20), default="pending"
     )  # 向量生成状态: pending / embedded / failed
 
+    # Phase 07 hierarchy lineage (nullable — legacy raw chunks remain valid)
+    hierarchy_node_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    hierarchy_level: Mapped[str | None] = mapped_column(
+        String(16), nullable=True
+    )  # evidence | scene | raw
+    hierarchy_parent_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    hierarchy_build_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    source_start: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    source_end: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
     # 全文搜索向量（PostgreSQL tsvector，用于 BM25 混合搜索）
     # SQLite 不支持 tsvector，设为 nullable
     search_vector: Mapped[str | None] = mapped_column(

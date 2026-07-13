@@ -58,9 +58,15 @@ REQ-AUTO-01..11 已交付（含 06-08 QualityRun 持久化、06-09 BaselineCandi
 CLI：`backend/scripts/run_chunker_qualification.py`  
 测试：`tests/unit|integration/chunking` + adversarial + legacy `test_chunking` → **88 passed**
 
+### PG / indexing wiring (done)
+
+- Alembic `09chunkhier01`: `chunk_builds`, `chunk_active_pointers`, `chunk_hierarchy_nodes`, `text_chunks.hierarchy_*`
+- `pg_store.create_and_persist_hierarchy_build` after raw index
+- `hybrid_search` scene expand with raw fallback
+- Tests: `test_pg_hierarchy_wiring.py` + full chunking suite
+
 ### Residuals
 
-- Hierarchy / build lifecycle 当前以服务层 + InMemory 契约验证为主；生产 PostgreSQL 迁移与 `indexing_service` / `hybrid_search` 全量接线列为 follow-up。
 - 分支上仍有本地 BGE / 阅读器 UX 等非 Phase 07 WIP 未提交。
 
 ## Verified In v0.3 (historical snapshot)

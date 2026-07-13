@@ -85,7 +85,18 @@ class HybridSearchService:
 
         # 3. 混合融合排序
         merged = await self._hybrid_rerank(bm25_results, all_vector_results, top_k)
-        return merged
+        # 4. hierarchy enrich per novel (raw fallback if missing)
+        enriched: list[dict[str, Any]] = []
+        for item in merged:
+            nid = item.get("novel_id")
+            if isinstance(nid, int):
+                one = await self._enrich_with_hierarchy(db, nid, [item])
+                enriched.extend(one)
+            else:
+                item = dict(item)
+                item["hierarchy_mode"] = "raw_fallback"
+                enriched.append(item)
+        return enriched
 
     async def search_novel(
         self,
@@ -123,7 +134,38 @@ class HybridSearchService:
 
         # 3. 融合排序
         merged = await self._hybrid_rerank(bm25_results, vector_results, top_k)
-        return merged
+        # 4. Phase 07 hierarchy: evidence hit → scene expand (raw fallback)
+        return await self._enrich_with_hierarchy(db, novel_id, merged)
+
+    async def _enrich_with_hierarchy(
+        self,
+        db: AsyncSession,
+        novel_id: int,
+        results: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        """Attach scene context when active hierarchy exists; never fail search."""
+        if not results:
+            return results
+        try:
+            from app.services.chunking.pg_store import expand_search_result_with_hierarchy
+
+            enriched: list[dict[str, Any]] = []
+            for item in results:
+                try:
+                    enriched.append(
+                        await expand_search_result_with_hierarchy(
+                            db, novel_id=novel_id, result=item
+                        )
+                    )
+                except Exception as e:
+                    logger.debug("hierarchy enrich skip chunk=%s: %s", item.get("chunk_id"), e)
+                    item = dict(item)
+                    item["hierarchy_mode"] = "raw_fallback"
+                    enriched.append(item)
+            return enriched
+        except Exception as e:
+            logger.warning("hierarchy enrich unavailable novel_%d: %s", novel_id, e)
+            return results
 
     async def _bm25_search(
         self,
@@ -192,19 +234,50 @@ class HybridSearchService:
             logger.error("BM25 搜索失败: %s", e)
             return []
 
-        return [
-            {
+        # Pull hierarchy columns when present (SQLite tests may lack them pre-migration)
+        out: list[dict[str, Any]] = []
+        for row in rows:
+            item: dict[str, Any] = {
                 "novel_id": row.novel_id,
                 "novel_title": row.novel_title or "",
                 "chapter_id": row.chapter_id,
                 "chapter_title": row.chapter_title or "",
                 "chunk_id": row.chunk_id,
                 "chunk_index": row.chunk_index,
-                "content_snippet": row.headline or row.content[:100],
+                "content_snippet": row.headline or (row.content[:100] if row.content else ""),
                 "score": float(row.rank),
             }
-            for row in rows
-        ]
+            out.append(item)
+        # Best-effort attach hierarchy ids from ORM for enrichment
+        try:
+            chunk_ids = [i["chunk_id"] for i in out if i.get("chunk_id")]
+            if chunk_ids:
+                rows2 = (
+                    await db.execute(
+                        select(
+                            TextChunk.id,
+                            TextChunk.hierarchy_node_id,
+                            TextChunk.hierarchy_build_id,
+                            TextChunk.hierarchy_level,
+                            TextChunk.hierarchy_parent_id,
+                            TextChunk.source_start,
+                            TextChunk.source_end,
+                        ).where(TextChunk.id.in_(chunk_ids))
+                    )
+                ).all()
+                by_id = {r.id: r for r in rows2}
+                for item in out:
+                    r = by_id.get(item["chunk_id"])
+                    if r and r.hierarchy_node_id:
+                        item["hierarchy_node_id"] = r.hierarchy_node_id
+                        item["hierarchy_build_id"] = r.hierarchy_build_id
+                        item["hierarchy_level"] = r.hierarchy_level
+                        item["hierarchy_parent_id"] = r.hierarchy_parent_id
+                        item["source_start"] = r.source_start
+                        item["source_end"] = r.source_end
+        except Exception as e:
+            logger.debug("hierarchy column attach skipped: %s", e)
+        return out
 
     async def _vector_search(
         self,

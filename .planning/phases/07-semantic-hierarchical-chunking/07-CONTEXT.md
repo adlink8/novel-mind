@@ -1,7 +1,7 @@
 # Phase 07 Context — Semantic and Hierarchical Chunking
 
-**Status:** COMPLETE (2026-07-13) — plans 07-01..07-06 executed; see `07-VERIFICATION.md`.  
-**Residuals:** production PostgreSQL hierarchy/build tables and full `indexing_service` / `hybrid_search` wiring (logic covered by `InMemoryBuildStore` + unit/integration tests).
+**Status:** COMPLETE (2026-07-13) — plans 07-01..07-06 + PG/indexing wiring; see `07-VERIFICATION.md`.  
+**Persistence:** `chunk_builds` / `chunk_active_pointers` / `chunk_hierarchy_nodes` (Alembic `09chunkhier01`); index + hybrid search hooks live.
 
 ## Goal
 
