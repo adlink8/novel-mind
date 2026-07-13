@@ -1,6 +1,6 @@
 """Durable, owner-scoped timeline orchestration and spoiler-safe reads."""
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
@@ -17,6 +17,7 @@ from app.schemas.timeline import (
 )
 from app.services.timeline.promotion import ManifestValidationError, StalePointerError, rollback_version
 from app.services.timeline.query import build_version_view
+from app.services.timeline.worker import dispatch_timeline_run
 
 router = APIRouter(dependencies=[Depends(require_user)])
 
@@ -39,12 +40,20 @@ async def _owned_run(db: AsyncSession, owner_id: int, novel_id: int) -> Analysis
 
 
 @router.post("/{novel_id}/start-or-resume", response_model=TimelineRunResponse)
-async def start_or_resume(novel: Novel = Depends(require_owned_novel), db: AsyncSession = Depends(get_db),
+async def start_or_resume(background_tasks: BackgroundTasks,
+                          novel: Novel = Depends(require_owned_novel), db: AsyncSession = Depends(get_db),
                           current_user: User = Depends(require_user)):
     row = await db.scalar(select(AnalysisRun).where(
         AnalysisRun.owner_id == current_user.id, AnalysisRun.novel_id == novel.id,
         AnalysisRun.active_key == "active",
     ).with_for_update())
+    if row is None:
+        row = await db.scalar(select(AnalysisRun).where(
+            AnalysisRun.owner_id == current_user.id,
+            AnalysisRun.novel_id == novel.id,
+            AnalysisRun.status == "completed",
+            AnalysisRun.version_id.is_not(None),
+        ).order_by(AnalysisRun.id.desc()).limit(1))
     if row is None:
         row = AnalysisRun(owner_id=current_user.id, novel_id=novel.id,
                           active_key="active", status="pending", progress={})
@@ -62,6 +71,8 @@ async def start_or_resume(novel: Novel = Depends(require_owned_novel), db: Async
                 raise
     await db.commit()
     await db.refresh(row)
+    if row.status != "completed":
+        background_tasks.add_task(dispatch_timeline_run, row.id)
     return _run_response(row)
 
 
@@ -81,11 +92,13 @@ async def cancel(novel: Novel = Depends(require_owned_novel), db: AsyncSession =
 
 
 @router.post("/{novel_id}/resume", response_model=TimelineRunResponse)
-async def resume(novel: Novel = Depends(require_owned_novel), db: AsyncSession = Depends(get_db),
+async def resume(background_tasks: BackgroundTasks,
+                 novel: Novel = Depends(require_owned_novel), db: AsyncSession = Depends(get_db),
                  current_user: User = Depends(require_user)):
     row = await _owned_run(db, current_user.id, novel.id)
     row.status, row.cancel_requested = "pending", False
     await db.commit(); await db.refresh(row)
+    background_tasks.add_task(dispatch_timeline_run, row.id)
     return _run_response(row)
 
 
@@ -164,6 +177,7 @@ async def set_preference(data: TimelinePreferenceRequest, novel: Novel = Depends
 
 # Legacy compatibility: extraction now means durable start/resume; old edit path remains scoped by lookup.
 @router.post("/{novel_id}/extract", response_model=TimelineRunResponse)
-async def extract_timeline(novel: Novel = Depends(require_owned_novel), db: AsyncSession = Depends(get_db),
+async def extract_timeline(background_tasks: BackgroundTasks,
+                           novel: Novel = Depends(require_owned_novel), db: AsyncSession = Depends(get_db),
                            current_user: User = Depends(require_user)):
-    return await start_or_resume(novel, db, current_user)
+    return await start_or_resume(background_tasks, novel, db, current_user)

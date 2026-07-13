@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
@@ -66,6 +67,23 @@ class ProductionTransport:
         }
 
 
+class InterruptOnceTransport(ProductionTransport):
+    def __init__(self) -> None:
+        super().__init__()
+        self.extraction_attempts: list[int] = []
+        self.interrupted = False
+
+    async def complete(self, **kwargs):
+        if kwargs["response_format"].__name__ == "TimelineExtraction":
+            payload = json.loads(kwargs["messages"][1]["content"])
+            chapter_id = payload["scope"]["chapter_id"]
+            self.extraction_attempts.append(chapter_id)
+            if len(set(self.extraction_attempts)) == 2 and not self.interrupted:
+                self.interrupted = True
+                raise ConnectionError("simulated worker loss after first chapter")
+        return await super().complete(**kwargs)
+
+
 def _deployment(model_id: str) -> ModelDeployment:
     return ModelDeployment(
         provider="test",
@@ -96,7 +114,7 @@ async def _seed_hierarchy(db_session):
     )
     db_session.add(build)
     db_session.add(ChunkActivePointer(
-        novel_id=novel.id, build_id=build.build_id, committed_at=build.created_at,
+        novel_id=novel.id, build_id=build.build_id, committed_at=datetime.now(UTC),
     ))
     for index, chapter in enumerate(chapters):
         text = chapter.content
@@ -110,14 +128,14 @@ async def _seed_hierarchy(db_session):
             decision_lineage=[], order_index=index,
         ))
     await db_session.commit()
-    return owner, novel
+    return owner, novel, chapters
 
 
 @pytest.mark.asyncio
 async def test_first_entry_runs_durable_pipeline_and_repeat_entry_is_idempotent(
     db_session, auth_client, monkeypatch,
 ):
-    owner, novel = await _seed_hierarchy(db_session)
+    owner, novel, chapters = await _seed_hierarchy(db_session)
     transport = ProductionTransport()
     sessions = async_sessionmaker(db_session.bind, expire_on_commit=False)
     runtime = TimelineWorkerRuntime(
@@ -134,14 +152,16 @@ async def test_first_entry_runs_durable_pipeline_and_repeat_entry_is_idempotent(
     response = await auth_client.post(f"/api/timeline/{novel.id}/start-or-resume")
     assert response.status_code == 200
     run_id = response.json()["id"]
+    owner_id, novel_id = owner.id, novel.id
+    chapter_ids = [chapter.id for chapter in chapters]
 
     db_session.expire_all()
     run = await db_session.get(AnalysisRun, run_id)
     assert run.status == "completed"
     assert run.progress == {"completed_chapters": 2, "total_chapters": 2, "stage": "completed"}
     pointer = await db_session.scalar(select(TimelineActivePointer).where(
-        TimelineActivePointer.owner_id == owner.id,
-        TimelineActivePointer.novel_id == novel.id,
+        TimelineActivePointer.owner_id == owner_id,
+        TimelineActivePointer.novel_id == novel_id,
     ))
     assert pointer is not None and pointer.version_id == run.version_id
     events = list((await db_session.scalars(select(MachineTimelineEvent).where(
@@ -153,11 +173,43 @@ async def test_first_entry_runs_durable_pipeline_and_repeat_entry_is_idempotent(
         AnalysisChapterStage.run_id == run.id,
         AnalysisChapterStage.status == "completed",
     ))).all())
-    assert {stage.stage_key for stage in completed} >= {
-        f"chapter_extract:{chapter_id}" for chapter_id in [events[0].id, events[1].id]
-    } or len(completed) >= 4
+    assert {stage.stage_key for stage in completed} == {
+        f"chapter_extract:{chapter_id}" for chapter_id in chapter_ids
+    } | {"cross_chapter_reconcile:book"}
     assert transport.calls == ["TimelineExtraction", "TimelineExtraction", "ReconciliationOutputModel"]
 
-    again = await auth_client.post(f"/api/timeline/{novel.id}/start-or-resume")
+    again = await auth_client.post(f"/api/timeline/{novel_id}/start-or-resume")
     assert again.status_code == 200 and again.json()["id"] == run_id
     assert transport.calls == ["TimelineExtraction", "TimelineExtraction", "ReconciliationOutputModel"]
+
+
+@pytest.mark.asyncio
+async def test_resume_skips_completed_chapter_after_interruption(
+    db_session, auth_client, monkeypatch,
+):
+    _, novel, chapters = await _seed_hierarchy(db_session)
+    novel_id = novel.id
+    chapter_ids = [chapter.id for chapter in chapters]
+    transport = InterruptOnceTransport()
+    runtime = TimelineWorkerRuntime(
+        sessions=async_sessionmaker(db_session.bind, expire_on_commit=False),
+        gateway=TimelineModelGateway(transport),
+        extraction_deployment=_deployment("balanced-qualified"),
+        reconciliation_deployment=_deployment("quality-qualified"),
+    )
+
+    async def dispatch(run_id: int) -> None:
+        await run_timeline_worker(run_id, runtime=runtime)
+
+    monkeypatch.setattr(timeline_api, "dispatch_timeline_run", dispatch)
+    started = await auth_client.post(f"/api/timeline/{novel_id}/start-or-resume")
+    assert started.status_code == 200
+    run_id = started.json()["id"]
+    db_session.expire_all()
+    assert (await db_session.get(AnalysisRun, run_id)).status == "paused_dependency"
+
+    resumed = await auth_client.post(f"/api/timeline/{novel_id}/resume")
+    assert resumed.status_code == 200
+    db_session.expire_all()
+    assert (await db_session.get(AnalysisRun, run_id)).status == "completed"
+    assert transport.extraction_attempts == [chapter_ids[0], chapter_ids[1], chapter_ids[1]]

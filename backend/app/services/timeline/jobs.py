@@ -129,7 +129,7 @@ class PostgresTimelineJobStore:
         async with self.sessions.begin() as session:
             await session.execute(update(AnalysisRun).where(AnalysisRun.id == run_id).values(
                 status=status, cancel_requested=cancel_requested,
-                active_key=None if status in {"completed", "failed"} else "active"))
+                active_key=None if status == "failed" else "active"))
 
 
 class TimelineJobCoordinator:
