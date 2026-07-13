@@ -2,22 +2,26 @@
 
 from __future__ import annotations
 
+import asyncio
+import uuid
 from decimal import Decimal
 
 import pytest
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import async_sessionmaker
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.models.analysis import (
     AnalysisBudgetLedger,
     AnalysisBudgetReservation,
+    AnalysisChapterStage,
     AnalysisRun,
     ModelCallAttempt,
 )
 from app.models.novel import Novel
 from app.models.user import User
 from app.schemas.timeline import TimelineExtraction
-from app.services.timeline.budget import BudgetGate, BudgetPolicy, UnknownPricing
+from app.services.timeline.budget import BudgetExceeded, BudgetGate, BudgetPolicy, UnknownPricing
+from app.services.timeline.extraction import load_persistent_exact_cache
 from app.services.timeline.model_gateway import (
     DependencyPaused,
     ModelDeployment,
@@ -102,7 +106,17 @@ async def test_successful_call_reserves_settles_and_survives_repository_restart(
     assert ledger.reserved_calls == 0 and ledger.settled_calls == 1
     assert ledger.settled_input_tokens == 12 and ledger.settled_output_tokens == 4
 
+    db_session.add(AnalysisChapterStage(
+        run_id=run_id, stage_key="chapter_extract:1", status="completed",
+        artifact_checksum="a" * 64,
+        checkpoint={"gateway_output": {"events": [], "story_time_constraints": []}},
+    ))
+    await db_session.commit()
+
     restarted_repository = PostgresCallRepository(sessions)
+    cached = await load_persistent_exact_cache(sessions, "cache-key-1")
+    assert cached is not None and cached.source_attempt_id == attempt.id
+    assert cached.gateway_output == {"events": [], "story_time_constraints": []}
     skipped = await restarted_repository.record_cache_hit(
         run_id=run_id, stage_key="chapter_extract:cached", cache_key="cache-key-1",
         source_attempt_id=attempt.id, artifact_checksum="a" * 64,
@@ -129,6 +143,13 @@ async def test_unknown_price_and_missing_schema_capability_make_zero_provider_ca
             deployment=deployment(structured=False), schema=TimelineExtraction, messages=[],
             budget=BudgetGate(BudgetPolicy(3, 1000, 500, Decimal("1"))),
             run_id=run_id, stage_key="chapter_extract:no-schema",
+            max_input_tokens=100, max_output_tokens=50,
+        )
+    with pytest.raises(BudgetExceeded):
+        await gateway.generate(
+            deployment=deployment(), schema=TimelineExtraction, messages=[],
+            budget=BudgetGate(BudgetPolicy(3, 1000, 500, Decimal("1"))),
+            run_id=run_id, stage_key="chapter_extract:after-pause",
             max_input_tokens=100, max_output_tokens=50,
         )
     assert transport.calls == []
@@ -166,3 +187,41 @@ async def test_gateway_uses_strict_validation_and_one_persisted_repair(db_sessio
         ModelCallAttempt.run_id == run_id,
     ).order_by(ModelCallAttempt.attempt_number))).all())
     assert [attempt.status for attempt in attempts] == ["schema_rejected", "succeeded"]
+
+
+@pytest.mark.asyncio
+async def test_postgres_concurrent_reservations_allow_only_one_provider_call(
+    pg_async_url, require_postgres,
+):
+    engine = create_async_engine(pg_async_url)
+    sessions = async_sessionmaker(engine, expire_on_commit=False)
+    async with sessions() as setup:
+        run_id = await _run_with_ledger(setup, uuid.uuid4().hex, max_calls=1)
+    transports = [RecordingTransport(), RecordingTransport()]
+
+    async def call(index: int):
+        gateway = TimelineModelGateway(
+            transports[index], persistence=PostgresCallRepository(sessions),
+        )
+        return await gateway.generate(
+            deployment=deployment(), schema=TimelineExtraction, messages=[],
+            budget=BudgetGate(BudgetPolicy(1, 1000, 500, Decimal("1"))),
+            run_id=run_id, stage_key=f"chapter_extract:{index}",
+            max_input_tokens=100, max_output_tokens=50,
+        )
+
+    results = await asyncio.gather(call(0), call(1), return_exceptions=True)
+    assert sum(not isinstance(result, Exception) for result in results) == 1
+    assert sum(len(transport.calls) for transport in transports) == 1
+    async with sessions() as session:
+        statuses = list((await session.scalars(select(ModelCallAttempt.status).where(
+            ModelCallAttempt.run_id == run_id,
+        ).order_by(ModelCallAttempt.id))).all())
+        ledger = await session.scalar(select(AnalysisBudgetLedger).where(
+            AnalysisBudgetLedger.run_id == run_id,
+        ))
+        assert sorted(statuses) == ["budget_rejected", "succeeded"], [
+            repr(result) for result in results
+        ]
+        assert ledger.settled_calls == 1 and ledger.reserved_calls == 0
+    await engine.dispose()

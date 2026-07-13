@@ -11,7 +11,6 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -32,45 +31,22 @@ from app.models.timeline import (
     TimelineParticipant,
 )
 from app.schemas.timeline import EventCandidate, EvidenceRef, Participant, StoryTime, TimelineExtraction
-from app.services.timeline.budget import BudgetGate, BudgetPolicy
+from app.services.timeline.budget import BudgetExceeded, BudgetGate, BudgetPolicy
 from app.services.timeline.evidence import EvidencePackage, EvidenceUnit, validate_extraction
+from app.services.timeline.extraction import ExactCacheKey, load_persistent_exact_cache
 from app.services.timeline.model_gateway import (
     DependencyPaused,
     ModelCallFailed,
     ModelDeployment,
+    PostgresCallRepository,
     TimelineModelGateway,
 )
 from app.services.timeline.promotion import promote_version, snapshot_manifest
-from app.services.timeline.reconcile import CausalProposal, ReconcileInput, TimelineReconciler
+from app.services.timeline.reconcile import ReconciliationOutputModel, TimelineReconciler
 
 
 class TimelineWorkerError(RuntimeError):
     """A deterministic production pipeline precondition failed."""
-
-
-class ReconciliationCausalProposalModel(BaseModel):
-    model_config = ConfigDict(extra="forbid", strict=True)
-
-    source_id: str = Field(min_length=1, max_length=160)
-    target_id: str = Field(min_length=1, max_length=160)
-    edge_type: str
-    evidence_ids: list[str] = Field(min_length=1)
-    confidence: float = Field(ge=0, le=1)
-
-
-class ReconciliationOutputModel(BaseModel):
-    model_config = ConfigDict(extra="forbid", strict=True)
-
-    duplicate_groups: list[list[str]] = Field(default_factory=list)
-    story_constraints: list[tuple[str, str, str]] = Field(default_factory=list)
-    causal_edges: list[ReconciliationCausalProposalModel] = Field(default_factory=list)
-
-    def as_input(self) -> ReconcileInput:
-        return ReconcileInput(
-            duplicate_groups=self.duplicate_groups,
-            story_constraints=self.story_constraints,
-            causal_edges=[CausalProposal(**item.model_dump()) for item in self.causal_edges],
-        )
 
 
 @dataclass(frozen=True)
@@ -112,7 +88,9 @@ def production_runtime() -> TimelineWorkerRuntime:
     reconciliation_model = "gpt-4o-2024-08-06"
     return TimelineWorkerRuntime(
         sessions=async_session_factory,
-        gateway=TimelineModelGateway(_LiteLLMTransport()),
+        gateway=TimelineModelGateway(
+            _LiteLLMTransport(), persistence=PostgresCallRepository(async_session_factory),
+        ),
         extraction_deployment=ModelDeployment(
             "openai", extraction_model, extraction_model,
             bool(litellm.supports_response_schema(extraction_model, custom_llm_provider="openai")),
@@ -154,6 +132,9 @@ async def run_timeline_worker(run_id: int, *, runtime: TimelineWorkerRuntime) ->
         return
     except ModelCallFailed as exc:
         await _finish_run(runtime.sessions, run_id, "paused_dependency", str(exc))
+        return
+    except BudgetExceeded as exc:
+        await _finish_run(runtime.sessions, run_id, "paused_budget", str(exc))
         return
     except Exception as exc:
         await _finish_run(runtime.sessions, run_id, "failed", type(exc).__name__)
@@ -282,29 +263,54 @@ async def _extract_and_persist(runtime, budget, run, version, build, chapter) ->
             node.node_id, node.source_start, node.source_end, node.content, node.content_hash,
         ) for node in nodes],
     )
-    result = await runtime.gateway.generate(
-        deployment=runtime.extraction_deployment,
-        schema=TimelineExtraction,
-        messages=[
-            {"role": "system", "content": runtime.extraction_prompt},
-            {"role": "user", "content": json.dumps({
-                "scope": {"owner_id": run.owner_id, "novel_id": run.novel_id,
-                          "chapter_id": chapter.id, "unit_id": package.unit_id},
-                "lineage": {"source_snapshot_hash": package.source_snapshot_hash,
-                            "hierarchy_build_id": package.hierarchy_build_id,
-                            "hierarchy_checksum": package.hierarchy_checksum,
-                            "evidence_package_hash": package.package_hash},
-                "evidence": [unit.__dict__ for unit in package.units],
-            }, sort_keys=True)},
-        ],
-        budget=budget,
-        run_id=run.id,
-        stage_key=stage_key,
-        max_input_tokens=max(256, sum(len(unit.text) for unit in package.units) * 2),
-        max_output_tokens=1800,
-        business_validator=lambda output: validate_extraction(package, output),
+    cache_key = ExactCacheKey.for_package(
+        package,
+        stage="chapter_extract",
+        prompt_hash=version.prompt_hash,
+        schema_hash=version.schema_hash,
+        model_provider=runtime.extraction_deployment.provider,
+        model_id=runtime.extraction_deployment.model_id,
+        model_revision=runtime.extraction_deployment.revision,
+        decoding_hash=version.decoding_hash,
+        config_hash=version.config_hash,
     )
-    await _persist_chapter(runtime.sessions, run, version, chapter, stage_key, result.output)
+    output = None
+    if runtime.gateway.persistence is not None:
+        cached = await load_persistent_exact_cache(runtime.sessions, cache_key.digest)
+        if cached is not None:
+            output = TimelineExtraction.model_validate(cached.gateway_output, strict=True)
+            validate_extraction(package, output)
+            await runtime.gateway.persistence.record_cache_hit(
+                run_id=run.id, stage_key=stage_key, cache_key=cache_key.digest,
+                source_attempt_id=cached.source_attempt_id,
+                artifact_checksum=cached.artifact_checksum,
+            )
+    if output is None:
+        result = await runtime.gateway.generate(
+            deployment=runtime.extraction_deployment,
+            schema=TimelineExtraction,
+            messages=[
+                {"role": "system", "content": runtime.extraction_prompt},
+                {"role": "user", "content": json.dumps({
+                    "scope": {"owner_id": run.owner_id, "novel_id": run.novel_id,
+                              "chapter_id": chapter.id, "unit_id": package.unit_id},
+                    "lineage": {"source_snapshot_hash": package.source_snapshot_hash,
+                                "hierarchy_build_id": package.hierarchy_build_id,
+                                "hierarchy_checksum": package.hierarchy_checksum,
+                                "evidence_package_hash": package.package_hash},
+                    "evidence": [unit.__dict__ for unit in package.units],
+                }, sort_keys=True)},
+            ],
+            budget=budget,
+            run_id=run.id,
+            stage_key=stage_key,
+            cache_key=cache_key.digest,
+            max_input_tokens=max(256, sum(len(unit.text) for unit in package.units) * 2),
+            max_output_tokens=1800,
+            business_validator=lambda candidate: validate_extraction(package, candidate),
+        )
+        output = result.output
+    await _persist_chapter(runtime.sessions, run, version, chapter, stage_key, output)
 
 
 async def _persist_chapter(sessions, run, version, chapter, stage_key, extraction) -> None:
@@ -360,7 +366,7 @@ async def _persist_chapter(sessions, run, version, chapter, stage_key, extractio
                     content_hash=ref.content_hash,
                 ) for ref in candidate.evidence
             ])
-        checkpoint = {"artifact": json.loads(artifact), "artifact_checksum": checksum}
+        checkpoint = {"gateway_output": json.loads(artifact), "artifact_checksum": checksum}
         if existing is None:
             session.add(AnalysisChapterStage(
                 run_id=run.id, chapter_id=chapter.id, stage_key=stage_key,
@@ -431,20 +437,43 @@ async def _reconcile_and_persist(runtime, budget, run, version) -> None:
         "participants": [item.model_dump() for item in event.participants],
         "evidence_ids": [item.evidence_id for item in event.evidence],
     } for event in candidates]
-    gateway_result = await runtime.gateway.generate(
-        deployment=runtime.reconciliation_deployment,
-        schema=ReconciliationOutputModel,
-        messages=[
-            {"role": "system", "content": "Reconcile only the supplied event IDs using evidence-backed constraints."},
-            {"role": "user", "content": json.dumps(payload, sort_keys=True)},
-        ],
-        budget=budget,
-        run_id=run.id,
-        stage_key=stage_key,
-        max_input_tokens=max(512, sum(len(event.description) for event in candidates) * 2),
-        max_output_tokens=4000,
-    )
-    reconciled = TimelineReconciler._materialize(candidates, gateway_result.output.as_input())
+    cache_key = hashlib.sha256(json.dumps({
+        "stage": "cross_chapter_reconcile",
+        "source_snapshot_hash": version.source_snapshot_hash,
+        "hierarchy_build_id": version.hierarchy_build_id,
+        "hierarchy_checksum": version.hierarchy_checksum,
+        "events": payload,
+        "model": runtime.reconciliation_deployment.lineage,
+        "decoding_hash": version.decoding_hash,
+        "config_hash": version.config_hash,
+    }, sort_keys=True, default=str).encode()).hexdigest()
+    gateway_output = None
+    if runtime.gateway.persistence is not None:
+        cached = await load_persistent_exact_cache(runtime.sessions, cache_key)
+        if cached is not None:
+            gateway_output = ReconciliationOutputModel.model_validate(cached.gateway_output, strict=True)
+            await runtime.gateway.persistence.record_cache_hit(
+                run_id=run.id, stage_key=stage_key, cache_key=cache_key,
+                source_attempt_id=cached.source_attempt_id,
+                artifact_checksum=cached.artifact_checksum,
+            )
+    if gateway_output is None:
+        gateway_result = await runtime.gateway.generate(
+            deployment=runtime.reconciliation_deployment,
+            schema=ReconciliationOutputModel,
+            messages=[
+                {"role": "system", "content": "Reconcile only the supplied event IDs using evidence-backed constraints."},
+                {"role": "user", "content": json.dumps(payload, sort_keys=True)},
+            ],
+            budget=budget,
+            run_id=run.id,
+            stage_key=stage_key,
+            cache_key=cache_key,
+            max_input_tokens=max(512, sum(len(event.description) for event in candidates) * 2),
+            max_output_tokens=4000,
+        )
+        gateway_output = gateway_result.output
+    reconciled = TimelineReconciler._materialize(candidates, gateway_output.as_input())
     artifact = json.dumps({
         "events": [item.__dict__ for item in reconciled.events],
         "edges": [item.__dict__ for item in reconciled.edges],
@@ -475,7 +504,11 @@ async def _reconcile_and_persist(runtime, budget, run, version) -> None:
                 ))
         session.add(AnalysisChapterStage(
             run_id=run.id, stage_key=stage_key, status="completed",
-            artifact_checksum=checksum, checkpoint={"artifact": json.loads(artifact)},
+            artifact_checksum=checksum,
+            checkpoint={
+                "gateway_output": gateway_output.model_dump(mode="json"),
+                "artifact": json.loads(artifact),
+            },
         ))
         row = await session.get(AnalysisRun, run.id)
         row.progress = {**(row.progress or {}), "stage": "reconciling"}

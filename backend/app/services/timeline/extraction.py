@@ -6,6 +6,10 @@ import hashlib
 import json
 from dataclasses import dataclass
 
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+from app.models.analysis import AnalysisChapterStage, ModelCallAttempt
 from app.schemas.timeline import EventCandidate, TimelineExtraction
 from app.services.timeline.budget import BudgetGate
 from app.services.timeline.evidence import EvidencePackage, validate_extraction
@@ -85,6 +89,35 @@ class ExtractionResult:
     artifact_checksum: str
     source_attempt_id: int
     cache_hit: bool
+
+
+@dataclass(frozen=True)
+class PersistentCacheHit:
+    gateway_output: dict
+    artifact_checksum: str
+    source_attempt_id: int
+
+
+async def load_persistent_exact_cache(
+    sessions: async_sessionmaker[AsyncSession], cache_key: str,
+) -> PersistentCacheHit | None:
+    """Recover a complete validated artifact from PostgreSQL after process restart."""
+    async with sessions() as session:
+        attempts = list((await session.scalars(select(ModelCallAttempt).where(
+            ModelCallAttempt.cache_key == cache_key,
+            ModelCallAttempt.status == "succeeded",
+        ).order_by(ModelCallAttempt.id.desc()))).all())
+        for attempt in attempts:
+            stage = await session.scalar(select(AnalysisChapterStage).where(
+                AnalysisChapterStage.run_id == attempt.run_id,
+                AnalysisChapterStage.stage_key == attempt.stage_key,
+                AnalysisChapterStage.status == "completed",
+            ))
+            checkpoint = dict(stage.checkpoint or {}) if stage is not None else {}
+            output = checkpoint.get("gateway_output")
+            if isinstance(output, dict) and stage.artifact_checksum:
+                return PersistentCacheHit(output, stage.artifact_checksum, attempt.id)
+    return None
 
 
 class InMemoryExtractionStore:

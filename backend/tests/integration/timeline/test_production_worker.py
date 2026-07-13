@@ -11,7 +11,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from app.api import timeline as timeline_api
-from app.models.analysis import AnalysisChapterStage, AnalysisRun
+from app.models.analysis import AnalysisChapterStage, AnalysisRun, ModelCallAttempt
 from app.models.chunk_build import ChunkActivePointer, ChunkBuild, ChunkHierarchyNode
 from app.models.novel import Chapter, Novel
 from app.models.timeline import (
@@ -20,7 +20,11 @@ from app.models.timeline import (
     TimelineEvidenceRef,
 )
 from app.models.user import User
-from app.services.timeline.model_gateway import ModelDeployment, TimelineModelGateway
+from app.services.timeline.model_gateway import (
+    ModelDeployment,
+    PostgresCallRepository,
+    TimelineModelGateway,
+)
 from app.services.timeline.worker import TimelineWorkerRuntime, run_timeline_worker
 
 pytestmark = pytest.mark.integration
@@ -140,7 +144,7 @@ async def test_first_entry_runs_durable_pipeline_and_repeat_entry_is_idempotent(
     sessions = async_sessionmaker(db_session.bind, expire_on_commit=False)
     runtime = TimelineWorkerRuntime(
         sessions=sessions,
-        gateway=TimelineModelGateway(transport),
+        gateway=TimelineModelGateway(transport, persistence=PostgresCallRepository(sessions)),
         extraction_deployment=_deployment("balanced-qualified"),
         reconciliation_deployment=_deployment("quality-qualified"),
     )
@@ -177,6 +181,13 @@ async def test_first_entry_runs_durable_pipeline_and_repeat_entry_is_idempotent(
         f"chapter_extract:{chapter_id}" for chapter_id in chapter_ids
     } | {"cross_chapter_reconcile:book"}
     assert transport.calls == ["TimelineExtraction", "TimelineExtraction", "ReconciliationOutputModel"]
+    attempts = list((await db_session.scalars(select(ModelCallAttempt).where(
+        ModelCallAttempt.run_id == run.id,
+    ).order_by(ModelCallAttempt.id))).all())
+    assert [attempt.status for attempt in attempts] == ["succeeded", "succeeded", "succeeded"]
+    assert [attempt.stage_key for attempt in attempts] == [
+        f"chapter_extract:{chapter_id}" for chapter_id in chapter_ids
+    ] + ["cross_chapter_reconcile:book"]
 
     again = await auth_client.post(f"/api/timeline/{novel_id}/start-or-resume")
     assert again.status_code == 200 and again.json()["id"] == run_id
@@ -193,7 +204,12 @@ async def test_resume_skips_completed_chapter_after_interruption(
     transport = InterruptOnceTransport()
     runtime = TimelineWorkerRuntime(
         sessions=async_sessionmaker(db_session.bind, expire_on_commit=False),
-        gateway=TimelineModelGateway(transport),
+        gateway=TimelineModelGateway(
+            transport,
+            persistence=PostgresCallRepository(
+                async_sessionmaker(db_session.bind, expire_on_commit=False),
+            ),
+        ),
         extraction_deployment=_deployment("balanced-qualified"),
         reconciliation_deployment=_deployment("quality-qualified"),
     )

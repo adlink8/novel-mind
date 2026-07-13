@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import json
 from typing import Awaitable, Callable, Literal
+
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.timeline import EventCandidate
 from app.services.timeline.budget import BudgetExceeded, BudgetGate
-from app.services.timeline.model_gateway import ModelDeployment
+from app.services.timeline.model_gateway import ModelDeployment, TimelineModelGateway
 
 EdgeType = Literal["causes", "triggers", "responds_to", "blocks"]
 
@@ -26,6 +29,33 @@ class ReconcileInput:
     duplicate_groups: list[list[str]] = field(default_factory=list)
     story_constraints: list[tuple[str, str, str]] = field(default_factory=list)
     causal_edges: list[CausalProposal] = field(default_factory=list)
+
+
+class ReconciliationCausalProposalModel(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    source_id: str = Field(min_length=1, max_length=160)
+    target_id: str = Field(min_length=1, max_length=160)
+    edge_type: EdgeType
+    evidence_ids: list[str] = Field(min_length=1)
+    confidence: float = Field(ge=0, le=1)
+
+
+class ReconciliationOutputModel(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    duplicate_groups: list[list[str]] = Field(default_factory=list)
+    story_constraints: list[tuple[str, str, Literal["before", "after", "simultaneous"]]] = Field(
+        default_factory=list,
+    )
+    causal_edges: list[ReconciliationCausalProposalModel] = Field(default_factory=list)
+
+    def as_input(self) -> ReconcileInput:
+        return ReconcileInput(
+            duplicate_groups=self.duplicate_groups,
+            story_constraints=[tuple(item) for item in self.story_constraints],
+            causal_edges=[CausalProposal(**item.model_dump()) for item in self.causal_edges],
+        )
 
 
 @dataclass(frozen=True)
@@ -61,35 +91,63 @@ Transport = Callable[[dict], Awaitable[ReconcileInput]]
 class TimelineReconciler:
     """The script reserves budget, validates proposals, and owns graph ordering."""
 
-    def __init__(self, *, transport: Transport, deployment: ModelDeployment,
-                 budget: BudgetGate) -> None:
-        self.transport = transport
+    def __init__(self, *, deployment: ModelDeployment, budget: BudgetGate,
+                 gateway: TimelineModelGateway | None = None,
+                 transport: Transport | None = None) -> None:
+        if gateway is None and transport is None:
+            raise ValueError("reconciliation requires the strict gateway")
+        self.gateway = gateway
+        # Kept only for deterministic unit adapters; production worker always supplies gateway.
+        self._test_transport = transport
         self.deployment = deployment
         self.budget = budget
         self.run_status = "running"
 
-    async def reconcile(self, *, run_id: int, events: list[EventCandidate]) -> ReconcileResult:
+    async def reconcile(self, *, run_id: int, events: list[EventCandidate],
+                        cache_key: str | None = None) -> ReconcileResult:
         if "quality" not in self.deployment.model_id.lower():
             raise ValueError("reconciliation requires an explicitly qualified quality deployment")
-        reservation_key = f"reconcile:{run_id}:attempt:1"
-        try:
-            reservation = self.budget.reserve(
-                reservation_key,
-                input_tokens=max(512, sum(len(e.description) for e in events) * 2),
-                output_tokens=2048,
-                input_price_per_million=self.deployment.input_price_per_million,
-                output_price_per_million=self.deployment.output_price_per_million,
-            )
-        except BudgetExceeded:
-            self.run_status = "paused_budget"
-            raise
-
-        proposal = await self.transport({
-            "run_id": run_id,
-            "deployment": self.deployment.lineage,
-            "reservation_status": reservation.status,
-            "events": events,
-        })
+        if self.gateway is not None:
+            try:
+                gateway_result = await self.gateway.generate(
+                    deployment=self.deployment,
+                    schema=ReconciliationOutputModel,
+                    messages=[
+                        {"role": "system", "content": "Reconcile only supplied event IDs and evidence."},
+                        {"role": "user", "content": json.dumps([
+                            event.model_dump(mode="json") for event in events
+                        ], sort_keys=True)},
+                    ],
+                    budget=self.budget,
+                    run_id=run_id,
+                    stage_key="cross_chapter_reconcile:book",
+                    cache_key=cache_key,
+                    max_input_tokens=max(512, sum(len(e.description) for e in events) * 2),
+                    max_output_tokens=4000,
+                )
+            except BudgetExceeded:
+                self.run_status = "paused_budget"
+                raise
+            proposal = gateway_result.output.as_input()
+        else:
+            reservation_key = f"reconcile:{run_id}:attempt:1"
+            try:
+                reservation = self.budget.reserve(
+                    reservation_key,
+                    input_tokens=max(512, sum(len(e.description) for e in events) * 2),
+                    output_tokens=2048,
+                    input_price_per_million=self.deployment.input_price_per_million,
+                    output_price_per_million=self.deployment.output_price_per_million,
+                )
+            except BudgetExceeded:
+                self.run_status = "paused_budget"
+                raise
+            proposal = await self._test_transport({
+                "run_id": run_id,
+                "deployment": self.deployment.lineage,
+                "reservation_status": reservation.status,
+                "events": events,
+            })
         return self._materialize(events, proposal)
 
     @staticmethod
