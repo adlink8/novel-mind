@@ -129,12 +129,12 @@ Plans:
 **Requirements**: REQ-TIME-01..10
 **Depends on:** Phase 7
 **Status:** PLANNED
-**Plans:** 3/6 plans executed
+**Plans:** 4/6 plans executed
 
 Plans:
 - [x] 08-01 durable analysis jobs and immutable version foundation
 - [x] 08-02 strict timeline schema and evidence-bound chapter extraction
 - [x] 08-03 cross-chapter reconciliation, overrides, budget, and promotion
-- [ ] 08-04 progressive owner-scoped API and spoiler boundary
+- [x] 08-04 progressive owner-scoped API and spoiler boundary
 - [ ] 08-05 global analysis workspace and interactive ECharts timeline
 - [ ] 08-06 frozen qualification, end-to-end verification, and release gate

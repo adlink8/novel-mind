@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v0.6
 milestone_name: Versioned Novel Analysis and Timeline
 status: planned
-last_updated: "2026-07-13T03:43:23.425Z"
+last_updated: "2026-07-13T03:57:17.947Z"
 progress:
   total_phases: 7
   completed_phases: 4
   total_plans: 30
-  completed_plans: 31
+  completed_plans: 32
   percent: 57
 ---
 
@@ -24,21 +24,22 @@ See `.planning/PROJECT.md` and `IMPLEMENTATION-STATUS.md`.
 ## Current Position
 
 Phase: 08 (Versioned novel analysis orchestration and interactive timeline) — EXECUTING
-Plan: 4 of 6
-**Phase 08 EXECUTING** (03/06) - ready to execute 08-04
+Plan: 5 of 6
+**Phase 08 EXECUTING** (04/06) - ready to execute 08-05
 
 - Branch: `feat/phase2-wave2-embedding`
-- Last activity: 2026-07-13 — 08-03 reconciliation, override relink, and PostgreSQL CAS promotion/rollback completed (9 tests passed)
+- Last activity: 2026-07-13 — 08-04 owner-scoped progressive API and visible-set-first spoiler boundary completed (backend 5 passed; frontend contract 12 passed)
 - Plan directory: `.planning/phases/08-versioned-novel-analysis-orchestration-and-interactive-timel/`
 
 ## Auto Routing
 
-下一动作为执行 Phase 08 Plan 04。`auto_start` 保持关闭，必须显式启动执行。
+下一动作为执行 Phase 08 Plan 05。`auto_start` 保持关闭，必须显式启动执行。
 
 ## Phase 08 Execution Metrics
 
 - 08-02: 18min, 3 tasks, 11 files, 23 targeted tests passed.
 - 08-03: 9min, 3 tasks, 7 files, 9 targeted tests passed including real PostgreSQL lifecycle coverage.
+- 08-04: 11min, 3 tasks, 7 files, backend 5 tests and frontend 12 contract tests passed.
 
 ## Phase 08 Decisions
 
@@ -47,6 +48,8 @@ Plan: 4 of 6
 - Only evidence-valid complete output is cached and provisionally published.
 - Contradictory chronology remains explicitly unranked instead of receiving fabricated story order.
 - Promotion and rollback require recomputed graph manifests and row-locked expected-revision CAS.
+- Missing reading progress exposes only the first chapter; full-book access requires an explicit persisted per-novel preference.
+- Active and running candidate responses keep independent progress, events, counts, aggregates, previews, and edges.
 
 ## Phase 06 (v0.5) — COMPLETE
 
@@ -104,5 +107,5 @@ CLI：`backend/scripts/run_chunker_qualification.py`
 
 ## Next Action
 
-1. 执行 Phase 08 Plan 04：progressive owner-scoped API and spoiler boundary。  
+1. 执行 Phase 08 Plan 05：global analysis workspace and interactive timeline。  
 2. 保留本地 BGE / 阅读器 UX 等非 Phase 08 WIP，不纳入当前计划提交。  
