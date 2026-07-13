@@ -441,6 +441,7 @@ jobs:
             tests/integration/test_postgres_semantics.py \
             tests/integration/test_chroma_contract.py \
             tests/integration/test_chroma_recovery.py \
+            tests/integration/timeline/test_real_qualification.py \
             --junitxml=artifacts/integration-junit.xml \
             --timeout=30
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -13,13 +14,19 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from app.models.analysis import AnalysisRun
+from app.models.analysis import AnalysisRun, AnalysisVersion
 from app.models.chunk_build import ChunkActivePointer, ChunkBuild, ChunkHierarchyNode
 from app.models.novel import Chapter, Novel
 from app.models.user import User
 from app.services.timeline.model_gateway import ModelDeployment, PostgresCallRepository, TimelineModelGateway
 from app.services.timeline.worker import TimelineWorkerRuntime
-from scripts.run_timeline_qualification import render_markdown, run_production_qualification
+from scripts.run_timeline_qualification import (
+    REQUIRED_TEST_COMMANDS,
+    CommandSpec,
+    render_markdown,
+    run_production_qualification,
+    run_release_verification,
+)
 
 pytestmark = pytest.mark.integration
 
@@ -67,6 +74,55 @@ class QualificationTransport:
 
 def _deployment(model_id: str) -> ModelDeployment:
     return ModelDeployment("controlled", model_id, "r1", True, Decimal("1"), Decimal("2"))
+
+
+def _executed_command_specs(tmp_path: Path, *, failing_index: int | None = None):
+    return tuple(
+        CommandSpec(
+            display=display,
+            cwd=tmp_path,
+            argv=(
+                sys.executable,
+                "-c",
+                (
+                    f"import sys; sys.stdout.write('release-check-{index}'); "
+                    f"raise SystemExit({9 if index == failing_index else 0})"
+                ),
+            ),
+        )
+        for index, display in enumerate(REQUIRED_TEST_COMMANDS)
+    )
+
+
+async def _qualified_report(pg_async_url):
+    engine = create_async_engine(pg_async_url)
+    sessions = async_sessionmaker(engine, expire_on_commit=False)
+    async with sessions() as session:
+        owner, _, chapters, run = await _seed_run(session)
+    transport = QualificationTransport()
+    runtime = TimelineWorkerRuntime(
+        sessions=sessions,
+        gateway=TimelineModelGateway(transport, persistence=PostgresCallRepository(sessions)),
+        extraction_deployment=_deployment("balanced-release"),
+        reconciliation_deployment=_deployment("quality-release"),
+    )
+    expected_ids = [f"event-{chapter.id}" for chapter in chapters]
+    report = await run_production_qualification(
+        run.id,
+        runtime=runtime,
+        sessions=sessions,
+        expected_event_ids=expected_ids,
+        expected_story_order=expected_ids,
+    )
+    assert report["status"] == "qualified", report
+    return engine, sessions, owner.id, report
+
+
+async def _delete_qualification_owner(sessions, owner_id: int) -> None:
+    async with sessions.begin() as session:
+        persisted_owner = await session.get(User, owner_id)
+        if persisted_owner is not None:
+            await session.delete(persisted_owner)
 
 
 async def _seed_run(session):
@@ -181,4 +237,87 @@ async def test_qualification_cannot_pass_from_missing_expected_production_output
     async with sessions.begin() as session:
         persisted_owner = await session.get(User, owner.id)
         await session.delete(persisted_owner)
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_release_entry_qualifies_with_fresh_postgres_observation_and_executed_commands(
+    pg_async_url, require_postgres, tmp_path,
+):
+    engine, sessions, owner_id, report = await _qualified_report(pg_async_url)
+    report_path = tmp_path / "qualification.json"
+    report_path.write_text(json.dumps(report), encoding="utf-8")
+    observer_engine = create_async_engine(pg_async_url)
+    observer_sessions = async_sessionmaker(observer_engine, expire_on_commit=False)
+
+    verdict = await run_release_verification(
+        Path(__file__).resolve().parents[4],
+        report_path,
+        sessions=observer_sessions,
+        command_specs=_executed_command_specs(tmp_path),
+    )
+
+    assert verdict["status"] == "qualified", verdict
+    assert verdict["quality_comparable"] is True
+    assert all(item["exit_code"] == 0 for item in verdict["command_results"])
+    assert all(len(item["output_sha256"]) == 64 for item in verdict["command_results"])
+    assert len({item["output_sha256"] for item in verdict["command_results"]}) == len(REQUIRED_TEST_COMMANDS)
+    await _delete_qualification_owner(sessions, owner_id)
+    await observer_engine.dispose()
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_release_entry_blocks_a_real_failed_command(
+    pg_async_url, require_postgres, tmp_path,
+):
+    engine, sessions, owner_id, report = await _qualified_report(pg_async_url)
+    report_path = tmp_path / "qualification.json"
+    report_path.write_text(json.dumps(report), encoding="utf-8")
+    observer_engine = create_async_engine(pg_async_url)
+    observer_sessions = async_sessionmaker(observer_engine, expire_on_commit=False)
+
+    verdict = await run_release_verification(
+        Path(__file__).resolve().parents[4],
+        report_path,
+        sessions=observer_sessions,
+        command_specs=_executed_command_specs(tmp_path, failing_index=2),
+    )
+
+    assert verdict["status"] == "blocked_release", verdict
+    assert verdict["quality_comparable"] is False
+    assert verdict["checks"]["database_authority"] is True
+    assert verdict["checks"]["command_output_attestation"] is False
+    assert verdict["command_results"][2]["exit_code"] == 9
+    await _delete_qualification_owner(sessions, owner_id)
+    await observer_engine.dispose()
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_release_entry_blocks_postgres_report_authority_mismatch(
+    pg_async_url, require_postgres, tmp_path,
+):
+    engine, sessions, owner_id, report = await _qualified_report(pg_async_url)
+    report_path = tmp_path / "qualification.json"
+    report_path.write_text(json.dumps(report), encoding="utf-8")
+    async with sessions.begin() as session:
+        version = await session.get(AnalysisVersion, report["artifact"]["run"]["version_id"])
+        version.manifest_checksum = "0" * 64
+    observer_engine = create_async_engine(pg_async_url)
+    observer_sessions = async_sessionmaker(observer_engine, expire_on_commit=False)
+
+    verdict = await run_release_verification(
+        Path(__file__).resolve().parents[4],
+        report_path,
+        sessions=observer_sessions,
+        command_specs=_executed_command_specs(tmp_path),
+    )
+
+    assert verdict["status"] == "blocked_release", verdict
+    assert verdict["quality_comparable"] is False
+    assert verdict["checks"]["database_authority"] is False
+    assert verdict["checks"]["command_output_attestation"] is True
+    await _delete_qualification_owner(sessions, owner_id)
+    await observer_engine.dispose()
     await engine.dispose()
