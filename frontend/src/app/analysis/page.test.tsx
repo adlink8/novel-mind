@@ -52,7 +52,7 @@ describe("global analysis timeline workspace", () => {
     render(<AnalysisPage />);
     fireEvent.change(await screen.findByLabelText("选择小说"), { target: { value: "11" } });
     await waitFor(() => expect(mocks.startOrResume).toHaveBeenCalledWith("11"));
-    expect(await screen.findByText("当前版本")).toBeInTheDocument();
+    expect(await screen.findByRole("tab", { name: /当前版本/ })).toBeInTheDocument();
     expect(screen.getByText("旧版事件")).toBeInTheDocument();
     expect(screen.queryByText("候选事件")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("tab", { name: /正在生成/ }));
