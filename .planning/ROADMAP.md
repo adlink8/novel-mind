@@ -42,11 +42,11 @@
 | Phase 5 叙事知识单元层 | 5/5 | Complete |
 | v0.5 / Phase 6 自动质量与 CI 门禁 | 9/9 | **Complete** (REQ-AUTO-11 closed) |
 | Phase 7 语义/层级分块 | 6/6 | **Complete** (logic+tests+PG/indexing wiring) |
-| Phase 8 版本化小说分析与时间线 | 6/6 | **Implemented** (independent verification pending) |
+| Phase 8 版本化小说分析与时间线 | 7/8 | **In Progress** (08-07 complete; 08-08 pending) |
 
 ## Auto Start
 
-Phase 06 与 Phase 07 均已完成。当前无自动执行 plan。auto-start 保持关闭。  
+Phase 06 与 Phase 07 均已完成。Phase 08 的 08-07 已完成，08-08 待单独执行。auto-start 保持关闭。
 验证：`.planning/phases/06-automated-quality-ci/` SUMMARYs；`.planning/phases/07-semantic-hierarchical-chunking/07-VERIFICATION.md`。
 
 ## Backlog
@@ -129,8 +129,8 @@ Plans:
 **Goal:** 以持久、版本化、证据约束的后台分析任务生成小说时间事件，并在全局分析工作台渐进展示防剧透的双顺序横向时间线。
 **Requirements**: REQ-TIME-01..10
 **Depends on:** Phase 7
-**Status:** IMPLEMENTED — READY FOR INDEPENDENT VERIFICATION
-**Plans:** 6/6 plans complete
+**Status:** GAP CLOSURE IN PROGRESS — 08-07 COMPLETE, 08-08 PENDING
+**Plans:** 7/8 plans executed
 
 Plans:
 - [x] 08-01 durable analysis jobs and immutable version foundation
@@ -139,3 +139,5 @@ Plans:
 - [x] 08-04 progressive owner-scoped API and spoiler boundary
 - [x] 08-05 global analysis workspace and interactive ECharts timeline
 - [x] 08-06 frozen qualification, end-to-end verification, and release gate
+- [x] 08-07 production worker orchestration and PostgreSQL call boundaries
+- [ ] 08-08 real ordering/source isolation and production qualification

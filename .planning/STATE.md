@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v0.6
 milestone_name: Versioned Novel Analysis and Timeline
-status: ready_for_verification
-last_updated: "2026-07-13T04:26:50.590Z"
+status: in_progress
+last_updated: "2026-07-13T05:16:30.733Z"
 progress:
   total_phases: 7
-  completed_phases: 5
-  total_plans: 30
-  completed_plans: 34
-  percent: 71
+  completed_phases: 4
+  total_plans: 32
+  completed_plans: 35
+  percent: 57
 ---
 
 # Project State
@@ -23,17 +23,17 @@ See `.planning/PROJECT.md` and `IMPLEMENTATION-STATUS.md`.
 
 ## Current Position
 
-Phase: 08 (Versioned novel analysis orchestration and interactive timeline) — IMPLEMENTED
-Plan: 6 of 6
-**Phase 08 IMPLEMENTED** (06/06) - ready for independent verification
+Phase: 08 (Versioned novel analysis orchestration and interactive timeline) — GAP CLOSURE IN PROGRESS
+Plan: 7 of 8
+**Phase 08 gap plan 08-07 COMPLETE** — 08-08 remains pending and was not executed
 
 - Branch: `feat/phase2-wave2-embedding`
-- Last activity: 2026-07-13 — 08-06 frozen qualification and release gate completed (backend 56, live 7, CI 5, frontend 66, build passed)
+- Last activity: 2026-07-13 — 08-07 production worker orchestration and PostgreSQL model-call boundaries completed (63 timeline tests passed)
 - Plan directory: `.planning/phases/08-versioned-novel-analysis-orchestration-and-interactive-timel/`
 
 ## Auto Routing
 
-下一动作为独立验证 Phase 08；`08-VERIFICATION.md` 仅由 verifier 创建。`auto_start` 保持关闭。
+下一动作为 08-08 gap plan；本次执行明确停止于 08-07，不自动启动 08-08。`auto_start` 保持关闭。
 
 ## Phase 08 Execution Metrics
 
@@ -42,6 +42,7 @@ Plan: 6 of 6
 - 08-04: 11min, 3 tasks, 7 files, backend 5 tests and frontend 12 contract tests passed.
 - 08-05: 11min, 3 tasks, 7 files, frontend 66 unit tests plus desktop/mobile Playwright passed.
 - 08-06: 9min, 3 tasks, 6 files, backend 56 + controlled live 7 + CI 5 + frontend 66 tests and build passed.
+- 08-07: 26min, 3 tasks, 9 files, 63 timeline tests passed including real PostgreSQL concurrency coverage.
 
 ## Phase 08 Decisions
 
@@ -56,6 +57,9 @@ Plan: 6 of 6
 - Full-book disclosure requires confirmation before persisting the per-novel preference.
 - Blocked or unavailable live timeline dependencies produce `metrics=null` and cannot satisfy the release gate.
 - Phase 08 qualification is fiction-only and proves deferred relationship graph, reader AI, clue tracking, and history products are absent.
+- Production timeline work is driven by durable background workers over the active Phase 07 hierarchy and resumes from completed chapter/stage checkpoints.
+- Gateway budget reservations, call attempts, outcomes, and exact cache recovery are PostgreSQL-backed and auditable across process restarts.
+- Production extraction and reconciliation use fixed no-fallback deployments; unsupported capability, unknown pricing, or budget rejection pauses before a provider call.
 
 ## Phase 06 (v0.5) — COMPLETE
 
@@ -113,5 +117,6 @@ CLI：`backend/scripts/run_chunker_qualification.py`
 
 ## Next Action
 
-1. 由独立 verifier 执行 Phase 08 verification，并独占创建 `08-VERIFICATION.md`。  
-2. 保留本地 BGE / 阅读器 UX 等非 Phase 08 WIP，不纳入 Phase 08 提交。  
+1. 08-08 仍待单独执行；本次不进入该计划。
+2. 08-08 完成后再由独立 verifier 复验 Phase 08 gaps。
+3. 保留本地 BGE / 阅读器 UX 等非 Phase 08 WIP，不纳入 Phase 08 提交。
