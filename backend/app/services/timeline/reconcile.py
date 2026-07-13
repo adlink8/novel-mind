@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import hashlib
 import json
 from typing import Awaitable, Callable, Literal
 
@@ -13,6 +14,7 @@ from app.services.timeline.budget import BudgetExceeded, BudgetGate
 from app.services.timeline.model_gateway import ModelDeployment, TimelineModelGateway
 
 EdgeType = Literal["causes", "triggers", "responds_to", "blocks"]
+RECONCILIATION_PROMPT = "Reconcile only the supplied event IDs using evidence-backed constraints."
 
 
 @dataclass(frozen=True)
@@ -54,6 +56,15 @@ class ReconciliationOutputModel(BaseModel):
             story_constraints=[tuple(item) for item in self.story_constraints],
             causal_edges=[CausalProposal(**item.model_dump()) for item in self.causal_edges],
         )
+
+
+def reconciliation_contract_hashes() -> tuple[str, str]:
+    """Return hashes for the exact prompt and schema sent to the provider."""
+    prompt_hash = hashlib.sha256(RECONCILIATION_PROMPT.encode()).hexdigest()
+    schema_hash = hashlib.sha256(json.dumps(
+        ReconciliationOutputModel.model_json_schema(), sort_keys=True,
+    ).encode()).hexdigest()
+    return prompt_hash, schema_hash
 
 
 @dataclass(frozen=True)
@@ -111,7 +122,7 @@ class TimelineReconciler:
                     deployment=self.deployment,
                     schema=ReconciliationOutputModel,
                     messages=[
-                        {"role": "system", "content": "Reconcile only supplied event IDs and evidence."},
+                        {"role": "system", "content": RECONCILIATION_PROMPT},
                         {"role": "user", "content": json.dumps([
                             event.model_dump(mode="json") for event in events
                         ], sort_keys=True)},

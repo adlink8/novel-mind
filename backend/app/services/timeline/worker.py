@@ -42,11 +42,20 @@ from app.services.timeline.model_gateway import (
     TimelineModelGateway,
 )
 from app.services.timeline.promotion import promote_version, snapshot_manifest
-from app.services.timeline.reconcile import ReconciliationOutputModel, TimelineReconciler
+from app.services.timeline.reconcile import (
+    RECONCILIATION_PROMPT,
+    ReconciliationOutputModel,
+    TimelineReconciler,
+    reconciliation_contract_hashes,
+)
 
 
 class TimelineWorkerError(RuntimeError):
     """A deterministic production pipeline precondition failed."""
+
+
+class TimelineCancellationRequested(RuntimeError):
+    """The durable run was cancelled while the production worker was active."""
 
 
 @dataclass(frozen=True)
@@ -121,12 +130,19 @@ async def run_timeline_worker(run_id: int, *, runtime: TimelineWorkerRuntime) ->
         return
     try:
         run, version, build, chapters = await _prepare_run(runtime, run_id)
+        await _raise_if_cancel_requested(runtime.sessions, run_id)
         budget = BudgetGate(runtime.budget_policy)
         for completed, chapter in enumerate(chapters, start=1):
             await _extract_and_persist(runtime, budget, run, version, build, chapter)
+            await _raise_if_cancel_requested(runtime.sessions, run_id)
             await _update_progress(runtime.sessions, run.id, completed, len(chapters), "extracting")
+        await _raise_if_cancel_requested(runtime.sessions, run_id)
         await _reconcile_and_persist(runtime, budget, run, version)
+        await _raise_if_cancel_requested(runtime.sessions, run_id)
         await _validate_and_promote(runtime.sessions, run, version)
+    except TimelineCancellationRequested:
+        await _finish_run(runtime.sessions, run_id, "cancelled", "cancel requested")
+        return
     except DependencyPaused as exc:
         await _finish_run(runtime.sessions, run_id, "paused_dependency", str(exc))
         return
@@ -156,6 +172,17 @@ async def _claim_run(
         run.heartbeat_at = now
         run.status = "running"
         return True
+
+
+async def _raise_if_cancel_requested(
+    sessions: async_sessionmaker[AsyncSession], run_id: int,
+) -> None:
+    async with sessions() as session:
+        cancelled = await session.scalar(select(AnalysisRun.cancel_requested).where(
+            AnalysisRun.id == run_id,
+        ))
+    if cancelled:
+        raise TimelineCancellationRequested
 
 
 async def _prepare_run(runtime: TimelineWorkerRuntime, run_id: int):
@@ -251,6 +278,7 @@ async def _extract_and_persist(runtime, budget, run, version, build, chapter) ->
         ).order_by(ChunkHierarchyNode.order_index, ChunkHierarchyNode.node_id))).all())
     if not nodes:
         raise DependencyPaused(f"chapter {chapter.id} has no Phase 07 evidence")
+    await _raise_if_cancel_requested(runtime.sessions, run.id)
     package = EvidencePackage.create(
         owner_id=run.owner_id,
         novel_id=run.novel_id,
@@ -310,6 +338,7 @@ async def _extract_and_persist(runtime, budget, run, version, build, chapter) ->
             business_validator=lambda candidate: validate_extraction(package, candidate),
         )
         output = result.output
+    await _raise_if_cancel_requested(runtime.sessions, run.id)
     await _persist_chapter(runtime.sessions, run, version, chapter, stage_key, output)
 
 
@@ -437,11 +466,16 @@ async def _reconcile_and_persist(runtime, budget, run, version) -> None:
         "participants": [item.model_dump() for item in event.participants],
         "evidence_ids": [item.evidence_id for item in event.evidence],
     } for event in candidates]
+    reconciliation_prompt_hash, reconciliation_schema_hash = reconciliation_contract_hashes()
     cache_key = hashlib.sha256(json.dumps({
         "stage": "cross_chapter_reconcile",
         "source_snapshot_hash": version.source_snapshot_hash,
         "hierarchy_build_id": version.hierarchy_build_id,
         "hierarchy_checksum": version.hierarchy_checksum,
+        "version_prompt_hash": version.prompt_hash,
+        "version_schema_hash": version.schema_hash,
+        "prompt_hash": reconciliation_prompt_hash,
+        "schema_hash": reconciliation_schema_hash,
         "events": payload,
         "model": runtime.reconciliation_deployment.lineage,
         "decoding_hash": version.decoding_hash,
@@ -462,7 +496,7 @@ async def _reconcile_and_persist(runtime, budget, run, version) -> None:
             deployment=runtime.reconciliation_deployment,
             schema=ReconciliationOutputModel,
             messages=[
-                {"role": "system", "content": "Reconcile only the supplied event IDs using evidence-backed constraints."},
+                {"role": "system", "content": RECONCILIATION_PROMPT},
                 {"role": "user", "content": json.dumps(payload, sort_keys=True)},
             ],
             budget=budget,
@@ -473,6 +507,7 @@ async def _reconcile_and_persist(runtime, budget, run, version) -> None:
             max_output_tokens=4000,
         )
         gateway_output = gateway_result.output
+    await _raise_if_cancel_requested(runtime.sessions, run.id)
     reconciled = TimelineReconciler._materialize(candidates, gateway_output.as_input())
     artifact = json.dumps({
         "events": [item.__dict__ for item in reconciled.events],

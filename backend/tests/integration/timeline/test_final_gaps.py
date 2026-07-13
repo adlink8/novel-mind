@@ -201,12 +201,16 @@ async def test_reconciliation_cache_misses_after_lineage_hash_change(
     transport = FinalGapTransport()
     runtime = _runtime(db_session, transport)
     await run_timeline_worker(baseline_run.id, runtime=runtime)
+    baseline = await db_session.get(AnalysisRun, baseline_run.id)
+    baseline.active_key = None
+    await db_session.commit()
 
     changed_run = AnalysisRun(
-        owner_id=baseline_run.owner_id, novel_id=novel.id, status="pending", active_key=None,
+        owner_id=baseline_run.owner_id, novel_id=novel.id, status="pending",
     )
     db_session.add(changed_run)
     await db_session.commit()
+    changed_run_id = changed_run.id
     original = worker_module._prepare_run
 
     async def mutate_lineage_after_restart(*args, **kwargs):
@@ -221,11 +225,11 @@ async def test_reconciliation_cache_misses_after_lineage_hash_change(
 
     monkeypatch.setattr(worker_module, "_prepare_run", mutate_lineage_after_restart)
     call_start = len(transport.calls)
-    await run_timeline_worker(changed_run.id, runtime=runtime)
+    await run_timeline_worker(changed_run_id, runtime=runtime)
 
     db_session.expire_all()
     attempts = list((await db_session.scalars(select(ModelCallAttempt).where(
-        ModelCallAttempt.run_id == changed_run.id,
+        ModelCallAttempt.run_id == changed_run_id,
         ModelCallAttempt.stage_key == "cross_chapter_reconcile:book",
     ))).all())
     assert [attempt.status for attempt in attempts] == ["succeeded"]
