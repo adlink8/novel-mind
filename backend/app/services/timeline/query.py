@@ -13,6 +13,7 @@ from app.models.timeline import (
     MachineTimelineEvent,
     TimelineActivePointer,
     TimelineCausalEdge,
+    TimelineEvidenceRef,
     TimelineOverride,
     TimelineParticipant,
 )
@@ -96,6 +97,16 @@ async def build_version_view(
     visible_rows = list((await session.scalars(event_query)).all())
     visible_ids = {row.id for row in visible_rows}
 
+    evidence_rows = list((await session.scalars(select(TimelineEvidenceRef).where(
+        TimelineEvidenceRef.event_id.in_(visible_ids),
+    ))).all()) if visible_ids else []
+    source_start_by_event: dict[int, int] = {}
+    for evidence in evidence_rows:
+        source_start_by_event[evidence.event_id] = min(
+            source_start_by_event.get(evidence.event_id, evidence.source_start),
+            evidence.source_start,
+        )
+
     participants = list((await session.scalars(select(TimelineParticipant).where(
         TimelineParticipant.event_id.in_(visible_ids)
     ))).all()) if visible_ids else []
@@ -121,9 +132,10 @@ async def build_version_view(
     for row in overrides:
         override_by_event.setdefault(row.logical_event_id, {})[row.field_name] = row.value
 
-    order_key = ((lambda row: (row.story_rank is None, row.story_rank, row.narrative_chapter_number, row.narrative_index))
+    source_start = lambda row: source_start_by_event.get(row.id, row.narrative_index)
+    order_key = ((lambda row: (row.story_rank is None, row.story_rank, row.narrative_chapter_number, source_start(row), row.id))
                  if ordering == TimelineOrdering.STORY else
-                 (lambda row: (row.narrative_chapter_number, row.narrative_index)))
+                 (lambda row: (row.narrative_chapter_number, source_start(row), row.id)))
     visible_rows.sort(key=order_key)
     events = []
     participant_mentions: list[str] = []
@@ -137,6 +149,7 @@ async def build_version_view(
             title=patch.get("title", row.title), description=patch.get("description", row.description),
             event_type=patch.get("event_type", row.event_type),
             narrative_chapter_number=row.narrative_chapter_number,
+            source_start=source_start(row),
             narrative_index=row.narrative_index, story_rank=row.story_rank,
             time_precision=row.time_precision,
             time_expression=patch.get("time_expression", row.time_expression),

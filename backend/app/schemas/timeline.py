@@ -185,6 +185,7 @@ class TimelineVisibleEvent(StrictTimelineModel):
     description: str
     event_type: str
     narrative_chapter_number: int
+    source_start: int = Field(ge=0)
     narrative_index: int
     story_rank: int | None = None
     time_precision: TimePrecision

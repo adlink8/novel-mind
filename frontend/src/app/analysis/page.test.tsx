@@ -31,7 +31,7 @@ const active = {
   version_id: 7,
   status: "completed",
   progress: { visible_through_chapter: 1 },
-  events: [{ id: 1, logical_event_id: "a", title: "旧版事件", description: "active only", event_type: "plot", narrative_chapter_number: 1, narrative_index: 0, story_rank: 2, time_precision: "unknown", confidence: 0.8, participants: [{ mention: "林墨" }], provenance: {} }],
+  events: [{ id: 1, logical_event_id: "a", title: "旧版事件", description: "active only", event_type: "plot", narrative_chapter_number: 1, source_start: 0, narrative_index: 0, story_rank: 2, time_precision: "unknown", confidence: 0.8, participants: [{ mention: "林墨" }], provenance: {} }],
   causal_edges: [], counts: { events: 1, participants: 1, causal_edges: 0 }, aggregates: { plot: 1 }, previews: ["旧版事件"],
 };
 const candidate = {

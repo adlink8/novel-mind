@@ -15,12 +15,9 @@ echarts.use([ScatterChart, LineChart, DataZoomComponent, GridComponent, TooltipC
 
 type Props = { events: TimelineEvent[]; causalEdges: TimelineCausalEdge[]; ordering: TimelineOrdering; novelId: string };
 
-type TimelineEventWithSourceOffset = TimelineEvent & { source_start?: number | null };
-
 function compareNarrative(a: TimelineEvent, b: TimelineEvent) {
-  const sourceStart = (event: TimelineEvent) => (event as TimelineEventWithSourceOffset).source_start ?? event.narrative_index;
   return a.narrative_chapter_number - b.narrative_chapter_number
-    || sourceStart(a) - sourceStart(b)
+    || a.source_start - b.source_start
     || a.id - b.id;
 }
 

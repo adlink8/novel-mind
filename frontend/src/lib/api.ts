@@ -274,6 +274,7 @@ export interface TimelineEvent {
   description: string;
   event_type: string;
   narrative_chapter_number: number;
+  source_start: number;
   narrative_index: number;
   story_rank?: number | null;
   time_precision: "exact" | "relative" | "fuzzy" | "unknown";
