@@ -129,10 +129,10 @@ Plans:
 **Requirements**: REQ-TIME-01..10
 **Depends on:** Phase 7
 **Status:** PLANNED
-**Plans:** 6 plans
+**Plans:** 1/6 plans executed
 
 Plans:
-- [ ] 08-01 durable analysis jobs and immutable version foundation
+- [x] 08-01 durable analysis jobs and immutable version foundation
 - [ ] 08-02 strict timeline schema and evidence-bound chapter extraction
 - [ ] 08-03 cross-chapter reconciliation, overrides, budget, and promotion
 - [ ] 08-04 progressive owner-scoped API and spoiler boundary
