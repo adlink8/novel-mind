@@ -7,6 +7,7 @@ import {
   BookOpenText,
   Feather,
   LibraryBig,
+  ListTree,
   Search,
   Settings2,
   Sparkles,
@@ -17,7 +18,7 @@ import { cn } from "@/lib/utils";
 const navigation = [
   { href: "/", label: "工作台", icon: Sparkles },
   { href: "/novels", label: "书架", icon: LibraryBig },
-  { href: "/search", label: "检索", icon: Search },
+  { href: "/analysis", label: "分析", icon: ListTree },
   { href: "/eval", label: "评测", icon: BarChart3 },
   { href: "/writing", label: "创作", icon: Feather },
   { href: "/settings", label: "设置", icon: Settings2 },

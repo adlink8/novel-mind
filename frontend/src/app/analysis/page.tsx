@@ -24,6 +24,20 @@ export default function AnalysisPage() {
 
   useEffect(() => { novelsApi.list().then((response) => setNovels(response.data.items)).catch(() => setError("无法加载小说列表")); }, []);
 
+  useEffect(() => {
+    if (!novelId || !run || !["queued", "running", "partial"].includes(run.status)) return;
+    const timer = window.setInterval(async () => {
+      try {
+        const statusResponse = await timelineApi.status(novelId);
+        setRun(statusResponse.data);
+        await loadTimeline(novelId);
+      } catch { setError("自动更新暂时中断，可重新选择小说重试。"); }
+    }, 5000);
+    return () => window.clearInterval(timer);
+  // Query changes already refresh explicitly; polling follows the latest rendered state.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [novelId, run?.status]);
+
   async function loadTimeline(id = novelId, next = { ordering, person, causal, fullBook }) {
     if (!id) return;
     const response = await timelineApi.getTimeline(id, { ordering: next.ordering, person: next.person || undefined, causal: next.causal, full_book: next.fullBook });

@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import AnalysisPage from "./page";
+import { TimelineStatus } from "@/components/timeline/timeline-status";
 
 const mocks = vi.hoisted(() => ({
   list: vi.fn(),
@@ -22,7 +23,7 @@ vi.mock("@/lib/api", () => ({
 }));
 
 vi.mock("@/components/timeline/timeline-chart", () => ({
-  TimelineChart: ({ events }: { events: unknown[] }) => <div data-testid="timeline-chart">{events.length} events</div>,
+  TimelineChart: ({ events }: { events: Array<{ title: string }> }) => <div data-testid="timeline-chart">{events.map((event) => <span key={event.title}>{event.title}</span>)}</div>,
 }));
 
 const active = {
@@ -81,5 +82,13 @@ describe("global analysis timeline workspace", () => {
     expect(mocks.setFullBookPreference).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "确认显示全书" }));
     await waitFor(() => expect(mocks.setFullBookPreference).toHaveBeenCalledWith("11", true));
+  });
+
+  it.each([
+    ["empty", "尚未生成"], ["running", "正在分析"], ["partial", "已有部分结果"],
+    ["paused_budget", "预算不足，已暂停"], ["failed", "分析失败"], ["completed", "分析完成"],
+  ])("renders the %s progressive state", (status, label) => {
+    render(<TimelineStatus hasEvents={false} run={{ id: 1, novel_id: 11, status, progress: {}, cancel_requested: false }} />);
+    expect(screen.getByText(label)).toBeInTheDocument();
   });
 });
