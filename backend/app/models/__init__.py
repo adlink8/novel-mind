@@ -94,6 +94,18 @@ from app.models.relationship import (
     RelationshipOverride,
     RelationshipProjectionAudit,
 )
+from app.models.reader_chat import (
+    ReaderBudgetLedger,
+    ReaderBudgetReservation,
+    ReaderContextEvidenceRef,
+    ReaderContextManifest,
+    ReaderConversation,
+    ReaderGenerationJob,
+    ReaderMessage,
+    ReaderMessageCitation,
+    ReaderMessageSelection,
+    ReaderModelCallAttempt,
+)
 
 __all__ = [
     "Base",
@@ -150,4 +162,14 @@ __all__ = [
     "CharacterIdentityOverride",
     "RelationshipOverride",
     "RelationshipProjectionAudit",
+    "ReaderConversation",
+    "ReaderMessage",
+    "ReaderMessageSelection",
+    "ReaderContextManifest",
+    "ReaderContextEvidenceRef",
+    "ReaderMessageCitation",
+    "ReaderGenerationJob",
+    "ReaderModelCallAttempt",
+    "ReaderBudgetLedger",
+    "ReaderBudgetReservation",
 ]
