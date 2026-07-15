@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 import pytest
-import pytest_asyncio
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.models.chunk_build import ChunkActivePointer, ChunkHierarchyNode
 from app.models.novel import Chapter, Novel
@@ -16,23 +14,9 @@ from app.services.narrative_memory.audit_contracts import (
     ReasonCode,
 )
 from app.services.narrative_memory.audit_pg import PostgresAuditSource
-from tests.integration.conftest import run_alembic
 
 
 pytestmark = pytest.mark.integration
-
-
-@pytest_asyncio.fixture
-async def audit_pg_session(empty_postgres: str, pg_async_url: str):
-    run_alembic("upgrade", "head", database_url=empty_postgres)
-    engine = create_async_engine(pg_async_url, pool_pre_ping=True)
-    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    try:
-        async with factory() as session:
-            yield session
-            await session.rollback()
-    finally:
-        await engine.dispose()
 
 
 async def _seed_valid_hierarchy(
@@ -77,6 +61,19 @@ async def test_valid_hierarchy_is_exact_and_optional_sources_are_unavailable(aud
     assert report.provider_calls_allowed is True
     for kind in (AssetKind.TIMELINE, AssetKind.RELATIONSHIP, AssetKind.CLUE):
         assert by_kind[kind].status == EligibilityStatus.OPTIONAL_UNAVAILABLE
+
+
+@pytest.mark.asyncio
+async def test_deferred_chapter_content_is_loaded_without_async_lazy_io(audit_pg_session):
+    user, novel, _ = await _seed_valid_hierarchy(audit_pg_session)
+    owner_id, novel_id = user.id, novel.id
+    audit_pg_session.expire_all()
+
+    report = await audit_assets(
+        PostgresAuditSource(audit_pg_session), owner_id=owner_id, novel_id=novel_id
+    )
+
+    assert report.provider_calls_allowed is True
 
 
 @pytest.mark.asyncio
@@ -152,3 +149,10 @@ async def test_cross_owner_request_discloses_no_build_identity(audit_pg_session)
     assert hierarchy.source_snapshot_hash is None
     assert hierarchy.manifest_hash is None
     assert ReasonCode.SOURCE_MISSING in hierarchy.reason_codes
+
+
+def test_rebuild_ranges_are_coalesced() -> None:
+    assert [
+        (item.start_chapter, item.end_chapter)
+        for item in PostgresAuditSource._coalesce_ranges({1, 2, 3, 5, 7, 8})
+    ] == [(1, 3), (5, 5), (7, 8)]

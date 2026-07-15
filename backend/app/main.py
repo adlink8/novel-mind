@@ -25,6 +25,7 @@ from fastapi.responses import JSONResponse
 
 from app.api import novels, analysis, timeline, characters, fanfiction, models, auth, rag, search
 from app.api.clues import router as clues_router
+from app.api.asset_audit import router as asset_audit_router
 from app.api.eval import router as eval_router
 from app.api.knowledge import router as knowledge_router
 from app.api.reader_chat import router as reader_chat_router
@@ -160,6 +161,7 @@ app.include_router(novels.router, prefix="/api/novels", tags=["小说管理"])
 app.include_router(analysis.router, prefix="/api/analysis", tags=["剧情分析"])
 app.include_router(timeline.router, prefix="/api/timeline", tags=["时间线"])
 app.include_router(clues_router, prefix="/api/clues", tags=["线索与伏笔"])
+app.include_router(asset_audit_router)
 app.include_router(characters.router, prefix="/api/characters", tags=["人物关系"])
 app.include_router(
     relationships_router,

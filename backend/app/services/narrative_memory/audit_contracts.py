@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class AssetKind(StrEnum):
@@ -45,8 +45,9 @@ class ReasonCode(StrEnum):
 class RebuildRange(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    start_chapter: int = Field(ge=1)
-    end_chapter: int = Field(ge=1)
+    # Imported books may use chapter 0 for a preface/prologue.
+    start_chapter: int = Field(ge=0)
+    end_chapter: int = Field(ge=0)
 
     @model_validator(mode="after")
     def validate_order(self) -> "RebuildRange":
@@ -134,6 +135,26 @@ class EligibilityReport(BaseModel):
     owner_id: int = Field(ge=1)
     novel_id: int = Field(ge=1)
     assets: tuple[AssetEligibility, ...]
+    provider_calls_allowed: bool
+
+    @model_validator(mode="before")
+    @classmethod
+    def derive_provider_guard(cls, value: object) -> object:
+        if not isinstance(value, dict):
+            return value
+        raw_assets = value.get("assets", ())
+        assets = tuple(
+            item if isinstance(item, AssetEligibility) else AssetEligibility.model_validate(item)
+            for item in raw_assets
+        )
+        required = [item for item in assets if item.requirement == AssetRequirement.REQUIRED]
+        expected = bool(required) and all(
+            item.status == EligibilityStatus.REUSABLE_EXACT for item in required
+        )
+        supplied = value.get("provider_calls_allowed")
+        if supplied is not None and supplied != expected:
+            raise ValueError("provider_calls_allowed must be derived from required assets")
+        return {**value, "provider_calls_allowed": expected}
 
     @field_validator("assets")
     @classmethod
@@ -157,11 +178,3 @@ class EligibilityReport(BaseModel):
         if any(item.requirement != expected_requirements[item.kind] for item in self.assets):
             raise ValueError("asset requirements are policy-defined and cannot be caller supplied")
         return self
-
-    @computed_field
-    @property
-    def provider_calls_allowed(self) -> bool:
-        required = [item for item in self.assets if item.requirement == AssetRequirement.REQUIRED]
-        return bool(required) and all(
-            item.status == EligibilityStatus.REUSABLE_EXACT for item in required
-        )

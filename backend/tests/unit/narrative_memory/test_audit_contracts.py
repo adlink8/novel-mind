@@ -41,6 +41,7 @@ def test_inventory_is_strict_and_canonical() -> None:
         AssetInventory(kind="hierarchy", owner_id=1, novel_id=2, unexpected=True)  # type: ignore[call-arg]
     with pytest.raises(ValidationError):
         RebuildRange(start_chapter=3, end_chapter=2)
+    assert RebuildRange(start_chapter=0, end_chapter=0).start_chapter == 0
 
 
 def test_report_requires_all_unique_assets_and_matching_scope() -> None:
@@ -65,3 +66,8 @@ def test_model_dump_is_stable_for_logically_identical_input() -> None:
     first = EligibilityReport(owner_id=1, novel_id=2, assets=tuple(_result(kind) for kind in AssetKind))
     second = EligibilityReport(owner_id=1, novel_id=2, assets=tuple(_result(kind) for kind in reversed(list(AssetKind))))
     assert first.model_dump_json() == second.model_dump_json()
+    assert EligibilityReport.model_validate_json(first.model_dump_json()) == first
+    with pytest.raises(ValidationError):
+        EligibilityReport.model_validate(
+            {**first.model_dump(), "provider_calls_allowed": False}
+        )

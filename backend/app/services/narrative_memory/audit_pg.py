@@ -6,6 +6,7 @@ from collections import defaultdict
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import undefer
 
 from app.models.analysis import AnalysisVersion
 from app.models.chunk_build import ChunkActivePointer, ChunkBuild, ChunkHierarchyNode
@@ -102,6 +103,7 @@ class PostgresAuditSource:
             (
                 await self._session.scalars(
                     select(Chapter)
+                    .options(undefer(Chapter.content))
                     .where(Chapter.novel_id == novel.id)
                     .order_by(Chapter.chapter_number, Chapter.id)
                 )
@@ -209,10 +211,7 @@ class PostgresAuditSource:
                 manifest_hash=build.manifest_checksum,
                 item_count=len(rows),
                 reason_codes=tuple(reasons),
-                rebuild_ranges=tuple(
-                    RebuildRange(start_chapter=number, end_chapter=number)
-                    for number in sorted(affected)
-                ),
+                rebuild_ranges=self._coalesce_ranges(affected),
             ),
             build,
         )
@@ -333,3 +332,19 @@ class PostgresAuditSource:
             available=not reasons,
             reason_codes=reasons,
         )
+
+    @staticmethod
+    def _coalesce_ranges(chapter_numbers: set[int]) -> tuple[RebuildRange, ...]:
+        ordered = sorted(chapter_numbers)
+        if not ordered:
+            return ()
+        ranges: list[RebuildRange] = []
+        start = end = ordered[0]
+        for number in ordered[1:]:
+            if number == end + 1:
+                end = number
+                continue
+            ranges.append(RebuildRange(start_chapter=start, end_chapter=end))
+            start = end = number
+        ranges.append(RebuildRange(start_chapter=start, end_chapter=end))
+        return tuple(ranges)
