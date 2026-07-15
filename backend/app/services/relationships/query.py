@@ -1,0 +1,953 @@
+"""
+Owner/version/spoiler-scoped relationship graph read model.
+
+PostgreSQL accepted observations are the sole fact source. Nodes, edges,
+filters, counts and evidence previews all derive from one visible-set fold.
+Legacy CharacterRelation is never read.
+"""
+
+from __future__ import annotations
+
+from collections import defaultdict
+from copy import deepcopy
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from typing import Any, Iterable
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.analysis import AnalysisRun, AnalysisVersion
+from app.models.character import Character
+from app.models.novel import Chapter, Novel
+from app.models.relationship import (
+    CharacterIdentityOverride,
+    RelationshipEvidenceLink,
+    RelationshipObservation,
+    RelationshipOverride,
+)
+from app.models.timeline import TimelineActivePointer
+from app.schemas.relationship import (
+    GraphDegradationMode,
+    ProvenanceKind,
+    RelationshipCounts,
+    RelationshipDegradation,
+    RelationshipEdgeType,
+    RelationshipEvidenceRef,
+    RelationshipEvidenceResponse,
+    RelationshipGraphEdge,
+    RelationshipGraphEnvelope,
+    RelationshipGraphNode,
+    RelationshipVersionSource,
+)
+
+# D-22 degradation thresholds (immutable product contract).
+NORMAL_NODE_CAP = 200
+NORMAL_EDGE_CAP = 600
+HARD_NODE_CAP = 500
+HARD_EDGE_CAP = 1500
+
+
+@dataclass(frozen=True)
+class ResolvedVersion:
+    version_id: int
+    source: RelationshipVersionSource
+    status: str
+    progress: dict[str, Any]
+
+
+@dataclass
+class _FoldedEdge:
+    observation_id: int
+    source_character_id: int
+    target_character_id: int
+    relation_type: str
+    transition: str
+    confidence: float
+    valid_from_chapter: int
+    valid_to_chapter: int | None
+    logical_key: str
+    provenance: ProvenanceKind = ProvenanceKind.MACHINE
+    evidence_preview: str | None = None
+    evidence_count: int = 0
+
+
+def logical_relationship_key(
+    source_character_id: int,
+    target_character_id: int,
+    relation_type: str,
+) -> str:
+    """Stable directed key used by overrides and fold grouping."""
+    return f"{source_character_id}:{target_character_id}:{relation_type}"
+
+
+def _position_tuple(chapter: int, narrative_index: int = 0) -> tuple[int, int]:
+    return (chapter, narrative_index)
+
+
+def _covers_position(
+    *,
+    valid_from_chapter: int,
+    valid_from_narrative_index: int,
+    valid_to_chapter: int | None,
+    valid_to_narrative_index: int | None,
+    through_chapter: int,
+    through_narrative_index: int = 0,
+) -> bool:
+    start = _position_tuple(valid_from_chapter, valid_from_narrative_index)
+    pos = _position_tuple(through_chapter, through_narrative_index)
+    if start > pos:
+        return False
+    if valid_to_chapter is None:
+        return True
+    end = _position_tuple(valid_to_chapter, valid_to_narrative_index or 0)
+    return end >= pos
+
+
+def _parse_aliases(raw: str | None) -> list[str]:
+    if not raw:
+        return []
+    return [part.strip() for part in raw.split(",") if part.strip()]
+
+
+class RelationshipGraphQueryService:
+    """Server-side version proof, narrative fold, and spoiler-safe projection."""
+
+    async def resolve_version(
+        self,
+        session: AsyncSession,
+        *,
+        owner_id: int,
+        novel_id: int,
+        source: RelationshipVersionSource = RelationshipVersionSource.ACTIVE,
+        version_id: int | None = None,
+    ) -> ResolvedVersion | None:
+        """Prove version access inside owner/novel; never merge sources."""
+
+        if version_id is not None:
+            version = await session.scalar(
+                select(AnalysisVersion).where(
+                    AnalysisVersion.id == version_id,
+                    AnalysisVersion.owner_id == owner_id,
+                    AnalysisVersion.novel_id == novel_id,
+                )
+            )
+            if version is None:
+                return None
+
+            pointer = await session.scalar(
+                select(TimelineActivePointer).where(
+                    TimelineActivePointer.owner_id == owner_id,
+                    TimelineActivePointer.novel_id == novel_id,
+                    TimelineActivePointer.version_id == version_id,
+                )
+            )
+            if pointer is not None and source in (
+                RelationshipVersionSource.ACTIVE,
+                RelationshipVersionSource.HISTORY,
+            ):
+                # Explicit id that is currently active is still a valid active view
+                # when client asked for active/history of that id.
+                if source == RelationshipVersionSource.ACTIVE or (
+                    source == RelationshipVersionSource.HISTORY
+                ):
+                    # Prefer classifying as active when pointer matches and source=active.
+                    if source == RelationshipVersionSource.ACTIVE:
+                        return ResolvedVersion(
+                            version_id=version_id,
+                            source=RelationshipVersionSource.ACTIVE,
+                            status=version.status,
+                            progress={},
+                        )
+
+            run = await session.scalar(
+                select(AnalysisRun).where(
+                    AnalysisRun.owner_id == owner_id,
+                    AnalysisRun.novel_id == novel_id,
+                    AnalysisRun.active_key == "active",
+                    AnalysisRun.status != "completed",
+                    AnalysisRun.version_id == version_id,
+                )
+            )
+            if run is not None and source == RelationshipVersionSource.RUNNING_CANDIDATE:
+                return ResolvedVersion(
+                    version_id=version_id,
+                    source=RelationshipVersionSource.RUNNING_CANDIDATE,
+                    status=run.status,
+                    progress=dict(run.progress or {}),
+                )
+
+            if source == RelationshipVersionSource.HISTORY or (
+                source == RelationshipVersionSource.ACTIVE and pointer is None
+            ):
+                # History: any owned version; Active+id without pointer: only if version is active status.
+                if source == RelationshipVersionSource.HISTORY:
+                    return ResolvedVersion(
+                        version_id=version_id,
+                        source=RelationshipVersionSource.HISTORY,
+                        status=version.status,
+                        progress={},
+                    )
+                if version.status == "active" or pointer is not None:
+                    return ResolvedVersion(
+                        version_id=version_id,
+                        source=RelationshipVersionSource.ACTIVE,
+                        status=version.status,
+                        progress={},
+                    )
+                # Explicit version_id with default source: treat as history when owned.
+                return ResolvedVersion(
+                    version_id=version_id,
+                    source=RelationshipVersionSource.HISTORY,
+                    status=version.status,
+                    progress={},
+                )
+
+            # Source mismatch for explicit id (e.g. asked running_candidate but not running).
+            if source == RelationshipVersionSource.ACTIVE and pointer is not None:
+                return ResolvedVersion(
+                    version_id=version_id,
+                    source=RelationshipVersionSource.ACTIVE,
+                    status=version.status,
+                    progress={},
+                )
+            if source == RelationshipVersionSource.RUNNING_CANDIDATE:
+                return None
+            return ResolvedVersion(
+                version_id=version_id,
+                source=RelationshipVersionSource.HISTORY,
+                status=version.status,
+                progress={},
+            )
+
+        if source == RelationshipVersionSource.ACTIVE:
+            pointer = await session.scalar(
+                select(TimelineActivePointer).where(
+                    TimelineActivePointer.owner_id == owner_id,
+                    TimelineActivePointer.novel_id == novel_id,
+                )
+            )
+            if pointer is None:
+                # Fallback: analysis version marked active for this novel/owner.
+                version = await session.scalar(
+                    select(AnalysisVersion)
+                    .where(
+                        AnalysisVersion.owner_id == owner_id,
+                        AnalysisVersion.novel_id == novel_id,
+                        AnalysisVersion.status == "active",
+                    )
+                    .order_by(AnalysisVersion.id.desc())
+                    .limit(1)
+                )
+                if version is None:
+                    return None
+                return ResolvedVersion(
+                    version_id=version.id,
+                    source=RelationshipVersionSource.ACTIVE,
+                    status=version.status,
+                    progress={},
+                )
+            version = await session.get(AnalysisVersion, pointer.version_id)
+            return ResolvedVersion(
+                version_id=pointer.version_id,
+                source=RelationshipVersionSource.ACTIVE,
+                status=version.status if version else "active",
+                progress={},
+            )
+
+        if source == RelationshipVersionSource.RUNNING_CANDIDATE:
+            run = await session.scalar(
+                select(AnalysisRun).where(
+                    AnalysisRun.owner_id == owner_id,
+                    AnalysisRun.novel_id == novel_id,
+                    AnalysisRun.active_key == "active",
+                    AnalysisRun.status != "completed",
+                    AnalysisRun.version_id.is_not(None),
+                )
+            )
+            if run is None or run.version_id is None:
+                return None
+            return ResolvedVersion(
+                version_id=run.version_id,
+                source=RelationshipVersionSource.RUNNING_CANDIDATE,
+                status=run.status,
+                progress=dict(run.progress or {}),
+            )
+
+        # HISTORY requires an explicit version_id.
+        return None
+
+    async def resolve_cutoff(
+        self,
+        session: AsyncSession,
+        *,
+        novel: Novel,
+        source: RelationshipVersionSource,
+        request_full_book: bool,
+    ) -> tuple[int | None, bool]:
+        """Return (cutoff_chapter, full_book_applied).
+
+        D-09/D-10: missing/invalid progress → first chapter; full-book only when
+        persisted timeline_full_book is true. Running candidate skips reading cutoff.
+        """
+        max_chapter = await session.scalar(
+            select(Chapter.chapter_number)
+            .where(Chapter.novel_id == novel.id)
+            .order_by(Chapter.chapter_number.desc())
+            .limit(1)
+        )
+        if max_chapter is None:
+            return None, False
+
+        progress = novel.reading_progress or {}
+        persisted_full_book = bool(progress.get("timeline_full_book", False))
+        full_book = bool(request_full_book and persisted_full_book)
+
+        if source == RelationshipVersionSource.RUNNING_CANDIDATE or full_book:
+            return int(max_chapter), full_book
+
+        chapter_id = progress.get("chapter_id")
+        if chapter_id is not None:
+            try:
+                chapter = await session.scalar(
+                    select(Chapter).where(
+                        Chapter.id == int(chapter_id),
+                        Chapter.novel_id == novel.id,
+                    )
+                )
+            except (TypeError, ValueError):
+                chapter = None
+            if chapter is not None:
+                return int(chapter.chapter_number), False
+
+        first = await session.scalar(
+            select(Chapter.chapter_number)
+            .where(Chapter.novel_id == novel.id)
+            .order_by(Chapter.chapter_number)
+            .limit(1)
+        )
+        return (int(first) if first is not None else None), False
+
+    async def build_graph(
+        self,
+        session: AsyncSession,
+        *,
+        novel: Novel,
+        owner_id: int,
+        source: RelationshipVersionSource = RelationshipVersionSource.ACTIVE,
+        version_id: int | None = None,
+        through_chapter: int | None = None,
+        request_full_book: bool = False,
+        character_id: int | None = None,
+        relation_type: str | None = None,
+    ) -> RelationshipGraphEnvelope | None:
+        """Fold accepted observations into a spoiler-safe graph envelope."""
+
+        resolved = await self.resolve_version(
+            session,
+            owner_id=owner_id,
+            novel_id=novel.id,
+            source=source,
+            version_id=version_id,
+        )
+        if resolved is None:
+            return None
+
+        cutoff, full_book = await self.resolve_cutoff(
+            session,
+            novel=novel,
+            source=resolved.source,
+            request_full_book=request_full_book,
+        )
+        if cutoff is None:
+            return RelationshipGraphEnvelope(
+                novel_id=novel.id,
+                version_id=resolved.version_id,
+                source=resolved.source,
+                through_chapter=1,
+                full_book=False,
+                cutoff_chapter=1,
+                nodes=[],
+                edges=[],
+                counts=RelationshipCounts(),
+                available_relation_types=[],
+                available_character_ids=[],
+                degradation=RelationshipDegradation(mode=GraphDegradationMode.NORMAL),
+                generated_at=datetime.now(timezone.utc),
+            )
+
+        position = through_chapter if through_chapter is not None else cutoff
+        if position < 1:
+            position = 1
+        if position > cutoff:
+            position = cutoff
+
+        observations = list(
+            (
+                await session.scalars(
+                    select(RelationshipObservation)
+                    .where(
+                        RelationshipObservation.owner_id == owner_id,
+                        RelationshipObservation.novel_id == novel.id,
+                        RelationshipObservation.analysis_version_id
+                        == resolved.version_id,
+                        RelationshipObservation.status == "accepted",
+                    )
+                    .order_by(
+                        RelationshipObservation.valid_from_chapter,
+                        RelationshipObservation.valid_from_narrative_index,
+                        RelationshipObservation.id,
+                    )
+                )
+            ).all()
+        )
+
+        covering = [
+            obs
+            for obs in observations
+            if _covers_position(
+                valid_from_chapter=obs.valid_from_chapter,
+                valid_from_narrative_index=obs.valid_from_narrative_index,
+                valid_to_chapter=obs.valid_to_chapter,
+                valid_to_narrative_index=obs.valid_to_narrative_index,
+                through_chapter=position,
+            )
+        ]
+
+        identity_map = await self._identity_map(
+            session,
+            owner_id=owner_id,
+            novel_id=novel.id,
+            version_id=resolved.version_id,
+        )
+        override_fields = await self._active_relationship_overrides(
+            session,
+            owner_id=owner_id,
+            novel_id=novel.id,
+            version_id=resolved.version_id,
+        )
+
+        folded = self._fold_observations(
+            covering,
+            identity_map=identity_map,
+            override_fields=override_fields,
+        )
+
+        # Optional client filters apply only after fold (never expand the set).
+        if character_id is not None:
+            cid = identity_map.get(character_id, character_id)
+            folded = [
+                e
+                for e in folded
+                if e.source_character_id == cid or e.target_character_id == cid
+            ]
+        if relation_type is not None:
+            folded = [e for e in folded if e.relation_type == relation_type]
+
+        evidence_by_obs = await self._evidence_for_observations(
+            session,
+            observation_ids=[e.observation_id for e in folded],
+        )
+        for edge in folded:
+            refs = evidence_by_obs.get(edge.observation_id, [])
+            edge.evidence_count = len(refs)
+            if refs:
+                # Visible-set only: excerpt already attached to accepted evidence.
+                edge.evidence_preview = (refs[0].excerpt or "")[:400] or None
+
+        node_ids: set[int] = set()
+        for edge in folded:
+            node_ids.add(edge.source_character_id)
+            node_ids.add(edge.target_character_id)
+
+        characters = {}
+        if node_ids:
+            rows = (
+                await session.scalars(
+                    select(Character).where(
+                        Character.novel_id == novel.id,
+                        Character.id.in_(node_ids),
+                    )
+                )
+            ).all()
+            characters = {row.id: row for row in rows}
+
+        first_visible: dict[int, int] = {}
+        for edge in folded:
+            for cid in (edge.source_character_id, edge.target_character_id):
+                prev = first_visible.get(cid)
+                if prev is None or edge.valid_from_chapter < prev:
+                    first_visible[cid] = edge.valid_from_chapter
+
+        nodes = [
+            RelationshipGraphNode(
+                character_id=cid,
+                name=characters[cid].name if cid in characters else f"character:{cid}",
+                aliases=_parse_aliases(
+                    characters[cid].aliases if cid in characters else None
+                ),
+                first_visible_chapter=first_visible.get(cid, position),
+            )
+            for cid in sorted(node_ids)
+        ]
+
+        edges = [
+            RelationshipGraphEdge(
+                observation_id=e.observation_id,
+                source_character_id=e.source_character_id,
+                target_character_id=e.target_character_id,
+                relation_type=RelationshipEdgeType(e.relation_type),
+                transition=e.transition,  # type: ignore[arg-type]
+                confidence=e.confidence,
+                valid_from_chapter=e.valid_from_chapter,
+                valid_to_chapter=e.valid_to_chapter,
+                provenance=e.provenance,
+                evidence_preview=e.evidence_preview,
+                evidence_count=e.evidence_count,
+            )
+            for e in folded
+            if e.transition in ("establish", "change", "end")
+            and e.relation_type
+            in {t.value for t in RelationshipEdgeType}
+        ]
+        # Ended transitions are already removed by fold; keep only active edges.
+        edges = [e for e in edges if e.transition != "end"]
+
+        type_counts: dict[str, int] = defaultdict(int)
+        for edge in edges:
+            type_counts[edge.relation_type.value] += 1
+
+        node_count = len(nodes)
+        edge_count = len(edges)
+        mode = self._degradation_mode(node_count, edge_count)
+
+        available_types = sorted(
+            {RelationshipEdgeType(t) for t in type_counts.keys()},
+            key=lambda t: t.value,
+        )
+        available_character_ids = sorted(node_ids)
+
+        if mode == GraphDegradationMode.FILTERS_REQUIRED:
+            # Hard cap: no graph elements; counts remain spoiler-safe.
+            return RelationshipGraphEnvelope(
+                novel_id=novel.id,
+                version_id=resolved.version_id,
+                source=resolved.source,
+                through_chapter=position,
+                full_book=full_book,
+                cutoff_chapter=cutoff,
+                nodes=[],
+                edges=[],
+                counts=RelationshipCounts(
+                    nodes=node_count,
+                    edges=edge_count,
+                    relation_types=dict(type_counts),
+                ),
+                available_relation_types=available_types,
+                available_character_ids=available_character_ids,
+                degradation=RelationshipDegradation(
+                    mode=mode,
+                    node_count=node_count,
+                    edge_count=edge_count,
+                    hard_node_cap=HARD_NODE_CAP,
+                    hard_edge_cap=HARD_EDGE_CAP,
+                    message="Graph exceeds hard caps; apply filters before loading elements",
+                ),
+                generated_at=datetime.now(timezone.utc),
+            )
+
+        return RelationshipGraphEnvelope(
+            novel_id=novel.id,
+            version_id=resolved.version_id,
+            source=resolved.source,
+            through_chapter=position,
+            full_book=full_book,
+            cutoff_chapter=cutoff,
+            nodes=nodes,
+            edges=edges,
+            counts=RelationshipCounts(
+                nodes=node_count,
+                edges=edge_count,
+                relation_types=dict(type_counts),
+            ),
+            available_relation_types=available_types,
+            available_character_ids=available_character_ids,
+            degradation=RelationshipDegradation(
+                mode=mode,
+                node_count=node_count,
+                edge_count=edge_count,
+                hard_node_cap=HARD_NODE_CAP,
+                hard_edge_cap=HARD_EDGE_CAP,
+            ),
+            generated_at=datetime.now(timezone.utc),
+        )
+
+    async def get_visible_evidence(
+        self,
+        session: AsyncSession,
+        *,
+        novel: Novel,
+        owner_id: int,
+        observation_id: int,
+        source: RelationshipVersionSource = RelationshipVersionSource.ACTIVE,
+        version_id: int | None = None,
+        request_full_book: bool = False,
+        through_chapter: int | None = None,
+    ) -> RelationshipEvidenceResponse | None:
+        """Return evidence only if the observation is in the visible folded set."""
+
+        graph = await self.build_graph(
+            session,
+            novel=novel,
+            owner_id=owner_id,
+            source=source,
+            version_id=version_id,
+            through_chapter=through_chapter,
+            request_full_book=request_full_book,
+        )
+        if graph is None:
+            return None
+        visible = next(
+            (e for e in graph.edges if e.observation_id == observation_id), None
+        )
+        if visible is None:
+            return None
+
+        refs = await self._evidence_for_observations(
+            session, observation_ids=[observation_id]
+        )
+        evidence = [
+            RelationshipEvidenceRef(
+                evidence_id=row.evidence_id,
+                chapter_id=row.chapter_id,
+                source_start=row.source_start,
+                source_end=row.source_end,
+                content_hash=row.content_hash,
+                excerpt=row.excerpt,
+            )
+            for row in refs.get(observation_id, [])
+        ]
+        return RelationshipEvidenceResponse(
+            observation_id=observation_id,
+            novel_id=novel.id,
+            version_id=graph.version_id,
+            through_chapter=graph.through_chapter,
+            relation_type=visible.relation_type,
+            source_character_id=visible.source_character_id,
+            target_character_id=visible.target_character_id,
+            evidence=evidence,
+            provenance=visible.provenance,
+        )
+
+    # ------------------------------------------------------------------
+    # Phase 10 / Phase 11 read-only contracts (D-23 / D-24)
+    # ------------------------------------------------------------------
+
+    async def load_filtered_relationship_graph(
+        self,
+        session: AsyncSession,
+        *,
+        novel: Novel,
+        owner_id: int,
+        source: RelationshipVersionSource = RelationshipVersionSource.ACTIVE,
+        version_id: int | None = None,
+        through_chapter: int | None = None,
+        request_full_book: bool = False,
+        character_id: int | None = None,
+        relation_type: str | None = None,
+    ) -> RelationshipGraphEnvelope | None:
+        """Phase 10 public read-only contract: already owner/version/spoiler filtered.
+
+        Chat text and answers must never be candidate sources. This method does
+        not create sessions, messages, or write paths.
+        """
+        return await self.build_graph(
+            session,
+            novel=novel,
+            owner_id=owner_id,
+            source=source,
+            version_id=version_id,
+            through_chapter=through_chapter,
+            request_full_book=request_full_book,
+            character_id=character_id,
+            relation_type=relation_type,
+        )
+
+    async def list_accepted_observation_refs(
+        self,
+        session: AsyncSession,
+        *,
+        owner_id: int,
+        novel_id: int,
+        version_id: int,
+        through_chapter: int | None = None,
+    ) -> list[dict[str, Any]]:
+        """Phase 11 contract: accepted observation IDs, character IDs, evidence refs.
+
+        Does not create clue tables, state machines, or UI. Spoiler filtering is
+        applied when through_chapter is provided.
+        """
+        rows = list(
+            (
+                await session.scalars(
+                    select(RelationshipObservation).where(
+                        RelationshipObservation.owner_id == owner_id,
+                        RelationshipObservation.novel_id == novel_id,
+                        RelationshipObservation.analysis_version_id == version_id,
+                        RelationshipObservation.status == "accepted",
+                    )
+                )
+            ).all()
+        )
+        if through_chapter is not None:
+            rows = [
+                r
+                for r in rows
+                if _covers_position(
+                    valid_from_chapter=r.valid_from_chapter,
+                    valid_from_narrative_index=r.valid_from_narrative_index,
+                    valid_to_chapter=r.valid_to_chapter,
+                    valid_to_narrative_index=r.valid_to_narrative_index,
+                    through_chapter=through_chapter,
+                )
+            ]
+        evidence = await self._evidence_for_observations(
+            session, observation_ids=[r.id for r in rows]
+        )
+        payload: list[dict[str, Any]] = []
+        for row in rows:
+            payload.append(
+                {
+                    "observation_id": row.id,
+                    "analysis_version_id": row.analysis_version_id,
+                    "source_character_id": row.source_character_id,
+                    "target_character_id": row.target_character_id,
+                    "relation_type": row.relation_type,
+                    "evidence": [
+                        {
+                            "evidence_id": e.evidence_id,
+                            "chapter_id": e.chapter_id,
+                            "source_start": e.source_start,
+                            "source_end": e.source_end,
+                            "content_hash": e.content_hash,
+                        }
+                        for e in evidence.get(row.id, [])
+                    ],
+                }
+            )
+        return payload
+
+    # ------------------------------------------------------------------
+    # Internals
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _degradation_mode(node_count: int, edge_count: int) -> GraphDegradationMode:
+        if node_count > HARD_NODE_CAP or edge_count > HARD_EDGE_CAP:
+            return GraphDegradationMode.FILTERS_REQUIRED
+        if node_count > NORMAL_NODE_CAP or edge_count > NORMAL_EDGE_CAP:
+            return GraphDegradationMode.LARGE
+        return GraphDegradationMode.NORMAL
+
+    def _fold_observations(
+        self,
+        observations: Iterable[RelationshipObservation],
+        *,
+        identity_map: dict[int, int],
+        override_fields: dict[str, dict[str, Any]],
+    ) -> list[_FoldedEdge]:
+        """Deterministic transition fold per logical relationship key (D-06)."""
+
+        by_key: dict[str, list[RelationshipObservation]] = defaultdict(list)
+        for obs in observations:
+            src = identity_map.get(obs.source_character_id, obs.source_character_id)
+            tgt = identity_map.get(obs.target_character_id, obs.target_character_id)
+            if src == tgt:
+                continue
+            key = logical_relationship_key(src, tgt, obs.relation_type)
+            by_key[key].append(obs)
+
+        folded: list[_FoldedEdge] = []
+        for key, chain in by_key.items():
+            chain.sort(
+                key=lambda o: (
+                    o.valid_from_chapter,
+                    o.valid_from_narrative_index,
+                    o.id,
+                )
+            )
+            current: _FoldedEdge | None = None
+            for obs in chain:
+                src = identity_map.get(obs.source_character_id, obs.source_character_id)
+                tgt = identity_map.get(obs.target_character_id, obs.target_character_id)
+                if obs.transition == "end":
+                    current = None
+                    continue
+                current = _FoldedEdge(
+                    observation_id=obs.id,
+                    source_character_id=src,
+                    target_character_id=tgt,
+                    relation_type=obs.relation_type,
+                    transition=obs.transition,
+                    confidence=float(obs.confidence),
+                    valid_from_chapter=obs.valid_from_chapter,
+                    valid_to_chapter=obs.valid_to_chapter,
+                    logical_key=key,
+                    provenance=ProvenanceKind.MACHINE,
+                )
+
+            if current is None:
+                continue
+
+            # Apply latest eligible overrides for this logical key (overlay only).
+            patches = override_fields.get(current.logical_key, {})
+            # Also accept overrides keyed without type if type was changed.
+            if not patches:
+                # Try all override keys that share endpoints.
+                for okey, fields in override_fields.items():
+                    parts = okey.split(":")
+                    if len(parts) == 3 and parts[0] == str(
+                        current.source_character_id
+                    ) and parts[1] == str(current.target_character_id):
+                        patches = fields
+                        break
+
+            provenance = ProvenanceKind.MACHINE
+            if patches:
+                provenance = ProvenanceKind.MANUAL
+                if "relation_type" in patches:
+                    value = patches["relation_type"]
+                    if isinstance(value, dict):
+                        value = value.get("relation_type", current.relation_type)
+                    current.relation_type = str(value)
+                if "transition" in patches:
+                    value = patches["transition"]
+                    if isinstance(value, dict):
+                        value = value.get("transition", current.transition)
+                    current.transition = str(value)
+                if "valid_from" in patches:
+                    value = patches["valid_from"]
+                    if isinstance(value, dict) and "valid_from_chapter" in value:
+                        current.valid_from_chapter = int(value["valid_from_chapter"])
+                if "valid_to" in patches:
+                    value = patches["valid_to"]
+                    if isinstance(value, dict):
+                        if value.get("valid_to_chapter") is None:
+                            current.valid_to_chapter = None
+                        else:
+                            current.valid_to_chapter = int(value["valid_to_chapter"])
+                current.provenance = provenance
+
+            if current.transition == "end":
+                continue
+            folded.append(current)
+
+        folded.sort(
+            key=lambda e: (
+                e.valid_from_chapter,
+                e.source_character_id,
+                e.target_character_id,
+                e.observation_id,
+            )
+        )
+        return folded
+
+    async def _identity_map(
+        self,
+        session: AsyncSession,
+        *,
+        owner_id: int,
+        novel_id: int,
+        version_id: int,
+    ) -> dict[int, int]:
+        """Latest-wins character merge map from append-only identity overrides."""
+
+        rows = list(
+            (
+                await session.scalars(
+                    select(CharacterIdentityOverride)
+                    .where(
+                        CharacterIdentityOverride.owner_id == owner_id,
+                        CharacterIdentityOverride.novel_id == novel_id,
+                        CharacterIdentityOverride.analysis_version_id == version_id,
+                    )
+                    .order_by(CharacterIdentityOverride.id)
+                )
+            ).all()
+        )
+        # Latest row by canonical target wins; needs_relink does not apply merges.
+        latest_by_merged: dict[int, CharacterIdentityOverride] = {}
+        for row in rows:
+            for mid in row.merged_character_ids or []:
+                latest_by_merged[int(mid)] = row
+        mapping: dict[int, int] = {}
+        for mid, row in latest_by_merged.items():
+            if row.status != "active":
+                continue
+            mapping[mid] = row.canonical_character_id
+            mapping[row.canonical_character_id] = row.canonical_character_id
+        return mapping
+
+    async def _active_relationship_overrides(
+        self,
+        session: AsyncSession,
+        *,
+        owner_id: int,
+        novel_id: int,
+        version_id: int,
+    ) -> dict[str, dict[str, Any]]:
+        """Latest-wins field patches per logical key (append-only supersession)."""
+
+        rows = list(
+            (
+                await session.scalars(
+                    select(RelationshipOverride)
+                    .where(
+                        RelationshipOverride.owner_id == owner_id,
+                        RelationshipOverride.novel_id == novel_id,
+                        RelationshipOverride.analysis_version_id == version_id,
+                    )
+                    .order_by(RelationshipOverride.id)
+                )
+            ).all()
+        )
+        # Highest id per (logical_key, field_name) wins; only status=active applies.
+        latest: dict[tuple[str, str], RelationshipOverride] = {}
+        for row in rows:
+            latest[(row.logical_relationship_key, row.field_name)] = row
+
+        result: dict[str, dict[str, Any]] = defaultdict(dict)
+        for (key, field), row in latest.items():
+            if row.status != "active":
+                continue
+            result[key][field] = deepcopy(row.value)
+        return dict(result)
+
+    async def _evidence_for_observations(
+        self,
+        session: AsyncSession,
+        *,
+        observation_ids: list[int],
+    ) -> dict[int, list[RelationshipEvidenceLink]]:
+        if not observation_ids:
+            return {}
+        rows = list(
+            (
+                await session.scalars(
+                    select(RelationshipEvidenceLink)
+                    .where(RelationshipEvidenceLink.observation_id.in_(observation_ids))
+                    .order_by(
+                        RelationshipEvidenceLink.observation_id,
+                        RelationshipEvidenceLink.sort_order,
+                        RelationshipEvidenceLink.id,
+                    )
+                )
+            ).all()
+        )
+        out: dict[int, list[RelationshipEvidenceLink]] = defaultdict(list)
+        for row in rows:
+            out[row.observation_id].append(row)
+        return dict(out)
+
+
+relationship_graph_query_service = RelationshipGraphQueryService()

@@ -1,4 +1,4 @@
-"""Phase 09 relationship observation analysis pipeline."""
+"""Phase 09 relationship observation analysis pipeline and graph read model."""
 
 from app.services.relationships.candidates import (
     ALLOWED_RELATIONSHIP_EDGE_TYPES,
@@ -20,6 +20,19 @@ from app.services.relationships.judgment import (
     RelationshipJudgmentService,
     relationship_judgment_service,
 )
+from app.services.relationships.overrides import (
+    RelationshipOverrideService,
+    relationship_override_service,
+)
+from app.services.relationships.projection import (
+    RelationshipProjectionService,
+    relationship_projection_service,
+    replay_accepted_observations,
+)
+from app.services.relationships.query import (
+    RelationshipGraphQueryService,
+    relationship_graph_query_service,
+)
 from app.services.relationships.worker import (
     RelationshipObservationWorker,
     relationship_observation_worker,
@@ -32,12 +45,19 @@ __all__ = [
     "GateDecision",
     "RelationshipCandidateService",
     "RelationshipGateService",
+    "RelationshipGraphQueryService",
     "RelationshipJudgmentService",
     "RelationshipObservationWorker",
+    "RelationshipOverrideService",
+    "RelationshipProjectionService",
     "build_relationship_evidence_package",
     "package_hash_for",
     "relationship_candidate_service",
     "relationship_gate_service",
+    "relationship_graph_query_service",
     "relationship_judgment_service",
     "relationship_observation_worker",
+    "relationship_override_service",
+    "relationship_projection_service",
+    "replay_accepted_observations",
 ]
