@@ -43,12 +43,12 @@
 | v0.5 / Phase 6 自动质量与 CI 门禁 | 9/9 | **Complete** (REQ-AUTO-11 closed) |
 | Phase 7 语义/层级分块 | 6/6 | **Complete** (logic+tests+PG/indexing wiring) |
 | Phase 8 版本化小说分析与时间线 | 10/10 | **Complete** (35/35 must-haves verified) |
-| v0.7 / Phase 9-11 叙事关系、阅读问答与线索追踪 | Phase 09: 5/5; Phase 10: 5/5; Phase 11: 5/5 | **Phase 09 VERIFIED**; **Phase 10 PARTIAL**; **Phase 11 PARTIAL** (15/15 product; 1 adversarial residual) |
+| v0.7 / Phase 9-11 叙事关系、阅读问答与线索追踪 | Phase 09: 5/5; Phase 10: 5/5; Phase 11: 5/5 | **09 VERIFIED**; **10 PARTIAL** (real Playwright residual); **11 implement-complete** (adversarial residual closed) |
 
 ## Auto Start
 
-Phase 06–09 已完成。Phase 09 已独立验证通过（21/21 must-haves）。Phase 10 implement-complete + independent verification **PARTIAL**（19/20）。Phase 11 implement-complete + independent verification **PARTIAL**（15/15 product must-haves；对抗包级 `session.add` 扫描 1 失败；Playwright 本会话未重跑）。
-验证：`.planning/phases/06-automated-quality-ci/` SUMMARYs；`.planning/phases/07-semantic-hierarchical-chunking/07-VERIFICATION.md`；Phase 08 `08-VERIFICATION.md`；Phase 09 `09-VERIFICATION.md`；Phase 10 `10-VERIFICATION.md`；Phase 11 `11-VERIFICATION.md`。
+Phase 06–11 实现均已完成。Phase 09 独立验证通过（21/21）。Phase 10 验证 PARTIAL（19/20；`reader-chat-real` 需 PG）。Phase 11 实现完成，pure-module 写库扫描 residual 已关闭；可选补跑 `clue-real.spec.ts` 后做 v0.7 close-out。
+验证：Phase 08–11 各 `*-VERIFICATION.md` 与 09–11 SUMMARY。
 
 ## Backlog
 
