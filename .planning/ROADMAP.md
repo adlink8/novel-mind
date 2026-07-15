@@ -6,6 +6,7 @@
 - [x] v0.2 安全与架构修复 - 关闭安全、迁移、路由、依赖和导入可靠性阻断项。
 - [ ] v0.3 小说导入 + RAG 索引 - 导入/索引/搜索已交付，RAG 评测质量闭环仍有缺口。
 - [x] v0.5 自动质量与 CI 门禁 - 以全栈自动化和双模型仲裁替代人工 RAG 质量确认；REQ-AUTO-11 closed（06-08/06-09）。
+- [ ] v0.8 分层叙事记忆与层级 RAG - 复用现有证据资产，以 candidate-only 单书 dry-run 验证上层叙事记忆、局部重建和 evidence-final 分层检索。
 
 第一个 active milestone 已按要求设为并完成"审计与启动修复"。v0.3 经 2006-06-13 复审后恢复为 active，详见 `.planning/v0.3-MILESTONE-AUDIT.md`。
 
@@ -44,11 +45,12 @@
 | Phase 7 语义/层级分块 | 6/6 | **Complete** (logic+tests+PG/indexing wiring) |
 | Phase 8 版本化小说分析与时间线 | 10/10 | **Complete** (35/35 must-haves verified) |
 | v0.7 / Phase 9-11 叙事关系、阅读问答与线索追踪 | Phase 09: 5/5; Phase 10: 5/5; Phase 11: 5/5 | **09 VERIFIED**; **10 PARTIAL** (real Playwright residual); **11 implement-complete** (adversarial residual closed) |
+| v0.8 / Phase 12-17 分层叙事记忆与层级 RAG | 0/19 initial plans | **PLANNED** — 28/28 V08 requirements uniquely mapped; candidate-only/no pointer cutover |
 
 ## Auto Start
 
-Phase 06–11 实现均已完成。Phase 09 独立验证通过（21/21）。Phase 10 验证 PARTIAL（19/20；`reader-chat-real` 需 PG）。Phase 11 实现完成，pure-module 写库扫描 residual 已关闭；可选补跑 `clue-real.spec.ts` 后做 v0.7 close-out。
-验证：Phase 08–11 各 `*-VERIFICATION.md` 与 09–11 SUMMARY。
+下一执行入口为 **Phase 12: Read-only Asset Audit and Eligibility**。先讨论/规划 Phase 12；任何 v0.8 provider 调用都必须等待 Phase 12 对 active Phase 07 hierarchy 给出 `reusable_exact`。
+Phase 06–11 历史实现与验证状态保持不变；Phase 10 real Playwright residual 和 v0.3 质量缺口不因 v0.8 单书 dry-run 自动关闭。
 
 ## Backlog
 
@@ -192,3 +194,121 @@ Plans:
 - [x] 11-05 frozen fixtures, false-positive/spoiler/version adversarial tests, browser qualification, and release gate
 
 **Waves:** 1 → 2 → 3 → 4 → 5 complete. Verified: `.planning/phases/11-clue-and-foreshadow-tracking/11-VERIFICATION.md`. Alembic head `11cluetrack01`. Clue UI on `/analysis` only (no top-level `/clues`). Qualification: `backend/scripts/run_clue_qualification.py`. Phase 10 chat is never a clue source; Phase 09 reader outages remain `source_unavailable`, not zero signals.
+
+### Phase 12: Read-only Asset Audit and Eligibility
+
+**Goal:** 在任何模型调用或上层写入前，以只读方式证明单本小说现有 hierarchy 与可选分析资产是否可被 v0.8 精确复用，并给出可机器处理的阻断原因和最小重建范围。
+**Requirements:** V08-AUDIT-01, V08-AUDIT-02, V08-AUDIT-03, V08-AUDIT-04
+**Depends on:** Phase 07, Phase 08, Phase 09, Phase 11
+**Status:** PLANNED
+**Plans:** 3 initial plans
+
+**Success Criteria:**
+1. 运维者对一部 owner-scoped 小说运行审计后，可获得按 hierarchy、timeline、relationship、clue 的版本化资产清单，以及每项唯一的 `reusable_exact`、`rebuild_required`、`blocked` 或 `optional_unavailable` 判定和 reason codes。
+2. 审计会从 PostgreSQL 重算 active Phase 07 build 的 source snapshot、manifest、chapter→scene→evidence 父子关系、offset/content hash 和覆盖率；任一 required invariant 无效时，后续构建在 provider call 前被阻断。
+3. timeline、relationship 或 clue 缺失、不可用或 lineage 不匹配时会作为可选来源状态显式报告，不会被解释为“没有事件/关系/线索”，也不会阻断仅依赖 hierarchy 的资格。
+4. 自动化负向验证证明审计前后 provider call 数为零，现有数据未被修复，并且 chunk、timeline、clue 及其他生产 active pointer/revision 均未变化。
+
+Plans:
+- [ ] 12-01 audit contracts and read-only source adapters: eligibility enums, reason codes, owner/novel/version inventory, optional-source status
+- [ ] 12-02 hierarchy and domain lineage verification: manifest/tree/offset/hash/coverage checks with provider-call-before blocking
+- [ ] 12-03 owner-scoped audit CLI/API and PostgreSQL negative tests: report, minimal rebuild scope, no model/data/pointer writes
+
+### Phase 13: Candidate Memory Contracts and Provenance Authority
+
+**Goal:** 建立与现有分析生命周期隔离的不可变叙事记忆候选契约，使每条 Chapter State、Story Arc/Volume 和 Global Story Model 主张均可由数据库权威追到同一 source snapshot 的叶子原文。
+**Requirements:** V08-MEM-01, V08-MEM-02, V08-MEM-03, V08-MEM-04, V08-MEM-05
+**Depends on:** Phase 12
+**Status:** PLANNED
+**Plans:** 3 initial plans
+
+**Success Criteria:**
+1. 系统可创建独立于 timeline/relationship/clue 的 immutable `NarrativeMemoryVersion` candidate，并持久保存 owner、novel、version、source/hierarchy lineage、prompt/schema/model/config hashes；v0.8 不存在可达的 production promotion 路径。
+2. Chapter State、连续 Story Arc/Volume 和 Global Story Model 使用 strict typed claims/state deltas；extra fields、summary-only facts、包外 source refs 或未知 authoritative 字段会 fail closed。
+3. 对任一候选 claim，验证器可沿 node/edge/source links 下钻并从服务器 `Chapter.content[start:end]` 重切，证明 owner、novel、snapshot、offset 和 content hash 完全一致；断链或宽泛引用使候选不合格。
+4. PostgreSQL integration tests 证明父子图无环、章节范围合法、manifest 可从排序后的 node/edge/link rows 重算，且 candidate 创建/验证不会创建或移动任何 active pointer。
+
+Plans:
+- [ ] 13-01 narrative memory PostgreSQL authority: additive version/run/stage/node/edge/source-link/report migration and composite scope constraints
+- [ ] 13-02 strict ChapterState/StoryArc/GlobalStoryModel schemas: typed claims, deltas, uncertainty, visibility and builder lineage
+- [ ] 13-03 provenance closure and manifest gates: DAG/range/source re-slice validation, append-only enforcement and no-pointer invariants
+
+### Phase 14: Durable Bottom-up Candidate Builder
+
+**Goal:** 对已通过 Phase 12 审计的单本小说，按 Chapter State → Story Arc/Volume → Global Story Model 自下而上构建可恢复候选，同时隔离章节失败并约束所有模型费用与可选来源。
+**Requirements:** V08-BUILD-01, V08-BUILD-02, V08-BUILD-03, V08-BUILD-04, V08-BUILD-05
+**Depends on:** Phase 13
+**Status:** PLANNED
+**Plans:** 4 initial plans
+
+**Success Criteria:**
+1. 运维者启动 candidate dry-run 后，durable worker 先逐章生成 evidence-bound Chapter State，再按显式卷界或版本化连续范围生成 Story Arc/Volume，最后只从已验证 arcs 生成单个 Global Story Model。
+2. 每个模型调用在执行前完成预算预留，并绑定 frozen source/prompt/schema/model/config exact-cache key；任务支持 checkpoint、取消和恢复，未知价格或依赖失效时零 provider 调用并明确暂停。
+3. 模拟单章失败时，已完成兄弟 Chapter States 保持 byte-identical，worker 仅阻断包含该章的 arc 与 Global；恢复后从失败 stage 继续而不是无条件重跑整本小说。
+4. timeline、accepted relationship observations 和 clue lifecycle 仅在 lineage/evidence 合格时作为可选 enrichment；来源 unavailable 被显式记录，Reader Chat imports/text/citations 均不能进入事实 package。
+5. 构建完成后数据库重算 candidate manifest 与 worker artifact 一致，报告列出完成/失败 stages、calls、tokens、cost、cache hits 和来源状态，且所有生产 pointers 保持不变。
+
+Plans:
+- [ ] 14-01 durable chapter-state worker: frozen packages, strict generation, budget, exact cache, checkpoint, cancel and resume
+- [ ] 14-02 contiguous arc/volume planning and aggregation: explicit volume preference, deterministic coverage gates and evidence closure
+- [ ] 14-03 global story aggregation and candidate manifest: validated-child-only claims, conflict/open-loop handling and DB recomputation
+- [ ] 14-04 optional source adapters and failure isolation: timeline/relationship/clue enrichment, chat exclusion and partial-stage recovery tests
+
+### Phase 15: Adaptive Hierarchical Retrieval and Leaf Evidence Safety
+
+**Goal:** 在不替换现有 Reader Chat 的前提下，提供可审计、全程防剧透的离线分层检索实验，使 local/arc/global/mixed 查询能够下钻并最终只引用重验后的叶子原文。
+**Requirements:** V08-RETR-01, V08-RETR-02, V08-RETR-03, V08-RETR-04, V08-RETR-05
+**Depends on:** Phase 14
+**Status:** PLANNED
+**Plans:** 3 initial plans
+
+**Success Criteria:**
+1. 冻结问题进入实验入口后，确定性 router 会记录 local、arc、global 或 mixed 起始层和 reason；不同层候选确实改变检索路径，而不是仅把上层摘要附加到 leaf top-k。
+2. 检索可从 Global/Arc 向 Chapter State 下钻，并在上层缺失、partial 或误路由时使用 collapsed multi-level 或 raw/leaf fallback；返回结果包含 traversal path、各层候选、omitted counts 和 fallback reason。
+3. 所有最终 citation 都由服务端在 frozen hierarchy build 中重新校验 chapter、Unicode code-point offsets 和 content hash；摘要、similarity、routing score 或聊天文本不能作为 citation。
+4. owner、novel、candidate version 和 persisted reading cutoff 在候选选择、下钻、leaf expansion、rerank、cache 与最终 manifest 每一步生效；跨 scope 或 future evidence fail closed。
+5. 对抗测试证明未读 arc 的标题、节点数量、分数、trace、cache key 和 source status 不泄露未来内容，且实验入口默认关闭、不改变现有 Reader Chat consumer output。
+
+Plans:
+- [ ] 15-01 deterministic query router and visible candidate sets: local/arc/global/mixed intent, cutoff-first SQL/metadata filtering
+- [ ] 15-02 multi-level descent and leaf resolver: adaptive/collapsed candidates, raw fallback, server re-slice and frozen retrieval manifest
+- [ ] 15-03 routing audit and adversarial safety: owner/version/tenant-cache IDOR, future-metadata leakage and reader-chat no-cutover tests
+
+### Phase 16: Dependency-aware Local Rebuild and Carry-forward
+
+**Goal:** 以可验证的依赖图和变更 oracle 计算 candidate 的最小安全 dirty closure，在边界不确定时保守扩散，并量化未变资产复用带来的调用与成本节省。
+**Requirements:** V08-REUSE-01, V08-REUSE-02, V08-REUSE-03, V08-REUSE-04
+**Depends on:** Phase 15
+**Status:** PLANNED
+**Plans:** 3 initial plans
+
+**Success Criteria:**
+1. 对 chapter edit、insert、delete、reorder 和 arc-boundary change fixture，系统可输出由 source/evidence → Chapter State → Arc/Volume → Global 构成的 dirty closure 及每个节点的失效原因。
+2. 未进入 dirty closure 的节点在新 candidate 中以 checksum-identical、lineage-valid 的方式 carry forward；验证证明它们不会产生 provider call、embedding 或重复索引写入。
+3. 当 arc 边界、跨章状态延续或 dependency lineage 无法证明稳定时，planner 会将重建范围扩大到受影响 arc/后缀和 Global，而不会保留可能 stale 的父节点。
+4. 重用报告同时给出 rebuilt/carried/stale counts、实际与避免的 calls/tokens/cost、dirty range 和 cache reuse；与 full rebuild upper bound 的口径可复核。
+
+Plans:
+- [ ] 16-01 dependency graph and change oracle: edit/insert/delete/reorder/boundary fixtures with deterministic dirty reasons
+- [ ] 16-02 checksum carry-forward and conservative propagation: no-change byte identity, stale-ref rejection and stage-only rebuild
+- [ ] 16-03 reuse economics report: avoided calls/tokens/cost, rebuild scope and PostgreSQL authority verification
+
+### Phase 17: Frozen Single-book Qualification and Candidate Verdict
+
+**Goal:** 使用冻结单书题集和同源 leaf baseline 独立验证结构、溯源、安全、检索质量、faithfulness、成本与复用收益，只产出 `qualified_candidate` 或 `blocked`，绝不执行 promotion。
+**Requirements:** V08-QUAL-01, V08-QUAL-02, V08-QUAL-03, V08-QUAL-04, V08-QUAL-05
+**Depends on:** Phase 12, Phase 13, Phase 14, Phase 15, Phase 16
+**Status:** PLANNED
+**Plans:** 3 initial plans
+
+**Success Criteria:**
+1. 资格运行使用在查看候选结果前冻结的单书 source、policy 和问题集，且题目明确覆盖 local、跨章节/arc、whole-book/global、no-answer 和 spoiler 分桶。
+2. hierarchical candidate 与 leaf/raw baseline 使用同一 source snapshot、reading cutoff、问题和预算口径；报告逐桶给出 leaf evidence recall/ranking、routing hit/fallback、answer faithfulness/relevance、p50/p95、calls/tokens/cost 和 reuse 指标。
+3. fresh PostgreSQL verifier 独立重算结构、manifest、claim→leaf lineage、owner/snapshot scope、spoiler visibility 和所有 pointer before/after；任一断链、越界、泄漏、空必需指标或 pointer 变化都得到 `blocked`。
+4. fixed-command qualification 只能返回 `qualified_candidate` 或 `blocked`，并保存 policy/fixture/source/prompt/schema/model/config hashes 与命令输出 digest；没有 endpoint、CLI 或 worker 路径会执行 promotion。
+5. 最终报告明确说明这是单书 candidate 结论，不会替换 timeline、relationship、clue 或 Reader Chat，也不会宣称关闭 v0.3 的 100 confirmed、faithfulness/cost 全项目缺口。
+
+Plans:
+- [ ] 17-01 frozen single-book fixture and policy: bucketed questions, no-answer/spoiler adversarial cases, same-source baseline and predeclared thresholds
+- [ ] 17-02 comparative evaluation and complete metrics: retrieval, routing, faithfulness, latency, cost, reuse and fallback reports
+- [ ] 17-03 independent PostgreSQL qualification authority: fixed commands, fresh observer, pointer-diff proof and candidate-only verdict
