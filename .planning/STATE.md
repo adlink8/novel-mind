@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v0.7
 milestone_name: Narrative Relationships, Reader AI, and Clue Tracking
 status: executing
-last_updated: "2026-07-15T01:43:00.000Z"
+last_updated: "2026-07-15T09:50:00.000Z"
 progress:
   total_phases: 11
   completed_phases: 10
@@ -23,17 +23,17 @@ See `.planning/PROJECT.md` and `IMPLEMENTATION-STATUS.md`.
 
 ## Current Position
 
-Phase: 10 (Reader Selection AI and Multi-Session Conversations) — implement-complete (5/5 plans)
-Plan: 10-05 complete
-**Next:** Phase 10 verification/UAT if desired; then Phase 11 clue tracking (never treat chat as facts)
+Phase: 10 (Reader Selection AI and Multi-Session Conversations) — **PARTIAL verified** (19/20 must-haves; real Playwright residual)
+Plan: 10-05 complete; `10-VERIFICATION.md` written
+**Next:** When Postgres is up, run `reader-chat-real.spec.ts` and re-verify truth #20; then Phase 11 clue tracking (never treat chat as facts)
 
 - Branch: `feat/phase2-wave2-embedding`
-- Last activity: 2026-07-15 — completed 10-05 reader selection UI + multi-session panel + release gate
+- Last activity: 2026-07-15 — independent Phase 10 verification (PARTIAL; 5432 offline)
 - Plan directories: `.planning/phases/09-dynamic-character-relationship-graph/`, `.planning/phases/10-reader-selection-ai-and-multi-session-conversations/`, `.planning/phases/11-clue-and-foreshadow-tracking/`
 
 ## Auto Routing
 
-Phase 10-05 完成（implement-complete）。可进入 Phase 11 规划/执行，但聊天不得作为线索事实源。本机 real e2e 需 Postgres 在线时补跑 `reader-chat-real.spec.ts`。
+Phase 10 independent verification: **PARTIAL** (19/20). Backend 93 + release gate 10 + frontend reader 19 passed; Phase 09 production reader wired; no clue product UI. Residual: real e2e needs Postgres 5432. Phase 11 may proceed for planning/execution but chat is never a fact source.
 
 ## Phase 10 Execution Metrics
 
@@ -140,11 +140,11 @@ REQ-AUTO-01..11 已交付（含 06-08 QualityRun 持久化、06-09 BaselineCandi
 
 ## Next Action
 
-1. When Postgres is up: run `frontend` e2e `reader-chat-real.spec.ts` (desktop+mobile) and optional full release collect-commands.
+1. When Postgres is up: run `frontend` e2e `reader-chat-real.spec.ts` (desktop+mobile); update `10-VERIFICATION.md` truth #20 → VERIFIED if green.
 2. Phase 11 clue tracking — never import reader-chat as fact source.
-3. 保留当前所有非 10-05 的本地 WIP，不纳入本次提交。
+3. 保留当前所有非 verification 的本地 WIP，不纳入本次提交。
 
 ## Session
 
-- Stopped at: Completed 10-05-PLAN.md (reader UI + release gate)
+- Stopped at: Independent Phase 10 verification report (`10-VERIFICATION.md`, PARTIAL)
 - Resume file: None
