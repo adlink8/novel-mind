@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v0.7
 milestone_name: Narrative Relationships, Reader AI, and Clue Tracking
 status: executing
-last_updated: "2026-07-15T10:00:00.000Z"
+last_updated: "2026-07-15T01:12:41.000Z"
 progress:
   total_phases: 11
   completed_phases: 9
   total_plans: 56
-  completed_plans: 47
-  percent: 84
+  completed_plans: 48
+  percent: 86
 ---
 
 # Project State
@@ -23,21 +23,22 @@ See `.planning/PROJECT.md` and `IMPLEMENTATION-STATUS.md`.
 
 ## Current Position
 
-Phase: 10 (Reader Selection AI and Multi-Session Conversations) — in progress (1/5 plans)
-Plan: 10-01 complete
-**Next:** 10-02 owner-scoped multi-session lifecycle API
+Phase: 10 (Reader Selection AI and Multi-Session Conversations) — in progress (2/5 plans)
+Plan: 10-02 complete
+**Next:** 10-03 server-verified selections and visible-context assembly (first incomplete plan)
 
 - Branch: `feat/phase2-wave2-embedding`
-- Last activity: 2026-07-15 — completed 10-01 reader-chat persistence authority
+- Last activity: 2026-07-15 — completed 10-02 conversation lifecycle API
 - Plan directories: `.planning/phases/09-dynamic-character-relationship-graph/`, `.planning/phases/10-reader-selection-ai-and-multi-session-conversations/`, `.planning/phases/11-clue-and-foreshadow-tracking/`
 
 ## Auto Routing
 
-Phase 10-01 完成；下一步执行 10-02（会话生命周期 API）。不进入 Phase 11 线索产品代码。
+Phase 10-02 完成；下一步执行第一个未完成 plan（10-03 若 SUMMARY 不存在）。不进入 Phase 11 线索产品代码。不把 10-03 标为 done。
 
 ## Phase 10 Execution Metrics
 
 - 10-01: 45min, 3 tasks, 8 files, 28 targeted unit+PostgreSQL migration tests passed (0 skip); alembic head `12readerchat01`.
+- 10-02: 25min, 3 tasks, 7 files, 9 targeted PostgreSQL API/IDOR tests passed (0 skip); OpenAPI conversation paths + ruff clean.
 
 ## Phase 10 Decisions
 
@@ -46,6 +47,10 @@ Phase 10-01 完成；下一步执行 10-02（会话生命周期 API）。不进�
 - Suggestions always require_explicit_confirmation=true; no apply/confirm domain write contract.
 - Hard-delete cascades private chat content; novel-scoped chat ledger survives conversation delete.
 - reader_* tables never FK into timeline/relationship/clue fact tables.
+- Conversation API injects ContextBuilder; Plan 02 uses DeterministicContextBuilder until Plan 03.
+- Archived conversations are readable but reject new messages with 409.
+- Child resources always scoped owner+novel+conversation; inaccessible IDs return 404 with no ownership leak.
+- Row lock on reader_conversations.next_sequence; client_message_id unique idempotency with savepoint recovery.
 
 ## Phase 09 Execution Metrics
 
@@ -114,64 +119,18 @@ Phase 10-01 完成；下一步执行 10-02（会话生命周期 API）。不进�
 
 REQ-AUTO-01..11 已交付（含 06-08 QualityRun 持久化、06-09 BaselineCandidate prepare/commit 与跨 chunker 报告）。
 
-关键产物：
-
-- `backend/app/models/eval.py` — `QualityRun` / `BaselineCandidate` / `ActiveBaseline`
-- Alembic: `07qualityruns01`, `08baselinecand01`
-- API: `/api/eval/quality/runs*`, `/api/eval/quality/baseline/*`, `/api/eval/quality/reports/cross-chunker`
-
 ## Phase 07 — COMPLETE (logic + tests; PG wiring residual)
 
-| Plan | 交付 |
-|---|---|
-| 07-01 | baseline manifest、unicode offsets、`chunking/{schemas,manifests,baseline}` |
-| 07-02 | AtomicSpan、BoundaryProposal、CandidateSegmentation |
-| 07-03 | BoundaryAdjudicator、BudgetLedger、adversarial fallback |
-| 07-04 | HierarchyTree chapter→scene→evidence、scene expand / raw fallback |
-| 07-05 | InMemoryBuildStore 不可变构建、增量、reconcile、promote、rollback |
-| 07-06 | 同 snapshot A/B、`QualifiedChunkerEvidence`、release verifier、CLI |
-
 包路径：`backend/app/services/chunking/`  
-CLI：`backend/scripts/run_chunker_qualification.py`  
-测试：`tests/unit|integration/chunking` + adversarial + legacy `test_chunking` → **88 passed**
-
-### PG / indexing wiring (done)
-
-- Alembic `09chunkhier01`: `chunk_builds`, `chunk_active_pointers`, `chunk_hierarchy_nodes`, `text_chunks.hierarchy_*`
-- `pg_store.create_and_persist_hierarchy_build` after raw index
-- `hybrid_search` scene expand with raw fallback
-- Tests: `test_pg_hierarchy_wiring.py` + full chunking suite
-
-### Residuals
-
-- 分支上仍有本地 BGE / 阅读器 UX 等非 Phase 07 WIP 未提交。
-
-## Verified In v0.3 (historical snapshot)
-
-### 混合搜索后端
-
-- BM25 全文搜索（PostgreSQL tsvector）
-- 向量语义搜索（ChromaDB；默认 embedding 已改为本地 BGE 路径，见运行配置）
-- 加权融合排序
-- 全局 / 小说内搜索 API
-
-### 前端搜索 UI
-
-- 全局搜索栏、结果页、阅读页内搜索
-
-### RAG 评测基础设施
-
-- EvalDataset / EvalRun / EvalResult + quality durable jobs
-- Phase 06 自动质量门与 baseline 晋升
+测试：`tests/unit|integration/chunking` + adversarial + legacy → **88 passed**
 
 ## Next Action
 
-1. Start Phase 10 (Reader Text-Selection AI and Multi-Session Conversations); depend on `load_filtered_relationship_graph` only.
+1. Execute first incomplete Phase 10 plan (10-03 context assembly unless already done in parallel).
 2. Phase 11 may depend on `list_accepted_observation_refs`; never treat chat as fact source.
 3. 保留当前所有非 `.planning` 的本地 WIP，不纳入本次规划提交。
-4. Optional residual: re-run Playwright `relationships-real.spec.ts` and full frontend suite/build in CI or full-stack host if desired (not blocking).
 
 ## Session
 
-- Stopped at: Completed 09-VERIFICATION.md (passed)
+- Stopped at: Completed 10-02-PLAN.md
 - Resume file: None
