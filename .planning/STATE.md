@@ -1,15 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v0.7
-milestone_name: Narrative Relationships, Reader AI, and Clue Tracking
-status: phase_complete
-last_updated: "2026-07-15T10:55:00.000Z"
+milestone: v0.8
+milestone_name: 分层叙事记忆与层级 RAG
+status: planning
+last_updated: "2026-07-15T09:23:33.333Z"
+last_activity: 2026-07-15
 progress:
-  total_phases: 11
-  completed_phases: 11
-  total_plans: 56
-  completed_plans: 56
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -23,14 +24,10 @@ See `.planning/PROJECT.md` and `IMPLEMENTATION-STATUS.md`.
 
 ## Current Position
 
-Phase: 11 (Clue and Foreshadow Tracking) — implement-complete; residual adversarial scan fixed
-Plan: 11-05 complete; independent verification written; pure-module write scan scoped
-**Next:** optional re-run `clue-real.spec.ts` / `reader-chat-real.spec.ts` on PG; v0.7 milestone close-out when ready
-
-- Branch: `feat/phase2-wave2-embedding`
-- Last activity: 2026-07-15 — Phase 09-11 execution complete; clue adversarial residual closed
-- Plan directories: `.planning/phases/09-dynamic-character-relationship-graph/`, `.planning/phases/10-reader-selection-ai-and-multi-session-conversations/`, `.planning/phases/11-clue-and-foreshadow-tracking/`
-- Verification: `.planning/phases/11-clue-and-foreshadow-tracking/11-VERIFICATION.md`
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-07-15 — Milestone v0.8 started
 
 ## Auto Routing
 
