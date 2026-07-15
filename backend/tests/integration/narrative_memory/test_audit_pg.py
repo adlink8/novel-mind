@@ -376,6 +376,7 @@ async def test_clue_requires_validated_pointer_target_and_counts_real_facts(
         )
         assert clue.status == EligibilityStatus.OPTIONAL_UNAVAILABLE
         assert ReasonCode.OPTIONAL_LINEAGE_MISMATCH in clue.reason_codes
+        assert invalid_report.provider_calls_allowed is True
 
 
 def test_rebuild_ranges_are_coalesced() -> None:
