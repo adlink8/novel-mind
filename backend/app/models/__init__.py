@@ -84,6 +84,16 @@ from app.models.knowledge_unit import (
     NarrativeUnit,
     NarrativeUnitEvidenceLink,
 )
+from app.models.relationship import (
+    CharacterIdentityOverride,
+    RelationshipBuildRun,
+    RelationshipEvidenceLink,
+    RelationshipObservation,
+    RelationshipObservationCandidate,
+    RelationshipObservationJudgment,
+    RelationshipOverride,
+    RelationshipProjectionAudit,
+)
 
 __all__ = [
     "Base",
@@ -132,4 +142,12 @@ __all__ = [
     "NarrativePromotionJournal",
     "NarrativeRefreshRun",
     "NarrativeSourceWatermark",
+    "RelationshipBuildRun",
+    "RelationshipObservationCandidate",
+    "RelationshipObservationJudgment",
+    "RelationshipObservation",
+    "RelationshipEvidenceLink",
+    "CharacterIdentityOverride",
+    "RelationshipOverride",
+    "RelationshipProjectionAudit",
 ]
