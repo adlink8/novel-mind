@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
+from pathlib import Path
+from threading import Event
+
 import pytest
 from sqlalchemy import ForeignKeyConstraint, create_engine, inspect, text
 from sqlalchemy.exc import DBAPIError, IntegrityError
@@ -35,6 +39,22 @@ FORBIDDEN_TABLE_FRAGMENTS = {
 
 HEX_A = "a" * 64
 HEX_B = "b" * 64
+
+
+def test_migration_is_revision_frozen_and_never_imports_runtime_models():
+    migration_path = (
+        Path(__file__).resolve().parents[3]
+        / "migrations"
+        / "versions"
+        / "13_narrative_memory_authority.py"
+    )
+    source = migration_path.read_text(encoding="utf-8")
+
+    assert "from app.models" not in source
+    assert "Base.metadata" not in source
+    assert source.count("CREATE TABLE narrative_memory_") == 7
+    assert source.count("op.drop_table(table_name)") == 1
+    assert "FOR UPDATE" in source
 
 
 def _seed_candidate(engine, *, seal: bool = False) -> dict[str, int | str]:
@@ -489,19 +509,32 @@ def test_graph_trigger_rejects_transition_range_and_cycle(
     with engine.begin() as conn, pytest.raises(DBAPIError) as exc:
         conn.execute(
             text(edge_sql),
+            edge_params(
+                ids["global_id"], ids["chapter_node_id"], "derives_from"
+            ),
+        )
+    assert "memory_edge_transition_violation" in str(exc.value)
+
+    with engine.begin() as conn, pytest.raises(DBAPIError) as exc:
+        conn.execute(
+            text(edge_sql),
             edge_params(ids["chapter_node_id"], ids["arc_id"], "derives_from"),
         )
     assert "memory_edge_range_violation" in str(exc.value)
 
+    # Seed a corrupt reverse edge with user triggers disabled, then prove the
+    # deferred recursive guard rejects a legal edge that would close the cycle.
     with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE narrative_memory_edges DISABLE TRIGGER USER"))
         conn.execute(
             text(edge_sql),
-            edge_params(ids["arc_id"], ids["arc_peer_id"], "derives_from"),
+            edge_params(ids["arc_id"], ids["global_id"], "derives_from"),
         )
+        conn.execute(text("ALTER TABLE narrative_memory_edges ENABLE TRIGGER USER"))
     with engine.begin() as conn, pytest.raises(DBAPIError) as exc:
         conn.execute(
             text(edge_sql),
-            edge_params(ids["arc_peer_id"], ids["arc_id"], "derives_from"),
+            edge_params(ids["global_id"], ids["arc_id"], "derives_from"),
         )
     assert "memory_edge_cycle_violation" in str(exc.value)
 
@@ -513,6 +546,113 @@ def test_graph_trigger_rejects_transition_range_and_cycle(
             )
         ).scalar_one()
         assert trigger is True
+    engine.dispose()
+
+
+def test_manifest_lock_serializes_racing_content_insert(
+    empty_postgres: str, require_postgres: None
+):
+    run_alembic("upgrade", "head", database_url=empty_postgres)
+    engine = create_engine(empty_postgres, pool_size=4)
+    ids = _seed_candidate(engine)
+    manifest_sql = text(
+        """
+        INSERT INTO narrative_memory_manifests (
+            owner_id,novel_id,version_id,manifest_schema_version,
+            component_counts,component_hashes,manifest_checksum
+        ) VALUES (:owner,:novel,:version,'v1','{}','{}',:hash)
+        """
+    )
+    late_node_sql = text(
+        """
+        INSERT INTO narrative_memory_nodes (
+            owner_id,novel_id,version_id,node_key,node_kind,chapter_start,
+            chapter_end,schema_version,content_checksum,model_lineage_checksum
+        ) VALUES (:owner,:novel,:version,'racing-node','chapter_state',2,2,
+                  'v1',:hash,:hash)
+        """
+    )
+    params = {
+        "owner": ids["owner_id"],
+        "novel": ids["novel_id"],
+        "version": ids["version_id"],
+        "hash": HEX_A,
+    }
+
+    sealing = engine.connect()
+    sealing.execute(manifest_sql, params)
+    started = Event()
+
+    def insert_content() -> None:
+        with engine.begin() as conn:
+            started.set()
+            conn.execute(late_node_sql, params)
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(insert_content)
+        assert started.wait(timeout=2)
+        with pytest.raises(FutureTimeout):
+            future.result(timeout=0.25)
+        sealing.commit()
+        with pytest.raises(DBAPIError) as exc:
+            future.result(timeout=5)
+        assert "sealed_candidate_violation" in str(exc.value)
+    sealing.close()
+    engine.dispose()
+
+
+def test_edge_version_lock_serializes_racing_reverse_edge(
+    empty_postgres: str, require_postgres: None
+):
+    run_alembic("upgrade", "head", database_url=empty_postgres)
+    engine = create_engine(empty_postgres, pool_size=4)
+    ids = _seed_candidate(engine)
+    edge_sql = text(
+        """
+        INSERT INTO narrative_memory_edges (
+            owner_id,novel_id,version_id,source_node_id,target_node_id,
+            edge_type,edge_checksum,model_lineage_checksum
+        ) VALUES (:owner,:novel,:version,:source,:target,:kind,:hash,:hash)
+        """
+    )
+    common = {
+        "owner": ids["owner_id"],
+        "novel": ids["novel_id"],
+        "version": ids["version_id"],
+        "hash": HEX_A,
+    }
+    forward = {
+        **common,
+        "source": ids["global_id"],
+        "target": ids["arc_peer_id"],
+        "kind": "contains",
+    }
+    reverse = {
+        **common,
+        "source": ids["arc_peer_id"],
+        "target": ids["global_id"],
+        "kind": "derives_from",
+    }
+
+    first = engine.connect()
+    first.execute(edge_sql, forward)
+    started = Event()
+
+    def insert_reverse() -> None:
+        with engine.begin() as conn:
+            started.set()
+            conn.execute(edge_sql, reverse)
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(insert_reverse)
+        assert started.wait(timeout=2)
+        with pytest.raises(FutureTimeout):
+            future.result(timeout=0.25)
+        first.commit()
+        with pytest.raises(DBAPIError) as exc:
+            future.result(timeout=5)
+        assert "memory_edge_transition_violation" in str(exc.value)
+    first.close()
     engine.dispose()
 
 
