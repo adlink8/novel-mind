@@ -43,12 +43,12 @@
 | v0.5 / Phase 6 自动质量与 CI 门禁 | 9/9 | **Complete** (REQ-AUTO-11 closed) |
 | Phase 7 语义/层级分块 | 6/6 | **Complete** (logic+tests+PG/indexing wiring) |
 | Phase 8 版本化小说分析与时间线 | 10/10 | **Complete** (35/35 must-haves verified) |
-| v0.7 / Phase 9-11 叙事关系、阅读问答与线索追踪 | 0/3 phases planned | **Planning** (implementation not started) |
+| v0.7 / Phase 9-11 叙事关系、阅读问答与线索追踪 | Phase 09: 1/5 plans | **Executing** (09-01 complete) |
 
 ## Auto Start
 
-Phase 06、Phase 07 与 Phase 08 均已完成。Phase 09-11 仅完成方案规划，尚未开始实现。auto-start 保持关闭。
-验证：`.planning/phases/06-automated-quality-ci/` SUMMARYs；`.planning/phases/07-semantic-hierarchical-chunking/07-VERIFICATION.md`；Phase 08 `08-VERIFICATION.md`。
+Phase 06–08 已完成。Phase 09 已开始执行（09-01 complete）。Phase 10–11 仍为 planned only。
+验证：`.planning/phases/06-automated-quality-ci/` SUMMARYs；`.planning/phases/07-semantic-hierarchical-chunking/07-VERIFICATION.md`；Phase 08 `08-VERIFICATION.md`；Phase 09 `09-01-SUMMARY.md`。
 
 ## Backlog
 
@@ -150,10 +150,10 @@ Plans:
 **Goal:** 基于已证据门控的人物关系事实和时间线版本，生成可按叙事进度演化、默认防剧透的小说人物关系图。
 **Requirements:** REQ-REL-01..06
 **Depends on:** Phase 04, Phase 08
-**Status:** PLANNED ONLY — implementation not started
+**Status:** IN PROGRESS — 09-01 complete
 
 Plans:
-- [ ] 09-01 append-only relationship observation contracts, evidence lineage, overrides, and migration
+- [x] 09-01 append-only relationship observation contracts, evidence lineage, overrides, and migration
 - [ ] 09-02 deterministic relationship candidates, bounded evidence packages, LLM judgment, and gates
 - [ ] 09-03 owner/version/spoiler graph API, fold, overrides, and replayable Neo4j projection
 - [ ] 09-04 Cytoscape.js analysis workspace, evidence panel, timeline linking, and large-graph degradation
