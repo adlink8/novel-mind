@@ -125,6 +125,24 @@ from app.schemas.knowledge_unit import (
     NarrativeUnitCreate,
     NarrativeUnitResponse,
 )
+from app.schemas.clue import (
+    ClueEvidenceRef,
+    ClueHumanActionRequest,
+    ClueLifecycleEventContract,
+    ClueLifecycleState,
+    ClueLinkContract,
+    ClueOverrideContract,
+    ClueSemanticJudgment,
+    ClueVersionDiff,
+    ClueVersionLineage,
+    ClueVisibleEnvelope,
+    ClueVisibleItem,
+    MachineClueContract,
+    LEGAL_TRANSITIONS,
+    is_legal_transition,
+    replay_lifecycle,
+    validate_lifecycle_event,
+)
 
 __all__ = [
     # 通用
@@ -203,4 +221,21 @@ __all__ = [
     "NarrativeIndexBuildCreate",
     "NarrativeActivePointerCreate",
     "NarrativePromotionJournalCreate",
+    # Clue / foreshadow (Phase 11)
+    "ClueLifecycleState",
+    "ClueEvidenceRef",
+    "ClueVersionLineage",
+    "MachineClueContract",
+    "ClueLifecycleEventContract",
+    "ClueLinkContract",
+    "ClueOverrideContract",
+    "ClueSemanticJudgment",
+    "ClueVersionDiff",
+    "ClueVisibleItem",
+    "ClueVisibleEnvelope",
+    "ClueHumanActionRequest",
+    "LEGAL_TRANSITIONS",
+    "is_legal_transition",
+    "replay_lifecycle",
+    "validate_lifecycle_event",
 ]

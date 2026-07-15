@@ -106,6 +106,20 @@ from app.models.reader_chat import (
     ReaderMessageSelection,
     ReaderModelCallAttempt,
 )
+from app.models.clue import (
+    ClueActivePointer,
+    ClueAnalysisRun,
+    ClueAnalysisVersion,
+    ClueBudgetLedger,
+    ClueBudgetReservation,
+    ClueEvidenceRef,
+    ClueLifecycleEvent,
+    ClueLink,
+    ClueModelCallAttempt,
+    ClueOverride,
+    CluePointerJournal,
+    MachineClue,
+)
 
 __all__ = [
     "Base",
@@ -172,4 +186,16 @@ __all__ = [
     "ReaderModelCallAttempt",
     "ReaderBudgetLedger",
     "ReaderBudgetReservation",
+    "ClueAnalysisVersion",
+    "ClueAnalysisRun",
+    "MachineClue",
+    "ClueEvidenceRef",
+    "ClueLifecycleEvent",
+    "ClueLink",
+    "ClueOverride",
+    "ClueBudgetLedger",
+    "ClueBudgetReservation",
+    "ClueModelCallAttempt",
+    "ClueActivePointer",
+    "CluePointerJournal",
 ]
