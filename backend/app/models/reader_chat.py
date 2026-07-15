@@ -203,7 +203,7 @@ class ReaderContextManifest(TimestampMixin, Base):
         nullable=False,
     )
     reading_progress_snapshot: Mapped[dict] = mapped_column(
-        JSON, nullable=False, default=dict, server_default=text("'{}'::json")
+        JSON, nullable=False, default=dict, server_default=text("'{}'")
     )
     full_book: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default="false"
@@ -216,10 +216,10 @@ class ReaderContextManifest(TimestampMixin, Base):
     hierarchy_checksum: Mapped[str] = mapped_column(String(64), nullable=False)
     manifest_checksum: Mapped[str] = mapped_column(String(64), nullable=False)
     prompt_inputs: Mapped[dict] = mapped_column(
-        JSON, nullable=False, default=dict, server_default=text("'{}'::json")
+        JSON, nullable=False, default=dict, server_default=text("'{}'")
     )
     omitted_evidence_counts: Mapped[dict] = mapped_column(
-        JSON, nullable=False, default=dict, server_default=text("'{}'::json")
+        JSON, nullable=False, default=dict, server_default=text("'{}'")
     )
 
 
@@ -266,7 +266,7 @@ class ReaderContextEvidenceRef(Base):
         Integer, nullable=False, default=0, server_default="0"
     )
     version_lineage: Mapped[dict] = mapped_column(
-        JSON, nullable=False, default=dict, server_default=text("'{}'::json")
+        JSON, nullable=False, default=dict, server_default=text("'{}'")
     )
 
 
@@ -353,12 +353,12 @@ class ReaderGenerationJob(TimestampMixin, Base):
     schema_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     context_manifest_checksum: Mapped[str] = mapped_column(String(64), nullable=False)
     model_lineage: Mapped[dict] = mapped_column(
-        JSON, nullable=False, default=dict, server_default=text("'{}'::json")
+        JSON, nullable=False, default=dict, server_default=text("'{}'")
     )
     decoding_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     config_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     price_snapshot: Mapped[dict] = mapped_column(
-        JSON, nullable=False, default=dict, server_default=text("'{}'::json")
+        JSON, nullable=False, default=dict, server_default=text("'{}'")
     )
     response_hash: Mapped[str | None] = mapped_column(String(64))
     error_code: Mapped[str | None] = mapped_column(String(80))
@@ -403,7 +403,7 @@ class ReaderModelCallAttempt(TimestampMixin, Base):
     request_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     response_hash: Mapped[str | None] = mapped_column(String(64))
     usage: Mapped[dict] = mapped_column(
-        JSON, nullable=False, default=dict, server_default=text("'{}'::json")
+        JSON, nullable=False, default=dict, server_default=text("'{}'")
     )
     cost_usd: Mapped[Decimal | None] = mapped_column(Numeric(18, 8))
     latency_ms: Mapped[int | None] = mapped_column(Integer)
@@ -512,5 +512,5 @@ class ReaderBudgetReservation(TimestampMixin, Base):
     output_tokens: Mapped[int] = mapped_column(Integer, nullable=False)
     cost_usd: Mapped[Decimal] = mapped_column(Numeric(18, 8), nullable=False)
     settled_usage: Mapped[dict] = mapped_column(
-        JSON, nullable=False, default=dict, server_default=text("'{}'::json")
+        JSON, nullable=False, default=dict, server_default=text("'{}'")
     )

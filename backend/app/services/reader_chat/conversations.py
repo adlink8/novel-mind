@@ -114,9 +114,93 @@ class ContextBuilder(Protocol):
     ) -> ContextGraph: ...
 
 
+class ProductionContextBuilder:
+    """Plan 03 production assembly: exact selection + visible-set-first manifest."""
+
+    async def build(
+        self,
+        db: AsyncSession,
+        *,
+        novel: Novel,
+        owner_id: int,
+        conversation_id: int,
+        selection: SelectionCoordinate,
+        body: str,
+    ) -> ContextGraph:
+        from app.services.reader_chat.context import (
+            SelectionValidationError,
+            assemble_context_manifest,
+            validate_selection,
+        )
+        from app.services.reader_chat.retrieval import (
+            Phase09RelationshipObservationReader,
+        )
+
+        try:
+            validated = await validate_selection(
+                db,
+                novel=novel,
+                owner_id=owner_id,
+                selection=selection,
+            )
+            manifest = await assemble_context_manifest(
+                db,
+                novel=novel,
+                owner_id=owner_id,
+                selection=validated,
+                question=body,
+                relationship_reader=Phase09RelationshipObservationReader(),
+            )
+        except SelectionValidationError as exc:
+            raise HTTPException(status_code=422, detail=exc.message) from exc
+
+        evidence_refs = [
+            EvidenceRefDraft(
+                evidence_key=entry.evidence_key,
+                source_type=entry.source_type,
+                source_id=entry.source_id,
+                chapter_id=entry.chapter_id,
+                chapter_number=entry.chapter_number,
+                source_start=entry.source_start,
+                source_end=entry.source_end,
+                content_hash=entry.content_hash,
+                excerpt=entry.excerpt,
+                sort_order=entry.sort_order,
+                version_lineage=dict(entry.version_lineage),
+            )
+            for entry in manifest.evidence
+        ]
+        frozen = "d" * 64
+        prompt_inputs = dict(manifest.prompt_inputs)
+        prompt_inputs["conversation_id"] = conversation_id
+        prompt_inputs["owner_id"] = owner_id
+        prompt_inputs["builder"] = "production-plan03"
+        return ContextGraph(
+            selection_text=validated.selection_text,
+            selection_text_hash=validated.selection_text_hash,
+            chapter_content_hash=validated.chapter_content_hash,
+            hierarchy_build_id=manifest.hierarchy_build_id,
+            hierarchy_checksum=manifest.hierarchy_checksum,
+            reading_progress_snapshot=dict(manifest.reading_progress_snapshot),
+            full_book=manifest.full_book,
+            cutoff_chapter_number=manifest.cutoff_chapter_number,
+            analysis_version_id=manifest.analysis_version_id,
+            manifest_checksum=manifest.manifest_checksum,
+            prompt_inputs=prompt_inputs,
+            omitted_evidence_counts=dict(manifest.omitted_evidence_counts),
+            evidence_refs=evidence_refs,
+            prompt_hash=frozen,
+            schema_hash=frozen,
+            decoding_hash=frozen,
+            config_hash=frozen,
+            model_lineage={"builder": "production-plan03"},
+            price_snapshot={},
+        )
+
+
 class DeterministicContextBuilder:
     """
-    Plan-02 stub until Plan 03 supplies production assembly.
+    Plan-02 stub retained for tests and fallback isolation.
 
     Validates selection against owned Chapter.content and commits a minimal
     selection-only evidence graph. Never invents domain facts.
@@ -248,7 +332,7 @@ class DeterministicContextBuilder:
 
 class ConversationService:
     def __init__(self, context_builder: ContextBuilder | None = None) -> None:
-        self._context_builder = context_builder or DeterministicContextBuilder()
+        self._context_builder = context_builder or ProductionContextBuilder()
 
     # ------------------------------------------------------------------
     # Conversation CRUD

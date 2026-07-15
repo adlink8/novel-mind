@@ -52,7 +52,11 @@ async def resolve_version_id(
     return run.version_id, run.status, dict(run.progress or {})
 
 
-async def _chapter_cutoff(session: AsyncSession, novel: Novel) -> int | None:
+async def resolve_chapter_cutoff(session: AsyncSession, novel: Novel) -> int | None:
+    """Public reusable cutoff from persisted reading progress (D20 / Phase 10).
+
+    No usable progress returns the first chapter number, never the whole book.
+    """
     progress = novel.reading_progress or {}
     chapter_id = progress.get("chapter_id")
     if chapter_id is not None:
@@ -65,6 +69,12 @@ async def _chapter_cutoff(session: AsyncSession, novel: Novel) -> int | None:
     return await session.scalar(select(Chapter.chapter_number).where(
         Chapter.novel_id == novel.id,
     ).order_by(Chapter.chapter_number).limit(1))
+
+
+
+# Backward-compatible private alias (scripts / historical imports).
+async def _chapter_cutoff(session: AsyncSession, novel: Novel) -> int | None:
+    return await resolve_chapter_cutoff(session, novel)
 
 
 async def build_version_view(
@@ -83,7 +93,7 @@ async def build_version_view(
         return None
     version_id, status, progress = resolved
     persisted_full_book = bool((novel.reading_progress or {}).get("timeline_full_book", False))
-    cutoff = None if request_full_book and persisted_full_book else await _chapter_cutoff(session, novel)
+    cutoff = None if request_full_book and persisted_full_book else await resolve_chapter_cutoff(session, novel)
 
     event_query = select(MachineTimelineEvent).where(
         MachineTimelineEvent.owner_id == owner_id,
@@ -132,11 +142,23 @@ async def build_version_view(
     for row in overrides:
         override_by_event.setdefault(row.logical_event_id, {})[row.field_name] = row.value
 
-    source_start = lambda row: source_start_by_event.get(row.id, row.narrative_index)
-    order_key = ((lambda row: (row.story_rank is None, row.story_rank, row.narrative_chapter_number, source_start(row), row.id))
-                 if ordering == TimelineOrdering.STORY else
-                 (lambda row: (row.narrative_chapter_number, source_start(row), row.id)))
-    visible_rows.sort(key=order_key)
+    def _source_start(row: MachineTimelineEvent) -> int:
+        return source_start_by_event.get(row.id, row.narrative_index)
+
+    if ordering == TimelineOrdering.STORY:
+        def _order_key(row: MachineTimelineEvent) -> tuple:
+            return (
+                row.story_rank is None,
+                row.story_rank,
+                row.narrative_chapter_number,
+                _source_start(row),
+                row.id,
+            )
+    else:
+        def _order_key(row: MachineTimelineEvent) -> tuple:
+            return (row.narrative_chapter_number, _source_start(row), row.id)
+
+    visible_rows.sort(key=_order_key)
     events = []
     participant_mentions: list[str] = []
     for row in visible_rows:
@@ -149,7 +171,7 @@ async def build_version_view(
             title=patch.get("title", row.title), description=patch.get("description", row.description),
             event_type=patch.get("event_type", row.event_type),
             narrative_chapter_number=row.narrative_chapter_number,
-            source_start=source_start(row),
+            source_start=_source_start(row),
             narrative_index=row.narrative_index, story_rank=row.story_rank,
             time_precision=row.time_precision,
             time_expression=patch.get("time_expression", row.time_expression),
