@@ -8,13 +8,21 @@ import pytest
 from pydantic import ValidationError
 
 from app.services.narrative_memory.contracts import (
+    CandidatePackage,
     CandidateVersionSpec,
     ExactSourceLink,
     MemoryClaim,
     MemoryEdge,
     ModelLineage,
     NodeKind,
+    canonical_json,
+    claim_checksum,
+    edge_checksum,
+    model_lineage_checksum,
+    node_checksum,
     parse_memory_node,
+    source_link_checksum,
+    version_spec_checksum,
 )
 
 
@@ -211,3 +219,169 @@ def test_node_edge_source_and_version_contracts_fail_closed() -> None:
     )
     with pytest.raises(ValidationError):
         lineage.provider = "other"  # type: ignore[misc]
+
+
+def _package_dict() -> dict[str, object]:
+    claim = _claim(_claim_payloads()[0])
+    claim["node_key"] = "chapter:1"
+    return {
+        "nodes": [
+            {
+                "node_kind": "global_story",
+                "node_key": "global",
+                "chapter_start": 1,
+                "chapter_end": 2,
+                "schema_version": "memory-node.v1",
+            },
+            {
+                "node_kind": "story_arc",
+                "node_key": "arc:1",
+                "chapter_start": 1,
+                "chapter_end": 2,
+                "schema_version": "memory-node.v1",
+            },
+            {
+                "node_kind": "chapter_state",
+                "node_key": "chapter:1",
+                "chapter_start": 1,
+                "chapter_end": 1,
+                "schema_version": "memory-node.v1",
+            },
+        ],
+        "claims": [claim],
+        "edges": [
+            {
+                "edge_type": "contains",
+                "source_node_key": "global",
+                "target_node_key": "arc:1",
+            },
+            {
+                "edge_type": "contains",
+                "source_node_key": "arc:1",
+                "target_node_key": "chapter:1",
+            },
+        ],
+        "source_links": [
+            {
+                "source_key": "source:1",
+                "claim_key": "claim:entity_state",
+                "source_kind": "hierarchy",
+                "hierarchy_build_id": "build-1",
+                "evidence_node_id": "leaf-1",
+                "chapter_id": 10,
+                "chapter_number": 1,
+                "source_start": 0,
+                "source_end": 3,
+                "content_hash": "a" * 64,
+                "source_snapshot_hash": "b" * 64,
+            }
+        ],
+    }
+
+
+def test_candidate_package_requires_local_node_claim_and_source_keys() -> None:
+    package = CandidatePackage.model_validate_json(json.dumps(_package_dict()))
+    assert package.claims[0].source_keys == ("source:1",)
+
+    invalid_packages: list[dict[str, object]] = []
+    for mutation in ("foreign_node", "foreign_claim", "foreign_source"):
+        raw = json.loads(json.dumps(_package_dict()))
+        if mutation == "foreign_node":
+            raw["claims"][0]["node_key"] = "chapter:outside"
+        elif mutation == "foreign_claim":
+            raw["source_links"][0]["claim_key"] = "claim:outside"
+        else:
+            raw["claims"][0]["source_keys"] = ["source:outside"]
+        invalid_packages.append(raw)
+
+    for raw in invalid_packages:
+        with pytest.raises(ValidationError):
+            CandidatePackage.model_validate_json(json.dumps(raw))
+
+
+def test_package_rejects_visibility_or_evidence_outside_node_range() -> None:
+    visibility = json.loads(json.dumps(_package_dict()))
+    visibility["claims"][0]["visible_from_chapter"] = 2
+    with pytest.raises(ValidationError):
+        CandidatePackage.model_validate_json(json.dumps(visibility))
+
+    evidence = json.loads(json.dumps(_package_dict()))
+    evidence["source_links"][0]["chapter_number"] = 2
+    with pytest.raises(ValidationError):
+        CandidatePackage.model_validate_json(json.dumps(evidence))
+
+
+def test_canonical_hashes_are_order_independent_and_authority_sensitive() -> None:
+    package = CandidatePackage.model_validate_json(json.dumps(_package_dict()))
+    node = package.nodes[2]
+    claim = package.claims[0]
+    edge = package.edges[0]
+    link = package.source_links[0]
+    lineage = ModelLineage(
+        provider="openai", model="gpt", deployment="fixed", revision="1"
+    )
+    spec = CandidateVersionSpec(
+        version_key="memory-v1",
+        prompt_hash="a" * 64,
+        schema_hash="b" * 64,
+        model_lineage=lineage,
+        decoding_hash="c" * 64,
+        config_hash="d" * 64,
+        policy_hash="e" * 64,
+    )
+
+    reordered = MemoryClaim.model_validate_json(
+        json.dumps(dict(reversed(list(_claim(_claim_payloads()[0]).items()))))
+    )
+    assert canonical_json(reordered) == canonical_json(claim)
+    assert claim_checksum(reordered) == claim_checksum(claim)
+
+    assert len(
+        {
+            node_checksum(node),
+            claim_checksum(claim),
+            edge_checksum(edge),
+            source_link_checksum(link),
+            model_lineage_checksum(lineage),
+            version_spec_checksum(spec),
+        }
+    ) == 6
+
+    changed_claim = claim.model_copy(update={"visible_from_chapter": 2})
+    changed_lineage = lineage.model_copy(update={"revision": "2"})
+    assert claim_checksum(changed_claim) != claim_checksum(claim)
+    assert model_lineage_checksum(changed_lineage) != model_lineage_checksum(lineage)
+
+    with pytest.raises(TypeError):
+        canonical_json({"arbitrary": "unvalidated"})  # type: ignore[arg-type]
+
+
+def test_every_frozen_version_lineage_field_changes_server_checksum() -> None:
+    lineage = ModelLineage(
+        provider="openai", model="gpt", deployment="fixed", revision="1"
+    )
+    spec = CandidateVersionSpec(
+        version_key="memory-v1",
+        prompt_hash="a" * 64,
+        schema_hash="b" * 64,
+        model_lineage=lineage,
+        decoding_hash="c" * 64,
+        config_hash="d" * 64,
+        policy_hash="e" * 64,
+    )
+    baseline = version_spec_checksum(spec)
+    changes = (
+        {"version_key": "memory-v2"},
+        {"parent_version_id": 1},
+        {"prompt_hash": "f" * 64},
+        {"schema_hash": "f" * 64},
+        {"model_lineage": lineage.model_copy(update={"revision": "2"})},
+        {"decoding_hash": "f" * 64},
+        {"config_hash": "f" * 64},
+        {"policy_hash": "f" * 64},
+    )
+
+    assert all(
+        version_spec_checksum(spec.model_copy(update=change)) != baseline
+        for change in changes
+    )

@@ -8,6 +8,7 @@ closed discriminated unions below.
 from __future__ import annotations
 
 import json
+from hashlib import sha256
 from enum import StrEnum
 from typing import Annotated, Literal, TypeAlias
 
@@ -430,3 +431,132 @@ class ExactSourceLink(StrictFrozenModel):
         if self.source_kind != SourceKind.HIERARCHY and not self.optional_domain_source_key:
             raise ValueError("optional domain source requires its exact source key")
         return self
+
+
+class CandidatePackage(StrictFrozenModel):
+    """One closed, package-local set of candidate content rows."""
+
+    nodes: Annotated[tuple[MemoryNode, ...], Field(min_length=1)]
+    claims: Annotated[tuple[MemoryClaim, ...], Field(min_length=1)]
+    edges: tuple[MemoryEdge, ...] = ()
+    source_links: Annotated[tuple[ExactSourceLink, ...], Field(min_length=1)]
+
+    @model_validator(mode="after")
+    def validate_package_local_references(self) -> "CandidatePackage":
+        nodes = self._unique_by_key(self.nodes, "node_key", "node")
+        claims = self._unique_by_key(self.claims, "claim_key", "claim")
+        sources = self._unique_by_key(self.source_links, "source_key", "source")
+
+        edge_identities = {
+            (edge.edge_type, edge.source_node_key, edge.target_node_key)
+            for edge in self.edges
+        }
+        if len(edge_identities) != len(self.edges):
+            raise ValueError("edge identities must be unique")
+
+        for edge in self.edges:
+            if edge.source_node_key not in nodes or edge.target_node_key not in nodes:
+                raise ValueError("edge endpoints must be package-local node keys")
+            parent = nodes[edge.source_node_key]
+            child = nodes[edge.target_node_key]
+            allowed = (
+                parent.node_kind == NodeKind.GLOBAL_STORY
+                and child.node_kind in {NodeKind.STORY_ARC, NodeKind.VOLUME}
+            ) or (
+                parent.node_kind in {NodeKind.STORY_ARC, NodeKind.VOLUME}
+                and child.node_kind == NodeKind.CHAPTER_STATE
+            )
+            if not allowed:
+                raise ValueError("edge endpoints violate the closed memory hierarchy")
+            if (
+                parent.chapter_start > child.chapter_start
+                or parent.chapter_end < child.chapter_end
+            ):
+                raise ValueError("parent range must contain child range")
+
+        links_by_claim: dict[str, set[str]] = {}
+        for link in self.source_links:
+            if link.claim_key not in claims:
+                raise ValueError("source link claim_key must be package-local")
+            links_by_claim.setdefault(link.claim_key, set()).add(link.source_key)
+
+        build_ids = {link.hierarchy_build_id for link in self.source_links}
+        snapshots = {link.source_snapshot_hash for link in self.source_links}
+        if len(build_ids) != 1 or len(snapshots) != 1:
+            raise ValueError("all source links must use one frozen hierarchy snapshot")
+
+        for claim in self.claims:
+            node = nodes.get(claim.node_key)
+            if node is None:
+                raise ValueError("claim node_key must be package-local")
+            if not node.chapter_start <= claim.visible_from_chapter <= node.chapter_end:
+                raise ValueError("claim visibility must be inside its node range")
+            expected_sources = set(claim.source_keys)
+            if expected_sources != links_by_claim.get(claim.claim_key, set()):
+                raise ValueError("claim source_keys must resolve exactly inside the package")
+            claim_links = [sources[key] for key in claim.source_keys]
+            if any(
+                not node.chapter_start <= link.chapter_number <= node.chapter_end
+                for link in claim_links
+            ):
+                raise ValueError("claim evidence chapter must be inside its node range")
+            if max(link.chapter_number for link in claim_links) > claim.visible_from_chapter:
+                raise ValueError("claim cannot be visible before its latest evidence")
+            if isinstance(claim.payload, EventFactClaim) and (
+                claim.payload.chapter_start < node.chapter_start
+                or claim.payload.chapter_end > node.chapter_end
+            ):
+                raise ValueError("event range must be inside its node range")
+
+        return self
+
+    @staticmethod
+    def _unique_by_key(
+        rows: tuple[object, ...], attribute: str, label: str
+    ) -> dict[str, object]:
+        indexed = {str(getattr(row, attribute)): row for row in rows}
+        if len(indexed) != len(rows):
+            raise ValueError(f"{label} keys must be unique")
+        return indexed
+
+
+def canonical_json(value: BaseModel) -> str:
+    """Canonical Unicode JSON for an already validated contract model."""
+
+    if not isinstance(value, BaseModel):
+        raise TypeError("canonical_json accepts validated Pydantic models only")
+    return json.dumps(
+        value.model_dump(mode="json"),
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+
+
+def _component_checksum(component: str, value: BaseModel) -> str:
+    encoded = f"narrative-memory.v1:{component}\n{canonical_json(value)}"
+    return sha256(encoded.encode("utf-8")).hexdigest()
+
+
+def model_lineage_checksum(value: ModelLineage) -> str:
+    return _component_checksum("model-lineage", value)
+
+
+def version_spec_checksum(value: CandidateVersionSpec) -> str:
+    return _component_checksum("version-spec", value)
+
+
+def node_checksum(value: MemoryNode) -> str:
+    return _component_checksum("node", value)
+
+
+def claim_checksum(value: MemoryClaim) -> str:
+    return _component_checksum("claim", value)
+
+
+def edge_checksum(value: MemoryEdge) -> str:
+    return _component_checksum("edge", value)
+
+
+def source_link_checksum(value: ExactSourceLink) -> str:
+    return _component_checksum("source-link", value)
