@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v0.7
 milestone_name: Narrative Relationships, Reader AI, and Clue Tracking
 status: executing
-last_updated: "2026-07-15T01:55:00.000Z"
+last_updated: "2026-07-15T03:10:00.000Z"
 progress:
   total_phases: 11
   completed_phases: 9
   total_plans: 56
-  completed_plans: 49
-  percent: 88
+  completed_plans: 50
+  percent: 89
 ---
 
 # Project State
@@ -23,23 +23,24 @@ See `.planning/PROJECT.md` and `IMPLEMENTATION-STATUS.md`.
 
 ## Current Position
 
-Phase: 10 (Reader Selection AI and Multi-Session Conversations) — in progress (3/5 plans)
-Plan: 10-03 complete
-**Next:** 10-04 cited answer worker, dual budgets, cancel/retry
+Phase: 10 (Reader Selection AI and Multi-Session Conversations) — in progress (4/5 plans)
+Plan: 10-04 complete
+**Next:** 10-05 reader UI selection panel, multi-session, browser qualification, release gate
 
 - Branch: `feat/phase2-wave2-embedding`
-- Last activity: 2026-07-15 — completed 10-03 selection validation and visible-context assembly
+- Last activity: 2026-07-15 — completed 10-04 cited answer worker (dual budgets, cancel/retry, adversarial)
 - Plan directories: `.planning/phases/09-dynamic-character-relationship-graph/`, `.planning/phases/10-reader-selection-ai-and-multi-session-conversations/`, `.planning/phases/11-clue-and-foreshadow-tracking/`
 
 ## Auto Routing
 
-Phase 10-03 完成；下一步执行 10-04（generation worker）。不进入 Phase 11 线索产品代码。
+Phase 10-04 完成；下一步执行 10-05（frontend + browser release）。不进入 Phase 11 线索产品代码。
 
 ## Phase 10 Execution Metrics
 
 - 10-01: 45min, 3 tasks, 8 files, 28 targeted unit+PostgreSQL migration tests passed (0 skip); alembic head `12readerchat01`.
 - 10-02: 25min, 3 tasks, 7 files, 9 targeted PostgreSQL API/IDOR tests passed (0 skip); OpenAPI conversation paths + ruff clean.
 - 10-03: 55min, 3 tasks, 8 files, 35 targeted tests passed (20 unit + 4 PG context + 9 conversation API/IDOR + 2 HEAD spoilers); ruff clean; Phase 09 files untouched.
+- 10-04: 70min, 3 tasks, 12 files, 93 full reader-chat suite passed (32 plan-targeted: 5 budget + 8 gateway + 9 generation PG + 10 adversarial); ruff clean; forbidden capability scan empty.
 
 ## Phase 10 Decisions
 
@@ -55,6 +56,10 @@ Phase 10-03 完成；下一步执行 10-04（generation worker）。不进入 Ph
 - resolve_chapter_cutoff is the shared public spoiler cutoff; full-book only via persisted timeline_full_book.
 - Phase 09 observations enter chat only via RelationshipObservationReader; runtime outages are source_unavailable, never invented edges.
 - Retry rehydrates frozen manifest checksum; never rebuild under newer reading progress.
+- Dual budget lock order: novel ledger then conversation ledger; unknown pricing or either ceiling → zero provider calls.
+- Worker freezes deployment/prompt/schema hashes on process; one schema/citation repair only; post-cancel responses settle then discard.
+- Exact recovery stores validated envelope on attempt.usage; cache_hit audit on re-publish without provider call.
+- Chat worker has no LangChain/LangGraph/tools/remote conversation IDs and no domain mutation imports.
 
 ## Phase 09 Execution Metrics
 
@@ -130,11 +135,11 @@ REQ-AUTO-01..11 已交付（含 06-08 QualityRun 持久化、06-09 BaselineCandi
 
 ## Next Action
 
-1. Execute 10-04 cited answer worker (frozen manifests, dual budgets, cancel/retry).
+1. Execute 10-05 reader selection UI + multi-session panel + browser qualification + release gate.
 2. Phase 11 may depend on `list_accepted_observation_refs`; never treat chat as fact source.
-3. 保留当前所有非 `.planning` 的本地 WIP，不纳入本次规划提交。
+3. 保留当前所有非 `.planning` 的本地 WIP，不纳入本次规划提交（unless explicitly part of 10-04 code）。
 
 ## Session
 
-- Stopped at: Completed 10-03-PLAN.md (selection + visible context)
+- Stopped at: Completed 10-04-PLAN.md (cited answer worker)
 - Resume file: None

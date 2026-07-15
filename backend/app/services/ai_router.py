@@ -104,6 +104,7 @@ _TASK_TIER_MAP: Dict[str, str] = {
     "chapter_summary": "balanced",  # 章节摘要
     "style_analysis": "quality",  # 文风分析
     "translation": "balanced",  # 翻译
+    "reader_chat": "balanced",  # Phase 10 选区问答：均衡层；job 级冻结单一 deployment，无透明降级
 }
 
 

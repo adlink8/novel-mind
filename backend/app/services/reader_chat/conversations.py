@@ -175,6 +175,8 @@ class ProductionContextBuilder:
         prompt_inputs["conversation_id"] = conversation_id
         prompt_inputs["owner_id"] = owner_id
         prompt_inputs["builder"] = "production-plan03"
+        # Persist source_status so 10-04 freeze_manifest_from_stored can rehydrate checksum.
+        prompt_inputs["source_status"] = dict(manifest.source_status)
         return ContextGraph(
             selection_text=validated.selection_text,
             selection_text_hash=validated.selection_text_hash,
