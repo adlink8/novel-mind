@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import pytest
+import pytest_asyncio
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.models.chunk_build import ChunkActivePointer, ChunkHierarchyNode
 from app.models.novel import Chapter, Novel
@@ -14,9 +16,23 @@ from app.services.narrative_memory.audit_contracts import (
     ReasonCode,
 )
 from app.services.narrative_memory.audit_pg import PostgresAuditSource
+from tests.integration.conftest import run_alembic
 
 
 pytestmark = pytest.mark.integration
+
+
+@pytest_asyncio.fixture
+async def audit_pg_session(empty_postgres: str, pg_async_url: str):
+    run_alembic("upgrade", "head", database_url=empty_postgres)
+    engine = create_async_engine(pg_async_url, pool_pre_ping=True)
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            yield session
+            await session.rollback()
+    finally:
+        await engine.dispose()
 
 
 async def _seed_valid_hierarchy(
@@ -44,16 +60,16 @@ async def _seed_valid_hierarchy(
         promote_active=True,
         force_full=True,
     )
-    await db_session.commit()
+    await db_session.flush()
     return user, novel, chapters
 
 
 @pytest.mark.asyncio
-async def test_valid_hierarchy_is_exact_and_optional_sources_are_unavailable(db_session):
-    user, novel, _ = await _seed_valid_hierarchy(db_session)
+async def test_valid_hierarchy_is_exact_and_optional_sources_are_unavailable(audit_pg_session):
+    user, novel, _ = await _seed_valid_hierarchy(audit_pg_session)
 
     report = await audit_assets(
-        PostgresAuditSource(db_session), owner_id=user.id, novel_id=novel.id
+        PostgresAuditSource(audit_pg_session), owner_id=user.id, novel_id=novel.id
     )
     by_kind = {asset.kind: asset for asset in report.assets}
 
@@ -64,9 +80,9 @@ async def test_valid_hierarchy_is_exact_and_optional_sources_are_unavailable(db_
 
 
 @pytest.mark.asyncio
-async def test_content_hash_mismatch_reports_only_affected_chapter(db_session):
-    user, novel, chapters = await _seed_valid_hierarchy(db_session)
-    evidence = await db_session.scalar(
+async def test_content_hash_mismatch_reports_only_affected_chapter(audit_pg_session):
+    user, novel, chapters = await _seed_valid_hierarchy(audit_pg_session)
+    evidence = await audit_pg_session.scalar(
         select(ChunkHierarchyNode).where(
             ChunkHierarchyNode.novel_id == novel.id,
             ChunkHierarchyNode.chapter_id == chapters[1].id,
@@ -74,10 +90,10 @@ async def test_content_hash_mismatch_reports_only_affected_chapter(db_session):
         )
     )
     evidence.content_hash = "0" * 64
-    await db_session.commit()
+    await audit_pg_session.flush()
 
     report = await audit_assets(
-        PostgresAuditSource(db_session), owner_id=user.id, novel_id=novel.id
+        PostgresAuditSource(audit_pg_session), owner_id=user.id, novel_id=novel.id
     )
     hierarchy = next(a for a in report.assets if a.kind == AssetKind.HIERARCHY)
 
@@ -88,13 +104,13 @@ async def test_content_hash_mismatch_reports_only_affected_chapter(db_session):
 
 
 @pytest.mark.asyncio
-async def test_normalized_multi_span_content_is_not_claimed_as_exact(db_session):
+async def test_normalized_multi_span_content_is_not_claimed_as_exact(audit_pg_session):
     user, novel, _ = await _seed_valid_hierarchy(
-        db_session, ("甲乙丙。丁戊己。", "庚辛壬。癸子丑。")
+        audit_pg_session, ("甲乙丙。丁戊己。", "庚辛壬。癸子丑。")
     )
 
     report = await audit_assets(
-        PostgresAuditSource(db_session), owner_id=user.id, novel_id=novel.id
+        PostgresAuditSource(audit_pg_session), owner_id=user.id, novel_id=novel.id
     )
     hierarchy = next(a for a in report.assets if a.kind == AssetKind.HIERARCHY)
 
@@ -104,16 +120,16 @@ async def test_normalized_multi_span_content_is_not_claimed_as_exact(db_session)
 
 
 @pytest.mark.asyncio
-async def test_missing_pointer_blocks_without_repair(db_session):
-    user, novel, _ = await _seed_valid_hierarchy(db_session)
-    pointer = await db_session.scalar(
+async def test_missing_pointer_blocks_without_repair(audit_pg_session):
+    user, novel, _ = await _seed_valid_hierarchy(audit_pg_session)
+    pointer = await audit_pg_session.scalar(
         select(ChunkActivePointer).where(ChunkActivePointer.novel_id == novel.id)
     )
-    await db_session.delete(pointer)
-    await db_session.commit()
+    await audit_pg_session.delete(pointer)
+    await audit_pg_session.flush()
 
     report = await audit_assets(
-        PostgresAuditSource(db_session), owner_id=user.id, novel_id=novel.id
+        PostgresAuditSource(audit_pg_session), owner_id=user.id, novel_id=novel.id
     )
     hierarchy = next(a for a in report.assets if a.kind == AssetKind.HIERARCHY)
     assert hierarchy.status == EligibilityStatus.BLOCKED
@@ -121,13 +137,13 @@ async def test_missing_pointer_blocks_without_repair(db_session):
 
 
 @pytest.mark.asyncio
-async def test_cross_owner_request_discloses_no_build_identity(db_session):
-    _, novel, _ = await _seed_valid_hierarchy(db_session)
+async def test_cross_owner_request_discloses_no_build_identity(audit_pg_session):
+    _, novel, _ = await _seed_valid_hierarchy(audit_pg_session)
     other = User(username="audit-other", email="other@example.com", hashed_password="x")
-    db_session.add(other)
-    await db_session.commit()
+    audit_pg_session.add(other)
+    await audit_pg_session.flush()
 
-    inventories = await PostgresAuditSource(db_session).inventory(
+    inventories = await PostgresAuditSource(audit_pg_session).inventory(
         owner_id=other.id, novel_id=novel.id
     )
     hierarchy = next(item for item in inventories if item.kind == AssetKind.HIERARCHY)
