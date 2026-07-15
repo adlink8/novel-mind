@@ -219,8 +219,8 @@ Plans:
 **Goal:** 建立与现有分析生命周期隔离的不可变叙事记忆候选契约，使每条 Chapter State、Story Arc/Volume 和 Global Story Model 主张均可由数据库权威追到同一 source snapshot 的叶子原文。
 **Requirements:** V08-MEM-01, V08-MEM-02, V08-MEM-03, V08-MEM-04, V08-MEM-05
 **Depends on:** Phase 12
-**Status:** PLANNED
-**Plans:** 3 initial plans
+**Status:** PLANNED — 3/3 executable plans verified; ready for 13-01
+**Plans:** 3/3 plans created
 
 **Success Criteria:**
 1. 系统可创建独立于 timeline/relationship/clue 的 immutable `NarrativeMemoryVersion` candidate，并持久保存 owner、novel、version、source/hierarchy lineage、prompt/schema/model/config hashes；v0.8 不存在可达的 production promotion 路径。
