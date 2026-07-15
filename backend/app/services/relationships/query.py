@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Iterable
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.analysis import AnalysisRun, AnalysisVersion
@@ -382,17 +382,46 @@ class RelationshipGraphQueryService:
         if position > cutoff:
             position = cutoff
 
+        identity_map = await self._identity_map(
+            session,
+            owner_id=owner_id,
+            novel_id=novel.id,
+            version_id=resolved.version_id,
+        )
+        override_fields = await self._active_relationship_overrides(
+            session,
+            owner_id=owner_id,
+            novel_id=novel.id,
+            version_id=resolved.version_id,
+        )
+
+        # Indexed prefilter: never expand the visible set. Character filter loads
+        # only endpoint-related rows (including merged aliases) so 10k graphs stay
+        # within the D-22 query budget after warmup.
+        obs_filters = [
+            RelationshipObservation.owner_id == owner_id,
+            RelationshipObservation.novel_id == novel.id,
+            RelationshipObservation.analysis_version_id == resolved.version_id,
+            RelationshipObservation.status == "accepted",
+        ]
+        if character_id is not None:
+            target = identity_map.get(character_id, character_id)
+            related_ids = {character_id, target}
+            for raw, canon in identity_map.items():
+                if canon == target:
+                    related_ids.add(raw)
+            obs_filters.append(
+                or_(
+                    RelationshipObservation.source_character_id.in_(related_ids),
+                    RelationshipObservation.target_character_id.in_(related_ids),
+                )
+            )
+
         observations = list(
             (
                 await session.scalars(
                     select(RelationshipObservation)
-                    .where(
-                        RelationshipObservation.owner_id == owner_id,
-                        RelationshipObservation.novel_id == novel.id,
-                        RelationshipObservation.analysis_version_id
-                        == resolved.version_id,
-                        RelationshipObservation.status == "accepted",
-                    )
+                    .where(*obs_filters)
                     .order_by(
                         RelationshipObservation.valid_from_chapter,
                         RelationshipObservation.valid_from_narrative_index,
@@ -413,19 +442,6 @@ class RelationshipGraphQueryService:
                 through_chapter=position,
             )
         ]
-
-        identity_map = await self._identity_map(
-            session,
-            owner_id=owner_id,
-            novel_id=novel.id,
-            version_id=resolved.version_id,
-        )
-        override_fields = await self._active_relationship_overrides(
-            session,
-            owner_id=owner_id,
-            novel_id=novel.id,
-            version_id=resolved.version_id,
-        )
 
         folded = self._fold_observations(
             covering,

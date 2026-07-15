@@ -445,6 +445,23 @@ jobs:
             --junitxml=artifacts/integration-junit.xml \
             --timeout=30
 
+      # Phase 09 relationship release authority (retains Phase 08 timeline gates above)
+      - name: Relationship qualification suite
+        working-directory: backend
+        env:
+          NOVELMIND_DATABASE_URL: ${{ env.NOVELMIND_DATABASE_URL }}
+        run: |
+          mkdir -p artifacts
+          pytest \
+            tests/integration/relationships/test_release_gate.py \
+            tests/integration/relationships/test_boundaries_pg.py \
+            tests/integration/relationships/test_performance.py \
+            tests/adversarial/test_relationship_boundaries.py \
+            --junitxml=artifacts/relationship-junit.xml \
+            --timeout=180
+          python scripts/run_relationship_qualification.py --scope-scan \
+            > artifacts/relationship-scope-scan.json
+
       - name: Collect service logs
         if: always() && (github.event_name == 'push' || github.event_name == 'schedule')
         run: |
@@ -459,6 +476,8 @@ jobs:
           name: integration-results
           path: |
             backend/artifacts/integration-junit.xml
+            backend/artifacts/relationship-junit.xml
+            backend/artifacts/relationship-scope-scan.json
             backend/artifacts/service-logs/**
             backend/artifacts/chroma-failure-*.json
           if-no-files-found: warn
