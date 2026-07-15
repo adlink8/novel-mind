@@ -4,16 +4,16 @@ from __future__ import annotations
 
 from collections import defaultdict
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import undefer
 
 from app.models.analysis import AnalysisVersion
 from app.models.chunk_build import ChunkActivePointer, ChunkBuild, ChunkHierarchyNode
-from app.models.clue import ClueActivePointer, ClueAnalysisVersion
+from app.models.clue import ClueActivePointer, ClueAnalysisVersion, MachineClue
 from app.models.novel import Chapter, Novel
-from app.models.relationship import RelationshipBuildRun
-from app.models.timeline import TimelineActivePointer
+from app.models.relationship import RelationshipBuildRun, RelationshipObservation
+from app.models.timeline import MachineTimelineEvent, TimelineActivePointer
 from app.services.chunking.hierarchy import validate_hierarchy_invariants
 from app.services.chunking.manifests import content_hash
 from app.services.chunking.pg_store import _node_from_row
@@ -109,18 +109,24 @@ class PostgresAuditSource:
                 )
             ).all()
         )
-        rows = list(
+        all_build_rows = list(
             (
                 await self._session.scalars(
                     select(ChunkHierarchyNode).where(
                         ChunkHierarchyNode.build_id == build.build_id,
-                        ChunkHierarchyNode.novel_id == novel.id,
                     )
                 )
             ).all()
         )
         reasons: set[ReasonCode] = set()
         affected: set[int] = set()
+        if not build.immutable or build.is_candidate or build.status not in {"built", "committed"}:
+            reasons.add(ReasonCode.STALE_ASSET)
+            affected.update(chapter.chapter_number for chapter in chapters)
+        if any(row.novel_id != novel.id for row in all_build_rows):
+            reasons.add(ReasonCode.NOVEL_SCOPE_MISMATCH)
+            affected.update(chapter.chapter_number for chapter in chapters)
+        rows = [row for row in all_build_rows if row.novel_id == novel.id]
 
         expected_snapshot = stable_hash(
             {
@@ -238,9 +244,33 @@ class PostgresAuditSource:
         if pointer is None:
             return self._optional_unavailable(AssetKind.TIMELINE, owner_id, novel_id)
         version = await self._session.get(AnalysisVersion, pointer.version_id)
-        reasons = self._lineage_reasons(version, build)
+        reasons = self._lineage_reasons(
+            version,
+            build,
+            owner_id=owner_id,
+            novel_id=novel_id,
+            pointer_manifest=pointer.manifest_checksum,
+            allowed_statuses={"active"},
+        )
+        item_count = int(
+            await self._session.scalar(
+                select(func.count())
+                .select_from(MachineTimelineEvent)
+                .where(
+                    MachineTimelineEvent.version_id == pointer.version_id,
+                    MachineTimelineEvent.owner_id == owner_id,
+                    MachineTimelineEvent.novel_id == novel_id,
+                )
+            )
+            or 0
+        )
         return self._optional_result(
-            AssetKind.TIMELINE, owner_id, novel_id, str(pointer.version_id), reasons
+            AssetKind.TIMELINE,
+            owner_id,
+            novel_id,
+            str(pointer.version_id),
+            reasons,
+            item_count=item_count,
         )
 
     async def _relationship_inventory(
@@ -259,14 +289,35 @@ class PostgresAuditSource:
         if run is None:
             return self._optional_unavailable(AssetKind.RELATIONSHIP, owner_id, novel_id)
         version = await self._session.get(AnalysisVersion, run.analysis_version_id)
-        reasons = self._lineage_reasons(version, build)
+        reasons = self._lineage_reasons(
+            version,
+            build,
+            owner_id=owner_id,
+            novel_id=novel_id,
+            pointer_manifest=None,
+            allowed_statuses={"active", "superseded"},
+        )
+        actual_count = int(
+            await self._session.scalar(
+                select(func.count())
+                .select_from(RelationshipObservation)
+                .where(
+                    RelationshipObservation.analysis_version_id == run.analysis_version_id,
+                    RelationshipObservation.owner_id == owner_id,
+                    RelationshipObservation.novel_id == novel_id,
+                )
+            )
+            or 0
+        )
+        if actual_count != run.accepted_count:
+            reasons = (ReasonCode.OPTIONAL_LINEAGE_MISMATCH,)
         return self._optional_result(
             AssetKind.RELATIONSHIP,
             owner_id,
             novel_id,
             str(run.analysis_version_id),
             reasons,
-            item_count=run.accepted_count,
+            item_count=actual_count,
         )
 
     async def _clue_inventory(
@@ -282,20 +333,60 @@ class PostgresAuditSource:
             return self._optional_unavailable(AssetKind.CLUE, owner_id, novel_id)
         version = await self._session.get(ClueAnalysisVersion, pointer.version_id)
         reasons: tuple[ReasonCode, ...] = ()
-        if version is None or version.source_snapshot_hash != build.source_snapshot_hash or version.hierarchy_build_id != build.build_id:
+        if (
+            version is None
+            or version.owner_id != owner_id
+            or version.novel_id != novel_id
+            or version.status not in {"candidate", "validated", "superseded"}
+            or version.source_snapshot_hash != build.source_snapshot_hash
+            or version.hierarchy_build_id != build.build_id
+            or version.hierarchy_checksum != build.manifest_checksum
+            or version.manifest_checksum != pointer.manifest_checksum
+        ):
             reasons = (ReasonCode.OPTIONAL_LINEAGE_MISMATCH,)
+        item_count = int(
+            await self._session.scalar(
+                select(func.count())
+                .select_from(MachineClue)
+                .where(
+                    MachineClue.version_id == pointer.version_id,
+                    MachineClue.owner_id == owner_id,
+                    MachineClue.novel_id == novel_id,
+                )
+            )
+            or 0
+        )
         return self._optional_result(
-            AssetKind.CLUE, owner_id, novel_id, str(pointer.version_id), reasons
+            AssetKind.CLUE,
+            owner_id,
+            novel_id,
+            str(pointer.version_id),
+            reasons,
+            item_count=item_count,
         )
 
     @staticmethod
     def _lineage_reasons(
-        version: AnalysisVersion | None, build: ChunkBuild
+        version: AnalysisVersion | None,
+        build: ChunkBuild,
+        *,
+        owner_id: int,
+        novel_id: int,
+        pointer_manifest: str | None,
+        allowed_statuses: set[str],
     ) -> tuple[ReasonCode, ...]:
         if (
             version is None
+            or version.owner_id != owner_id
+            or version.novel_id != novel_id
+            or version.status not in allowed_statuses
             or version.source_snapshot_hash != build.source_snapshot_hash
             or version.hierarchy_build_id != build.build_id
+            or version.hierarchy_checksum != build.manifest_checksum
+            or (
+                pointer_manifest is not None
+                and version.manifest_checksum != pointer_manifest
+            )
         ):
             return (ReasonCode.OPTIONAL_LINEAGE_MISMATCH,)
         return ()
