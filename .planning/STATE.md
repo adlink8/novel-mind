@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v0.7
 milestone_name: Narrative Relationships, Reader AI, and Clue Tracking
 status: executing
-last_updated: "2026-07-15T04:40:00.000Z"
+last_updated: "2026-07-15T03:00:00.000Z"
 progress:
   total_phases: 11
   completed_phases: 10
   total_plans: 56
-  completed_plans: 54
-  percent: 96
+  completed_plans: 55
+  percent: 98
 ---
 
 # Project State
@@ -23,23 +23,24 @@ See `.planning/PROJECT.md` and `IMPLEMENTATION-STATUS.md`.
 
 ## Current Position
 
-Phase: 11 (Clue and Foreshadow Tracking) — Wave 3 complete (3/5 plans)
-Plan: 11-03 complete
-**Next:** 11-04 analysis workspace clue UI
+Phase: 11 (Clue and Foreshadow Tracking) — Wave 4 complete (4/5 plans)
+Plan: 11-04 complete
+**Next:** 11-05 qualification and release gate
 
 - Branch: `feat/phase2-wave2-embedding`
-- Last activity: 2026-07-15 — completed 11-03 durable worker + versioning + overrides + spoiler API
+- Last activity: 2026-07-15 — completed 11-04 analysis workspace clue UI
 - Plan directories: `.planning/phases/09-dynamic-character-relationship-graph/`, `.planning/phases/10-reader-selection-ai-and-multi-session-conversations/`, `.planning/phases/11-clue-and-foreshadow-tracking/`
 
 ## Auto Routing
 
-Phase 11-03 完成。继续 11-04。聊天不得作为线索事实源；Phase 09 relationship reader 不可用时记录 `source_unavailable`，不得伪装成零关系。
+Phase 11-04 完成。继续 11-05。聊天不得作为线索事实源；Phase 09 relationship reader 不可用时记录 `source_unavailable`，不得伪装成零关系。浏览器 E2E/qualification 由 11-05 拥有。
 
 ## Phase 11 Execution Metrics
 
 - 11-01: 55min, 3 tasks, 10 files, 28 targeted tests passed (16 unit + 12 PostgreSQL integration, 0 skip); alembic head `11cluetrack01`.
 - 11-02: 45min, 3 tasks, 12 files, 38 targeted tests passed (6 candidates + 8 source protocols + 8 llm + 12 gates + 4 adversarial, 0 skip).
 - 11-03: 95min, 3 tasks, 14 files, 15 targeted tests passed (7 unit + 8 integration, 0 skip); feat commit `464f65c`.
+- 11-04: 45min, 3 tasks, 9 files, 28 plan-targeted + 121 full frontend Vitest + production build; feat commit `0d61b1b`.
 
 ## Phase 11 Decisions
 
@@ -56,6 +57,10 @@ Phase 11-03 完成。继续 11-04。聊天不得作为线索事实源；Phase 09
 - Lifecycle evidence rows attach only to lifecycle_event_id (not machine_clue_id) to avoid unique collisions rolling back machine clues.
 - Spoiler full-book reuses Phase 08 `timeline_full_book` only; no clue-specific preference endpoint.
 - Override supersession is INSERT-only latest-wins; reanalysis relinks on exactly one evidence identity match.
+- Frontend clue client lives in `frontend/src/lib/clue-api.ts` (does not overwrite dirty `api.ts`).
+- UI matches live 11-03 envelope fields (`available_states` / `available_character_ids` / `counts.by_state`).
+- ClueWorkspace owns independent clue run start/status; /analysis adds 线索与伏笔 tab without top-level /clues route.
+- Reject and adjust_link require explicit confirmation; actions refresh from server authority only.
 
 ## Phase 10 Execution Metrics
 
@@ -162,11 +167,11 @@ REQ-AUTO-01..11 已交付（含 06-08 QualityRun 持久化、06-09 BaselineCandi
 
 ## Next Action
 
-1. Execute `11-04-PLAN.md` (analysis workspace clue UI).
+1. Execute `11-05-PLAN.md` (fixtures, adversarial, browser qualification, release gate).
 2. Never import reader-chat as clue fact source; relationship outages → `source_unavailable`.
-3. 保留当前所有非 11-03 的本地 WIP，不纳入本次提交。
+3. 保留当前所有非 11-04 的本地 WIP，不纳入本次提交。
 
 ## Session
 
-- Stopped at: Completed 11-03-PLAN.md (durable worker + versions + overrides + spoiler API)
+- Stopped at: Completed 11-04-PLAN.md (analysis workspace clue UI)
 - Resume file: None
