@@ -201,7 +201,7 @@ Plans:
 **Requirements:** V08-AUDIT-01, V08-AUDIT-02, V08-AUDIT-03, V08-AUDIT-04
 **Depends on:** Phase 07, Phase 08, Phase 09, Phase 11
 **Status:** PLANNED
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans complete
 
 **Success Criteria:**
 1. 运维者对一部 owner-scoped 小说运行审计后，可获得按 hierarchy、timeline、relationship、clue 的版本化资产清单，以及每项唯一的 `reusable_exact`、`rebuild_required`、`blocked` 或 `optional_unavailable` 判定和 reason codes。
@@ -212,7 +212,7 @@ Plans:
 Plans:
 - [x] 12-01 audit contracts and read-only source adapters: eligibility enums, reason codes, owner/novel/version inventory, optional-source status
 - [x] 12-02 hierarchy and domain lineage verification: manifest/tree/offset/hash/coverage checks with provider-call-before blocking
-- [ ] 12-03 owner-scoped audit CLI/API and PostgreSQL negative tests: report, minimal rebuild scope, no model/data/pointer writes
+- [x] 12-03 owner-scoped audit CLI/API and PostgreSQL negative tests: report, minimal rebuild scope, no model/data/pointer writes
 
 ### Phase 13: Candidate Memory Contracts and Provenance Authority
 
