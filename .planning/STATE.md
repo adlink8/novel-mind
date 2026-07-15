@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v0.7
 milestone_name: Narrative Relationships, Reader AI, and Clue Tracking
 status: executing
-last_updated: "2026-07-15T08:35:00.000Z"
+last_updated: "2026-07-15T09:00:00.000Z"
 progress:
   total_phases: 11
   completed_phases: 8
   total_plans: 56
-  completed_plans: 45
-  percent: 71
+  completed_plans: 46
+  percent: 73
 ---
 
 # Project State
@@ -23,17 +23,17 @@ See `.planning/PROJECT.md` and `IMPLEMENTATION-STATUS.md`.
 
 ## Current Position
 
-Phase: 09 (Dynamic Character Relationship Graph) — EXECUTING
-Plan: 09-05 (wave 5 of 5) — next
+Phase: 09 (Dynamic Character Relationship Graph) — PLANS COMPLETE (5/5); ready for verify
+Plan: 09-05 complete
 **Phase 09-11 authorized for GSD execute** — user confirmed plans and requested execution 2026-07-15
 
 - Branch: `feat/phase2-wave2-embedding`
-- Last activity: 2026-07-15 — completed 09-04 Cytoscape analysis workspace
+- Last activity: 2026-07-15 — completed 09-05 qualification/release gate
 - Plan directories: `.planning/phases/09-dynamic-character-relationship-graph/`, `.planning/phases/10-reader-selection-ai-and-multi-session-conversations/`, `.planning/phases/11-clue-and-foreshadow-tracking/`
 
 ## Auto Routing
 
-Phase 09-11 规划已确认；用户授权执行。按依赖顺序：09 → 10 → 11。当前执行 Phase 09，下一步 09-05。
+Phase 09 全部计划已执行完；下一步 Phase 09 verify，通过后进入 Phase 10。
 
 ## Phase 09 Execution Metrics
 
@@ -41,6 +41,7 @@ Phase 09-11 规划已确认；用户授权执行。按依赖顺序：09 → 10 �
 - 09-02: 45min, 3 tasks, 10 files, 17 targeted pipeline tests passed (13 unit + 4 PostgreSQL integration, 0 skip).
 - 09-03: 55min, 3 tasks, 8 files, 10 targeted graph API/projection PostgreSQL tests passed (0 skip); OpenAPI graph path registered.
 - 09-04: 45min, 3 tasks, 13 files, frontend 85 Vitest + lint (0 errors) + Next production build passed; cytoscape@3.34.0 pinned.
+- 09-05: 95min, 3 tasks, 9 files, backend 60 + frontend 85 + Playwright 4 + release qualified; scope_clean true.
 
 ## Phase 09 Decisions
 
@@ -56,6 +57,8 @@ Phase 09-11 规划已确认；用户授权执行。按依赖顺序：09 → 10 �
 - Phase 10/11 get documented read-only service functions only; no chat/clue tables or routes in Phase 09.
 - Cytoscape.js is the relationship renderer (exact 3.34.0); ECharts timeline remains; workspaces share version/full-book/through_chapter only.
 - Graph client filter params match OpenAPI singular character_id/relation_type; filters_required never mounts Cytoscape.
+- Phase 09 release uses independent PostgreSQL observations + internally executed command digests; verdict is passed or blocked_release.
+- Character-filtered graph queries prefilter endpoints in SQL so 10k observation seeds meet p95<=300ms.
 
 ## Phase 08 Execution Metrics
 
@@ -151,11 +154,12 @@ CLI：`backend/scripts/run_chunker_qualification.py`
 
 ## Next Action
 
-1. Execute 09-05 (qualification, adversarial, performance, release gate for Phase 09).
-2. Phase 10 可依赖 `load_filtered_relationship_graph`；Phase 11 可依赖 `list_accepted_observation_refs`；均不把聊天当事实来源。
-3. 保留当前所有非 `.planning` 的本地 WIP，不纳入本次规划提交。
+1. Run Phase 09 verification (`$gsd-verify-work` / 09-VERIFICATION) — plans 5/5 implement-complete.
+2. After verify, start Phase 10; depend on `load_filtered_relationship_graph` only.
+3. Phase 11 may depend on `list_accepted_observation_refs`; never treat chat as fact source.
+4. 保留当前所有非 `.planning` 的本地 WIP，不纳入本次规划提交。
 
 ## Session
 
-- Stopped at: Completed 09-04-PLAN.md
+- Stopped at: Completed 09-05-PLAN.md
 - Resume file: None

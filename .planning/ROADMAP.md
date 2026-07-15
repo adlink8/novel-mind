@@ -43,12 +43,12 @@
 | v0.5 / Phase 6 自动质量与 CI 门禁 | 9/9 | **Complete** (REQ-AUTO-11 closed) |
 | Phase 7 语义/层级分块 | 6/6 | **Complete** (logic+tests+PG/indexing wiring) |
 | Phase 8 版本化小说分析与时间线 | 10/10 | **Complete** (35/35 must-haves verified) |
-| v0.7 / Phase 9-11 叙事关系、阅读问答与线索追踪 | Phase 09: 4/5 plans | **Executing** (09-04 complete) |
+| v0.7 / Phase 9-11 叙事关系、阅读问答与线索追踪 | Phase 09: 5/5 plans | **Phase 09 implement-complete** (ready for verify) |
 
 ## Auto Start
 
-Phase 06–08 已完成。Phase 09 执行中（09-04 complete）。Phase 10–11 仍为 planned only。
-验证：`.planning/phases/06-automated-quality-ci/` SUMMARYs；`.planning/phases/07-semantic-hierarchical-chunking/07-VERIFICATION.md`；Phase 08 `08-VERIFICATION.md`；Phase 09 `09-01-SUMMARY.md`、`09-02-SUMMARY.md`、`09-03-SUMMARY.md`、`09-04-SUMMARY.md`。
+Phase 06–08 已完成。Phase 09 计划 5/5 已执行完，待 verify。Phase 10–11 仍为 planned only。
+验证：`.planning/phases/06-automated-quality-ci/` SUMMARYs；`.planning/phases/07-semantic-hierarchical-chunking/07-VERIFICATION.md`；Phase 08 `08-VERIFICATION.md`；Phase 09 `09-01`..`09-05-SUMMARY.md`。
 
 ## Backlog
 
@@ -150,16 +150,16 @@ Plans:
 **Goal:** 基于已证据门控的人物关系事实和时间线版本，生成可按叙事进度演化、默认防剧透的小说人物关系图。
 **Requirements:** REQ-REL-01..06
 **Depends on:** Phase 04, Phase 08
-**Status:** IN PROGRESS — 09-04 complete
+**Status:** IMPLEMENT COMPLETE — 09-01..09-05 executed; pending independent verification
 
 Plans:
 - [x] 09-01 append-only relationship observation contracts, evidence lineage, overrides, and migration
 - [x] 09-02 deterministic relationship candidates, bounded evidence packages, LLM judgment, and gates
 - [x] 09-03 owner/version/spoiler graph API, fold, overrides, and replayable Neo4j projection
 - [x] 09-04 Cytoscape.js analysis workspace, evidence panel, timeline linking, and large-graph degradation
-- [ ] 09-05 frozen fixtures, adversarial/performance tests, browser qualification, and release gate
+- [x] 09-05 frozen fixtures, adversarial/performance tests, browser qualification, and release gate
 
-**Waves:** 1 → 2 → 3 → 4 → 5. Each wave is blocked on the prior data contract and validation evidence.
+**Waves:** 1 → 2 → 3 → 4 → 5 complete. Ready for Phase 09 verify before Phase 10.
 
 ### Phase 10: Reader Text-Selection AI and Multi-Session Conversations
 
