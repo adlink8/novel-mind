@@ -87,10 +87,10 @@
 | REQ-CLUE-05 | 用户可确认、驳回、补充说明或调整线索关联；人工决策形成保护性 override，重分析仅产生需对比的新版本 | P1 | PLANNED |
 | REQ-CLUE-06 | 分析工作台提供线索时间带、证据面板、状态筛选和回收链路，而非把后端剧情摘要中间结果暴露成新菜单 | P1 | PLANNED |
 | REQ-CLUE-07 | 冻结小说 fixture、对抗性假阳性/剧透/跨版本测试、成本延迟和浏览器验证共同构成发布门禁 | P1 | PLANNED |
-| V08-AUDIT-01 | 运维者可按资产与版本生成只读的层级记忆候选资格报告 | P0 | PLANNED |
-| V08-AUDIT-02 | 报告将现有资产明确分类为 reusable_exact、rebuild_required、blocked 或 optional_unavailable | P0 | PLANNED |
-| V08-AUDIT-03 | Phase 07 层级资产无效时必须在任何 provider 调用前阻断构建 | P0 | PLANNED |
-| V08-AUDIT-04 | 资格审计不得调用模型、修复数据或写入任何 active pointer | P0 | PLANNED |
+| V08-AUDIT-01 | 运维者可按资产与版本生成只读的层级记忆候选资格报告 | P0 | VERIFIED |
+| V08-AUDIT-02 | 报告将现有资产明确分类为 reusable_exact、rebuild_required、blocked 或 optional_unavailable | P0 | VERIFIED |
+| V08-AUDIT-03 | Phase 07 层级资产无效时必须在任何 provider 调用前阻断构建 | P0 | VERIFIED |
+| V08-AUDIT-04 | 资格审计不得调用模型、修复数据或写入任何 active pointer | P0 | VERIFIED |
 | V08-MEM-01 | Chapter State、连续 Story Arc/Volume 与 Global Story Model 使用独立 immutable candidate version | P0 | PLANNED |
 | V08-MEM-02 | 上层状态与主张使用严格类型 schema；自由文本不得充当事实权威 | P0 | PLANNED |
 | V08-MEM-03 | 每条上层主张都必须解析到同一 source snapshot 的 leaf evidence | P0 | PLANNED |

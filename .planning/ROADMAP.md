@@ -45,11 +45,11 @@
 | Phase 7 语义/层级分块 | 6/6 | **Complete** (logic+tests+PG/indexing wiring) |
 | Phase 8 版本化小说分析与时间线 | 10/10 | **Complete** (35/35 must-haves verified) |
 | v0.7 / Phase 9-11 叙事关系、阅读问答与线索追踪 | Phase 09: 5/5; Phase 10: 5/5; Phase 11: 5/5 | **09 VERIFIED**; **10 PARTIAL** (real Playwright residual); **11 implement-complete** (adversarial residual closed) |
-| v0.8 / Phase 12-17 分层叙事记忆与层级 RAG | 0/19 initial plans | **PLANNED** — 28/28 V08 requirements uniquely mapped; candidate-only/no pointer cutover |
+| v0.8 / Phase 12-17 分层叙事记忆与层级 RAG | 3/19 initial plans | **IN PROGRESS** — Phase 12 verified; Phase 13 next; candidate-only/no pointer cutover |
 
 ## Auto Start
 
-下一执行入口为 **Phase 12: Read-only Asset Audit and Eligibility**。先讨论/规划 Phase 12；任何 v0.8 provider 调用都必须等待 Phase 12 对 active Phase 07 hierarchy 给出 `reusable_exact`。
+下一执行入口为 **Phase 13: Candidate Memory Contracts and Provenance Authority**。Phase 12 只读审计已独立验证通过；Phase 14 的 provider 调用仍必须使用其 `provider_calls_allowed` 门禁。
 Phase 06–11 历史实现与验证状态保持不变；Phase 10 real Playwright residual 和 v0.3 质量缺口不因 v0.8 单书 dry-run 自动关闭。
 
 ## Backlog
@@ -200,7 +200,7 @@ Plans:
 **Goal:** 在任何模型调用或上层写入前，以只读方式证明单本小说现有 hierarchy 与可选分析资产是否可被 v0.8 精确复用，并给出可机器处理的阻断原因和最小重建范围。
 **Requirements:** V08-AUDIT-01, V08-AUDIT-02, V08-AUDIT-03, V08-AUDIT-04
 **Depends on:** Phase 07, Phase 08, Phase 09, Phase 11
-**Status:** PLANNED
+**Status:** COMPLETE — 3/3 plans; independent verification passed 4/4 requirements and 10/10 truths (2026-07-15)
 **Plans:** 3/3 plans complete
 
 **Success Criteria:**

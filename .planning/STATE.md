@@ -2,15 +2,16 @@
 gsd_state_version: 1.0
 milestone: v0.8
 milestone_name: 分层叙事记忆与层级 RAG
-status: verifying
-last_updated: "2026-07-15T10:21:12.960Z"
+status: ready_to_plan
+last_updated: 2026-07-15T10:41:54.332Z
 last_activity: 2026-07-15
 progress:
   total_phases: 16
-  completed_phases: 9
+  completed_phases: 10
   total_plans: 52
   completed_plans: 56
-  percent: 56
+  percent: 63
+stopped_at: Phase 12 verified — planning Phase 13
 ---
 
 # Project State
@@ -24,9 +25,9 @@ See `.planning/PROJECT.md` and `IMPLEMENTATION-STATUS.md`.
 
 ## Current Position
 
-Phase: 12 (Read-only Asset Audit and Eligibility) — EXECUTING
-Plan: 3 of 3
-Status: Phase complete — ready for verification
+Phase: 13 (Candidate Memory Contracts and Provenance Authority)
+Plan: Not started
+Status: Ready to plan
 Last activity: 2026-07-15
 
 ## Auto Routing

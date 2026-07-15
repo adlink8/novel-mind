@@ -1,17 +1,17 @@
 ---
 phase: 12-read-only-asset-audit-and-eligibility
 verified: 2026-07-15
-status: gaps_found
-score: "1/4 requirements fully verified; 5/10 plan truths verified"
+status: passed
+score: "4/4 requirements verified; 10/10 plan truths verified"
 ---
 
 # Phase 12 Verification — Read-only Asset Audit and Eligibility
 
 **Goal:** 在任何模型调用或上层写入前，以只读方式证明单本小说现有 hierarchy 与可选分析资产是否可被 v0.8 精确复用，并给出可机器处理的阻断原因和最小重建范围。
 
-**Verdict:** `gaps_found`
+**Final verdict:** `passed`
 
-Phase 12 已交付严格报告 contract、纯资格 evaluator、PostgreSQL reader、provider guard、管理员 API 和 CLI；定向测试与 Ruff 均通过，实际代码中也未发现 provider、repair、promotion 或 ORM 写入路径。但是当前 PostgreSQL 资格判断尚不能证明所有 `reusable_exact` 都是 exact：required hierarchy 未校验 build lifecycle/immutability 且会过滤掉同 build 的 foreign-scope node；optional readers 未完整校验 owner/novel/checksum/事实计数。因而 Phase 12 goal 和 V08-AUDIT-01..03 尚不能判定通过。
+Phase 12 goal is achieved. The implementation produces deterministic owner-scoped eligibility reports over the required Phase 07 hierarchy and optional timeline/relationship/clue assets, blocks invalid required hierarchy before later provider work, exposes read-only administrator API and CLI entry points, and has no provider, repair, promotion or pointer-write capability.
 
 ## Evidence Reviewed
 
@@ -19,10 +19,11 @@ Phase 12 已交付严格报告 contract、纯资格 evaluator、PostgreSQL reade
 - `12-01-SUMMARY.md`, `12-02-SUMMARY.md`, `12-03-SUMMARY.md`
 - `12-CONTEXT.md`, `12-RESEARCH.md`, `.planning/REQUIREMENTS.md`
 - `backend/app/services/narrative_memory/{audit_contracts,audit_sources,audit,audit_pg}.py`
-- `backend/app/api/asset_audit.py`, `backend/scripts/run_asset_audit.py`, `backend/app/main.py`
-- Phase 12 unit/integration tests and existing Phase 11 source-protocol tests
+- `backend/app/api/asset_audit.py`, `backend/scripts/run_asset_audit.py`, router registration in `backend/app/main.py`
+- Phase 12 unit/PostgreSQL integration tests and Phase 11 unavailable-source regressions
+- Gap-closure commit `d6f1f93` and current working-tree test assertion that invalid optional clue state does not block hierarchy-only eligibility
 
-## Commands Executed
+## Independent Commands
 
 ```text
 cd backend
@@ -30,85 +31,82 @@ cd backend
   tests/unit/narrative_memory \
   tests/integration/narrative_memory \
   tests/integration/clues/test_source_protocols.py -q
-# 29 passed, 3 existing pytest-timeout configuration warnings
+# 34 passed, 3 existing pytest-timeout configuration warnings
 
 .\.venv\Scripts\ruff.exe check \
-  app/services/narrative_memory app/api/asset_audit.py \
-  scripts/run_asset_audit.py tests/unit/narrative_memory \
+  app/services/narrative_memory \
+  tests/unit/narrative_memory \
   tests/integration/narrative_memory
 # All checks passed
 ```
 
-Prior execution evidence retained from `12-03-SUMMARY.md`:
-
-- Real CLI audit for novel 91 completed read-only and returned hierarchy `rebuild_required`, exit 2.
-- Real CLI audit for novel 104 inspected 9,413 hierarchy rows, returned `content_hash_mismatch` with rebuild range 0–419, exit 2.
-- Neither real book was repaired or reanalyzed.
+The warnings are pre-existing environment/configuration warnings for unavailable `pytest-timeout`; no Phase 12 test was skipped or failed.
 
 ## Requirement Verification
 
-| Requirement | Status | Evidence / Gap |
+| Requirement | Status | Evidence |
 |---|---|---|
-| V08-AUDIT-01 — 按资产与版本生成只读资格报告 | ⚠ PARTIAL | Strict report、API、CLI 和四类资产均存在；但 optional inventory 可将跨 scope/checksum 不一致版本或非空 timeline/clue 错报为 exact/healthy-empty，报告事实不充分。 |
-| V08-AUDIT-02 — 四种唯一分类 | ⚠ PARTIAL | Enum 和每资产唯一状态已验证；分类输入不完整，故 `reusable_exact` 结论并非始终可靠。 |
-| V08-AUDIT-03 — 无效 Phase 07 hierarchy 在 provider 前阻断 | ✗ GAP | guard 本身 fail-closed，但 hierarchy adapter 未检查 `ChunkBuild.immutable`/status，并过滤同 build 的 foreign-novel nodes；这些无效状态可无 reason code 地到达 `reusable_exact`，使 guard 为 true。 |
-| V08-AUDIT-04 — 零模型、零修复、零 active-pointer 写入 | ✓ VERIFIED | package/API/CLI 仅包含 SELECT/read 路径；capability scan、before/after tests 通过；未发现 provider/repair/promotion/session add/delete/commit/flush。测试证明范围仍有下述独立 observer 缺口，但实际代码未发现写能力。 |
+| V08-AUDIT-01 — operator can generate a read-only per-asset/version report | ✓ VERIFIED | Strict canonical `EligibilityReport`; superuser GET API and fixed CLI use the same SELECT-only service and emit equivalent reports. |
+| V08-AUDIT-02 — exactly four explicit statuses | ✓ VERIFIED | Closed enums and deterministic evaluator produce exactly `reusable_exact`, `rebuild_required`, `blocked`, or `optional_unavailable`; duplicate/malformed/scope inputs fail closed. |
+| V08-AUDIT-03 — invalid Phase 07 hierarchy blocks before provider calls | ✓ VERIFIED | Active build must be immutable, non-candidate and valid status; snapshot, manifest, tree, offsets, hashes, coverage and foreign-build rows are checked. Every invalid required case keeps the derived guard false. |
+| V08-AUDIT-04 — no model, repair or active-pointer writes | ✓ VERIFIED | Code is SELECT-only; forbidden-capability scans pass; fresh observers around real HTTP API and independent CLI exact/blocked executions show authority and pointers unchanged. |
 
-**Requirement score:** 1/4 fully verified.
+**Score:** 4/4 requirements verified.
 
 ## Plan Must-have Verification
 
-| Plan truth | Status | Evidence / Gap |
+| Truth | Status | Evidence |
 |---|---|---|
-| 每项资产只有一种 closed status 与稳定 reason codes | ✓ | Strict enums、unique kind validation、canonical serialization unit tests通过。 |
-| required hierarchy 仅 exact 时允许 provider；未知/缺失 fail closed | ⚠ | `EligibilityReport` guard 正确，但 PG adapter 可把未检查的 invalid build 标成 exact。 |
-| optional unavailable 与 healthy empty 区分且不制造事实 | ✗ | unavailable 状态存在；但 timeline/clue reader不统计真实事实，兼容 active version 默认 `item_count=0`、`healthy_empty=true`。 |
-| 首切片无 provider/ORM writer/repair/promotion/dispatch/pointer capability | ✓ | 静态扫描和源码检查通过。 |
-| active hierarchy 被 lossless inventory，不由修复树推断 exact | ✗ | 查询在 `audit_pg.py:115-118` 预先限定 `novel_id`，因此同 `build_id` 的 foreign-scope rows 被隐藏而不是形成 anomaly。 |
-| owner/novel/build/snapshot/manifest/tree/offset/hash/coverage 均在 exact 前证明 | ✗ | owner、novel、snapshot、manifest、tree、offset/hash、coverage 有检查；build `immutable`、lifecycle/status 未检查。 |
-| timeline/relationship/clue 遵循真实 authority 且保持 optional | ✗ | authority 入口正确，但引用 version 后未重新校验 version owner/novel，也未校验 `hierarchy_checksum`；timeline/clue pointer manifest 与实际事实数未验证。 |
-| 授权 operator 可通过 API/CLI 重现 scoped report | ✓ | superuser API、CLI 共用 service；entrypoint tests通过；canonical payload一致。 |
-| audit 不改变 provider calls/domain rows/pointers/revisions/journals | ✓（代码）/⚠（证明） | 源码为 SELECT-only 且现有 before/after test通过；但测试使用同一 session，不是计划要求的 fresh observer，也未对所有 domain rows 做内容 checksum。 |
-| blocked hierarchy 无法越过 pre-provider guard | ✓ | `provider_calls_allowed` 只由 required exact 派生；blocked CLI exit 2。invalid-but-misclassified 情况归入上面的 adapter gap。 |
+| Every asset gets one closed status and stable reason codes | ✓ | Strict Pydantic contracts, unique asset-kind enforcement and canonical serialization tests. |
+| Required hierarchy permits providers only when exact | ✓ | `provider_calls_allowed` is derived from required results; caller overrides are rejected. |
+| Optional unavailable differs from healthy empty | ✓ | Real fact counts for timeline, relationship and clue; explicit unavailable and zero-fact cases. |
+| No provider/writer/repair/promotion/dispatch capability | ✓ | Static scan plus direct source inspection. |
+| Active hierarchy inventory is lossless | ✓ | All rows for build ID load before scope filtering; foreign-novel rows produce `NOVEL_SCOPE_MISMATCH`. |
+| Owner/build/snapshot/manifest/tree/offset/hash/coverage proved before exact | ✓ | PostgreSQL corruption tests cover mutable build, foreign rows, missing pointer, normalized multi-span mismatch and per-chapter rebuild range. |
+| Optional domains follow real version authority | ✓ | Owner/novel/status, snapshot/build/checksum, pointer manifest and actual fact counts are validated. |
+| Authorized operator can reproduce report through API and CLI | ✓ | Superuser authorization, non-admin rejection, canonical API/CLI equivalence and deterministic exit codes. |
+| Audit leaves provider/data/pointers/revisions/journals unchanged | ✓ | Fresh-session snapshots wrap real HTTP API and subprocess CLI in exact and blocked cases. |
+| Blocked hierarchy cannot cross pre-provider guard | ✓ | Blocked/rebuild cases return guard false and CLI exit 2; optional clue anomalies remain non-blocking when hierarchy is exact. |
 
-**Plan truth score:** 5/10 verified；4 gaps；1 implementation verified but independent-proof incomplete.
+**Score:** 10/10 plan truths verified.
 
-## Blocking Gaps
+## Gap-closure Evidence
 
-### 1. Required hierarchy can be falsely classified `reusable_exact`
+### Required hierarchy lifecycle and foreign rows
 
-`PostgresAuditSource._hierarchy_inventory` verifies hashes/tree/coverage but never checks `ChunkBuild.immutable`, candidate/lifecycle status, or whether the active build is in an allowed committed state. An active pointer to a mutable or otherwise invalid build can therefore produce no reason code and allow `provider_calls_allowed=true`.
+- Requires `immutable=true`, `is_candidate=false`, status `built|committed`.
+- Loads every hierarchy row for the build before target-novel filtering.
+- Foreign-scope row produces a blocking scope reason.
+- Tests: `test_mutable_active_build_never_allows_provider`, `test_foreign_scope_node_is_not_hidden_by_target_filter`.
 
-The node query also filters by both build and target novel (`audit_pg.py:115-118`). Because `ChunkHierarchyNode.build_id` is not a composite FK to the build's novel, a foreign-novel row sharing the build ID is possible. Filtering it out violates the plan's lossless inventory requirement and hides a foreign-scope anomaly.
+### Optional version authority and facts
 
-**Required closure:** load all rows for the selected build ID, reject/flag any row whose novel differs, validate allowed build lifecycle plus `immutable=true`, and add PostgreSQL adversarial tests proving both cases keep the guard false.
+- Timeline/relationship/clue re-check owner, novel, status, source snapshot, hierarchy build and hierarchy checksum.
+- Timeline and clue validate pointer manifest identity.
+- Actual domain fact counts distinguish true empty from non-empty assets; relationship count is checked against the completed run.
+- Clue active pointer target is now strictly `validated`; `candidate` and `superseded` become `optional_unavailable` with `OPTIONAL_LINEAGE_MISMATCH`.
+- `test_clue_requires_validated_pointer_target_and_counts_real_facts` covers validated empty/non-empty plus both invalid states and proves optional failure leaves an exact hierarchy's provider guard true.
 
-### 2. Optional assets are not proved exact and can be mislabeled healthy-empty
+### Independent no-side-effect authority
 
-Timeline and relationship use `AnalysisVersion`, and clue uses `ClueAnalysisVersion`, but the readers do not re-check referenced version owner/novel. `_lineage_reasons` only compares source snapshot and hierarchy build ID (`audit_pg.py:292-300`); it omits `hierarchy_checksum`. Clue has the same omission (`audit_pg.py:285`). Pointer manifest checks are also absent.
+- `test_fresh_observer_wraps_real_api_and_cli_for_exact_and_blocked_cases` commits fixture authority, uses fresh database sessions, invokes the real HTTP route, launches the CLI as a subprocess, and compares before/after build/node content, pointers/revisions and relevant journal/run counts.
+- Exact case returns API guard true and CLI exit 0; mutable-build case returns guard false and CLI exit 2; both leave authority byte-equivalent within the observed contract.
 
-Additionally, timeline and clue always use default `item_count=0`; `_optional_result` then marks them `healthy_empty=true` (`audit_pg.py:316-331`) even when their active versions contain events/clues. This can turn “facts not inventoried” into “healthy empty,” contrary to the required unavailable-vs-empty semantics.
+## Real-data Audit Evidence
 
-**Required closure:** validate owner/novel/version status, hierarchy checksum and pointer/version manifest lineage; count or otherwise prove the relevant domain facts/evidence; add active-nonempty, true-empty, cross-owner version and checksum-mismatch integration cases.
+Retained from `12-03-SUMMARY.md`:
 
-### 3. The promised fresh-observer no-side-effect proof is incomplete
+- Novel 91 completed a read-only audit and safely returned hierarchy `rebuild_required`, CLI exit 2.
+- Novel 104 inspected 9,413 hierarchy rows, found `content_hash_mismatch`, returned rebuild range 0–419 and CLI exit 2.
+- No existing novel was repaired, reanalyzed or promoted.
 
-`test_service_and_cli_helpers_leave_authority_unchanged` uses the same `audit_pg_session` for audit and before/after observation (`test_audit_no_side_effects.py:63-74`). The observer records selected table counts and pointers, not content checksums for all relevant domain authority, and it does not wrap the real HTTP API plus separate CLI process in the same independent observation.
+## Scope Confirmation
 
-Static inspection strongly supports V08-AUDIT-04 and no mutation was observed, so this is an evidence/plan-must-have gap rather than a discovered write. It still fails the explicit 12-03 “fresh PostgreSQL observer” acceptance claim.
+- No Chapter State, Story Arc/Volume or Global Story Model schema/table was added; those remain Phase 13.
+- No model call, budget, checkpoint, cache or builder was added; those remain Phase 14.
+- No production active pointer or existing timeline/relationship/clue/Reader Chat consumer was changed.
+- No new product UI or production dependency was introduced.
 
-**Required closure:** use a separate fresh session/connection to snapshot content digests and pointers/journals around the actual API and CLI entry paths, including malformed/blocked cases.
+## Final Conclusion
 
-## Verified Artifacts and Links
-
-- `audit_contracts.py`: strict four-status schema and policy-owned required/optional mapping.
-- `audit.py`: deterministic evaluator and derived provider guard.
-- `audit_pg.py`: real PostgreSQL reader, source re-slice, tree/manifest/coverage checks and optional adapters.
-- `asset_audit.py`: authenticated superuser GET endpoint; no mutation route.
-- `run_asset_audit.py`: canonical JSON; exit 0 only for allowed report, otherwise 2.
-- `main.py`: router registered.
-- 29 targeted tests pass, including API/CLI equivalence, owner isolation, malformed hierarchy, provider guard, capability scan and existing clue unavailable semantics.
-
-## Overall Verdict
-
-**GAPS FOUND.** The read-only/control-capability boundary is implemented correctly, and real CLI audits safely block both current books. However, Phase 12's core promise is not merely to block current fixtures; it must prove that any `reusable_exact` classification is exact. Missing hierarchy lifecycle/foreign-row validation and incomplete optional version/empty-state validation leave false-exact paths. Close these gaps and rerun independent verification before Phase 14 is allowed to treat the report as a provider-call gate.
+**PASSED.** Phase 12 provides a reproducible read-only gate whose exact classifications are backed by current PostgreSQL authority, whose optional-source failures remain explicit and non-blocking, and whose invalid required hierarchy cannot authorize later provider calls. All previously reported gaps are closed with executable PostgreSQL tests.
