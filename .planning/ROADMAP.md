@@ -43,11 +43,11 @@
 | v0.5 / Phase 6 自动质量与 CI 门禁 | 9/9 | **Complete** (REQ-AUTO-11 closed) |
 | Phase 7 语义/层级分块 | 6/6 | **Complete** (logic+tests+PG/indexing wiring) |
 | Phase 8 版本化小说分析与时间线 | 10/10 | **Complete** (35/35 must-haves verified) |
-| v0.7 / Phase 9-11 叙事关系、阅读问答与线索追踪 | Phase 09: 5/5 plans | **Phase 09 VERIFIED** (21/21 must-haves); Phase 10–11 planned |
+| v0.7 / Phase 9-11 叙事关系、阅读问答与线索追踪 | Phase 09: 5/5; Phase 10: 1/5 | **Phase 09 VERIFIED**; Phase 10 in progress |
 
 ## Auto Start
 
-Phase 06–09 已完成。Phase 09 已独立验证通过（21/21 must-haves）。Phase 10–11 仍为 planned only。
+Phase 06–09 已完成。Phase 09 已独立验证通过（21/21 must-haves）。Phase 10 执行中（10-01 complete）。
 验证：`.planning/phases/06-automated-quality-ci/` SUMMARYs；`.planning/phases/07-semantic-hierarchical-chunking/07-VERIFICATION.md`；Phase 08 `08-VERIFICATION.md`；Phase 09 `09-VERIFICATION.md`。
 
 ## Backlog
@@ -166,16 +166,16 @@ Plans:
 **Goal:** 让读者从阅读器选取原文后，在同一本小说的多个持久会话中进行证据受限、防剧透的 AI 对话。
 **Requirements:** REQ-CHAT-01..07
 **Depends on:** Phase 08, Phase 09
-**Status:** PLANNED ONLY — implementation not started
+**Status:** IN PROGRESS — 1/5 plans complete
 
 Plans:
-- [ ] 10-01 durable conversations, messages, selections, manifests, citations, jobs, calls, budgets, and migration
+- [x] 10-01 durable conversations, messages, selections, manifests, citations, jobs, calls, budgets, and migration
 - [ ] 10-02 owner-scoped multi-session lifecycle, ordered messages, idempotency, and API contracts
 - [ ] 10-03 server-verified Unicode selections, visible-context assembly, and Phase 09 read-only contract
 - [ ] 10-04 cited answer worker, audit lineage, dual budgets, cancellation, retry, and adversarial tests
 - [ ] 10-05 reader selection entry, collapsible multi-session window, citations, browser qualification, and release gate
 
-**Waves:** 1 → {2, 3} → 4 → 5. Wave 3 binds the completed Phase 09 public reader; it does not install a null graph adapter.
+**Waves:** 1 → {2, 3} → 4 → 5. Wave 1 complete (`10-01-SUMMARY.md`). Wave 3 binds the completed Phase 09 public reader; it does not install a null graph adapter.
 
 ### Phase 11: Clue and Foreshadow Tracking
 

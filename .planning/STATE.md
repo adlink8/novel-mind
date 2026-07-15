@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v0.7
 milestone_name: Narrative Relationships, Reader AI, and Clue Tracking
 status: executing
-last_updated: "2026-07-15T09:15:00.000Z"
+last_updated: "2026-07-15T10:00:00.000Z"
 progress:
   total_phases: 11
   completed_phases: 9
   total_plans: 56
-  completed_plans: 46
-  percent: 82
+  completed_plans: 47
+  percent: 84
 ---
 
 # Project State
@@ -23,17 +23,29 @@ See `.planning/PROJECT.md` and `IMPLEMENTATION-STATUS.md`.
 
 ## Current Position
 
-Phase: 09 (Dynamic Character Relationship Graph) — VERIFIED (5/5 plans; 21/21 must-haves)
-Plan: 09-05 complete; 09-VERIFICATION passed
-**Phase 10-11 authorized for GSD execute** — Phase 09 independent verification complete 2026-07-15
+Phase: 10 (Reader Selection AI and Multi-Session Conversations) — in progress (1/5 plans)
+Plan: 10-01 complete
+**Next:** 10-02 owner-scoped multi-session lifecycle API
 
 - Branch: `feat/phase2-wave2-embedding`
-- Last activity: 2026-07-15 — Phase 09 verification report (21/21 must-haves; backend 60 + frontend relationships 17 re-run)
+- Last activity: 2026-07-15 — completed 10-01 reader-chat persistence authority
 - Plan directories: `.planning/phases/09-dynamic-character-relationship-graph/`, `.planning/phases/10-reader-selection-ai-and-multi-session-conversations/`, `.planning/phases/11-clue-and-foreshadow-tracking/`
 
 ## Auto Routing
 
-Phase 09 已独立验证通过；下一步进入 Phase 10（依赖 `load_filtered_relationship_graph` only）。
+Phase 10-01 完成；下一步执行 10-02（会话生命周期 API）。不进入 Phase 11 线索产品代码。
+
+## Phase 10 Execution Metrics
+
+- 10-01: 45min, 3 tasks, 8 files, 28 targeted unit+PostgreSQL migration tests passed (0 skip); alembic head `12readerchat01`.
+
+## Phase 10 Decisions
+
+- Migration down_revision is Phase 09 single head `11relobserve01`.
+- Chat budgets use separate reader_* ledger tables with conversation and novel scopes.
+- Suggestions always require_explicit_confirmation=true; no apply/confirm domain write contract.
+- Hard-delete cascades private chat content; novel-scoped chat ledger survives conversation delete.
+- reader_* tables never FK into timeline/relationship/clue fact tables.
 
 ## Phase 09 Execution Metrics
 
