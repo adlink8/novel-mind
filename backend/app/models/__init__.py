@@ -120,6 +120,15 @@ from app.models.clue import (
     CluePointerJournal,
     MachineClue,
 )
+from app.models.narrative_memory import (
+    NarrativeMemoryClaim,
+    NarrativeMemoryEdge,
+    NarrativeMemoryManifest,
+    NarrativeMemoryNode,
+    NarrativeMemorySourceLink,
+    NarrativeMemoryValidationReport,
+    NarrativeMemoryVersion,
+)
 
 __all__ = [
     "Base",
@@ -198,4 +207,11 @@ __all__ = [
     "ClueModelCallAttempt",
     "ClueActivePointer",
     "CluePointerJournal",
+    "NarrativeMemoryVersion",
+    "NarrativeMemoryNode",
+    "NarrativeMemoryClaim",
+    "NarrativeMemoryEdge",
+    "NarrativeMemorySourceLink",
+    "NarrativeMemoryManifest",
+    "NarrativeMemoryValidationReport",
 ]
