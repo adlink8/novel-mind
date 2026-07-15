@@ -43,12 +43,12 @@
 | v0.5 / Phase 6 自动质量与 CI 门禁 | 9/9 | **Complete** (REQ-AUTO-11 closed) |
 | Phase 7 语义/层级分块 | 6/6 | **Complete** (logic+tests+PG/indexing wiring) |
 | Phase 8 版本化小说分析与时间线 | 10/10 | **Complete** (35/35 must-haves verified) |
-| v0.7 / Phase 9-11 叙事关系、阅读问答与线索追踪 | Phase 09: 5/5; Phase 10: 5/5; Phase 11: 5/5 | **Phase 09 VERIFIED**; **Phase 10 PARTIAL**; **Phase 11 implement-complete** (11-01..11-05) |
+| v0.7 / Phase 9-11 叙事关系、阅读问答与线索追踪 | Phase 09: 5/5; Phase 10: 5/5; Phase 11: 5/5 | **Phase 09 VERIFIED**; **Phase 10 PARTIAL**; **Phase 11 PARTIAL** (15/15 product; 1 adversarial residual) |
 
 ## Auto Start
 
-Phase 06–09 已完成。Phase 09 已独立验证通过（21/21 must-haves）。Phase 10 implement-complete + independent verification **PARTIAL**（19/20）。Phase 11 **implement-complete**（5/5；real PG on 5433 + dual-viewport Playwright passed in 11-05）。
-验证：`.planning/phases/06-automated-quality-ci/` SUMMARYs；`.planning/phases/07-semantic-hierarchical-chunking/07-VERIFICATION.md`；Phase 08 `08-VERIFICATION.md`；Phase 09 `09-VERIFICATION.md`；Phase 10 `10-VERIFICATION.md`；Phase 11 `11-01`..`11-05-SUMMARY.md`。
+Phase 06–09 已完成。Phase 09 已独立验证通过（21/21 must-haves）。Phase 10 implement-complete + independent verification **PARTIAL**（19/20）。Phase 11 implement-complete + independent verification **PARTIAL**（15/15 product must-haves；对抗包级 `session.add` 扫描 1 失败；Playwright 本会话未重跑）。
+验证：`.planning/phases/06-automated-quality-ci/` SUMMARYs；`.planning/phases/07-semantic-hierarchical-chunking/07-VERIFICATION.md`；Phase 08 `08-VERIFICATION.md`；Phase 09 `09-VERIFICATION.md`；Phase 10 `10-VERIFICATION.md`；Phase 11 `11-VERIFICATION.md`。
 
 ## Backlog
 
@@ -182,7 +182,7 @@ Plans:
 **Goal:** 以证据、版本和人工可控的五状态生命周期，发现、追踪、核验小说中的线索、伏笔及其回收。
 **Requirements:** REQ-CLUE-01..07
 **Depends on:** Phase 08, Phase 09, Phase 10
-**Status:** implement-complete — 5/5 plans (independent verification optional)
+**Status:** PARTIAL — 5/5 plans; independent verification 15/15 product must-haves (2026-07-15); adversarial static-scan residual
 
 Plans:
 - [x] 11-01 clue lifecycle contracts, PostgreSQL authority, append-only states, overrides, and migration
@@ -191,4 +191,4 @@ Plans:
 - [x] 11-04 analysis workspace clue timeband, filters, evidence panel, payoff chain, and manual actions
 - [x] 11-05 frozen fixtures, false-positive/spoiler/version adversarial tests, browser qualification, and release gate
 
-**Waves:** 1 → 2 → 3 → 4 → 5 complete. SUMMARYs: `11-01`..`11-05-SUMMARY.md`. Alembic head `11cluetrack01`. Clue UI on `/analysis` only (no top-level `/clues`). Qualification: `backend/scripts/run_clue_qualification.py`. Phase 10 chat is never a clue source; Phase 09 reader outages remain `source_unavailable`, not zero signals.
+**Waves:** 1 → 2 → 3 → 4 → 5 complete. Verified: `.planning/phases/11-clue-and-foreshadow-tracking/11-VERIFICATION.md` (PARTIAL). Alembic head `11cluetrack01`. Clue UI on `/analysis` only (no top-level `/clues`). Qualification: `backend/scripts/run_clue_qualification.py`. Phase 10 chat is never a clue source; Phase 09 reader outages remain `source_unavailable`, not zero signals. Residual: scope pure-module write scan in `test_clue_false_positives.py` before full CI green.
