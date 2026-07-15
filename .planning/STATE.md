@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v0.7
 milestone_name: Narrative Relationships, Reader AI, and Clue Tracking
 status: executing
-last_updated: "2026-07-15T09:50:00.000Z"
+last_updated: "2026-07-15T03:00:00.000Z"
 progress:
   total_phases: 11
   completed_phases: 10
   total_plans: 56
-  completed_plans: 51
-  percent: 91
+  completed_plans: 52
+  percent: 93
 ---
 
 # Project State
@@ -23,17 +23,31 @@ See `.planning/PROJECT.md` and `IMPLEMENTATION-STATUS.md`.
 
 ## Current Position
 
-Phase: 10 (Reader Selection AI and Multi-Session Conversations) — **PARTIAL verified** (19/20 must-haves; real Playwright residual)
-Plan: 10-05 complete; `10-VERIFICATION.md` written
-**Next:** When Postgres is up, run `reader-chat-real.spec.ts` and re-verify truth #20; then Phase 11 clue tracking (never treat chat as facts)
+Phase: 11 (Clue and Foreshadow Tracking) — Wave 1 complete (1/5 plans)
+Plan: 11-01 complete
+**Next:** 11-02 cross-chapter candidate recall, evidence packages, Phase 09 null source protocol, LLM gates
 
 - Branch: `feat/phase2-wave2-embedding`
-- Last activity: 2026-07-15 — independent Phase 10 verification (PARTIAL; 5432 offline)
+- Last activity: 2026-07-15 — completed 11-01 clue lifecycle contracts + PostgreSQL authority + migration
 - Plan directories: `.planning/phases/09-dynamic-character-relationship-graph/`, `.planning/phases/10-reader-selection-ai-and-multi-session-conversations/`, `.planning/phases/11-clue-and-foreshadow-tracking/`
 
 ## Auto Routing
 
-Phase 10 independent verification: **PARTIAL** (19/20). Backend 93 + release gate 10 + frontend reader 19 passed; Phase 09 production reader wired; no clue product UI. Residual: real e2e needs Postgres 5432. Phase 11 may proceed for planning/execution but chat is never a fact source.
+Phase 11-01 完成。继续 11-02。聊天不得作为线索事实源；Phase 09 relationship reader 不可用时记录 `source_unavailable`，不得伪装成零关系。
+
+## Phase 11 Execution Metrics
+
+- 11-01: 55min, 3 tasks, 10 files, 28 targeted tests passed (16 unit + 12 PostgreSQL integration, 0 skip); alembic head `11cluetrack01`.
+
+## Phase 11 Decisions
+
+- Migration down_revision is live single head `12readerchat01` (not the outdated plan text `10analysistime01`).
+- Clue uses fully clue-owned run/version tables so timeline `analysis_runs` active_key uniqueness is not shared.
+- Lifecycle current state is always derived via `replay_lifecycle`; no mutable authoritative current_status column.
+- Lifecycle events, overrides and pointer journals are physically append-only via PostgreSQL triggers.
+- paid_off requires distinct cue+payoff narrative coordinates with strict later order (app validator + DB trigger).
+- Chat text / similarity scores are never lifecycle evidence; link contracts reject those fields.
+- Relationship observation links may be `source_unavailable` without inventing graph rows.
 
 ## Phase 10 Execution Metrics
 
@@ -140,11 +154,11 @@ REQ-AUTO-01..11 已交付（含 06-08 QualityRun 持久化、06-09 BaselineCandi
 
 ## Next Action
 
-1. When Postgres is up: run `frontend` e2e `reader-chat-real.spec.ts` (desktop+mobile); update `10-VERIFICATION.md` truth #20 → VERIFIED if green.
-2. Phase 11 clue tracking — never import reader-chat as fact source.
-3. 保留当前所有非 verification 的本地 WIP，不纳入本次提交。
+1. Execute `11-02-PLAN.md` (candidate recall + evidence packages + LLM gates + Phase 09 source protocol).
+2. Never import reader-chat as clue fact source; relationship outages → `source_unavailable`.
+3. 保留当前所有非 11-01 的本地 WIP，不纳入本次提交。
 
 ## Session
 
-- Stopped at: Independent Phase 10 verification report (`10-VERIFICATION.md`, PARTIAL)
+- Stopped at: Completed 11-01-PLAN.md (clue contracts + authority + migration)
 - Resume file: None

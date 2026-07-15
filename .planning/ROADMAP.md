@@ -182,13 +182,13 @@ Plans:
 **Goal:** 以证据、版本和人工可控的五状态生命周期，发现、追踪、核验小说中的线索、伏笔及其回收。
 **Requirements:** REQ-CLUE-01..07
 **Depends on:** Phase 08, Phase 09, Phase 10
-**Status:** PLANNED ONLY — implementation not started
+**Status:** EXECUTING — Wave 1 complete (1/5 plans)
 
 Plans:
-- [ ] 11-01 clue lifecycle contracts, PostgreSQL authority, append-only states, overrides, and migration
+- [x] 11-01 clue lifecycle contracts, PostgreSQL authority, append-only states, overrides, and migration
 - [ ] 11-02 cross-chapter candidate recall, bounded evidence packages, Phase 09 read-only protocol, and LLM gates
 - [ ] 11-03 durable clue worker, versioning, budgets, overrides, owner/spoiler API, and explicit unavailable-source behavior
 - [ ] 11-04 analysis workspace clue timeband, filters, evidence panel, payoff chain, and manual actions
 - [ ] 11-05 frozen fixtures, false-positive/spoiler/version adversarial tests, browser qualification, and release gate
 
-**Waves:** 1 → 2 → 3 → 4 → 5. Phase 10 chat is never a clue source; Phase 09 reader outages remain explicit rather than becoming zero signals.
+**Waves:** 1 → 2 → 3 → 4 → 5. Wave 1 complete (`11-01-SUMMARY.md`). Alembic head `11cluetrack01`. Phase 10 chat is never a clue source; Phase 09 reader outages remain `source_unavailable`, not zero signals.
