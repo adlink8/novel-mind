@@ -68,7 +68,7 @@ completed: 2026-07-15
 
 - `python -m alembic heads` → one head: `13memoryauth01`.
 - `upgrade head -> downgrade 11cluetrack01 -> upgrade head` → passed; downgrade inspection found no narrative-memory tables or guard functions.
-- `pytest tests/integration/narrative_memory/test_candidate_authority_pg.py -q -x` → **9 passed**, no skips.
+- `pytest tests/integration/narrative_memory/test_candidate_authority_pg.py -q -x` → **12 passed**, no skips after review gap closure.
 - `ruff check app/models/narrative_memory.py migrations/versions/13_narrative_memory_authority.py tests/integration/narrative_memory/test_candidate_authority_pg.py` → **All checks passed**.
 - Existing repository warnings remain for unregistered/unavailable `pytest-timeout`; no Phase 13 test was skipped or failed.
 
@@ -77,6 +77,8 @@ completed: 2026-07-15
 - Kept the authority strictly candidate-only: no run, stage, checkpoint, provider, API, worker, active pointer, promotion, rollback, Chroma, or Reader Chat table/path was introduced.
 - Used a direct composite FK to Phase 07 `(build_id, node_id)` and a trigger to close the owner/novel/build/evidence-level/chapter/offset/hash/snapshot dimensions that the legacy key cannot express.
 - Used a `DEFERRABLE` edge constraint trigger so legal batches remain possible while transition, containment, and DAG invariants stay database-authoritative.
+- Candidate content, manifest sealing, and edge insertion all serialize on the same immutable version row, closing seal/content and opposite-edge races.
+- The Alembic revision owns a frozen explicit seven-table DDL contract and never imports runtime ORM metadata.
 
 ## Deviations from Plan
 
@@ -90,6 +92,27 @@ None - plan executed exactly as written.
 ## User Setup Required
 
 None - no external service configuration or dependency was added.
+
+## Independent Review Gap Closure
+
+Four P1 findings from the independent 13-01 review were closed:
+
+1. **Seal/content race:** content-table and manifest `BEFORE INSERT` triggers now acquire `FOR UPDATE` on the same scoped version row before checking or creating the seal.
+2. **Concurrent graph race:** every edge insert locks the scoped version before transition/range/recursive DAG validation, serializing competing edge statements.
+3. **`derives_from` bypass:** both edge types now enforce the same legal hierarchy; Global Story cannot connect directly to Chapter State.
+4. **Migration reproducibility:** revision `13memoryauth01` explicitly freezes all seven tables, constraints, indexes, and foreign keys; upgrade/downgrade contain no `app.models` or `Base.metadata` dependency.
+
+Gap-closure commits:
+
+- `b013572` — version-lock serialization, strict edge levels, and frozen revision DDL.
+- `4f386f4` — two-connection race tests, `derives_from` adversarial coverage, and static migration import guard.
+
+Gap-closure verification:
+
+- Full `test_candidate_authority_pg.py`: **12 passed**, including real two-connection blocking/commit observations.
+- Ruff over the migration and integration test: **All checks passed**.
+- `heads`, upgrade, downgrade to `11cluetrack01`, and re-upgrade: passed.
+- `alembic check` remains limited to the same two pre-existing Phase 07/text-chunk index differences documented above; no narrative-memory operation is detected.
 
 ## Next Phase Readiness
 
