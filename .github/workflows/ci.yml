@@ -442,6 +442,7 @@ jobs:
             tests/integration/test_chroma_contract.py \
             tests/integration/test_chroma_recovery.py \
             tests/integration/timeline/test_real_qualification.py \
+            tests/integration/clues/test_real_qualification.py \
             --junitxml=artifacts/integration-junit.xml \
             --timeout=30
 
@@ -461,6 +462,25 @@ jobs:
             --timeout=180
           python scripts/run_relationship_qualification.py --scope-scan \
             > artifacts/relationship-scope-scan.json
+
+      # Phase 11 clue qualification and release authority
+      - name: Clue qualification suite
+        working-directory: backend
+        env:
+          NOVELMIND_DATABASE_URL: ${{ env.NOVELMIND_DATABASE_URL }}
+        run: |
+          mkdir -p artifacts
+          pytest \
+            tests/integration/clues/test_real_qualification.py \
+            tests/adversarial/test_clue_false_positives.py \
+            tests/adversarial/test_clue_spoilers_and_versions.py \
+            tests/unit/clues/test_eval.py \
+            --junitxml=artifacts/clue-junit.xml \
+            --timeout=180
+          python scripts/run_clue_qualification.py --scope-scan \
+            > artifacts/clue-scope-scan.json
+          python scripts/run_clue_qualification.py --offline \
+            > artifacts/clue-offline-qualification.json
 
       - name: Collect service logs
         if: always() && (github.event_name == 'push' || github.event_name == 'schedule')
