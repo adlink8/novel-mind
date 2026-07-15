@@ -229,7 +229,7 @@ Plans:
 4. PostgreSQL integration tests 证明父子图无环、章节范围合法、manifest 可从排序后的 node/edge/link rows 重算，且 candidate 创建/验证不会创建或移动任何 active pointer。
 
 Plans:
-- [ ] 13-01 narrative memory PostgreSQL authority: additive version/run/stage/node/edge/source-link/report migration and composite scope constraints
+- [x] 13-01 narrative memory PostgreSQL authority: additive candidate version/node/claim/edge/source-link/manifest/report migration and composite scope constraints
 - [ ] 13-02 strict ChapterState/StoryArc/GlobalStoryModel schemas: typed claims, deltas, uncertainty, visibility and builder lineage
 - [ ] 13-03 provenance closure and manifest gates: DAG/range/source re-slice validation, append-only enforcement and no-pointer invariants
 
