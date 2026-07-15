@@ -20,6 +20,7 @@
     "axios": "^1.7.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "cytoscape": "3.34.0",
     "echarts": "^5.5.0",
     "echarts-for-react": "^3.0.2",
     "lucide-react": "^0.400.0",

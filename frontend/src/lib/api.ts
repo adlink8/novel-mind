@@ -109,6 +109,8 @@ export interface Novel {
   reading_progress?: {
     chapter_id?: number;
     progress_percent?: number;
+    /** 时间线「显示全书」偏好，后端存在 reading_progress JSON 内 */
+    timeline_full_book?: boolean;
   } | null;
   created_at: string;
   updated_at: string;
@@ -327,10 +329,15 @@ export interface TimelineQuery {
 }
 
 export const timelineApi = {
-  startOrResume: (novelId: string) => api.post<TimelineRun>(`/timeline/${novelId}/start-or-resume`),
+  /** 准备 Phase07 层级并启动/恢复时间线（可能较慢，超时 5 分钟） */
+  startOrResume: (novelId: string) =>
+    api.post<TimelineRun>(`/timeline/${novelId}/start-or-resume`, null, {
+      timeout: 300_000,
+    }),
   status: (novelId: string) => api.get<TimelineRun>(`/timeline/${novelId}/status`),
   cancel: (novelId: string) => api.post<TimelineRun>(`/timeline/${novelId}/cancel`),
-  resume: (novelId: string) => api.post<TimelineRun>(`/timeline/${novelId}/resume`),
+  resume: (novelId: string) =>
+    api.post<TimelineRun>(`/timeline/${novelId}/resume`, null, { timeout: 300_000 }),
   getTimeline: (novelId: string, params?: TimelineQuery) =>
     api.get<TimelineEnvelope>(`/timeline/${novelId}`, { params }),
   getVersion: (novelId: string, versionId: number, params?: TimelineQuery) =>
@@ -379,6 +386,149 @@ export const charactersApi = {
   extractCharacters: (novelId: string) => api.post(`/characters/${novelId}/extract`),
 };
 
+// ==================== 人物关系图 API（Phase 09） ====================
+
+/** Canonical Phase 09 edge types only — causes/precedes/same_entity are not graph edges. */
+export type RelationshipEdgeType =
+  | "ally"
+  | "enemy"
+  | "family"
+  | "mentor"
+  | "romantic";
+
+export type RelationshipVersionSource =
+  | "active"
+  | "running_candidate"
+  | "history";
+
+export type GraphDegradationMode = "normal" | "large" | "filters_required";
+
+export type RelationshipProvenance = "machine" | "manual";
+
+export interface RelationshipGraphNode {
+  character_id: number;
+  name: string;
+  aliases: string[];
+  first_visible_chapter: number;
+}
+
+export interface RelationshipGraphEdge {
+  observation_id: number;
+  source_character_id: number;
+  target_character_id: number;
+  relation_type: RelationshipEdgeType;
+  transition: "establish" | "change" | "end";
+  confidence: number;
+  valid_from_chapter: number;
+  valid_to_chapter: number | null;
+  provenance: RelationshipProvenance;
+  evidence_preview: string | null;
+  evidence_count: number;
+}
+
+export interface RelationshipCounts {
+  nodes: number;
+  edges: number;
+  relation_types: Record<string, number>;
+}
+
+export interface RelationshipDegradation {
+  mode: GraphDegradationMode;
+  node_count: number;
+  edge_count: number;
+  hard_node_cap: number;
+  hard_edge_cap: number;
+  message: string | null;
+}
+
+export interface RelationshipGraphEnvelope {
+  novel_id: number;
+  version_id: number;
+  source: RelationshipVersionSource;
+  through_chapter: number;
+  full_book: boolean;
+  cutoff_chapter: number;
+  nodes: RelationshipGraphNode[];
+  edges: RelationshipGraphEdge[];
+  counts: RelationshipCounts;
+  available_relation_types: RelationshipEdgeType[];
+  available_character_ids: number[];
+  degradation: RelationshipDegradation;
+  generated_at: string | null;
+}
+
+export interface RelationshipEvidenceRef {
+  evidence_id: string;
+  chapter_id: number;
+  source_start: number;
+  source_end: number;
+  content_hash: string;
+  excerpt: string | null;
+}
+
+export interface RelationshipEvidenceResponse {
+  observation_id: number;
+  novel_id: number;
+  version_id: number;
+  through_chapter: number;
+  relation_type: RelationshipEdgeType;
+  source_character_id: number;
+  target_character_id: number;
+  evidence: RelationshipEvidenceRef[];
+  provenance: RelationshipProvenance;
+}
+
+/**
+ * Graph query params matching OpenAPI GET /relationships/{novel_id}/graph.
+ * Server uses singular character_id / relation_type filters (09-03).
+ * Client never sends owner_id.
+ */
+export interface RelationshipGraphQuery {
+  source?: RelationshipVersionSource;
+  version_id?: number;
+  through_chapter?: number;
+  full_book?: boolean;
+  character_id?: number;
+  relation_type?: RelationshipEdgeType | string;
+}
+
+export interface RelationshipEvidenceQuery {
+  source?: RelationshipVersionSource;
+  version_id?: number;
+  through_chapter?: number;
+  full_book?: boolean;
+}
+
+export const relationshipsApi = {
+  getGraph: (novelId: string | number, params?: RelationshipGraphQuery) =>
+    api.get<RelationshipGraphEnvelope>(`/relationships/${novelId}/graph`, {
+      params: {
+        source: params?.source,
+        version_id: params?.version_id,
+        through_chapter: params?.through_chapter,
+        full_book: params?.full_book,
+        character_id: params?.character_id,
+        relation_type: params?.relation_type,
+      },
+    }),
+  getEvidence: (
+    novelId: string | number,
+    observationId: number,
+    params?: RelationshipEvidenceQuery
+  ) =>
+    api.get<RelationshipEvidenceResponse>(
+      `/relationships/${novelId}/observations/${observationId}/evidence`,
+      {
+        params: {
+          source: params?.source,
+          version_id: params?.version_id,
+          through_chapter: params?.through_chapter,
+          full_book: params?.full_book,
+        },
+      }
+    ),
+};
+
 // ==================== 同人文 API ====================
 
 export interface FanFiction {
@@ -400,10 +550,22 @@ export const fanfictionApi = {
 
 // ==================== AI 模型 API ====================
 
+export type AIModelProvider =
+  | "openai"
+  | "anthropic"
+  | "ollama"
+  | "custom"
+  | "vertex_google"
+  | "gemini"
+  | "google"
+  | "vertex"
+  | "vertex_ai";
+
 export interface AIModelConfig {
   id: number;
   name: string;
-  provider: "openai" | "anthropic" | "ollama" | "custom";
+  /** 后端存字符串；前端已知值见 AIModelProvider */
+  provider: AIModelProvider | string;
   model_id: string;
   base_url?: string;
   tier: "quality" | "balanced" | "budget";

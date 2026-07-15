@@ -59,13 +59,17 @@ describe("timelineApi progressive spoiler-safe contract (08-04)", () => {
 
   it("drives durable lifecycle and explicit full-book preference", async () => {
     await timelineApi.startOrResume("7");
-    expect(mockPost).toHaveBeenCalledWith("/timeline/7/start-or-resume");
+    expect(mockPost).toHaveBeenCalledWith("/timeline/7/start-or-resume", null, {
+      timeout: 300_000,
+    });
     await timelineApi.status("7");
     expect(mockGet).toHaveBeenCalledWith("/timeline/7/status");
     await timelineApi.cancel("7");
     expect(mockPost).toHaveBeenCalledWith("/timeline/7/cancel");
     await timelineApi.resume("7");
-    expect(mockPost).toHaveBeenCalledWith("/timeline/7/resume");
+    expect(mockPost).toHaveBeenCalledWith("/timeline/7/resume", null, {
+      timeout: 300_000,
+    });
     await timelineApi.setFullBookPreference("7", true);
     expect(mockPut).toHaveBeenCalledWith("/timeline/7/preference", { full_book: true });
   });
