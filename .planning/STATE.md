@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v0.7
 milestone_name: Narrative Relationships, Reader AI, and Clue Tracking
 status: executing
-last_updated: "2026-07-15T09:00:00.000Z"
+last_updated: "2026-07-15T09:15:00.000Z"
 progress:
   total_phases: 11
-  completed_phases: 8
+  completed_phases: 9
   total_plans: 56
   completed_plans: 46
-  percent: 73
+  percent: 82
 ---
 
 # Project State
@@ -23,17 +23,17 @@ See `.planning/PROJECT.md` and `IMPLEMENTATION-STATUS.md`.
 
 ## Current Position
 
-Phase: 09 (Dynamic Character Relationship Graph) — PLANS COMPLETE (5/5); ready for verify
-Plan: 09-05 complete
-**Phase 09-11 authorized for GSD execute** — user confirmed plans and requested execution 2026-07-15
+Phase: 09 (Dynamic Character Relationship Graph) — VERIFIED (5/5 plans; 21/21 must-haves)
+Plan: 09-05 complete; 09-VERIFICATION passed
+**Phase 10-11 authorized for GSD execute** — Phase 09 independent verification complete 2026-07-15
 
 - Branch: `feat/phase2-wave2-embedding`
-- Last activity: 2026-07-15 — completed 09-05 qualification/release gate
+- Last activity: 2026-07-15 — Phase 09 verification report (21/21 must-haves; backend 60 + frontend relationships 17 re-run)
 - Plan directories: `.planning/phases/09-dynamic-character-relationship-graph/`, `.planning/phases/10-reader-selection-ai-and-multi-session-conversations/`, `.planning/phases/11-clue-and-foreshadow-tracking/`
 
 ## Auto Routing
 
-Phase 09 全部计划已执行完；下一步 Phase 09 verify，通过后进入 Phase 10。
+Phase 09 已独立验证通过；下一步进入 Phase 10（依赖 `load_filtered_relationship_graph` only）。
 
 ## Phase 09 Execution Metrics
 
@@ -154,12 +154,12 @@ CLI：`backend/scripts/run_chunker_qualification.py`
 
 ## Next Action
 
-1. Run Phase 09 verification (`$gsd-verify-work` / 09-VERIFICATION) — plans 5/5 implement-complete.
-2. After verify, start Phase 10; depend on `load_filtered_relationship_graph` only.
-3. Phase 11 may depend on `list_accepted_observation_refs`; never treat chat as fact source.
-4. 保留当前所有非 `.planning` 的本地 WIP，不纳入本次规划提交。
+1. Start Phase 10 (Reader Text-Selection AI and Multi-Session Conversations); depend on `load_filtered_relationship_graph` only.
+2. Phase 11 may depend on `list_accepted_observation_refs`; never treat chat as fact source.
+3. 保留当前所有非 `.planning` 的本地 WIP，不纳入本次规划提交。
+4. Optional residual: re-run Playwright `relationships-real.spec.ts` and full frontend suite/build in CI or full-stack host if desired (not blocking).
 
 ## Session
 
-- Stopped at: Completed 09-05-PLAN.md
+- Stopped at: Completed 09-VERIFICATION.md (passed)
 - Resume file: None
