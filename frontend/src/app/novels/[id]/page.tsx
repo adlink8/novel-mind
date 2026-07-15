@@ -1,19 +1,27 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
-import { useParams, useRouter } from "next/navigation";
+import React, { useState, useEffect, useCallback, useRef, Suspense } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ChapterSidebar } from "@/components/reader/chapter-sidebar";
 import { ReaderContent } from "@/components/reader/reader-content";
+import { ReaderChatPanel } from "@/components/reader/reader-chat-panel";
 import { ProgressBar } from "@/components/reader/progress-bar";
 import { SearchPanel } from "@/components/reader/search-panel";
-import { novelsApi, type Novel, type Chapter } from "@/lib/api";
+import {
+  novelsApi,
+  type Novel,
+  type Chapter,
+  type SelectionCoordinate,
+} from "@/lib/api";
+import { loadReaderChatPresentation } from "@/lib/reader-selection";
 import {
   ArrowLeft,
   ChevronLeft,
   ChevronRight,
   LoaderCircle,
   Menu,
+  MessageSquareText,
   PanelLeft,
   Search,
 } from "lucide-react";
@@ -53,10 +61,28 @@ function saveProgress(
   }
 }
 
-export default function NovelReaderPage() {
+function resolveChapterFromQuery(
+  chapterList: Chapter[],
+  chapterParam: string | null
+): Chapter | null {
+  if (!chapterParam || !chapterList.length) return null;
+  const n = Number(chapterParam);
+  if (!Number.isFinite(n)) return null;
+  // 优先当 DB id；再当 chapter_number（第几章）
+  return (
+    chapterList.find((c) => c.id === n) ??
+    chapterList.find((c) => c.chapter_number === n) ??
+    null
+  );
+}
+
+function NovelReaderInner() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const novelId = String(params.id);
+  const chapterQuery = searchParams.get("chapter");
+  const fromTimeline = searchParams.get("from") === "timeline";
 
   const [novel, setNovel] = useState<Novel | null>(null);
   const [chapters, setChapters] = useState<Chapter[]>([]);
@@ -74,6 +100,35 @@ export default function NovelReaderPage() {
   const [chapterPercent, setChapterPercent] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
   const chaptersRef = useRef<Chapter[]>([]);
+  /** 时间线定位模式：不写入阅读进度，避免污染「上次读到」 */
+  const [progressWritable, setProgressWritable] = useState(!fromTimeline);
+  const jumpedChapterIdRef = useRef<number | null>(null);
+
+  // Phase 10 reader chat — presentation only in localStorage; truth is PostgreSQL
+  const [chatOpen, setChatOpen] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return Boolean(loadReaderChatPresentation(novelId).open);
+  });
+  const [chatCollapsed, setChatCollapsed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return Boolean(loadReaderChatPresentation(novelId).collapsed);
+  });
+  const [pendingSelection, setPendingSelection] =
+    useState<SelectionCoordinate | null>(null);
+  const [highlightRange, setHighlightRange] = useState<{
+    sourceStart: number;
+    sourceEnd: number;
+  } | null>(null);
+  const [isDesktop, setIsDesktop] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return window.innerWidth >= 1024;
+  });
+
+  useEffect(() => {
+    const onResize = () => setIsDesktop(window.innerWidth >= 1024);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
 
   useEffect(() => {
     chaptersRef.current = chapters;
@@ -90,25 +145,40 @@ export default function NovelReaderPage() {
         const chapterList = chaptersRes.data;
         setChapters(chapterList);
 
-        // 恢复：localStorage > 服务端 reading_progress > 第一章
-        const saved = loadProgress(novelId);
+        // A1: ?chapter= 且 from=timeline → 优先时间线定位，不覆盖真实阅读进度
+        const fromQuery = resolveChapterFromQuery(chapterList, chapterQuery);
         let initialChapterId = 0;
-        if (saved?.chapterId && chapterList.some((c) => c.id === saved.chapterId)) {
-          initialChapterId = saved.chapterId;
-          setChapterPercent(saved.chapterPercent ?? 0);
-        } else {
-          const serverChapterId = (res.data as Novel & {
-            reading_progress?: { chapter_id?: number };
-          }).reading_progress?.chapter_id;
-          if (
-            serverChapterId &&
-            chapterList.some((c) => c.id === serverChapterId)
-          ) {
-            initialChapterId = serverChapterId;
-          } else if (chapterList.length > 0) {
-            initialChapterId = chapterList[0].id;
+        let initialPercent = 0;
+
+        if (fromQuery && (fromTimeline || chapterQuery)) {
+          initialChapterId = fromQuery.id;
+          initialPercent = 0;
+          if (fromTimeline) {
+            jumpedChapterIdRef.current = fromQuery.id;
+            setProgressWritable(false);
           }
+        } else {
+          // 恢复：localStorage > 服务端 reading_progress > 第一章
+          const saved = loadProgress(novelId);
+          if (saved?.chapterId && chapterList.some((c) => c.id === saved.chapterId)) {
+            initialChapterId = saved.chapterId;
+            initialPercent = saved.chapterPercent ?? 0;
+          } else {
+            const serverChapterId = (res.data as Novel & {
+              reading_progress?: { chapter_id?: number };
+            }).reading_progress?.chapter_id;
+            if (
+              serverChapterId &&
+              chapterList.some((c) => c.id === serverChapterId)
+            ) {
+              initialChapterId = serverChapterId;
+            } else if (chapterList.length > 0) {
+              initialChapterId = chapterList[0].id;
+            }
+          }
+          setProgressWritable(true);
         }
+        setChapterPercent(initialPercent);
         setCurrentChapterId(initialChapterId);
       } catch {
         setError("加载小说失败，请重试");
@@ -117,7 +187,7 @@ export default function NovelReaderPage() {
       }
     }
     loadNovel();
-  }, [novelId]);
+  }, [novelId, chapterQuery, fromTimeline]);
 
   useEffect(() => {
     if (!currentChapterId) return;
@@ -126,18 +196,34 @@ export default function NovelReaderPage() {
       try {
         const res = await novelsApi.getChapter(novelId, String(currentChapterId));
         setChapterContent(res.data);
-        scrollRef.current?.scrollTo({ top: 0 });
+        // 换章立刻顶到开头（instant）；布局后再顶一次，避免沿用上一章滚位
+        const el = scrollRef.current;
+        if (el) {
+          el.scrollTop = 0;
+          requestAnimationFrame(() => {
+            el.scrollTop = 0;
+          });
+        }
 
-        // 持久化当前章节（本章进度由滚动/分页回调更新）
+        // 持久化当前章节：换章默认从 0% 起，不沿用上一章百分比
         const saved = loadProgress(novelId);
-        const pct =
-          saved?.chapterId === currentChapterId ? (saved.chapterPercent ?? 0) : 0;
+        const sameChapter = saved?.chapterId === currentChapterId;
+        const pct = sameChapter ? (saved.chapterPercent ?? 0) : 0;
         setChapterPercent(pct);
-        saveProgress(novelId, currentChapterId, pct);
+        // 仅同章恢复才写回进度；新章由 ReaderContent 从顶部开始
+        if (sameChapter) {
+          saveProgress(novelId, currentChapterId, pct);
+        } else if (progressWritable) {
+          saveProgress(novelId, currentChapterId, 0);
+        }
 
         // 同步到服务端（整书章节位置）
         try {
-          await novelsApi.updateProgress(novelId, currentChapterId, pct);
+          await novelsApi.updateProgress(
+            novelId,
+            currentChapterId,
+            sameChapter ? pct : 0
+          );
         } catch {
           /* 后端进度失败不影响阅读 */
         }
@@ -147,19 +233,42 @@ export default function NovelReaderPage() {
     }
 
     loadChapter();
-  }, [currentChapterId, novelId]);
+  }, [currentChapterId, novelId, progressWritable]);
+
+  const persistProgress = useCallback(
+    (chapterId: number, percent: number) => {
+      if (!progressWritable || !chapterId) return;
+      saveProgress(novelId, chapterId, percent);
+    },
+    [novelId, progressWritable]
+  );
 
   const handleChapterProgress = useCallback(
     (percent: number) => {
       setChapterPercent(percent);
-      if (currentChapterId) {
-        saveProgress(novelId, currentChapterId, percent);
+      // 时间线定位：用户在本章滚动不写进度；翻章后才写
+      if (
+        progressWritable ||
+        (jumpedChapterIdRef.current != null &&
+          currentChapterId !== jumpedChapterIdRef.current)
+      ) {
+        if (!progressWritable) setProgressWritable(true);
+        if (currentChapterId) {
+          saveProgress(novelId, currentChapterId, percent);
+        }
       }
     },
-    [currentChapterId, novelId]
+    [currentChapterId, novelId, progressWritable]
   );
 
   const handleSelectChapter = useCallback((chapterId: number) => {
+    // 用户主动换章 → 恢复真实阅读进度写入
+    if (
+      jumpedChapterIdRef.current != null &&
+      chapterId !== jumpedChapterIdRef.current
+    ) {
+      setProgressWritable(true);
+    }
     setCurrentChapterId(chapterId);
   }, []);
 
@@ -177,6 +286,31 @@ export default function NovelReaderPage() {
     }
   }, [currentChapterId, handleSelectChapter]);
 
+  const handleAskSelection = useCallback((payload: SelectionCoordinate) => {
+    setPendingSelection(payload);
+    setChatOpen(true);
+    setChatCollapsed(false);
+  }, []);
+
+  const handleCitationNavigate = useCallback(
+    (target: {
+      chapter_id: number;
+      source_start: number;
+      source_end: number;
+    }) => {
+      setHighlightRange({
+        sourceStart: target.source_start,
+        sourceEnd: target.source_end,
+      });
+      if (target.chapter_id !== currentChapterId) {
+        handleSelectChapter(target.chapter_id);
+      }
+      // Clear highlight after a few seconds so reading can continue
+      window.setTimeout(() => setHighlightRange(null), 8000);
+    },
+    [currentChapterId, handleSelectChapter]
+  );
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "f") {
@@ -188,14 +322,13 @@ export default function NovelReaderPage() {
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
-  // 离开页面前再存一次
+  // 离开页面前再存一次（时间线定位模式且仍停在跳转章时不写）
   useEffect(() => {
     return () => {
-      if (currentChapterId) {
-        saveProgress(novelId, currentChapterId, chapterPercent);
-      }
+      if (!progressWritable || !currentChapterId) return;
+      saveProgress(novelId, currentChapterId, chapterPercent);
     };
-  }, [novelId, currentChapterId, chapterPercent]);
+  }, [novelId, currentChapterId, chapterPercent, progressWritable]);
 
   if (loading) {
     return (
@@ -221,6 +354,9 @@ export default function NovelReaderPage() {
 
   const currentIndex = chapters.findIndex((c) => c.id === currentChapterId);
   const currentChapterTitle = chapterContent?.title || "-";
+
+  const showDesktopChat = chatOpen && isDesktop;
+  const showMobileChat = chatOpen && !isDesktop;
 
   return (
     <div className="relative flex h-[calc(100vh-4rem)] overflow-hidden bg-[#f6f1e8]/70 lg:h-screen lg:p-4 lg:pl-0">
@@ -251,9 +387,7 @@ export default function NovelReaderPage() {
               variant="ghost"
               size="sm"
               onClick={() => {
-                if (currentChapterId) {
-                  saveProgress(novelId, currentChapterId, chapterPercent);
-                }
+                persistProgress(currentChapterId, chapterPercent);
                 router.push("/novels");
               }}
               className="hidden sm:inline-flex"
@@ -268,6 +402,18 @@ export default function NovelReaderPage() {
           </div>
 
           <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setChatOpen(true);
+                setChatCollapsed(false);
+              }}
+              title="选区对话"
+              data-testid="reader-chat-open"
+            >
+              <MessageSquareText className="size-4" />
+            </Button>
             <Button
               variant="ghost"
               size="sm"
@@ -297,12 +443,49 @@ export default function NovelReaderPage() {
           </div>
         </header>
 
-        <div ref={scrollRef} className="flex-1 overflow-y-auto pb-16">
-          <ReaderContent
-            chapter={chapterContent}
-            onChapterProgress={handleChapterProgress}
-            scrollContainerRef={scrollRef}
-          />
+        {/* Desktop: reading column + reserved chat column (no permanent overlay). */}
+        <div className="flex min-h-0 flex-1">
+          <div
+            ref={scrollRef}
+            data-testid="reader-scroll-column"
+            className="min-w-0 flex-1 overflow-y-auto pb-16"
+          >
+            <ReaderContent
+              chapter={chapterContent}
+              onChapterProgress={handleChapterProgress}
+              scrollContainerRef={scrollRef}
+              onNextChapter={handleNextChapter}
+              onPrevChapter={handlePrevChapter}
+              hasNextChapter={
+                currentIndex >= 0 && currentIndex < chapters.length - 1
+              }
+              hasPrevChapter={currentIndex > 0}
+              onAskSelection={handleAskSelection}
+              highlightRange={highlightRange}
+            />
+          </div>
+          {showDesktopChat ? (
+            <div
+              data-testid="reader-chat-column"
+              className={
+                chatCollapsed
+                  ? "w-12 shrink-0"
+                  : "w-[min(360px,38vw)] shrink-0"
+              }
+            >
+              <ReaderChatPanel
+                novelId={novelId}
+                layout="desktop"
+                open={chatOpen}
+                collapsed={chatCollapsed}
+                onOpenChange={setChatOpen}
+                onCollapsedChange={setChatCollapsed}
+                pendingSelection={pendingSelection}
+                onClearSelection={() => setPendingSelection(null)}
+                onCitationNavigate={handleCitationNavigate}
+              />
+            </div>
+          ) : null}
         </div>
 
         <ProgressBar
@@ -313,12 +496,45 @@ export default function NovelReaderPage() {
         />
       </main>
 
+      {showMobileChat ? (
+        <ReaderChatPanel
+          novelId={novelId}
+          layout="mobile"
+          open={chatOpen}
+          collapsed={chatCollapsed}
+          onOpenChange={setChatOpen}
+          onCollapsedChange={setChatCollapsed}
+          pendingSelection={pendingSelection}
+          onClearSelection={() => setPendingSelection(null)}
+          onCitationNavigate={handleCitationNavigate}
+        />
+      ) : null}
+
       <SearchPanel
         novelId={Number(novelId)}
         isOpen={searchOpen}
         onClose={() => setSearchOpen(false)}
         onNavigate={(chapterId) => handleSelectChapter(chapterId)}
       />
+      {fromTimeline && !progressWritable && (
+        <div className="pointer-events-none absolute bottom-20 left-1/2 z-30 -translate-x-1/2 rounded-full border border-amber-300/80 bg-amber-50 px-4 py-1.5 text-xs text-amber-950 shadow-sm">
+          时间线定位模式 · 未改动你的阅读进度
+        </div>
+      )}
     </div>
+  );
+}
+
+export default function NovelReaderPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-[70vh] items-center justify-center text-muted-foreground">
+          加载阅读器…
+        </div>
+      }
+    >
+      <NovelReaderInner />
+    </Suspense>
   );
 }

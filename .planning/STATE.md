@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v0.7
 milestone_name: Narrative Relationships, Reader AI, and Clue Tracking
 status: executing
-last_updated: "2026-07-15T03:10:00.000Z"
+last_updated: "2026-07-15T01:43:00.000Z"
 progress:
   total_phases: 11
-  completed_phases: 9
+  completed_phases: 10
   total_plans: 56
-  completed_plans: 50
-  percent: 89
+  completed_plans: 51
+  percent: 91
 ---
 
 # Project State
@@ -23,17 +23,17 @@ See `.planning/PROJECT.md` and `IMPLEMENTATION-STATUS.md`.
 
 ## Current Position
 
-Phase: 10 (Reader Selection AI and Multi-Session Conversations) — in progress (4/5 plans)
-Plan: 10-04 complete
-**Next:** 10-05 reader UI selection panel, multi-session, browser qualification, release gate
+Phase: 10 (Reader Selection AI and Multi-Session Conversations) — implement-complete (5/5 plans)
+Plan: 10-05 complete
+**Next:** Phase 10 verification/UAT if desired; then Phase 11 clue tracking (never treat chat as facts)
 
 - Branch: `feat/phase2-wave2-embedding`
-- Last activity: 2026-07-15 — completed 10-04 cited answer worker (dual budgets, cancel/retry, adversarial)
+- Last activity: 2026-07-15 — completed 10-05 reader selection UI + multi-session panel + release gate
 - Plan directories: `.planning/phases/09-dynamic-character-relationship-graph/`, `.planning/phases/10-reader-selection-ai-and-multi-session-conversations/`, `.planning/phases/11-clue-and-foreshadow-tracking/`
 
 ## Auto Routing
 
-Phase 10-04 完成；下一步执行 10-05（frontend + browser release）。不进入 Phase 11 线索产品代码。
+Phase 10-05 完成（implement-complete）。可进入 Phase 11 规划/执行，但聊天不得作为线索事实源。本机 real e2e 需 Postgres 在线时补跑 `reader-chat-real.spec.ts`。
 
 ## Phase 10 Execution Metrics
 
@@ -41,6 +41,7 @@ Phase 10-04 完成；下一步执行 10-05（frontend + browser release）。不
 - 10-02: 25min, 3 tasks, 7 files, 9 targeted PostgreSQL API/IDOR tests passed (0 skip); OpenAPI conversation paths + ruff clean.
 - 10-03: 55min, 3 tasks, 8 files, 35 targeted tests passed (20 unit + 4 PG context + 9 conversation API/IDOR + 2 HEAD spoilers); ruff clean; Phase 09 files untouched.
 - 10-04: 70min, 3 tasks, 12 files, 93 full reader-chat suite passed (32 plan-targeted: 5 budget + 8 gateway + 9 generation PG + 10 adversarial); ruff clean; forbidden capability scan empty.
+- 10-05: 95min, 3 tasks, 13 files, backend 93 + frontend 19 unit + lint 0 err + build + mocked e2e 4 + release gate 10 passed; real e2e blocked (Postgres 5432 offline).
 
 ## Phase 10 Decisions
 
@@ -60,6 +61,10 @@ Phase 10-04 完成；下一步执行 10-05（frontend + browser release）。不
 - Worker freezes deployment/prompt/schema hashes on process; one schema/citation repair only; post-cancel responses settle then discard.
 - Exact recovery stores validated envelope on attempt.usage; cache_hit audit on re-publish without provider call.
 - Chat worker has no LangChain/LangGraph/tools/remote conversation IDs and no domain mutation imports.
+- Selection: page UTF-16 base + Array.from code-point conversion; server re-slice remains authority.
+- Desktop reserves chat column (no permanent text cover); mobile max-h 45vh collapsible chip.
+- Conversation truth only in PostgreSQL; localStorage is panel presentation only.
+- Background job dispatch is fail-soft; e2e completes jobs via controlled transport helper.
 
 ## Phase 09 Execution Metrics
 
@@ -135,11 +140,11 @@ REQ-AUTO-01..11 已交付（含 06-08 QualityRun 持久化、06-09 BaselineCandi
 
 ## Next Action
 
-1. Execute 10-05 reader selection UI + multi-session panel + browser qualification + release gate.
-2. Phase 11 may depend on `list_accepted_observation_refs`; never treat chat as fact source.
-3. 保留当前所有非 `.planning` 的本地 WIP，不纳入本次规划提交（unless explicitly part of 10-04 code）。
+1. When Postgres is up: run `frontend` e2e `reader-chat-real.spec.ts` (desktop+mobile) and optional full release collect-commands.
+2. Phase 11 clue tracking — never import reader-chat as fact source.
+3. 保留当前所有非 10-05 的本地 WIP，不纳入本次提交。
 
 ## Session
 
-- Stopped at: Completed 10-04-PLAN.md (cited answer worker)
+- Stopped at: Completed 10-05-PLAN.md (reader UI + release gate)
 - Resume file: None

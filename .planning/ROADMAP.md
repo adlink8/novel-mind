@@ -43,11 +43,11 @@
 | v0.5 / Phase 6 自动质量与 CI 门禁 | 9/9 | **Complete** (REQ-AUTO-11 closed) |
 | Phase 7 语义/层级分块 | 6/6 | **Complete** (logic+tests+PG/indexing wiring) |
 | Phase 8 版本化小说分析与时间线 | 10/10 | **Complete** (35/35 must-haves verified) |
-| v0.7 / Phase 9-11 叙事关系、阅读问答与线索追踪 | Phase 09: 5/5; Phase 10: 4/5 | **Phase 09 VERIFIED**; Phase 10 in progress |
+| v0.7 / Phase 9-11 叙事关系、阅读问答与线索追踪 | Phase 09: 5/5; Phase 10: 5/5 | **Phase 09 VERIFIED**; Phase 10 implement-complete |
 
 ## Auto Start
 
-Phase 06–09 已完成。Phase 09 已独立验证通过（21/21 must-haves）。Phase 10 执行中（10-01..10-04 complete；next 10-05）。
+Phase 06–09 已完成。Phase 09 已独立验证通过（21/21 must-haves）。Phase 10 implement-complete（10-01..10-05）；real-browser 需本机 Postgres 在线时补跑。
 验证：`.planning/phases/06-automated-quality-ci/` SUMMARYs；`.planning/phases/07-semantic-hierarchical-chunking/07-VERIFICATION.md`；Phase 08 `08-VERIFICATION.md`；Phase 09 `09-VERIFICATION.md`。
 
 ## Backlog
@@ -173,9 +173,9 @@ Plans:
 - [x] 10-02 owner-scoped multi-session lifecycle, ordered messages, idempotency, and API contracts
 - [x] 10-03 server-verified Unicode selections, visible-context assembly, and Phase 09 read-only contract
 - [x] 10-04 cited answer worker, audit lineage, dual budgets, cancellation, retry, and adversarial tests
-- [ ] 10-05 reader selection entry, collapsible multi-session window, citations, browser qualification, and release gate
+- [x] 10-05 reader selection entry, collapsible multi-session window, citations, browser qualification, and release gate
 
-**Waves:** 1 → {2, 3} → 4 → 5. Wave 1–4 complete (`10-01`..`10-04-SUMMARY.md`). Next: 10-05 reader UI + browser release. Phase 09 public reader bound without null adapter.
+**Waves:** 1 → {2, 3} → 4 → 5. Wave 1–5 complete (`10-01`..`10-05-SUMMARY.md`). Phase 10 implement-complete; real e2e residual if Postgres offline.
 
 ### Phase 11: Clue and Foreshadow Tracking
 

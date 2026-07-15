@@ -529,6 +529,245 @@ export const relationshipsApi = {
     ),
 };
 
+// ==================== 阅读器选区对话 API（Phase 10） ====================
+
+export type ConversationStatus = "active" | "archived";
+export type MessageRole = "user" | "assistant";
+
+export type GenerationJobStatus =
+  | "queued"
+  | "running"
+  | "paused_budget"
+  | "paused_dependency"
+  | "cancelled"
+  | "completed"
+  | "failed"
+  | "failed_validation";
+
+export interface SelectionCoordinate {
+  chapter_id: number;
+  source_start: number;
+  source_end: number;
+  selection_text: string;
+  selection_text_hash: string;
+  chapter_content_hash: string;
+}
+
+export interface SelectionSummary {
+  chapter_id: number;
+  source_start: number;
+  source_end: number;
+  selection_text_hash: string;
+  chapter_content_hash: string;
+}
+
+export interface CitationView {
+  block_id: string;
+  evidence_key: string;
+  context_evidence_ref_id: number;
+  chapter_id: number;
+  source_start: number;
+  source_end: number;
+}
+
+export interface GenerationJobView {
+  id: number;
+  user_message_id: number;
+  status: GenerationJobStatus;
+  status_reason: string | null;
+  cancel_requested: boolean;
+  retry_count: number;
+  error_code: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ConversationListItem {
+  id: number;
+  novel_id: number;
+  title: string;
+  status: ConversationStatus;
+  next_sequence: number;
+  last_opened_at: string | null;
+  created_at: string;
+  updated_at: string;
+  last_message_sequence: number | null;
+  last_message_role: MessageRole | null;
+  last_message_at: string | null;
+}
+
+export type ConversationDetail = ConversationListItem;
+
+export interface MessageView {
+  id: number;
+  conversation_id: number;
+  sequence: number;
+  role: MessageRole;
+  body: string;
+  client_message_id: string | null;
+  reply_to_message_id: number | null;
+  selection: SelectionSummary | null;
+  citations: CitationView[];
+  generation_job: GenerationJobView | null;
+  created_at: string;
+}
+
+export interface MessageAccepted {
+  message: MessageView;
+  job: GenerationJobView;
+}
+
+export interface ConversationListResponse {
+  items: ConversationListItem[];
+  total: number;
+  skip: number;
+  limit: number;
+}
+
+export interface MessageListResponse {
+  items: MessageView[];
+  total: number;
+  skip: number;
+  limit: number;
+  after_sequence: number;
+}
+
+export interface MessageCreateBody {
+  client_message_id: string;
+  body: string;
+  selection: SelectionCoordinate;
+}
+
+const TERMINAL_JOB_STATUSES: ReadonlySet<GenerationJobStatus> = new Set([
+  "completed",
+  "cancelled",
+  "failed",
+  "failed_validation",
+  "paused_budget",
+  "paused_dependency",
+]);
+
+export function isTerminalJobStatus(status: string): boolean {
+  return TERMINAL_JOB_STATUSES.has(status as GenerationJobStatus);
+}
+
+/**
+ * Poll a generation job until terminal or timeout.
+ * Never fabricates assistant content — only returns server job views.
+ */
+export async function pollReaderChatJob(
+  novelId: string | number,
+  conversationId: number,
+  jobId: number,
+  options?: {
+    intervalMs?: number;
+    timeoutMs?: number;
+    signal?: AbortSignal;
+    onUpdate?: (job: GenerationJobView) => void;
+  }
+): Promise<GenerationJobView> {
+  const intervalMs = options?.intervalMs ?? 800;
+  const timeoutMs = options?.timeoutMs ?? 120_000;
+  const started = Date.now();
+  let last: GenerationJobView | null = null;
+  while (Date.now() - started < timeoutMs) {
+    if (options?.signal?.aborted) {
+      throw new DOMException("Aborted", "AbortError");
+    }
+    const res = await readerChatApi.getJob(novelId, conversationId, jobId);
+    last = res.data;
+    options?.onUpdate?.(last);
+    if (isTerminalJobStatus(last.status)) return last;
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+  if (last) return last;
+  throw new Error("job poll timeout with no response");
+}
+
+export const readerChatApi = {
+  listConversations: (
+    novelId: string | number,
+    params?: { status?: ConversationStatus; skip?: number; limit?: number }
+  ) =>
+    api.get<ConversationListResponse>(`/novels/${novelId}/conversations`, {
+      params: {
+        status: params?.status,
+        skip: params?.skip,
+        limit: params?.limit,
+      },
+    }),
+
+  createConversation: (novelId: string | number, title = "New chat") =>
+    api.post<ConversationDetail>(`/novels/${novelId}/conversations`, { title }),
+
+  getConversation: (novelId: string | number, conversationId: number) =>
+    api.get<ConversationDetail>(
+      `/novels/${novelId}/conversations/${conversationId}`
+    ),
+
+  patchConversation: (
+    novelId: string | number,
+    conversationId: number,
+    body: { title?: string; status?: ConversationStatus }
+  ) =>
+    api.patch<ConversationDetail>(
+      `/novels/${novelId}/conversations/${conversationId}`,
+      body
+    ),
+
+  deleteConversation: (novelId: string | number, conversationId: number) =>
+    api.delete(`/novels/${novelId}/conversations/${conversationId}`),
+
+  listMessages: (
+    novelId: string | number,
+    conversationId: number,
+    params?: { after_sequence?: number; skip?: number; limit?: number }
+  ) =>
+    api.get<MessageListResponse>(
+      `/novels/${novelId}/conversations/${conversationId}/messages`,
+      {
+        params: {
+          after_sequence: params?.after_sequence,
+          skip: params?.skip,
+          limit: params?.limit,
+        },
+      }
+    ),
+
+  createMessage: (
+    novelId: string | number,
+    conversationId: number,
+    body: MessageCreateBody
+  ) =>
+    api.post<MessageAccepted>(
+      `/novels/${novelId}/conversations/${conversationId}/messages`,
+      body
+    ),
+
+  getJob: (novelId: string | number, conversationId: number, jobId: number) =>
+    api.get<GenerationJobView>(
+      `/novels/${novelId}/conversations/${conversationId}/jobs/${jobId}`
+    ),
+
+  cancelJob: (
+    novelId: string | number,
+    conversationId: number,
+    jobId: number
+  ) =>
+    api.post<GenerationJobView>(
+      `/novels/${novelId}/conversations/${conversationId}/jobs/${jobId}/cancel`
+    ),
+
+  retryJob: (
+    novelId: string | number,
+    conversationId: number,
+    jobId: number
+  ) =>
+    api.post<GenerationJobView>(
+      `/novels/${novelId}/conversations/${conversationId}/jobs/${jobId}/retry`
+    ),
+};
+
 // ==================== 同人文 API ====================
 
 export interface FanFiction {

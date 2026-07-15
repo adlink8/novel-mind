@@ -147,13 +147,90 @@ def resolve_reader_chat_deployment() -> ModelDeployment:
     )
 
 
+class _ControlledE2ETransport:
+    """Deterministic provider used only when NOVELMIND_READER_CHAT_CONTROLLED_TRANSPORT=1."""
+
+    async def complete(self, **kwargs: Any) -> dict[str, Any]:
+        import json
+        import re
+
+        messages = list(kwargs.get("messages") or [])
+        user_content = ""
+        for msg in reversed(messages):
+            if msg.get("role") == "user":
+                user_content = str(msg.get("content") or "")
+                break
+        allowed: list[str] = []
+        match = re.search(r"UNTRUSTED_DATA_BEGIN\n(.*)\nUNTRUSTED_DATA_END", user_content, re.S)
+        if match:
+            try:
+                payload = json.loads(match.group(1))
+                allowed = list(payload.get("allowed_evidence_ids") or [])
+            except json.JSONDecodeError:
+                allowed = []
+        if not allowed:
+            content = json.dumps(
+                {
+                    "schema_version": "reader-answer.v1",
+                    "answer_blocks": [],
+                    "clarifying_question": None,
+                    "uncertainty": {
+                        "reason_code": "no_evidence",
+                        "explanation": "没有可用证据。",
+                        "missing_evidence": [],
+                    },
+                    "suggestion_candidates": [],
+                },
+                ensure_ascii=False,
+            )
+        else:
+            ref = allowed[0]
+            content = json.dumps(
+                {
+                    "schema_version": "reader-answer.v1",
+                    "answer_blocks": [
+                        {
+                            "block_id": "b1",
+                            "text": "阿宁走进竹林。",
+                            "evidence_refs": [ref],
+                        }
+                    ],
+                    "clarifying_question": None,
+                    "uncertainty": None,
+                    "suggestion_candidates": [],
+                },
+                ensure_ascii=False,
+            )
+        return {
+            "id": "e2e-controlled",
+            "content": content,
+            "usage": {"prompt_tokens": 100, "completion_tokens": 40, "total_tokens": 140},
+        }
+
+
 def production_runtime() -> ReaderChatWorkerRuntime:
+    import os
+
     deployment = resolve_reader_chat_deployment()
     sessions = async_session_factory
+    transport: Any
+    if os.environ.get("NOVELMIND_READER_CHAT_CONTROLLED_TRANSPORT") == "1":
+        # E2E / qualification only — never used in production configs.
+        transport = _ControlledE2ETransport()
+        deployment = ModelDeployment(
+            provider="e2e",
+            model_id="reader-controlled",
+            revision="e2e-1",
+            supports_structured_output=True,
+            input_price_per_million=Decimal("1"),
+            output_price_per_million=Decimal("2"),
+        )
+    else:
+        transport = _LiteLLMTransport()
     return ReaderChatWorkerRuntime(
         sessions=sessions,
         gateway=ReaderChatGateway(
-            _LiteLLMTransport(),
+            transport,
             persistence=DualBudgetRepository(sessions),
         ),
         deployment=deployment,
@@ -161,9 +238,18 @@ def production_runtime() -> ReaderChatWorkerRuntime:
 
 
 async def dispatch_reader_chat_job(job_id: int) -> None:
-    """BackgroundTasks entrypoint; durable lease makes repeated dispatch safe."""
+    """BackgroundTasks entrypoint; durable lease makes repeated dispatch safe.
 
-    await run_reader_chat_worker(job_id, runtime=production_runtime())
+    Never raise to the ASGI background runner — HTTP already returned 202 and
+    the job remains durable for later reclaim/retry if this process fails.
+    """
+
+    try:
+        await run_reader_chat_worker(job_id, runtime=production_runtime())
+    except Exception:
+        _SAFE_LOG.exception(
+            "reader_chat background dispatch failed job_id=%s", job_id
+        )
 
 
 async def run_reader_chat_worker(

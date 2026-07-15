@@ -7,7 +7,7 @@ owner + novel + conversation and return 404 for inaccessible IDs.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query, Response, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import require_owned_novel
@@ -25,6 +25,7 @@ from app.schemas.reader_chat import (
     MessageView,
 )
 from app.services.reader_chat.conversations import conversation_service
+from app.services.reader_chat.worker import dispatch_reader_chat_job
 
 router = APIRouter(dependencies=[Depends(require_user)])
 
@@ -167,17 +168,22 @@ async def list_messages(
 async def create_message(
     conversation_id: int,
     data: MessageCreate,
+    background_tasks: BackgroundTasks,
     novel: Novel = Depends(require_owned_novel),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_user),
 ) -> MessageAccepted:
-    return await conversation_service.create_message_safe(
+    accepted = await conversation_service.create_message_safe(
         db,
         novel=novel,
         owner_id=current_user.id,
         conversation_id=conversation_id,
         data=data,
     )
+    # Durable job: dispatch after request commits (BackgroundTasks + get_db commit).
+    if accepted.job.status.value in ("queued", "running"):
+        background_tasks.add_task(dispatch_reader_chat_job, accepted.job.id)
+    return accepted
 
 
 @router.get(
@@ -227,17 +233,21 @@ async def cancel_job(
 async def retry_job(
     conversation_id: int,
     job_id: int,
+    background_tasks: BackgroundTasks,
     novel: Novel = Depends(require_owned_novel),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_user),
 ) -> GenerationJobView:
-    return await conversation_service.retry_job(
+    view = await conversation_service.retry_job(
         db,
         novel=novel,
         owner_id=current_user.id,
         conversation_id=conversation_id,
         job_id=job_id,
     )
+    if view.status.value in ("queued", "running"):
+        background_tasks.add_task(dispatch_reader_chat_job, view.id)
+    return view
 
 
 # Silence unused import warnings for OpenAPI model refs used by response_model.
