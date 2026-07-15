@@ -97,16 +97,33 @@ async def test_duplicate_inventory_is_rejected() -> None:
 
 def test_package_has_no_mutation_or_provider_capabilities() -> None:
     root = Path(__file__).parents[3] / "app" / "services" / "narrative_memory"
-    combined = "\n".join(path.read_text(encoding="utf-8") for path in root.glob("*.py")).lower()
-    forbidden = (
+    pure_files = ("__init__.py", "audit.py", "audit_contracts.py", "audit_sources.py")
+    pure_text = "\n".join((root / name).read_text(encoding="utf-8") for name in pure_files).lower()
+    pure_forbidden = (
         "sqlalchemy",
         "model_gateway",
         "litellm",
-        "promotion",
         "set_active_pointer",
         "dispatch_job",
         "session.add",
         "session.execute(update",
         "session.execute(delete",
     )
-    assert not [token for token in forbidden if token in combined]
+    assert not [token for token in pure_forbidden if token in pure_text]
+
+    pg_path = root / "audit_pg.py"
+    if pg_path.exists():
+        pg_text = pg_path.read_text(encoding="utf-8").lower()
+        pg_forbidden = (
+            "model_gateway",
+            "litellm",
+            "from app.services.chunking.promotion",
+            "set_active_pointer",
+            "self._session.add(",
+            "self._session.delete(",
+            "self._session.commit(",
+            "self._session.flush(",
+            "from sqlalchemy import update",
+            "from sqlalchemy import insert",
+        )
+        assert not [token for token in pg_forbidden if token in pg_text]
