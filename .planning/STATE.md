@@ -1,16 +1,15 @@
 ---
 gsd_state_version: 1.0
-milestone: v0.6
-milestone_name: Versioned Novel Analysis and Timeline
-status: ready_to_plan
-last_updated: 2026-07-13T07:05:28.045Z
+milestone: v0.7
+milestone_name: Narrative Relationships, Reader AI, and Clue Tracking
+status: planned_only
+last_updated: "2026-07-15T00:00:00.000Z"
 progress:
-  total_phases: 8
+  total_phases: 11
   completed_phases: 7
-  total_plans: 41
+  total_plans: 56
   completed_plans: 41
-  percent: 88
-stopped_at: Phase 08 complete (10/10) — ready to discuss Phase 999.1
+  percent: 64
 ---
 
 # Project State
@@ -24,17 +23,17 @@ See `.planning/PROJECT.md` and `IMPLEMENTATION-STATUS.md`.
 
 ## Current Position
 
-Phase: 999.1
-Plan: Not started
-**Phase 08 COMPLETE** — 10/10 plans executed and independently verified (35/35 must-haves)
+Phase: 09 (Dynamic Character Relationship Graph) — PLANNED ONLY
+Plan: 5 plans in 5 waves; implementation is not authorized
+**Phase 09-11 PLANNED** — 15 plans cover the relationship graph, reader AI conversations, and clue tracking without executing product code
 
 - Branch: `feat/phase2-wave2-embedding`
-- Last activity: 2026-07-13 — Phase 08 independently verified: 35/35 must-haves, 77 backend tests, 68 frontend tests, production build, and 2 real browser tests passed
-- Plan directory: `.planning/phases/08-versioned-novel-analysis-orchestration-and-interactive-timel/`
+- Last activity: 2026-07-15 — Phase 09-11 specification, AI boundaries, validation, and wave plans reviewed; implementation not started
+- Plan directories: `.planning/phases/09-dynamic-character-relationship-graph/`, `.planning/phases/10-reader-selection-ai-and-multi-session-conversations/`, `.planning/phases/11-clue-and-foreshadow-tracking/`
 
 ## Auto Routing
 
-Phase 08 已完成；`auto_start` 保持关闭。下一阶段需单独讨论和规划。
+Phase 09-11 仅完成规划。`auto_start` 保持关闭；未经用户明确授权不得运行 `execute-phase`。
 
 ## Phase 08 Execution Metrics
 
@@ -130,5 +129,6 @@ CLI：`backend/scripts/run_chunker_qualification.py`
 
 ## Next Action
 
-1. Phase 08 无剩余执行项；后续功能进入新阶段前先讨论和规划。
-2. 保留本地 Vertex/BGE/阅读器 UX 等非 Phase 08 WIP，不纳入 Phase 08 提交。
+1. 审阅并确认 Phase 09-11 规划后，才可单独授权执行 Phase 09。
+2. Phase 10 需等 Phase 09 公共只读关系 reader 完成；Phase 11 不读取聊天作为事实来源。
+3. 保留当前所有非 `.planning` 的本地 WIP，不纳入本次规划提交。

@@ -152,6 +152,15 @@ Plans:
 **Depends on:** Phase 04, Phase 08
 **Status:** PLANNED ONLY — implementation not started
 
+Plans:
+- [ ] 09-01 append-only relationship observation contracts, evidence lineage, overrides, and migration
+- [ ] 09-02 deterministic relationship candidates, bounded evidence packages, LLM judgment, and gates
+- [ ] 09-03 owner/version/spoiler graph API, fold, overrides, and replayable Neo4j projection
+- [ ] 09-04 Cytoscape.js analysis workspace, evidence panel, timeline linking, and large-graph degradation
+- [ ] 09-05 frozen fixtures, adversarial/performance tests, browser qualification, and release gate
+
+**Waves:** 1 → 2 → 3 → 4 → 5. Each wave is blocked on the prior data contract and validation evidence.
+
 ### Phase 10: Reader Text-Selection AI and Multi-Session Conversations
 
 **Goal:** 让读者从阅读器选取原文后，在同一本小说的多个持久会话中进行证据受限、防剧透的 AI 对话。
@@ -159,9 +168,27 @@ Plans:
 **Depends on:** Phase 08, Phase 09
 **Status:** PLANNED ONLY — implementation not started
 
+Plans:
+- [ ] 10-01 durable conversations, messages, selections, manifests, citations, jobs, calls, budgets, and migration
+- [ ] 10-02 owner-scoped multi-session lifecycle, ordered messages, idempotency, and API contracts
+- [ ] 10-03 server-verified Unicode selections, visible-context assembly, and Phase 09 read-only contract
+- [ ] 10-04 cited answer worker, audit lineage, dual budgets, cancellation, retry, and adversarial tests
+- [ ] 10-05 reader selection entry, collapsible multi-session window, citations, browser qualification, and release gate
+
+**Waves:** 1 → {2, 3} → 4 → 5. Wave 3 binds the completed Phase 09 public reader; it does not install a null graph adapter.
+
 ### Phase 11: Clue and Foreshadow Tracking
 
 **Goal:** 以证据、版本和人工可控的五状态生命周期，发现、追踪、核验小说中的线索、伏笔及其回收。
 **Requirements:** REQ-CLUE-01..07
 **Depends on:** Phase 08, Phase 09, Phase 10
 **Status:** PLANNED ONLY — implementation not started
+
+Plans:
+- [ ] 11-01 clue lifecycle contracts, PostgreSQL authority, append-only states, overrides, and migration
+- [ ] 11-02 cross-chapter candidate recall, bounded evidence packages, Phase 09 read-only protocol, and LLM gates
+- [ ] 11-03 durable clue worker, versioning, budgets, overrides, owner/spoiler API, and explicit unavailable-source behavior
+- [ ] 11-04 analysis workspace clue timeband, filters, evidence panel, payoff chain, and manual actions
+- [ ] 11-05 frozen fixtures, false-positive/spoiler/version adversarial tests, browser qualification, and release gate
+
+**Waves:** 1 → 2 → 3 → 4 → 5. Phase 10 chat is never a clue source; Phase 09 reader outages remain explicit rather than becoming zero signals.
