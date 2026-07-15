@@ -5,6 +5,7 @@ from sqlalchemy import select
 
 from app.models.analysis import AnalysisVersion
 from app.models.chunk_build import ChunkActivePointer, ChunkBuild, ChunkHierarchyNode
+from app.models.clue import ClueActivePointer, ClueAnalysisVersion, MachineClue
 from app.models.novel import Chapter, Novel
 from app.models.timeline import MachineTimelineEvent, TimelineActivePointer
 from app.models.user import User
@@ -286,6 +287,95 @@ async def test_timeline_counts_real_facts_and_rechecks_lineage(audit_pg_session)
     timeline = next(item for item in mismatch.assets if item.kind == AssetKind.TIMELINE)
     assert timeline.status == EligibilityStatus.OPTIONAL_UNAVAILABLE
     assert timeline.healthy_empty is False
+
+
+@pytest.mark.asyncio
+async def test_clue_requires_validated_pointer_target_and_counts_real_facts(
+    audit_pg_session,
+):
+    user, novel, _ = await _seed_valid_hierarchy(audit_pg_session)
+    build = await audit_pg_session.scalar(
+        select(ChunkBuild)
+        .join(ChunkActivePointer, ChunkActivePointer.build_id == ChunkBuild.build_id)
+        .where(ChunkActivePointer.novel_id == novel.id)
+    )
+    manifest = "e" * 64
+    version = ClueAnalysisVersion(
+        owner_id=user.id,
+        novel_id=novel.id,
+        version_key="audit-clue-v1",
+        status="validated",
+        source_snapshot_hash=build.source_snapshot_hash,
+        hierarchy_build_id=build.build_id,
+        hierarchy_checksum=build.manifest_checksum,
+        prompt_hash="1" * 64,
+        schema_hash="2" * 64,
+        decoding_hash="3" * 64,
+        config_hash="4" * 64,
+        policy_hash="5" * 64,
+        model_lineage={},
+        price_snapshot={},
+        manifest={},
+        manifest_checksum=manifest,
+    )
+    audit_pg_session.add(version)
+    await audit_pg_session.flush()
+    audit_pg_session.add(
+        ClueActivePointer(
+            owner_id=user.id,
+            novel_id=novel.id,
+            version_id=version.id,
+            revision=1,
+            manifest_checksum=manifest,
+        )
+    )
+    await audit_pg_session.flush()
+
+    empty_report = await audit_assets(
+        PostgresAuditSource(audit_pg_session), owner_id=user.id, novel_id=novel.id
+    )
+    clue = next(item for item in empty_report.assets if item.kind == AssetKind.CLUE)
+    assert clue.status == EligibilityStatus.REUSABLE_EXACT
+    assert clue.item_count == 0
+    assert clue.healthy_empty is True
+
+    audit_pg_session.add(
+        MachineClue(
+            owner_id=user.id,
+            novel_id=novel.id,
+            version_id=version.id,
+            logical_clue_id="clue-1",
+            title="线索",
+            summary="摘要",
+            package_hash="6" * 64,
+            package_snapshot={},
+            confidence=0.9,
+            publication_status="published",
+        )
+    )
+    await audit_pg_session.flush()
+
+    populated_report = await audit_assets(
+        PostgresAuditSource(audit_pg_session), owner_id=user.id, novel_id=novel.id
+    )
+    clue = next(item for item in populated_report.assets if item.kind == AssetKind.CLUE)
+    assert clue.status == EligibilityStatus.REUSABLE_EXACT
+    assert clue.item_count == 1
+    assert clue.healthy_empty is False
+
+    for invalid_status in ("candidate", "superseded"):
+        version.status = invalid_status
+        await audit_pg_session.flush()
+        invalid_report = await audit_assets(
+            PostgresAuditSource(audit_pg_session),
+            owner_id=user.id,
+            novel_id=novel.id,
+        )
+        clue = next(
+            item for item in invalid_report.assets if item.kind == AssetKind.CLUE
+        )
+        assert clue.status == EligibilityStatus.OPTIONAL_UNAVAILABLE
+        assert ReasonCode.OPTIONAL_LINEAGE_MISMATCH in clue.reason_codes
 
 
 def test_rebuild_ranges_are_coalesced() -> None:

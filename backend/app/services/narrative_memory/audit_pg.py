@@ -337,7 +337,7 @@ class PostgresAuditSource:
             version is None
             or version.owner_id != owner_id
             or version.novel_id != novel_id
-            or version.status not in {"candidate", "validated", "superseded"}
+            or version.status != "validated"
             or version.source_snapshot_hash != build.source_snapshot_hash
             or version.hierarchy_build_id != build.build_id
             or version.hierarchy_checksum != build.manifest_checksum
