@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v0.7
 milestone_name: Narrative Relationships, Reader AI, and Clue Tracking
 status: executing
-last_updated: "2026-07-15T01:45:00.000Z"
+last_updated: "2026-07-15T02:55:00.000Z"
 progress:
   total_phases: 11
   completed_phases: 8
   total_plans: 56
-  completed_plans: 43
-  percent: 68
+  completed_plans: 44
+  percent: 70
 ---
 
 # Project State
@@ -24,21 +24,22 @@ See `.planning/PROJECT.md` and `IMPLEMENTATION-STATUS.md`.
 ## Current Position
 
 Phase: 09 (Dynamic Character Relationship Graph) — EXECUTING
-Plan: 09-03 (wave 3 of 5) — next
+Plan: 09-04 (wave 4 of 5) — next
 **Phase 09-11 authorized for GSD execute** — user confirmed plans and requested execution 2026-07-15
 
 - Branch: `feat/phase2-wave2-embedding`
-- Last activity: 2026-07-15 — completed 09-02 relationship candidates/judgment/gates/worker
+- Last activity: 2026-07-15 — completed 09-03 graph API/fold/overrides/projection
 - Plan directories: `.planning/phases/09-dynamic-character-relationship-graph/`, `.planning/phases/10-reader-selection-ai-and-multi-session-conversations/`, `.planning/phases/11-clue-and-foreshadow-tracking/`
 
 ## Auto Routing
 
-Phase 09-11 规划已确认；用户授权执行。按依赖顺序：09 → 10 → 11。当前执行 Phase 09，下一步 09-03。
+Phase 09-11 规划已确认；用户授权执行。按依赖顺序：09 → 10 → 11。当前执行 Phase 09，下一步 09-04。
 
 ## Phase 09 Execution Metrics
 
 - 09-01: 28min, 3 tasks, 6 files, 13 targeted persistence tests passed (0 skip); alembic head `11relobserve01`.
 - 09-02: 45min, 3 tasks, 10 files, 17 targeted pipeline tests passed (13 unit + 4 PostgreSQL integration, 0 skip).
+- 09-03: 55min, 3 tasks, 8 files, 10 targeted graph API/projection PostgreSQL tests passed (0 skip); OpenAPI graph path registered.
 
 ## Phase 09 Decisions
 
@@ -48,6 +49,10 @@ Phase 09-11 规划已确认；用户授权执行。按依赖顺序：09 → 10 �
 - AUTO_ACCEPT_THRESHOLD = 0.85; REVIEW_THRESHOLD = 0.65; policy_hash freezes gate order and thresholds.
 - same_entity/causes/precedes never produce RelationshipObservation; same_entity is identity-review metadata only.
 - RelationshipObservationWorker is the sole accepted-observation writer; LLM cannot choose owner/version/status.
+- Graph cutoff reuses only Phase 08 timeline_full_book; missing progress defaults to chapter one.
+- Latest-wins overrides use highest id per logical key/field without mutating prior override rows.
+- Hard cap responses empty nodes/edges with filters_required while preserving spoiler-safe counts.
+- Phase 10/11 get documented read-only service functions only; no chat/clue tables or routes in Phase 09.
 
 ## Phase 08 Execution Metrics
 
@@ -143,8 +148,8 @@ CLI：`backend/scripts/run_chunker_qualification.py`
 
 ## Next Action
 
-1. Execute 09-02 (deterministic candidates, evidence packages, LLM judgment, gates).
-2. Phase 10 需等 Phase 09 公共只读关系 reader 完成；Phase 11 不读取聊天作为事实来源。
+1. Execute 09-04 (Cytoscape analysis workspace, evidence panel, timeline linking, large-graph degradation).
+2. Phase 10 可依赖 `load_filtered_relationship_graph`；Phase 11 可依赖 `list_accepted_observation_refs`；均不把聊天当事实来源。
 3. 保留当前所有非 `.planning` 的本地 WIP，不纳入本次规划提交。
 
 ## Session
