@@ -1,15 +1,16 @@
 "use client";
 
 /**
- * 全局分析工作台 — Phase 08 时间线 + Phase 09 人物关系
+ * 全局分析工作台 — Phase 08 时间线 + Phase 09 人物关系 + Phase 11 线索与伏笔
  * 布局 C1：状态+筛选紧凑 · 主图 · 详情抽屉 · 列表折叠
- * 工作区切换：timeline | relationships（不暴露中间摘要）
+ * 工作区切换：timeline | relationships | clues（不暴露中间摘要/主题/节奏）
  */
 
 import { useEffect, useMemo, useRef, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { BookOpen, RefreshCw } from "lucide-react";
 
+import { ClueWorkspace } from "@/components/clues/clue-workspace";
 import { RelationshipWorkspace } from "@/components/relationships/relationship-workspace";
 import { TimelineChart } from "@/components/timeline/timeline-chart";
 import { TimelineControls } from "@/components/timeline/timeline-controls";
@@ -24,7 +25,7 @@ import {
   type TimelineVersionSource,
 } from "@/lib/api";
 
-type AnalysisWorkspaceMode = "timeline" | "relationships";
+type AnalysisWorkspaceMode = "timeline" | "relationships" | "clues";
 
 function eventsSignature(
   envelope: TimelineEnvelope,
@@ -385,7 +386,7 @@ function AnalysisWorkspace() {
             小说分析
           </h1>
           <p className="mt-0.5 text-xs text-muted-foreground sm:text-sm">
-            时间线与人物关系共享版本与防剧透设置 · 点「开始分析」才调用模型
+            时间线 / 人物关系 / 线索与伏笔 · 共享全书防剧透 · 点「开始分析」才调用模型
           </p>
         </div>
         <label className="grid min-w-48 gap-1 text-xs text-muted-foreground">
@@ -420,20 +421,7 @@ function AnalysisWorkspace() {
         </div>
       ) : (
         <div className="grid gap-3">
-          {/* 第一行：状态 + 暂停/继续 */}
-          <TimelineStatus
-            run={run}
-            hasEvents={Boolean(
-              envelope.active?.events.length ||
-                envelope.running_candidate?.events.length
-            )}
-            onPause={() => void pauseRun()}
-            onResume={() => void retryRun()}
-            onStart={() => void startAnalysis()}
-            actionBusy={loading}
-          />
-
-          {/* 工作区：仅时间线 / 人物关系（不暴露中间摘要） */}
+          {/* 工作区：时间线 / 人物关系 / 线索与伏笔（不暴露中间摘要） */}
           <div
             role="tablist"
             aria-label="分析工作区"
@@ -465,90 +453,127 @@ function AnalysisWorkspace() {
             >
               人物关系
             </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={workspace === "clues"}
+              onClick={() => setWorkspace("clues")}
+              className={`rounded-full px-4 py-2 text-sm ${
+                workspace === "clues"
+                  ? "bg-foreground text-background"
+                  : "border bg-card"
+              }`}
+            >
+              线索与伏笔
+            </button>
           </div>
 
-          {/* 第二行：筛选工具条 + 版本（时间线控件；全书偏好两个工作区共享） */}
-          <div className="grid gap-2 rounded-2xl border bg-card/60 p-2 sm:p-3">
-            {workspace === "timeline" && (
-              <TimelineControls
-                ordering={ordering}
-                onOrderingChange={(value) => void updateQuery({ ordering: value })}
-                people={people}
-                person={person}
-                onPersonChange={(value) => void updateQuery({ person: value })}
-                causal={causal}
-                onCausalChange={(value) => void updateQuery({ causal: value })}
-                fullBook={fullBook}
-                onFullBookRequest={(value) =>
-                  value
-                    ? setConfirmFullBook(true)
-                    : void timelineApi
-                        .setFullBookPreference(novelId, false)
-                        .then(() => updateQuery({ fullBook: false }))
-                }
-              />
-            )}
-            {workspace === "relationships" && (
-              <div className="flex flex-wrap items-center gap-3 p-1">
-                <label className="flex h-10 items-center gap-2 rounded-xl border border-amber-300/70 bg-amber-50 px-3 text-sm text-amber-950">
-                  <input
-                    type="checkbox"
-                    checked={fullBook}
-                    onChange={(event) =>
-                      event.target.checked
-                        ? setConfirmFullBook(true)
-                        : void timelineApi
-                            .setFullBookPreference(novelId, false)
-                            .then(() => updateQuery({ fullBook: false }))
-                    }
-                  />
-                  显示全书（可能剧透）
-                </label>
-                <p className="text-xs text-muted-foreground">
-                  与时间线共用版本与全书偏好；API 为防剧透权威。
-                </p>
-              </div>
-            )}
-            {(envelope.active || envelope.running_candidate) && (
-              <div
-                role="tablist"
-                aria-label="分析版本"
-                className="flex gap-2 overflow-x-auto px-1"
-              >
-                {envelope.active && (
-                  <button
-                    role="tab"
-                    aria-selected={source === "active"}
-                    onClick={() => selectSource("active")}
-                    className={`whitespace-nowrap rounded-full px-3 py-1.5 text-xs ${
-                      source === "active"
-                        ? "bg-foreground text-background"
-                        : "border bg-background"
-                    }`}
-                  >
-                    当前版本 · v{envelope.active.version_id}
-                  </button>
-                )}
-                {envelope.running_candidate && (
-                  <button
-                    role="tab"
-                    aria-selected={source === "running_candidate"}
-                    onClick={() => selectSource("running_candidate")}
-                    className={`whitespace-nowrap rounded-full px-3 py-1.5 text-xs ${
-                      source === "running_candidate"
-                        ? "bg-foreground text-background"
-                        : "border bg-background"
-                    }`}
-                  >
-                    <RefreshCw className="mr-1 inline size-3" />
-                    正在生成 · v{envelope.running_candidate.version_id}
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
+          {/* 线索工作台自带 run 状态与全书控件；时间线/关系保留既有顶栏 */}
+          {workspace !== "clues" && (
+            <TimelineStatus
+              run={run}
+              hasEvents={Boolean(
+                envelope.active?.events.length ||
+                  envelope.running_candidate?.events.length
+              )}
+              onPause={() => void pauseRun()}
+              onResume={() => void retryRun()}
+              onStart={() => void startAnalysis()}
+              actionBusy={loading}
+            />
+          )}
 
-          {run && ACTIVE_RUN.has(run.status) && (
+          {workspace !== "clues" && (
+            <div className="grid gap-2 rounded-2xl border bg-card/60 p-2 sm:p-3">
+              {workspace === "timeline" && (
+                <TimelineControls
+                  ordering={ordering}
+                  onOrderingChange={(value) =>
+                    void updateQuery({ ordering: value })
+                  }
+                  people={people}
+                  person={person}
+                  onPersonChange={(value) =>
+                    void updateQuery({ person: value })
+                  }
+                  causal={causal}
+                  onCausalChange={(value) =>
+                    void updateQuery({ causal: value })
+                  }
+                  fullBook={fullBook}
+                  onFullBookRequest={(value) =>
+                    value
+                      ? setConfirmFullBook(true)
+                      : void timelineApi
+                          .setFullBookPreference(novelId, false)
+                          .then(() => updateQuery({ fullBook: false }))
+                  }
+                />
+              )}
+              {workspace === "relationships" && (
+                <div className="flex flex-wrap items-center gap-3 p-1">
+                  <label className="flex h-10 items-center gap-2 rounded-xl border border-amber-300/70 bg-amber-50 px-3 text-sm text-amber-950">
+                    <input
+                      type="checkbox"
+                      checked={fullBook}
+                      onChange={(event) =>
+                        event.target.checked
+                          ? setConfirmFullBook(true)
+                          : void timelineApi
+                              .setFullBookPreference(novelId, false)
+                              .then(() => updateQuery({ fullBook: false }))
+                      }
+                    />
+                    显示全书（可能剧透）
+                  </label>
+                  <p className="text-xs text-muted-foreground">
+                    与时间线共用版本与全书偏好；API 为防剧透权威。
+                  </p>
+                </div>
+              )}
+              {(envelope.active || envelope.running_candidate) && (
+                <div
+                  role="tablist"
+                  aria-label="分析版本"
+                  className="flex gap-2 overflow-x-auto px-1"
+                >
+                  {envelope.active && (
+                    <button
+                      role="tab"
+                      aria-selected={source === "active"}
+                      onClick={() => selectSource("active")}
+                      className={`whitespace-nowrap rounded-full px-3 py-1.5 text-xs ${
+                        source === "active"
+                          ? "bg-foreground text-background"
+                          : "border bg-background"
+                      }`}
+                    >
+                      当前版本 · v{envelope.active.version_id}
+                    </button>
+                  )}
+                  {envelope.running_candidate && (
+                    <button
+                      role="tab"
+                      aria-selected={source === "running_candidate"}
+                      onClick={() => selectSource("running_candidate")}
+                      className={`whitespace-nowrap rounded-full px-3 py-1.5 text-xs ${
+                        source === "running_candidate"
+                          ? "bg-foreground text-background"
+                          : "border bg-background"
+                      }`}
+                    >
+                      <RefreshCw className="mr-1 inline size-3" />
+                      正在生成 · v{envelope.running_candidate.version_id}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {workspace !== "clues" &&
+            run &&
+            ACTIVE_RUN.has(run.status) && (
             <p className="rounded-xl border border-sky-300/70 bg-sky-50 px-3 py-2 text-xs text-sky-950">
               分析进行中：进度 {Number(run.progress?.completed_chapters ?? 0)}/
               {Number(run.progress?.total_chapters ?? 0) || "?"} 章；时间线图/列表展示
@@ -557,7 +582,8 @@ function AnalysisWorkspace() {
               {view?.events.length ?? 0} 条。
             </p>
           )}
-          {!ACTIVE_RUN.has(run?.status ?? "") &&
+          {workspace !== "clues" &&
+            !ACTIVE_RUN.has(run?.status ?? "") &&
             !fullBook &&
             !selectedNovel?.reading_progress?.timeline_full_book && (
             <p className="rounded-xl border border-amber-300/70 bg-amber-50 px-3 py-2 text-xs text-amber-950">
@@ -565,10 +591,10 @@ function AnalysisWorkspace() {
               后台可能已分析更多章；勾选「显示全书」可看全部。
             </p>
           )}
-          {prepNote && (
+          {workspace !== "clues" && prepNote && (
             <p className="text-xs text-muted-foreground">{prepNote}</p>
           )}
-          {error && (
+          {workspace !== "clues" && error && (
             <p
               role="alert"
               className="rounded-xl bg-destructive/10 p-3 text-sm text-destructive"
@@ -577,8 +603,23 @@ function AnalysisWorkspace() {
             </p>
           )}
 
-          {/* 主区：时间轴 或 人物关系 */}
-          {workspace === "relationships" ? (
+          {/* 主区：时间轴 / 人物关系 / 线索 */}
+          {workspace === "clues" ? (
+            <ClueWorkspace
+              key={novelId}
+              novelId={novelId}
+              fullBook={fullBook}
+              onFullBookRequest={(enable) => {
+                if (enable) {
+                  setConfirmFullBook(true);
+                } else {
+                  void timelineApi
+                    .setFullBookPreference(novelId, false)
+                    .then(() => updateQuery({ fullBook: false }));
+                }
+              }}
+            />
+          ) : workspace === "relationships" ? (
             <RelationshipWorkspace
               key={`${novelId}:${source}:${view?.version_id ?? "none"}`}
               novelId={novelId}

@@ -10,6 +10,9 @@ const mocks = vi.hoisted(() => ({
   getTimeline: vi.fn(),
   status: vi.fn(),
   setFullBookPreference: vi.fn(),
+  clueGetClues: vi.fn(),
+  clueStatus: vi.fn(),
+  clueStartOrResume: vi.fn(),
 }));
 
 vi.mock("@/lib/api", () => ({
@@ -49,6 +52,28 @@ vi.mock("@/lib/api", () => ({
     getEvidence: vi.fn(),
   },
 }));
+
+vi.mock("@/lib/clue-api", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/clue-api")>(
+    "@/lib/clue-api"
+  );
+  return {
+    ...actual,
+    clueApi: {
+      getClues: mocks.clueGetClues,
+      status: mocks.clueStatus,
+      startOrResume: mocks.clueStartOrResume,
+      cancel: vi.fn(),
+      resume: vi.fn(),
+      reanalyze: vi.fn(),
+      getVersion: vi.fn(),
+      getDetail: vi.fn(),
+      compare: vi.fn(),
+      rollback: vi.fn(),
+      action: vi.fn(),
+    },
+  };
+});
 
 vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
@@ -154,6 +179,47 @@ describe("global analysis timeline workspace", () => {
       data: { active, running_candidate: candidate },
     });
     mocks.setFullBookPreference.mockResolvedValue({ data: {} });
+    mocks.clueStatus.mockResolvedValue({
+      data: {
+        id: 1,
+        novel_id: 11,
+        version_id: 7,
+        status: "completed",
+        status_reason: null,
+        progress: {},
+        cancel_requested: false,
+        updated_at: "2026-07-15T00:00:00Z",
+      },
+    });
+    mocks.clueGetClues.mockResolvedValue({
+      data: {
+        active: {
+          novel_id: 11,
+          version_id: 7,
+          source: "active",
+          through_chapter: 1,
+          full_book: false,
+          cutoff_chapter: 1,
+          clues: [
+            {
+              logical_clue_id: "c1",
+              title: "雾中铃铛",
+              derived_state: "active",
+              narrative_chapter_number: 1,
+              source_start: 0,
+              confidence: 0.9,
+              evidence_count: 1,
+              link_count: 0,
+              provenance: {},
+            },
+          ],
+          counts: { clues: 1, by_state: { active: 1 } },
+          available_states: ["active"],
+          available_character_ids: [],
+        },
+        running_candidate: null,
+      },
+    });
   });
 
   it("does not auto-start; live run prefers candidate events for chart/list", async () => {
@@ -357,5 +423,68 @@ describe("global analysis timeline workspace", () => {
       />
     );
     expect(screen.getByText(label)).toBeInTheDocument();
+  });
+
+  it("switches to clue workspace under one novel selector without intermediate menus", async () => {
+    mocks.status.mockResolvedValue({
+      data: {
+        id: 3,
+        novel_id: 11,
+        status: "completed",
+        progress: {},
+        cancel_requested: false,
+        updated_at: "2026-07-13T04:00:00Z",
+      },
+    });
+    render(<AnalysisPage />);
+    fireEvent.change(await screen.findByLabelText("选择小说"), {
+      target: { value: "11" },
+    });
+    await waitFor(() =>
+      expect(screen.getByRole("tab", { name: "线索与伏笔" })).toBeInTheDocument()
+    );
+
+    expect(screen.getByRole("tab", { name: "时间线" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "人物关系" })).toBeInTheDocument();
+    expect(
+      screen.queryByText(/剧情摘要|节拍|主题|节奏|章节总结/)
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "线索与伏笔" }));
+    expect(await screen.findByTestId("clue-workspace")).toBeInTheDocument();
+    expect((await screen.findAllByText("雾中铃铛")).length).toBeGreaterThan(0);
+    // timeline canvas not required in clue view
+    expect(screen.queryByTestId("timeline-canvas")).not.toBeInTheDocument();
+    // still one novel selector
+    expect(screen.getAllByLabelText("选择小说")).toHaveLength(1);
+    // no top-level /clues route link
+    expect(screen.queryByRole("link", { name: /线索/ })).not.toBeInTheDocument();
+  });
+
+  it("shares Phase 08 full-book confirmation from the clue workspace", async () => {
+    mocks.status.mockResolvedValue({
+      data: {
+        id: 3,
+        novel_id: 11,
+        status: "completed",
+        progress: {},
+        cancel_requested: false,
+        updated_at: "2026-07-13T04:00:00Z",
+      },
+    });
+    render(<AnalysisPage />);
+    fireEvent.change(await screen.findByLabelText("选择小说"), {
+      target: { value: "11" },
+    });
+    fireEvent.click(await screen.findByRole("tab", { name: "线索与伏笔" }));
+    await screen.findByTestId("clue-workspace");
+
+    fireEvent.click(screen.getByLabelText("显示全书（可能剧透）"));
+    expect(screen.getByRole("dialog", { name: "确认显示全书" })).toBeInTheDocument();
+    expect(mocks.setFullBookPreference).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "确认显示全书" }));
+    await waitFor(() =>
+      expect(mocks.setFullBookPreference).toHaveBeenCalledWith("11", true)
+    );
   });
 });
