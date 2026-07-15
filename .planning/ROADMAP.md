@@ -182,7 +182,7 @@ Plans:
 **Goal:** 以证据、版本和人工可控的五状态生命周期，发现、追踪、核验小说中的线索、伏笔及其回收。
 **Requirements:** REQ-CLUE-01..07
 **Depends on:** Phase 08, Phase 09, Phase 10
-**Status:** PARTIAL — 5/5 plans; independent verification 15/15 product must-haves (2026-07-15); adversarial static-scan residual
+**Status:** IMPLEMENT COMPLETE — 5/5 plans; product must-haves verified; pure-module write scan residual closed (2026-07-15)
 
 Plans:
 - [x] 11-01 clue lifecycle contracts, PostgreSQL authority, append-only states, overrides, and migration
@@ -191,4 +191,4 @@ Plans:
 - [x] 11-04 analysis workspace clue timeband, filters, evidence panel, payoff chain, and manual actions
 - [x] 11-05 frozen fixtures, false-positive/spoiler/version adversarial tests, browser qualification, and release gate
 
-**Waves:** 1 → 2 → 3 → 4 → 5 complete. Verified: `.planning/phases/11-clue-and-foreshadow-tracking/11-VERIFICATION.md` (PARTIAL). Alembic head `11cluetrack01`. Clue UI on `/analysis` only (no top-level `/clues`). Qualification: `backend/scripts/run_clue_qualification.py`. Phase 10 chat is never a clue source; Phase 09 reader outages remain `source_unavailable`, not zero signals. Residual: scope pure-module write scan in `test_clue_false_positives.py` before full CI green.
+**Waves:** 1 → 2 → 3 → 4 → 5 complete. Verified: `.planning/phases/11-clue-and-foreshadow-tracking/11-VERIFICATION.md`. Alembic head `11cluetrack01`. Clue UI on `/analysis` only (no top-level `/clues`). Qualification: `backend/scripts/run_clue_qualification.py`. Phase 10 chat is never a clue source; Phase 09 reader outages remain `source_unavailable`, not zero signals.
