@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v0.7
 milestone_name: Narrative Relationships, Reader AI, and Clue Tracking
 status: executing
-last_updated: "2026-07-15T02:15:00.000Z"
+last_updated: "2026-07-15T04:40:00.000Z"
 progress:
   total_phases: 11
   completed_phases: 10
   total_plans: 56
-  completed_plans: 53
-  percent: 95
+  completed_plans: 54
+  percent: 96
 ---
 
 # Project State
@@ -23,22 +23,23 @@ See `.planning/PROJECT.md` and `IMPLEMENTATION-STATUS.md`.
 
 ## Current Position
 
-Phase: 11 (Clue and Foreshadow Tracking) — Wave 2 complete (2/5 plans)
-Plan: 11-02 complete
-**Next:** 11-03 durable clue worker, versioning, budgets, overrides, owner/spoiler API
+Phase: 11 (Clue and Foreshadow Tracking) — Wave 3 complete (3/5 plans)
+Plan: 11-03 complete
+**Next:** 11-04 analysis workspace clue UI
 
 - Branch: `feat/phase2-wave2-embedding`
-- Last activity: 2026-07-15 — completed 11-02 candidate recall + evidence packages + LLM gates + Phase 09 source protocol
+- Last activity: 2026-07-15 — completed 11-03 durable worker + versioning + overrides + spoiler API
 - Plan directories: `.planning/phases/09-dynamic-character-relationship-graph/`, `.planning/phases/10-reader-selection-ai-and-multi-session-conversations/`, `.planning/phases/11-clue-and-foreshadow-tracking/`
 
 ## Auto Routing
 
-Phase 11-02 完成。继续 11-03。聊天不得作为线索事实源；Phase 09 relationship reader 不可用时记录 `source_unavailable`，不得伪装成零关系。
+Phase 11-03 完成。继续 11-04。聊天不得作为线索事实源；Phase 09 relationship reader 不可用时记录 `source_unavailable`，不得伪装成零关系。
 
 ## Phase 11 Execution Metrics
 
 - 11-01: 55min, 3 tasks, 10 files, 28 targeted tests passed (16 unit + 12 PostgreSQL integration, 0 skip); alembic head `11cluetrack01`.
 - 11-02: 45min, 3 tasks, 12 files, 38 targeted tests passed (6 candidates + 8 source protocols + 8 llm + 12 gates + 4 adversarial, 0 skip).
+- 11-03: 95min, 3 tasks, 14 files, 15 targeted tests passed (7 unit + 8 integration, 0 skip); feat commit `464f65c`.
 
 ## Phase 11 Decisions
 
@@ -52,6 +53,9 @@ Phase 11-02 完成。继续 11-03。聊天不得作为线索事实源；Phase 09
 - Phase 09 null/outage sources emit `source_unavailable` (distinct from healthy `empty`); never zero-signal success substitute.
 - Clue LLM repair is caller-controlled (`repair=True` only); provider_retries=0; judge has no DB/lifecycle writes.
 - GateService returns pure GateDecision; similarity/motif/vector alone cannot accept active/paid_off.
+- Lifecycle evidence rows attach only to lifecycle_event_id (not machine_clue_id) to avoid unique collisions rolling back machine clues.
+- Spoiler full-book reuses Phase 08 `timeline_full_book` only; no clue-specific preference endpoint.
+- Override supersession is INSERT-only latest-wins; reanalysis relinks on exactly one evidence identity match.
 
 ## Phase 10 Execution Metrics
 
@@ -158,11 +162,11 @@ REQ-AUTO-01..11 已交付（含 06-08 QualityRun 持久化、06-09 BaselineCandi
 
 ## Next Action
 
-1. Execute `11-03-PLAN.md` (durable worker + versioning + budgets + overrides + owner/spoiler API).
+1. Execute `11-04-PLAN.md` (analysis workspace clue UI).
 2. Never import reader-chat as clue fact source; relationship outages → `source_unavailable`.
-3. 保留当前所有非 11-02 的本地 WIP，不纳入本次提交。
+3. 保留当前所有非 11-03 的本地 WIP，不纳入本次提交。
 
 ## Session
 
-- Stopped at: Completed 11-02-PLAN.md (candidate recall + evidence + judge + gates)
+- Stopped at: Completed 11-03-PLAN.md (durable worker + versions + overrides + spoiler API)
 - Resume file: None

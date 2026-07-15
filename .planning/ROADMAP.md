@@ -43,7 +43,7 @@
 | v0.5 / Phase 6 自动质量与 CI 门禁 | 9/9 | **Complete** (REQ-AUTO-11 closed) |
 | Phase 7 语义/层级分块 | 6/6 | **Complete** (logic+tests+PG/indexing wiring) |
 | Phase 8 版本化小说分析与时间线 | 10/10 | **Complete** (35/35 must-haves verified) |
-| v0.7 / Phase 9-11 叙事关系、阅读问答与线索追踪 | Phase 09: 5/5; Phase 10: 5/5; Phase 11: 2/5 | **Phase 09 VERIFIED**; **Phase 10 PARTIAL**; **Phase 11 EXECUTING** (11-01..11-02) |
+| v0.7 / Phase 9-11 叙事关系、阅读问答与线索追踪 | Phase 09: 5/5; Phase 10: 5/5; Phase 11: 3/5 | **Phase 09 VERIFIED**; **Phase 10 PARTIAL**; **Phase 11 EXECUTING** (11-01..11-03) |
 
 ## Auto Start
 
@@ -187,8 +187,8 @@ Plans:
 Plans:
 - [x] 11-01 clue lifecycle contracts, PostgreSQL authority, append-only states, overrides, and migration
 - [x] 11-02 cross-chapter candidate recall, bounded evidence packages, Phase 09 read-only protocol, and LLM gates
-- [ ] 11-03 durable clue worker, versioning, budgets, overrides, owner/spoiler API, and explicit unavailable-source behavior
+- [x] 11-03 durable clue worker, versioning, budgets, overrides, owner/spoiler API, and explicit unavailable-source behavior
 - [ ] 11-04 analysis workspace clue timeband, filters, evidence panel, payoff chain, and manual actions
 - [ ] 11-05 frozen fixtures, false-positive/spoiler/version adversarial tests, browser qualification, and release gate
 
-**Waves:** 1 → 2 → 3 → 4 → 5. Wave 2 complete (`11-01-SUMMARY.md`, `11-02-SUMMARY.md`). Alembic head `11cluetrack01`. Phase 10 chat is never a clue source; Phase 09 reader outages remain `source_unavailable`, not zero signals.
+**Waves:** 1 → 2 → 3 → 4 → 5. Wave 3 complete (`11-01`..`11-03-SUMMARY.md`). Alembic head `11cluetrack01`. Phase 10 chat is never a clue source; Phase 09 reader outages remain `source_unavailable`, not zero signals.
