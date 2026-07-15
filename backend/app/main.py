@@ -26,6 +26,7 @@ from fastapi.responses import JSONResponse
 from app.api import novels, analysis, timeline, characters, fanfiction, models, auth, rag, search
 from app.api.eval import router as eval_router
 from app.api.knowledge import router as knowledge_router
+from app.api.reader_chat import router as reader_chat_router
 from app.api.relationships import router as relationships_router
 from app.config import settings
 from app.core.logging import RequestLoggingMiddleware, setup_logging
@@ -169,6 +170,11 @@ app.include_router(rag.router, prefix="/api/novels", tags=["RAG 检索"])
 app.include_router(knowledge_router)
 app.include_router(search.router, prefix="/api/search", tags=["搜索"])
 app.include_router(eval_router)
+app.include_router(
+    reader_chat_router,
+    prefix="/api/novels",
+    tags=["阅读器对话"],
+)
 
 
 @app.get("/api/health")
