@@ -292,14 +292,28 @@ def test_llm_cannot_smuggle_lifecycle_status_into_accepted_gate():
 
 
 def test_service_files_contain_no_asyncsession_lifecycle_writes():
+    """Pure recall/gate/judge modules must not write; persistence lives in worker path."""
     from pathlib import Path
 
+    pure_modules = {
+        "candidates.py",
+        "evidence.py",
+        "gates.py",
+        "llm_judge.py",
+        "sources.py",
+        "query.py",
+        "eval.py",
+    }
     root = Path(__file__).resolve().parents[2] / "app" / "services" / "clues"
     offenders: list[str] = []
-    for path in root.glob("*.py"):
+    for name in pure_modules:
+        path = root / name
+        if not path.is_file():
+            offenders.append(f"missing:{name}")
+            continue
         text = path.read_text(encoding="utf-8")
         if "session.add" in text or "db.add(" in text:
-            offenders.append(path.name)
+            offenders.append(name)
         if "ClueLifecycleEvent(" in text:
-            offenders.append(f"{path.name}:lifecycle_ctor")
+            offenders.append(f"{name}:lifecycle_ctor")
     assert offenders == []
