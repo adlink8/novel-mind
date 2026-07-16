@@ -46,7 +46,7 @@
 | Phase 8 版本化小说分析与时间线 | 10/10 | **Complete** (35/35 must-haves verified) |
 | v0.7 / Phase 9-11 叙事关系、阅读问答与线索追踪 | Phase 09: 5/5; Phase 10: 5/5; Phase 11: 5/5 | **09 VERIFIED**; **10 PARTIAL** (real Playwright residual); **11 implement-complete** (adversarial residual closed) |
 | v0.8 / Phase 12-17 分层叙事记忆与层级 RAG | 3/19 initial plans | **IN PROGRESS** — Phase 12 verified; Phase 13 next; candidate-only/no pointer cutover |
-| Phase 18 前端动效与过渡系统 | 1/3 | **EXECUTING** — 18-01 done (`f6280cf`); 18-02 next |
+| Phase 18 前端动效与过渡系统 | 2/3 | **EXECUTING** — 18-01/02 done; 18-03 qualification next |
 
 ## Auto Start
 
@@ -320,8 +320,8 @@ Plans:
 **Goal:** 在不改变业务行为、API 或数据结构的前提下，为现有 Next.js 界面建立克制、统一、可访问的动画过渡系统，并消除主题首帧闪烁、浮层退出不一致和动态内容布局跳动。
 **Requirements:** UI-MOTION-01, UI-MOTION-02, UI-MOTION-03, UI-MOTION-04, UI-MOTION-05, UI-MOTION-06
 **Depends on:** Existing frontend foundation (Phases 08–11); independent from the Phase 14–17 RAG execution chain
-**Status:** EXECUTING — 18-01 complete; authorized 2026-07-16 orchestration
-**Plans:** 1/3 plans complete
+**Status:** EXECUTING — 18-01/02 complete; authorized 2026-07-16 orchestration
+**Plans:** 2/3 plans complete
 
 **Success Criteria:**
 1. 所有目标交互使用 150/200/300ms 语义 token，进入为 ease-out、退出为 ease-in；新增代码无任意时长、linear 或 `transition-all`。
@@ -332,7 +332,7 @@ Plans:
 
 Plans:
 - [x] 18-01 motion tokens, reduced-motion contract, pre-paint theme bootstrap and shared primitives
-- [ ] 18-02 dismissable sidebar/settings/search/chat/evidence panels with topmost outside-click and focus restoration
+- [x] 18-02 dismissable sidebar/settings/search/chat/evidence panels with topmost outside-click and focus restoration
 - [ ] 18-03 analysis progress/list/card transitions plus desktop/mobile Playwright motion qualification
 
 **Scope note:** Phase 18 是独立的前端体验阶段，不属于 v0.8 candidate RAG 的生产切换，不新增后端、API、动画运行时依赖、滚动劫持或持续装饰动画。

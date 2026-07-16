@@ -46,7 +46,7 @@ Last activity: 2026-07-16
 - Phase 15: 3/3 plans planned; after Phase 14 verified
 - Phase 16: 3/3 plans planned; after Phase 15 verified
 - Phase 17: 3/3 plans planned; after Phases 12–16 verified; candidate-only verdict
-- Phase 18: 18-01 SUMMARY done (feat `f6280cf`); 18-02/18-03 pending
+- Phase 18: 18-01 (`f6280cf`) + 18-02 (`2035b54`) SUMMARY done; 18-03 pending
 
 ## Auto Routing
 
@@ -189,7 +189,7 @@ REQ-AUTO-01..11 已交付（含 06-08 QualityRun 持久化、06-09 BaselineCandi
 ## Next Action
 
 1. Finish Phase 13-02 Task 3 from existing WIP; write 13-02-SUMMARY; execute 13-03; write 13-VERIFICATION.
-2. Parallel: Phase 18-01 done; continue 18-02 → 18-03 with motion qualification.
+2. Parallel: Phase 18-01/02 done; finish 18-03 Playwright motion qualification.
 3. After Phase 13 verified: execute Phase 14-01..14-04 then verify.
 4. Then Phase 15 → 16 → 17 in order; never promote narrative-memory candidates.
 
