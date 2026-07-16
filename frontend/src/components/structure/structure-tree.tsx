@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   BookMarked,
   ChevronRight,
@@ -44,7 +44,7 @@ function TreeRow({
   defaultOpen: boolean;
 }) {
   const hasChildren = node.children.length > 0;
-  const [open, setOpen] = useState(defaultOpen || depth < 2);
+  const [open, setOpen] = useState(defaultOpen);
   const selected = selectedId === node.id;
 
   return (
@@ -53,7 +53,8 @@ function TreeRow({
         className={cn(
           "group flex items-center gap-0.5 rounded-lg pr-1",
           "motion-transition-feedback",
-          selected && "bg-foreground/5 shadow-[inset_2px_0_0_0_hsl(var(--foreground)/0.35)]"
+          selected &&
+            "bg-foreground/5 shadow-[inset_2px_0_0_0_hsl(var(--foreground)/0.35)]"
         )}
         style={{ paddingLeft: Math.min(depth, 6) * 12 }}
       >
@@ -96,10 +97,6 @@ function TreeRow({
         </button>
       </div>
 
-      {/*
-        Height slide via grid-template-rows (0fr ↔ 1fr) — children stay mounted
-        so expand/collapse animates instead of abrupt list length jumps.
-      */}
       {hasChildren && (
         <div
           data-testid={`tree-branch-${node.id}`}
@@ -125,7 +122,12 @@ function TreeRow({
                   depth={depth + 1}
                   selectedId={selectedId}
                   onSelect={onSelect}
-                  defaultOpen={depth < 1}
+                  // Deep/large lists stay collapsed by default; parent scroll shows the rest.
+                  defaultOpen={
+                    child.children.length > 0 &&
+                    child.children.length <= 24 &&
+                    depth < 1
+                  }
                 />
               ))}
             </ul>
@@ -144,6 +146,7 @@ export function StructureTree({
   className,
 }: Props) {
   const empty = forest.length === 0;
+  const scrollRef = useRef<HTMLUListElement>(null);
   const sourceHint = useMemo(
     () =>
       structureSource === "narrative_memory"
@@ -152,9 +155,26 @@ export function StructureTree({
     [structureSource]
   );
 
+  // Keep the selected row in the vertical scroll viewport (not page scroll).
+  useEffect(() => {
+    if (!selectedId || !scrollRef.current) return;
+    const safe =
+      typeof CSS !== "undefined" && typeof CSS.escape === "function"
+        ? CSS.escape(selectedId)
+        : selectedId.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+    const el = scrollRef.current.querySelector(
+      `[data-structure-node-id="${safe}"]`
+    );
+    if (el instanceof HTMLElement && typeof el.scrollIntoView === "function") {
+      el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+  }, [selectedId]);
+
   return (
-    <div className={cn("flex min-h-0 flex-col", className)}>
-      <div className="mb-2 flex items-center justify-between gap-2 px-1">
+    <div
+      className={cn("flex min-h-0 flex-1 flex-col overflow-hidden", className)}
+    >
+      <div className="mb-2 flex shrink-0 items-center justify-between gap-2 px-1">
         <p className="text-xs font-medium text-muted-foreground">{sourceHint}</p>
         {structureSource === "narrative_memory" && (
           <span className="rounded-full border border-violet-300/70 bg-violet-50 px-2 py-0.5 text-[10px] text-violet-950">
@@ -168,9 +188,16 @@ export function StructureTree({
         </p>
       ) : (
         <ul
+          ref={scrollRef}
           role="tree"
           aria-label="结构树"
-          className="m-0 min-h-0 flex-1 list-none space-y-0.5 overflow-y-auto overflow-x-hidden p-0"
+          data-testid="structure-tree-scroll"
+          className={cn(
+            "m-0 min-h-0 flex-1 list-none space-y-0.5 p-0",
+            // Vertical scrollbar for long novels (e.g. 500 chapters) — viewport is fixed by shell.
+            "overflow-y-auto overflow-x-hidden overscroll-contain",
+            "[scrollbar-gutter:stable]"
+          )}
         >
           {forest.map((node) => (
             <TreeRow
@@ -179,14 +206,15 @@ export function StructureTree({
               depth={0}
               selectedId={selectedId}
               onSelect={onSelect}
+              // Root open so chapters appear; list scrolls inside fixed rail viewport.
               defaultOpen
             />
           ))}
         </ul>
       )}
       {!empty && structureSource === "chapters" && (
-        <p className="mt-2 px-1 text-[10px] leading-relaxed text-muted-foreground">
-          L3/L4 层（故事弧 / 全书叙事）需叙事记忆候选；当前仅章节坐标。
+        <p className="mt-2 shrink-0 px-1 text-[10px] leading-relaxed text-muted-foreground">
+          长列表在上方区域内上下滚动；L3/L4 需叙事记忆候选。
         </p>
       )}
       {!empty && (

@@ -433,6 +433,32 @@ describe("StructureWorkspaceShell selection scope", () => {
     expect(branch).toHaveAttribute("data-open", "true");
   });
 
+  it("long chapter lists scroll inside a fixed-height rail (not page-length tree)", () => {
+    const forest = buildChapterFallbackTree(120);
+    render(
+      <StructureWorkspaceShell
+        structureSource="chapters"
+        forest={forest}
+        selected={treeNodeToSelection(forest[0])}
+        onSelect={vi.fn()}
+      >
+        <div data-testid="facet-body">facets</div>
+      </StructureWorkspaceShell>
+    );
+
+    const scroll = screen.getByTestId("structure-tree-scroll");
+    expect(scroll.className).toMatch(/overflow-y-auto/);
+    // Many chapter nodes render, but they live in the scrollport
+    expect(
+      scroll.querySelectorAll("[data-structure-node-id^='chapter:']").length
+    ).toBe(120);
+
+    const panel = screen.getByTestId("structure-rail-panel");
+    // Fixed viewport classes — must not grow unbounded with content
+    expect(panel.className).toMatch(/max-h-\[min\(70vh,36rem\)\]/);
+    expect(panel.className).toMatch(/overflow-hidden/);
+  });
+
   it("shows candidate preview badge when NM source", () => {
     const forest = buildNmStructureTree([
       {
