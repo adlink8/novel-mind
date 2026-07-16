@@ -91,36 +91,36 @@
 | V08-AUDIT-02 | 报告将现有资产明确分类为 reusable_exact、rebuild_required、blocked 或 optional_unavailable | P0 | VERIFIED |
 | V08-AUDIT-03 | Phase 07 层级资产无效时必须在任何 provider 调用前阻断构建 | P0 | VERIFIED |
 | V08-AUDIT-04 | 资格审计不得调用模型、修复数据或写入任何 active pointer | P0 | VERIFIED |
-| V08-MEM-01 | Chapter State、连续 Story Arc/Volume 与 Global Story Model 使用独立 immutable candidate version | P0 | PLANNED |
-| V08-MEM-02 | 上层状态与主张使用严格类型 schema；自由文本不得充当事实权威 | P0 | PLANNED |
-| V08-MEM-03 | 每条上层主张都必须解析到同一 source snapshot 的 leaf evidence | P0 | PLANNED |
-| V08-MEM-04 | 节点、边、来源链接与 manifest 均保存 owner、novel、version、checksum 与 model lineage | P0 | PLANNED |
-| V08-MEM-05 | v0.8 不创建或切换生产 active pointer | P0 | PLANNED |
-| V08-BUILD-01 | 候选构建严格按 Chapter State → Story Arc/Volume → Global Story Model 自底向上执行 | P0 | PLANNED |
-| V08-BUILD-02 | 构建支持预算、checkpoint、取消、恢复与 exact-cache reuse | P0 | PLANNED |
-| V08-BUILD-03 | 章节失败只阻断受影响 arc/global，不触发整本无条件重启 | P0 | PLANNED |
-| V08-BUILD-04 | 时间线、人物关系和线索只作为可追溯的可选增强信号 | P1 | PLANNED |
-| V08-BUILD-05 | Reader Chat 永远不得作为层级记忆事实来源 | P0 | PLANNED |
-| V08-RETR-01 | 检索可根据问题选择 local、arc、global 或 mixed 起始层 | P0 | PLANNED |
-| V08-RETR-02 | 检索支持逐层下钻并在上层不可用时回退 leaf/raw evidence | P0 | PLANNED |
-| V08-RETR-03 | 最终引用只允许使用重新校验过 offset/hash 的原文证据 | P0 | PLANNED |
-| V08-RETR-04 | owner、novel、version 与 spoiler 边界必须在每个检索步骤生效 | P0 | PLANNED |
-| V08-RETR-05 | 路由过程可审计且不得通过路由元数据泄露未来内容 | P0 | PLANNED |
-| V08-REUSE-01 | 系统通过依赖图计算变更后的 dirty closure | P0 | PLANNED |
-| V08-REUSE-02 | 未变化节点以 checksum-identical 方式 carry forward | P0 | PLANNED |
-| V08-REUSE-03 | arc 边界不确定时保守扩大重建范围 | P1 | PLANNED |
-| V08-REUSE-04 | 重用报告量化避免的调用、token 与成本 | P1 | PLANNED |
-| V08-QUAL-01 | 单书冻结题集覆盖 local、跨章节、global、no-answer 与 spoiler 场景 | P0 | PLANNED |
-| V08-QUAL-02 | 候选与 leaf baseline 在同一 source、cutoff 与预算下比较 | P0 | PLANNED |
-| V08-QUAL-03 | lineage、owner、snapshot、spoiler 或 pointer 任一违规都必须阻断资格 | P0 | PLANNED |
-| V08-QUAL-04 | 报告覆盖质量、faithfulness、延迟、成本、reuse 与 fallback 指标 | P0 | PLANNED |
-| V08-QUAL-05 | 最终结论仅允许 qualified_candidate 或 blocked，且不得执行 promotion | P0 | PLANNED |
-| UI-MOTION-01 | 全站交互动效使用统一的 150/200/300ms token、方向 easing 与 reduced-motion 规则 | P1 | PLANNED |
-| UI-MOTION-02 | Sidebar、设置、搜索、Chat 与证据浮层具有一致的打开、关闭、outside-click、Escape 与焦点返回语义 | P1 | PLANNED |
-| UI-MOTION-03 | 页面内容、分析进度、列表和卡片状态过渡不得引起布局跳动或重复播放 | P1 | PLANNED |
-| UI-MOTION-04 | Light、dark 与 custom 主题在首帧前恢复，切换无 hydration 闪烁或正文尺寸变化 | P1 | PLANNED |
-| UI-MOTION-05 | 动效不改变 API、数据、导航、阅读、分析或权限行为，且不新增动画运行时依赖 | P0 | PLANNED |
-| UI-MOTION-06 | 桌面与 390px 触摸视口自动验证键盘、触摸、reduced-motion、无遮挡和无水平滚动 | P1 | PLANNED |
+| V08-MEM-01 | Chapter State、连续 Story Arc/Volume 与 Global Story Model 使用独立 immutable candidate version | P0 | VERIFIED |
+| V08-MEM-02 | 上层状态与主张使用严格类型 schema；自由文本不得充当事实权威 | P0 | VERIFIED |
+| V08-MEM-03 | 每条上层主张都必须解析到同一 source snapshot 的 leaf evidence | P0 | VERIFIED |
+| V08-MEM-04 | 节点、边、来源链接与 manifest 均保存 owner、novel、version、checksum 与 model lineage | P0 | VERIFIED |
+| V08-MEM-05 | v0.8 不创建或切换生产 active pointer | P0 | VERIFIED |
+| V08-BUILD-01 | 候选构建严格按 Chapter State → Story Arc/Volume → Global Story Model 自底向上执行 | P0 | VERIFIED |
+| V08-BUILD-02 | 构建支持预算、checkpoint、取消、恢复与 exact-cache reuse | P0 | VERIFIED |
+| V08-BUILD-03 | 章节失败只阻断受影响 arc/global，不触发整本无条件重启 | P0 | VERIFIED |
+| V08-BUILD-04 | 时间线、人物关系和线索只作为可追溯的可选增强信号 | P1 | VERIFIED |
+| V08-BUILD-05 | Reader Chat 永远不得作为层级记忆事实来源 | P0 | VERIFIED |
+| V08-RETR-01 | 检索可根据问题选择 local、arc、global 或 mixed 起始层 | P0 | VERIFIED |
+| V08-RETR-02 | 检索支持逐层下钻并在上层不可用时回退 leaf/raw evidence | P0 | VERIFIED |
+| V08-RETR-03 | 最终引用只允许使用重新校验过 offset/hash 的原文证据 | P0 | VERIFIED |
+| V08-RETR-04 | owner、novel、version 与 spoiler 边界必须在每个检索步骤生效 | P0 | VERIFIED |
+| V08-RETR-05 | 路由过程可审计且不得通过路由元数据泄露未来内容 | P0 | VERIFIED |
+| V08-REUSE-01 | 系统通过依赖图计算变更后的 dirty closure | P0 | VERIFIED |
+| V08-REUSE-02 | 未变化节点以 checksum-identical 方式 carry forward | P0 | VERIFIED |
+| V08-REUSE-03 | arc 边界不确定时保守扩大重建范围 | P1 | VERIFIED |
+| V08-REUSE-04 | 重用报告量化避免的调用、token 与成本 | P1 | VERIFIED |
+| V08-QUAL-01 | 单书冻结题集覆盖 local、跨章节、global、no-answer 与 spoiler 场景 | P0 | VERIFIED |
+| V08-QUAL-02 | 候选与 leaf baseline 在同一 source、cutoff 与预算下比较 | P0 | VERIFIED |
+| V08-QUAL-03 | lineage、owner、snapshot、spoiler 或 pointer 任一违规都必须阻断资格 | P0 | VERIFIED |
+| V08-QUAL-04 | 报告覆盖质量、faithfulness、延迟、成本、reuse 与 fallback 指标 | P0 | VERIFIED |
+| V08-QUAL-05 | 最终结论仅允许 qualified_candidate 或 blocked，且不得执行 promotion | P0 | VERIFIED |
+| UI-MOTION-01 | 全站交互动效使用统一的 150/200/300ms token、方向 easing 与 reduced-motion 规则 | P1 | VERIFIED |
+| UI-MOTION-02 | Sidebar、设置、搜索、Chat 与证据浮层具有一致的打开、关闭、outside-click、Escape 与焦点返回语义 | P1 | VERIFIED |
+| UI-MOTION-03 | 页面内容、分析进度、列表和卡片状态过渡不得引起布局跳动或重复播放 | P1 | VERIFIED |
+| UI-MOTION-04 | Light、dark 与 custom 主题在首帧前恢复，切换无 hydration 闪烁或正文尺寸变化 | P1 | VERIFIED |
+| UI-MOTION-05 | 动效不改变 API、数据、导航、阅读、分析或权限行为，且不新增动画运行时依赖 | P0 | VERIFIED |
+| UI-MOTION-06 | 桌面与 390px 触摸视口自动验证键盘、触摸、reduced-motion、无遮挡和无水平滚动 | P1 | VERIFIED |
 
 ## v0.8 Scope Boundaries
 
@@ -147,20 +147,22 @@
 | REQ-CHUNK-01..03,07,08 | 07-01..03,07-06 completed | `07-VERIFICATION.md`; `backend/app/services/chunking/*`; 88 related tests |
 | REQ-CHUNK-04..06 | 07-04..05 + PG wiring | `chunk_builds` / `chunk_hierarchy_nodes` / active pointer; `indexing_service` + `hybrid_search` hooks; `test_pg_hierarchy_wiring.py` |
 | REQ-TIME-01..10 | 08 implemented; qualification passed | `.planning/phases/08-versioned-novel-analysis-orchestration-and-interactive-timel/08-QUALIFICATION.md` |
-| V08-AUDIT-01..04 | Phase 12 | read-only eligibility report；provider/pointer negative tests |
-| V08-MEM-01..05 | Phase 13 | strict candidate contracts；lineage and no-pointer invariants |
-| V08-BUILD-01..05 | Phase 14 | bottom-up builder；checkpoint/cache/failure-scope tests |
-| V08-RETR-01..05 | Phase 15 | routing/down-drill；raw citation and spoiler adversarial tests |
-| V08-REUSE-01..04 | Phase 16 | dependency dirty closure；checksum carry-forward report |
-| V08-QUAL-01..05 | Phase 17 | frozen single-book comparative qualification；candidate-only verdict |
-| UI-MOTION-01..06 | Phase 18 | motion tokens；dismissable surfaces；theme boot；responsive accessibility qualification |
+| V08-AUDIT-01..04 | Phase 12 | `12-VERIFICATION.md` passed；read-only eligibility；provider/pointer negative tests |
+| V08-MEM-01..05 | Phase 13 | `13-VERIFICATION.md` passed；strict candidate contracts；lineage and no-pointer invariants |
+| V08-BUILD-01..05 | Phase 14 | `14-VERIFICATION.md` passed；bottom-up builder；checkpoint/cache/failure-scope tests |
+| V08-RETR-01..05 | Phase 15 | `15-VERIFICATION.md` passed；routing/down-drill；raw citation and spoiler adversarial tests |
+| V08-REUSE-01..04 | Phase 16 | `16-VERIFICATION.md` passed；dependency dirty closure；checksum carry-forward report |
+| V08-QUAL-01..05 | Phase 17 | `17-VERIFICATION.md` passed；frozen single-book comparative qualification；candidate-only verdict |
+| UI-MOTION-01..06 | Phase 18 | `18-VERIFICATION.md` passed；motion tokens；dismissable surfaces；theme boot；responsive accessibility |
 
 ## Current Evidence
 
+- **v0.8 audit:** `.planning/v0.8-MILESTONE-AUDIT.md` — verdict `achieved_candidate_scope` (2026-07-16).
+- Phase 12–17 narrative-memory chain VERIFIED candidate-only; Alembic head `17memqual01`.
+- Phase 18 frontend motion VERIFIED (independent UX track).
 - Phase 06 quality durable jobs + baseline prepare/commit + cross-chunker reports delivered.
 - Phase 07 chunking pipeline packages under `backend/app/services/chunking/` with SUMMARYs 07-01..07-06.
 - Related automated suite: **88 passed** (`unit/integration chunking` + adversarial + legacy `test_chunking`).
-- Alembic head includes quality run/baseline tables (`08baselinecand01`).
 - Import progress is persisted through `ImportJob`; lease control, retry, cancellation and restart recovery are verified.
 - Phase 04 knowledge graph fixture eval has 20 labeled fiction/history examples and deterministic offline tests.
 - Phase 07 residual: promote hierarchy/build stores from in-memory contracts to PostgreSQL + production retrieval wiring.

@@ -3,16 +3,16 @@ gsd_state_version: 1.0
 milestone: v0.8
 milestone_name: 分层叙事记忆与层级 RAG
 status: idle
-last_updated: 2026-07-16T20:00:00.000Z
+last_updated: 2026-07-16T21:30:00.000Z
 last_activity: 2026-07-16
 progress:
   total_phases: 17
-  completed_phases: 15
+  completed_phases: 16
   total_plans: 74
-  completed_plans: 73
-  percent: 92
+  completed_plans: 74
+  percent: 100
 stopped_at: null
-authorized_scope: phases 13-18 (user 2026-07-16: 查看13-18阶段任务 编排GSD子代理执行)
+authorized_scope: phases 13-18 complete; milestone audit achieved_candidate_scope
 ---
 
 # Project State
@@ -26,9 +26,9 @@ See `.planning/PROJECT.md` and `IMPLEMENTATION-STATUS.md`.
 
 ## Current Position
 
-Phase: 17 (Frozen Single-book Qualification and Candidate Verdict)
-Plan: 3 of 3
-Status: COMPLETE — 17-VERIFICATION `status: passed`; v0.8 serial RAG chain plans complete
+Phase: v0.8 milestone audit complete
+Plan: n/a
+Status: IDLE — Phase 12–18 verified; audit verdict `achieved_candidate_scope` (`.planning/v0.8-MILESTONE-AUDIT.md`)
 Last activity: 2026-07-16
 
 ## Authorization (2026-07-16)
@@ -50,9 +50,10 @@ Last activity: 2026-07-16
 
 ## Auto Routing
 
-Wave A Phase 13–17: **done**. Phase 18 complete in parallel.
-v0.8 serial RAG chain (12–17) verified candidate-only; no narrative-memory promotion/pointer cutover.
-Phase 17 emits `qualified_candidate|blocked` only (never promote).
+v0.8 Phase 12–18 **done** + milestone audit written.
+Next optional: product sign-off → `gsd-complete-milestone`; or hard-budget live single-book dry-run.
+Never enable narrative-memory promotion / Reader Chat cutover without a new milestone.
+Live DB upgraded to Alembic `17memqual01` (2026-07-16).
 
 ## Phase 11 Execution Metrics
 

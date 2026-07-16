@@ -6,7 +6,7 @@
 - [x] v0.2 安全与架构修复 - 关闭安全、迁移、路由、依赖和导入可靠性阻断项。
 - [ ] v0.3 小说导入 + RAG 索引 - 导入/索引/搜索已交付，RAG 评测质量闭环仍有缺口。
 - [x] v0.5 自动质量与 CI 门禁 - 以全栈自动化和双模型仲裁替代人工 RAG 质量确认；REQ-AUTO-11 closed（06-08/06-09）。
-- [ ] v0.8 分层叙事记忆与层级 RAG - 复用现有证据资产，以 candidate-only 单书 dry-run 验证上层叙事记忆、局部重建和 evidence-final 分层检索。
+- [x] v0.8 分层叙事记忆与层级 RAG - 复用现有证据资产，以 candidate-only 单书 dry-run 验证上层叙事记忆、局部重建和 evidence-final 分层检索（见 `.planning/v0.8-MILESTONE-AUDIT.md`）。
 
 第一个 active milestone 已按要求设为并完成"审计与启动修复"。v0.3 经 2006-06-13 复审后恢复为 active，详见 `.planning/v0.3-MILESTONE-AUDIT.md`。
 
@@ -50,8 +50,9 @@
 
 ## Auto Start
 
-**2026-07-16 已授权执行 Phase 13–18**（用户：查看13-18阶段任务 编排GSD子代理执行）。详见 `.planning/HANDOFF.json`。
-执行顺序：Phase 13 收尾并验证 → 14 → 15 → 16 → 17；**Phase 18 可并行**。Phase 14 的 provider 调用仍必须使用 Phase 12 的 `provider_calls_allowed` 门禁。
+**v0.8 Phase 12–18 已完成并审计**（`.planning/v0.8-MILESTONE-AUDIT.md`，verdict: `achieved_candidate_scope`）。
+下一动作可选：产品负责人确认后 `gsd-complete-milestone` 归档；或受控 live-provider 单书 dry-run（需 hard-budget）。
+**禁止**在没有新里程碑的情况下做 narrative-memory promotion / Reader Chat cutover。
 Phase 06–11 历史实现与验证状态保持不变；Phase 10 real Playwright residual 和 v0.3 质量缺口不因 v0.8 单书 dry-run 自动关闭。
 
 ## Backlog
@@ -263,8 +264,8 @@ Plans:
 **Goal:** 在不替换现有 Reader Chat 的前提下，提供可审计、全程防剧透的离线分层检索实验，使 local/arc/global/mixed 查询能够下钻并最终只引用重验后的叶子原文。
 **Requirements:** V08-RETR-01, V08-RETR-02, V08-RETR-03, V08-RETR-04, V08-RETR-05
 **Depends on:** Phase 14
-**Status:** PLANNED — 3/3 plans created; Phase 14 verification passed; authorized under 13–18 scope; not started
-**Plans:** 3/3 plans created
+**Status:** COMPLETE — 3/3 plans; independent verification passed (2026-07-16); 59 targeted tests
+**Plans:** 3/3 plans complete
 
 **Success Criteria:**
 1. 冻结问题进入实验入口后，确定性 router 会记录 local、arc、global 或 mixed 起始层和 reason；不同层候选确实改变检索路径，而不是仅把上层摘要附加到 leaf top-k。
