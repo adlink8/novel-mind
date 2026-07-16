@@ -49,16 +49,35 @@ function resolveTimelineSource(
   runStatus: string | null | undefined
 ): TimelineVersionSource {
   const live = Boolean(runStatus && ACTIVE_RUN.has(runStatus));
+  const hasActive = Boolean(data.active?.events?.length);
+  const hasCandidate = Boolean(data.running_candidate?.events?.length);
+  // Live run always prefers the growing candidate.
   if (live && data.running_candidate) {
     return "running_candidate";
   }
-  if (!live && data.active) {
-    return "active";
+  // Prefer preferred only when it actually has events.
+  if (preferred === "active" && hasActive) return "active";
+  if (preferred === "running_candidate" && data.running_candidate) {
+    return "running_candidate";
   }
-  if (data[preferred]) return preferred;
-  if (data.active) return "active";
+  // Cancelled/failed runs often leave a rich candidate with no active pointer.
+  if (hasCandidate && !hasActive) return "running_candidate";
+  if (hasActive) return "active";
   if (data.running_candidate) return "running_candidate";
+  if (data.active) return "active";
   return preferred;
+}
+
+function pickTimelineView(
+  envelope: TimelineEnvelope,
+  source: TimelineVersionSource
+) {
+  return (
+    envelope[source] ??
+    envelope.active ??
+    envelope.running_candidate ??
+    null
+  );
 }
 
 function AnalysisWorkspace() {
@@ -249,9 +268,15 @@ function AnalysisWorkspace() {
           envelopeSigRef.current = "";
           await loadTimeline(id, undefined, false);
         } else if (st === "cancelled") {
-          setPrepNote("上次分析已暂停，可点「继续分析」续跑。");
+          setSource("running_candidate");
+          sourceRef.current = "running_candidate";
+          setPrepNote(
+            "上次分析已暂停。若有「候选结果」页签可先浏览已抽取事件；点「继续分析」可续跑。人物关系与线索需时间线完成后自动生成。"
+          );
         } else if (st === "paused_dependency" || st === "paused_budget" || st === "failed") {
-          setPrepNote("上次分析中断，可点「继续分析」重试。");
+          setSource("running_candidate");
+          sourceRef.current = "running_candidate";
+          setPrepNote("上次分析中断，可点「继续分析」重试。关系/线索依赖已完成的时间线版本。");
           if (statusResponse.data.status_reason) {
             setError(statusResponse.data.status_reason);
           }
@@ -368,7 +393,7 @@ function AnalysisWorkspace() {
   }
 
   const selectedNovel = novels.find((novel) => String(novel.id) === novelId);
-  const view = envelope[source];
+  const view = pickTimelineView(envelope, source);
   const people = useMemo(
     () =>
       Array.from(
@@ -572,7 +597,13 @@ function AnalysisWorkspace() {
                       }`}
                     >
                       <RefreshCw className="mr-1 inline size-3" />
-                      正在生成 · v{envelope.running_candidate.version_id}
+                      {ACTIVE_RUN.has(run?.status ?? "")
+                        ? "正在生成"
+                        : "候选结果"}{" "}
+                      · v{envelope.running_candidate.version_id}
+                      {envelope.running_candidate.events?.length
+                        ? ` · ${envelope.running_candidate.events.length} 事件`
+                        : ""}
                     </button>
                   )}
                 </div>
@@ -586,18 +617,38 @@ function AnalysisWorkspace() {
             <p className="rounded-xl border border-sky-300/70 bg-sky-50 px-3 py-2 text-xs text-sky-950">
               分析进行中：进度 {Number(run.progress?.completed_chapters ?? 0)}/
               {Number(run.progress?.total_chapters ?? 0) || "?"} 章；时间线图/列表展示
-              <strong> 正在生成 </strong>
+              <strong> 候选 </strong>
               版本中已落库的全部事件（不受阅读进度截断）。当前可见{" "}
               {view?.events.length ?? 0} 条。
             </p>
           )}
           {workspace !== "clues" &&
+            run &&
+            (run.status === "cancelled" || run.status === "failed") &&
+            Boolean(envelope.running_candidate?.events?.length) && (
+            <p className="rounded-xl border border-sky-300/70 bg-sky-50 px-3 py-2 text-xs text-sky-950">
+              已暂停/中断，但仍有{" "}
+              <strong>{envelope.running_candidate?.events.length ?? 0}</strong>{" "}
+              条候选时间线事件可浏览。点「继续分析」可续跑；
+              <strong>人物关系</strong>与<strong>线索</strong>
+              要在时间线<strong>完成并发布</strong>后才会自动生成。
+            </p>
+          )}
+          {workspace === "relationships" &&
+            !(view?.events?.length) &&
+            !(envelope.active || envelope.running_candidate) && (
+            <p className="rounded-xl border border-amber-300/70 bg-amber-50 px-3 py-2 text-xs text-amber-950">
+              人物关系依赖时间线版本。请先在「时间线」完成分析；完成后系统会自动抽取关系观察。
+            </p>
+          )}
+          {workspace !== "clues" &&
             !ACTIVE_RUN.has(run?.status ?? "") &&
+            source === "active" &&
             !fullBook &&
             !selectedNovel?.reading_progress?.timeline_full_book && (
             <p className="rounded-xl border border-amber-300/70 bg-amber-50 px-3 py-2 text-xs text-amber-950">
               防剧透：未勾选「显示全书」时，已发布版本只显示到阅读进度章节（无进度则仅第一章）。
-              后台可能已分析更多章；勾选「显示全书」可看全部。
+              后台可能已分析更多章；勾选「显示全书」可看全部。候选结果页签不受阅读进度截断。
             </p>
           )}
           {workspace !== "clues" && prepNote && (

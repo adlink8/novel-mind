@@ -197,7 +197,9 @@ async def run_clue_worker(run_id: int, *, runtime: ClueWorkerRuntime) -> None:
         await _finish_run(runtime.sessions, run_id, "paused_budget", str(exc)[:160])
         return
     except Exception as exc:
-        await _finish_run(runtime.sessions, run_id, "failed", type(exc).__name__[:160])
+        # Keep type + message so operators see e.g. ClueEvidenceScopeError: hierarchy...
+        detail = f"{type(exc).__name__}: {exc}"[:160]
+        await _finish_run(runtime.sessions, run_id, "failed", detail)
         raise
 
 

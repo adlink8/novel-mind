@@ -271,12 +271,23 @@ export function RelationshipWorkspace(props: Props) {
         !loading && (
           <div className="grid min-h-64 place-items-center rounded-3xl border border-dashed p-8 text-center text-muted-foreground">
             <p className="text-sm">暂无人物关系数据。</p>
-            <p className="mt-2 text-xs">
-              关系图来自已接受的观察；完成时间线/关系抽取后可见。
+            <p className="mt-2 max-w-md text-xs leading-5">
+              关系观察在<strong>时间线完成并发布</strong>
+              后自动抽取。当前若时间线仅有「候选结果」或任务已暂停，请先回到时间线点
+              「继续分析」跑完；完成后会自动入队关系任务。
             </p>
           </div>
         )
       )}
+      {envelope &&
+        !loading &&
+        envelope.counts.nodes === 0 &&
+        envelope.counts.edges === 0 && (
+          <p className="rounded-xl border border-amber-300/70 bg-amber-50 px-3 py-2 text-xs text-amber-950">
+            已绑定版本 v{envelope.version_id}，但尚无已接受的关系观察（0 人 / 0
+            边）。通常表示关系抽取尚未成功完成。
+          </p>
+        )}
 
       <RelationshipEvidencePanel
         novelId={props.novelId}

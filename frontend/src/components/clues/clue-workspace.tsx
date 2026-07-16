@@ -45,7 +45,7 @@ const RUN_LABELS: Record<string, string> = {
   running: "正在分析线索",
   partial: "已有部分线索",
   paused_budget: "预算不足，已暂停",
-  paused_dependency: "依赖未就绪",
+  paused_dependency: "依赖未就绪（通常需先完成时间线）",
   cancelled: "已暂停",
   failed: "线索分析失败",
   completed: "线索分析完成",
