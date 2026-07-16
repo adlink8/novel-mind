@@ -122,6 +122,13 @@ class ClueWorkerRuntime:
 
 
 def production_runtime() -> ClueWorkerRuntime:
+    """Build production runtime with judge model frozen to the same deployment.
+
+    Budget/lineage used vertex while the judge previously fell back to
+    ``ai_router.route_task("extraction")`` → ``openai/gpt-4o-mini`` (no key),
+    producing ``provider_error:AuthenticationError`` and 0 clues. Wire the
+    judge to the selected provider/model explicitly (same pattern as reader_chat).
+    """
     from app.config import settings
 
     provider = (settings.chat_provider or "vertex_google").strip().lower()
@@ -134,6 +141,17 @@ def production_runtime() -> ClueWorkerRuntime:
     ) or not (settings.openai_api_key or "").strip()
     if use_vertex:
         model_id = (settings.vertex_model or "gemini-3.5-flash").strip()
+        for prefix in (
+            "vertex_google/",
+            "vertex_ai/",
+            "vertex/",
+            "gcp/",
+            "google/",
+        ):
+            if model_id.lower().startswith(prefix):
+                model_id = model_id[len(prefix) :]
+                break
+        model_id = model_id or "gemini-3.5-flash"
         deployment = ClueModelDeployment(
             "vertex_google",
             model_id,
@@ -141,17 +159,19 @@ def production_runtime() -> ClueWorkerRuntime:
             Decimal("0.10"),
             Decimal("0.40"),
         )
+        judge_model = f"vertex_google/{model_id}"
     else:
         model_id = "gpt-4o-mini-2024-07-18"
         deployment = ClueModelDeployment(
             "openai", model_id, model_id, Decimal("0.15"), Decimal("0.60")
         )
+        judge_model = f"openai/{model_id}"
     sessions = async_session_factory
     return ClueWorkerRuntime(
         sessions=sessions,
         call_repo=ClueCallRepository(sessions),
         deployment=deployment,
-        judge=ClueLLMJudgeService(),
+        judge=ClueLLMJudgeService(model_name=judge_model),
     )
 
 
@@ -531,22 +551,28 @@ async def _judge_and_persist(
                 "schema_hash": version.schema_hash,
             }
         )
+        # Clue packages carry multi-unit excerpts + system prompt; Vertex prompt
+        # tokens routinely exceed the old 12k headroom (observed ~16k on novel 91).
+        # Under-reservation makes BudgetGate.settle raise after a successful call,
+        # which the except path rewrites to outcome_unknown / paused_dependency.
+        reserve_input_tokens = 48_000
+        reserve_output_tokens = 2_000  # MAX_JUDGE_TOKENS is 1200
         handle = await runtime.call_repo.reserve_and_start(
             run_id=run.id,
             stage_key=stage_key,
             reservation_key=f"{stage_key}:primary",
             request_hash=request_hash,
             cache_key=cache_key,
-            input_tokens=12_000,
-            output_tokens=1_200,
+            input_tokens=reserve_input_tokens,
+            output_tokens=reserve_output_tokens,
             input_price_per_million=runtime.deployment.input_price_per_million,
             output_price_per_million=runtime.deployment.output_price_per_million,
         )
         # Mirror pure BudgetGate so in-process ceilings stay consistent.
         budget.reserve(
             f"{stage_key}:primary",
-            input_tokens=12_000,
-            output_tokens=1_200,
+            input_tokens=reserve_input_tokens,
+            output_tokens=reserve_output_tokens,
             input_price_per_million=runtime.deployment.input_price_per_million,
             output_price_per_million=runtime.deployment.output_price_per_million,
         )
