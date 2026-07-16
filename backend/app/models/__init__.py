@@ -137,6 +137,11 @@ from app.models.narrative_memory_builder import (
     NarrativeMemoryBuildRun,
     NarrativeMemoryBuildStage,
 )
+from app.models.narrative_memory_rebuild import (
+    NarrativeMemoryRebuildItem,
+    NarrativeMemoryRebuildPlan,
+    NarrativeMemoryReuseReport,
+)
 
 __all__ = [
     "Base",
@@ -228,4 +233,7 @@ __all__ = [
     "NarrativeMemoryBuildBudgetReservation",
     "NarrativeMemoryBuildModelCallAttempt",
     "NarrativeMemoryBuildReport",
+    "NarrativeMemoryRebuildPlan",
+    "NarrativeMemoryRebuildItem",
+    "NarrativeMemoryReuseReport",
 ]

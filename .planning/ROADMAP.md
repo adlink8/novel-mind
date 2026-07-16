@@ -45,7 +45,7 @@
 | Phase 7 语义/层级分块 | 6/6 | **Complete** (logic+tests+PG/indexing wiring) |
 | Phase 8 版本化小说分析与时间线 | 10/10 | **Complete** (35/35 must-haves verified) |
 | v0.7 / Phase 9-11 叙事关系、阅读问答与线索追踪 | Phase 09: 5/5; Phase 10: 5/5; Phase 11: 5/5 | **09 VERIFIED**; **10 PARTIAL** (real Playwright residual); **11 implement-complete** (adversarial residual closed) |
-| v0.8 / Phase 12-17 分层叙事记忆与层级 RAG | 13/19 plans (12–15 done) | **IN PROGRESS** — Phase 12–15 verified; Phase 16 next; candidate-only/no pointer cutover |
+| v0.8 / Phase 12-17 分层叙事记忆与层级 RAG | 16/19 plans (12–16 done) | **IN PROGRESS** — Phase 12–16 verified; Phase 17 next; candidate-only/no pointer cutover |
 | Phase 18 前端动效与过渡系统 | 3/3 | **COMPLETE** — 18-01..03 done; dual-viewport motion qualified |
 
 ## Auto Start
@@ -285,19 +285,19 @@ Plans:
 **Goal:** 以可验证的依赖图和变更 oracle 计算 candidate 的最小安全 dirty closure，在边界不确定时保守扩散，并量化未变资产复用带来的调用与成本节省。
 **Requirements:** V08-REUSE-01, V08-REUSE-02, V08-REUSE-03, V08-REUSE-04
 **Depends on:** Phase 15
-**Status:** PLANNED — 3/3 plans created; **unblocked** by Phase 15 verification; orchestration authorization for 13–18 remains active
-**Plans:** 3/3 plans created
+**Status:** COMPLETE — 16-VERIFICATION `status: passed`; Alembic `16memrebuild01`; 62 targeted tests
+**Plans:** 3/3 plans complete
 
 **Success Criteria:**
-1. 对 chapter edit、insert、delete、reorder 和 arc-boundary change fixture，系统可输出由 source/evidence → Chapter State → Arc/Volume → Global 构成的 dirty closure 及每个节点的失效原因。
-2. 未进入 dirty closure 的节点在新 candidate 中以 checksum-identical、lineage-valid 的方式 carry forward；验证证明它们不会产生 provider call、embedding 或重复索引写入。
-3. 当 arc 边界、跨章状态延续或 dependency lineage 无法证明稳定时，planner 会将重建范围扩大到受影响 arc/后缀和 Global，而不会保留可能 stale 的父节点。
-4. 重用报告同时给出 rebuilt/carried/stale counts、实际与避免的 calls/tokens/cost、dirty range 和 cache reuse；与 full rebuild upper bound 的口径可复核。
+1. 对 chapter edit、insert、delete、reorder 和 arc-boundary change fixture，系统可输出由 source/evidence → Chapter State → Arc/Volume → Global 构成的 dirty closure 及每个节点的失效原因。 VERIFIED
+2. 未进入 dirty closure 的节点在新 candidate 中以 checksum-identical、lineage-valid 的方式 carry forward；验证证明它们不会产生 provider call、embedding 或重复索引写入。 VERIFIED
+3. 当 arc 边界、跨章状态延续或 dependency lineage 无法证明稳定时，planner 会将重建范围扩大到受影响 arc/后缀和 Global，而不会保留可能 stale 的父节点。 VERIFIED
+4. 重用报告同时给出 rebuilt/carried/stale counts、实际与避免的 calls/tokens/cost、dirty range 和 cache reuse；与 full rebuild upper bound 的口径可复核。 VERIFIED
 
 Plans:
-- [ ] 16-01 dependency graph and change oracle: edit/insert/delete/reorder/boundary fixtures with deterministic dirty reasons
-- [ ] 16-02 checksum carry-forward and conservative propagation: no-change byte identity, stale-ref rejection and stage-only rebuild
-- [ ] 16-03 reuse economics report: avoided calls/tokens/cost, rebuild scope and PostgreSQL authority verification
+- [x] 16-01 dependency graph and change oracle: edit/insert/delete/reorder/boundary fixtures with deterministic dirty reasons
+- [x] 16-02 checksum carry-forward and conservative propagation: no-change byte identity, stale-ref rejection and stage-only rebuild
+- [x] 16-03 reuse economics report: avoided calls/tokens/cost, rebuild scope and PostgreSQL authority verification
 
 ### Phase 17: Frozen Single-book Qualification and Candidate Verdict
 
