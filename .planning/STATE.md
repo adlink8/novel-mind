@@ -1,9 +1,9 @@
 ---
 gsd_state_version: 1.0
-milestone: v0.8
-milestone_name: 分层叙事记忆与层级 RAG
+milestone: null
+milestone_name: null
 status: idle
-last_updated: 2026-07-16T21:30:00.000Z
+last_updated: 2026-07-16T23:00:00.000Z
 last_activity: 2026-07-16
 progress:
   total_phases: 17
@@ -12,7 +12,8 @@ progress:
   completed_plans: 74
   percent: 100
 stopped_at: null
-authorized_scope: phases 13-18 complete; milestone audit achieved_candidate_scope
+last_shipped_milestone: v0.8
+last_shipped_verdict: achieved_candidate_scope
 ---
 
 # Project State
@@ -26,9 +27,9 @@ See `.planning/PROJECT.md` and `IMPLEMENTATION-STATUS.md`.
 
 ## Current Position
 
-Phase: v0.8 milestone audit complete
+Phase: n/a (between milestones)
 Plan: n/a
-Status: IDLE — Phase 12–18 verified; audit verdict `achieved_candidate_scope` (`.planning/v0.8-MILESTONE-AUDIT.md`)
+Status: IDLE — v0.8 archived (candidate scope); see `.planning/milestones/v0.8-ROADMAP.md`
 Last activity: 2026-07-16
 
 ## Authorization (2026-07-16)
@@ -50,10 +51,21 @@ Last activity: 2026-07-16
 
 ## Auto Routing
 
-v0.8 Phase 12–18 **done** + milestone audit written.
-Next optional: product sign-off → `gsd-complete-milestone`; or hard-budget live single-book dry-run.
+v0.8 **archived** 2026-07-16 (`achieved_candidate_scope`).
+WIP inventory: `.planning/WIP-INVENTORY-2026-07-16.md` (dirty tree not auto-deleted).
+Next: `/gsd-new-milestone` or residual tracks (v0.3 eval / Phase 10 real e2e).
 Never enable narrative-memory promotion / Reader Chat cutover without a new milestone.
-Live DB upgraded to Alembic `17memqual01` (2026-07-16).
+
+## Deferred Items
+
+Items deferred at v0.8 close (acknowledged):
+
+| Category | Item | Status |
+|---|---|---|
+| residual | v0.3 RAG eval quality (100 confirmed / faithfulness / cost) | open |
+| residual | Phase 10 real Playwright reader-chat residual | open |
+| residual | Live-provider single-book qualification hard-budget run | optional operator |
+| ops | Working tree dirty WIP (~66 paths) | inventoried, not deleted |
 
 ## Phase 11 Execution Metrics
 

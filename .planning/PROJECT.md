@@ -4,32 +4,38 @@
 
 在可信、安全、可迁移的基础上构建 AI 小说理解与创作能力。功能数量不能替代权限、数据一致性和可重复验证。
 
-## Current Milestone: v0.8 分层叙事记忆与层级 RAG
+## Current Milestone
 
-**Goal:** 在不推倒现有分析资产的前提下，将 chapter → scene → evidence 扩展为可版本化、可回滚、可评测的分层叙事记忆，并验证自下而上构建与自上而下检索的纵向 MVP。
+**No active v0.8 work** — v0.8 已于 2026-07-16 以 **candidate scope** 收口归档。
 
-**Target features:**
-- 只读审计现有层级、时间线、人物关系和线索资产，按 lineage/checksum 判定复用资格。
-- 定义 Chapter State → Story Arc/Volume → Global Story Model 的证据约束数据契约。
-- 对单本小说执行不切 active pointer 的 dry-run backfill，并量化覆盖率、成本与失败范围。
-- 验证 coarse-to-fine 检索最终回落到原文 evidence 和 spoiler cutoff。
+下一里程碑未立项；可选：`/gsd-new-milestone`，或处理 v0.3 评测 / Phase 10 residual / WIP 分拣。
 
-## Active Requirements
+## Current State (shipped)
 
-- [ ] 现有合格 evidence/scene/chapter 资产无需重新调用模型即可被新层级复用。
-- [ ] 任何上层叙事结论都能沿父子关系追溯到 active source snapshot 中的原文证据。
-- [ ] 新层级以候选版本运行，未通过验证前不替换现有时间线、人物关系、线索或聊天读模型。
-- [ ] 单层失败可局部重建，不要求整本小说从头分析。
+- **v0.8 分层叙事记忆与层级 RAG（candidate-only）**：Phase 12–17 VERIFIED；Phase 18 动效 VERIFIED。  
+  审计：`.planning/v0.8-MILESTONE-AUDIT.md` → `achieved_candidate_scope`  
+  归档：`.planning/milestones/v0.8-ROADMAP.md`、`v0.8-REQUIREMENTS.md`  
+  Alembic head：`17memqual01`  
+- 不存在 narrative-memory production promotion / active pointer cutover。
+
+## Active Requirements (cross-milestone residuals)
+
+- [ ] v0.3 RAG 评测质量闭环（100 confirmed、有效非零指标、faithfulness/cost）。
+- [ ] Phase 10 real Playwright residual（reader-chat-real）。
+- [ ] （可选）live-provider 单书 qualification（需 hard-budget，非 CI 权威）。
 
 ## Current Reality
 
-v0.1-v0.2 已完成。v0.3 的导入、索引、混合搜索、前端搜索和评测基础设施已验证，但 RAG 评测质量闭环仍有验收缺口：数据库仅 10/100 题为 confirmed，现有运行的检索指标均为 0，faithfulness/cost 未实现。详细证据见 `IMPLEMENTATION-STATUS.md` 和 `.planning/v0.3-MILESTONE-AUDIT.md`。
+v0.1–v0.2 完成。v0.3 主检索链路完成但评测质量仍 PARTIAL。v0.5–v0.7 主产品能力已落地（09 VERIFIED；10 PARTIAL；11 implement-complete）。v0.8 candidate 链路与动效系统已交付并通过集成/单元复验。
 
 ## Milestone History
 
-- v0.1 审计与启动修复：完成，建立 VERIFIED / PARTIAL / MISSING 基线并修复启动级 API 契约。
-- v0.2 安全与架构修复：完成，关闭 2026-06-11 复审发现的 P0/P1 阻断项（3 个 Phase，全部 VERIFIED）。
-- v0.3 小说导入 + RAG 索引：PARTIAL，主检索链路完成，RAG 评测质量门槛待关闭。
+- v0.1 审计与启动修复：完成。
+- v0.2 安全与架构修复：完成。
+- v0.3 小说导入 + RAG 索引：PARTIAL，评测质量门槛待关闭。
+- v0.5 自动质量与 CI：完成。
+- v0.7 关系 / 阅读问答 / 线索：09 VERIFIED；10 PARTIAL；11 implement-complete。
+- **v0.8 分层叙事记忆与层级 RAG：SHIPPED candidate scope 2026-07-16。**
 
 ## Planning Sources
 
@@ -63,4 +69,4 @@ This document evolves at phase transitions and milestone boundaries.
 3. Update context with verified implementation facts.
 
 ---
-*Last updated: 2026-07-15 after starting milestone v0.8.*
+*Last updated: 2026-07-16 after archiving milestone v0.8 (candidate scope).*

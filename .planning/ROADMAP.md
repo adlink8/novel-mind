@@ -6,7 +6,7 @@
 - [x] v0.2 安全与架构修复 - 关闭安全、迁移、路由、依赖和导入可靠性阻断项。
 - [ ] v0.3 小说导入 + RAG 索引 - 导入/索引/搜索已交付，RAG 评测质量闭环仍有缺口。
 - [x] v0.5 自动质量与 CI 门禁 - 以全栈自动化和双模型仲裁替代人工 RAG 质量确认；REQ-AUTO-11 closed（06-08/06-09）。
-- [x] v0.8 分层叙事记忆与层级 RAG - 复用现有证据资产，以 candidate-only 单书 dry-run 验证上层叙事记忆、局部重建和 evidence-final 分层检索（见 `.planning/v0.8-MILESTONE-AUDIT.md`）。
+- [x] v0.8 分层叙事记忆与层级 RAG - **SHIPPED** candidate scope 2026-07-16 — 归档 [v0.8-ROADMAP](./milestones/v0.8-ROADMAP.md) / [audit](./v0.8-MILESTONE-AUDIT.md)
 
 第一个 active milestone 已按要求设为并完成"审计与启动修复"。v0.3 经 2006-06-13 复审后恢复为 active，详见 `.planning/v0.3-MILESTONE-AUDIT.md`。
 
@@ -50,10 +50,9 @@
 
 ## Auto Start
 
-**v0.8 Phase 12–18 已完成并审计**（`.planning/v0.8-MILESTONE-AUDIT.md`，verdict: `achieved_candidate_scope`）。
-下一动作可选：产品负责人确认后 `gsd-complete-milestone` 归档；或受控 live-provider 单书 dry-run（需 hard-budget）。
+**v0.8 已归档（2026-07-16）**。无自动执行 phase。  
+下一动作：`/gsd-new-milestone`，或处理 v0.3 评测 / Phase 10 residual / `.planning/WIP-INVENTORY-2026-07-16.md`。  
 **禁止**在没有新里程碑的情况下做 narrative-memory promotion / Reader Chat cutover。
-Phase 06–11 历史实现与验证状态保持不变；Phase 10 real Playwright residual 和 v0.3 质量缺口不因 v0.8 单书 dry-run 自动关闭。
 
 ## Backlog
 
