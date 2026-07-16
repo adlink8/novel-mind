@@ -249,9 +249,13 @@ export function RelationshipWorkspace(props: Props) {
 
       {loading && !envelope ? (
         <div
-          className="h-96 animate-pulse rounded-3xl bg-muted"
+          className="grid h-96 min-h-96 place-items-center rounded-3xl bg-muted motion-transition-content"
+          role="status"
+          aria-busy="true"
           aria-label="正在加载人物关系"
-        />
+        >
+          <p className="text-sm text-muted-foreground">正在加载人物关系…</p>
+        </div>
       ) : envelope ? (
         <RelationshipGraph
           nodes={envelope.nodes}

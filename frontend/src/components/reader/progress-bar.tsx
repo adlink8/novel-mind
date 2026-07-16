@@ -20,7 +20,7 @@ export function ProgressBar({
   const pct = Math.min(100, Math.max(0, Math.round(chapterPercent)));
 
   return (
-    <div className="absolute inset-x-0 bottom-0 z-30 border-t border-border/70 bg-card/90 backdrop-blur-xl">
+    <div className="z-30 shrink-0 border-t border-border/70 bg-card/90 backdrop-blur-xl">
       <div className="mx-auto max-w-3xl px-4 py-2.5">
         <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
           <span className="mr-4 flex-1 truncate">{chapterTitle}</span>
@@ -34,8 +34,13 @@ export function ProgressBar({
 
         <div className="h-1 overflow-hidden rounded-full bg-muted">
           <div
-            className="h-full bg-primary transition-all duration-150"
+            className="h-full bg-primary transition-[width] motion-duration-fast motion-ease-enter"
             style={{ width: `${pct}%` }}
+            role="progressbar"
+            aria-valuenow={pct}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label="本章阅读进度"
           />
         </div>
       </div>

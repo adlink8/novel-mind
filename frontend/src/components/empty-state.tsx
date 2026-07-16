@@ -36,7 +36,10 @@ export function EmptyState({
   onAction,
 }: EmptyStateProps) {
   return (
-    <div className="paper-surface flex flex-col items-center justify-center rounded-3xl border-dashed p-10 text-center sm:p-14">
+    <div
+      className="paper-surface flex flex-col items-center justify-center rounded-3xl border-dashed p-10 text-center motion-transition-content sm:p-14"
+      role="status"
+    >
       <div className="mb-5 grid size-14 place-items-center rounded-2xl bg-secondary text-primary">{icon}</div>
       <h3 className="font-serif text-xl font-semibold mb-2">{title}</h3>
       {description && (

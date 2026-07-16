@@ -75,8 +75,15 @@ export function ClueWorkspace(props: Props) {
   const detailRequestIdRef = useRef(0);
   const sourceRef = useRef(source);
   const runStatusRef = useRef<string | null>(null);
-  sourceRef.current = source;
-  runStatusRef.current = run?.status ?? null;
+  const currentRunStatus = run?.status ?? null;
+
+  useEffect(() => {
+    sourceRef.current = source;
+  }, [source]);
+
+  useEffect(() => {
+    runStatusRef.current = currentRunStatus;
+  }, [currentRunStatus]);
 
   const loadEnvelope = useCallback(async () => {
     if (!props.novelId) return;
@@ -141,7 +148,7 @@ export function ClueWorkspace(props: Props) {
 
   // Poll while clue run is live
   useEffect(() => {
-    if (!props.novelId || !run || !CLUE_ACTIVE_RUN.has(run.status)) return;
+    if (!props.novelId || !currentRunStatus || !CLUE_ACTIVE_RUN.has(currentRunStatus)) return;
     let cancelled = false;
     const tick = async () => {
       try {
@@ -160,7 +167,7 @@ export function ClueWorkspace(props: Props) {
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [props.novelId, run?.status, loadEnvelope]);
+  }, [props.novelId, currentRunStatus, loadEnvelope]);
 
   const view = envelope[source];
   const orderedClues = useMemo(
@@ -392,10 +399,14 @@ export function ClueWorkspace(props: Props) {
 
       {loading && !view ? (
         <div
-          className="h-64 animate-pulse rounded-3xl bg-muted"
+          className="grid h-64 min-h-64 place-items-center rounded-3xl bg-muted motion-transition-content"
+          role="status"
+          aria-busy="true"
           aria-label="正在加载线索"
           data-testid="clue-loading"
-        />
+        >
+          <p className="text-sm text-muted-foreground">正在加载线索…</p>
+        </div>
       ) : view ? (
         <ClueBand
           clues={orderedClues}

@@ -11,6 +11,7 @@ import { useSearchParams } from "next/navigation";
 import { BookOpen, RefreshCw } from "lucide-react";
 
 import { ClueWorkspace } from "@/components/clues/clue-workspace";
+import { clueApi } from "@/lib/clue-api";
 import { RelationshipWorkspace } from "@/components/relationships/relationship-workspace";
 import { TimelineChart } from "@/components/timeline/timeline-chart";
 import { TimelineControls } from "@/components/timeline/timeline-controls";
@@ -276,7 +277,11 @@ function AnalysisWorkspace() {
     setError("");
     setPrepNote("正在启动分析（准备场景层级并排队任务）…");
     try {
-      await timelineApi.startOrResume(novelId);
+      const [timelineStart, clueStart] = await Promise.allSettled([
+        timelineApi.startOrResume(novelId),
+        clueApi.startOrResume(novelId),
+      ]);
+      if (timelineStart.status === "rejected") throw timelineStart.reason;
       const statusResponse = await timelineApi.status(novelId);
       setRun(statusResponse.data);
       runStatusRef.current = statusResponse.data.status;
@@ -289,9 +294,13 @@ function AnalysisWorkspace() {
       }
       await loadTimeline(novelId, undefined, false);
       const st = statusResponse.data.status;
-      if (st === "completed") setPrepNote("时间线已就绪。");
+      if (st === "completed") setPrepNote("时间线已就绪；关系与线索任务已续跑。");
       else if (ACTIVE_RUN.has(st)) {
-        setPrepNote("分析进行中：图与列表按章实时更新，可随时暂停。");
+        setPrepNote(
+          clueStart.status === "fulfilled"
+            ? "时间线与线索已入队；人物关系将在时间线版本完成后自动开始。"
+            : "时间线已入队；线索任务暂未入队，可在「线索与伏笔」中重试。"
+        );
       } else {
         setPrepNote(statusResponse.data.status_reason || "任务已提交。");
       }
@@ -408,7 +417,7 @@ function AnalysisWorkspace() {
       </header>
 
       {!novelId ? (
-        <div className="grid min-h-72 place-items-center rounded-3xl border border-dashed bg-card/50 p-8 text-center">
+        <div className="grid min-h-72 place-items-center rounded-3xl border border-dashed bg-card/50 p-8 text-center motion-transition-content">
           <div>
             <BookOpen className="mx-auto mb-3 size-8 text-primary" />
             <h2 className="font-serif text-2xl font-semibold">
@@ -432,7 +441,7 @@ function AnalysisWorkspace() {
               role="tab"
               aria-selected={workspace === "timeline"}
               onClick={() => setWorkspace("timeline")}
-              className={`rounded-full px-4 py-2 text-sm ${
+              className={`rounded-full px-4 py-2 text-sm transition-[color,background-color,border-color,box-shadow] motion-duration-standard motion-ease-enter ${
                 workspace === "timeline"
                   ? "bg-foreground text-background"
                   : "border bg-card"
@@ -445,7 +454,7 @@ function AnalysisWorkspace() {
               role="tab"
               aria-selected={workspace === "relationships"}
               onClick={() => setWorkspace("relationships")}
-              className={`rounded-full px-4 py-2 text-sm ${
+              className={`rounded-full px-4 py-2 text-sm transition-[color,background-color,border-color,box-shadow] motion-duration-standard motion-ease-enter ${
                 workspace === "relationships"
                   ? "bg-foreground text-background"
                   : "border bg-card"
@@ -458,7 +467,7 @@ function AnalysisWorkspace() {
               role="tab"
               aria-selected={workspace === "clues"}
               onClick={() => setWorkspace("clues")}
-              className={`rounded-full px-4 py-2 text-sm ${
+              className={`rounded-full px-4 py-2 text-sm transition-[color,background-color,border-color,box-shadow] motion-duration-standard motion-ease-enter ${
                 workspace === "clues"
                   ? "bg-foreground text-background"
                   : "border bg-card"
@@ -632,9 +641,13 @@ function AnalysisWorkspace() {
             />
           ) : loading && !view ? (
             <div
-              className="h-96 animate-pulse rounded-3xl bg-muted"
+              className="grid h-96 min-h-96 place-items-center rounded-3xl bg-muted motion-transition-content"
+              role="status"
+              aria-busy="true"
               aria-label="正在加载时间线"
-            />
+            >
+              <p className="text-sm text-muted-foreground">正在加载时间线…</p>
+            </div>
           ) : view ? (
             <TimelineChart
               events={view.events}

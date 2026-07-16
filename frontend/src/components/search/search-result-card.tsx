@@ -49,7 +49,7 @@ function buildReadUrl(
 export function SearchResultCard({ result }: SearchResultCardProps) {
   return (
     <Link href={buildReadUrl(result.novel_id, result.chapter_id, result.chunk_index)} className="group block">
-      <Card className="paper-surface cursor-pointer rounded-3xl transition-all duration-200 group-hover:-translate-y-0.5 group-hover:border-primary/30 group-hover:shadow-lg">
+      <Card className="paper-surface cursor-pointer rounded-3xl transition-[border-color,box-shadow,background-color] motion-duration-standard motion-ease-enter group-hover:border-primary/30 group-hover:shadow-lg group-focus-within:border-primary/30 group-focus-within:shadow-lg">
         <CardContent className="flex flex-col gap-3 p-5 sm:p-6">
           {/* 小说名 + 分数 */}
           <div className="flex items-center justify-between gap-2">

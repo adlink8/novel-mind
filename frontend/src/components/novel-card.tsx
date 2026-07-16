@@ -1,11 +1,15 @@
 /**
  * 小说卡片组件 — 书架列表
+ *
+ * Phase 08 编排：卡片「分析」入口导向全局时间线工作台（/analysis），
+ * 不再把 plot_summary 当成主产品。层级准备由后端 start-or-resume 负责。
  */
 
 "use client";
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Card,
   CardContent,
@@ -13,24 +17,37 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   ArrowUpRight,
   BookOpenText,
   FileText,
   Trash2,
   LoaderCircle,
+  Pencil,
 } from "lucide-react";
-import { analysisApi, type Novel } from "@/lib/api";
+import type { Novel } from "@/lib/api";
 
 interface NovelCardProps {
   novel: Novel;
   onDelete?: (id: number) => Promise<void> | void;
-  onAnalyzed?: () => void;
+  onRename?: (id: number, title: string) => Promise<void> | void;
+  selectionMode?: boolean;
+  selected?: boolean;
+  onSelectedChange?: (id: number, selected: boolean) => void;
 }
 
-/** 状态展示：导入 / 索引 / 分析 */
+/** 状态展示：导入 / 索引 / 分析（分析 = 时间线任务） */
 function statusMeta(status: string): { label: string; className: string; hint: string } {
   switch (status) {
     case "importing":
@@ -48,15 +65,15 @@ function statusMeta(status: string): { label: string; className: string; hint: s
       };
     case "analyzing":
       return {
-        label: "分析中",
+        label: "时间线分析中",
         className: "bg-indigo-100 text-indigo-800",
-        hint: "正在进行剧情/人物分析",
+        hint: "Phase 08：正在基于场景层级抽取时间线事件",
       };
     case "analyzed":
       return {
-        label: "已分析",
+        label: "已有时间线",
         className: "bg-violet-100 text-violet-800",
-        hint: "已完成 AI 分析",
+        hint: "时间线分析已完成，可在分析页查看",
       };
     case "ready":
     default:
@@ -65,7 +82,7 @@ function statusMeta(status: string): { label: string; className: string; hint: s
         className: "bg-green-100 text-green-800",
         hint:
           status === "ready"
-            ? "已分章入库。检索需完成索引；剧情分析需单独触发（当前多为未分析）"
+            ? "已分章入库。检索需建索引；时间线分析请进入分析页（首次会自动启动）"
             : "状态未知",
       };
   }
@@ -94,37 +111,29 @@ function formatWordCount(count: number): string {
   return `${count}字`;
 }
 
-export function NovelCard({ novel, onDelete, onAnalyzed }: NovelCardProps) {
+export function NovelCard({
+  novel,
+  onDelete,
+  onRename,
+  selectionMode = false,
+  selected = false,
+  onSelectedChange,
+}: NovelCardProps) {
+  const router = useRouter();
   const [deleting, setDeleting] = useState(false);
-  const [analyzing, setAnalyzing] = useState(false);
-  const [analyzeMsg, setAnalyzeMsg] = useState<string | null>(null);
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [renameValue, setRenameValue] = useState(novel.title);
+  const [renaming, setRenaming] = useState(false);
+  const [renameError, setRenameError] = useState("");
   const meta = statusMeta(novel.status);
   const indexed = (novel.chunk_count ?? 0) > 0;
-  const analyzed = novel.status === "analyzed";
+  const analyzed = novel.status === "analyzed" || novel.status === "analyzing";
 
-  const handleAnalyze = async (e: React.MouseEvent) => {
+  const handleOpenTimeline = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (analyzing) return;
-    setAnalyzing(true);
-    setAnalyzeMsg(null);
-    try {
-      // Phase 07：先确保层级，再结构分析（LLM 可选，失败仍返回结构结果）
-      const res = await analysisApi.analyze(String(novel.id), {
-        analysis_type: "plot_summary",
-        use_llm: true,
-        rebuild_hierarchy: !analyzed,
-      });
-      const data = res.data.result_data || {};
-      const scenes = (data.scene_count as number) ?? 0;
-      const llm = data.llm_enriched ? " · 已 LLM 精炼" : " · 结构分析";
-      setAnalyzeMsg(`完成：${scenes} 场景${llm}`);
-      onAnalyzed?.();
-    } catch (err) {
-      setAnalyzeMsg(err instanceof Error ? err.message : "分析失败");
-    } finally {
-      setAnalyzing(false);
-    }
+    // Phase 08 主入口：全局分析工作台；层级与 start-or-resume 在分析页完成
+    router.push(`/analysis?novel=${novel.id}`);
   };
 
   const handleDelete = async (e: React.MouseEvent) => {
@@ -143,10 +152,33 @@ export function NovelCard({ novel, onDelete, onAnalyzed }: NovelCardProps) {
     }
   };
 
+  const handleRename = async () => {
+    const title = renameValue.trim();
+    if (!title) {
+      setRenameError("书籍名称不能为空");
+      return;
+    }
+    if (title === novel.title) {
+      setRenameOpen(false);
+      return;
+    }
+    if (!onRename) return;
+    setRenaming(true);
+    setRenameError("");
+    try {
+      await onRename(novel.id, title);
+      setRenameOpen(false);
+    } catch {
+      setRenameError("保存失败，请稍后重试");
+    } finally {
+      setRenaming(false);
+    }
+  };
+
   return (
-    <div className="group relative h-full">
-      <Link href={`/novels/${novel.id}`} className="block h-full">
-        <Card className="paper-surface h-full cursor-pointer overflow-hidden rounded-3xl border-white/60 transition-all duration-300 group-hover:-translate-y-1 group-hover:border-primary/25 group-hover:shadow-[0_24px_60px_-35px_rgba(52,42,32,0.6)]">
+    <div className="group">
+      <Card className={`paper-surface flex flex-col overflow-hidden rounded-3xl border-border/70 transition-[border-color,box-shadow] motion-duration-standard motion-ease-enter hover:border-primary/25 hover:shadow-[0_24px_60px_-35px_rgba(52,42,32,0.6)] focus-within:border-primary/25 focus-within:shadow-[0_24px_60px_-35px_rgba(52,42,32,0.6)] ${selected ? "ring-2 ring-primary/50" : ""}`}>
+        <Link href={`/novels/${novel.id}`} className="block cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           <div
             className={`relative h-40 overflow-hidden bg-gradient-to-br ${getCoverTone(novel.title)} p-5 text-white`}
           >
@@ -155,14 +187,16 @@ export function NovelCard({ novel, onDelete, onAnalyzed }: NovelCardProps) {
             <div className="relative flex h-full flex-col justify-between">
               <div className="flex items-center justify-between">
                 <BookOpenText className="size-5 text-white/70" />
-                <ArrowUpRight className="size-4 text-white/60 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                <ArrowUpRight className="size-4 text-white/60 transition-[color,opacity] motion-duration-fast motion-ease-enter group-hover:text-white group-focus-within:text-white" />
               </div>
               <p className="line-clamp-2 max-w-[85%] font-serif text-xl font-semibold leading-tight tracking-tight">
                 {novel.title}
               </p>
             </div>
           </div>
+        </Link>
 
+        <Link href={`/novels/${novel.id}`} className="block cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           <CardHeader>
             <CardTitle className="line-clamp-1 font-serif text-lg">
               {novel.title}
@@ -171,8 +205,9 @@ export function NovelCard({ novel, onDelete, onAnalyzed }: NovelCardProps) {
               {novel.author || "未知作者"}
             </CardDescription>
           </CardHeader>
+        </Link>
 
-          <CardContent>
+        <CardContent>
             <div className="mb-3 flex flex-wrap items-center gap-2">
               {novel.genre && (
                 <Badge variant="secondary" className="text-xs">
@@ -201,9 +236,11 @@ export function NovelCard({ novel, onDelete, onAnalyzed }: NovelCardProps) {
               </span>
               <span
                 title={
-                  analyzed
-                    ? "已完成剧情/层级分析（Phase 07 场景结构）"
-                    : "未做分析：可点击「分析」基于 Phase 07 场景层级生成结构摘要"
+                  novel.status === "analyzed"
+                    ? "时间线已完成（Phase 08）"
+                    : novel.status === "analyzing"
+                      ? "时间线任务进行中"
+                      : "未做时间线分析：点击「时间线」进入分析页自动启动"
                 }
                 className={`inline-flex h-5 items-center rounded-4xl px-2 text-xs font-medium ${
                   analyzed
@@ -211,7 +248,11 @@ export function NovelCard({ novel, onDelete, onAnalyzed }: NovelCardProps) {
                     : "bg-slate-100 text-slate-600"
                 }`}
               >
-                {analyzed ? "已分析" : "未分析"}
+                {novel.status === "analyzed"
+                  ? "时间线就绪"
+                  : novel.status === "analyzing"
+                    ? "抽取中"
+                    : "未分析"}
               </span>
             </div>
 
@@ -225,48 +266,60 @@ export function NovelCard({ novel, onDelete, onAnalyzed }: NovelCardProps) {
                 {formatWordCount(novel.word_count)}
               </span>
             </div>
-            {analyzeMsg && (
-              <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">
-                {analyzeMsg}
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      </Link>
+        </CardContent>
 
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        disabled={analyzing}
-        onClick={handleAnalyze}
-        className="absolute bottom-3 right-3 z-10 h-8 rounded-full border-white/40 bg-black/35 px-2.5 text-white backdrop-blur hover:bg-violet-600/90 hover:text-white"
-        title="Phase 07 场景层级剧情分析"
-      >
-        {analyzing ? (
-          <LoaderCircle className="size-3.5 animate-spin" />
-        ) : (
-          "分析"
-        )}
-      </Button>
-
-      {onDelete && (
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={deleting}
-          onClick={handleDelete}
-          className="absolute right-3 top-3 z-10 h-8 rounded-full border-white/40 bg-black/35 px-2.5 text-white backdrop-blur hover:bg-red-600/90 hover:text-white"
-          title="删除本书"
-        >
-          {deleting ? (
-            <LoaderCircle className="size-3.5 animate-spin" />
-          ) : (
-            <Trash2 className="size-3.5" />
+        <div className="flex min-h-14 items-center gap-2 border-t border-border/60 px-4 py-3">
+          {selectionMode && (
+            <label className="mr-auto inline-flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
+              <input
+                type="checkbox"
+                checked={selected}
+                onChange={(event) => onSelectedChange?.(novel.id, event.target.checked)}
+                className="size-4 cursor-pointer rounded border-border accent-primary"
+                aria-label={`选择《${novel.title}》`}
+              />
+              选择
+            </label>
           )}
-        </Button>
-      )}
+          {!selectionMode && <span className="mr-auto text-xs text-muted-foreground">书籍管理</span>}
+
+          {onRename && (
+            <Dialog open={renameOpen} onOpenChange={(open) => {
+              setRenameOpen(open);
+              if (open) {
+                setRenameValue(novel.title);
+                setRenameError("");
+              }
+            }}>
+              <DialogTrigger render={<Button type="button" variant="outline" size="icon" className="rounded-xl" aria-label={`重命名《${novel.title}》`}><Pencil className="size-3.5" /></Button>} />
+              <DialogContent className="rounded-3xl sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>更改书籍名称</DialogTitle>
+                  <DialogDescription>只修改书架显示名称，不会改变章节内容。</DialogDescription>
+                </DialogHeader>
+                <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); void handleRename(); }}>
+                  <label className="block space-y-2 text-sm font-medium">
+                    书籍名称
+                    <Input
+                      value={renameValue}
+                      onChange={(event) => setRenameValue(event.target.value)}
+                      maxLength={200}
+                      autoFocus
+                    />
+                  </label>
+                  {renameError && <p className="text-sm text-destructive" role="alert">{renameError}</p>}
+                  <div className="flex justify-end gap-2">
+                    <Button type="button" variant="outline" onClick={() => setRenameOpen(false)}>取消</Button>
+                    <Button type="submit" disabled={renaming}>{renaming ? "保存中..." : "保存名称"}</Button>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
+          )}
+          <Button type="button" variant="outline" size="sm" onClick={handleOpenTimeline} className="rounded-xl" title="打开时间线分析">时间线</Button>
+          {onDelete && !selectionMode && <Button type="button" variant="outline" size="icon" disabled={deleting} onClick={handleDelete} className="rounded-xl text-destructive hover:bg-destructive/10 hover:text-destructive" title="删除本书" aria-label={`删除《${novel.title}》`}>{deleting ? <LoaderCircle className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}</Button>}
+        </div>
+      </Card>
     </div>
   );
 }
