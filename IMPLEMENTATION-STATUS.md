@@ -1,12 +1,15 @@
 # NovelMind Implementation Status
 
-审计日期：2026-06-13 16:05（Asia/Shanghai）
+审计日期：2026-06-13 16:05（Asia/Shanghai）  
+分析工作台与关系回填补充：2026-07-16（基于代码与样例小说 runtime 证据，不推翻上方基线审计快照）
 
 事实来源：实际代码、自动化测试、依赖审计、Next.js 构建输出和真实 PostgreSQL Alembic 命令。规划文档中的勾选不作为完成证据。
 
 ## Summary
 
 安全与启动基线已经修复并验证。v0.3 的持久化导入、端到端 RAG、混合搜索、前端搜索和评测基础设施已完成；但评测质量闭环仍为 PARTIAL：仅 10/100 题 confirmed，现有 6 次运行的检索指标均为 0，faithfulness/cost 尚未计算。前端已完成文学编辑台风格重构，并通过桌面与移动端浏览器验收。
+
+**分析工作台不再是 MISSING。** 前端 `/analysis` 提供 progressive 产品流（时间线 / 人物关系 / 线索）；后端已有 Phase 08 timeline、Phase 09 relationships、Phase 11 clues 与相关 worker。同人文生成、富文本编辑与导出仍为 MISSING。叙事记忆（narrative memory）与评测 gold 在样例小说上仍为空。
 
 状态定义：
 
@@ -37,6 +40,7 @@
 | RAG 管线 | VERIFIED | 分块 → Ollama nomic-embed-text (768维) → ChromaDB → 混合搜索（向量 + BM25） |
 | 混合搜索 | VERIFIED | BM25 tsvector 全文搜索 + 向量加权融合；全局/小说内搜索 API；搜索页面 + 阅读页内搜索面板 |
 | RAG 评测基础设施 | VERIFIED | EvalDataset/EvalRun/EvalResult ORM；bm25/baseline_vector/hybrid_search；owner 隔离 API；CLI；错误案例；前端 ECharts 管理与趋势页 |
+| 分析工作台 UI 壳 | VERIFIED | `frontend/src/app/analysis/page.tsx`：`timeline` / `relationships` / `clues` 工作区切换；plot-density 时间线 stages（非固定 7 段）；hub-centric 关系图；progressive 时间线候选/active 视图 |
 
 ## PARTIAL
 
@@ -47,13 +51,20 @@
 | AI 路由与成本统计 | PARTIAL | 服务与模型骨架存在，业务生成端点仍未接入 |
 | 生产部署 | PARTIAL | 应用会拒绝弱生产密钥，但 TLS、秘密管理和网络策略由部署环境提供 |
 | RAG 评测质量闭环 | PARTIAL | 100 条数据中仅 10 confirmed；6 次运行 Recall/Precision/MRR/NDCG 均为 0；faithfulness/cost 为 null；HTTP 触发仍同步 |
+| Phase 08 时间线 | PARTIAL | Worker/query/UI 已落地。样例小说 slime（novel_id=91）存在 active version，约 1933 events。流式分析端点仍为 501 占位 |
+| Phase 09 人物关系 | PARTIAL | Observation worker + graph query 已落地；无 accepted observations 时仍走 timeline 共现 provisional 回退。关系曾依赖 KG accepted 为空导致空图；现有确定性回填：`backend/app/services/relationships/timeline_kg_backfill.py` + `backend/scripts/backfill_relationship_kg_from_timeline.py`。回填后 slime 约 40 characters、41 KG accepted、41 relationship observations（均为 establish；尚无 evolution / change / end 产出） |
+| Phase 11 线索与伏笔 | PARTIAL | 管线与 UI 已存在。候选构建曾因 `later windows span more than 4 chapters` 失败；现已在 `clues/evidence.py` + `clues/candidates.py` 于 package 构建前 clamp later units。生产样例需 re-run 后才能确认产出质量 |
+| 叙事记忆 narrative memory | PARTIAL | 服务与 qualification/build 脚本存在；样例 novel 91 仍无 narrative memory 产出；eval gold 仍为空 |
+| 通用 AI 分析 API | PARTIAL | `POST/GET /api/analysis/...` 与 hierarchy 有实现；`analyze/stream` 仍 501 |
 
 ## MISSING
 
 | Area | Status | Gap |
 |---|---|---|
-| AI 分析与创作 | MISSING | 分析、人物、时间线和同人文生成仍返回空状态或 501 |
+| 同人文生成 | MISSING | `fanfiction` 创建/续写端点仍返回 HTTP 501 |
 | 编辑与导出 | MISSING | 无富文本编辑、版本管理和 EPUB/Markdown 导出 |
+| 关系演化观测 | MISSING | 回填与当前观测以 establish 为主；change/end 演化链尚未在样例数据中形成 |
+| 线索生产闭环 | MISSING | clamp 修复已合入代码，但样例小说线索 run 需重新执行后才有可验收产物 |
 
 ## Security Closure
 

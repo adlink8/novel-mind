@@ -15,6 +15,22 @@
 | `ai_router.py` | 8.0 KB | AI 智能路由器 — 按任务类型和路由层级选择最优模型 |
 | `hybrid_search.py` | — | PostgreSQL tsvector + Chroma 向量结果融合，返回章节/chunk/evidence |
 | `eval_service.py` | — | bm25/baseline_vector/hybrid_search 评测，Recall/Precision/MRR/NDCG 与错误案例 |
+| `analysis_service.py` | — | 通用剧情/人物/主题等分析读写与 hierarchy 状态 |
+
+## 包目录（分析与叙事）
+
+| 目录 | 职责 |
+|---|---|
+| `timeline/` | Phase 08：事件提取、worker、promotion、query、overrides |
+| `relationships/` | Phase 09：候选、判定、gates、worker、graph query；无 accepted 时 provisional 共现回退 |
+| `relationships/timeline_kg_backfill.py` | 从 active timeline 确定性回填 Characters + KG accepted +（可选）relationship observations |
+| `clues/` | Phase 11：候选、evidence package、gates、worker、query；later windows 在 package 构建前 clamp（≤4 chapters） |
+| `knowledge/` | Phase 04 KG 候选/判定/投影 |
+| `narrative_memory/` | 叙事记忆 build/audit/qualification（样例数据可能仍为空） |
+| `reader_chat/` | 阅读页对话检索与 worker |
+| `chunking/` | 分层分块 build/promote/reconcile |
+
+回填 CLI：`backend/scripts/backfill_relationship_kg_from_timeline.py`（`--novel-id` + `--write` / `--dry-run`）。
 
 ## 服务间依赖
 
@@ -30,6 +46,12 @@ services/
 ├── vector_store.py        ← 依赖 ChromaDB HTTP API
 ├── hybrid_search.py       ← 依赖 PostgreSQL + vector_store + ai_service
 ├── eval_service.py        ← 依赖 hybrid_search + vector_store + eval ORM
+├── analysis_service.py    ← 通用分析 + hierarchy
+├── timeline/              ← Phase 08 时间线
+├── relationships/         ← Phase 09 关系（含 timeline_kg_backfill）
+├── clues/                 ← Phase 11 线索
+├── knowledge/             ← Phase 04 KG
+├── narrative_memory/      ← 叙事记忆
 ├── ai_service.py          ← 依赖 ai_router + LiteLLM
 └── ai_router.py           ← 依赖 models.AIModelConfig
 ```

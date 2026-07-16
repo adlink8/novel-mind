@@ -50,9 +50,9 @@ The first active account becomes the bootstrap administrator and claims legacy u
 
 Model configuration is owner-scoped. API keys are stored as versioned Fernet ciphertext and are never returned by list/detail responses. Custom base URLs require a server-side exact-host allowlist and pass scheme, credential, DNS, IPv4 and IPv6 checks before storage and again before provider access.
 
-## Placeholder Domains
+## Analysis and generation domains
 
-Analysis, timeline, characters and fanfiction routes require authentication. Query endpoints may return empty state; unimplemented generation/write endpoints return HTTP 501. They are not complete AI engines.
+Authenticated analysis, timeline, relationships and clues routes exist beyond pure placeholders; product completeness varies by phase (see `IMPLEMENTATION-STATUS.md`). Fanfiction create/continue still return HTTP 501. Empty graph/query state may still appear when KG/observations are missing or when spoiler filters hide data.
 
 ## Current Verification
 

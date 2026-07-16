@@ -40,7 +40,7 @@ docker compose --profile graph up -d neo4j
 - 数据服务端口当前映射到宿主机；
 - Chroma 使用未固定的 `latest` 镜像；
 - 无 secret manager、备份恢复演练、监控和告警；
-- RAG 检索与评测已实现，但 AI 分析、创作、编辑和导出链路尚未实现。
+- RAG 检索与评测已实现；分析工作台（时间线/关系/线索）与相关 worker 已部分落地（见 `IMPLEMENTATION-STATUS.md`）；同人文创作、编辑和导出链路尚未实现。
 
 ## Minimum Production Topology
 

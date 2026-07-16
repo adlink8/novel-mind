@@ -29,13 +29,21 @@ React 组件，按功能域分目录组织。
 | `SearchBar` | `search/search-bar.tsx` | 全局搜索输入、300ms 防抖、Command/Ctrl+K 与下拉预览 |
 | `SearchResultCard` | `search/search-result-card.tsx` | 搜索结果、高亮片段、相关度与章节跳转 |
 
+## 分析工作台组件
+
+| 域 | 目录 | 职责 |
+|---|---|---|
+| 时间线 | `timeline/` | 控件、状态条、chart；overview stages 按剧情密度/章节 seam 分段（非固定 7 段） |
+| 人物关系 | `relationships/` | workspace、controls、evidence、hub-centric 关系图 |
+| 线索与伏笔 | `clues/` | workspace、controls、evidence、band |
+
+富文本编辑器仍未创建。同人文/创作可视化不在本目录。
+
 ## UI 基础组件 (`ui/`)
 
 基于 shadcn/ui 的 10 个基础组件：`badge`、`button`、`card`、`dialog`、`dropdown-menu`、`input`、`sheet`、`tabs`、`textarea`、`tooltip`。
 
 使用 `npx shadcn-ui@latest add <name>` 添加新组件。
-
-富文本编辑器、时间线和人物关系图组件当前尚未创建。
 
 ## 约定
 
