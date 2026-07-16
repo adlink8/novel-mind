@@ -24,7 +24,7 @@ const navigation = [
   { href: "/analysis", label: "分析", icon: ListTree },
   { href: "/eval", label: "评测", icon: BarChart3 },
   { href: "/writing", label: "创作", icon: Feather },
-  { href: "/settings", label: "设置", icon: Settings2 },
+  { href: "/settings", label: "设置中心", icon: Settings2 },
 ];
 
 const SHELL_NAV_KEY = "novelmind:app-shell:nav-collapsed";

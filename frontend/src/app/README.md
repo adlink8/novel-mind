@@ -13,7 +13,7 @@ Next.js 16 App Router 页面路由，每个文件夹对应一个 URL 路径段�
 | `/novels/[id]` | `novels/[id]/page.tsx` | 小说详情/阅读页 — 动态路由，章节侧边栏 + 阅读内容 |
 | `/search` | `search/page.tsx` | 全局混合搜索结果页 — 搜索栏、结果卡片、空/错/加载状态 |
 | `/eval` | `eval/page.tsx` | RAG 评测管理 — 数据集、运行、指标对比与趋势图 |
-| `/settings` | `settings/page.tsx` | AI 模型设置页 — CRUD、测试连接、设为默认 |
+| `/settings` | `settings/page.tsx` | 设置中心 — 账户退出、模型路由、CRUD/测试连接 |
 | `/writing` | `writing/page.tsx` | 写作页骨架，真实创作能力留待后续里程碑 |
 
 ## 认证流程

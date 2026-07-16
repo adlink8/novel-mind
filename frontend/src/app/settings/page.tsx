@@ -1,41 +1,11 @@
 /**
- * AI 设置页面 - app/settings/page.tsx
- * ======================================
- * 管理 AI 模型配置和智能路由策略的设置页面。
- *
- * 主要职责：
- * 1. 路由策略选择 - 用户可选择"极致质量"/"智能均衡"/"省钱模式"
- * 2. AI 模型管理 - 添加、删除、设置默认模型、测试连接
- * 3. 用量概览 - 展示 Token 消耗和费用统计（目前为占位数据）
- * 4. 添加模型对话框 - 表单收集模型名称、ID、提供商、Base URL、API Key
- *
- * 数据流：
- * - 通过 useAIModels Hook 从 Zustand aiConfigStore 获取模型列表和操作方法
- * - 路由策略通过 store 的 setRoutingPreference 持久化
- * - 模型 CRUD 操作通过 store 调用后端 API
- *
- * 支持的 AI 提供商：
- * - OpenAI (GPT 系列)
- * - Anthropic (Claude 系列)
- * - Ollama (本地部署)
- * - 自定义（第三方兼容 API）
- */
-
-/**
- * AI 设置页 (Settings Page)
- *
- * 功能:
- * 1. 路由策略选择（质量优先/智能均衡/节省模式）
- * 2. AI 模型管理（添加/删除/测试连接/设为默认）
- * 3. 用量概览（今日/本周/本月费用，总 Token 数 — 当前为占位数据）
- *
- * 数据流:
- * useAIModels() → Zustand Store → aiModelsApi → GET/POST/DELETE /api/models
+ * 设置中心 - app/settings/page.tsx
+ * 账户（退出登录）+ AI 模型路由 / 模型管理 / 用量概览。
  */
 
 "use client";
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -56,9 +26,23 @@ import {
 } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/empty-state";
 import { useAIModels } from "@/hooks/use-ai-models";
-import type { AIModelConfig } from "@/lib/api";
-import { Bot, CheckCircle2, CircleDollarSign, Gauge, LoaderCircle, Plus, Scale, Sparkles, Wrench, XCircle } from "lucide-react";
+import { authApi, type AIModelConfig, type AuthUser } from "@/lib/api";
+import {
+  Bot,
+  CheckCircle2,
+  CircleDollarSign,
+  Gauge,
+  LoaderCircle,
+  LogOut,
+  Plus,
+  Scale,
+  Sparkles,
+  UserRound,
+  Wrench,
+  XCircle,
+} from "lucide-react";
 import { PageContainer, PageHeader } from "@/components/page-header";
+import { cn } from "@/lib/utils";
 
 /** 路由策略偏好类型 */
 type RoutingPreference = "quality" | "balanced" | "budget";
@@ -98,7 +82,9 @@ const routingOptions: {
 ];
 
 /** AI 服务提供商选项列表 */
-const providerOptions: { value: AIModelConfig["provider"]; label: string }[] = [
+const providerOptions: { value: string; label: string }[] = [
+  { value: "vertex_google", label: "Google Cloud Vertex" },
+  { value: "gemini", label: "Google AI Studio" },
   { value: "openai", label: "OpenAI" },
   { value: "anthropic", label: "Anthropic" },
   { value: "ollama", label: "Ollama" },
@@ -106,20 +92,40 @@ const providerOptions: { value: AIModelConfig["provider"]; label: string }[] = [
 ];
 
 /** 提供商显示名称映射 */
-const providerLabels: Record<AIModelConfig["provider"], string> = {
+const providerLabels: Record<string, string> = {
   openai: "OpenAI",
   anthropic: "Anthropic",
   ollama: "Ollama",
   custom: "自定义",
+  vertex_google: "Google Cloud Vertex",
+  vertex: "Google Cloud Vertex",
+  vertex_ai: "Google Cloud Vertex",
+  gemini: "Google AI Studio",
+  google: "Google",
 };
 
-/** 提供商 Emoji 图标映射 */
-const providerIcons: Record<AIModelConfig["provider"], React.ComponentType<{ className?: string }>> = {
+/** 提供商图标映射 */
+const providerIcons: Record<string, React.ComponentType<{ className?: string }>> = {
   openai: Bot,
   anthropic: Sparkles,
   ollama: Gauge,
   custom: Wrench,
+  vertex_google: Sparkles,
+  vertex: Sparkles,
+  vertex_ai: Sparkles,
+  gemini: Sparkles,
+  google: Sparkles,
 };
+
+function resolveProviderIcon(
+  provider: string
+): React.ComponentType<{ className?: string }> {
+  return providerIcons[provider] ?? Bot;
+}
+
+function resolveProviderLabel(provider: string): string {
+  return providerLabels[provider] ?? provider;
+}
 
 // ============================================================
 // 占位费用数据 - 后续应接入真实的用量统计 API
@@ -131,16 +137,7 @@ const costSummary = {
   totalTokens: "0",
 };
 
-/**
- * AI 设置页面组件
- * 
- * 状态管理：
- * - addDialogOpen: 添加模型对话框的开关状态
- * - formData: 添加模型表单数据（name, model_id, provider, base_url, api_key）
- * - addLoading: 添加操作的加载状态
- */
 export default function SettingsPage() {
-  // 从 Hook 获取 AI 模型相关状态和操作方法
   const {
     models,
     defaultModel,
@@ -155,18 +152,50 @@ export default function SettingsPage() {
     getTestResult,
   } = useAIModels();
 
-  // 添加模型对话框状态
-  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [userLoading, setUserLoading] = useState(true);
+  const [logoutLoading, setLogoutLoading] = useState(false);
+  const [logoutError, setLogoutError] = useState<string | null>(null);
 
-  // 添加模型表单数据
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     model_id: "",
-    provider: "openai" as AIModelConfig["provider"],
+    provider: "vertex_google" as AIModelConfig["provider"],
     base_url: "",
     api_key: "",
   });
   const [addLoading, setAddLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await authApi.me();
+        if (!cancelled) setUser(res.data);
+      } catch {
+        if (!cancelled) setUser(null);
+      } finally {
+        if (!cancelled) setUserLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleLogout = useCallback(async () => {
+    setLogoutLoading(true);
+    setLogoutError(null);
+    try {
+      await authApi.logout();
+      // Full navigation so AuthGate re-validates session.
+      window.location.assign("/");
+    } catch {
+      setLogoutError("退出失败，请重试");
+      setLogoutLoading(false);
+    }
+  }, []);
 
   /**
    * 处理添加模型
@@ -184,7 +213,7 @@ export default function SettingsPage() {
         api_key: formData.api_key || undefined,
       });
       // 重置表单数据
-      setFormData({ name: "", model_id: "", provider: "openai", base_url: "", api_key: "" });
+      setFormData({ name: "", model_id: "", provider: "vertex_google", base_url: "", api_key: "" });
       setAddDialogOpen(false);
       fetchModels(); // 刷新模型列表
     } catch {
@@ -220,25 +249,83 @@ export default function SettingsPage() {
 
   return (
     <PageContainer className="space-y-9">
-      {/* ========== 页面头部 ========== */}
-      <PageHeader eyebrow="Model routing" title="AI 设置" description="连接本地或云端模型，为检索、分析与创作选择合适的推理路径。" />
+      <PageHeader
+        eyebrow="Settings"
+        title="设置中心"
+        description="管理账户、模型路由与 AI 提供商。退出登录请在下方账户区操作。"
+      />
 
-      {/* ========== 路由策略选择区 ========== */}
-      {/* 三张卡片，用户点击选择当前使用的路由策略 */}
-      <section>
-        <h3 className="mb-4 font-serif text-xl font-semibold">智能路由策略</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* ========== 账户 ========== */}
+      <section aria-labelledby="settings-account-heading" className="motion-transition-content">
+        <h3 id="settings-account-heading" className="mb-4 font-serif text-xl font-semibold">
+          账户
+        </h3>
+        <Card className="paper-surface motion-transition-feedback">
+          <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <span className="grid size-11 place-items-center rounded-2xl bg-secondary text-primary">
+                <UserRound className="size-5" />
+              </span>
+              <div>
+                <p className="text-sm font-medium">
+                  {userLoading
+                    ? "加载账户…"
+                    : user
+                      ? user.username
+                      : "未登录"}
+                </p>
+                {user?.email ? (
+                  <p className="text-xs text-muted-foreground">{user.email}</p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    退出后需重新登录才能访问书架与分析
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="flex flex-col items-stretch gap-2 sm:items-end">
+              {logoutError ? (
+                <p className="text-xs text-destructive" role="alert">
+                  {logoutError}
+                </p>
+              ) : null}
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-full motion-transition-feedback"
+                disabled={logoutLoading || userLoading || !user}
+                onClick={() => void handleLogout()}
+                data-testid="settings-logout"
+              >
+                {logoutLoading ? (
+                  <LoaderCircle className="mr-2 size-4 animate-spin" />
+                ) : (
+                  <LogOut className="mr-2 size-4" />
+                )}
+                退出登录
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </section>
+
+      {/* ========== 路由策略 ========== */}
+      <section aria-labelledby="settings-routing-heading">
+        <h3 id="settings-routing-heading" className="mb-4 font-serif text-xl font-semibold">
+          智能路由策略
+        </h3>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           {routingOptions.map((option) => {
             const OptionIcon = option.icon;
             return (
             <Card
               key={option.value}
-              className={`cursor-pointer transition-all ${
-                // 选中状态高亮：显示 ring 边框和阴影
+              className={cn(
+                "cursor-pointer paper-surface motion-transition-feedback",
                 routingPreference === option.value
-                  ? "paper-surface border-primary/40 bg-primary/[0.06] ring-1 ring-primary/30"
-                  : "paper-surface hover:-translate-y-0.5 hover:border-primary/20 hover:shadow-lg"
-              }`}
+                  ? "border-primary/40 bg-primary/[0.06] ring-1 ring-primary/30"
+                  : "hover:-translate-y-0.5 hover:border-primary/20 hover:shadow-lg"
+              )}
               onClick={() => setRoutingPreference(option.value)}
             >
               <CardContent>
@@ -305,7 +392,7 @@ export default function SettingsPage() {
                     <div className="flex items-center justify-between">
                       {/* 左侧：模型信息（图标 + 名称 + 提供商 + 模型ID） */}
                       <div className="flex items-center gap-4">
-                        <div className="grid size-12 place-items-center rounded-2xl bg-secondary text-primary">{React.createElement(providerIcons[model.provider], { className: "size-5" })}</div>
+                        <div className="grid size-12 place-items-center rounded-2xl bg-secondary text-primary">{React.createElement(resolveProviderIcon(model.provider), { className: "size-5" })}</div>
                         <div>
                           <div className="flex items-center gap-2">
                             <h4 className="font-semibold">
@@ -319,7 +406,7 @@ export default function SettingsPage() {
                             )}
                           </div>
                           <p className="text-xs text-muted-foreground mt-0.5">
-                            {providerLabels[model.provider]}
+                            {resolveProviderLabel(model.provider)}
                             <span className="ml-2">{model.model_id}</span>
                             {model.base_url && (
                               <span className="ml-2">
