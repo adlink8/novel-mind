@@ -116,15 +116,18 @@ export function ReaderChatPanel({
   const msgRequestRef = useRef(0);
   const panelRef = useRef<HTMLDivElement>(null);
 
-  // Expanded panel only — collapsed chip is not a dismissable surface.
+  // Expanded panel only — collapsed chip/rail is not a dismissable surface.
+  // Close/collapse ONLY via explicit header buttons (not outside click / Escape).
   const dismissableOpen = open && !(layout === "mobile" && collapsed);
   const { present, closing } = useDismissableLayer({
     open: dismissableOpen,
-    onDismiss: () => onOpenChange(false),
+    onDismiss: () => {
+      /* intentional no-op: outside/Escape must not close the panel */
+    },
     layerRef: panelRef,
     ignoreSelectors: ["[data-reader-chat-toggle]"],
-    // Desktop reserved column: outside click still closes; mobile sheet same.
-    closeOnOutside: true,
+    closeOnOutside: false,
+    closeOnEscape: false,
   });
 
   // Restore presentation-only active conversation id (lazy init alternative for novel change)

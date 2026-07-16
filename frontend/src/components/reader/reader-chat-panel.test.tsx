@@ -196,17 +196,18 @@ describe("ReaderChatPanel", () => {
     expect(screen.getByTestId("reader-chat-panel").parentElement?.className).toMatch(/bottom-14/);
   });
 
-  it("closes the expanded panel when clicking outside", async () => {
+  it("does not close when clicking outside — only collapse/close buttons", async () => {
     const { props } = renderPanel();
     await waitFor(() =>
       expect(screen.getByTestId("reader-chat-panel")).toBeInTheDocument()
     );
-    // Opening-frame suppressOutside clears on the next animation frame.
     await new Promise<void>((resolve) =>
       requestAnimationFrame(() => resolve())
     );
     fireEvent.pointerDown(document.body);
-    expect(props.onOpenChange).toHaveBeenCalledWith(false);
+    expect(props.onOpenChange).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByLabelText("折叠对话"));
+    expect(props.onCollapsedChange).toHaveBeenCalledWith(true);
   });
 
   it("creates, switches, archives, restores and deletes conversations", async () => {
