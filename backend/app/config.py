@@ -85,6 +85,10 @@ class Settings(BaseSettings):
     ai_allowed_hosts: str = "api.openai.com,api.anthropic.com"
     ai_allowed_private_hosts: str = ""
 
+    # Phase 15: offline hierarchical retrieval experiment (default OFF).
+    # Never enables a production Reader Chat consumer or active pointer path.
+    narrative_memory_retrieval_experiment_enabled: bool = False
+
     # pydantic-settings 配置：从 .env 文件加载，环境变量前缀为 NOVELMIND_
     model_config = {"env_file": ".env", "env_prefix": "NOVELMIND_"}
 

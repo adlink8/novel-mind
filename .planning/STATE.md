@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v0.8
 milestone_name: 分层叙事记忆与层级 RAG
 status: executing
-last_updated: 2026-07-16T23:50:00.000Z
+last_updated: 2026-07-16T24:30:00.000Z
 last_activity: 2026-07-16
 progress:
   total_phases: 16
-  completed_phases: 12
+  completed_phases: 13
   total_plans: 71
-  completed_plans: 64
-  percent: 71
+  completed_plans: 67
+  percent: 75
 stopped_at: null
 authorized_scope: phases 13-18 (user 2026-07-16: 查看13-18阶段任务 编排GSD子代理执行)
 ---
@@ -26,9 +26,9 @@ See `.planning/PROJECT.md` and `IMPLEMENTATION-STATUS.md`.
 
 ## Current Position
 
-Phase: 14 (Durable Bottom-up Candidate Builder)
-Plan: 4 of 4
-Status: COMPLETE — 14-VERIFICATION `status: passed`; Phase 15 unblocked (not started)
+Phase: 15 (Adaptive Hierarchical Retrieval and Leaf Evidence Safety)
+Plan: 3 of 3
+Status: COMPLETE — 15-VERIFICATION `status: passed`; Phase 16 unblocked (not started)
 Last activity: 2026-07-16
 
 ## Authorization (2026-07-16)
@@ -43,16 +43,16 @@ Last activity: 2026-07-16
 
 - Phase 13: **COMPLETE + VERIFIED** (`13-VERIFICATION.md` status: passed). 13-01/02/03 SUMMARYs present. Candidate-only authority, strict contracts, provenance seal, no-pointer proofs.
 - Phase 14: **COMPLETE + VERIFIED** (`14-VERIFICATION.md` status: passed). 14-01..04 SUMMARYs present. Builder control plane Alembic `14membuild01`; Chapter→Arc→Global candidate worker; optional sources; CLI dry-run; 37 tests passed.
-- Phase 15: 3/3 plans planned; **unblocked** by Phase 14 verification; not started
-- Phase 16: 3/3 plans planned; after Phase 15 verified
+- Phase 15: **COMPLETE + VERIFIED** (`15-VERIFICATION.md` status: passed). 15-01..03 SUMMARYs present. Deterministic router; cutoff-first visible loaders; multi-level descent + leaf re-slice; default-off offline experiment; 59 targeted tests passed.
+- Phase 16: 3/3 plans planned; **unblocked** by Phase 15 verification; not started
 - Phase 17: 3/3 plans planned; after Phases 12–16 verified; candidate-only verdict
 - Phase 18: COMPLETE — 18-01 `f6280cf`, 18-02 `2035b54`, 18-03 `743a524`; dual-viewport motion qualified (parallel track)
 
 ## Auto Routing
 
-Wave A Phase 13–14: **done**. Phase 18 complete in parallel.
-Next serial RAG chain: Phase 15 → 16 → 17 after each phase verification.
-Phase 14 holds Phase 12 `provider_calls_allowed` as the sole provider gate; candidate-only (no pointer cutover).
+Wave A Phase 13–15: **done**. Phase 18 complete in parallel.
+Next serial RAG chain: Phase 16 → 17 after each phase verification.
+Phase 15 is offline retrieval only (default-off); no Reader Chat cutover; candidate-only (no pointer).
 
 ## Phase 11 Execution Metrics
 

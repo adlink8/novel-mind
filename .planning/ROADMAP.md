@@ -45,7 +45,7 @@
 | Phase 7 语义/层级分块 | 6/6 | **Complete** (logic+tests+PG/indexing wiring) |
 | Phase 8 版本化小说分析与时间线 | 10/10 | **Complete** (35/35 must-haves verified) |
 | v0.7 / Phase 9-11 叙事关系、阅读问答与线索追踪 | Phase 09: 5/5; Phase 10: 5/5; Phase 11: 5/5 | **09 VERIFIED**; **10 PARTIAL** (real Playwright residual); **11 implement-complete** (adversarial residual closed) |
-| v0.8 / Phase 12-17 分层叙事记忆与层级 RAG | 10/19 plans (12+13+14 done) | **IN PROGRESS** — Phase 12–14 verified; Phase 15 next; candidate-only/no pointer cutover |
+| v0.8 / Phase 12-17 分层叙事记忆与层级 RAG | 13/19 plans (12–15 done) | **IN PROGRESS** — Phase 12–15 verified; Phase 16 next; candidate-only/no pointer cutover |
 | Phase 18 前端动效与过渡系统 | 3/3 | **COMPLETE** — 18-01..03 done; dual-viewport motion qualified |
 
 ## Auto Start
@@ -274,16 +274,18 @@ Plans:
 5. 对抗测试证明未读 arc 的标题、节点数量、分数、trace、cache key 和 source status 不泄露未来内容，且实验入口默认关闭、不改变现有 Reader Chat consumer output。
 
 Plans:
-- [ ] 15-01 deterministic query router and visible candidate sets: local/arc/global/mixed intent, cutoff-first SQL/metadata filtering
-- [ ] 15-02 multi-level descent and leaf resolver: adaptive/collapsed candidates, raw fallback, server re-slice and frozen retrieval manifest
-- [ ] 15-03 routing audit and adversarial safety: owner/version/tenant-cache IDOR, future-metadata leakage and reader-chat no-cutover tests
+- [x] 15-01 deterministic query router and visible candidate sets: local/arc/global/mixed intent, cutoff-first SQL/metadata filtering
+- [x] 15-02 multi-level descent and leaf resolver: adaptive/collapsed candidates, raw fallback, server re-slice and frozen retrieval manifest
+- [x] 15-03 routing audit and adversarial safety: owner/version/tenant-cache IDOR, future-metadata leakage and reader-chat no-cutover tests
+
+**Waves:** 1 → 2 → 3 complete. Verified: `.planning/phases/15-adaptive-hierarchical-retrieval-and-leaf-evidence-safety/15-VERIFICATION.md` (59 targeted tests passed).
 
 ### Phase 16: Dependency-aware Local Rebuild and Carry-forward
 
 **Goal:** 以可验证的依赖图和变更 oracle 计算 candidate 的最小安全 dirty closure，在边界不确定时保守扩散，并量化未变资产复用带来的调用与成本节省。
 **Requirements:** V08-REUSE-01, V08-REUSE-02, V08-REUSE-03, V08-REUSE-04
 **Depends on:** Phase 15
-**Status:** PLANNED — 3/3 plans created; execution gated on Phase 15 verification and explicit authorization
+**Status:** PLANNED — 3/3 plans created; **unblocked** by Phase 15 verification; orchestration authorization for 13–18 remains active
 **Plans:** 3/3 plans created
 
 **Success Criteria:**
