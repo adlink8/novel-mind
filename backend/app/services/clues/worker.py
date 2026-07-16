@@ -676,6 +676,55 @@ def _unit_to_evidence_dict(unit, role: str) -> dict[str, Any]:
     }
 
 
+def _clean_title_stem(text: str, *, max_len: int = 24) -> str:
+    """Collapse whitespace and take a short stem for product titles."""
+    cleaned = " ".join((text or "").replace("\r", "\n").split())
+    if not cleaned:
+        return ""
+    # Prefer first sentence-like fragment.
+    for sep in ("。", "！", "？", ".", "!", "?", "；", ";"):
+        if sep in cleaned:
+            cleaned = cleaned.split(sep, 1)[0].strip()
+            break
+    if len(cleaned) <= max_len:
+        return cleaned
+    return cleaned[: max_len - 1].rstrip() + "…"
+
+
+def build_machine_clue_title(
+    *,
+    rationale: str | None,
+    cue_text: str | None,
+    chapter: int | None,
+    candidate_id: str,
+    max_len: int = 32,
+) -> str:
+    """Short hypothesis title — never the raw long cue excerpt alone.
+
+    Prefer the first cleaned line of the judgment rationale; otherwise
+    ``伏笔·第N章`` + a short stem from cue text.
+    """
+    rationale_line = ""
+    if rationale:
+        first = (rationale.replace("\r", "\n").split("\n", 1)[0] or "").strip()
+        rationale_line = _clean_title_stem(first, max_len=max_len)
+    if rationale_line and len(rationale_line) >= 2:
+        return rationale_line[:max_len]
+
+    stem = _clean_title_stem(cue_text or "", max_len=16)
+    if chapter is not None and int(chapter) > 0:
+        prefix = f"伏笔·第{int(chapter)}章"
+        if stem:
+            title = f"{prefix}·{stem}"
+        else:
+            title = prefix
+        return title[:max_len]
+
+    if stem:
+        return f"伏笔·{stem}"[:max_len]
+    return (candidate_id or "伏笔候选")[:max_len]
+
+
 async def _persist_decision(
     runtime: ClueWorkerRuntime,
     run: ClueAnalysisRun,
@@ -736,11 +785,23 @@ async def _persist_decision(
             return
 
         cue_unit = package.cue_units[0] if package.cue_units else None
-        title = (
-            (cue_unit.text or draft.candidate_id)[:80]
-            if cue_unit is not None
-            else draft.candidate_id
+        cue_text = (cue_unit.text or "") if cue_unit is not None else ""
+        title = build_machine_clue_title(
+            rationale=judgment.rationale,
+            cue_text=cue_text or None,
+            chapter=(
+                cue_unit.narrative_chapter_number if cue_unit is not None else None
+            ),
+            candidate_id=draft.candidate_id,
         )
+        snapshot = package.to_snapshot()
+        # Keep raw cue excerpt for ops/debug; product title stays short hypothesis.
+        if isinstance(snapshot, dict) and cue_text:
+            snapshot = {
+                **snapshot,
+                "cue_excerpt": cue_text[:500],
+                "title_source": "rationale_or_chapter_stem",
+            }
         machine = MachineClue(
             owner_id=owner_id,
             novel_id=novel_id,
@@ -749,7 +810,7 @@ async def _persist_decision(
             title=title or draft.candidate_id,
             summary=(judgment.rationale or "")[:4000],
             package_hash=draft.package_hash,
-            package_snapshot=package.to_snapshot(),
+            package_snapshot=snapshot,
             confidence=float(judgment.confidence),
             publication_status="provisional",
             first_cue_chapter=(

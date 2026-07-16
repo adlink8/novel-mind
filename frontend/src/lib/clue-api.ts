@@ -69,6 +69,12 @@ export interface VisibleClue {
   evidence_count: number;
   link_count: number;
   provenance: Record<string, ClueProvenanceKind>;
+  /** Plant chapter when known; list projection only. */
+  first_cue_chapter?: number | null;
+  /** Payoff chapter when spoiler-visible; null if hidden/unknown. */
+  payoff_chapter?: number | null;
+  /** Short summary line when available. */
+  summary?: string | null;
 }
 
 export interface ClueVersionView {

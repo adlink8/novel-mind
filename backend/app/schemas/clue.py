@@ -552,6 +552,11 @@ class ClueVisibleItem(StrictClueModel):
     evidence_count: int = Field(ge=0)
     link_count: int = Field(ge=0)
     provenance: dict[str, Literal["machine", "manual"]] = Field(default_factory=dict)
+    # Spoiler-safe plant/payoff span for list projection (no full detail fetch).
+    first_cue_chapter: int | None = Field(default=None, gt=0)
+    # Null when unknown or when payoff chapter is beyond the spoiler cutoff.
+    payoff_chapter: int | None = Field(default=None, gt=0)
+    summary: str | None = Field(default=None, max_length=240)
 
 
 class ClueVisibleEnvelope(StrictClueModel):

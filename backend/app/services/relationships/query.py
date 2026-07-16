@@ -36,10 +36,12 @@ from app.schemas.relationship import (
     ProvenanceKind,
     RelationshipCounts,
     RelationshipDegradation,
+    RelationshipEdgeKind,
     RelationshipEdgeType,
     RelationshipEvidenceRef,
     RelationshipEvidenceResponse,
     RelationshipGraphEdge,
+    RelationshipGraphEdgeLabel,
     RelationshipGraphEnvelope,
     RelationshipGraphNode,
     RelationshipVersionSource,
@@ -74,6 +76,8 @@ class _FoldedEdge:
     provenance: ProvenanceKind = ProvenanceKind.MACHINE
     evidence_preview: str | None = None
     evidence_count: int = 0
+    edge_kind: RelationshipEdgeKind = RelationshipEdgeKind.ACCEPTED_OBSERVATION
+    suggested_type: str | None = None
 
 
 def logical_relationship_key(
@@ -344,8 +348,14 @@ class RelationshipGraphQueryService:
         request_full_book: bool = False,
         character_id: int | None = None,
         relation_type: str | None = None,
+        include_provisional: bool = False,
     ) -> RelationshipGraphEnvelope | None:
-        """Fold accepted observations into a spoiler-safe graph envelope."""
+        """Fold accepted observations into a spoiler-safe graph envelope.
+
+        Default graph is accepted observations only. Provisional timeline
+        co-occurrence is used only when accepted is empty, or when the client
+        opts in via ``include_provisional=true``.
+        """
 
         resolved = await self.resolve_version(
             session,
@@ -461,14 +471,29 @@ class RelationshipGraphQueryService:
                 for e in folded
                 if e.source_character_id == cid or e.target_character_id == cid
             ]
+        # Truth-tier decision must not depend on relation_type filter: if accepted
+        # observations exist but none match the type filter, stay accepted-only
+        # (empty edges) rather than silently flooding with provisional co-occur.
+        has_accepted = bool(folded)
         if relation_type is not None:
-            folded = [e for e in folded if e.relation_type == relation_type]
+            folded = [
+                e
+                for e in folded
+                if e.relation_type == relation_type
+                or e.suggested_type == relation_type
+            ]
 
         evidence_by_obs = await self._evidence_for_observations(
             session,
-            observation_ids=[e.observation_id for e in folded],
+            observation_ids=[
+                e.observation_id
+                for e in folded
+                if e.edge_kind == RelationshipEdgeKind.ACCEPTED_OBSERVATION
+            ],
         )
         for edge in folded:
+            if edge.edge_kind != RelationshipEdgeKind.ACCEPTED_OBSERVATION:
+                continue
             refs = evidence_by_obs.get(edge.observation_id, [])
             edge.evidence_count = len(refs)
             if refs:
@@ -476,10 +501,10 @@ class RelationshipGraphQueryService:
                 edge.evidence_preview = (refs[0].excerpt or "")[:400] or None
 
         provisional_names: dict[int, str] = {}
-        if not folded:
+        if not has_accepted:
             # Progressive product surface: when Phase 09 observations are empty,
             # derive a co-occurrence graph from timeline participants so the UI
-            # is not blank while (or after) analysis runs.
+            # is not blank. Edges are honesty-typed as cooccur, never fake ally.
             folded, provisional_names = await self._provisional_from_timeline(
                 session,
                 owner_id=owner_id,
@@ -489,6 +514,32 @@ class RelationshipGraphQueryService:
                 character_id=character_id,
                 relation_type=relation_type,
             )
+        elif include_provisional:
+            # Opt-in layer: add provisional co-occurrence that does not duplicate
+            # an already-accepted undirected character pair.
+            provisional, provisional_names = await self._provisional_from_timeline(
+                session,
+                owner_id=owner_id,
+                novel_id=novel.id,
+                version_id=resolved.version_id,
+                through_chapter=position,
+                character_id=character_id,
+                relation_type=relation_type,
+            )
+            accepted_pairs = {
+                (
+                    min(e.source_character_id, e.target_character_id),
+                    max(e.source_character_id, e.target_character_id),
+                )
+                for e in folded
+            }
+            for edge in provisional:
+                pair = (
+                    min(edge.source_character_id, edge.target_character_id),
+                    max(edge.source_character_id, edge.target_character_id),
+                )
+                if pair not in accepted_pairs:
+                    folded.append(edge)
 
         node_ids: set[int] = set()
         for edge in folded:
@@ -530,12 +581,13 @@ class RelationshipGraphQueryService:
             for cid in sorted(node_ids)
         ]
 
+        allowed_labels = {t.value for t in RelationshipGraphEdgeLabel}
         edges = [
             RelationshipGraphEdge(
                 observation_id=e.observation_id,
                 source_character_id=e.source_character_id,
                 target_character_id=e.target_character_id,
-                relation_type=RelationshipEdgeType(e.relation_type),
+                relation_type=RelationshipGraphEdgeLabel(e.relation_type),
                 transition=e.transition,  # type: ignore[arg-type]
                 confidence=e.confidence,
                 valid_from_chapter=e.valid_from_chapter,
@@ -543,11 +595,17 @@ class RelationshipGraphQueryService:
                 provenance=e.provenance,
                 evidence_preview=e.evidence_preview,
                 evidence_count=e.evidence_count,
+                edge_kind=e.edge_kind,
+                suggested_type=(
+                    RelationshipEdgeType(e.suggested_type)
+                    if e.suggested_type
+                    in {t.value for t in RelationshipEdgeType}
+                    else None
+                ),
             )
             for e in folded
             if e.transition in ("establish", "change", "end")
-            and e.relation_type
-            in {t.value for t in RelationshipEdgeType}
+            and e.relation_type in allowed_labels
         ]
         # Ended transitions are already removed by fold; keep only active edges.
         edges = [e for e in edges if e.transition != "end"]
@@ -561,7 +619,7 @@ class RelationshipGraphQueryService:
         mode = self._degradation_mode(node_count, edge_count)
 
         available_types = sorted(
-            {RelationshipEdgeType(t) for t in type_counts.keys()},
+            {RelationshipGraphEdgeLabel(t) for t in type_counts.keys()},
             key=lambda t: t.value,
         )
         available_character_ids = sorted(node_ids)
@@ -989,10 +1047,11 @@ class RelationshipGraphQueryService:
         character_id: int | None,
         relation_type: str | None,
     ) -> tuple[list[_FoldedEdge], dict[int, str]]:
-        """Co-occurrence graph from timeline participants (progressive UI).
+        """Provisional co-occurrence graph from timeline participants.
 
-        Infers ally/enemy/family/mentor/romantic from event text + event_type
-        so the provisional surface is not a mono-ally spiderweb.
+        Primary label is always ``cooccur`` (not a confirmed fiction type).
+        Heuristic ally/enemy/… live only in ``suggested_type`` and preview text
+        as non-assertive type clues, never as accepted observations.
         """
         events = list(
             (
@@ -1075,8 +1134,9 @@ class RelationshipGraphQueryService:
                     if inferred not in st["type_samples"]:
                         st["type_samples"][inferred] = (event.title or "")[:80]
 
-        # Typed candidates — quota per type so "naming ceremony" ally edges
-        # do not monopolize the whole graph.
+        # One co-occurrence edge per pair; optional suggested_type for UI tint.
+        # Quotas still diversify by suggested heuristic so conflict arcs surface
+        # without claiming accepted fiction types.
         min_cooccur = 2
         type_quota = {
             RelationshipEdgeType.ENEMY.value: 14,
@@ -1092,8 +1152,9 @@ class RelationshipGraphQueryService:
             "mentor": "师徒",
             "romantic": "爱慕",
         }
+        cooccur_label = RelationshipGraphEdgeLabel.COOCCUR.value
 
-        # (pair, rel_t, vote_n, st)
+        # (pair, suggested_t, vote_n, st)
         typed: list[tuple[tuple[int, int], str, int, dict[str, Any]]] = []
         for key, st in pair_stats.items():
             if st["count"] < min_cooccur:
@@ -1111,20 +1172,23 @@ class RelationshipGraphQueryService:
                 second_t, second_v = ordered[1]
                 if second_v >= max(2, int(top_v * 0.4)) and second_t != top_t:
                     selected.append((second_t, second_v))
-            for rel_t, vote_n in selected:
-                if relation_type is not None and relation_type != rel_t:
+            for suggested_t, vote_n in selected:
+                if relation_type is not None and relation_type not in (
+                    suggested_t,
+                    cooccur_label,
+                ):
                     continue
                 if vote_n < 1:
                     continue
-                typed.append((key, rel_t, vote_n, st))
+                typed.append((key, suggested_t, vote_n, st))
 
         # Prefer higher votes; enemy slightly boosted so conflict arcs surface.
         def sort_key(
             item: tuple[tuple[int, int], str, int, dict[str, Any]],
         ) -> tuple[int, int, int, tuple[int, int]]:
-            key, rel_t, vote_n, st = item
-            boost = 3 if rel_t == RelationshipEdgeType.ENEMY.value else 0
-            if rel_t in (
+            key, suggested_t, vote_n, st = item
+            boost = 3 if suggested_t == RelationshipEdgeType.ENEMY.value else 0
+            if suggested_t in (
                 RelationshipEdgeType.FAMILY.value,
                 RelationshipEdgeType.MENTOR.value,
                 RelationshipEdgeType.ROMANTIC.value,
@@ -1136,34 +1200,44 @@ class RelationshipGraphQueryService:
 
         used_quota: dict[str, int] = defaultdict(int)
         folded: list[_FoldedEdge] = []
-        for (a, b), rel_t, vote_n, st in typed:
-            if used_quota[rel_t] >= type_quota.get(rel_t, 8):
+        # Deduplicate undirected pair so multi-suggested does not double-claim.
+        seen_pairs: set[tuple[int, int]] = set()
+        for (a, b), suggested_t, vote_n, st in typed:
+            pair_key = (a, b)
+            if pair_key in seen_pairs:
                 continue
-            sample = (st.get("type_samples") or {}).get(rel_t) or ""
+            if used_quota[suggested_t] >= type_quota.get(suggested_t, 8):
+                continue
+            sample = (st.get("type_samples") or {}).get(suggested_t) or ""
+            clue_label = type_label.get(suggested_t, suggested_t)
+            preview = (
+                f"时间线共现×{int(st['count'])}"
+                f"（类型线索·{clue_label}×{int(vote_n)}，非已确认关系）"
+                + (f"：{sample}" if sample else "")
+                + " · 临时图"
+            )
             folded.append(
                 _FoldedEdge(
-                    observation_id=self._pair_synthetic_id(a, b, rel_t),
+                    observation_id=self._pair_synthetic_id(a, b, cooccur_label),
                     source_character_id=a,
                     target_character_id=b,
-                    relation_type=rel_t,
+                    relation_type=cooccur_label,
                     transition="establish",
                     confidence=min(
-                        0.62, 0.28 + 0.04 * int(vote_n) + 0.02 * int(st["count"])
+                        0.55, 0.22 + 0.03 * int(vote_n) + 0.02 * int(st["count"])
                     ),
                     valid_from_chapter=int(st["first_chapter"]),
                     valid_to_chapter=None,
-                    logical_key=logical_relationship_key(a, b, rel_t),
+                    logical_key=logical_relationship_key(a, b, cooccur_label),
                     provenance=ProvenanceKind.MACHINE,
-                    evidence_preview=(
-                        f"时间线推断·{type_label.get(rel_t, rel_t)}×{int(vote_n)}"
-                        f"（共现{int(st['count'])}）"
-                        + (f"：{sample}" if sample else "")
-                        + " · 临时图"
-                    ),
-                    evidence_count=int(vote_n),
+                    evidence_preview=preview[:400],
+                    evidence_count=int(st["count"]),
+                    edge_kind=RelationshipEdgeKind.PROVISIONAL_COOCCURRENCE,
+                    suggested_type=suggested_t,
                 )
             )
-            used_quota[rel_t] += 1
+            used_quota[suggested_t] += 1
+            seen_pairs.add(pair_key)
 
         return folded, names
 

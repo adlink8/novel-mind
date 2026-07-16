@@ -443,6 +443,25 @@ async def build_clue_version_view(
             elif isinstance(val, str):
                 title = val
 
+        first_cue_chapter = (
+            int(clue.first_cue_chapter) if clue.first_cue_chapter is not None else None
+        )
+        # Spoiler-safe payoff span: only expose when payoff chapter ≤ cutoff.
+        payoff_chapter: int | None = None
+        for ev in events:
+            if ev.payoff_chapter is None:
+                continue
+            ch = int(ev.payoff_chapter)
+            if cutoff is not None and ch > cutoff:
+                continue
+            if payoff_chapter is None or ch > payoff_chapter:
+                payoff_chapter = ch
+        summary_raw = (getattr(clue, "summary", None) or "").strip()
+        summary_short: str | None = None
+        if summary_raw:
+            first_line = summary_raw.replace("\r", "\n").split("\n", 1)[0].strip()
+            summary_short = first_line[:240] if first_line else None
+
         items.append(
             ClueVisibleItem(
                 logical_clue_id=clue.logical_clue_id,
@@ -454,6 +473,9 @@ async def build_clue_version_view(
                 evidence_count=len(visible_evidence),
                 link_count=len(visible_links),
                 provenance=provenance,  # type: ignore[arg-type]
+                first_cue_chapter=first_cue_chapter,
+                payoff_chapter=payoff_chapter,
+                summary=summary_short,
             )
         )
         state_counter[derived.value] += 1

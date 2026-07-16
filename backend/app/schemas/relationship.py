@@ -72,6 +72,30 @@ class ProvenanceKind(StrEnum):
     MANUAL = "manual"
 
 
+class RelationshipEdgeKind(StrEnum):
+    """Truth tier for graph edges — accepted fact vs provisional co-occurrence."""
+
+    ACCEPTED_OBSERVATION = "accepted_observation"
+    PROVISIONAL_COOCCURRENCE = "provisional_cooccurrence"
+
+
+class RelationshipGraphEdgeLabel(StrEnum):
+    """
+    Labels allowed on graph *projection* edges.
+
+    Fiction enum types remain write-path authority for accepted observations.
+    ``cooccur`` is honesty-only for provisional timeline co-occurrence and must
+    never be written as an accepted observation relation_type.
+    """
+
+    ALLY = "ally"
+    ENEMY = "enemy"
+    FAMILY = "family"
+    MENTOR = "mentor"
+    ROMANTIC = "romantic"
+    COOCCUR = "cooccur"
+
+
 _FORBIDDEN_EDGE_TYPES = frozenset(
     {
         "causes",
@@ -234,7 +258,7 @@ class RelationshipGraphEdge(StrictRelationshipModel):
     observation_id: int = Field(gt=0)
     source_character_id: int = Field(gt=0)
     target_character_id: int = Field(gt=0)
-    relation_type: RelationshipEdgeType
+    relation_type: RelationshipGraphEdgeLabel
     transition: Literal["establish", "change", "end"]
     confidence: float = Field(ge=0, le=1)
     valid_from_chapter: int = Field(gt=0)
@@ -242,6 +266,9 @@ class RelationshipGraphEdge(StrictRelationshipModel):
     provenance: ProvenanceKind = ProvenanceKind.MACHINE
     evidence_preview: str | None = Field(default=None, max_length=400)
     evidence_count: int = Field(default=0, ge=0)
+    edge_kind: RelationshipEdgeKind = RelationshipEdgeKind.ACCEPTED_OBSERVATION
+    # Heuristic fiction label for provisional co-occurrence only; never accepted fact.
+    suggested_type: RelationshipEdgeType | None = None
 
     @field_validator("relation_type", mode="before")
     @classmethod
@@ -251,9 +278,23 @@ class RelationshipGraphEdge(StrictRelationshipModel):
         return value
 
     @model_validator(mode="after")
-    def validate_endpoints(self) -> "RelationshipGraphEdge":
+    def validate_endpoints_and_truth_tier(self) -> "RelationshipGraphEdge":
         if self.source_character_id == self.target_character_id:
             raise ValueError("self-edges are forbidden")
+        if (
+            self.edge_kind == RelationshipEdgeKind.PROVISIONAL_COOCCURRENCE
+            and self.relation_type != RelationshipGraphEdgeLabel.COOCCUR
+        ):
+            raise ValueError(
+                "provisional co-occurrence edges must use relation_type=cooccur"
+            )
+        if (
+            self.edge_kind == RelationshipEdgeKind.ACCEPTED_OBSERVATION
+            and self.relation_type == RelationshipGraphEdgeLabel.COOCCUR
+        ):
+            raise ValueError(
+                "accepted observation edges cannot use relation_type=cooccur"
+            )
         return self
 
 
@@ -282,7 +323,9 @@ class RelationshipGraphEnvelope(StrictRelationshipModel):
     nodes: list[RelationshipGraphNode] = Field(default_factory=list)
     edges: list[RelationshipGraphEdge] = Field(default_factory=list)
     counts: RelationshipCounts = Field(default_factory=RelationshipCounts)
-    available_relation_types: list[RelationshipEdgeType] = Field(default_factory=list)
+    available_relation_types: list[RelationshipGraphEdgeLabel] = Field(
+        default_factory=list
+    )
     available_character_ids: list[int] = Field(default_factory=list)
     degradation: RelationshipDegradation = Field(default_factory=RelationshipDegradation)
     generated_at: datetime | None = None

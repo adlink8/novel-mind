@@ -150,6 +150,11 @@ export interface NovelUploadResponse {
   word_count: number;
 }
 
+export interface NovelBulkDeleteResponse {
+  deleted_ids: number[];
+  skipped_ids: number[];
+}
+
 /** 导入进度状态 */
 export interface ImportStatus {
   job_id?: number | null;
@@ -172,6 +177,12 @@ export const novelsApi = {
     });
   },
   delete: (id: string) => api.delete(`/novels/${id}`),
+  update: (id: string | number, data: { title: string }) =>
+    api.patch<Novel>(`/novels/${id}`, data),
+  bulkDelete: (ids: number[]) =>
+    api.delete<NovelBulkDeleteResponse>("/novels/bulk", {
+      data: { novel_ids: ids },
+    }),
   getChapters: (id: string) => api.get<Chapter[]>(`/novels/${id}/chapters`),
   getChapter: (novelId: string, chapterId: string) =>
     api.get<Chapter>(`/novels/${novelId}/chapters/${chapterId}`),
@@ -396,6 +407,13 @@ export type RelationshipEdgeType =
   | "mentor"
   | "romantic";
 
+/** Graph projection labels include honesty-only cooccur for provisional edges. */
+export type RelationshipGraphEdgeLabel = RelationshipEdgeType | "cooccur";
+
+export type RelationshipEdgeKind =
+  | "accepted_observation"
+  | "provisional_cooccurrence";
+
 export type RelationshipVersionSource =
   | "active"
   | "running_candidate"
@@ -416,7 +434,7 @@ export interface RelationshipGraphEdge {
   observation_id: number;
   source_character_id: number;
   target_character_id: number;
-  relation_type: RelationshipEdgeType;
+  relation_type: RelationshipGraphEdgeLabel;
   transition: "establish" | "change" | "end";
   confidence: number;
   valid_from_chapter: number;
@@ -424,6 +442,10 @@ export interface RelationshipGraphEdge {
   provenance: RelationshipProvenance;
   evidence_preview: string | null;
   evidence_count: number;
+  /** Truth tier: accepted observation vs provisional co-occurrence. */
+  edge_kind?: RelationshipEdgeKind;
+  /** Heuristic type clue for provisional edges only — not accepted fact. */
+  suggested_type?: RelationshipEdgeType | null;
 }
 
 export interface RelationshipCounts {
@@ -451,7 +473,7 @@ export interface RelationshipGraphEnvelope {
   nodes: RelationshipGraphNode[];
   edges: RelationshipGraphEdge[];
   counts: RelationshipCounts;
-  available_relation_types: RelationshipEdgeType[];
+  available_relation_types: RelationshipGraphEdgeLabel[];
   available_character_ids: number[];
   degradation: RelationshipDegradation;
   generated_at: string | null;
@@ -489,7 +511,9 @@ export interface RelationshipGraphQuery {
   through_chapter?: number;
   full_book?: boolean;
   character_id?: number;
-  relation_type?: RelationshipEdgeType | string;
+  relation_type?: RelationshipGraphEdgeLabel | string;
+  /** When accepted edges exist, also load provisional co-occurrence layer. */
+  include_provisional?: boolean;
 }
 
 export interface RelationshipEvidenceQuery {
@@ -509,6 +533,7 @@ export const relationshipsApi = {
         full_book: params?.full_book,
         character_id: params?.character_id,
         relation_type: params?.relation_type,
+        include_provisional: params?.include_provisional,
       },
     }),
   getEvidence: (
@@ -635,7 +660,8 @@ export interface MessageListResponse {
 export interface MessageCreateBody {
   client_message_id: string;
   body: string;
-  selection: SelectionCoordinate;
+  chapter_id?: number;
+  selection?: SelectionCoordinate;
 }
 
 const TERMINAL_JOB_STATUSES: ReadonlySet<GenerationJobStatus> = new Set([
@@ -1052,6 +1078,12 @@ export interface QualityRunCreateBody {
   run_immediately?: boolean;
 }
 
+export interface QualityRunFromNovelBody {
+  novel_id: number;
+  dataset_ids?: number[];
+  run_immediately?: boolean;
+}
+
 /** Human-readable Chinese labels for quality statuses. */
 export const QUALITY_STATUS_LABELS: Record<string, string> = {
   queued: "排队中",
@@ -1147,6 +1179,9 @@ export const evalApi = {
 
   createQualityRun: (body: QualityRunCreateBody) =>
     api.post<QualityRunResponse>("/eval/quality/runs", body),
+
+  createQualityRunFromNovel: (body: QualityRunFromNovelBody) =>
+    api.post<QualityRunResponse>("/eval/quality/runs/from-novel", body),
 
   resumeQualityRun: (jobId: string) =>
     api.post<QualityRunResponse>(`/eval/quality/runs/${jobId}/resume`),

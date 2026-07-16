@@ -48,6 +48,14 @@ async def get_relationship_graph(
     full_book: bool = False,
     character_id: int | None = Query(default=None, gt=0),
     relation_type: str | None = Query(default=None, max_length=32),
+    include_provisional: bool = Query(
+        default=False,
+        description=(
+            "When accepted observations exist, also include provisional "
+            "timeline co-occurrence edges (edge_kind=provisional_cooccurrence). "
+            "When accepted is empty, provisional is already the default surface."
+        ),
+    ),
 ) -> RelationshipGraphEnvelope:
     """Spoiler-safe graph envelope for one owned novel/version."""
 
@@ -61,6 +69,7 @@ async def get_relationship_graph(
         request_full_book=full_book,
         character_id=character_id,
         relation_type=relation_type,
+        include_provisional=include_provisional,
     )
     if envelope is None:
         raise HTTPException(status_code=404, detail="relationship graph not found")

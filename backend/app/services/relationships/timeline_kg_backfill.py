@@ -1,13 +1,21 @@
-"""Backfill Characters + Phase-04 KG accepted judgments from timeline participants.
+"""Seed-mode ops backfill: Characters + Phase-04 KG rows from timeline participants.
 
 Closes the data hole: Phase 09 relationship worker only selects
 KnowledgeRelationJudgment rows with status/gate_status == accepted and character
 endpoints. Timeline-only novels currently have 0 KG rows → 0 observations.
 
+**Seed / ops path only — not a silent product truth path.**
+
 This path is deterministic (no LLM) and uses timeline co-occurrence + event text
-heuristics to seed typed judgments with real evidence locators. The relationship
-worker can then materialize accepted observations (optionally with deterministic
-judgments to skip a second LLM pass).
+heuristics to *seed* typed judgments with real evidence locators. Rows are
+marked with ``source=timeline_kg_backfill`` in package/config/raw/structured
+metadata so operators can distinguish seed pollution from pipeline-accepted
+observations. Prefer relying on graph provisional co-occurrence
+(``edge_kind=provisional_cooccurrence``) for progressive UI when empty;
+run this backfill only when deliberately seeding accepted intake for ops.
+
+The relationship worker can then materialize accepted observations (optionally
+with deterministic judgments to skip a second LLM pass).
 """
 
 from __future__ import annotations
@@ -165,7 +173,9 @@ class TimelineKgBackfillService:
             status="running",
             prompt_version="timeline-kg-backfill.v1",
             config_snapshot={
-                "source": "machine_timeline",
+                "source": "timeline_kg_backfill",
+                "seed_mode": True,
+                "upstream": "machine_timeline",
                 "version_id": version.id,
                 "max_characters": max_characters,
                 "max_judgments": max_judgments,
@@ -553,9 +563,15 @@ class TimelineKgBackfillService:
                 f"类型={rel_t} 票={pair['vote']} 共现={pair['count']} "
                 f"自首见第{pair['first_chapter']}章"
             ),
-            risk_flags=["timeline_heuristic_seed"],
-            raw_output={"source": "timeline_kg_backfill", "pair": pair["key"]},
+            risk_flags=["timeline_heuristic_seed", "seed_mode_ops"],
+            raw_output={
+                "source": "timeline_kg_backfill",
+                "seed_mode": True,
+                "pair": pair["key"],
+            },
             structured_output={
+                "source": "timeline_kg_backfill",
+                "seed_mode": True,
                 "relation_type": rel_t,
                 "confidence": confidence,
                 "evidence_refs": evidence_refs,
