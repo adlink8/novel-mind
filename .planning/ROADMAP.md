@@ -7,6 +7,7 @@
 - [ ] v0.3 小说导入 + RAG 索引 - 导入/索引/搜索已交付，RAG 评测质量闭环仍有缺口。
 - [x] v0.5 自动质量与 CI 门禁 - 以全栈自动化和双模型仲裁替代人工 RAG 质量确认；REQ-AUTO-11 closed（06-08/06-09）。
 - [x] v0.8 分层叙事记忆与层级 RAG - **SHIPPED** candidate scope 2026-07-16 — 归档 [v0.8-ROADMAP](./milestones/v0.8-ROADMAP.md) / [audit](./v0.8-MILESTONE-AUDIT.md)
+- [ ] v0.9 分析工作台呈现与数据诚实 - **ACTIVE** — Phase 19（不重开 08/09/11）
 
 第一个 active milestone 已按要求设为并完成"审计与启动修复"。v0.3 经 2006-06-13 复审后恢复为 active，详见 `.planning/v0.3-MILESTONE-AUDIT.md`。
 
@@ -47,12 +48,30 @@
 | v0.7 / Phase 9-11 叙事关系、阅读问答与线索追踪 | Phase 09: 5/5; Phase 10: 5/5; Phase 11: 5/5 | **09 VERIFIED**; **10 PARTIAL** (real Playwright residual); **11 implement-complete** (adversarial residual closed) |
 | v0.8 / Phase 12-17 分层叙事记忆与层级 RAG | 19/19 plans (12–17 done) | **COMPLETE** — Phase 12–17 verified; candidate-only/no pointer cutover |
 | Phase 18 前端动效与过渡系统 | 3/3 | **COMPLETE** — 18-01..03 done; dual-viewport motion qualified |
+| v0.9 / Phase 19 分析工作台呈现与数据诚实 | 4/4 | **COMPLETE** — 19-01..04 done (truth + presentation) |
+
+### Phase 19: Analysis Workbench Presentation & Truth
+
+**Goal:** 让分析台三 tab 在呈现与数据诚实上分离：时间线=章节多轨剧情；关系=已接受 vs 临时共现可区分；线索=埋设→兑现跨章对象（非时间线摘要墙）。  
+**Depends on:** Phase 07, 08, 09, 11（消费契约，不重开）  
+**Status:** COMPLETE (plans verified; optional phase report / ship)  
+**Non-goals:** narrative-memory promotion、完整 KG 重训、换图表库  
+
+Plans:
+- [x] 19-01 truth layer & API honesty (edge_kind / clue title+span)
+- [x] 19-02 timeline multi-lane chapter plot view
+- [x] 19-03 relationship honest edges & ego presentation
+- [x] 19-04 clue plant→payoff presentation
+
+**Waves:** 1 (19-01) → 2 (19-02 ∥ 19-03) → 3 (19-04).  
+Context: `.planning/phases/19-analysis-workbench-presentation-and-truth/19-CONTEXT.md`.  
+Summaries: `19-01`..`19-04-SUMMARY.md`.
 
 ## Auto Start
 
-**v0.8 已归档（2026-07-16）**。无自动执行 phase。  
-下一动作：`/gsd-new-milestone`，或处理 v0.3 评测 / Phase 10 residual / `.planning/WIP-INVENTORY-2026-07-16.md`。  
-**禁止**在没有新里程碑的情况下做 narrative-memory promotion / Reader Chat cutover。
+**v0.9 / Phase 19 COMPLETE（2026-07-16）** — plans 19-01..04 verified.  
+**禁止** narrative-memory promotion / Reader Chat cutover 无新里程碑授权时执行。  
+Next: optional phase report / ship / human docs after facts verified.
 
 ## Backlog
 
