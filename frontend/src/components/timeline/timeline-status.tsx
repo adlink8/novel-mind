@@ -67,12 +67,14 @@ export function TimelineStatus({
 
   return (
     <div
-      className="grid gap-2 rounded-2xl border bg-card p-4"
+      className="grid gap-2 border-b border-border/40 pb-3"
       role="status"
       aria-live="polite"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="font-semibold">{labels[status] ?? status}</span>
+        <span className="text-sm font-semibold tracking-tight">
+          {labels[status] ?? status}
+        </span>
         <div className="flex flex-wrap items-center gap-2">
           {run?.updated_at && (
             <time
@@ -87,7 +89,7 @@ export function TimelineStatus({
               type="button"
               disabled={actionBusy}
               onClick={onPause}
-              className="rounded-lg border border-amber-400/80 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-950 hover:bg-amber-100 disabled:opacity-50"
+              className="rounded-md px-2.5 py-1 text-xs font-medium text-amber-900/90 hover:bg-amber-50 disabled:opacity-50"
             >
               暂停
             </button>
@@ -97,7 +99,7 @@ export function TimelineStatus({
               type="button"
               disabled={actionBusy}
               onClick={onResume}
-              className="rounded-lg bg-foreground px-3 py-1.5 text-xs font-medium text-background hover:opacity-90 disabled:opacity-50"
+              className="rounded-md bg-foreground px-2.5 py-1 text-xs font-medium text-background hover:opacity-90 disabled:opacity-50"
             >
               继续分析
             </button>
@@ -107,7 +109,7 @@ export function TimelineStatus({
               type="button"
               disabled={actionBusy}
               onClick={onStart}
-              className="rounded-lg bg-foreground px-3 py-1.5 text-xs font-medium text-background hover:opacity-90 disabled:opacity-50"
+              className="rounded-md bg-foreground px-2.5 py-1 text-xs font-medium text-background hover:opacity-90 disabled:opacity-50"
             >
               {hasEvents || status === "completed" ? "重新分析" : "开始分析"}
             </button>

@@ -38,7 +38,7 @@ export function RelationshipControls(props: Props) {
   return (
     <section
       aria-label="人物关系控制"
-      className="flex flex-wrap items-end gap-3 rounded-2xl border bg-card/80 p-3"
+      className="flex flex-wrap items-end gap-x-4 gap-y-2"
     >
       <label className="grid min-w-40 gap-1 text-xs text-muted-foreground">
         筛选人物
@@ -49,7 +49,7 @@ export function RelationshipControls(props: Props) {
             const raw = event.target.value;
             props.onCharacterChange(raw === "" ? "" : Number(raw));
           }}
-          className="h-10 rounded-xl border bg-background px-3 text-sm text-foreground"
+          className="h-9 rounded-lg border-0 bg-muted/50 px-2.5 text-sm text-foreground ring-1 ring-border/50 focus:outline-none focus:ring-foreground/20"
         >
           <option value="">全部人物</option>
           {props.nodes.map((node) => (
@@ -70,7 +70,7 @@ export function RelationshipControls(props: Props) {
               (event.target.value || "") as RelationshipEdgeType | ""
             )
           }
-          className="h-10 rounded-xl border bg-background px-3 text-sm text-foreground"
+          className="h-9 rounded-lg border-0 bg-muted/50 px-2.5 text-sm text-foreground ring-1 ring-border/50 focus:outline-none focus:ring-foreground/20"
         >
           <option value="">全部类型</option>
           {props.availableRelationTypes
@@ -103,11 +103,11 @@ export function RelationshipControls(props: Props) {
             }
           }}
           placeholder="跟随默认"
-          className="h-10 w-28 rounded-xl border bg-background px-3 text-sm text-foreground"
+          className="h-9 w-28 rounded-lg border-0 bg-muted/50 px-2.5 text-sm text-foreground ring-1 ring-border/50 focus:outline-none focus:ring-foreground/20"
         />
       </label>
 
-      <label className="flex h-10 min-w-[9.5rem] cursor-pointer items-center gap-2 rounded-xl border bg-background px-3 text-sm text-foreground">
+      <label className="flex h-9 min-w-[9.5rem] cursor-pointer items-center gap-2 text-sm text-muted-foreground">
         <input
           type="checkbox"
           aria-label="显示临时共现"
@@ -122,28 +122,28 @@ export function RelationshipControls(props: Props) {
       </label>
 
       <div
-        className="flex flex-wrap gap-2"
+        className="flex flex-wrap gap-1"
         role="group"
         aria-label="关系图缩放"
       >
         <button
           type="button"
           onClick={props.onZoomIn}
-          className="h-10 rounded-xl border bg-background px-3 text-sm"
+          className="h-9 rounded-md px-2.5 text-sm text-muted-foreground hover:bg-muted/60 hover:text-foreground"
         >
           放大
         </button>
         <button
           type="button"
           onClick={props.onZoomOut}
-          className="h-10 rounded-xl border bg-background px-3 text-sm"
+          className="h-9 rounded-md px-2.5 text-sm text-muted-foreground hover:bg-muted/60 hover:text-foreground"
         >
           缩小
         </button>
         <button
           type="button"
           onClick={props.onFit}
-          className="h-10 rounded-xl border bg-background px-3 text-sm"
+          className="h-9 rounded-md px-2.5 text-sm text-muted-foreground hover:bg-muted/60 hover:text-foreground"
         >
           适配
         </button>

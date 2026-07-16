@@ -334,8 +334,10 @@ describe("StructureWorkspaceShell selection scope", () => {
     const scope = screen.getByTestId("structure-scope-label");
     expect(scope).toHaveTextContent("视图范围：");
     expect(scope).toHaveTextContent("第 1–4 章");
-    // Scope label lives in the center column with facet tabs
-    expect(scope.parentElement).toContainElement(
+    // Scope + facet tabs share the same work surface track
+    const track = screen.getByTestId("structure-workspace-track");
+    expect(track).toContainElement(scope);
+    expect(track).toContainElement(
       screen.getByRole("tablist", { name: "分析切片" })
     );
 

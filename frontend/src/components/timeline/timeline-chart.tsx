@@ -652,18 +652,18 @@ export function TimelineChart({
     <section className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_330px]" aria-label="交互式小说时间线">
       <div className="min-w-0 space-y-4">
         {showOverview ? (
-          <section aria-labelledby="timeline-overview-title" className="overflow-hidden rounded-3xl border bg-card p-4 shadow-sm sm:p-6">
-            <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+          <section aria-labelledby="timeline-overview-title" className="min-w-0">
+            <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#53745a]">Whole book overview</p>
-                <h2 id="timeline-overview-title" className="mt-1 font-serif text-xl font-semibold">全书概览 <span className="font-sans text-base font-normal text-muted-foreground">· {sorted.length} 个事件</span></h2>
+                <p className="text-xs font-medium tracking-wide text-muted-foreground">剧情阶段</p>
+                <h2 id="timeline-overview-title" className="mt-0.5 font-serif text-xl font-semibold">全书概览 <span className="font-sans text-base font-normal text-muted-foreground">· {sorted.length} 个事件</span></h2>
               </div>
-              <p className="inline-flex items-center gap-1.5 rounded-full bg-[#eef4ec] px-3 py-1.5 text-xs font-medium text-[#486d50]">
+              <p className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
                 <CircleHelp className="size-3.5" />
                 按剧情节奏分段 · 非固定七等分
               </p>
             </div>
-            <div className="rounded-2xl border bg-[#fcfdfb] p-4 sm:p-5">
+            <div className="rounded-xl bg-muted/25 p-3 sm:p-4">
               <div className="mb-4 flex flex-wrap items-end justify-between gap-2 text-xs text-muted-foreground">
                 <span>{ordering === "narrative" ? "叙事推进" : "故事时间"}</span>
                 <span>
@@ -722,19 +722,19 @@ export function TimelineChart({
                 })}
               </div>
             </div>
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50/65 px-4 py-3">
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border/40 pt-3">
               <div>
-                <p className="text-sm font-semibold text-amber-950">
-                  选择一个剧情阶段，展开查看事件与因果连接
+                <p className="text-sm font-medium text-foreground/90">
+                  选择一个剧情阶段，展开事件与因果
                 </p>
-                <p className="mt-0.5 text-xs text-amber-900/75">
-                  阶段按章节事件密度谷值切分（跟随剧情节奏），不是固定七等分。
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  阶段按章节事件密度谷值切分，不是固定七等分。
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setActiveWindow(windows[0])}
-                className="inline-flex items-center gap-2 rounded-xl bg-[#3d684d] px-3.5 py-2 text-sm font-medium text-white transition hover:bg-[#31563f]"
+                className="inline-flex items-center gap-2 rounded-md bg-foreground px-3 py-1.5 text-sm font-medium text-background transition hover:opacity-90"
               >
                 <Expand className="size-4" />
                 展开首阶段
@@ -742,12 +742,12 @@ export function TimelineChart({
             </div>
           </section>
         ) : (
-          <section className="rounded-3xl border bg-card p-4 shadow-sm sm:p-6">
-            <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-3"><button type="button" onClick={() => { setActiveWindow(null); setListOpen(false); }} className="rounded-xl border p-2 text-muted-foreground transition hover:text-foreground" aria-label="返回全书概览"><ArrowLeft className="size-4" /></button><div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#a56d21]">Zoomed range</p><h2 className="mt-1 font-serif text-xl font-semibold">{activeWindow ? chapterRangeLabel(activeWindow) : "当前时间线"} <span className="font-sans text-base font-normal text-muted-foreground">· {visibleEvents.length} 个事件</span></h2></div></div>
+          <section className="min-w-0">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3"><button type="button" onClick={() => { setActiveWindow(null); setListOpen(false); }} className="rounded-md p-2 text-muted-foreground transition hover:bg-muted/60 hover:text-foreground" aria-label="返回全书概览"><ArrowLeft className="size-4" /></button><div><p className="text-xs font-medium text-muted-foreground">阶段详情</p><h2 className="mt-0.5 font-serif text-xl font-semibold">{activeWindow ? chapterRangeLabel(activeWindow) : "当前时间线"} <span className="font-sans text-base font-normal text-muted-foreground">· {visibleEvents.length} 个事件</span></h2></div></div>
               <p className="text-xs text-muted-foreground">横轴章节 · 纵轴类型泳道 · 滚轮缩放</p>
             </div>
-            <div data-testid="timeline-canvas" data-zoom="inside-slider" data-layout="chapter-swimlane" className="min-w-0 overflow-hidden rounded-2xl border bg-[#fdfefc] p-2 sm:p-4">
+            <div data-testid="timeline-canvas" data-zoom="inside-slider" data-layout="chapter-swimlane" className="min-w-0 overflow-hidden rounded-xl bg-muted/20 p-2 sm:p-3">
               <ReactEChartsCore echarts={echarts} option={option} style={{ height: 420, width: "100%" }} notMerge={false} lazyUpdate opts={{ renderer: "canvas" }} onEvents={{ click: (params: { seriesType?: string; data?: ScatterDatum }) => { try { if (params.seriesType !== "scatter") return; const id = params.data?.eventId; const event = id == null ? undefined : eventMap.get(id); if (event) setSelected(event); } catch { /* ignore chart click glitches */ } }, datazoom: (params: { start?: number; end?: number; batch?: Array<{ start?: number; end?: number }> }) => { try { const batch = params.batch?.[0]; const start = batch?.start ?? params.start; const end = batch?.end ?? params.end; if (typeof start === "number" && typeof end === "number") zoomRef.current = clampZoom({ start, end }); } catch { /* ignore */ } } }} />
             </div>
             <p className="mt-3 text-xs text-muted-foreground">
@@ -758,19 +758,19 @@ export function TimelineChart({
           </section>
         )}
 
-        <section className="rounded-3xl border bg-card p-4 shadow-sm sm:p-5">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><div><h2 className="font-serif text-xl font-semibold">当前范围事件</h2><p className="mt-0.5 text-xs text-muted-foreground">{activeWindow ? `仅显示 ${chapterRangeLabel(activeWindow)} 内 ${visibleEvents.length} 个事件` : `共 ${sorted.length} 个事件`}</p></div><button type="button" aria-label={listOpen ? "收起列表" : activeWindow ? "展开当前范围列表" : "展开全部列表"} onClick={() => setListOpen((value) => !value)} className="inline-flex items-center gap-1.5 text-sm font-medium text-primary">{listOpen ? "收起列表" : "查看全部"}{listOpen ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}</button></div>
-          <ol aria-label="时间线事件列表" className="grid min-h-[6rem] gap-3 md:grid-cols-3">{displayedEvents.map((event) => <li key={event.id} data-event-id={event.id} data-insertion={freshEventIds.has(event.id) ? "fresh" : "stable"} className={freshEventIds.has(event.id) ? "motion-transition-content opacity-100" : undefined}><button type="button" onClick={() => setSelected(event)} className={`h-full w-full rounded-2xl border p-4 text-left transition-[border-color,box-shadow,background-color,color] motion-duration-standard motion-ease-enter hover:border-primary hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${selected?.id === event.id ? "border-primary/60 bg-primary/5" : "bg-card"}`}><p className="text-xs text-muted-foreground">{chapterLabel(event)} · {event.time_expression ?? "时间未知"}</p><h3 className="mt-1.5 line-clamp-1 font-serif text-base font-semibold">{event.title}</h3><p className="mt-2 line-clamp-2 text-xs leading-5 text-muted-foreground">{event.description}</p></button></li>)}</ol>
+        <section className="min-w-0 border-t border-border/40 pt-4">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3"><div><h2 className="font-serif text-lg font-semibold">当前范围事件</h2><p className="mt-0.5 text-xs text-muted-foreground">{activeWindow ? `仅显示 ${chapterRangeLabel(activeWindow)} 内 ${visibleEvents.length} 个事件` : `共 ${sorted.length} 个事件`}</p></div><button type="button" aria-label={listOpen ? "收起列表" : activeWindow ? "展开当前范围列表" : "展开全部列表"} onClick={() => setListOpen((value) => !value)} className="inline-flex items-center gap-1.5 text-sm font-medium text-primary">{listOpen ? "收起列表" : "查看全部"}{listOpen ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}</button></div>
+          <ol aria-label="时间线事件列表" className="grid min-h-[6rem] gap-2 md:grid-cols-3">{displayedEvents.map((event) => <li key={event.id} data-event-id={event.id} data-insertion={freshEventIds.has(event.id) ? "fresh" : "stable"} className={freshEventIds.has(event.id) ? "motion-transition-content opacity-100" : undefined}><button type="button" onClick={() => setSelected(event)} className={`h-full w-full rounded-xl p-3 text-left transition-[background-color,color] motion-duration-standard motion-ease-enter hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${selected?.id === event.id ? "bg-foreground/[0.05]" : "bg-muted/20"}`}><p className="text-xs text-muted-foreground">{chapterLabel(event)} · {event.time_expression ?? "时间未知"}</p><h3 className="mt-1.5 line-clamp-1 font-serif text-base font-semibold">{event.title}</h3><p className="mt-2 line-clamp-2 text-xs leading-5 text-muted-foreground">{event.description}</p></button></li>)}</ol>
         </section>
       </div>
 
-      <aside className="h-fit rounded-3xl border bg-card p-5 shadow-sm xl:sticky xl:top-5" aria-label="选中事件详情">
-        <div className="mb-5 flex items-center justify-between"><span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">{chapterLabel(detailEvent)}</span>{selected && <button type="button" onClick={() => setSelected(null)} className="rounded-lg p-1.5 text-muted-foreground transition hover:bg-muted" aria-label="关闭详情">×</button>}</div>
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#a56d21]">Selected event</p><h2 className="mt-1 font-serif text-2xl font-semibold leading-snug">{detailEvent.title}</h2>
-        <p className="mt-4 text-sm leading-7 text-muted-foreground">{detailEvent.description}</p>
-        {detailEvent.participants?.length > 0 && <div className="mt-5 border-t pt-4"><p className="text-xs font-semibold text-muted-foreground">参与人物</p><div className="mt-2 flex flex-wrap gap-2">{detailEvent.participants.map((participant) => <span key={participant.mention} className="rounded-full bg-muted px-2.5 py-1 text-xs">{participant.mention}</span>)}</div></div>}
-        <div className="mt-5 rounded-xl bg-[#f2f6f0] p-3"><p className="text-xs font-medium text-[#53745a]">为什么在这里显示？</p><p className="mt-1 text-xs leading-5 text-muted-foreground">它位于当前可见范围内；全书概览不会堆叠展示事件标题。</p></div>
-        <div className="mt-5 grid gap-2"><Link href={`/search?q=${encodeURIComponent(detailEvent.title)}`} className="inline-flex items-center justify-center gap-2 rounded-xl border bg-card px-3 py-2.5 text-sm font-medium transition hover:border-primary"><Search className="size-4" />检索证据</Link><Link href={readerHref(detailEvent)} className="inline-flex items-center justify-center gap-2 rounded-xl bg-foreground px-3 py-2.5 text-sm font-medium text-background transition hover:bg-foreground/85"><BookOpen className="size-4" />阅读此章</Link></div>
+      <aside className="h-fit border-l border-border/40 pl-4 xl:sticky xl:top-5" aria-label="选中事件详情">
+        <div className="mb-4 flex items-center justify-between"><span className="text-xs font-medium text-primary">{chapterLabel(detailEvent)}</span>{selected && <button type="button" onClick={() => setSelected(null)} className="rounded-md p-1.5 text-muted-foreground transition hover:bg-muted" aria-label="关闭详情">×</button>}</div>
+        <p className="text-xs font-medium text-muted-foreground">选中事件</p><h2 className="mt-1 font-serif text-xl font-semibold leading-snug">{detailEvent.title}</h2>
+        <p className="mt-3 text-sm leading-7 text-muted-foreground">{detailEvent.description}</p>
+        {detailEvent.participants?.length > 0 && <div className="mt-4 border-t border-border/40 pt-3"><p className="text-xs font-medium text-muted-foreground">参与人物</p><div className="mt-2 flex flex-wrap gap-2">{detailEvent.participants.map((participant) => <span key={participant.mention} className="rounded-full bg-muted/70 px-2.5 py-1 text-xs">{participant.mention}</span>)}</div></div>}
+        <p className="mt-4 text-xs leading-5 text-muted-foreground">位于当前可见范围；全书概览不堆叠展示事件标题。</p>
+        <div className="mt-4 grid gap-2"><Link href={`/search?q=${encodeURIComponent(detailEvent.title)}`} className="inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted/50 hover:text-foreground"><Search className="size-4" />检索证据</Link><Link href={readerHref(detailEvent)} className="inline-flex items-center justify-center gap-2 rounded-md bg-foreground px-3 py-2 text-sm font-medium text-background transition hover:opacity-90"><BookOpen className="size-4" />阅读此章</Link></div>
       </aside>
     </section>
   );

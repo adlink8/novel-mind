@@ -7,6 +7,7 @@ import type {
   NmClaimItem,
   NmSourceLinkItem,
 } from "@/lib/narrative-memory-api";
+import { cn } from "@/lib/utils";
 import {
   formatChapterRange,
   nodeKindLabel,
@@ -20,13 +21,11 @@ type Props = {
   claims?: NmClaimItem[];
   claimsLoading?: boolean;
   claimsError?: string | null;
-  /** Claim currently drilled for source-links (NM only). */
   selectedClaimId?: number | null;
   onClaimSelect?: (claim: NmClaimItem) => void;
   sourceLinks?: NmSourceLinkItem[];
   sourceLinksLoading?: boolean;
   sourceLinksError?: string | null;
-  /** Used for reader deep-links from source evidence. */
   novelId?: string;
   className?: string;
 };
@@ -38,16 +37,11 @@ function shortHash(hash: string | null | undefined): string {
   return `${t.slice(0, 8)}…`;
 }
 
-function readerHref(
-  novelId: string,
-  link: NmSourceLinkItem
-): string {
-  const chapter = link.chapter_number;
-  const start = link.source_start;
+function readerHref(novelId: string, link: NmSourceLinkItem): string {
   const params = new URLSearchParams();
-  params.set("chapter", String(chapter));
-  if (typeof start === "number" && Number.isFinite(start)) {
-    params.set("start", String(start));
+  params.set("chapter", String(link.chapter_number));
+  if (typeof link.source_start === "number" && Number.isFinite(link.source_start)) {
+    params.set("start", String(link.source_start));
   }
   params.set("from", "structure");
   return `/novels/${novelId}?${params.toString()}`;
@@ -70,12 +64,12 @@ export function StructureNodePanel({
   if (!selected) {
     return (
       <div
-        className={
-          className ??
-          "rounded-xl border border-dashed bg-card/40 p-3 text-xs text-muted-foreground motion-transition-content"
-        }
+        className={cn(
+          "px-0.5 py-1 text-xs leading-relaxed text-muted-foreground motion-transition-content",
+          className
+        )}
       >
-        在左侧选择结构节点，以限定时间线 / 关系 / 线索的章节范围。
+        选择结构节点以限定切片章节范围。
       </div>
     );
   }
@@ -86,10 +80,7 @@ export function StructureNodePanel({
   return (
     <div
       key={selected.id}
-      className={
-        className ??
-        "rounded-xl border bg-card/70 p-3 text-sm shadow-sm motion-transition-content"
-      }
+      className={cn("px-0.5 text-sm motion-transition-content", className)}
       data-testid="structure-node-panel"
     >
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -97,17 +88,17 @@ export function StructureNodePanel({
           <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
             {nodeKindLabel(selected.kind)}
           </p>
-          <p className="mt-0.5 font-serif text-base font-semibold leading-snug">
+          <p className="mt-0.5 font-serif text-sm font-semibold leading-snug">
             {selected.label}
           </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            视图范围：{formatChapterRange(selected.chapterStart, selected.chapterEnd)}
+          <p className="mt-0.5 text-[11px] text-muted-foreground">
+            {formatChapterRange(selected.chapterStart, selected.chapterEnd)}
           </p>
         </div>
         {isNm && (
           <span
             data-testid="nm-node-badge"
-            className="shrink-0 rounded-full border border-violet-300/80 bg-violet-50 px-2 py-0.5 text-[10px] font-medium text-violet-950"
+            className="shrink-0 text-[10px] font-medium text-violet-900/80"
           >
             {NM_NODE_BADGE_LABEL}
           </span>
@@ -115,28 +106,28 @@ export function StructureNodePanel({
       </div>
 
       {isNm && (
-        <div className="mt-3 border-t pt-2">
+        <div className="mt-2 space-y-2">
           <p className="text-[11px] font-medium text-muted-foreground">
-            节点声明（候选）
+            节点声明
           </p>
           {claimsLoading && (
-            <p className="mt-1 text-xs text-muted-foreground">加载声明…</p>
+            <p className="text-xs text-muted-foreground">加载声明…</p>
           )}
           {claimsError && (
-            <p className="mt-1 text-xs text-destructive" role="alert">
+            <p className="text-xs text-destructive" role="alert">
               {claimsError}
             </p>
           )}
           {!claimsLoading && !claimsError && claims.length === 0 && (
             <p
-              className="mt-1 text-xs text-muted-foreground"
+              className="text-xs text-muted-foreground"
               data-testid="claims-empty-honesty"
             >
               此节点暂无可见声明。
             </p>
           )}
           {!claimsLoading && claims.length > 0 && (
-            <ul className="mt-1.5 max-h-36 space-y-1.5 overflow-y-auto">
+            <ul className="max-h-32 space-y-0.5 overflow-y-auto">
               {claims.map((c) => {
                 const active = selectedClaimId === c.id;
                 return (
@@ -146,11 +137,12 @@ export function StructureNodePanel({
                       data-testid={`nm-claim-${c.id}`}
                       aria-pressed={active}
                       onClick={() => onClaimSelect?.(c)}
-                      className={`w-full rounded-lg border px-2 py-1.5 text-left text-xs transition-colors ${
+                      className={cn(
+                        "w-full rounded-md px-2 py-1.5 text-left text-xs transition-colors",
                         active
-                          ? "border-violet-400 bg-violet-50/80"
-                          : "bg-background/80 hover:bg-muted/60"
-                      }`}
+                          ? "bg-foreground/[0.06] text-foreground"
+                          : "hover:bg-muted/50"
+                      )}
                     >
                       <span className="text-[10px] text-muted-foreground">
                         {c.claim_kind}
@@ -166,20 +158,15 @@ export function StructureNodePanel({
           )}
 
           {selectedClaimId != null && (
-            <div
-              className="mt-2 rounded-lg border border-dashed bg-background/60 p-2"
-              data-testid="source-links-panel"
-            >
+            <div data-testid="source-links-panel" className="space-y-1 pt-1">
               <p className="text-[11px] font-medium text-muted-foreground">
-                叶子证据链接
+                叶子证据
               </p>
               {sourceLinksLoading && (
-                <p className="mt-1 text-xs text-muted-foreground">
-                  加载证据链接…
-                </p>
+                <p className="text-xs text-muted-foreground">加载证据…</p>
               )}
               {sourceLinksError && (
-                <p className="mt-1 text-xs text-destructive" role="alert">
+                <p className="text-xs text-destructive" role="alert">
                   {sourceLinksError}
                 </p>
               )}
@@ -187,14 +174,14 @@ export function StructureNodePanel({
                 !sourceLinksError &&
                 sourceLinks.length === 0 && (
                   <p
-                    className="mt-1 text-xs text-muted-foreground"
+                    className="text-xs text-muted-foreground"
                     data-testid="source-links-empty-honesty"
                   >
                     无叶子证据链接
                   </p>
                 )}
               {!sourceLinksLoading && sourceLinks.length > 0 && (
-                <ul className="mt-1.5 max-h-40 space-y-1.5 overflow-y-auto">
+                <ul className="max-h-36 space-y-1 overflow-y-auto">
                   {sourceLinks
                     .filter((l) => l.claim_id === selectedClaimId)
                     .map((link) => {
@@ -227,7 +214,7 @@ export function StructureNodePanel({
                         <li
                           key={link.id}
                           data-testid={`source-link-${link.id}`}
-                          className="rounded-md border bg-card px-2 py-1.5 text-xs"
+                          className="px-1 py-1 text-xs"
                         >
                           {novelId ? (
                             <Link
@@ -249,7 +236,7 @@ export function StructureNodePanel({
                 sourceLinks.filter((l) => l.claim_id === selectedClaimId)
                   .length === 0 && (
                   <p
-                    className="mt-1 text-xs text-muted-foreground"
+                    className="text-xs text-muted-foreground"
                     data-testid="source-links-empty-honesty"
                   >
                     无叶子证据链接

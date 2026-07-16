@@ -324,23 +324,22 @@ export function ClueWorkspace(props: Props) {
   ].includes(String(runStatus));
 
   return (
-    <div className="grid gap-3" data-testid="clue-workspace">
-      {/* Clue run status (independent of timeline worker) */}
+    <div className="grid gap-4" data-testid="clue-workspace">
       <div
-        className="grid gap-2 rounded-2xl border bg-card p-4"
+        className="grid gap-2 border-b border-border/40 pb-3"
         role="status"
         aria-live="polite"
         data-testid="clue-run-status"
       >
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="font-semibold">
+          <span className="text-sm font-semibold tracking-tight">
             {RUN_LABELS[runStatus] ?? runStatus}
           </span>
           <div className="flex flex-wrap gap-2">
             {canStart && (
               <button
                 type="button"
-                className="rounded-xl bg-foreground px-4 py-2 text-sm text-background disabled:opacity-50"
+                className="rounded-md bg-foreground px-3 py-1.5 text-xs font-medium text-background disabled:opacity-50"
                 disabled={Boolean(actionBusyNote)}
                 onClick={() => void startOrResume()}
               >
@@ -350,7 +349,7 @@ export function ClueWorkspace(props: Props) {
             {canResume && (
               <button
                 type="button"
-                className="rounded-xl bg-foreground px-4 py-2 text-sm text-background disabled:opacity-50"
+                className="rounded-md bg-foreground px-3 py-1.5 text-xs font-medium text-background disabled:opacity-50"
                 disabled={Boolean(actionBusyNote)}
                 onClick={() => void startOrResume()}
               >
@@ -360,7 +359,7 @@ export function ClueWorkspace(props: Props) {
             {run && CLUE_ACTIVE_RUN.has(run.status) && (
               <button
                 type="button"
-                className="rounded-xl border px-4 py-2 text-sm"
+                className="rounded-md px-2.5 py-1 text-xs text-muted-foreground hover:bg-muted/60 hover:text-foreground"
                 onClick={() => void pauseRun()}
               >
                 暂停
@@ -373,19 +372,19 @@ export function ClueWorkspace(props: Props) {
         )}
       </div>
 
-      {/* Shared full-book control (parent owns persistence) */}
-      <div className="flex flex-wrap items-center gap-3 rounded-2xl border bg-card/60 p-3">
-        <label className="flex h-10 items-center gap-2 rounded-xl border border-amber-300/70 bg-amber-50 px-3 text-sm text-amber-950">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <label className="flex items-center gap-2 text-sm text-amber-900/85">
           <input
             type="checkbox"
             aria-label="显示全书（可能剧透）"
             checked={props.fullBook}
             onChange={(event) => props.onFullBookRequest(event.target.checked)}
+            className="rounded border-border"
           />
           显示全书（可能剧透）
         </label>
         <p className="text-xs text-muted-foreground">
-          与时间线共用 Phase 08 全书偏好；线索无独立剧透开关。
+          与时间线共用全书偏好
         </p>
       </div>
 

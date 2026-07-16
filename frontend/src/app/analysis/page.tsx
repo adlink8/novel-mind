@@ -895,55 +895,37 @@ function AnalysisWorkspace() {
           sourceLinksError={nmSourceLinksError}
           novelId={novelId}
         >
-          <div className="grid gap-3">
-            {/* Facet tabs: timeline | relationships | clues */}
+          <div className="grid gap-4">
+            {/* Facet tabs — underline style, not pill boxes */}
             <div
               role="tablist"
               aria-label="分析切片"
-              className="flex flex-wrap gap-2"
+              className="flex flex-wrap gap-1 border-b border-border/40"
             >
-              <button
-                type="button"
-                role="tab"
-                aria-selected={workspace === "timeline"}
-                onClick={() => setWorkspace("timeline")}
-                className={`rounded-full px-4 py-2 text-sm transition-[color,background-color,border-color,box-shadow] motion-duration-standard motion-ease-enter ${
-                  workspace === "timeline"
-                    ? "bg-foreground text-background"
-                    : "border bg-card"
-                }`}
-              >
-                时间线
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={workspace === "relationships"}
-                onClick={() => setWorkspace("relationships")}
-                className={`rounded-full px-4 py-2 text-sm transition-[color,background-color,border-color,box-shadow] motion-duration-standard motion-ease-enter ${
-                  workspace === "relationships"
-                    ? "bg-foreground text-background"
-                    : "border bg-card"
-                }`}
-              >
-                人物关系
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={workspace === "clues"}
-                onClick={() => setWorkspace("clues")}
-                className={`rounded-full px-4 py-2 text-sm transition-[color,background-color,border-color,box-shadow] motion-duration-standard motion-ease-enter ${
-                  workspace === "clues"
-                    ? "bg-foreground text-background"
-                    : "border bg-card"
-                }`}
-              >
-                线索与伏笔
-              </button>
+              {(
+                [
+                  ["timeline", "时间线"],
+                  ["relationships", "人物关系"],
+                  ["clues", "线索与伏笔"],
+                ] as const
+              ).map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  role="tab"
+                  aria-selected={workspace === id}
+                  onClick={() => setWorkspace(id)}
+                  className={`-mb-px border-b-2 px-3 py-2 text-sm transition-colors motion-duration-fast ${
+                    workspace === id
+                      ? "border-foreground font-medium text-foreground"
+                      : "border-transparent text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
 
-            {/* 线索工作台自带 run 状态与全书控件；时间线/关系保留既有顶栏 */}
             {workspace !== "clues" && (
               <TimelineStatus
                 run={run}
@@ -959,7 +941,7 @@ function AnalysisWorkspace() {
             )}
 
             {workspace !== "clues" && (
-              <div className="grid gap-2 rounded-2xl border bg-card/60 p-2 sm:p-3">
+              <div className="grid gap-3">
                 {workspace === "timeline" && (
                   <TimelineControls
                     ordering={ordering}
@@ -986,8 +968,8 @@ function AnalysisWorkspace() {
                   />
                 )}
                 {workspace === "relationships" && (
-                  <div className="flex flex-wrap items-center gap-3 p-1">
-                    <label className="flex h-10 items-center gap-2 rounded-xl border border-amber-300/70 bg-amber-50 px-3 text-sm text-amber-950">
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+                    <label className="flex items-center gap-2 text-amber-900/85">
                       <input
                         type="checkbox"
                         checked={fullBook}
@@ -998,11 +980,12 @@ function AnalysisWorkspace() {
                                 .setFullBookPreference(novelId, false)
                                 .then(() => updateQuery({ fullBook: false }))
                         }
+                        className="rounded border-border"
                       />
                       显示全书（可能剧透）
                     </label>
                     <p className="text-xs text-muted-foreground">
-                      与时间线共用版本与全书偏好；结构节点会收窄 through_chapter。
+                      与时间线共用版本偏好；结构节点会收窄 through_chapter
                     </p>
                   </div>
                 )}
@@ -1010,17 +993,17 @@ function AnalysisWorkspace() {
                   <div
                     role="tablist"
                     aria-label="分析版本"
-                    className="flex gap-2 overflow-x-auto px-1"
+                    className="flex flex-wrap gap-3 text-xs"
                   >
                     {envelope.active && (
                       <button
                         role="tab"
                         aria-selected={source === "active"}
                         onClick={() => selectSource("active")}
-                        className={`whitespace-nowrap rounded-full px-3 py-1.5 text-xs ${
+                        className={`pb-0.5 ${
                           source === "active"
-                            ? "bg-foreground text-background"
-                            : "border bg-background"
+                            ? "font-medium text-foreground underline underline-offset-4"
+                            : "text-muted-foreground hover:text-foreground"
                         }`}
                       >
                         当前版本 · v{envelope.active.version_id}
@@ -1031,13 +1014,13 @@ function AnalysisWorkspace() {
                         role="tab"
                         aria-selected={source === "running_candidate"}
                         onClick={() => selectSource("running_candidate")}
-                        className={`whitespace-nowrap rounded-full px-3 py-1.5 text-xs ${
+                        className={`inline-flex items-center gap-1 pb-0.5 ${
                           source === "running_candidate"
-                            ? "bg-foreground text-background"
-                            : "border bg-background"
+                            ? "font-medium text-foreground underline underline-offset-4"
+                            : "text-muted-foreground hover:text-foreground"
                         }`}
                       >
-                        <RefreshCw className="mr-1 inline size-3" />
+                        <RefreshCw className="size-3" />
                         {ACTIVE_RUN.has(run?.status ?? "")
                           ? "正在生成"
                           : "候选结果"}{" "}
@@ -1055,11 +1038,11 @@ function AnalysisWorkspace() {
             {workspace !== "clues" &&
               run &&
               ACTIVE_RUN.has(run.status) && (
-              <p className="rounded-xl border border-sky-300/70 bg-sky-50 px-3 py-2 text-xs text-sky-950">
+              <p className="text-xs leading-relaxed text-muted-foreground">
                 分析进行中：进度 {Number(run.progress?.completed_chapters ?? 0)}/
-                {Number(run.progress?.total_chapters ?? 0) || "?"} 章；时间线图/列表展示
-                <strong> 候选 </strong>
-                版本中已落库的全部事件（不受阅读进度截断）。当前可见{" "}
+                {Number(run.progress?.total_chapters ?? 0) || "?"} 章；图/列表展示
+                <strong className="font-medium text-foreground"> 候选 </strong>
+                版本中已落库事件（不受阅读进度截断）。当前可见{" "}
                 {scopedEvents.length}
                 {selectedNode && view && scopedEvents.length !== view.events.length
                   ? ` / 结构前 ${view.events.length}`
@@ -1071,19 +1054,19 @@ function AnalysisWorkspace() {
               run &&
               (run.status === "cancelled" || run.status === "failed") &&
               Boolean(envelope.running_candidate?.events?.length) && (
-              <p className="rounded-xl border border-sky-300/70 bg-sky-50 px-3 py-2 text-xs text-sky-950">
-                已暂停/中断，但仍有{" "}
-                <strong>{envelope.running_candidate?.events.length ?? 0}</strong>{" "}
-                条候选时间线事件可浏览。点「继续分析」可续跑；
-                <strong>人物关系</strong>与<strong>线索</strong>
-                要在时间线<strong>完成并发布</strong>后才会自动生成。
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                已暂停/中断，仍有{" "}
+                <strong className="font-medium text-foreground">
+                  {envelope.running_candidate?.events.length ?? 0}
+                </strong>{" "}
+                条候选事件可浏览。关系与线索需时间线完成并发布后才会生成。
               </p>
             )}
             {workspace === "relationships" &&
               !(view?.events?.length) &&
               !(envelope.active || envelope.running_candidate) && (
-              <p className="rounded-xl border border-amber-300/70 bg-amber-50 px-3 py-2 text-xs text-amber-950">
-                人物关系依赖时间线版本。请先在「时间线」完成分析；完成后系统会自动抽取关系观察。
+              <p className="text-xs leading-relaxed text-amber-900/80">
+                人物关系依赖时间线版本。请先在「时间线」完成分析。
               </p>
             )}
             {workspace !== "clues" &&
@@ -1091,19 +1074,15 @@ function AnalysisWorkspace() {
               source === "active" &&
               !fullBook &&
               !selectedNovel?.reading_progress?.timeline_full_book && (
-              <p className="rounded-xl border border-amber-300/70 bg-amber-50 px-3 py-2 text-xs text-amber-950">
-                防剧透：未勾选「显示全书」时，已发布版本只显示到阅读进度章节（无进度则仅第一章）。
-                后台可能已分析更多章；勾选「显示全书」可看全部。候选结果页签不受阅读进度截断。
+              <p className="text-xs leading-relaxed text-amber-900/80">
+                防剧透：未勾选「显示全书」时，已发布版本只显示到阅读进度（无进度则仅第一章）。
               </p>
             )}
             {workspace !== "clues" && prepNote && (
               <p className="text-xs text-muted-foreground">{prepNote}</p>
             )}
             {workspace !== "clues" && error && (
-              <p
-                role="alert"
-                className="rounded-xl bg-destructive/10 p-3 text-sm text-destructive"
-              >
+              <p role="alert" className="text-sm text-destructive">
                 {error}
               </p>
             )}
@@ -1158,14 +1137,14 @@ function AnalysisWorkspace() {
                 {multiChapterScope && selectedNode && (
                   <div
                     data-testid="timeline-multi-chapter-density"
-                    className="rounded-xl border border-sky-300/70 bg-sky-50/80 px-3 py-2 text-xs text-sky-950"
+                    className="text-xs leading-relaxed text-muted-foreground"
                   >
-                    <p className="font-medium">
-                      多章聚合视图 · 第 {selectedNode.chapterStart}–
+                    <p className="font-medium text-foreground/90">
+                      多章聚合 · 第 {selectedNode.chapterStart}–
                       {selectedNode.chapterEnd} 章
                     </p>
-                    <p className="mt-0.5 text-sky-900/85">
-                      范围内共 {timelineDensity.total} 条事件
+                    <p className="mt-0.5">
+                      共 {timelineDensity.total} 条事件
                       {timelineDensity.byChapter.length > 0 && (
                         <>
                           {" "}
@@ -1182,7 +1161,7 @@ function AnalysisWorkspace() {
                       {timelineDensity.truncated > 0 && (
                         <span data-testid="timeline-density-truncated">
                           {" "}
-                          · 图中展示 {scopedEvents.length} 条，还有{" "}
+                          · 图中 {scopedEvents.length} 条，还有{" "}
                           {timelineDensity.truncated} 条未展开
                         </span>
                       )}
@@ -1201,17 +1180,17 @@ function AnalysisWorkspace() {
                 />
               </>
             ) : (
-              <div className="grid min-h-64 place-items-center rounded-3xl border border-dashed p-8 text-center text-muted-foreground">
+              <div className="grid min-h-48 place-items-center py-10 text-center text-muted-foreground">
                 <div>
-                  <p className="text-sm">暂无时间线事件。</p>
-                  <p className="mt-2 text-xs">
-                    点上方「开始分析」后，按章抽取的事件会显示在这里。
+                  <p className="text-sm">暂无时间线事件</p>
+                  <p className="mt-1.5 text-xs">
+                    点「开始分析」后，按章事件会显示在这里
                   </p>
                   <button
                     type="button"
                     disabled={loading}
                     onClick={() => void startAnalysis()}
-                    className="mt-4 rounded-xl bg-foreground px-5 py-2.5 text-sm text-background disabled:opacity-50"
+                    className="mt-4 rounded-md bg-foreground px-4 py-2 text-sm text-background disabled:opacity-50"
                   >
                     开始分析
                   </button>
