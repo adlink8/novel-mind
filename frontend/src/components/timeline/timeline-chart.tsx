@@ -59,11 +59,31 @@ type EventWindow = {
 
 const OVERVIEW_THRESHOLD = 48;
 const EVENT_LABEL_THRESHOLD = 16;
+/** Draw causal edges only when the visible window is small enough to stay readable. */
+const CAUSAL_EDGE_THRESHOLD = 24;
 /** Soft target events per overview stage — not a fixed "7 blocks" UI. */
 const SOFT_EVENTS_PER_STAGE = 80;
 const MIN_STAGES = 3;
 const MAX_STAGES = 14;
 const MIN_EVENTS_PER_STAGE = 10;
+
+/** Fixed Y swimlanes for drill-down (top → bottom). */
+export const EVENT_TYPE_LANES = ["plot", "conflict", "character", "world"] as const;
+export type EventTypeLane = (typeof EVENT_TYPE_LANES)[number];
+
+const LANE_LABELS: Record<EventTypeLane, string> = {
+  plot: "情节",
+  conflict: "冲突",
+  character: "人物",
+  world: "世界观",
+};
+
+const LANE_COLORS: Record<EventTypeLane, string> = {
+  plot: "#4f6f52",
+  conflict: "#b45309",
+  character: "#3b6ea5",
+  world: "#6b5b95",
+};
 
 type ScatterDatum = {
   value: [number, number];
@@ -78,6 +98,87 @@ type ScatterDatum = {
     fontSize: number;
   };
 };
+
+/** Map free-form event_type strings onto the four fixed lanes. */
+export function normalizeEventType(raw: string | undefined | null): EventTypeLane {
+  const t = (raw ?? "plot").toLowerCase().trim();
+  if (t === "plot" || t === "conflict" || t === "character" || t === "world") {
+    return t;
+  }
+  // Common aliases / Chinese labels from older extracts
+  if (t.includes("conflict") || t.includes("冲突")) return "conflict";
+  if (t.includes("character") || t.includes("人物") || t.includes("角色"))
+    return "character";
+  if (t.includes("world") || t.includes("世界") || t.includes("设定")) return "world";
+  return "plot";
+}
+
+/** Y coordinate for a type lane (plot at top). */
+export function eventTypeLaneY(eventType: string | undefined | null): number {
+  const lane = normalizeEventType(eventType);
+  return EVENT_TYPE_LANES.length - 1 - EVENT_TYPE_LANES.indexOf(lane);
+}
+
+/**
+ * Chapter-scaled X with micro-offset inside each chapter.
+ * Primary scale = narrative_chapter_number; within-chapter order uses
+ * source_start then narrative_index/id — never index%4 jitter as layout.
+ */
+export function buildChapterXPositions(
+  events: TimelineEvent[]
+): Map<number, number> {
+  const byChapter = new Map<number, TimelineEvent[]>();
+  for (const event of events) {
+    const ch = event.narrative_chapter_number;
+    const list = byChapter.get(ch);
+    if (list) list.push(event);
+    else byChapter.set(ch, [event]);
+  }
+
+  const result = new Map<number, number>();
+  for (const [ch, list] of byChapter) {
+    const ordered = [...list].sort(
+      (a, b) =>
+        (a.source_start ?? 0) - (b.source_start ?? 0) ||
+        a.narrative_index - b.narrative_index ||
+        a.id - b.id
+    );
+    const n = ordered.length;
+    const starts = ordered.map((e) => e.source_start ?? 0);
+    const minS = Math.min(...starts);
+    const maxS = Math.max(...starts);
+    ordered.forEach((event, i) => {
+      let micro: number;
+      if (n === 1) {
+        micro = 0.5;
+      } else if (maxS > minS) {
+        const fromStart = (starts[i] - minS) / (maxS - minS);
+        const fromIndex = i / (n - 1);
+        // Prefer text offset; blend rank so equal source_start still separates.
+        micro = 0.08 + 0.84 * (0.7 * fromStart + 0.3 * fromIndex);
+      } else {
+        micro = 0.08 + 0.84 * (i / (n - 1));
+      }
+      result.set(event.id, ch + micro);
+    });
+  }
+  return result;
+}
+
+/** Full swimlane points: [chapter+micro, typeLaneY] per event id. */
+export function buildSwimlanePoints(
+  events: TimelineEvent[]
+): Map<number, [number, number]> {
+  const xs = buildChapterXPositions(events);
+  const out = new Map<number, [number, number]>();
+  for (const event of events) {
+    out.set(event.id, [
+      xs.get(event.id) ?? event.narrative_chapter_number + 0.5,
+      eventTypeLaneY(event.event_type),
+    ]);
+  }
+  return out;
+}
 
 function compareNarrative(a: TimelineEvent, b: TimelineEvent) {
   return (
@@ -326,8 +427,8 @@ export function TimelineChart({
         : sorted,
     [activeWindow, sorted]
   );
-  const visiblePositions = useMemo(
-    () => new Map(visibleEvents.map((event, index) => [event.id, index])),
+  const swimlanePoints = useMemo(
+    () => buildSwimlanePoints(visibleEvents),
     [visibleEvents]
   );
   // Every novel enters through the same overview-first layout.  Small books
@@ -355,54 +456,76 @@ export function TimelineChart({
     // eslint-disable-next-line react-hooks/refs -- read latest zoom snapshot when rebuilding option
     const z = clampZoom(zoomRef.current);
     const showEventLabels = visibleEvents.length <= EVENT_LABEL_THRESHOLD;
-    const scatterData: ScatterDatum[] = visibleEvents.map((event, index) => ({
-      value: [index, ((index % 4) - 1.5) * 0.16],
-      eventId: event.id,
-      itemStyle: {
-        color: event.provenance?.title === "manual" ? "#b45309" : "#4f6f52",
-      },
-      label: {
-        show: showEventLabels,
-        position: index % 2 === 0 ? "bottom" : "top",
-        formatter: event.title || `事件 ${event.id}`,
-        width: 110,
-        overflow: "truncate",
-        fontSize: 11,
-      },
-    }));
+    const showCausalEdges =
+      causalEdges.length > 0 && visibleEvents.length <= CAUSAL_EDGE_THRESHOLD;
 
-    // 因果边：两端必须在当前可见事件里且索引有效，否则 ECharts getRawIndex 会炸
-    const lineSeries = causalEdges.flatMap((edge, edgeIndex) => {
-      const fromIdx = visiblePositions.get(edge.source_event_id);
-      const toIdx = visiblePositions.get(edge.target_event_id);
-      if (
-        fromIdx == null ||
-        toIdx == null ||
-        !Number.isFinite(fromIdx) ||
-        !Number.isFinite(toIdx)
-      ) {
-        return [];
-      }
-      return [
-        {
-          id: `causal-${edge.source_event_id}-${edge.target_event_id}-${edgeIndex}`,
-          type: "line" as const,
-          data: [
-            [fromIdx, 0],
-            [toIdx, 0],
-          ],
-          symbol: ["none", "arrow"],
-          lineStyle: { color: "#a16207", type: "dashed" as const, width: 2 },
-          silent: true,
-          z: 1,
-          clip: true,
-        },
+    const chapters = visibleEvents.map((e) => e.narrative_chapter_number);
+    const minChapter = chapters.length ? Math.min(...chapters) : 1;
+    const maxChapter = chapters.length ? Math.max(...chapters) : 1;
+
+    const scatterData: ScatterDatum[] = visibleEvents.map((event) => {
+      const point = swimlanePoints.get(event.id) ?? [
+        event.narrative_chapter_number + 0.5,
+        eventTypeLaneY(event.event_type),
       ];
+      const lane = normalizeEventType(event.event_type);
+      const baseColor = LANE_COLORS[lane];
+      return {
+        value: point,
+        eventId: event.id,
+        itemStyle: {
+          color:
+            event.provenance?.title === "manual" ? "#b45309" : baseColor,
+        },
+        label: {
+          show: showEventLabels,
+          position: point[1] >= 2 ? "bottom" : "top",
+          formatter: event.title || `事件 ${event.id}`,
+          width: 110,
+          overflow: "truncate",
+          fontSize: 11,
+        },
+      };
     });
+
+    // Causal edges: only in sparse windows; endpoints must both be in view.
+    const lineSeries = showCausalEdges
+      ? causalEdges.flatMap((edge, edgeIndex) => {
+          const from = swimlanePoints.get(edge.source_event_id);
+          const to = swimlanePoints.get(edge.target_event_id);
+          if (
+            !from ||
+            !to ||
+            !Number.isFinite(from[0]) ||
+            !Number.isFinite(from[1]) ||
+            !Number.isFinite(to[0]) ||
+            !Number.isFinite(to[1])
+          ) {
+            return [];
+          }
+          return [
+            {
+              id: `causal-${edge.source_event_id}-${edge.target_event_id}-${edgeIndex}`,
+              type: "line" as const,
+              data: [from, to],
+              symbol: ["none", "arrow"],
+              lineStyle: {
+                color: "#a16207",
+                type: "dashed" as const,
+                width: 1.5,
+                opacity: 0.75,
+              },
+              silent: true,
+              z: 1,
+              clip: true,
+            },
+          ];
+        })
+      : [];
 
     return {
       animation: false,
-      grid: { left: 28, right: 20, top: 40, bottom: 72, containLabel: true },
+      grid: { left: 56, right: 20, top: 40, bottom: 72, containLabel: true },
       tooltip: {
         trigger: "item",
         formatter: (params: unknown) => {
@@ -412,25 +535,49 @@ export function TimelineChart({
           }
           const event = eventMap.get(item.data.eventId);
           if (!event) return "";
-          return `<strong>${event.title}</strong><br/>${chapterLabel(event)} · ${event.time_expression ?? "时间未知"}`;
+          const lane = normalizeEventType(event.event_type);
+          return `<strong>${event.title}</strong><br/>${chapterLabel(event)} · ${LANE_LABELS[lane]} · ${event.time_expression ?? "时间未知"}`;
         },
       },
       xAxis: {
         type: "value",
-        min: -0.5,
-        max: Math.max(visibleEvents.length - 0.5, 0.5),
+        min: minChapter,
+        max: maxChapter + 1,
         minInterval: 1,
         axisLabel: {
           formatter: (value: number) => {
             const n = Math.round(value);
-            if (n < 0 || n >= visibleEvents.length) return "";
-            return ordering === "narrative" ? `节点 ${n + 1}` : `序位 ${n + 1}`;
+            // Chapter ticks only (skip micro-offset fractions).
+            if (Math.abs(value - n) > 0.02) return "";
+            if (n < minChapter || n > maxChapter) return "";
+            return `第 ${n} 章`;
           },
           hideOverlap: true,
         },
-        name: ordering === "narrative" ? "叙事推进" : "故事时间",
+        name: ordering === "story" ? "章节（故事序视图）" : "章节",
+        nameGap: 28,
       },
-      yAxis: { type: "value", min: -0.7, max: 0.7, show: false },
+      yAxis: {
+        type: "value",
+        min: -0.5,
+        max: EVENT_TYPE_LANES.length - 0.5,
+        interval: 1,
+        axisTick: { show: false },
+        axisLine: { show: false },
+        splitLine: {
+          show: true,
+          lineStyle: { type: "dashed", color: "#d5ddd6", opacity: 0.9 },
+        },
+        axisLabel: {
+          formatter: (value: number) => {
+            const n = Math.round(value);
+            if (Math.abs(value - n) > 0.02) return "";
+            const idx = EVENT_TYPE_LANES.length - 1 - n;
+            if (idx < 0 || idx >= EVENT_TYPE_LANES.length) return "";
+            return LANE_LABELS[EVENT_TYPE_LANES[idx]];
+          },
+        },
+      },
       dataZoom: [
         {
           id: "inside-x",
@@ -459,7 +606,7 @@ export function TimelineChart({
         {
           id: "events-scatter",
           type: "scatter" as const,
-          symbolSize: 18,
+          symbolSize: 16,
           data: scatterData,
           z: 2,
           clip: true,
@@ -468,7 +615,14 @@ export function TimelineChart({
     };
     // dataEpoch：事件变化时重读 zoomRef，避免拖动时 setState
     void dataEpoch;
-  }, [causalEdges, dataEpoch, eventMap, ordering, visibleEvents, visiblePositions]);
+  }, [
+    causalEdges,
+    dataEpoch,
+    eventMap,
+    ordering,
+    swimlanePoints,
+    visibleEvents,
+  ]);
 
   useEffect(() => {
     if (selected && !eventMap.has(selected.id)) {
@@ -591,12 +745,16 @@ export function TimelineChart({
           <section className="rounded-3xl border bg-card p-4 shadow-sm sm:p-6">
             <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3"><button type="button" onClick={() => { setActiveWindow(null); setListOpen(false); }} className="rounded-xl border p-2 text-muted-foreground transition hover:text-foreground" aria-label="返回全书概览"><ArrowLeft className="size-4" /></button><div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#a56d21]">Zoomed range</p><h2 className="mt-1 font-serif text-xl font-semibold">{activeWindow ? chapterRangeLabel(activeWindow) : "当前时间线"} <span className="font-sans text-base font-normal text-muted-foreground">· {visibleEvents.length} 个事件</span></h2></div></div>
-              <p className="text-xs text-muted-foreground">滚轮缩放 · 拖动平移 · 点击节点查看详情</p>
+              <p className="text-xs text-muted-foreground">横轴章节 · 纵轴类型泳道 · 滚轮缩放</p>
             </div>
-            <div data-testid="timeline-canvas" data-zoom="inside-slider" className="min-w-0 overflow-hidden rounded-2xl border bg-[#fdfefc] p-2 sm:p-4">
+            <div data-testid="timeline-canvas" data-zoom="inside-slider" data-layout="chapter-swimlane" className="min-w-0 overflow-hidden rounded-2xl border bg-[#fdfefc] p-2 sm:p-4">
               <ReactEChartsCore echarts={echarts} option={option} style={{ height: 420, width: "100%" }} notMerge={false} lazyUpdate opts={{ renderer: "canvas" }} onEvents={{ click: (params: { seriesType?: string; data?: ScatterDatum }) => { try { if (params.seriesType !== "scatter") return; const id = params.data?.eventId; const event = id == null ? undefined : eventMap.get(id); if (event) setSelected(event); } catch { /* ignore chart click glitches */ } }, datazoom: (params: { start?: number; end?: number; batch?: Array<{ start?: number; end?: number }> }) => { try { const batch = params.batch?.[0]; const start = batch?.start ?? params.start; const end = batch?.end ?? params.end; if (typeof start === "number" && typeof end === "number") zoomRef.current = clampZoom({ start, end }); } catch { /* ignore */ } } }} />
             </div>
-            <p className="mt-3 text-xs text-muted-foreground">{visibleEvents.length > EVENT_LABEL_THRESHOLD ? "悬停查看标题；点节点在右侧打开详情。" : "点节点在右侧打开详情。"}</p>
+            <p className="mt-3 text-xs text-muted-foreground">
+              {visibleEvents.length > EVENT_LABEL_THRESHOLD
+                ? "事件较多：悬停查看标题；点节点在右侧打开详情。因果边在密集区间自动隐藏。"
+                : "泳道按情节 / 冲突 / 人物 / 世界观分层；点节点在右侧打开详情。"}
+            </p>
           </section>
         )}
 
