@@ -106,7 +106,7 @@ async def test_service_and_cli_helpers_leave_authority_unchanged(audit_pg_sessio
 
 @pytest.mark.asyncio
 async def test_fresh_observer_wraps_real_api_and_cli_for_exact_and_blocked_cases(
-    client, audit_pg_session, pg_async_url
+    asgi_client, audit_pg_session, pg_async_url
 ):
     owner, novel, _ = await _seed_valid_hierarchy(audit_pg_session)
     owner.is_superuser = True
@@ -152,7 +152,7 @@ async def test_fresh_observer_wraps_real_api_and_cli_for_exact_and_blocked_cases
         )
 
     before = await fresh_snapshot()
-    response = await client.get(
+    response = await asgi_client.get(
         f"/api/admin/asset-audit/{novel_id}", params={"owner_id": owner_id}
     )
     exact_cli = run_cli()
@@ -172,7 +172,7 @@ async def test_fresh_observer_wraps_real_api_and_cli_for_exact_and_blocked_cases
         await setup.commit()
 
     blocked_before = await fresh_snapshot()
-    blocked_response = await client.get(
+    blocked_response = await asgi_client.get(
         f"/api/admin/asset-audit/{novel_id}", params={"owner_id": owner_id}
     )
     blocked_cli = run_cli()
@@ -184,12 +184,15 @@ async def test_fresh_observer_wraps_real_api_and_cli_for_exact_and_blocked_cases
 
 
 def test_entrypoints_and_audit_package_have_no_provider_or_write_capability() -> None:
+    """Phase 12 audit surface only — later phases add builder/write modules in the same package."""
     backend = Path(__file__).parents[3]
+    nm = backend / "app" / "services" / "narrative_memory"
     files = [
-        *sorted((backend / "app" / "services" / "narrative_memory").glob("*.py")),
+        *sorted(nm.glob("audit*.py")),
         backend / "app" / "api" / "asset_audit.py",
         backend / "scripts" / "run_asset_audit.py",
     ]
+    assert files, "expected Phase 12 audit modules"
     text = "\n".join(path.read_text(encoding="utf-8").lower() for path in files)
     forbidden = (
         "litellm",

@@ -15,7 +15,7 @@ pytestmark = pytest.mark.integration
 
 
 @pytest.mark.asyncio
-async def test_admin_api_and_cli_return_same_canonical_report(client, audit_pg_session):
+async def test_admin_api_and_cli_return_same_canonical_report(asgi_client, audit_pg_session):
     owner, novel, _ = await _seed_valid_hierarchy(audit_pg_session)
     owner.is_superuser = True
     await audit_pg_session.flush()
@@ -29,7 +29,7 @@ async def test_admin_api_and_cli_return_same_canonical_report(client, audit_pg_s
     app.dependency_overrides[get_db] = override_db
     app.dependency_overrides[require_user] = as_admin
 
-    response = await client.get(
+    response = await asgi_client.get(
         f"/api/admin/asset-audit/{novel.id}", params={"owner_id": owner.id}
     )
     assert response.status_code == 200
@@ -44,7 +44,7 @@ async def test_admin_api_and_cli_return_same_canonical_report(client, audit_pg_s
 
 
 @pytest.mark.asyncio
-async def test_non_admin_is_rejected_before_inventory(client, audit_pg_session):
+async def test_non_admin_is_rejected_before_inventory(asgi_client, audit_pg_session):
     owner, novel, _ = await _seed_valid_hierarchy(audit_pg_session)
 
     async def override_db():
@@ -55,7 +55,7 @@ async def test_non_admin_is_rejected_before_inventory(client, audit_pg_session):
 
     app.dependency_overrides[get_db] = override_db
     app.dependency_overrides[require_user] = as_non_admin
-    response = await client.get(
+    response = await asgi_client.get(
         f"/api/admin/asset-audit/{novel.id}", params={"owner_id": owner.id}
     )
     assert response.status_code == 403

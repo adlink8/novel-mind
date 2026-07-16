@@ -27,13 +27,13 @@ AUTHORITY_TABLES = {
     "narrative_memory_validation_reports",
 }
 
+# Phase 14–17 legitimately add run/stage/checkpoint builder tables.
+# Phase 13 forever forbids production selection / promotion / pointer surfaces.
 FORBIDDEN_TABLE_FRAGMENTS = {
-    "run",
-    "stage",
-    "checkpoint",
     "active_pointer",
     "promotion",
     "rollback",
+    "current_version",
     "provider",
 }
 
@@ -296,7 +296,8 @@ def test_candidate_authority_metadata_exports_exactly_seven_sidecar_tables():
         name for name in models.Base.metadata.tables if name.startswith("narrative_memory_")
     }
 
-    assert metadata_names == AUTHORITY_TABLES
+    # Phase 13 seven tables remain present; later phases may add builder/rebuild/qual tables.
+    assert AUTHORITY_TABLES <= metadata_names
     assert all(
         hasattr(models, exported)
         for exported in (
@@ -391,7 +392,7 @@ def test_migration_roundtrip_removes_functions_triggers_and_tables(
 
     run_alembic("upgrade", "head", database_url=empty_postgres)
     current = run_alembic("current", database_url=empty_postgres)
-    assert "13memoryauth01" in (current.stdout + current.stderr)
+    assert "17memqual01" in (current.stdout + current.stderr)
 
 
 def test_scope_fks_version_owner_and_source_leaf_closure_fail_closed(
@@ -742,17 +743,18 @@ def test_database_schema_has_no_memory_control_plane_or_pointer(
             for name in inspect(conn).get_table_names()
             if name.startswith("narrative_memory_")
         }
-        assert names == AUTHORITY_TABLES
+        # Phase 13 authority remains; Phase 14–17 may add builder/rebuild/qual tables.
+        assert AUTHORITY_TABLES <= names
         assert not any(
             fragment in name
             for name in names
             for fragment in FORBIDDEN_TABLE_FRAGMENTS
         )
+        assert "narrative_memory_active_pointers" not in names
     engine.dispose()
 
-    run_alembic("upgrade", "head", database_url=empty_postgres)
     current = run_alembic("current", database_url=empty_postgres)
-    assert "13memoryauth01" in (current.stdout + current.stderr)
+    assert "17memqual01" in (current.stdout + current.stderr)
 
     engine = create_engine(empty_postgres)
     with engine.connect() as conn:

@@ -57,7 +57,8 @@ def test_migration_is_revision_frozen_and_single_head(empty_postgres: str) -> No
             heads = conn.execute(
                 text("SELECT version_num FROM alembic_version")
             ).scalars().all()
-        assert heads == ["14membuild01"]
+        # Single live head after full upgrade (Phase 17 is tip; Phase 14 is mid-chain).
+        assert heads == ["17memqual01"]
     finally:
         engine.dispose()
 

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import pytest_asyncio
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from app.main import app
 from tests.integration.conftest import run_alembic
 
 
@@ -19,3 +21,13 @@ async def audit_pg_session(empty_postgres: str, pg_async_url: str):
             await session.rollback()
     finally:
         await engine.dispose()
+
+
+@pytest_asyncio.fixture
+async def asgi_client():
+    """HTTP client without SQLite create_all (JSONB models require PostgreSQL)."""
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        yield client
+    app.dependency_overrides.clear()
