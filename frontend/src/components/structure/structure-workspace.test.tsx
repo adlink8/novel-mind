@@ -383,6 +383,56 @@ describe("StructureWorkspaceShell selection scope", () => {
     expect(screen.getByTestId("facet-body")).toBeInTheDocument();
   });
 
+  it("collapses via horizontal rail slide, not stacking expand control above facets", () => {
+    const forest = buildChapterFallbackTree(2);
+    render(
+      <StructureWorkspaceShell
+        structureSource="chapters"
+        forest={forest}
+        selected={treeNodeToSelection(forest[0])}
+        onSelect={vi.fn()}
+      >
+        <div data-testid="facet-body">facets</div>
+      </StructureWorkspaceShell>
+    );
+
+    const track = screen.getByTestId("structure-workspace-track");
+    const rail = screen.getByTestId("structure-rail");
+    expect(rail).toHaveAttribute("data-open", "true");
+    expect(track).toContainElement(rail);
+    expect(track).toContainElement(screen.getByTestId("facet-body"));
+
+    fireEvent.click(screen.getByRole("button", { name: "收起结构树" }));
+    expect(rail).toHaveAttribute("data-open", "false");
+    // Expand control is inside the rail (side strip), not a row above the track
+    const expand = screen.getByRole("button", { name: "展开结构树" });
+    expect(rail).toContainElement(expand);
+    expect(track).toContainElement(screen.getByTestId("facet-body"));
+    // Facets remain a horizontal sibling of the rail
+    expect(track.className).toMatch(/flex/);
+
+    fireEvent.click(expand);
+    expect(rail).toHaveAttribute("data-open", "true");
+  });
+
+  it("tree branch uses data-open for slide expand state", () => {
+    const forest = buildChapterFallbackTree(2);
+    render(
+      <StructureTree
+        forest={forest}
+        structureSource="chapters"
+        selectedId="book"
+        onSelect={vi.fn()}
+      />
+    );
+    const branch = screen.getByTestId("tree-branch-book");
+    expect(branch).toHaveAttribute("data-open", "true");
+    fireEvent.click(screen.getByRole("button", { name: "折叠" }));
+    expect(branch).toHaveAttribute("data-open", "false");
+    fireEvent.click(screen.getByRole("button", { name: "展开" }));
+    expect(branch).toHaveAttribute("data-open", "true");
+  });
+
   it("shows candidate preview badge when NM source", () => {
     const forest = buildNmStructureTree([
       {

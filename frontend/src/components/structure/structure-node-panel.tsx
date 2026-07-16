@@ -72,7 +72,7 @@ export function StructureNodePanel({
       <div
         className={
           className ??
-          "rounded-xl border border-dashed bg-card/40 p-3 text-xs text-muted-foreground"
+          "rounded-xl border border-dashed bg-card/40 p-3 text-xs text-muted-foreground motion-transition-content"
         }
       >
         在左侧选择结构节点，以限定时间线 / 关系 / 线索的章节范围。
@@ -85,9 +85,10 @@ export function StructureNodePanel({
 
   return (
     <div
+      key={selected.id}
       className={
         className ??
-        "rounded-xl border bg-card/70 p-3 text-sm shadow-sm"
+        "rounded-xl border bg-card/70 p-3 text-sm shadow-sm motion-transition-content"
       }
       data-testid="structure-node-panel"
     >

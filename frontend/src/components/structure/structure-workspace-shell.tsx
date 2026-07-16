@@ -8,6 +8,7 @@ import {
   NM_PREVIEW_BADGE_LABEL,
 } from "@/lib/narrative-memory-api";
 import type { NmClaimItem, NmSourceLinkItem } from "@/lib/narrative-memory-api";
+import { cn } from "@/lib/utils";
 import { StructureNodePanel } from "./structure-node-panel";
 import { StructureTree } from "./structure-tree";
 import type {
@@ -16,6 +17,10 @@ import type {
   StructureTreeNode,
 } from "./structure-types";
 import { formatChapterRange } from "./structure-types";
+
+/** Open rail width — fixed track so the center facet does not reflow by “lengthening”. */
+const RAIL_OPEN_PX = 280;
+const RAIL_CLOSED_PX = 44;
 
 type Props = {
   structureSource: StructureSource;
@@ -53,7 +58,7 @@ export function StructureWorkspaceShell({
   children,
   className,
 }: Props) {
-  // Collapse only hides the tree spine; novel + facet state stay mounted in parent.
+  // Collapse slides the rail horizontally; novel + facet state stay mounted in parent.
   const [treeOpen, setTreeOpen] = useState(true);
 
   const scopeLabel = selected
@@ -66,14 +71,14 @@ export function StructureWorkspaceShell({
       {structureSource === "chapters" ? (
         <p
           data-testid="nm-empty-banner"
-          className="rounded-xl border border-amber-300/70 bg-amber-50 px-3 py-2 text-xs text-amber-950"
+          className="rounded-xl border border-amber-300/70 bg-amber-50 px-3 py-2 text-xs text-amber-950 motion-transition-content"
         >
           {NM_EMPTY_BANNER}
         </p>
       ) : (
         <p
           data-testid="nm-preview-badge"
-          className="rounded-xl border border-violet-300/70 bg-violet-50 px-3 py-2 text-xs text-violet-950"
+          className="rounded-xl border border-violet-300/70 bg-violet-50 px-3 py-2 text-xs text-violet-950 motion-transition-content"
         >
           <span className="font-medium">{NM_PREVIEW_BADGE_LABEL}</span>
           <span className="ml-2 text-violet-900/80">
@@ -82,26 +87,76 @@ export function StructureWorkspaceShell({
         </p>
       )}
 
+      {/*
+        Horizontal track: rail width animates; center is always flex-1.
+        Avoid stacking the expand control above facets (that “lengthens” the page).
+      */}
       <div
-        className={
-          treeOpen
-            ? "grid gap-3 lg:grid-cols-[minmax(220px,280px)_minmax(0,1fr)]"
-            : "grid gap-3"
-        }
+        data-testid="structure-workspace-track"
+        className="flex min-h-[280px] items-stretch gap-3 lg:min-h-[420px]"
       >
-        {/* Left structure spine */}
-        {treeOpen ? (
+        <div
+          data-testid="structure-rail"
+          data-open={treeOpen ? "true" : "false"}
+          className={cn(
+            "relative shrink-0 overflow-hidden",
+            "transition-[width] motion-duration-spatial motion-ease-enter"
+          )}
+          style={{
+            width: treeOpen ? RAIL_OPEN_PX : RAIL_CLOSED_PX,
+          }}
+        >
+          {/* Collapsed strip — always in the track, slides in as width shrinks */}
+          <div
+            className={cn(
+              "absolute inset-y-0 left-0 z-10 flex w-11 flex-col items-center border bg-card/80 py-2 shadow-sm",
+              "rounded-2xl motion-transition-spatial",
+              treeOpen
+                ? "pointer-events-none -translate-x-1 opacity-0"
+                : "translate-x-0 opacity-100"
+            )}
+            aria-hidden={treeOpen}
+          >
+            <button
+              type="button"
+              className="inline-flex flex-col items-center gap-1 rounded-xl px-1.5 py-2 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground motion-transition-feedback"
+              onClick={() => setTreeOpen(true)}
+              aria-label="展开结构树"
+              tabIndex={treeOpen ? -1 : 0}
+            >
+              <PanelLeftOpen className="size-4" />
+              <span
+                className="writing-mode-vertical max-h-24 overflow-hidden text-ellipsis"
+                style={{ writingMode: "vertical-rl" }}
+              >
+                结构
+                {selected
+                  ? ` · ${formatChapterRange(selected.chapterStart, selected.chapterEnd)}`
+                  : ""}
+              </span>
+            </button>
+          </div>
+
+          {/* Open panel — slides with the rail width rather than reflowing grid columns */}
           <aside
             aria-label="结构导航"
-            className="flex min-h-[280px] flex-col gap-2 rounded-2xl border bg-card/50 p-2 sm:p-3 lg:min-h-[420px]"
+            aria-hidden={!treeOpen}
+            className={cn(
+              "flex h-full min-h-[280px] w-[280px] flex-col gap-2 rounded-2xl border bg-card/50 p-2 sm:p-3 lg:min-h-[420px]",
+              "motion-transition-spatial",
+              treeOpen
+                ? "translate-x-0 opacity-100"
+                : "pointer-events-none -translate-x-3 opacity-0 motion-closing"
+            )}
           >
             <div className="flex items-center justify-between gap-2 px-0.5">
               <h2 className="font-serif text-sm font-semibold">结构</h2>
               <button
                 type="button"
-                className="inline-flex items-center gap-1 rounded-lg border bg-background px-2 py-1 text-[11px] text-muted-foreground hover:bg-muted"
+                className="inline-flex items-center gap-1 rounded-lg border bg-background px-2 py-1 text-[11px] text-muted-foreground hover:bg-muted motion-transition-feedback"
                 onClick={() => setTreeOpen(false)}
                 aria-label="收起结构树"
+                tabIndex={treeOpen ? 0 : -1}
               >
                 <PanelLeftClose className="size-3.5" />
                 收起
@@ -128,27 +183,10 @@ export function StructureWorkspaceShell({
               novelId={novelId}
             />
           </aside>
-        ) : (
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              className="inline-flex items-center gap-1.5 rounded-xl border bg-card px-3 py-2 text-xs hover:bg-muted"
-              onClick={() => setTreeOpen(true)}
-              aria-label="展开结构树"
-            >
-              <PanelLeftOpen className="size-3.5" />
-              展开结构
-              {selected && (
-                <span className="text-muted-foreground">
-                  · {formatChapterRange(selected.chapterStart, selected.chapterEnd)}
-                </span>
-              )}
-            </button>
-          </div>
-        )}
+        </div>
 
-        {/* Center facets — scope label always sits near facet tabs */}
-        <div className="min-w-0 space-y-2">
+        {/* Center facets — fixed flex sibling; does not drop below the rail */}
+        <div className="flex min-w-0 flex-1 flex-col gap-2 motion-transition-content">
           <p
             data-testid="structure-scope-label"
             className="text-xs text-muted-foreground"

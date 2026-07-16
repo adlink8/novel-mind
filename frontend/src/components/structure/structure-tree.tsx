@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react";
 import {
   BookMarked,
-  ChevronDown,
   ChevronRight,
   Layers,
   Network,
@@ -49,11 +48,12 @@ function TreeRow({
   const selected = selectedId === node.id;
 
   return (
-    <li>
+    <li className="list-none">
       <div
         className={cn(
           "group flex items-center gap-0.5 rounded-lg pr-1",
-          selected && "bg-foreground/5"
+          "motion-transition-feedback",
+          selected && "bg-foreground/5 shadow-[inset_2px_0_0_0_hsl(var(--foreground)/0.35)]"
         )}
         style={{ paddingLeft: Math.min(depth, 6) * 12 }}
       >
@@ -62,14 +62,15 @@ function TreeRow({
             type="button"
             aria-label={open ? "折叠" : "展开"}
             aria-expanded={open}
-            className="grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-muted"
+            className="grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-muted motion-transition-feedback"
             onClick={() => setOpen((v) => !v)}
           >
-            {open ? (
-              <ChevronDown className="size-3.5" />
-            ) : (
-              <ChevronRight className="size-3.5" />
-            )}
+            <ChevronRight
+              className={cn(
+                "size-3.5 transition-transform motion-duration-standard motion-ease-enter",
+                open && "rotate-90"
+              )}
+            />
           </button>
         ) : (
           <span className="inline-block size-7 shrink-0" aria-hidden />
@@ -80,10 +81,11 @@ function TreeRow({
           aria-current={selected ? "true" : undefined}
           onClick={() => onSelect(node)}
           className={cn(
-            "flex min-w-0 flex-1 items-center gap-1.5 rounded-lg px-1.5 py-1.5 text-left text-sm transition-colors",
+            "flex min-w-0 flex-1 items-center gap-1.5 rounded-lg px-1.5 py-1.5 text-left text-sm",
+            "transition-[color,background-color,transform] motion-duration-fast motion-ease-enter",
             selected
               ? "font-medium text-foreground"
-              : "text-foreground/90 hover:bg-muted/80"
+              : "text-foreground/90 hover:bg-muted/80 active:scale-[0.99]"
           )}
         >
           {kindIcon(node.kind)}
@@ -93,19 +95,42 @@ function TreeRow({
           </span>
         </button>
       </div>
-      {hasChildren && open && (
-        <ul className="m-0 list-none p-0">
-          {node.children.map((child) => (
-            <TreeRow
-              key={child.id}
-              node={child}
-              depth={depth + 1}
-              selectedId={selectedId}
-              onSelect={onSelect}
-              defaultOpen={depth < 1}
-            />
-          ))}
-        </ul>
+
+      {/*
+        Height slide via grid-template-rows (0fr ↔ 1fr) — children stay mounted
+        so expand/collapse animates instead of abrupt list length jumps.
+      */}
+      {hasChildren && (
+        <div
+          data-testid={`tree-branch-${node.id}`}
+          data-open={open ? "true" : "false"}
+          className={cn(
+            "grid transition-[grid-template-rows] motion-duration-spatial motion-ease-enter",
+            open ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+          )}
+        >
+          <div className="min-h-0 overflow-hidden">
+            <ul
+              className={cn(
+                "m-0 list-none space-y-0.5 p-0",
+                "transition-opacity motion-duration-standard motion-ease-enter",
+                open ? "opacity-100" : "opacity-0"
+              )}
+              aria-hidden={!open}
+            >
+              {node.children.map((child) => (
+                <TreeRow
+                  key={child.id}
+                  node={child}
+                  depth={depth + 1}
+                  selectedId={selectedId}
+                  onSelect={onSelect}
+                  defaultOpen={depth < 1}
+                />
+              ))}
+            </ul>
+          </div>
+        </div>
       )}
     </li>
   );
@@ -138,14 +163,14 @@ export function StructureTree({
         )}
       </div>
       {empty ? (
-        <p className="rounded-xl border border-dashed px-3 py-6 text-center text-xs text-muted-foreground">
+        <p className="rounded-xl border border-dashed px-3 py-6 text-center text-xs text-muted-foreground motion-transition-content">
           暂无结构节点。
         </p>
       ) : (
         <ul
           role="tree"
           aria-label="结构树"
-          className="m-0 min-h-0 flex-1 list-none space-y-0.5 overflow-y-auto p-0"
+          className="m-0 min-h-0 flex-1 list-none space-y-0.5 overflow-y-auto overflow-x-hidden p-0"
         >
           {forest.map((node) => (
             <TreeRow
