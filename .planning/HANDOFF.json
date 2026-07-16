@@ -1,0 +1,36 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-07-16T04:32:57.248Z",
+  "phase": "13",
+  "phase_name": "candidate-memory-contracts-and-provenance-authority",
+  "phase_dir": ".planning/phases/13-candidate-memory-contracts-and-provenance-authority",
+  "plan": 2,
+  "task": 3,
+  "total_tasks": 3,
+  "status": "paused",
+  "completed_tasks": [
+    {"id": 1, "name": "Define strict memory and provenance contracts", "status": "done", "commit": "a452380"},
+    {"id": 2, "name": "Canonicalize hashes and enforce package-local references", "status": "done", "commit": "bdc515c"},
+    {"id": 3, "name": "Persist explicit-version candidates behind Phase 12 eligibility", "status": "in_progress", "progress": "RED integration tests and a partial authority.py implementation exist but were not validated or committed."}
+  ],
+  "remaining_tasks": [
+    {"id": 3, "name": "Finish, review and verify explicit-version authority persistence", "status": "paused"},
+    {"id": 4, "name": "Write 13-02-SUMMARY and advance STATE only after verification", "status": "not_started"},
+    {"id": 5, "name": "Execute 13-03 provenance closure and manifests", "status": "not_started"}
+  ],
+  "blockers": [],
+  "human_actions_pending": [
+    {"action": "Explicitly authorize execution before resuming Phase 13 implementation", "context": "The user requested planning only and no execution for now.", "blocking": true}
+  ],
+  "decisions": [
+    {"decision": "Pause all implementation and testing immediately", "rationale": "User explicitly requested planning completion without execution.", "phase": "13"},
+    {"decision": "Preserve uncommitted authority.py and its integration test as incomplete WIP", "rationale": "They contain partial Task 3 work and must not be mistaken for verified implementation.", "phase": "13"},
+    {"decision": "Continue only with Phase 14-17 planning artifacts", "rationale": "This advances the approved v0.8 design without executing code.", "phase": "14-17"}
+  ],
+  "uncommitted_files": [
+    "backend/app/services/narrative_memory/authority.py",
+    "backend/tests/integration/narrative_memory/test_contract_authority_pg.py"
+  ],
+  "next_action": "When execution is explicitly re-authorized, read the handoff and 13-02-PLAN, inspect both WIP files, run the RED test once, then finish Task 3 without redoing committed Tasks 1-2.",
+  "context_notes": "Phase 13 Plan 13-01 is complete and independently reviewed. Plan 13-02 Tasks 1-2 are committed. No 13-02 Task 3 verification, summary or completion claim exists. Planning-only mode is active."
+}
