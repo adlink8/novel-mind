@@ -297,12 +297,56 @@ def build_structural_result(
     }
 
 
+async def resolve_chat_model(
+    db: AsyncSession,
+    *,
+    model: str | None = None,
+    owner_id: int | None = None,
+) -> tuple[str | None, str | None, str | None]:
+    """
+    解析分析用聊天模型。
+
+    返回 (litellm_model, api_key, api_base)。
+    优先调用方指定 model；否则取用户默认 AIModelConfig；再回落 settings/env。
+    """
+    if model:
+        return model, None, None
+
+    from app.models.ai_model import AIModelConfig
+
+    q = select(AIModelConfig).where(
+        AIModelConfig.is_active.is_(True),
+        AIModelConfig.is_default.is_(True),
+    )
+    if owner_id is not None:
+        q = q.where(AIModelConfig.owner_id == owner_id)
+    result = await db.execute(q.limit(1))
+    cfg = result.scalar_one_or_none()
+    if cfg is None and owner_id is not None:
+        # 无用户默认时尝试任意默认
+        result = await db.execute(
+            select(AIModelConfig)
+            .where(
+                AIModelConfig.is_active.is_(True),
+                AIModelConfig.is_default.is_(True),
+            )
+            .limit(1)
+        )
+        cfg = result.scalar_one_or_none()
+    if cfg is not None:
+        name = ai_service.litellm_model_name(cfg.provider, cfg.model_id)
+        return name, cfg.api_key, cfg.base_url
+    return ai_service.default_model, None, None
+
+
 async def try_llm_enrich(
     structural: dict[str, Any],
     *,
     analysis_type: str,
     novel_title: str,
     model: str | None = None,
+    api_key: str | None = None,
+    api_base: str | None = None,
 ) -> dict[str, Any]:
     """Optional LLM polish; never raises — returns structural on failure."""
     system = (
@@ -329,6 +373,8 @@ async def try_llm_enrich(
             model=model,
             temperature=0.3,
             max_tokens=1200,
+            api_key=api_key,
+            api_base=api_base,
         )
         text = resp.choices[0].message.content or ""
         # strip fences
@@ -432,14 +478,21 @@ class AnalysisService:
             completion_tokens = None
 
             if use_llm and analysis_type != "hierarchy_map":
+                resolved_model, resolved_key, resolved_base = await resolve_chat_model(
+                    db,
+                    model=model,
+                    owner_id=getattr(novel, "owner_id", None),
+                )
                 result_data = await try_llm_enrich(
                     structural,
                     analysis_type=analysis_type,
                     novel_title=novel.title or str(novel_id),
-                    model=model,
+                    model=resolved_model,
+                    api_key=resolved_key,
+                    api_base=resolved_base,
                 )
                 if result_data.get("llm_enriched"):
-                    model_used = model or ai_service.default_model
+                    model_used = resolved_model or ai_service.default_model
                     prompt_tokens = result_data.get("prompt_tokens")
                     completion_tokens = result_data.get("completion_tokens")
 
