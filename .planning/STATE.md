@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v0.8
 milestone_name: 分层叙事记忆与层级 RAG
 status: executing
-last_updated: 2026-07-16T20:30:00.000Z
+last_updated: 2026-07-16T23:50:00.000Z
 last_activity: 2026-07-16
 progress:
   total_phases: 16
-  completed_phases: 11
+  completed_phases: 12
   total_plans: 71
-  completed_plans: 60
-  percent: 66
+  completed_plans: 64
+  percent: 71
 stopped_at: null
 authorized_scope: phases 13-18 (user 2026-07-16: 查看13-18阶段任务 编排GSD子代理执行)
 ---
@@ -26,9 +26,9 @@ See `.planning/PROJECT.md` and `IMPLEMENTATION-STATUS.md`.
 
 ## Current Position
 
-Phase: 13 (Candidate Memory Contracts and Provenance Authority)
-Plan: 3 of 3
-Status: COMPLETE — 13-VERIFICATION `status: passed`; Phase 14 unblocked (not started)
+Phase: 14 (Durable Bottom-up Candidate Builder)
+Plan: 4 of 4
+Status: COMPLETE — 14-VERIFICATION `status: passed`; Phase 15 unblocked (not started)
 Last activity: 2026-07-16
 
 ## Authorization (2026-07-16)
@@ -42,17 +42,17 @@ Last activity: 2026-07-16
 ## Execution Inventory
 
 - Phase 13: **COMPLETE + VERIFIED** (`13-VERIFICATION.md` status: passed). 13-01/02/03 SUMMARYs present. Candidate-only authority, strict contracts, provenance seal, no-pointer proofs.
-- Phase 14: 4/4 plans planned; **unblocked** by Phase 13 verification; not started
-- Phase 15: 3/3 plans planned; after Phase 14 verified
+- Phase 14: **COMPLETE + VERIFIED** (`14-VERIFICATION.md` status: passed). 14-01..04 SUMMARYs present. Builder control plane Alembic `14membuild01`; Chapter→Arc→Global candidate worker; optional sources; CLI dry-run; 37 tests passed.
+- Phase 15: 3/3 plans planned; **unblocked** by Phase 14 verification; not started
 - Phase 16: 3/3 plans planned; after Phase 15 verified
 - Phase 17: 3/3 plans planned; after Phases 12–16 verified; candidate-only verdict
 - Phase 18: COMPLETE — 18-01 `f6280cf`, 18-02 `2035b54`, 18-03 `743a524`; dual-viewport motion qualified (parallel track)
 
 ## Auto Routing
 
-Wave A Phase 13 remainder: **done**. Phase 18 may continue in parallel.
-Next serial RAG chain: Phase 14 → 15 → 16 → 17 after each phase verification.
-Phase 14 must keep Phase 12 `provider_calls_allowed` as the sole provider gate.
+Wave A Phase 13–14: **done**. Phase 18 complete in parallel.
+Next serial RAG chain: Phase 15 → 16 → 17 after each phase verification.
+Phase 14 holds Phase 12 `provider_calls_allowed` as the sole provider gate; candidate-only (no pointer cutover).
 
 ## Phase 11 Execution Metrics
 
@@ -189,10 +189,9 @@ REQ-AUTO-01..11 已交付（含 06-08 QualityRun 持久化、06-09 BaselineCandi
 
 ## Next Action
 
-1. Finish Phase 13-02 Task 3 from existing WIP; write 13-02-SUMMARY; execute 13-03; write 13-VERIFICATION.
-2. Parallel: Phase 18 COMPLETE (motion system qualified).
-3. After Phase 13 verified: execute Phase 14-01..14-04 then verify.
-4. Then Phase 15 → 16 → 17 in order; never promote narrative-memory candidates.
+1. Execute Phase 15 (hierarchical query / descent) after reading 15 plans; keep candidate-only.
+2. Then Phase 16 → 17 in order; never promote narrative-memory candidates.
+3. Do not touch unrelated dirty WIP outside plan-declared files.
 
 ## Session
 

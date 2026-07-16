@@ -129,6 +129,14 @@ from app.models.narrative_memory import (
     NarrativeMemoryValidationReport,
     NarrativeMemoryVersion,
 )
+from app.models.narrative_memory_builder import (
+    NarrativeMemoryBuildBudgetLedger,
+    NarrativeMemoryBuildBudgetReservation,
+    NarrativeMemoryBuildModelCallAttempt,
+    NarrativeMemoryBuildReport,
+    NarrativeMemoryBuildRun,
+    NarrativeMemoryBuildStage,
+)
 
 __all__ = [
     "Base",
@@ -214,4 +222,10 @@ __all__ = [
     "NarrativeMemorySourceLink",
     "NarrativeMemoryManifest",
     "NarrativeMemoryValidationReport",
+    "NarrativeMemoryBuildRun",
+    "NarrativeMemoryBuildStage",
+    "NarrativeMemoryBuildBudgetLedger",
+    "NarrativeMemoryBuildBudgetReservation",
+    "NarrativeMemoryBuildModelCallAttempt",
+    "NarrativeMemoryBuildReport",
 ]

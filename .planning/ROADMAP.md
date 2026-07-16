@@ -45,7 +45,7 @@
 | Phase 7 语义/层级分块 | 6/6 | **Complete** (logic+tests+PG/indexing wiring) |
 | Phase 8 版本化小说分析与时间线 | 10/10 | **Complete** (35/35 must-haves verified) |
 | v0.7 / Phase 9-11 叙事关系、阅读问答与线索追踪 | Phase 09: 5/5; Phase 10: 5/5; Phase 11: 5/5 | **09 VERIFIED**; **10 PARTIAL** (real Playwright residual); **11 implement-complete** (adversarial residual closed) |
-| v0.8 / Phase 12-17 分层叙事记忆与层级 RAG | 6/19 plans (12+13 done) | **IN PROGRESS** — Phase 12–13 verified; Phase 14 next; candidate-only/no pointer cutover |
+| v0.8 / Phase 12-17 分层叙事记忆与层级 RAG | 10/19 plans (12+13+14 done) | **IN PROGRESS** — Phase 12–14 verified; Phase 15 next; candidate-only/no pointer cutover |
 | Phase 18 前端动效与过渡系统 | 3/3 | **COMPLETE** — 18-01..03 done; dual-viewport motion qualified |
 
 ## Auto Start
@@ -240,8 +240,8 @@ Plans:
 **Goal:** 对已通过 Phase 12 审计的单本小说，按 Chapter State → Story Arc/Volume → Global Story Model 自下而上构建可恢复候选，同时隔离章节失败并约束所有模型费用与可选来源。
 **Requirements:** V08-BUILD-01, V08-BUILD-02, V08-BUILD-03, V08-BUILD-04, V08-BUILD-05
 **Depends on:** Phase 13
-**Status:** PLANNED — 4/4 plans created; Phase 13 verification passed; authorized under 13–18 scope; not started
-**Plans:** 4/4 plans created
+**Status:** COMPLETE — 4/4 plans; independent verification passed (2026-07-16); Alembic head `14membuild01`
+**Plans:** 4/4 plans complete
 
 **Success Criteria:**
 1. 运维者启动 candidate dry-run 后，durable worker 先逐章生成 evidence-bound Chapter State，再按显式卷界或版本化连续范围生成 Story Arc/Volume，最后只从已验证 arcs 生成单个 Global Story Model。
@@ -251,17 +251,19 @@ Plans:
 5. 构建完成后数据库重算 candidate manifest 与 worker artifact 一致，报告列出完成/失败 stages、calls、tokens、cost、cache hits 和来源状态，且所有生产 pointers 保持不变。
 
 Plans:
-- [ ] 14-01 durable chapter-state worker: frozen packages, strict generation, budget, exact cache, checkpoint, cancel and resume
-- [ ] 14-02 contiguous arc/volume planning and aggregation: explicit volume preference, deterministic coverage gates and evidence closure
-- [ ] 14-03 global story aggregation and candidate manifest: validated-child-only claims, conflict/open-loop handling and DB recomputation
-- [ ] 14-04 optional source adapters and failure isolation: timeline/relationship/clue enrichment, chat exclusion and partial-stage recovery tests
+- [x] 14-01 durable chapter-state worker: frozen packages, strict generation, budget, exact cache, checkpoint, cancel and resume
+- [x] 14-02 contiguous arc/volume planning and aggregation: explicit volume preference, deterministic coverage gates and evidence closure
+- [x] 14-03 global story aggregation and candidate manifest: validated-child-only claims, conflict/open-loop handling and DB recomputation
+- [x] 14-04 optional source adapters and failure isolation: timeline/relationship/clue enrichment, chat exclusion and partial-stage recovery tests
+
+**Waves:** 1 → 2 → 3 → 4 complete. Verified: `.planning/phases/14-durable-bottom-up-candidate-builder/14-VERIFICATION.md` (37 targeted tests passed).
 
 ### Phase 15: Adaptive Hierarchical Retrieval and Leaf Evidence Safety
 
 **Goal:** 在不替换现有 Reader Chat 的前提下，提供可审计、全程防剧透的离线分层检索实验，使 local/arc/global/mixed 查询能够下钻并最终只引用重验后的叶子原文。
 **Requirements:** V08-RETR-01, V08-RETR-02, V08-RETR-03, V08-RETR-04, V08-RETR-05
 **Depends on:** Phase 14
-**Status:** PLANNED — 3/3 plans created; execution gated on Phase 14 verification and explicit authorization
+**Status:** PLANNED — 3/3 plans created; Phase 14 verification passed; authorized under 13–18 scope; not started
 **Plans:** 3/3 plans created
 
 **Success Criteria:**
