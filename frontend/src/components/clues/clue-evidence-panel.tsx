@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState, type ReactNode, type RefObject } from "react";
 import Link from "next/link";
 import { X } from "lucide-react";
 
@@ -11,6 +11,8 @@ import {
   type ClueState,
   type VisibleClue,
 } from "@/lib/clue-api";
+import { useDismissableLayer } from "@/lib/use-dismissable-layer";
+import { cn } from "@/lib/utils";
 
 const ROLE_LABELS: Record<string, string> = {
   cue: "预告",
@@ -48,6 +50,44 @@ type Props = {
   ) => void;
 };
 
+function NestedConfirmLayer({
+  open,
+  onDismiss,
+  label,
+  className,
+  children,
+}: {
+  open: boolean;
+  onDismiss: () => void;
+  label: string;
+  className?: string;
+  children: ReactNode;
+}) {
+  const layerRef = useRef<HTMLDivElement>(null);
+  const { present, closing } = useDismissableLayer({
+    open,
+    onDismiss,
+    layerRef: layerRef as RefObject<HTMLElement | null>,
+    // Nested confirmation is topmost; outside/Escape closes it before parent.
+    closeOnOutside: true,
+  });
+  if (!present) return null;
+  return (
+    <div
+      ref={layerRef}
+      role="alertdialog"
+      aria-label={label}
+      aria-hidden={closing || undefined}
+      className={cn(
+        className,
+        closing && "pointer-events-none opacity-60"
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
 export function ClueEvidencePanel(props: Props) {
   const { clue, detail } = props;
   const [reason, setReason] = useState("");
@@ -56,13 +96,18 @@ export function ClueEvidencePanel(props: Props) {
   const [confirmLink, setConfirmLink] = useState(false);
   const [linkKind, setLinkKind] = useState<ClueLinkTargetKind>("character");
   const [linkTarget, setLinkTarget] = useState("");
+  const layerRef = useRef<HTMLElement>(null);
 
-  if (!clue) return null;
-
-  const state = clue.derived_state;
-  const needsRelink = detail?.links.some(
-    (l) => l.validation_status === "source_unavailable" || l.validation_status === "unresolved"
-  );
+  const open = clue != null;
+  const { present, closing } = useDismissableLayer({
+    open,
+    onDismiss: () => {
+      resetForms();
+      props.onClose();
+    },
+    layerRef,
+    closeOnOutside: false, // backdrop owns outside
+  });
 
   function resetForms() {
     setReason("");
@@ -72,23 +117,40 @@ export function ClueEvidencePanel(props: Props) {
     setLinkTarget("");
   }
 
+  if (!clue || !present) return null;
+
+  const state = clue.derived_state;
+  const needsRelink = detail?.links.some(
+    (l) => l.validation_status === "source_unavailable" || l.validation_status === "unresolved"
+  );
+
   return (
     <>
       <button
         type="button"
         aria-label="关闭证据遮罩"
-        className="fixed inset-0 z-40 bg-black/30"
+        className={cn(
+          "fixed inset-0 z-40 bg-black/30 transition-[opacity] motion-duration-spatial motion-ease-enter",
+          open && !closing ? "opacity-100" : "pointer-events-none opacity-0 motion-ease-exit"
+        )}
         onClick={() => {
           resetForms();
           props.onClose();
         }}
       />
       <aside
+        ref={layerRef}
         role="dialog"
         aria-modal="true"
         aria-label="线索证据"
+        aria-hidden={closing || undefined}
         data-testid="clue-evidence-panel"
-        className="fixed bottom-0 right-0 top-0 z-50 flex w-full max-w-md flex-col border-l bg-background shadow-2xl"
+        className={cn(
+          "fixed bottom-0 right-0 top-0 z-50 flex w-full max-w-md flex-col border-l bg-background shadow-2xl transition-[opacity,transform] motion-duration-spatial motion-ease-enter",
+          open && !closing
+            ? "translate-x-0 opacity-100"
+            : "pointer-events-none translate-x-6 opacity-0 motion-ease-exit"
+        )}
       >
         <div className="flex items-start justify-between gap-3 border-b px-5 py-4">
           <div className="min-w-0">
@@ -275,35 +337,34 @@ export function ClueEvidencePanel(props: Props) {
               </button>
             </div>
 
-            {confirmReject && (
-              <div
-                role="alertdialog"
-                aria-label="确认驳回"
-                className="rounded-xl border border-destructive/40 bg-destructive/5 p-3 text-sm"
-              >
-                <p>确认驳回该线索？此操作会追加人工 override，不可静默撤销。</p>
-                <div className="mt-2 flex gap-2">
-                  <button
-                    type="button"
-                    className="rounded-lg border px-3 py-1.5 text-xs"
-                    onClick={() => setConfirmReject(false)}
-                  >
-                    取消
-                  </button>
-                  <button
-                    type="button"
-                    disabled={props.actionBusy}
-                    className="rounded-lg bg-destructive px-3 py-1.5 text-xs text-white disabled:opacity-50"
-                    onClick={() => {
-                      props.onReject(reason.trim());
-                      setConfirmReject(false);
-                    }}
-                  >
-                    确认驳回
-                  </button>
-                </div>
+            <NestedConfirmLayer
+              open={confirmReject}
+              onDismiss={() => setConfirmReject(false)}
+              label="确认驳回"
+              className="rounded-xl border border-destructive/40 bg-destructive/5 p-3 text-sm"
+            >
+              <p>确认驳回该线索？此操作会追加人工 override，不可静默撤销。</p>
+              <div className="mt-2 flex gap-2">
+                <button
+                  type="button"
+                  className="rounded-lg border px-3 py-1.5 text-xs"
+                  onClick={() => setConfirmReject(false)}
+                >
+                  取消
+                </button>
+                <button
+                  type="button"
+                  disabled={props.actionBusy}
+                  className="rounded-lg bg-destructive px-3 py-1.5 text-xs text-white disabled:opacity-50"
+                  onClick={() => {
+                    props.onReject(reason.trim());
+                    setConfirmReject(false);
+                  }}
+                >
+                  确认驳回
+                </button>
               </div>
-            )}
+            </NestedConfirmLayer>
 
             <label className="grid gap-1 text-xs text-muted-foreground">
               注释
@@ -366,50 +427,49 @@ export function ClueEvidencePanel(props: Props) {
               >
                 提交关联调整
               </button>
-              {confirmLink && (
-                <div
-                  role="alertdialog"
-                  aria-label="确认关联调整"
-                  className="rounded-lg border border-amber-300 bg-amber-50 p-2 text-xs text-amber-950"
-                >
-                  <p>确认替换/写入该关联？需显式确认后才会提交。</p>
-                  <div className="mt-2 flex gap-2">
-                    <button
-                      type="button"
-                      className="rounded border px-2 py-1"
-                      onClick={() => setConfirmLink(false)}
-                    >
-                      取消
-                    </button>
-                    <button
-                      type="button"
-                      disabled={props.actionBusy}
-                      className="rounded bg-foreground px-2 py-1 text-background disabled:opacity-50"
-                      onClick={() => {
-                        const base = {
-                          target_kind: linkKind,
-                        } as {
-                          target_kind: ClueLinkTargetKind;
-                          character_id?: number;
-                          timeline_event_id?: number;
-                          relationship_observation_ref?: string;
-                        };
-                        if (linkKind === "character") {
-                          base.character_id = Number(linkTarget);
-                        } else if (linkKind === "timeline_event") {
-                          base.timeline_event_id = Number(linkTarget);
-                        } else {
-                          base.relationship_observation_ref = linkTarget.trim();
-                        }
-                        props.onAdjustLink(reason.trim(), base);
-                        setConfirmLink(false);
-                      }}
-                    >
-                      确认提交
-                    </button>
-                  </div>
+              <NestedConfirmLayer
+                open={confirmLink}
+                onDismiss={() => setConfirmLink(false)}
+                label="确认关联调整"
+                className="rounded-lg border border-amber-300 bg-amber-50 p-2 text-xs text-amber-950"
+              >
+                <p>确认替换/写入该关联？需显式确认后才会提交。</p>
+                <div className="mt-2 flex gap-2">
+                  <button
+                    type="button"
+                    className="rounded border px-2 py-1"
+                    onClick={() => setConfirmLink(false)}
+                  >
+                    取消
+                  </button>
+                  <button
+                    type="button"
+                    disabled={props.actionBusy}
+                    className="rounded bg-foreground px-2 py-1 text-background disabled:opacity-50"
+                    onClick={() => {
+                      const base = {
+                        target_kind: linkKind,
+                      } as {
+                        target_kind: ClueLinkTargetKind;
+                        character_id?: number;
+                        timeline_event_id?: number;
+                        relationship_observation_ref?: string;
+                      };
+                      if (linkKind === "character") {
+                        base.character_id = Number(linkTarget);
+                      } else if (linkKind === "timeline_event") {
+                        base.timeline_event_id = Number(linkTarget);
+                      } else {
+                        base.relationship_observation_ref = linkTarget.trim();
+                      }
+                      props.onAdjustLink(reason.trim(), base);
+                      setConfirmLink(false);
+                    }}
+                  >
+                    确认提交
+                  </button>
                 </div>
-              )}
+              </NestedConfirmLayer>
             </div>
           </div>
         </div>

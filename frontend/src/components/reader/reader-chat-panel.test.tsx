@@ -144,6 +144,7 @@ function renderPanel(
 ) {
   const props = {
     novelId: "11",
+    currentChapterId: 1,
     layout: "desktop" as const,
     open: true,
     collapsed: false,
@@ -185,6 +186,20 @@ describe("ReaderChatPanel", () => {
       expect(screen.getByTestId("reader-chat-panel")).toBeInTheDocument()
     );
     expect(screen.getByTestId("reader-chat-panel").className).toMatch(/max-h-\[45vh\]/);
+    expect(screen.getByTestId("reader-chat-panel").parentElement?.className).toMatch(/bottom-14/);
+  });
+
+  it("closes the expanded panel when clicking outside", async () => {
+    const { props } = renderPanel();
+    await waitFor(() =>
+      expect(screen.getByTestId("reader-chat-panel")).toBeInTheDocument()
+    );
+    // Opening-frame suppressOutside clears on the next animation frame.
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => resolve())
+    );
+    fireEvent.pointerDown(document.body);
+    expect(props.onOpenChange).toHaveBeenCalledWith(false);
   });
 
   it("creates, switches, archives, restores and deletes conversations", async () => {
@@ -237,6 +252,7 @@ describe("ReaderChatPanel", () => {
     await waitFor(() => expect(mocks.createMessage).toHaveBeenCalled());
     const body = mocks.createMessage.mock.calls[0][2];
     expect(body.selection).toEqual(selection);
+    expect(body.chapter_id).toBe(1);
     expect(body.body).toBe("这段什么意思？");
     expect(body.client_message_id).toBeTruthy();
 
@@ -248,6 +264,21 @@ describe("ReaderChatPanel", () => {
     // No optimistic assistant fabricated
     expect(screen.queryByText("阿宁走进竹林")).not.toBeInTheDocument();
     expect(onClear).toHaveBeenCalled();
+  });
+
+  it("sends a current-chapter question without fabricating a selection", async () => {
+    renderPanel({ pendingSelection: null, currentChapterId: 7 });
+    await waitFor(() => expect(mocks.listConversations).toHaveBeenCalled());
+
+    fireEvent.change(screen.getByTestId("reader-chat-input"), {
+      target: { value: "这一章的主要冲突是什么？" },
+    });
+    fireEvent.click(screen.getByTestId("reader-chat-send"));
+
+    await waitFor(() => expect(mocks.createMessage).toHaveBeenCalled());
+    const body = mocks.createMessage.mock.calls[0][2];
+    expect(body.chapter_id).toBe(7);
+    expect(body.selection).toBeUndefined();
   });
 
   it("shows job loading, cancel and retry affordances", async () => {

@@ -31,6 +31,7 @@ import {
   loadReaderChatPresentation,
   saveReaderChatPresentation,
 } from "@/lib/reader-selection";
+import { useDismissableLayer } from "@/lib/use-dismissable-layer";
 import { cn } from "@/lib/utils";
 
 export type CitationNavigateTarget = {
@@ -42,6 +43,7 @@ export type CitationNavigateTarget = {
 
 type Props = {
   novelId: string;
+  currentChapterId: number;
   /** Desktop side panel reserves space; mobile is a bounded bottom sheet. */
   layout: "desktop" | "mobile";
   open: boolean;
@@ -64,15 +66,16 @@ function newClientMessageId(): string {
 
 function jobStatusLabel(job: GenerationJobView | null | undefined): string | null {
   if (!job) return null;
+  const reason = (job.status_reason || job.error_code || "").trim();
   switch (job.status) {
     case "queued":
       return "排队中…";
     case "running":
       return "生成中…";
     case "paused_budget":
-      return "预算已暂停";
+      return reason ? `预算已暂停：${reason}` : "预算已暂停";
     case "paused_dependency":
-      return "依赖不可用";
+      return reason ? `模型/依赖不可用：${reason}` : "模型或依赖不可用（可点重试）";
     case "cancelled":
       return "已取消";
     case "failed":
@@ -87,6 +90,7 @@ function jobStatusLabel(job: GenerationJobView | null | undefined): string | nul
 
 export function ReaderChatPanel({
   novelId,
+  currentChapterId,
   layout,
   open,
   collapsed,
@@ -110,6 +114,18 @@ export function ReaderChatPanel({
   const pollAbortRef = useRef<AbortController | null>(null);
   const listRequestRef = useRef(0);
   const msgRequestRef = useRef(0);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // Expanded panel only — collapsed chip is not a dismissable surface.
+  const dismissableOpen = open && !(layout === "mobile" && collapsed);
+  const { present, closing } = useDismissableLayer({
+    open: dismissableOpen,
+    onDismiss: () => onOpenChange(false),
+    layerRef: panelRef,
+    ignoreSelectors: ["[data-reader-chat-toggle]"],
+    // Desktop reserved column: outside click still closes; mobile sheet same.
+    closeOnOutside: true,
+  });
 
   // Restore presentation-only active conversation id (lazy init alternative for novel change)
   const [hydratedNovel, setHydratedNovel] = useState<string | null>(null);
@@ -241,6 +257,13 @@ export function ReaderChatPanel({
         await refreshConversations();
       } catch (err) {
         if ((err as Error).name === "AbortError") return;
+        const status = (err as { response?: { status?: number } })?.response?.status;
+        if (status === 404) {
+          setActiveJob(null);
+          setError("任务已失效或不属于当前会话，请重新发送");
+          return;
+        }
+        setError("任务状态同步失败，请稍后重试");
       }
     })();
 
@@ -317,8 +340,8 @@ export function ReaderChatPanel({
   };
 
   const handleSend = async () => {
-    if (!pendingSelection) {
-      setError("请先选中正文片段");
+    if (!currentChapterId) {
+      setError("当前章节尚未加载");
       return;
     }
     if (!draft.trim()) {
@@ -339,14 +362,18 @@ export function ReaderChatPanel({
         setSending(false);
         return;
       }
-      // Capture selection immutably before any UI that might clear DOM selection.
-      const selection: SelectionCoordinate = { ...pendingSelection };
+      // Capture an optional selection immutably. Without one, the server derives
+      // context from the owned current chapter and the frozen spoiler cutoff.
+      const selection: SelectionCoordinate | undefined = pendingSelection
+        ? { ...pendingSelection }
+        : undefined;
       const body = draft.trim();
       setDraft("");
       const accepted = await readerChatApi.createMessage(novelId, conversationId, {
         client_message_id: newClientMessageId(),
         body,
-        selection,
+        chapter_id: currentChapterId,
+        ...(selection ? { selection } : {}),
       });
       // Do not optimistically invent assistant text — only show user message + job.
       setMessages((prev) => {
@@ -393,7 +420,7 @@ export function ReaderChatPanel({
     }
   };
 
-  if (!open) return null;
+  if (!open && !present) return null;
 
   // Mobile collapsed chip
   if (layout === "mobile" && collapsed) {
@@ -401,27 +428,37 @@ export function ReaderChatPanel({
       <button
         type="button"
         data-testid="reader-chat-chip"
-        className="fixed bottom-20 right-3 z-40 flex items-center gap-2 rounded-full border border-border bg-card px-3 py-2 text-sm shadow-lg"
+        className="fixed bottom-20 right-3 z-40 flex items-center gap-2 rounded-full border border-border bg-card px-3 py-2 text-sm shadow-lg transition-[opacity,transform] motion-duration-fast motion-ease-enter"
         onClick={() => onCollapsedChange(false)}
       >
         <MessageSquarePlus className="size-4" />
         对话
         {activeJob && !isTerminalJobStatus(activeJob.status) ? (
-          <LoaderCircle className="size-3.5 animate-spin" />
+          <LoaderCircle className="size-3.5 animate-spin" aria-hidden />
+        ) : null}
+        {activeJob && !isTerminalJobStatus(activeJob.status) ? (
+          <span className="sr-only">生成中</span>
         ) : null}
       </button>
     );
   }
 
+  if (!present) return null;
+
   const panelBody = (
     <div
+      ref={panelRef}
       data-testid="reader-chat-panel"
       data-layout={layout}
+      aria-hidden={closing || undefined}
       className={cn(
-        "flex h-full min-h-0 flex-col bg-card text-sm",
+        "flex h-full min-h-0 flex-col bg-card text-sm transition-[opacity,transform] motion-duration-spatial motion-ease-enter",
         layout === "desktop" && "border-l border-border",
         layout === "mobile" &&
           "max-h-[45vh] rounded-t-2xl border border-border shadow-2xl",
+        open && !closing
+          ? "translate-y-0 opacity-100"
+          : "pointer-events-none translate-y-2 opacity-0 motion-ease-exit",
         className
       )}
     >
@@ -580,7 +617,7 @@ export function ReaderChatPanel({
                 data-testid="reader-chat-empty"
                 className="text-center text-xs text-muted-foreground"
               >
-                选中正文后提问，回答将带证据引用。
+                可直接针对当前章节提问；选中正文后会优先绑定该片段。
               </p>
             ) : null}
             {messages.map((m) => (
@@ -651,7 +688,7 @@ export function ReaderChatPanel({
             </div>
           ) : (
             <div className="shrink-0 border-t border-border/50 px-3 py-1.5 text-xs text-muted-foreground">
-              在正文中选中片段以绑定证据
+              当前章节提问模式 · 选中正文可绑定更精确的证据
             </div>
           )}
 
@@ -672,7 +709,9 @@ export function ReaderChatPanel({
               placeholder={
                 activeConversation?.status === "archived"
                   ? "已归档，无法发送"
-                  : "针对选区提问…"
+                  : pendingSelection
+                    ? "针对选区提问…"
+                    : "针对当前章节提问…"
               }
               value={draft}
               disabled={
@@ -695,7 +734,6 @@ export function ReaderChatPanel({
               data-testid="reader-chat-send"
               disabled={
                 sending ||
-                !pendingSelection ||
                 !draft.trim() ||
                 activeConversation?.status === "archived"
               }
@@ -715,7 +753,7 @@ export function ReaderChatPanel({
 
   if (layout === "mobile") {
     return (
-      <div className="fixed inset-x-0 bottom-0 z-40 px-0 sm:px-2">
+      <div className="fixed inset-x-0 bottom-14 z-40 px-0 sm:px-2">
         {panelBody}
       </div>
     );

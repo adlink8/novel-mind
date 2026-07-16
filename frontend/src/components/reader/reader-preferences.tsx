@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useDismissableLayer } from "@/lib/use-dismissable-layer";
 import {
   BookOpen,
   ChevronDown,
@@ -175,19 +176,16 @@ export function ReaderPreferencesPanel({
   floating = false,
 }: ReaderPreferencesPanelProps) {
   const rootRef = useRef<HTMLDivElement>(null);
+  const layerRef = useRef<HTMLElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const { present, closing } = useDismissableLayer({
+    open,
+    onDismiss: () => onOpenChange(false),
+    layerRef,
+    triggerRef,
+  });
   const update = (patch: Partial<ReaderPreferences>) =>
     onChange({ ...preferences, ...patch });
-
-  useEffect(() => {
-    if (!open) return;
-    const handleOutsidePointer = (event: PointerEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) {
-        onOpenChange(false);
-      }
-    };
-    document.addEventListener("pointerdown", handleOutsidePointer);
-    return () => document.removeEventListener("pointerdown", handleOutsidePointer);
-  }, [open, onOpenChange]);
 
   const customSpeed =
     preferences.autoScrollSpeed !== 1 && preferences.autoScrollSpeed !== 2;
@@ -195,6 +193,7 @@ export function ReaderPreferencesPanel({
   return (
     <div ref={rootRef} className={cn("relative", floating && "fixed right-4 top-4 z-50")}>
       <Button
+        ref={triggerRef}
         type="button"
         variant={floating ? "outline" : "ghost"}
         size={floating ? "default" : "sm"}
@@ -211,11 +210,18 @@ export function ReaderPreferencesPanel({
         {floating ? "阅读设置" : null}
       </Button>
 
-      {open ? (
+      {present ? (
         <section
+          ref={layerRef}
           id="reader-preferences-panel"
           aria-label="阅读设置"
-          className="absolute right-0 top-[calc(100%+0.6rem)] z-50 w-[min(21rem,calc(100vw-2rem))] rounded-2xl border border-border bg-card p-4 text-card-foreground shadow-2xl"
+          aria-hidden={closing || undefined}
+          className={cn(
+            "absolute right-0 top-[calc(100%+0.6rem)] z-50 w-[min(21rem,calc(100vw-2rem))] rounded-2xl border border-border bg-card p-4 text-card-foreground shadow-2xl transition-[opacity,transform] motion-duration-spatial motion-ease-enter",
+            open && !closing
+              ? "translate-y-0 opacity-100"
+              : "pointer-events-none -translate-y-1 opacity-0 motion-ease-exit"
+          )}
         >
           <div className="mb-4 flex items-center justify-between">
             <div>
@@ -394,7 +400,7 @@ function SegmentButton({
       onClick={onClick}
       aria-pressed={active}
       className={cn(
-        "flex min-h-9 cursor-pointer items-center justify-center gap-1 rounded-lg px-2 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        "flex min-h-9 cursor-pointer items-center justify-center gap-1 rounded-lg px-2 text-xs font-medium transition-[color,background-color,box-shadow] motion-duration-fast motion-ease-enter focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         active
           ? "bg-background text-foreground shadow-sm"
           : "text-muted-foreground hover:text-foreground"

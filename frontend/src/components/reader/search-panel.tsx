@@ -4,6 +4,8 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { searchApi, type SearchResult } from "@/lib/api";
+import { useDismissableLayer } from "@/lib/use-dismissable-layer";
+import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
 
 interface SearchPanelProps {
@@ -47,7 +49,16 @@ export function SearchPanel({
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const layerRef = useRef<HTMLElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Backdrop owns outside click; Escape still via shared layer.
+  const { present, closing } = useDismissableLayer({
+    open: isOpen,
+    onDismiss: onClose,
+    layerRef,
+    closeOnOutside: false,
+  });
 
   /** 面板打开时重置上次搜索并自动聚焦输入框 */
   useEffect(() => {
@@ -63,19 +74,6 @@ export function SearchPanel({
 
     return () => clearTimeout(timer);
   }, [isOpen]);
-
-  /** Esc 关闭面板 */
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (!isOpen) return;
-      if (e.key === "Escape") {
-        e.preventDefault();
-        onClose();
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [isOpen, onClose]);
 
   /** 执行搜索 */
   const performSearch = useCallback(
@@ -94,8 +92,8 @@ export function SearchPanel({
         setResults(res.data.results);
         setHasSearched(true);
       } catch (err: any) {
-        const msg = err?.response?.data?.detail 
-          || err?.message 
+        const msg = err?.response?.data?.detail
+          || err?.message
           || "搜索失败，请重试";
         setError(msg);
         setResults([]);
@@ -115,21 +113,31 @@ export function SearchPanel({
     };
   }, [query, performSearch]);
 
-  if (!isOpen) return null;
+  if (!present) return null;
 
   return (
     <>
-      {/* 遮罩层 */}
       <div
-        className="fixed inset-0 bg-black/20 z-40"
+        className={cn(
+          "fixed inset-0 z-40 bg-black/20 transition-[opacity] motion-duration-spatial motion-ease-enter",
+          isOpen && !closing ? "opacity-100" : "pointer-events-none opacity-0 motion-ease-exit"
+        )}
         onClick={onClose}
         aria-hidden="true"
       />
 
-      {/* 搜索面板 */}
-      <aside className="fixed right-0 top-0 h-full w-[400px] max-w-[90vw] bg-background border-l border-border z-50 flex flex-col shadow-xl animate-in slide-in-from-right">
-        {/* 头部：搜索输入框 + 关闭按钮 */}
-        <div className="flex items-center gap-2 p-4 border-b border-border">
+      <aside
+        ref={layerRef}
+        aria-label="小说内搜索"
+        aria-hidden={closing || undefined}
+        className={cn(
+          "fixed right-0 top-0 z-50 flex h-full w-[400px] max-w-[90vw] flex-col border-l border-border bg-background shadow-xl transition-[opacity,transform] motion-duration-spatial motion-ease-enter",
+          isOpen && !closing
+            ? "translate-x-0 opacity-100"
+            : "pointer-events-none translate-x-8 opacity-0 motion-ease-exit"
+        )}
+      >
+        <div className="flex items-center gap-2 border-b border-border p-4">
           <Input
             ref={inputRef}
             value={query}
@@ -142,43 +150,41 @@ export function SearchPanel({
           </Button>
         </div>
 
-        {/* 结果区域 */}
         <div className="flex-1 overflow-y-auto p-4">
-          {/* 加载中 */}
           {loading && (
-            <div className="flex items-center justify-center py-12 text-muted-foreground">
+            <div
+              className="flex items-center justify-center py-12 text-muted-foreground"
+              role="status"
+              aria-busy="true"
+            >
               <p>{"搜索中..."}</p>
             </div>
           )}
 
-          {/* 错误 */}
           {error && (
             <div className="flex items-center justify-center py-12 text-red-500">
               <p>{error}</p>
             </div>
           )}
 
-          {/* 空输入提示 */}
           {!loading && !error && !query.trim() && (
             <div className="flex items-center justify-center py-12 text-muted-foreground">
               <p>{"输入关键词开始搜索"}</p>
             </div>
           )}
 
-          {/* 无结果 */}
           {!loading && !error && hasSearched && results.length === 0 && (
             <div className="flex items-center justify-center py-12 text-muted-foreground">
               <p>{"未找到匹配内容"}</p>
             </div>
           )}
 
-          {/* 搜索结果列表 */}
           {!loading && results.length > 0 && (
             <div className="space-y-3">
               {results.map((result, idx) => (
                 <button
                   key={`${result.chunk_id}-${idx}`}
-                  className="w-full text-left p-3 rounded-lg border border-border hover:bg-accent transition-colors"
+                  className="w-full rounded-lg border border-border p-3 text-left transition-[background-color,border-color] motion-duration-fast motion-ease-enter hover:bg-accent"
                   onClick={() => {
                     if (result.chapter_id && onNavigate) {
                       onNavigate(result.chapter_id);
@@ -186,18 +192,15 @@ export function SearchPanel({
                     }
                   }}
                 >
-                  {/* 章节名 */}
-                  <p className="text-xs text-muted-foreground mb-1">
+                  <p className="mb-1 text-xs text-muted-foreground">
                     {result.chapter_title || `第${result.chapter_id}章`}
                   </p>
 
-                  {/* 高亮片段 */}
-                  <p className="text-sm leading-relaxed mb-1">
+                  <p className="mb-1 text-sm leading-relaxed">
                     {highlightText(result.content_snippet, query)}
                   </p>
 
-                  {/* 相关度 */}
-                  <p className="text-xs text-muted-foreground text-right">
+                  <p className="text-right text-xs text-muted-foreground">
                     相关度: {Math.round(result.score * 100)}%
                   </p>
                 </button>

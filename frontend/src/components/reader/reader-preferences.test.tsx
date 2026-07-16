@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { useState } from "react";
 
@@ -88,16 +88,25 @@ describe("reader preferences", () => {
     expect(screen.getByLabelText("自定义阅读背景")).toBeInTheDocument();
   });
 
-  it("offers an explicit immersive mode exit path", () => {
+  it("offers an explicit immersive mode exit path", async () => {
     render(<Harness />);
     fireEvent.click(screen.getByRole("button", { name: "进入沉浸模式" }));
-    expect(screen.queryByLabelText("阅读设置")).not.toBeInTheDocument();
+    // Exit presence may keep the node briefly; it becomes non-interactive then unmounts.
+    await waitFor(() => {
+      expect(screen.queryByLabelText("阅读设置")).not.toBeInTheDocument();
+    });
   });
 
-  it("closes when clicking outside the settings panel", () => {
+  it("closes when clicking outside the settings panel", async () => {
     render(<Harness />);
     expect(screen.getByLabelText("阅读设置")).toBeInTheDocument();
+    // Opening-frame suppressOutside clears on the next animation frame.
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => resolve())
+    );
     fireEvent.pointerDown(document.body);
-    expect(screen.queryByLabelText("阅读设置")).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByLabelText("阅读设置")).not.toBeInTheDocument();
+    });
   });
 });

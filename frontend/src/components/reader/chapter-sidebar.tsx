@@ -13,6 +13,11 @@ interface ChapterSidebarProps {
   onToggle: () => void;
 }
 
+function prefersReducedMotion(): boolean {
+  if (typeof window === "undefined" || !window.matchMedia) return false;
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
 export function ChapterSidebar({
   chapters,
   currentChapterId,
@@ -22,10 +27,13 @@ export function ChapterSidebar({
 }: ChapterSidebarProps) {
   const activeRef = useRef<HTMLButtonElement | null>(null);
 
-  // 打开时滚动到当前章节，便于记住上次读到哪
+  // 打开时滚动到当前章节；reduced-motion 使用 auto
   useEffect(() => {
     if (!isOpen) return;
-    activeRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+    activeRef.current?.scrollIntoView({
+      block: "center",
+      behavior: prefersReducedMotion() ? "auto" : "smooth",
+    });
   }, [isOpen, currentChapterId, chapters.length]);
 
   return (
@@ -33,8 +41,9 @@ export function ChapterSidebar({
       {/* 移动端遮罩 */}
       {isOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/30 lg:hidden"
+          className="fixed inset-0 z-40 bg-black/30 transition-[opacity] motion-duration-spatial motion-ease-enter lg:hidden"
           onClick={onToggle}
+          aria-hidden="true"
         />
       )}
 
@@ -43,7 +52,7 @@ export function ChapterSidebar({
         <button
           type="button"
           onClick={onToggle}
-          className="mb-0 hidden h-full w-10 shrink-0 flex-col items-center justify-center gap-2 rounded-[20px] border border-white/60 bg-card/80 text-muted-foreground shadow-sm transition hover:bg-card hover:text-foreground lg:flex"
+          className="mb-0 hidden h-full w-10 shrink-0 flex-col items-center justify-center gap-2 rounded-[20px] border border-border/70 bg-card/80 text-muted-foreground shadow-sm transition-[background-color,color,border-color] motion-duration-fast motion-ease-enter hover:bg-card hover:text-foreground lg:flex"
           title="展开目录"
         >
           <ChevronRight className="size-4" />
@@ -56,16 +65,16 @@ export function ChapterSidebar({
         </button>
       )}
 
-      {/* 侧边栏：桌面也可收起 */}
+      {/* 侧边栏：桌面也可收起；spatial transform/opacity only */}
       <aside
         className={cn(
-          "z-50 flex flex-col border-border/70 bg-sidebar/95 backdrop-blur-xl transition-all duration-300 ease-in-out",
+          "z-50 flex flex-col border-border/70 bg-sidebar/95 backdrop-blur-xl transition-[opacity,transform] motion-duration-spatial motion-ease-enter",
           // 移动：抽屉
           "fixed inset-y-0 left-0 w-72 border-r",
-          isOpen ? "translate-x-0" : "-translate-x-full",
-          // 桌面：静态栏，可收起宽度
-          "lg:static lg:mr-4 lg:rounded-[28px] lg:border lg:border-white/60",
-          isOpen ? "lg:w-64 lg:translate-x-0" : "lg:hidden"
+          isOpen ? "translate-x-0 opacity-100" : "pointer-events-none -translate-x-full opacity-0 motion-ease-exit",
+          // 桌面：静态栏，可收起宽度（保留占位语义，关闭时 lg:hidden 与业务一致）
+          "lg:static lg:mr-4 lg:rounded-[28px] lg:border lg:border-border/70",
+          isOpen ? "lg:w-64 lg:translate-x-0 lg:opacity-100 lg:pointer-events-auto" : "lg:hidden"
         )}
       >
         <div className="flex items-center justify-between border-b border-border/70 p-4">
@@ -76,7 +85,7 @@ export function ChapterSidebar({
           <button
             type="button"
             onClick={onToggle}
-            className="cursor-pointer rounded-lg p-1.5 hover:bg-muted"
+            className="cursor-pointer rounded-lg p-1.5 transition-[background-color] motion-duration-fast motion-ease-enter hover:bg-muted"
             title="收起目录"
           >
             <X className="size-4 lg:hidden" />
@@ -100,8 +109,8 @@ export function ChapterSidebar({
                   }
                 }}
                 className={cn(
-                  "w-full cursor-pointer rounded-xl px-3 py-2.5 text-left text-sm transition-colors",
-                  "hover:bg-white/70",
+                  "w-full cursor-pointer rounded-xl px-3 py-2.5 text-left text-sm transition-[background-color,color,box-shadow] motion-duration-fast motion-ease-enter",
+                  "hover:bg-card/70",
                   active
                     ? "bg-foreground font-medium text-background shadow-sm"
                     : "text-muted-foreground"

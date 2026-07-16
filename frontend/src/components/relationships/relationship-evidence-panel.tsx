@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef } from "react";
 import Link from "next/link";
 import { X } from "lucide-react";
 
@@ -9,6 +10,8 @@ import type {
   RelationshipGraphNode,
   RelationshipProvenance,
 } from "@/lib/api";
+import { useDismissableLayer } from "@/lib/use-dismissable-layer";
+import { cn } from "@/lib/utils";
 import { RELATION_LABELS } from "./relationship-controls";
 
 type Props = {
@@ -27,7 +30,16 @@ function provenanceLabel(kind: RelationshipProvenance) {
 
 export function RelationshipEvidencePanel(props: Props) {
   const { edge, evidence, nodesById, novelId } = props;
-  if (!edge) return null;
+  const layerRef = useRef<HTMLElement>(null);
+  const open = edge != null;
+  const { present, closing } = useDismissableLayer({
+    open,
+    onDismiss: props.onClose,
+    layerRef,
+    closeOnOutside: false, // backdrop owns outside
+  });
+
+  if (!edge || !present) return null;
 
   const sourceName =
     nodesById.get(edge.source_character_id)?.name ??
@@ -43,15 +55,25 @@ export function RelationshipEvidencePanel(props: Props) {
       <button
         type="button"
         aria-label="关闭证据遮罩"
-        className="fixed inset-0 z-40 bg-black/30"
+        className={cn(
+          "fixed inset-0 z-40 bg-black/30 transition-[opacity] motion-duration-spatial motion-ease-enter",
+          open && !closing ? "opacity-100" : "pointer-events-none opacity-0 motion-ease-exit"
+        )}
         onClick={props.onClose}
       />
       <aside
+        ref={layerRef}
         role="dialog"
         aria-modal="true"
         aria-label="关系证据"
+        aria-hidden={closing || undefined}
         data-testid="relationship-evidence-panel"
-        className="fixed bottom-0 right-0 top-0 z-50 flex w-full max-w-md flex-col border-l bg-background shadow-2xl"
+        className={cn(
+          "fixed bottom-0 right-0 top-0 z-50 flex w-full max-w-md flex-col border-l bg-background shadow-2xl transition-[opacity,transform] motion-duration-spatial motion-ease-enter",
+          open && !closing
+            ? "translate-x-0 opacity-100"
+            : "pointer-events-none translate-x-6 opacity-0 motion-ease-exit"
+        )}
       >
         <div className="flex items-start justify-between gap-3 border-b px-5 py-4">
           <div className="min-w-0">
@@ -72,7 +94,7 @@ export function RelationshipEvidencePanel(props: Props) {
           <button
             type="button"
             aria-label="关闭关系证据"
-            className="shrink-0 rounded-full border p-2"
+            className="shrink-0 rounded-full border p-2 transition-[background-color] motion-duration-fast motion-ease-enter hover:bg-muted"
             onClick={props.onClose}
           >
             <X className="size-4" />
@@ -95,7 +117,9 @@ export function RelationshipEvidencePanel(props: Props) {
             证据定位
           </p>
           {props.loading && (
-            <p className="mt-2 text-sm text-muted-foreground">加载证据…</p>
+            <p className="mt-2 text-sm text-muted-foreground" role="status" aria-busy="true">
+              加载证据…
+            </p>
           )}
           {props.error && (
             <p role="alert" className="mt-2 text-sm text-destructive">

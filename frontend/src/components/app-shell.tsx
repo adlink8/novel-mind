@@ -41,7 +41,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         跳到主内容
       </a>
 
-      <aside className="fixed inset-y-4 left-4 z-40 hidden w-60 flex-col rounded-[28px] border border-white/60 bg-sidebar/90 p-3 shadow-[0_24px_70px_-30px_rgba(38,31,24,0.38)] backdrop-blur-xl lg:flex">
+      <aside className="fixed inset-y-4 left-4 z-40 hidden w-60 flex-col rounded-[28px] border border-border/70 bg-sidebar/90 p-3 shadow-[0_24px_70px_-30px_rgba(38,31,24,0.38)] backdrop-blur-xl lg:flex">
         <Link href="/" className="flex items-center gap-3 rounded-2xl px-3 py-3">
           <span className="grid size-11 place-items-center rounded-2xl bg-foreground text-background shadow-sm">
             <BookOpenText className="size-5" />
@@ -62,10 +62,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 href={item.href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "group flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                  "group flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium transition-[color,background-color,box-shadow] motion-duration-standard motion-ease-enter",
                   active
                     ? "bg-foreground text-background shadow-sm"
-                    : "text-muted-foreground hover:bg-white/75 hover:text-foreground",
+                    : "text-muted-foreground hover:bg-card/75 hover:text-foreground",
                 )}
               >
                 <Icon className="size-[18px]" strokeWidth={active ? 2.2 : 1.8} />
@@ -76,7 +76,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-        <div className="mt-auto rounded-2xl border border-border/70 bg-white/65 p-4">
+        <div className="mt-auto rounded-2xl border border-border/70 bg-card/65 p-4">
           <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
             <Sparkles className="size-3.5 text-primary" />
             AI workspace
@@ -101,7 +101,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {children}
       </main>
 
-      <nav aria-label="移动导航" className="fixed inset-x-3 bottom-3 z-50 grid grid-cols-6 rounded-[22px] border border-white/60 bg-sidebar/95 p-1.5 shadow-[0_18px_50px_-22px_rgba(38,31,24,0.65)] backdrop-blur-xl lg:hidden">
+      <nav aria-label="移动导航" className="fixed inset-x-3 bottom-3 z-50 grid grid-cols-6 rounded-[22px] border border-border/70 bg-sidebar/95 p-1.5 shadow-[0_18px_50px_-22px_rgba(38,31,24,0.65)] backdrop-blur-xl lg:hidden">
         {navigation.map((item) => {
           const active = isActive(pathname, item.href);
           const Icon = item.icon;
@@ -112,7 +112,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               aria-label={item.label}
               aria-current={active ? "page" : undefined}
               className={cn(
-                "flex min-w-0 flex-col items-center gap-1 rounded-2xl px-1 py-2 text-[10px] font-medium transition-colors",
+                "flex min-w-0 flex-col items-center gap-1 rounded-2xl px-1 py-2 text-[10px] font-medium transition-[color,background-color] motion-duration-fast motion-ease-enter",
                 active ? "bg-foreground text-background" : "text-muted-foreground",
               )}
             >
