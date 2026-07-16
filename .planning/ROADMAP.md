@@ -7,7 +7,8 @@
 - [ ] v0.3 小说导入 + RAG 索引 - 导入/索引/搜索已交付，RAG 评测质量闭环仍有缺口。
 - [x] v0.5 自动质量与 CI 门禁 - 以全栈自动化和双模型仲裁替代人工 RAG 质量确认；REQ-AUTO-11 closed（06-08/06-09）。
 - [x] v0.8 分层叙事记忆与层级 RAG - **SHIPPED** candidate scope 2026-07-16 — 归档 [v0.8-ROADMAP](./milestones/v0.8-ROADMAP.md) / [audit](./v0.8-MILESTONE-AUDIT.md)
-- [ ] v0.9 分析工作台呈现与数据诚实 - **ACTIVE** — Phase 19（不重开 08/09/11）
+- [x] v0.9 分析工作台呈现与数据诚实 - Phase 19 COMPLETE
+- [x] v1.0 结构工作台与多层呈现 - Phase 20 COMPLETE（P0；NM 只读；禁止 promotion 仍有效）
 
 第一个 active milestone 已按要求设为并完成"审计与启动修复"。v0.3 经 2006-06-13 复审后恢复为 active，详见 `.planning/v0.3-MILESTONE-AUDIT.md`。
 
@@ -49,6 +50,7 @@
 | v0.8 / Phase 12-17 分层叙事记忆与层级 RAG | 19/19 plans (12–17 done) | **COMPLETE** — Phase 12–17 verified; candidate-only/no pointer cutover |
 | Phase 18 前端动效与过渡系统 | 3/3 | **COMPLETE** — 18-01..03 done; dual-viewport motion qualified |
 | v0.9 / Phase 19 分析工作台呈现与数据诚实 | 4/4 | **COMPLETE** — 19-01..04 done (truth + presentation) |
+| v1.0 / Phase 20 结构工作台与多层呈现 | 4/4 | **COMPLETE** — P0 Structure Workspace + NM read-only |
 
 ### Phase 19: Analysis Workbench Presentation & Truth
 
@@ -67,11 +69,30 @@ Plans:
 Context: `.planning/phases/19-analysis-workbench-presentation-and-truth/19-CONTEXT.md`.  
 Summaries: `19-01`..`19-04-SUMMARY.md`.
 
+### Phase 20: Structure Workspace & Multi-layer Presentation
+
+**Goal:** `/analysis` 以结构为主轴（自上而下呈现），时间线/关系/线索为挂载在结构节点上的 facet；复用 Narrative Memory 候选作为 L2–L4 只读骨架；无 NM 时章节结构诚实降级。  
+**Depends on:** Phase 07, 08, 09, 11, 12–17 NM candidate, 19 honesty  
+**Status:** COMPLETE (P0 verified; residuals in 20-VERIFICATION.md)  
+**Non-goals:** NM promotion、替换 08/09/11 生产权威、Reader Chat cutover、GraphRAG/Neo4j  
+
+Plans:
+- [x] 20-01 NM read-only structure API
+- [x] 20-02 Structure Workspace shell (FE)
+- [x] 20-03 Scope-bound facets + claims drill + honesty polish
+- [x] 20-04 Docs + verification + planning cursor
+
+**Waves:** 1 (20-01) → 2 (20-02) → 3 (20-03) → 4 (20-04).  
+Context: `.planning/phases/20-structure-workspace-multilayer-presentation/20-CONTEXT.md`.  
+Research: `20-RESEARCH.md`.  
+Verification: `20-VERIFICATION.md`.  
+Summaries: `20-01`..`20-04-SUMMARY.md`.
+
 ## Auto Start
 
-**v0.9 / Phase 19 COMPLETE（2026-07-16）** — plans 19-01..04 verified.  
-**禁止** narrative-memory promotion / Reader Chat cutover 无新里程碑授权时执行。  
-Next: optional phase report / ship / human docs after facts verified.
+**v1.0 / Phase 20 COMPLETE（2026-07-16）** — plans 20-01..04 verified (P0).  
+**禁止** narrative-memory promotion / Reader Chat cutover 无新授权时执行。  
+Next: optional UAT on `/analysis` with a novel that has NM rows; P1 NM build visibility / aggregation quality.
 
 ## Backlog
 

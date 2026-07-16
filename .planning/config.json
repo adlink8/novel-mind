@@ -1,13 +1,13 @@
 {
   "project": "novel-mind",
-  "active_milestone": "v0.9",
-  "last_completed_milestone": "v0.8",
-  "last_completed_phase": "18-frontend-motion-and-transition-system",
-  "active_phase": "19-analysis-workbench-presentation-and-truth",
-  "active_plan": "19-04",
+  "active_milestone": "v1.0",
+  "last_completed_milestone": "v1.0",
+  "last_completed_phase": "20-structure-workspace-multilayer-presentation",
+  "active_phase": "20-structure-workspace-multilayer-presentation",
+  "active_plan": "20-04",
   "status": "phase_complete",
   "canonical_dir": ".planning",
-  "auto_start": ".planning/phases/19-analysis-workbench-presentation-and-truth/19-01-PLAN.md",
+  "auto_start": ".planning/phases/20-structure-workspace-multilayer-presentation/20-VERIFICATION.md",
   "documentation_ownership": {
     "human": ["README.md", "IMPLEMENTATION-STATUS.md", "docs/"],
     "ai": [".planning/"]
@@ -18,10 +18,11 @@
     "status_labels": ["VERIFIED", "PARTIAL", "MISSING"]
   },
   "workflow": {
-    "_auto_chain_active": true,
+    "_auto_chain_active": false,
     "use_worktrees": false
   },
   "notes": {
-    "phase_19": "Analysis workbench presentation & truth; do not reopen 08/09/11"
+    "phase_19": "Analysis workbench presentation & truth; complete",
+    "phase_20": "Structure Workspace P0 complete; NM candidate-only; no promotion"
   }
 }

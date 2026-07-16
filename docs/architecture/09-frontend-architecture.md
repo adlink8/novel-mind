@@ -34,6 +34,8 @@ frontend/src/
 │   │   └── page.tsx        # RAG 评测管理与 ECharts 可视化
 │   ├── settings/
 │   │   └── page.tsx        # AI 模型设置页
+│   ├── analysis/
+│   │   └── page.tsx        # 结构工作台（Structure Workspace）
 │   └── writing/
 │       └── page.tsx        # 写作页（骨架）
 ├── components/             # React 组件
@@ -43,6 +45,10 @@ frontend/src/
 │   ├── novel-card.tsx      # 小说卡片
 │   ├── novel-upload-dialog.tsx  # 上传对话框
 │   ├── empty-state.tsx     # 空状态占位
+│   ├── structure/          # 结构树 / 节点面板 / 工作台壳（Phase 20）
+│   ├── timeline/           # 时间线 facet
+│   ├── relationships/      # 人物关系 facet
+│   ├── clues/              # 线索 facet
 │   ├── reader/             # 阅读器组件
 │   │   ├── chapter-sidebar.tsx
 │   │   ├── reader-content.tsx
@@ -51,7 +57,9 @@ frontend/src/
 │   ├── search/             # 搜索栏与结果卡片
 │   └── ui/                 # shadcn/ui 基础组件（10个）
 ├── lib/                    # 工具与 API 客户端
-│   ├── api.ts              # Axios API 封装（7.6KB）
+│   ├── api.ts              # Axios API 封装（timeline 等）
+│   ├── narrative-memory-api.ts  # NM 结构只读客户端（candidate_preview）
+│   ├── clue-api.ts         # 线索 API 客户端
 │   └── utils.ts            # 通用工具函数
 ├── stores/                 # Zustand 全局状态
 │   ├── aiConfigStore.ts    # AI 模型配置状态
@@ -73,7 +81,15 @@ frontend/src/
 | `/search` | 跨小说混合搜索结果 | 需要登录 | VERIFIED |
 | `/eval` | RAG 评测数据、运行和可视化 | 需要登录 | VERIFIED |
 | `/settings` | AI 模型设置 | 需要登录 | VERIFIED |
+| `/analysis` | 结构工作台：结构导航 + 时间线/关系/线索 facet | 需要登录 | VERIFIED（Phase 20 壳；NM 候选只读，无 promote） |
 | `/writing` | 写作页 | 需要登录 | SKELETON（骨架） |
+
+### `/analysis` 信息架构（Phase 20）
+
+- **主轴**：结构树（有 NM candidate 时 global→arc→chapter_state；否则章节列表降级）。
+- **辅轴**：Facet tabs（timeline | relationships | clues），scope = 选中节点 `chapter_start..chapter_end`。
+- **诚实**：NM 始终展示「预览·未发布」/ `candidate_preview`；无 NM 时横幅说明单层分析。
+- **非目标**：不将 NM promote 为生产 active；不复活 plot/theme 中间摘要菜单。
 
 ## 视觉系统
 

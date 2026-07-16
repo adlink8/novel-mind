@@ -20,8 +20,8 @@
 | 属性 | 内容 |
 |---|---|
 | **职责** | HTTP 端点：认证、小说 CRUD、AI 模型配置、RAG、混合搜索与评测 |
-| **主要文件** | `backend/app/api/auth.py`、`novels.py`、`models.py`、`rag.py`、`search.py`、`eval.py`、`dependencies.py` |
-| **状态** | VERIFIED（认证 + 小说 + 模型 + RAG + 搜索）；PARTIAL（评测质量闭环）；501 占位（分析/时间线/人物/同人） |
+| **主要文件** | `backend/app/api/auth.py`、`novels.py`、`models.py`、`rag.py`、`search.py`、`eval.py`、`timeline.py`、`relationships.py`、`clues.py`、`narrative_memory.py`、`dependencies.py` |
+| **状态** | VERIFIED（认证 + 小说 + 模型 + RAG + 搜索 + timeline/rel/clue 产品路由 + **NM structure 只读**）；PARTIAL（评测质量闭环、NM 样例产出）；501 占位（同人等） |
 | **上游** | 前端 HTTP 请求 |
 | **下游** | Service 层 |
 | **文档** | `backend/app/api/README.md` |
@@ -69,6 +69,17 @@
 | **上游** | API 路由层 |
 | **下游** | ORM 模型层、ChromaDB、AI Providers |
 | **文档** | `backend/app/services/README.md` |
+
+### 叙事记忆结构查询（Phase 20 产品只读面）
+
+| 属性 | 内容 |
+|---|---|
+| **职责** | 为 Structure Workspace 提供 candidate NM versions/tree/claims/source-links；cutoff 过滤；**不** promote、**不**启动 builder |
+| **主要文件** | `backend/app/services/narrative_memory/structure_query.py`、`api/narrative_memory.py`、`schemas/narrative_memory_product.py` |
+| **状态** | VERIFIED（单元测试）；样例数据常 empty → UI 降级章节树 |
+| **上游** | `/analysis` 前端、`require_owned_novel` |
+| **下游** | `narrative_memory_*` 表（只读） |
+| **文档** | `.planning/phases/20-structure-workspace-multilayer-presentation/` |
 
 ### 数据库迁移
 
