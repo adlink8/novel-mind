@@ -10,6 +10,8 @@
  * 响应式:
  * - md 以上: 显示侧边栏
  * - md 以下: 隐藏侧边栏（未来可加移动端汉堡菜单）
+ *
+ * Phase 18: pre-paint theme bootstrap (no FOUC) + AppThemeSync reconciler.
  */
 
 import type { Metadata } from "next";
@@ -18,6 +20,8 @@ import { Inter } from "next/font/google";
 import { cn } from "@/lib/utils";
 import { AuthGate } from "@/components/auth-gate";
 import { AppShell } from "@/components/app-shell";
+import { AppThemeSync } from "@/components/app-theme-sync";
+import { THEME_BOOT_SCRIPT } from "@/components/reader/reader-preferences";
 
 const inter = Inter({subsets:["latin"], variable:"--font-sans"});
 
@@ -32,8 +36,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="zh-CN" className={cn("font-sans", inter.variable)}>
+    <html lang="zh-CN" className={cn("font-sans", inter.variable)} suppressHydrationWarning>
+      <head>
+        <script
+          // Defensive pre-paint theme restore — same key/validation as AppThemeSync.
+          dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }}
+        />
+      </head>
       <body className="min-h-screen bg-background font-sans antialiased">
+        <AppThemeSync />
         <AuthGate><AppShell>{children}</AppShell></AuthGate>
       </body>
     </html>

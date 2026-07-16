@@ -7,6 +7,7 @@
  * 1. 引入 Tailwind CSS 的 base/components/utilities 层
  * 2. 定义 shadcn/ui 使用的 HSL 颜色 CSS 变量（亮色和暗色主题）
  * 3. 设置全局基础样式（边框颜色、背景色、文字色）
+ * 4. Phase 18 motion tokens、theme-transition gate、reduced-motion 权威覆盖
  *
  * 主题系统说明：
  * - 使用 HSL 格式的 CSS 变量（色相 饱和度 亮度）
@@ -81,6 +82,21 @@
     --sidebar-accent-foreground: 28 20% 13%;
     --sidebar-border: 32 18% 80%;
     --sidebar-ring: 16 70% 52%;
+
+    /* ============================================================
+     * Phase 18 motion contract (UI-MOTION-01)
+     * Only three durations + directional enter/exit easing.
+     * Components must reference these tokens; no arbitrary durations.
+     * ============================================================ */
+    --motion-duration-fast: 150ms;
+    --motion-duration-standard: 200ms;
+    --motion-duration-spatial: 300ms;
+    --motion-ease-enter: cubic-bezier(0, 0, 0.2, 1);
+    --motion-ease-exit: cubic-bezier(0.4, 0, 1, 1);
+
+    /* Pre-paint custom reader surface (validated six-digit hex only) */
+    --reader-custom-background: #efe4d1;
+    --reader-custom-foreground: 28 20% 13%;
   }
 
   /* ============================================================
@@ -143,21 +159,120 @@
       radial-gradient(circle at 90% 0%, hsl(229 45% 42% / 0.06), transparent 30rem);
     background-attachment: fixed;
   }
+
+  /* Custom reader surface consumes pre-paint CSS variables (no FOUC). */
+  [data-reader-surface][data-reader-theme="custom"],
+  html[data-reader-theme="custom"] [data-reader-surface] {
+    background-color: var(--reader-custom-background);
+    color: hsl(var(--reader-custom-foreground));
+  }
 }
+
+/* ------------------------------------------------------------
+ * 1) Boot: no theme color transition until AppThemeSync gates ready
+ * 2) Regular motion tokens / semantic utilities
+ * 3) Theme-transition-ready (color-only, after first paint)
+ * 4) prefers-reduced-motion last (final authority)
+ * ------------------------------------------------------------ */
 
 @layer utilities {
   .paper-surface {
-    border: 1px solid rgb(255 255 255 / 0.6);
+    border: 1px solid hsl(var(--border) / 0.7);
     background: hsl(var(--card) / 0.9);
     box-shadow: 0 20px 60px -38px rgb(52 42 32 / 0.38);
     backdrop-filter: blur(6px);
   }
+
+  /* Explicit-property semantic motion utilities (never animate every property). */
+  .motion-transition-feedback {
+    transition-property: opacity, transform, background-color, border-color, box-shadow, color;
+    transition-duration: var(--motion-duration-fast);
+    transition-timing-function: var(--motion-ease-enter);
+  }
+
+  .motion-transition-content {
+    transition-property: opacity, transform, background-color, border-color, box-shadow, color;
+    transition-duration: var(--motion-duration-standard);
+    transition-timing-function: var(--motion-ease-enter);
+  }
+
+  .motion-transition-spatial {
+    transition-property: opacity, transform;
+    transition-duration: var(--motion-duration-spatial);
+    transition-timing-function: var(--motion-ease-enter);
+  }
+
+  .motion-duration-fast {
+    transition-duration: var(--motion-duration-fast);
+    --tw-duration: var(--motion-duration-fast);
+    --tw-animation-duration: var(--motion-duration-fast);
+  }
+
+  .motion-duration-standard {
+    transition-duration: var(--motion-duration-standard);
+    --tw-duration: var(--motion-duration-standard);
+    --tw-animation-duration: var(--motion-duration-standard);
+  }
+
+  .motion-duration-spatial {
+    transition-duration: var(--motion-duration-spatial);
+    --tw-duration: var(--motion-duration-spatial);
+    --tw-animation-duration: var(--motion-duration-spatial);
+  }
+
+  .motion-ease-enter {
+    transition-timing-function: var(--motion-ease-enter);
+    --tw-ease: var(--motion-ease-enter);
+  }
+
+  .motion-ease-exit {
+    transition-timing-function: var(--motion-ease-exit);
+    --tw-ease: var(--motion-ease-exit);
+  }
+
+  /* Closing/present layers: no pointer while exiting */
+  .motion-closing {
+    pointer-events: none;
+  }
 }
 
+/* Color-only theme transitions after boot gate (never layout / images / bg position). */
+html.theme-transition-ready body {
+  transition-property: background-color, color;
+  transition-duration: var(--motion-duration-standard);
+  transition-timing-function: var(--motion-ease-enter);
+}
+
+html.theme-transition-ready .paper-surface,
+html.theme-transition-ready [data-theme-surface] {
+  transition-property: background-color, border-color, color, box-shadow;
+  transition-duration: var(--motion-duration-standard);
+  transition-timing-function: var(--motion-ease-enter);
+}
+
+/* Reduced-motion is final authority: instant usable state, no non-essential motion. */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  html.theme-transition-ready body,
+  html.theme-transition-ready .paper-surface,
+  html.theme-transition-ready [data-theme-surface] {
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+  }
+
+  /* Strip non-essential translate/scale/pulse while keeping final opacity/color state. */
+  .motion-transition-spatial,
+  .motion-transition-content,
+  .motion-transition-feedback {
+    transform: none !important;
   }
 }

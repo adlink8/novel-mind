@@ -78,6 +78,16 @@ const config: Config = {
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
+      // Phase 18 semantic motion tokens (UI-MOTION-01)
+      transitionDuration: {
+        fast: "var(--motion-duration-fast)",
+        standard: "var(--motion-duration-standard)",
+        spatial: "var(--motion-duration-spatial)",
+      },
+      transitionTimingFunction: {
+        enter: "var(--motion-ease-enter)",
+        exit: "var(--motion-ease-exit)",
+      },
     },
   },
   plugins: [],

@@ -9,6 +9,13 @@ import { ReaderChatPanel } from "@/components/reader/reader-chat-panel";
 import { ProgressBar } from "@/components/reader/progress-bar";
 import { SearchPanel } from "@/components/reader/search-panel";
 import {
+  loadReaderPreferences,
+  ReaderPreferencesPanel,
+  saveReaderPreferences,
+  type ReaderPreferences,
+} from "@/components/reader/reader-preferences";
+import { cn } from "@/lib/utils";
+import {
   novelsApi,
   type Novel,
   type Chapter,
@@ -25,6 +32,8 @@ import {
   PanelLeft,
   Search,
 } from "lucide-react";
+
+const AUTO_SCROLL_BASE_PX_PER_SECOND = 80;
 
 function getStorageKey(novelId: string): string {
   return `novelmind:reading:${novelId}`;
@@ -99,6 +108,10 @@ function NovelReaderInner() {
   const [error, setError] = useState<string | null>(null);
   const [chapterPercent, setChapterPercent] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [preferences, setPreferences] = useState<ReaderPreferences>(() =>
+    loadReaderPreferences()
+  );
+  const [preferencesOpen, setPreferencesOpen] = useState(false);
   const chaptersRef = useRef<Chapter[]>([]);
   /** 时间线定位模式：不写入阅读进度，避免污染「上次读到」 */
   const [progressWritable, setProgressWritable] = useState(!fromTimeline);
@@ -129,6 +142,45 @@ function NovelReaderInner() {
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
+
+  useEffect(() => {
+    saveReaderPreferences(preferences);
+  }, [preferences]);
+
+  useEffect(() => {
+    if (
+      preferences.mode !== "scroll" ||
+      !preferences.autoScroll ||
+      !chapterContent
+    ) {
+      return;
+    }
+    const el = scrollRef.current;
+    if (!el) return;
+
+    let frame = 0;
+    let previous = performance.now();
+    const tick = (now: number) => {
+      const elapsed = Math.min(50, now - previous);
+      previous = now;
+      el.scrollTop +=
+        (AUTO_SCROLL_BASE_PX_PER_SECOND * preferences.autoScrollSpeed * elapsed) /
+        1000;
+      const reachedEnd = el.scrollTop + el.clientHeight >= el.scrollHeight - 2;
+      if (reachedEnd) {
+        setPreferences((current) => ({ ...current, autoScroll: false }));
+        return;
+      }
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [
+    chapterContent,
+    preferences.autoScroll,
+    preferences.autoScrollSpeed,
+    preferences.mode,
+  ]);
 
   useEffect(() => {
     chaptersRef.current = chapters;
@@ -357,18 +409,34 @@ function NovelReaderInner() {
 
   const showDesktopChat = chatOpen && isDesktop;
   const showMobileChat = chatOpen && !isDesktop;
-
   return (
-    <div className="relative flex h-[calc(100vh-4rem)] overflow-hidden bg-[#f6f1e8]/70 lg:h-screen lg:p-4 lg:pl-0">
-      <ChapterSidebar
-        chapters={chapters}
-        currentChapterId={currentChapterId}
-        onSelectChapter={handleSelectChapter}
-        isOpen={sidebarOpen}
-        onToggle={() => setSidebarOpen((v) => !v)}
-      />
+    <div
+      className={cn(
+        "relative flex h-[calc(100vh-4rem)] overflow-hidden bg-background text-foreground lg:h-screen lg:p-4 lg:pl-0",
+        preferences.theme === "dark" && "dark",
+        preferences.immersive && "fixed inset-0 z-[60] h-screen p-0 lg:p-0"
+      )}
+      data-reader-theme={preferences.theme}
+      data-reader-mode={preferences.mode}
+    >
+      {!preferences.immersive ? (
+        <ChapterSidebar
+          chapters={chapters}
+          currentChapterId={currentChapterId}
+          onSelectChapter={handleSelectChapter}
+          isOpen={sidebarOpen}
+          onToggle={() => setSidebarOpen((v) => !v)}
+        />
+      ) : null}
 
-      <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden lg:rounded-[28px] lg:border lg:border-white/60 lg:bg-card/75 lg:shadow-[0_25px_70px_-45px_rgba(52,42,32,0.55)]">
+      <main
+        className={cn(
+          "relative flex min-w-0 flex-1 flex-col overflow-hidden bg-card/75",
+          !preferences.immersive &&
+            "lg:rounded-[28px] lg:border lg:border-border/70 lg:shadow-[0_25px_70px_-45px_rgba(52,42,32,0.55)]"
+        )}
+      >
+        {!preferences.immersive ? (
         <header className="z-20 flex items-center justify-between border-b border-border/70 bg-card/80 px-3 py-3 backdrop-blur-xl sm:px-5">
           <div className="flex items-center gap-2 sm:gap-3">
             <Button
@@ -402,15 +470,24 @@ function NovelReaderInner() {
           </div>
 
           <div className="flex items-center gap-2">
+            <ReaderPreferencesPanel
+              preferences={preferences}
+              onChange={setPreferences}
+              open={preferencesOpen}
+              onOpenChange={setPreferencesOpen}
+            />
             <Button
               variant="ghost"
               size="sm"
               onClick={() => {
-                setChatOpen(true);
-                setChatCollapsed(false);
+                setChatOpen((current) => {
+                  if (!current) setChatCollapsed(false);
+                  return !current;
+                });
               }}
               title="选区对话"
               data-testid="reader-chat-open"
+              data-reader-chat-toggle
             >
               <MessageSquareText className="size-4" />
             </Button>
@@ -442,13 +519,19 @@ function NovelReaderInner() {
             </Button>
           </div>
         </header>
+        ) : null}
 
         {/* Desktop: reading column + reserved chat column (no permanent overlay). */}
         <div className="flex min-h-0 flex-1">
           <div
             ref={scrollRef}
             data-testid="reader-scroll-column"
-            className="min-w-0 flex-1 overflow-y-auto pb-16"
+            data-reader-surface
+            data-reader-theme={preferences.theme}
+            className={cn(
+              "min-w-0 flex-1 overflow-y-auto",
+              preferences.immersive ? "pb-8" : "pb-6"
+            )}
           >
             <ReaderContent
               chapter={chapterContent}
@@ -462,6 +545,7 @@ function NovelReaderInner() {
               hasPrevChapter={currentIndex > 0}
               onAskSelection={handleAskSelection}
               highlightRange={highlightRange}
+              readingMode={preferences.mode}
             />
           </div>
           {showDesktopChat ? (
@@ -475,6 +559,7 @@ function NovelReaderInner() {
             >
               <ReaderChatPanel
                 novelId={novelId}
+                currentChapterId={currentChapterId}
                 layout="desktop"
                 open={chatOpen}
                 collapsed={chatCollapsed}
@@ -488,17 +573,30 @@ function NovelReaderInner() {
           ) : null}
         </div>
 
-        <ProgressBar
-          chapterPercent={chapterPercent}
-          chapterTitle={currentChapterTitle}
-          chapterIndex={currentIndex >= 0 ? currentIndex + 1 : 0}
-          chapterTotal={chapters.length}
-        />
+        {!preferences.immersive ? (
+          <ProgressBar
+            chapterPercent={chapterPercent}
+            chapterTitle={currentChapterTitle}
+            chapterIndex={currentIndex >= 0 ? currentIndex + 1 : 0}
+            chapterTotal={chapters.length}
+          />
+        ) : null}
       </main>
+
+      {preferences.immersive ? (
+        <ReaderPreferencesPanel
+          preferences={preferences}
+          onChange={setPreferences}
+          open={preferencesOpen}
+          onOpenChange={setPreferencesOpen}
+          floating
+        />
+      ) : null}
 
       {showMobileChat ? (
         <ReaderChatPanel
           novelId={novelId}
+          currentChapterId={currentChapterId}
           layout="mobile"
           open={chatOpen}
           collapsed={chatCollapsed}
