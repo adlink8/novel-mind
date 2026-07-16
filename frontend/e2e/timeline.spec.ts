@@ -24,20 +24,20 @@ async function mockTimeline(page: Page) {
   await page.route(/\/api\/timeline\/11(?:\?.*)?$/, (route) => route.fulfill({ json: { active: { source: "active", version_id: 7, status: "completed", progress: {}, events, causal_edges: [{ source_event_id: 1, target_event_id: 2, edge_type: "causes", confidence: 0.8 }], counts: { events: 8, participants: 2, causal_edges: 1 }, aggregates: { plot: 8 }, previews: [] }, running_candidate: null } }));
 }
 
-test("horizontal timeline renders canvas, zoom, accessible evidence list and stable screenshot", async ({ page }, testInfo) => {
+test("timeline renders a readable drill-down view with inline event detail", async ({ page }, testInfo) => {
   await mockTimeline(page);
   await page.goto("/analysis");
   await page.getByLabel("选择小说").selectOption("11");
-  await expect(page.getByRole("heading", { name: "雨夜相遇" })).toBeVisible();
+  await page.getByRole("button", { name: "展开查看" }).click();
   await expect(page.locator('[data-testid="timeline-canvas"] canvas')).toBeVisible();
   await expect(page.locator('[data-testid="timeline-canvas"]')).toHaveAttribute("data-zoom", "inside-slider");
   const firstEvent = page.getByRole("button", { name: /雨夜相遇/ });
   await firstEvent.focus();
   await expect(firstEvent).toBeFocused();
   await firstEvent.press("Enter");
-  await expect(page.getByRole("dialog", { name: /雨夜相遇/ })).toBeVisible();
-  await expect(page.getByRole("link", { name: "检索相关证据" })).toHaveAttribute("href", /\/search/);
-  await expect(page.getByRole("link", { name: "阅读第 1 章" })).toHaveAttribute("href", "/novels/11?chapter=1");
+  await expect(page.getByLabel("选中事件详情")).toContainText("雨夜相遇");
+  await expect(page.getByRole("link", { name: "检索证据" })).toHaveAttribute("href", /\/search/);
+  await expect(page.getByRole("link", { name: "阅读此章" })).toHaveAttribute("href", "/novels/11?chapter=1&from=timeline");
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath(`timeline-${testInfo.project.name}.png`), fullPage: true });
 });

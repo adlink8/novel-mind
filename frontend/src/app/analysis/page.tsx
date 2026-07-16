@@ -227,7 +227,7 @@ function AnalysisWorkspace() {
     }
   }
 
-  /** 仅选书 + 加载已有结果，不启动 worker */
+  /** 仅选书 + 加载已有结果，不启动 worker；有数据则直接展示 */
   async function selectNovel(id: string) {
     setNovelId(id);
     setPerson("");
@@ -242,13 +242,24 @@ function AnalysisWorkspace() {
     if (!id) {
       setEnvelope({ active: null, running_candidate: null });
       setRun(null);
+      setFullBook(false);
       return;
     }
+    // 同步服务端全书偏好，避免选书后还要再勾一次才看见数据
+    const novelMeta = novels.find((n) => String(n.id) === String(id));
+    const preferFullBook = Boolean(
+      novelMeta?.reading_progress?.timeline_full_book
+    );
+    setFullBook(preferFullBook);
     setLoading(true);
     try {
-      // 读已有时间线（若有）
+      // 读已有时间线（若有）— 选书即上数据，不点「开始分析」
       try {
-        await loadTimeline(id, undefined, false);
+        await loadTimeline(
+          id,
+          { ordering, person: "", causal, fullBook: preferFullBook },
+          false
+        );
       } catch {
         setEnvelope({ active: null, running_candidate: null });
       }
@@ -259,33 +270,61 @@ function AnalysisWorkspace() {
         runStatusRef.current = statusResponse.data.status;
         const st = statusResponse.data.status;
         if (st === "completed") {
-          setPrepNote("已有完成的时间线结果。可浏览；需要可点「重新分析」。");
+          setSource("active");
+          sourceRef.current = "active";
+          envelopeSigRef.current = "";
+          await loadTimeline(
+            id,
+            { ordering, person: "", causal, fullBook: preferFullBook },
+            false
+          );
+          setPrepNote(
+            "已有时间线数据，可直接浏览。人物关系可看共现临时图（正式关系观察待知识图谱）；线索可在「线索与伏笔」查看或重试。需要可点「重新分析」。"
+          );
         } else if (ACTIVE_RUN.has(st)) {
-          setPrepNote("检测到进行中的任务：图与列表会自动刷新。未点「开始分析」不会新建任务。");
+          setPrepNote(
+            "检测到进行中的时间线：事件会陆续出现。线索已可并行；人物关系在时间线发布后自动跑，图可先看共现。"
+          );
           // Snap to candidate so existing partial results are visible immediately
           setSource("running_candidate");
           sourceRef.current = "running_candidate";
           envelopeSigRef.current = "";
-          await loadTimeline(id, undefined, false);
+          await loadTimeline(
+            id,
+            { ordering, person: "", causal, fullBook: preferFullBook },
+            false
+          );
         } else if (st === "cancelled") {
           setSource("running_candidate");
           sourceRef.current = "running_candidate";
+          envelopeSigRef.current = "";
+          await loadTimeline(
+            id,
+            { ordering, person: "", causal, fullBook: preferFullBook },
+            false
+          );
           setPrepNote(
-            "上次分析已暂停。若有「候选结果」页签可先浏览已抽取事件；点「继续分析」可续跑。人物关系与线索需时间线完成后自动生成。"
+            "上次分析已暂停。若有候选事件可先浏览；点「继续分析」续跑。完成后人物关系与线索会并行生成。"
           );
         } else if (st === "paused_dependency" || st === "paused_budget" || st === "failed") {
           setSource("running_candidate");
           sourceRef.current = "running_candidate";
-          setPrepNote("上次分析中断，可点「继续分析」重试。关系/线索依赖已完成的时间线版本。");
+          envelopeSigRef.current = "";
+          await loadTimeline(
+            id,
+            { ordering, person: "", causal, fullBook: preferFullBook },
+            false
+          );
+          setPrepNote("上次分析中断，可点「继续分析」重试。关系/线索在时间线就绪后并行。");
           if (statusResponse.data.status_reason) {
             setError(statusResponse.data.status_reason);
           }
         } else {
-          setPrepNote("已加载状态。需要抽取时请点「开始分析」。");
+          setPrepNote("已加载状态。点「开始分析」：时间线主跑，同时并行线索；关系在时间线发布后并行。");
         }
       } catch {
         setRun(null);
-        setPrepNote("尚未分析。选择后请点「开始分析」才会调用模型。");
+        setPrepNote("尚未分析。点「开始分析」后：时间线开始，并并行线索；关系在时间线发布后启动。");
       }
     } catch {
       setError("加载小说分析状态失败。");
@@ -300,8 +339,11 @@ function AnalysisWorkspace() {
     if (!novelId) return;
     setLoading(true);
     setError("");
-    setPrepNote("正在启动分析（准备场景层级并排队任务）…");
+    setPrepNote("正在启动分析：时间线入队；完成后并行人物关系与线索…");
     try {
+      // Product: timeline primary; clue starts in parallel (may pause until hierarchy/timeline ready).
+      // Relationship worker is dispatched by backend after timeline promote; graph may show
+      // progressive co-occurrence while observations are empty.
       const [timelineStart, clueStart] = await Promise.allSettled([
         timelineApi.startOrResume(novelId),
         clueApi.startOrResume(novelId),
@@ -312,19 +354,23 @@ function AnalysisWorkspace() {
       runStatusRef.current = statusResponse.data.status;
       envelopeSigRef.current = "";
       progressSigRef.current = "";
-      // Prefer candidate tab while worker runs so chart/list stream in
-      if (ACTIVE_RUN.has(statusResponse.data.status)) {
-        setSource("running_candidate");
-        sourceRef.current = "running_candidate";
-      }
+      // Always show progressive candidate data immediately after start.
+      setSource("running_candidate");
+      sourceRef.current = "running_candidate";
       await loadTimeline(novelId, undefined, false);
       const st = statusResponse.data.status;
-      if (st === "completed") setPrepNote("时间线已就绪；关系与线索任务已续跑。");
-      else if (ACTIVE_RUN.has(st)) {
+      if (st === "completed") {
+        setSource("active");
+        sourceRef.current = "active";
+        await loadTimeline(novelId, undefined, false);
+        setPrepNote(
+          "时间线已完成并发布。人物关系与线索已/将并行处理；关系图可先显示时间线共现临时边。"
+        );
+      } else if (ACTIVE_RUN.has(st)) {
         setPrepNote(
           clueStart.status === "fulfilled"
-            ? "时间线与线索已入队；人物关系将在时间线版本完成后自动开始。"
-            : "时间线已入队；线索任务暂未入队，可在「线索与伏笔」中重试。"
+            ? "时间线分析中：候选事件会陆续出现。线索已并行入队；人物关系在时间线发布后自动跑，图可先看共现临时数据。"
+            : "时间线分析中：候选事件会陆续出现。线索入队失败时可在「线索与伏笔」重试。"
         );
       } else {
         setPrepNote(statusResponse.data.status_reason || "任务已提交。");

@@ -130,7 +130,7 @@ export function RelationshipControls(props: Props) {
 
       {props.degradationMode === "large" && (
         <p className="w-full text-xs text-amber-800">
-          大图模式：已关闭动画并简化标签，性能优先。
+          大图模式：画布以连接度最高人物为中心分层，悬停可聚焦邻接。
         </p>
       )}
       {props.degradationMode === "filters_required" && (

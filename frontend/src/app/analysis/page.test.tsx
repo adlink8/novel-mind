@@ -191,6 +191,18 @@ describe("global analysis timeline workspace", () => {
         updated_at: "2026-07-15T00:00:00Z",
       },
     });
+    mocks.clueStartOrResume.mockResolvedValue({
+      data: {
+        id: 2,
+        novel_id: 11,
+        version_id: null,
+        status: "pending",
+        status_reason: null,
+        progress: {},
+        cancel_requested: false,
+        updated_at: "2026-07-15T00:00:00Z",
+      },
+    });
     mocks.clueGetClues.mockResolvedValue({
       data: {
         active: {
@@ -238,7 +250,7 @@ describe("global analysis timeline workspace", () => {
     expect(screen.queryByRole("option", { name: "林墨" })).not.toBeInTheDocument();
 
     await expandEventList();
-    expect(await screen.findByText("候选事件")).toBeInTheDocument();
+    expect((await screen.findAllByText("候选事件")).length).toBeGreaterThan(0);
     expect(screen.queryByText("旧版事件")).not.toBeInTheDocument();
     // Live runs surface candidate events without the default spoiler cutoff banner.
     expect(
@@ -246,6 +258,21 @@ describe("global analysis timeline workspace", () => {
         Boolean(el?.textContent?.includes("不受阅读进度截断"))
       ).length
     ).toBeGreaterThan(0);
+  });
+
+  it("starts the timeline and clue pipelines from one analysis action", async () => {
+    mocks.status.mockResolvedValue({
+      data: { id: 3, novel_id: 11, status: "completed", progress: {}, cancel_requested: false, updated_at: "2026-07-13T04:00:00Z" },
+    });
+    render(<AnalysisPage />);
+    fireEvent.change(await screen.findByLabelText("选择小说"), { target: { value: "11" } });
+    fireEvent.click(await screen.findByRole("button", { name: "重新分析" }));
+
+    await waitFor(() => expect(mocks.startOrResume).toHaveBeenCalledWith("11"));
+    expect(mocks.clueStartOrResume).toHaveBeenCalledWith("11");
+    expect(
+      await screen.findByText(/时间线已完成并发布|人物关系与线索/)
+    ).toBeInTheDocument();
   });
 
   it("orders non-contiguous chapters by chapter, source offset and event id", async () => {
@@ -304,7 +331,7 @@ describe("global analysis timeline workspace", () => {
     await screen.findByText("第九章事件");
 
     const titles = screen
-      .getAllByRole("heading", { level: 2 })
+      .getAllByRole("heading", { level: 3 })
       .map((heading) => heading.textContent);
     expect(titles).toEqual(["第二章前事件", "第二章后事件", "第九章事件"]);
   });
@@ -329,7 +356,8 @@ describe("global analysis timeline workspace", () => {
     );
     expect(screen.queryByRole("option", { name: "顾遥" })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("tab", { name: /正在生成/ }));
+    // completed runs label the non-active tab as 候选结果 (not 正在生成)
+    fireEvent.click(screen.getByRole("tab", { name: /候选结果|正在生成/ }));
     expect(screen.getByRole("option", { name: "顾遥" })).toBeInTheDocument();
     expect(screen.queryByRole("option", { name: "林墨" })).not.toBeInTheDocument();
   });
@@ -368,8 +396,10 @@ describe("global analysis timeline workspace", () => {
         })
       )
     );
+    // Intermediate analysis modes must stay hidden (not the plot-segmentation copy "剧情节奏").
+    expect(screen.queryByText(/剧情摘要|节拍|主题分析|章节总结|文风/)).not.toBeInTheDocument();
     expect(
-      screen.queryByText(/剧情摘要|节拍|主题|节奏|章节总结|关系图/)
+      screen.queryByRole("tab", { name: /^(剧情摘要|节拍|主题|节奏|章节总结)$/ })
     ).not.toBeInTheDocument();
   });
 
@@ -446,8 +476,10 @@ describe("global analysis timeline workspace", () => {
 
     expect(screen.getByRole("tab", { name: "时间线" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "人物关系" })).toBeInTheDocument();
+    // Avoid bare "节奏" — product copy uses "剧情节奏" for plot-based windows.
+    expect(screen.queryByText(/剧情摘要|节拍|主题分析|章节总结|文风/)).not.toBeInTheDocument();
     expect(
-      screen.queryByText(/剧情摘要|节拍|主题|节奏|章节总结/)
+      screen.queryByRole("tab", { name: /^(剧情摘要|节拍|主题|节奏|章节总结)$/ })
     ).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("tab", { name: "线索与伏笔" }));

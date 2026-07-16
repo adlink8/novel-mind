@@ -59,6 +59,11 @@ type EventWindow = {
 
 const OVERVIEW_THRESHOLD = 48;
 const EVENT_LABEL_THRESHOLD = 16;
+/** Soft target events per overview stage — not a fixed "7 blocks" UI. */
+const SOFT_EVENTS_PER_STAGE = 80;
+const MIN_STAGES = 3;
+const MAX_STAGES = 14;
+const MIN_EVENTS_PER_STAGE = 10;
 
 type ScatterDatum = {
   value: [number, number];
@@ -116,33 +121,146 @@ function clampZoom(z: ZoomState | null): ZoomState {
   return { start, end };
 }
 
-function buildEventWindows(events: TimelineEvent[]): EventWindow[] {
-  const windows: EventWindow[] = [];
-  // The overview is deliberately limited to seven visual stages.  This makes a
-  // 998-event novel readable at a glance; drilling in still exposes every event.
-  const windowCount = Math.min(7, Math.ceil(events.length / OVERVIEW_THRESHOLD));
-  const windowSize = Math.ceil(events.length / windowCount);
-  for (let start = 0; start < events.length; start += windowSize) {
-    const end = Math.min(start + windowSize, events.length);
-    const first = events[start];
-    const last = events[end - 1];
-    windows.push({
-      start,
-      end,
-      firstChapter: first.narrative_chapter_number,
-      lastChapter: last.narrative_chapter_number,
-      eventCount: end - start,
-      previewTitle: first.title,
-      previewSummary: first.description,
-    });
+function makeWindow(events: TimelineEvent[], start: number, end: number): EventWindow {
+  const first = events[start];
+  const last = events[end - 1];
+  return {
+    start,
+    end,
+    firstChapter: first.narrative_chapter_number,
+    lastChapter: last.narrative_chapter_number,
+    eventCount: end - start,
+    previewTitle: first.title,
+    previewSummary: first.description,
+  };
+}
+
+/** Chapters with local event-density minima — natural plot-arc seams. */
+function detectDensityValleys(events: TimelineEvent[]): Set<number> {
+  const countByChapter = new Map<number, number>();
+  for (const event of events) {
+    const ch = event.narrative_chapter_number;
+    countByChapter.set(ch, (countByChapter.get(ch) ?? 0) + 1);
   }
-  return windows;
+  const chapters = [...countByChapter.keys()].sort((a, b) => a - b);
+  const valleys = new Set<number>();
+  for (let i = 1; i < chapters.length - 1; i++) {
+    const prev = countByChapter.get(chapters[i - 1]) ?? 0;
+    const cur = countByChapter.get(chapters[i]) ?? 0;
+    const next = countByChapter.get(chapters[i + 1]) ?? 0;
+    if (cur <= prev && cur <= next) {
+      valleys.add(chapters[i]);
+    }
+  }
+  return valleys;
+}
+
+/**
+ * Snap an ideal event-index cut to a nearby **chapter boundary**, preferring
+ * density valleys so stages follow plot rhythm rather than equal event quotas.
+ */
+function snapToPlotBoundary(
+  events: TimelineEvent[],
+  ideal: number,
+  valleys: Set<number>
+): number {
+  const n = events.length;
+  if (ideal <= 0) return 0;
+  if (ideal >= n) return n;
+  const radius = Math.max(16, Math.floor(n * 0.08));
+  let best = ideal;
+  let bestScore = Number.POSITIVE_INFINITY;
+  const lo = Math.max(1, ideal - radius);
+  const hi = Math.min(n - 1, ideal + radius);
+  for (let i = lo; i <= hi; i++) {
+    const prevCh = events[i - 1].narrative_chapter_number;
+    const ch = events[i].narrative_chapter_number;
+    if (ch === prevCh) continue; // only cut between chapters
+    let score = Math.abs(i - ideal);
+    if (valleys.has(ch) || valleys.has(prevCh)) score -= 28;
+    // Prefer quieter hand-off chapters slightly.
+    const gap = Math.abs(ch - prevCh);
+    if (gap >= 2) score -= Math.min(12, gap);
+    if (score < bestScore) {
+      bestScore = score;
+      best = i;
+    }
+  }
+  return best;
+}
+
+/**
+ * Overview stages from **plot density / chapter seams**, not a fixed 7-way split.
+ * Stage count scales with book length; cut points snap to narrative valleys.
+ */
+export function buildEventWindows(events: TimelineEvent[]): EventWindow[] {
+  if (!events.length) return [];
+  if (events.length <= OVERVIEW_THRESHOLD) {
+    return [makeWindow(events, 0, events.length)];
+  }
+
+  const valleys = detectDensityValleys(events);
+  const preferredStages = Math.min(
+    MAX_STAGES,
+    Math.max(MIN_STAGES, Math.ceil(events.length / SOFT_EVENTS_PER_STAGE))
+  );
+
+  const idealCuts: number[] = [];
+  for (let s = 1; s < preferredStages; s++) {
+    idealCuts.push(Math.round((events.length * s) / preferredStages));
+  }
+
+  const snapped = idealCuts
+    .map((ideal) => snapToPlotBoundary(events, ideal, valleys))
+    .filter((cut) => cut > 0 && cut < events.length);
+
+  // Unique sorted boundaries
+  const boundaries = [0, ...new Set(snapped)].sort((a, b) => a - b);
+  if (boundaries[boundaries.length - 1] !== events.length) {
+    boundaries.push(events.length);
+  }
+
+  // Merge tiny fragments so overview cards stay meaningful.
+  const merged: number[] = [0];
+  for (let i = 1; i < boundaries.length; i++) {
+    const end = boundaries[i];
+    const prev = merged[merged.length - 1];
+    const isLast = i === boundaries.length - 1;
+    if (!isLast && end - prev < MIN_EVENTS_PER_STAGE) {
+      continue; // absorb into next segment
+    }
+    merged.push(end);
+  }
+  if (merged[merged.length - 1] !== events.length) {
+    merged.push(events.length);
+  }
+  // If last absorb left a tiny tail, fold into previous.
+  if (
+    merged.length >= 3 &&
+    merged[merged.length - 1] - merged[merged.length - 2] < MIN_EVENTS_PER_STAGE
+  ) {
+    merged.splice(merged.length - 2, 1);
+  }
+
+  const windows: EventWindow[] = [];
+  for (let i = 0; i < merged.length - 1; i++) {
+    windows.push(makeWindow(events, merged[i], merged[i + 1]));
+  }
+  return windows.length ? windows : [makeWindow(events, 0, events.length)];
 }
 
 function chapterRangeLabel(window: EventWindow) {
   return window.firstChapter === window.lastChapter
     ? `第 ${window.firstChapter} 章`
     : `第 ${window.firstChapter}–${window.lastChapter} 章`;
+}
+
+function overviewGridClass(stageCount: number): string {
+  // Adaptive columns — no longer locked to 7.
+  if (stageCount <= 3) return "grid grid-cols-1 gap-2 sm:grid-cols-3";
+  if (stageCount <= 6) return "grid grid-cols-2 gap-2 sm:grid-cols-3";
+  if (stageCount <= 9) return "grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4";
+  return "grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5";
 }
 
 export function TimelineChart({
@@ -386,26 +504,87 @@ export function TimelineChart({
                 <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#53745a]">Whole book overview</p>
                 <h2 id="timeline-overview-title" className="mt-1 font-serif text-xl font-semibold">全书概览 <span className="font-sans text-base font-normal text-muted-foreground">· {sorted.length} 个事件</span></h2>
               </div>
-              <p className="inline-flex items-center gap-1.5 rounded-full bg-[#eef4ec] px-3 py-1.5 text-xs font-medium text-[#486d50]"><CircleHelp className="size-3.5" />每块代表一个剧情阶段，而非单个事件</p>
+              <p className="inline-flex items-center gap-1.5 rounded-full bg-[#eef4ec] px-3 py-1.5 text-xs font-medium text-[#486d50]">
+                <CircleHelp className="size-3.5" />
+                按剧情节奏分段 · 非固定七等分
+              </p>
             </div>
             <div className="rounded-2xl border bg-[#fcfdfb] p-4 sm:p-5">
-              <div className="mb-4 flex items-end justify-between text-xs text-muted-foreground"><span>{ordering === "narrative" ? "叙事推进" : "故事时间"}</span><span>{chapterRangeLabel(windows[0])} — {chapterRangeLabel(windows[windows.length - 1])}</span></div>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7" aria-label="按剧情阶段聚合的全书时间线">
+              <div className="mb-4 flex flex-wrap items-end justify-between gap-2 text-xs text-muted-foreground">
+                <span>{ordering === "narrative" ? "叙事推进" : "故事时间"}</span>
+                <span>
+                  {chapterRangeLabel(windows[0])} —{" "}
+                  {chapterRangeLabel(windows[windows.length - 1])} · 共{" "}
+                  {windows.length} 个剧情阶段
+                </span>
+              </div>
+              <div
+                className={overviewGridClass(windows.length)}
+                aria-label="按剧情阶段聚合的全书时间线"
+              >
                 {windows.map((window, index) => {
-                  const density = Math.max(28, Math.round((window.eventCount / Math.max(...windows.map((item) => item.eventCount))) * 100));
-                  return <button key={`${window.start}-${window.end}`} type="button" aria-label={`区间 ${index + 1} · ${window.eventCount} 个事件`} onClick={() => setActiveWindow(window)} className="group rounded-xl p-1.5 text-left transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-                    <div className="flex h-28 items-end rounded-lg bg-[#edf0e9] px-1.5 pb-1.5"><span className="w-full rounded-md bg-[#567d5c] transition group-hover:brightness-95" style={{ height: `${density}%` }} /></div>
-                    <p className="mt-2 truncate text-xs font-semibold text-foreground">{chapterRangeLabel(window)}</p>
-                    <p className="mt-0.5 truncate text-[11px] font-medium text-foreground/80">{window.previewTitle}</p>
-                    <p className="mt-1 line-clamp-2 min-h-8 text-[10px] leading-4 text-muted-foreground">{window.previewSummary}</p>
-                    <p className="mt-1 text-[11px] text-muted-foreground">{window.eventCount} 事件</p>
-                  </button>;
+                  const maxCount = Math.max(
+                    ...windows.map((item) => item.eventCount),
+                    1
+                  );
+                  const density = Math.max(
+                    28,
+                    Math.round((window.eventCount / maxCount) * 100)
+                  );
+                  const chapterSpan =
+                    window.lastChapter - window.firstChapter + 1;
+                  return (
+                    <button
+                      key={`${window.start}-${window.end}`}
+                      type="button"
+                      aria-label={`阶段 ${index + 1} · ${chapterRangeLabel(window)} · ${window.eventCount} 个事件`}
+                      onClick={() => setActiveWindow(window)}
+                      className="group rounded-xl p-1.5 text-left transition-[background-color,transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:bg-muted hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    >
+                      <div className="flex h-28 items-end rounded-lg bg-[#edf0e9] px-1.5 pb-1.5">
+                        <span
+                          className="w-full rounded-md bg-[#567d5c] transition-[height,filter] duration-300 ease-out group-hover:brightness-95"
+                          style={{ height: `${density}%` }}
+                        />
+                      </div>
+                      <p className="mt-2 text-[10px] font-medium uppercase tracking-wide text-[#53745a]">
+                        阶段 {index + 1}
+                        {chapterSpan > 1 ? ` · ${chapterSpan} 章` : ""}
+                      </p>
+                      <p className="mt-0.5 truncate text-xs font-semibold text-foreground">
+                        {chapterRangeLabel(window)}
+                      </p>
+                      <p className="mt-0.5 truncate text-[11px] font-medium text-foreground/80">
+                        {window.previewTitle}
+                      </p>
+                      <p className="mt-1 line-clamp-2 min-h-8 text-[10px] leading-4 text-muted-foreground">
+                        {window.previewSummary}
+                      </p>
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        {window.eventCount} 事件
+                      </p>
+                    </button>
+                  );
                 })}
               </div>
             </div>
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50/65 px-4 py-3">
-              <div><p className="text-sm font-semibold text-amber-950">选择一个剧情阶段，展开查看事件与因果连接</p><p className="mt-0.5 text-xs text-amber-900/75">完整事件标题仅在具体范围内展示，避免全书节点堆叠。</p></div>
-              <button type="button" onClick={() => setActiveWindow(windows[0])} className="inline-flex items-center gap-2 rounded-xl bg-[#3d684d] px-3.5 py-2 text-sm font-medium text-white transition hover:bg-[#31563f]"><Expand className="size-4" />展开查看</button>
+              <div>
+                <p className="text-sm font-semibold text-amber-950">
+                  选择一个剧情阶段，展开查看事件与因果连接
+                </p>
+                <p className="mt-0.5 text-xs text-amber-900/75">
+                  阶段按章节事件密度谷值切分（跟随剧情节奏），不是固定七等分。
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveWindow(windows[0])}
+                className="inline-flex items-center gap-2 rounded-xl bg-[#3d684d] px-3.5 py-2 text-sm font-medium text-white transition hover:bg-[#31563f]"
+              >
+                <Expand className="size-4" />
+                展开首阶段
+              </button>
             </div>
           </section>
         ) : (

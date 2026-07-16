@@ -369,7 +369,7 @@ describe("analysis relationship workspace (09-04)", () => {
       }),
     });
 
-    fireEvent.click(screen.getByRole("tab", { name: /正在生成/ }));
+    fireEvent.click(screen.getByRole("tab", { name: /候选结果|正在生成/ }));
     await waitFor(() => {
       const last = mocks.getGraph.mock.calls.at(-1)?.[1] as {
         source: string;

@@ -272,9 +272,8 @@ export function RelationshipWorkspace(props: Props) {
           <div className="grid min-h-64 place-items-center rounded-3xl border border-dashed p-8 text-center text-muted-foreground">
             <p className="text-sm">暂无人物关系数据。</p>
             <p className="mt-2 max-w-md text-xs leading-5">
-              关系观察在<strong>时间线完成并发布</strong>
-              后自动抽取。当前若时间线仅有「候选结果」或任务已暂停，请先回到时间线点
-              「继续分析」跑完；完成后会自动入队关系任务。
+              开始分析后，时间线事件落地即可显示<strong>共现临时图</strong>
+              ；正式关系观察在时间线发布后由 worker 生成。请先在「时间线」启动分析。
             </p>
           </div>
         )
@@ -284,8 +283,18 @@ export function RelationshipWorkspace(props: Props) {
         envelope.counts.nodes === 0 &&
         envelope.counts.edges === 0 && (
           <p className="rounded-xl border border-amber-300/70 bg-amber-50 px-3 py-2 text-xs text-amber-950">
-            已绑定版本 v{envelope.version_id}，但尚无已接受的关系观察（0 人 / 0
-            边）。通常表示关系抽取尚未成功完成。
+            已绑定版本 v{envelope.version_id}，但尚无共现/观察边。请确认时间线该版本已有事件。
+          </p>
+        )}
+      {envelope &&
+        !loading &&
+        envelope.counts.edges > 0 &&
+        envelope.edges.some((e) =>
+          (e.evidence_preview || "").includes("共现")
+        ) && (
+          <p className="rounded-xl border border-sky-300/70 bg-sky-50 px-3 py-2 text-xs text-sky-950">
+            当前为时间线<strong>共现+事件语义推断</strong>
+            的临时图（同盟/敌对/亲属/师徒/爱慕，非人工确认）。正式关系观察接受后会替换。
           </p>
         )}
 
