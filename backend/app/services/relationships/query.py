@@ -26,7 +26,11 @@ from app.models.relationship import (
     RelationshipObservation,
     RelationshipOverride,
 )
-from app.models.timeline import TimelineActivePointer
+from app.models.timeline import (
+    MachineTimelineEvent,
+    TimelineActivePointer,
+    TimelineParticipant,
+)
 from app.schemas.relationship import (
     GraphDegradationMode,
     ProvenanceKind,
@@ -471,6 +475,21 @@ class RelationshipGraphQueryService:
                 # Visible-set only: excerpt already attached to accepted evidence.
                 edge.evidence_preview = (refs[0].excerpt or "")[:400] or None
 
+        provisional_names: dict[int, str] = {}
+        if not folded:
+            # Progressive product surface: when Phase 09 observations are empty,
+            # derive a co-occurrence graph from timeline participants so the UI
+            # is not blank while (or after) analysis runs.
+            folded, provisional_names = await self._provisional_from_timeline(
+                session,
+                owner_id=owner_id,
+                novel_id=novel.id,
+                version_id=resolved.version_id,
+                through_chapter=position,
+                character_id=character_id,
+                relation_type=relation_type,
+            )
+
         node_ids: set[int] = set()
         for edge in folded:
             node_ids.add(edge.source_character_id)
@@ -498,7 +517,11 @@ class RelationshipGraphQueryService:
         nodes = [
             RelationshipGraphNode(
                 character_id=cid,
-                name=characters[cid].name if cid in characters else f"character:{cid}",
+                name=(
+                    characters[cid].name
+                    if cid in characters
+                    else provisional_names.get(cid, f"character:{cid}")
+                ),
                 aliases=_parse_aliases(
                     characters[cid].aliases if cid in characters else None
                 ),
@@ -756,6 +779,393 @@ class RelationshipGraphQueryService:
     # ------------------------------------------------------------------
     # Internals
     # ------------------------------------------------------------------
+
+    @staticmethod
+    def _mention_synthetic_id(mention: str) -> int:
+        """Stable positive graph id for mention-only nodes (no characters row yet)."""
+        import hashlib
+
+        digest = hashlib.sha1(mention.strip().lower().encode("utf-8")).hexdigest()
+        # Keep in positive int32-ish range, avoid 0.
+        return (int(digest[:8], 16) % 1_900_000_000) + 1
+
+    @staticmethod
+    def _pair_synthetic_id(
+        source_id: int, target_id: int, relation_type: str = "ally"
+    ) -> int:
+        """Stable unique provisional observation id for a character pair + type."""
+        import hashlib
+
+        lo, hi = (
+            (source_id, target_id)
+            if source_id <= target_id
+            else (target_id, source_id)
+        )
+        digest = hashlib.sha1(
+            f"rel:{lo}:{hi}:{relation_type}".encode("utf-8")
+        ).hexdigest()
+        return (int(digest[:8], 16) % 1_900_000_000) + 1
+
+    # Keyword heuristics for provisional typing (zh + common novel terms).
+    # Priority: more specific types first when multiple match.
+    _TYPE_KEYWORDS: dict[str, tuple[str, ...]] = {
+        RelationshipEdgeType.ENEMY.value: (
+            "战斗",
+            "对决",
+            "开战",
+            "攻打",
+            "攻击",
+            "击败",
+            "击杀",
+            "杀死",
+            "杀害",
+            "仇敌",
+            "敌人",
+            "敌对",
+            "对峙",
+            "追杀",
+            "讨伐",
+            "交战",
+            "开战",
+            "冲突",
+            "挑衅",
+            "侮辱",
+            "背叛",
+            "反叛",
+            "魔王战",
+            "死斗",
+            "斩杀",
+            "围攻",
+            "侵攻",
+            "侵略",
+            "battle",
+            "fight",
+            "enemy",
+            "kill",
+        ),
+        RelationshipEdgeType.FAMILY.value: (
+            "父亲",
+            "母亲",
+            "父女",
+            "父子",
+            "母女",
+            "母子",
+            "兄妹",
+            "姐弟",
+            "兄弟",
+            "姐妹",
+            "哥哥",
+            "姐姐",
+            "弟弟",
+            "妹妹",
+            "儿子",
+            "女儿",
+            "亲人",
+            "血缘",
+            "家族",
+            "家人",
+            "妻子",
+            "丈夫",
+            "夫妻",
+            "父",
+            "母",
+            "family",
+            "father",
+            "mother",
+            "sibling",
+        ),
+        RelationshipEdgeType.MENTOR.value: (
+            "师父",
+            "师傅",
+            "徒弟",
+            "弟子",
+            "传授",
+            "教导",
+            "指导",
+            "师从",
+            "拜师",
+            "收徒",
+            "训练",
+            "培养",
+            "指点",
+            "mentor",
+            "master",
+            "disciple",
+            "apprentice",
+        ),
+        RelationshipEdgeType.ROMANTIC.value: (
+            "恋爱",
+            "恋人",
+            "告白",
+            "表白",
+            "亲吻",
+            "接吻",
+            "结婚",
+            "婚约",
+            "爱慕",
+            "喜欢",
+            "倾心",
+            "情人",
+            "伴侣",
+            "romance",
+            "love",
+            "kiss",
+            "marry",
+        ),
+        RelationshipEdgeType.ALLY.value: (
+            "同盟",
+            "结盟",
+            "盟友",
+            "并肩",
+            "合作",
+            "帮助",
+            "救援",
+            "援护",
+            "部下",
+            "主从",
+            "效忠",
+            "誓约",
+            "结成",
+            "命名",
+            "庇护",
+            "守护",
+            "好友",
+            "伙伴",
+            "友军",
+            "ally",
+            "friend",
+            "allyship",
+        ),
+    }
+
+    @classmethod
+    def _infer_provisional_type(
+        cls, *, title: str, description: str, event_type: str
+    ) -> str:
+        """Infer edge type from event text + timeline event_type (heuristic)."""
+        blob = f"{title or ''}\n{description or ''}".lower()
+        et = (event_type or "").lower().strip()
+
+        # Event-type prior (timeline schema: conflict/plot/character/world).
+        if et in {"conflict", "battle", "fight", "war"}:
+            base = RelationshipEdgeType.ENEMY.value
+        elif et in {"character", "dialogue", "social"}:
+            base = RelationshipEdgeType.ALLY.value
+        else:
+            base = RelationshipEdgeType.ALLY.value
+
+        scores: dict[str, int] = {t.value: 0 for t in RelationshipEdgeType}
+        scores[base] += 1
+        if et in {"conflict", "battle", "fight", "war"}:
+            scores[RelationshipEdgeType.ENEMY.value] += 3
+
+        for rel_type, keywords in cls._TYPE_KEYWORDS.items():
+            for kw in keywords:
+                if kw.lower() in blob:
+                    scores[rel_type] += 2
+
+        # Prefer non-ally when it has clear keyword evidence.
+        ranked = sorted(
+            scores.items(),
+            key=lambda item: (
+                item[1],
+                1 if item[0] != RelationshipEdgeType.ALLY.value else 0,
+            ),
+            reverse=True,
+        )
+        best_type, best_score = ranked[0]
+        if best_score <= 0:
+            return RelationshipEdgeType.ALLY.value
+        return best_type
+
+    async def _provisional_from_timeline(
+        self,
+        session: AsyncSession,
+        *,
+        owner_id: int,
+        novel_id: int,
+        version_id: int,
+        through_chapter: int,
+        character_id: int | None,
+        relation_type: str | None,
+    ) -> tuple[list[_FoldedEdge], dict[int, str]]:
+        """Co-occurrence graph from timeline participants (progressive UI).
+
+        Infers ally/enemy/family/mentor/romantic from event text + event_type
+        so the provisional surface is not a mono-ally spiderweb.
+        """
+        events = list(
+            (
+                await session.scalars(
+                    select(MachineTimelineEvent).where(
+                        MachineTimelineEvent.owner_id == owner_id,
+                        MachineTimelineEvent.novel_id == novel_id,
+                        MachineTimelineEvent.version_id == version_id,
+                        MachineTimelineEvent.narrative_chapter_number
+                        <= through_chapter,
+                    )
+                )
+            ).all()
+        )
+        if not events:
+            return [], {}
+
+        event_by_id = {e.id: e for e in events}
+        event_ids = list(event_by_id.keys())
+        parts = list(
+            (
+                await session.scalars(
+                    select(TimelineParticipant).where(
+                        TimelineParticipant.event_id.in_(event_ids)
+                    )
+                )
+            ).all()
+        )
+        by_event: dict[int, list[TimelineParticipant]] = defaultdict(list)
+        for p in parts:
+            by_event[p.event_id].append(p)
+
+        # pair -> aggregate co-occurrence + per-type votes
+        pair_stats: dict[tuple[int, int], dict[str, Any]] = {}
+        names: dict[int, str] = {}
+
+        for event_id, plist in by_event.items():
+            event = event_by_id.get(event_id)
+            if event is None:
+                continue
+            inferred = self._infer_provisional_type(
+                title=event.title or "",
+                description=event.description or "",
+                event_type=event.event_type or "",
+            )
+            seen: dict[int, str] = {}
+            for p in plist:
+                mention = (p.mention or "").strip()
+                if not mention:
+                    continue
+                cid = (
+                    p.entity_id
+                    if p.entity_id is not None
+                    else self._mention_synthetic_id(mention)
+                )
+                names[cid] = (
+                    mention if p.entity_id is None else names.get(cid, mention)
+                )
+                seen[cid] = mention
+            ids = sorted(seen.keys())
+            ch = event.narrative_chapter_number
+            for i in range(len(ids)):
+                for j in range(i + 1, len(ids)):
+                    a, b = ids[i], ids[j]
+                    key = (a, b)
+                    st = pair_stats.get(key)
+                    if st is None:
+                        st = {
+                            "count": 0,
+                            "first_chapter": ch,
+                            "type_votes": defaultdict(int),
+                            "type_samples": {},
+                        }
+                        pair_stats[key] = st
+                    st["count"] += 1
+                    st["type_votes"][inferred] += 1
+                    if ch < st["first_chapter"]:
+                        st["first_chapter"] = ch
+                    # Keep a short sample title per type for preview.
+                    if inferred not in st["type_samples"]:
+                        st["type_samples"][inferred] = (event.title or "")[:80]
+
+        # Typed candidates — quota per type so "naming ceremony" ally edges
+        # do not monopolize the whole graph.
+        min_cooccur = 2
+        type_quota = {
+            RelationshipEdgeType.ENEMY.value: 14,
+            RelationshipEdgeType.ALLY.value: 14,
+            RelationshipEdgeType.FAMILY.value: 8,
+            RelationshipEdgeType.MENTOR.value: 8,
+            RelationshipEdgeType.ROMANTIC.value: 6,
+        }
+        type_label = {
+            "ally": "同盟/协作",
+            "enemy": "敌对/冲突",
+            "family": "亲属",
+            "mentor": "师徒",
+            "romantic": "爱慕",
+        }
+
+        # (pair, rel_t, vote_n, st)
+        typed: list[tuple[tuple[int, int], str, int, dict[str, Any]]] = []
+        for key, st in pair_stats.items():
+            if st["count"] < min_cooccur:
+                continue
+            a, b = key
+            if character_id is not None and character_id not in (a, b):
+                continue
+            votes: dict[str, int] = dict(st["type_votes"])
+            if not votes:
+                votes = {RelationshipEdgeType.ALLY.value: int(st["count"])}
+            ordered = sorted(votes.items(), key=lambda kv: (-kv[1], kv[0]))
+            selected: list[tuple[str, int]] = [ordered[0]]
+            if len(ordered) > 1:
+                top_t, top_v = ordered[0]
+                second_t, second_v = ordered[1]
+                if second_v >= max(2, int(top_v * 0.4)) and second_t != top_t:
+                    selected.append((second_t, second_v))
+            for rel_t, vote_n in selected:
+                if relation_type is not None and relation_type != rel_t:
+                    continue
+                if vote_n < 1:
+                    continue
+                typed.append((key, rel_t, vote_n, st))
+
+        # Prefer higher votes; enemy slightly boosted so conflict arcs surface.
+        def sort_key(
+            item: tuple[tuple[int, int], str, int, dict[str, Any]],
+        ) -> tuple[int, int, int, tuple[int, int]]:
+            key, rel_t, vote_n, st = item
+            boost = 3 if rel_t == RelationshipEdgeType.ENEMY.value else 0
+            if rel_t in (
+                RelationshipEdgeType.FAMILY.value,
+                RelationshipEdgeType.MENTOR.value,
+                RelationshipEdgeType.ROMANTIC.value,
+            ):
+                boost = 2
+            return (-(vote_n + boost), -int(st["count"]), int(st["first_chapter"]), key)
+
+        typed.sort(key=sort_key)
+
+        used_quota: dict[str, int] = defaultdict(int)
+        folded: list[_FoldedEdge] = []
+        for (a, b), rel_t, vote_n, st in typed:
+            if used_quota[rel_t] >= type_quota.get(rel_t, 8):
+                continue
+            sample = (st.get("type_samples") or {}).get(rel_t) or ""
+            folded.append(
+                _FoldedEdge(
+                    observation_id=self._pair_synthetic_id(a, b, rel_t),
+                    source_character_id=a,
+                    target_character_id=b,
+                    relation_type=rel_t,
+                    transition="establish",
+                    confidence=min(
+                        0.62, 0.28 + 0.04 * int(vote_n) + 0.02 * int(st["count"])
+                    ),
+                    valid_from_chapter=int(st["first_chapter"]),
+                    valid_to_chapter=None,
+                    logical_key=logical_relationship_key(a, b, rel_t),
+                    provenance=ProvenanceKind.MACHINE,
+                    evidence_preview=(
+                        f"时间线推断·{type_label.get(rel_t, rel_t)}×{int(vote_n)}"
+                        f"（共现{int(st['count'])}）"
+                        + (f"：{sample}" if sample else "")
+                        + " · 临时图"
+                    ),
+                    evidence_count=int(vote_n),
+                )
+            )
+            used_quota[rel_t] += 1
+
+        return folded, names
 
     @staticmethod
     def _degradation_mode(node_count: int, edge_count: int) -> GraphDegradationMode:

@@ -14,6 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.knowledge import KnowledgeRelationJudgment
+from app.core.database import async_session_factory
 from app.models.relationship import (
     RelationshipBuildRun,
     RelationshipEvidenceLink,
@@ -602,3 +603,21 @@ class RelationshipObservationWorker:
 
 
 relationship_observation_worker = RelationshipObservationWorker()
+
+
+async def dispatch_relationship_build(
+    *, owner_id: int, novel_id: int, analysis_version_id: int
+) -> None:
+    """Run the version-bound relationship worker after timeline promotion."""
+    async with async_session_factory() as session:
+        try:
+            await relationship_observation_worker.run(
+                session,
+                owner_id=owner_id,
+                novel_id=novel_id,
+                analysis_version_id=analysis_version_id,
+            )
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            logger.exception("relationship build dispatch failed")
