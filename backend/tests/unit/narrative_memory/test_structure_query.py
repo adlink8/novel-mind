@@ -96,6 +96,43 @@ def test_cutoff_filters_nodes():
     assert 4 not in ids
 
 
+def test_multi_chapter_tree_assembly_cutoff_safe():
+    """Multi-chapter arc/global still drop nodes past through_chapter after assembly."""
+    nodes = [
+        _node(1, "cs-1", "chapter_state", 1, 1, "Ch1"),
+        _node(2, "cs-2", "chapter_state", 2, 2, "Ch2"),
+        _node(3, "cs-5", "chapter_state", 5, 5, "Ch5"),
+        _node(10, "arc-early", "story_arc", 1, 2, "Early arc"),
+        _node(11, "arc-late", "story_arc", 3, 5, "Late arc"),
+        _node(20, "global", "global_story", 1, 5, "Global"),
+    ]
+    edges = [
+        _edge(20, 10),
+        _edge(20, 11),
+        _edge(10, 1),
+        _edge(10, 2),
+        _edge(11, 3),
+    ]
+    # At through=2: only ch1/ch2 + early arc; late arc/global end past cutoff.
+    visible = filter_nodes_by_cutoff(nodes, through_chapter=2)
+    product = assemble_structure_nodes(visible, edges)
+    ids = {n.id for n in product}
+    assert ids == {1, 2, 10}
+    assert 3 not in ids
+    assert 11 not in ids
+    assert 20 not in ids
+    by_id = {n.id: n for n in product}
+    # Orphan edges to filtered parents drop; early arc keeps visible children
+    assert set(by_id[10].child_ids) == {1, 2}
+    # Raising cutoff admits multi-chapter parents
+    visible5 = filter_nodes_by_cutoff(nodes, through_chapter=5)
+    product5 = assemble_structure_nodes(visible5, edges)
+    ids5 = {n.id for n in product5}
+    assert ids5 == {1, 2, 3, 10, 11, 20}
+    by5 = {n.id: n for n in product5}
+    assert set(by5[20].child_ids) == {10, 11}
+
+
 def test_tree_assembly_child_ids_and_order():
     nodes = [
         _node(10, "cs-1", "chapter_state", 1, 1, "Ch1"),

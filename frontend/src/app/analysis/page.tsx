@@ -16,12 +16,16 @@ import { RelationshipWorkspace } from "@/components/relationships/relationship-w
 import {
   buildChapterFallbackTree,
   buildNmStructureTree,
+  findTreeNodeById,
+  findTreeNodeByNmId,
   pickDefaultTreeNode,
   treeNodeToSelection,
 } from "@/components/structure/build-structure-tree";
 import { StructureWorkspaceShell } from "@/components/structure/structure-workspace-shell";
 import {
+  densifyTimelineForMultiChapter,
   eventInChapterRange,
+  isMultiChapterScope,
   type StructureNodeSelection,
   type StructureSource,
   type StructureTreeNode,
@@ -43,7 +47,11 @@ import {
   narrativeMemoryApi,
   pickLatestPreviewVersion,
   type NmClaimItem,
+  type NmSourceLinkItem,
 } from "@/lib/narrative-memory-api";
+
+/** Soft cap for multi-chapter scatter — full set kept for list density notes. */
+const MULTI_CHAPTER_TIMELINE_CAP = 120;
 
 type AnalysisWorkspaceMode = "timeline" | "relationships" | "clues";
 
@@ -127,6 +135,12 @@ function AnalysisWorkspace() {
   const [nmClaims, setNmClaims] = useState<NmClaimItem[]>([]);
   const [nmClaimsLoading, setNmClaimsLoading] = useState(false);
   const [nmClaimsError, setNmClaimsError] = useState<string | null>(null);
+  const [selectedClaimId, setSelectedClaimId] = useState<number | null>(null);
+  const [nmSourceLinks, setNmSourceLinks] = useState<NmSourceLinkItem[]>([]);
+  const [nmSourceLinksLoading, setNmSourceLinksLoading] = useState(false);
+  const [nmSourceLinksError, setNmSourceLinksError] = useState<string | null>(
+    null
+  );
   const [envelope, setEnvelope] = useState<TimelineEnvelope>({
     active: null,
     running_candidate: null,
@@ -139,8 +153,12 @@ function AnalysisWorkspace() {
   const progressSigRef = useRef("");
   const sourceRef = useRef(source);
   const runStatusRef = useRef<string | null>(null);
+  /** Last through_chapter used for NM tree fetch (re-fetch on spoiler change). */
+  const nmTreeThroughRef = useRef<number | null>(null);
+  const selectedNodeRef = useRef<StructureNodeSelection | null>(null);
   sourceRef.current = source;
   runStatusRef.current = run?.status ?? null;
+  selectedNodeRef.current = selectedNode;
 
   const applyChapterForest = useCallback((chapterCount: number) => {
     const forest = buildChapterFallbackTree(Math.max(1, chapterCount || 1));
@@ -149,16 +167,61 @@ function AnalysisWorkspace() {
     setNmVersionId(null);
     setNmClaims([]);
     setNmClaimsError(null);
+    setSelectedClaimId(null);
+    setNmSourceLinks([]);
+    setNmSourceLinksError(null);
+    nmTreeThroughRef.current = null;
     const def = pickDefaultTreeNode(forest);
     setSelectedNode(def ? treeNodeToSelection(def) : null);
   }, []);
+
+  const applyNmForest = useCallback(
+    (
+      forest: StructureTreeNode[],
+      versionId: number,
+      through: number,
+      opts?: { preserveSelection?: boolean }
+    ) => {
+      setStructureSource("narrative_memory");
+      setStructureForest(forest);
+      setNmVersionId(versionId);
+      nmTreeThroughRef.current = through;
+      setNmClaims([]);
+      setNmClaimsError(null);
+      setSelectedClaimId(null);
+      setNmSourceLinks([]);
+      setNmSourceLinksError(null);
+
+      if (opts?.preserveSelection) {
+        const prev = selectedNodeRef.current;
+        if (prev?.nmNodeId != null) {
+          const found = findTreeNodeByNmId(forest, prev.nmNodeId);
+          if (found) {
+            setSelectedNode(treeNodeToSelection(found));
+            return;
+          }
+        }
+        if (prev?.id) {
+          const found = findTreeNodeById(forest, prev.id);
+          if (found) {
+            setSelectedNode(treeNodeToSelection(found));
+            return;
+          }
+        }
+      }
+      const def = pickDefaultTreeNode(forest);
+      setSelectedNode(def ? treeNodeToSelection(def) : null);
+    },
+    []
+  );
 
   const loadStructure = useCallback(
     async (
       id: string,
       novelMeta: Novel | undefined,
       /** When selecting a novel, pass "" so we do not reuse prior book through_chapter. */
-      throughOverride?: number | ""
+      throughOverride?: number | "",
+      opts?: { preserveSelection?: boolean }
     ) => {
       const chapterCount = novelMeta?.chapter_count ?? 1;
       try {
@@ -182,19 +245,17 @@ function AnalysisWorkspace() {
           applyChapterForest(chapterCount);
           return;
         }
-        setStructureSource("narrative_memory");
-        setStructureForest(forest);
-        setNmVersionId(latest.version_id);
-        setNmClaims([]);
-        setNmClaimsError(null);
-        const def = pickDefaultTreeNode(forest);
-        setSelectedNode(def ? treeNodeToSelection(def) : null);
+        const resolvedThrough =
+          typeof through === "number" && through >= 1 ? through : chapterCount;
+        applyNmForest(forest, latest.version_id, resolvedThrough, {
+          preserveSelection: opts?.preserveSelection,
+        });
       } catch {
         // Honest fallback: no NM or API error → chapter structure only
         applyChapterForest(chapterCount);
       }
     },
-    [applyChapterForest, throughChapter]
+    [applyChapterForest, applyNmForest, throughChapter]
   );
 
   useEffect(() => {
@@ -327,7 +388,11 @@ function AnalysisWorkspace() {
     runStatusRef.current = null;
     setNmClaims([]);
     setNmClaimsError(null);
+    setSelectedClaimId(null);
+    setNmSourceLinks([]);
+    setNmSourceLinksError(null);
     setNmVersionId(null);
+    nmTreeThroughRef.current = null;
     if (!id) {
       setEnvelope({ active: null, running_candidate: null });
       setRun(null);
@@ -537,11 +602,13 @@ function AnalysisWorkspace() {
   const view = pickTimelineView(envelope, source);
 
   /**
-   * Timeline range filter is client-side only in 20-02: server lacks
+   * Timeline range filter is client-side only: server lacks
    * chapter_start..chapter_end params. When a structure node is selected,
    * keep events whose narrative_chapter_number is in [start, end].
+   * Multi-chapter scopes densify (cap + per-chapter counts); single-chapter
+   * keeps full Phase 19 swimlane UX.
    */
-  const scopedEvents: TimelineEvent[] = useMemo(() => {
+  const scopedEventsRaw: TimelineEvent[] = useMemo(() => {
     const events = view?.events ?? [];
     if (!selectedNode) return events;
     const { chapterStart, chapterEnd } = selectedNode;
@@ -549,6 +616,28 @@ function AnalysisWorkspace() {
       eventInChapterRange(e.narrative_chapter_number, chapterStart, chapterEnd)
     );
   }, [view, selectedNode]);
+
+  const multiChapterScope = Boolean(
+    selectedNode &&
+      isMultiChapterScope(selectedNode.chapterStart, selectedNode.chapterEnd)
+  );
+
+  const timelineDensity = useMemo(() => {
+    if (!multiChapterScope) {
+      return {
+        displayEvents: scopedEventsRaw,
+        total: scopedEventsRaw.length,
+        truncated: 0,
+        byChapter: [] as { chapter: number; count: number }[],
+      };
+    }
+    return densifyTimelineForMultiChapter(
+      scopedEventsRaw,
+      MULTI_CHAPTER_TIMELINE_CAP
+    );
+  }, [multiChapterScope, scopedEventsRaw]);
+
+  const scopedEvents: TimelineEvent[] = timelineDensity.displayEvents;
 
   const scopedCausalEdges = useMemo(() => {
     if (!view || !selectedNode) return view?.causal_edges ?? [];
@@ -589,13 +678,63 @@ function AnalysisWorkspace() {
   function handleStructureSelect(node: StructureTreeNode) {
     const selection = treeNodeToSelection(node);
     setSelectedNode(selection);
+    setSelectedClaimId(null);
+    setNmSourceLinks([]);
+    setNmSourceLinksError(null);
     // Align relationship through with node end when user has not set a lower cap
     if (throughChapter === "" || throughChapter > selection.chapterEnd) {
       setThroughChapter(selection.chapterEnd);
     }
   }
 
-  // Load NM claims for selected NM node (read-only preview; 20-03 deepens drill)
+  function handleClaimSelect(claim: NmClaimItem) {
+    setSelectedClaimId((prev) => (prev === claim.id ? null : claim.id));
+  }
+
+  // Re-fetch NM tree when spoiler through_chapter changes (mid-session).
+  useEffect(() => {
+    if (!novelId || structureSource !== "narrative_memory" || !nmVersionId) {
+      return;
+    }
+    const chapterCount = selectedNovel?.chapter_count ?? 1;
+    const through =
+      typeof throughChapter === "number" && throughChapter >= 1
+        ? throughChapter
+        : chapterCount;
+    if (nmTreeThroughRef.current === through) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const treeRes = await narrativeMemoryApi.getTree(novelId, nmVersionId, {
+          through_chapter: through,
+        });
+        if (cancelled) return;
+        const forest = buildNmStructureTree(treeRes.data.nodes ?? []);
+        if (!forest.length) {
+          applyChapterForest(chapterCount);
+          return;
+        }
+        applyNmForest(forest, nmVersionId, through, { preserveSelection: true });
+      } catch {
+        // Keep previous tree on transient failure
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // selectedNovel chapter_count only — avoid novel object identity churn
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    novelId,
+    structureSource,
+    nmVersionId,
+    throughChapter,
+    selectedNovel?.chapter_count,
+    applyChapterForest,
+    applyNmForest,
+  ]);
+
+  // Load NM claims for selected NM node (read-only candidate preview)
   useEffect(() => {
     if (
       !novelId ||
@@ -606,11 +745,16 @@ function AnalysisWorkspace() {
       setNmClaims([]);
       setNmClaimsError(null);
       setNmClaimsLoading(false);
+      setSelectedClaimId(null);
+      setNmSourceLinks([]);
       return;
     }
     let cancelled = false;
     setNmClaimsLoading(true);
     setNmClaimsError(null);
+    setSelectedClaimId(null);
+    setNmSourceLinks([]);
+    setNmSourceLinksError(null);
     const through =
       typeof relationshipThroughChapter === "number"
         ? relationshipThroughChapter
@@ -640,6 +784,56 @@ function AnalysisWorkspace() {
     nmVersionId,
     selectedNode?.nmNodeId,
     selectedNode?.chapterEnd,
+    relationshipThroughChapter,
+  ]);
+
+  // Claims → source-links drill (node-level API; filter by selected claim client-side)
+  useEffect(() => {
+    if (
+      !novelId ||
+      structureSource !== "narrative_memory" ||
+      !nmVersionId ||
+      !selectedNode?.nmNodeId ||
+      selectedClaimId == null
+    ) {
+      setNmSourceLinks([]);
+      setNmSourceLinksLoading(false);
+      setNmSourceLinksError(null);
+      return;
+    }
+    let cancelled = false;
+    setNmSourceLinksLoading(true);
+    setNmSourceLinksError(null);
+    const through =
+      typeof relationshipThroughChapter === "number"
+        ? relationshipThroughChapter
+        : selectedNode.chapterEnd;
+    narrativeMemoryApi
+      .getSourceLinks(novelId, nmVersionId, selectedNode.nmNodeId, {
+        through_chapter: through,
+      })
+      .then((res) => {
+        if (cancelled) return;
+        setNmSourceLinks(res.data.source_links ?? []);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setNmSourceLinks([]);
+        setNmSourceLinksError("加载证据链接失败。");
+      })
+      .finally(() => {
+        if (!cancelled) setNmSourceLinksLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    novelId,
+    structureSource,
+    nmVersionId,
+    selectedNode?.nmNodeId,
+    selectedNode?.chapterEnd,
+    selectedClaimId,
     relationshipThroughChapter,
   ]);
 
@@ -694,6 +888,12 @@ function AnalysisWorkspace() {
           claims={nmClaims}
           claimsLoading={nmClaimsLoading}
           claimsError={nmClaimsError}
+          selectedClaimId={selectedClaimId}
+          onClaimSelect={handleClaimSelect}
+          sourceLinks={nmSourceLinks}
+          sourceLinksLoading={nmSourceLinksLoading}
+          sourceLinksError={nmSourceLinksError}
+          novelId={novelId}
         >
           <div className="grid gap-3">
             {/* Facet tabs: timeline | relationships | clues */}
@@ -954,15 +1154,52 @@ function AnalysisWorkspace() {
                 <p className="text-sm text-muted-foreground">正在加载时间线…</p>
               </div>
             ) : view ? (
-              <TimelineChart
-                events={scopedEvents}
-                causalEdges={causal ? scopedCausalEdges : []}
-                ordering={ordering}
-                novelId={novelId}
-                onNarrativePositionChange={(chapter) => {
-                  if (chapter != null) setThroughChapter(chapter);
-                }}
-              />
+              <>
+                {multiChapterScope && selectedNode && (
+                  <div
+                    data-testid="timeline-multi-chapter-density"
+                    className="rounded-xl border border-sky-300/70 bg-sky-50/80 px-3 py-2 text-xs text-sky-950"
+                  >
+                    <p className="font-medium">
+                      多章聚合视图 · 第 {selectedNode.chapterStart}–
+                      {selectedNode.chapterEnd} 章
+                    </p>
+                    <p className="mt-0.5 text-sky-900/85">
+                      范围内共 {timelineDensity.total} 条事件
+                      {timelineDensity.byChapter.length > 0 && (
+                        <>
+                          {" "}
+                          · 分章：
+                          {timelineDensity.byChapter
+                            .slice(0, 12)
+                            .map((c) => `第${c.chapter}章 ${c.count}`)
+                            .join(" · ")}
+                          {timelineDensity.byChapter.length > 12
+                            ? ` · …共 ${timelineDensity.byChapter.length} 章`
+                            : ""}
+                        </>
+                      )}
+                      {timelineDensity.truncated > 0 && (
+                        <span data-testid="timeline-density-truncated">
+                          {" "}
+                          · 图中展示 {scopedEvents.length} 条，还有{" "}
+                          {timelineDensity.truncated} 条未展开
+                        </span>
+                      )}
+                      。单章节点可看完整泳道。
+                    </p>
+                  </div>
+                )}
+                <TimelineChart
+                  events={scopedEvents}
+                  causalEdges={causal ? scopedCausalEdges : []}
+                  ordering={ordering}
+                  novelId={novelId}
+                  onNarrativePositionChange={(chapter) => {
+                    if (chapter != null) setThroughChapter(chapter);
+                  }}
+                />
+              </>
             ) : (
               <div className="grid min-h-64 place-items-center rounded-3xl border border-dashed p-8 text-center text-muted-foreground">
                 <div>

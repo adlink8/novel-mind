@@ -140,3 +140,29 @@ export function treeNodeToSelection(
     nmNodeId: node.nmNodeId,
   };
 }
+
+/** Depth-first find by NM node id (preserve selection after tree re-fetch). */
+export function findTreeNodeByNmId(
+  forest: StructureTreeNode[],
+  nmNodeId: number
+): StructureTreeNode | null {
+  for (const node of forest) {
+    if (node.nmNodeId === nmNodeId) return node;
+    const hit = findTreeNodeByNmId(node.children, nmNodeId);
+    if (hit) return hit;
+  }
+  return null;
+}
+
+/** Depth-first find by UI id (`chapter:3` | `nm:12` | `book`). */
+export function findTreeNodeById(
+  forest: StructureTreeNode[],
+  id: string
+): StructureTreeNode | null {
+  for (const node of forest) {
+    if (node.id === id) return node;
+    const hit = findTreeNodeById(node.children, id);
+    if (hit) return hit;
+  }
+  return null;
+}

@@ -12,8 +12,10 @@ import { StructureTree } from "./structure-tree";
 import { StructureWorkspaceShell } from "./structure-workspace-shell";
 import {
   clueIntersectsChapterRange,
+  countEventsByChapter,
+  densifyTimelineForMultiChapter,
   eventInChapterRange,
-  formatChapterRange,
+  isMultiChapterScope,
 } from "./structure-types";
 import {
   NM_EMPTY_BANNER,
@@ -110,6 +112,56 @@ describe("scope helpers", () => {
       )
     ).toBe(false);
   });
+
+  it("flags multi-chapter scope and densifies large multi-chapter sets", () => {
+    expect(isMultiChapterScope(1, 1)).toBe(false);
+    expect(isMultiChapterScope(1, 4)).toBe(true);
+
+    const events = [
+      ...Array.from({ length: 40 }, (_, i) => ({
+        id: i + 1,
+        narrative_chapter_number: 1,
+      })),
+      ...Array.from({ length: 30 }, (_, i) => ({
+        id: 100 + i,
+        narrative_chapter_number: 2,
+      })),
+      ...Array.from({ length: 20 }, (_, i) => ({
+        id: 200 + i,
+        narrative_chapter_number: 3,
+      })),
+    ];
+    // Full set in range 1–3 (multi-chapter filter already applied by caller)
+    const inRange = events.filter((e) =>
+      eventInChapterRange(e.narrative_chapter_number, 1, 3)
+    );
+    expect(inRange).toHaveLength(90);
+
+    // Single-chapter subset is smaller than multi-chapter full set
+    const ch2Only = events.filter((e) =>
+      eventInChapterRange(e.narrative_chapter_number, 2, 2)
+    );
+    expect(ch2Only.length).toBeLessThan(inRange.length);
+    expect(ch2Only).toHaveLength(30);
+
+    const densified = densifyTimelineForMultiChapter(inRange, 20);
+    expect(densified.total).toBe(90);
+    expect(densified.displayEvents.length).toBeLessThanOrEqual(20);
+    expect(densified.truncated).toBe(90 - densified.displayEvents.length);
+    expect(densified.truncated).toBeGreaterThan(0);
+    // All three chapters represented when budget allows
+    const chapters = new Set(
+      densified.displayEvents.map((e) => e.narrative_chapter_number)
+    );
+    expect(chapters.has(1)).toBe(true);
+    expect(chapters.has(2)).toBe(true);
+    expect(chapters.has(3)).toBe(true);
+    expect(countEventsByChapter(inRange)).toEqual([
+      { chapter: 1, count: 40 },
+      { chapter: 2, count: 30 },
+      { chapter: 3, count: 20 },
+    ]);
+  });
 });
 
 describe("StructureTree chapters fallback", () => {
@@ -172,10 +224,88 @@ describe("StructureNodePanel badge", () => {
     );
     expect(screen.queryByTestId("nm-node-badge")).not.toBeInTheDocument();
   });
+
+  it("shows honest empty for claims and source-links", () => {
+    render(
+      <StructureNodePanel
+        structureSource="narrative_memory"
+        selected={{
+          id: "nm:9",
+          kind: "story_arc",
+          chapterStart: 1,
+          chapterEnd: 4,
+          label: "中段弧",
+          nmNodeId: 9,
+        }}
+        claims={[]}
+        claimsLoading={false}
+        selectedClaimId={42}
+        sourceLinks={[]}
+        sourceLinksLoading={false}
+      />
+    );
+    expect(screen.getByTestId("claims-empty-honesty")).toHaveTextContent(
+      "此节点暂无可见声明"
+    );
+    expect(screen.getByTestId("source-links-empty-honesty")).toHaveTextContent(
+      "无叶子证据链接"
+    );
+  });
+
+  it("lists source-links with chapter and offset when present", () => {
+    render(
+      <StructureNodePanel
+        structureSource="narrative_memory"
+        novelId="11"
+        selected={{
+          id: "nm:9",
+          kind: "chapter_state",
+          chapterStart: 2,
+          chapterEnd: 2,
+          label: "章状态",
+          nmNodeId: 9,
+        }}
+        claims={[
+          {
+            id: 7,
+            claim_kind: "event_fact",
+            summary: "hero arrives",
+            typed_payload: {},
+            uncertainty: "likely",
+            confidence: 0.9,
+            visible_from_chapter: 2,
+            node_id: 9,
+          },
+        ]}
+        selectedClaimId={7}
+        sourceLinks={[
+          {
+            id: 100,
+            claim_id: 7,
+            source_kind: "hierarchy_leaf",
+            hierarchy_build_id: "hb1",
+            evidence_node_id: "en1",
+            chapter_number: 2,
+            source_start: 10,
+            source_end: 40,
+            content_hash: "abcdef0123456789",
+          },
+        ]}
+      />
+    );
+    expect(screen.getByTestId("source-link-100")).toHaveTextContent("第 2 章");
+    expect(screen.getByTestId("source-link-100")).toHaveTextContent(
+      "offset 10–40"
+    );
+    expect(screen.getByTestId("source-link-100")).toHaveTextContent("abcdef01");
+    const link = screen.getByTestId("source-link-100").querySelector("a");
+    expect(link?.getAttribute("href")).toContain("/novels/11?");
+    expect(link?.getAttribute("href")).toContain("chapter=2");
+  });
 });
 
 describe("StructureWorkspaceShell selection scope", () => {
-  it("shows empty-NM banner and updates scope label on select", () => {
+  it("shows empty-NM banner and updates scope label near facets on select", () => {
     const forest = buildChapterFallbackTree(4);
     const defaultNode = pickDefaultTreeNode(forest)!;
     let selected = treeNodeToSelection(defaultNode);
@@ -190,8 +320,10 @@ describe("StructureWorkspaceShell selection scope", () => {
         selected={selected}
         onSelect={onSelect}
       >
-        <div data-testid="facet-scope">
-          {formatChapterRange(selected.chapterStart, selected.chapterEnd)}
+        <div role="tablist" aria-label="分析切片">
+          <button type="button" role="tab">
+            时间线
+          </button>
         </div>
       </StructureWorkspaceShell>
     );
@@ -199,10 +331,13 @@ describe("StructureWorkspaceShell selection scope", () => {
     expect(screen.getByTestId("nm-empty-banner")).toHaveTextContent(
       NM_EMPTY_BANNER
     );
-    expect(screen.getByTestId("structure-scope-label")).toHaveTextContent(
-      "第 1–4 章"
+    const scope = screen.getByTestId("structure-scope-label");
+    expect(scope).toHaveTextContent("视图范围：");
+    expect(scope).toHaveTextContent("第 1–4 章");
+    // Scope label lives in the center column with facet tabs
+    expect(scope.parentElement).toContainElement(
+      screen.getByRole("tablist", { name: "分析切片" })
     );
-    expect(screen.getByTestId("facet-scope")).toHaveTextContent("第 1–4 章");
 
     fireEvent.click(screen.getByRole("button", { name: /第 3 章/ }));
     expect(onSelect).toHaveBeenCalled();
@@ -217,15 +352,35 @@ describe("StructureWorkspaceShell selection scope", () => {
         selected={next}
         onSelect={onSelect}
       >
-        <div data-testid="facet-scope">
-          {formatChapterRange(next.chapterStart, next.chapterEnd)}
+        <div role="tablist" aria-label="分析切片">
+          <button type="button" role="tab">
+            时间线
+          </button>
         </div>
       </StructureWorkspaceShell>
     );
     expect(screen.getByTestId("structure-scope-label")).toHaveTextContent(
       "第 3 章"
     );
-    expect(screen.getByTestId("facet-scope")).toHaveTextContent("第 3 章");
+  });
+
+  it("keeps scope label when structure tree is collapsed", () => {
+    const forest = buildChapterFallbackTree(2);
+    render(
+      <StructureWorkspaceShell
+        structureSource="chapters"
+        forest={forest}
+        selected={treeNodeToSelection(forest[0])}
+        onSelect={vi.fn()}
+      >
+        <div data-testid="facet-body">facets</div>
+      </StructureWorkspaceShell>
+    );
+    fireEvent.click(screen.getByRole("button", { name: "收起结构树" }));
+    expect(screen.getByTestId("structure-scope-label")).toHaveTextContent(
+      "第 1–2 章"
+    );
+    expect(screen.getByTestId("facet-body")).toBeInTheDocument();
   });
 
   it("shows candidate preview badge when NM source", () => {

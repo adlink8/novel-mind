@@ -7,7 +7,7 @@ import {
   NM_EMPTY_BANNER,
   NM_PREVIEW_BADGE_LABEL,
 } from "@/lib/narrative-memory-api";
-import type { NmClaimItem } from "@/lib/narrative-memory-api";
+import type { NmClaimItem, NmSourceLinkItem } from "@/lib/narrative-memory-api";
 import { StructureNodePanel } from "./structure-node-panel";
 import { StructureTree } from "./structure-tree";
 import type {
@@ -25,6 +25,12 @@ type Props = {
   claims?: NmClaimItem[];
   claimsLoading?: boolean;
   claimsError?: string | null;
+  selectedClaimId?: number | null;
+  onClaimSelect?: (claim: NmClaimItem) => void;
+  sourceLinks?: NmSourceLinkItem[];
+  sourceLinksLoading?: boolean;
+  sourceLinksError?: string | null;
+  novelId?: string;
   /** Center facet area (tabs + workspaces). */
   children: React.ReactNode;
   className?: string;
@@ -38,10 +44,21 @@ export function StructureWorkspaceShell({
   claims,
   claimsLoading,
   claimsError,
+  selectedClaimId,
+  onClaimSelect,
+  sourceLinks,
+  sourceLinksLoading,
+  sourceLinksError,
+  novelId,
   children,
   className,
 }: Props) {
+  // Collapse only hides the tree spine; novel + facet state stay mounted in parent.
   const [treeOpen, setTreeOpen] = useState(true);
+
+  const scopeLabel = selected
+    ? formatChapterRange(selected.chapterStart, selected.chapterEnd)
+    : null;
 
   return (
     <div className={className ?? "grid gap-3"}>
@@ -62,20 +79,6 @@ export function StructureWorkspaceShell({
           <span className="ml-2 text-violet-900/80">
             只读候选，不会写入生产活跃指针
           </span>
-        </p>
-      )}
-
-      {selected && (
-        <p
-          data-testid="structure-scope-label"
-          className="text-xs text-muted-foreground"
-        >
-          视图范围：
-          <span className="font-medium text-foreground">
-            {formatChapterRange(selected.chapterStart, selected.chapterEnd)}
-          </span>
-          <span className="mx-1.5 text-border">·</span>
-          <span className="truncate">{selected.label}</span>
         </p>
       )}
 
@@ -117,6 +120,12 @@ export function StructureWorkspaceShell({
               claims={claims}
               claimsLoading={claimsLoading}
               claimsError={claimsError}
+              selectedClaimId={selectedClaimId}
+              onClaimSelect={onClaimSelect}
+              sourceLinks={sourceLinks}
+              sourceLinksLoading={sourceLinksLoading}
+              sourceLinksError={sourceLinksError}
+              novelId={novelId}
             />
           </aside>
         ) : (
@@ -138,8 +147,29 @@ export function StructureWorkspaceShell({
           </div>
         )}
 
-        {/* Center facets */}
-        <div className="min-w-0">{children}</div>
+        {/* Center facets — scope label always sits near facet tabs */}
+        <div className="min-w-0 space-y-2">
+          <p
+            data-testid="structure-scope-label"
+            className="text-xs text-muted-foreground"
+          >
+            视图范围：
+            {scopeLabel ? (
+              <>
+                <span className="font-medium text-foreground">{scopeLabel}</span>
+                {selected && (
+                  <>
+                    <span className="mx-1.5 text-border">·</span>
+                    <span className="truncate">{selected.label}</span>
+                  </>
+                )}
+              </>
+            ) : (
+              <span className="text-muted-foreground">未选择结构节点</span>
+            )}
+          </p>
+          {children}
+        </div>
       </div>
     </div>
   );
