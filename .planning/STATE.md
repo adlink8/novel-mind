@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v0.8
 milestone_name: 分层叙事记忆与层级 RAG
 status: executing
-last_updated: 2026-07-16T12:00:00.000Z
+last_updated: 2026-07-16T20:30:00.000Z
 last_activity: 2026-07-16
 progress:
   total_phases: 16
-  completed_phases: 10
+  completed_phases: 11
   total_plans: 71
-  completed_plans: 57
-  percent: 63
+  completed_plans: 60
+  percent: 66
 stopped_at: null
 authorized_scope: phases 13-18 (user 2026-07-16: 查看13-18阶段任务 编排GSD子代理执行)
 ---
@@ -27,8 +27,8 @@ See `.planning/PROJECT.md` and `IMPLEMENTATION-STATUS.md`.
 ## Current Position
 
 Phase: 13 (Candidate Memory Contracts and Provenance Authority)
-Plan: 2 of 3
-Status: EXECUTING — user authorized phases 13–18 via GSD subagent orchestration
+Plan: 3 of 3
+Status: COMPLETE — 13-VERIFICATION `status: passed`; Phase 14 unblocked (not started)
 Last activity: 2026-07-16
 
 ## Authorization (2026-07-16)
@@ -41,17 +41,18 @@ Last activity: 2026-07-16
 
 ## Execution Inventory
 
-- Phase 13: 13-01 SUMMARY done; 13-02 T1–T2 committed; T3 WIP (`authority.py`, `test_contract_authority_pg.py`); 13-03 pending; no 13-VERIFICATION yet
-- Phase 14: 4/4 plans planned; blocked until 13-VERIFICATION `status: passed`
+- Phase 13: **COMPLETE + VERIFIED** (`13-VERIFICATION.md` status: passed). 13-01/02/03 SUMMARYs present. Candidate-only authority, strict contracts, provenance seal, no-pointer proofs.
+- Phase 14: 4/4 plans planned; **unblocked** by Phase 13 verification; not started
 - Phase 15: 3/3 plans planned; after Phase 14 verified
 - Phase 16: 3/3 plans planned; after Phase 15 verified
 - Phase 17: 3/3 plans planned; after Phases 12–16 verified; candidate-only verdict
-- Phase 18: 18-01 (`f6280cf`) + 18-02 (`2035b54`) SUMMARY done; 18-03 pending
+- Phase 18: 18-01 (`f6280cf`) + 18-02 (`2035b54`) SUMMARY done; 18-03 pending (parallel track)
 
 ## Auto Routing
 
-Orchestration Wave A: Phase 13 remainder + Phase 18 in parallel.
-Then 14 → 15 → 16 → 17 serially after each phase verification.
+Wave A Phase 13 remainder: **done**. Phase 18 may continue in parallel.
+Next serial RAG chain: Phase 14 → 15 → 16 → 17 after each phase verification.
+Phase 14 must keep Phase 12 `provider_calls_allowed` as the sole provider gate.
 
 ## Phase 11 Execution Metrics
 

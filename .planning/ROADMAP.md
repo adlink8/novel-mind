@@ -45,7 +45,7 @@
 | Phase 7 语义/层级分块 | 6/6 | **Complete** (logic+tests+PG/indexing wiring) |
 | Phase 8 版本化小说分析与时间线 | 10/10 | **Complete** (35/35 must-haves verified) |
 | v0.7 / Phase 9-11 叙事关系、阅读问答与线索追踪 | Phase 09: 5/5; Phase 10: 5/5; Phase 11: 5/5 | **09 VERIFIED**; **10 PARTIAL** (real Playwright residual); **11 implement-complete** (adversarial residual closed) |
-| v0.8 / Phase 12-17 分层叙事记忆与层级 RAG | 3/19 initial plans | **IN PROGRESS** — Phase 12 verified; Phase 13 next; candidate-only/no pointer cutover |
+| v0.8 / Phase 12-17 分层叙事记忆与层级 RAG | 6/19 plans (12+13 done) | **IN PROGRESS** — Phase 12–13 verified; Phase 14 next; candidate-only/no pointer cutover |
 | Phase 18 前端动效与过渡系统 | 2/3 | **EXECUTING** — 18-01/02 done; 18-03 qualification next |
 
 ## Auto Start
@@ -221,8 +221,8 @@ Plans:
 **Goal:** 建立与现有分析生命周期隔离的不可变叙事记忆候选契约，使每条 Chapter State、Story Arc/Volume 和 Global Story Model 主张均可由数据库权威追到同一 source snapshot 的叶子原文。
 **Requirements:** V08-MEM-01, V08-MEM-02, V08-MEM-03, V08-MEM-04, V08-MEM-05
 **Depends on:** Phase 12
-**Status:** PAUSED — 13-01 complete; 13-02 Tasks 1–2 committed; Task 3 WIP unverified; execution requires explicit authorization
-**Plans:** 3/3 plans created
+**Status:** COMPLETE — verified 2026-07-16 (`13-VERIFICATION.md` status: passed)
+**Plans:** 3/3 plans complete
 
 **Success Criteria:**
 1. 系统可创建独立于 timeline/relationship/clue 的 immutable `NarrativeMemoryVersion` candidate，并持久保存 owner、novel、version、source/hierarchy lineage、prompt/schema/model/config hashes；v0.8 不存在可达的 production promotion 路径。
@@ -232,15 +232,15 @@ Plans:
 
 Plans:
 - [x] 13-01 narrative memory PostgreSQL authority: additive candidate version/node/claim/edge/source-link/manifest/report migration and composite scope constraints
-- [ ] 13-02 strict ChapterState/StoryArc/GlobalStoryModel schemas: typed claims, deltas, uncertainty, visibility and builder lineage
-- [ ] 13-03 provenance closure and manifest gates: DAG/range/source re-slice validation, append-only enforcement and no-pointer invariants
+- [x] 13-02 strict ChapterState/StoryArc/GlobalStoryModel schemas: typed claims, deltas, uncertainty, visibility and builder lineage
+- [x] 13-03 provenance closure and manifest gates: DAG/range/source re-slice validation, append-only enforcement and no-pointer invariants
 
 ### Phase 14: Durable Bottom-up Candidate Builder
 
 **Goal:** 对已通过 Phase 12 审计的单本小说，按 Chapter State → Story Arc/Volume → Global Story Model 自下而上构建可恢复候选，同时隔离章节失败并约束所有模型费用与可选来源。
 **Requirements:** V08-BUILD-01, V08-BUILD-02, V08-BUILD-03, V08-BUILD-04, V08-BUILD-05
 **Depends on:** Phase 13
-**Status:** PLANNED — 4/4 plans created; execution gated on Phase 13 verification and explicit authorization
+**Status:** PLANNED — 4/4 plans created; Phase 13 verification passed; authorized under 13–18 scope; not started
 **Plans:** 4/4 plans created
 
 **Success Criteria:**

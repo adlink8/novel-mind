@@ -1,36 +1,55 @@
 {
   "version": "1.0",
-  "timestamp": "2026-07-16T04:32:57.248Z",
+  "timestamp": "2026-07-16T20:30:00.000Z",
   "phase": "13",
   "phase_name": "candidate-memory-contracts-and-provenance-authority",
   "phase_dir": ".planning/phases/13-candidate-memory-contracts-and-provenance-authority",
-  "plan": 2,
-  "task": 3,
+  "plan": 3,
+  "task": "complete",
   "total_tasks": 3,
-  "status": "paused",
+  "status": "phase_verified",
+  "authorization": {
+    "granted_by": "user",
+    "message": "查看13-18阶段任务 编排GSD子代理执行",
+    "scope": ["13", "14", "15", "16", "17", "18"],
+    "granted_at": "2026-07-16",
+    "notes": "Phase 13 remainder complete and verified. Proceed 14→15→16→17; Phase 18 parallel."
+  },
   "completed_tasks": [
     {"id": 1, "name": "Define strict memory and provenance contracts", "status": "done", "commit": "a452380"},
     {"id": 2, "name": "Canonicalize hashes and enforce package-local references", "status": "done", "commit": "bdc515c"},
-    {"id": 3, "name": "Persist explicit-version candidates behind Phase 12 eligibility", "status": "in_progress", "progress": "RED integration tests and a partial authority.py implementation exist but were not validated or committed."}
+    {"id": 3, "name": "Persist explicit-version candidates behind Phase 12 eligibility", "status": "done", "commit": "7622889"},
+    {"id": 4, "name": "Validate graph/range/claim leaf closure", "status": "done", "commit": "59b29b8"},
+    {"id": 5, "name": "Seal database-row manifests with re-slice", "status": "done", "commit": "11f7191"},
+    {"id": 6, "name": "Fresh-observer no-pointer proofs", "status": "done", "commit": "32338ed"}
   ],
-  "remaining_tasks": [
-    {"id": 3, "name": "Finish, review and verify explicit-version authority persistence", "status": "paused"},
-    {"id": 4, "name": "Write 13-02-SUMMARY and advance STATE only after verification", "status": "not_started"},
-    {"id": 5, "name": "Execute 13-03 provenance closure and manifests", "status": "not_started"}
-  ],
+  "remaining_tasks": [],
+  "verification": {
+    "artifact": ".planning/phases/13-candidate-memory-contracts-and-provenance-authority/13-VERIFICATION.md",
+    "status": "passed",
+    "tests": "60 passed (Phase 13 narrative_memory consolidated suite)"
+  },
+  "orchestration": {
+    "wave_a_parallel": ["phase-13-remainder DONE", "phase-18 continues"],
+    "wave_b": ["phase-14 now unblocked"],
+    "wave_c": ["phase-15 after 14 verified"],
+    "wave_d": ["phase-16 after 15 verified"],
+    "wave_e": ["phase-17 after 12-16 verified"]
+  },
   "blockers": [],
-  "human_actions_pending": [
-    {"action": "Explicitly authorize execution before resuming Phase 13 implementation", "context": "The user requested planning only and no execution for now.", "blocking": true}
-  ],
+  "human_actions_pending": [],
   "decisions": [
-    {"decision": "Pause all implementation and testing immediately", "rationale": "User explicitly requested planning completion without execution.", "phase": "13"},
-    {"decision": "Preserve uncommitted authority.py and its integration test as incomplete WIP", "rationale": "They contain partial Task 3 work and must not be mistaken for verified implementation.", "phase": "13"},
-    {"decision": "Continue only with Phase 14-17 planning artifacts", "rationale": "This advances the approved v0.8 design without executing code.", "phase": "14-17"}
+    {
+      "decision": "Phase 13 verification passed; Phase 14 unblocked",
+      "rationale": "V08-MEM-01..05 evidenced by unit+PostgreSQL suites and no-pointer observer",
+      "phase": "13"
+    },
+    {
+      "decision": "Do not commit unrelated dirty working tree files",
+      "rationale": "Large unrelated WIP exists; only stage plan-declared files",
+      "phase": "all"
+    }
   ],
-  "uncommitted_files": [
-    "backend/app/services/narrative_memory/authority.py",
-    "backend/tests/integration/narrative_memory/test_contract_authority_pg.py"
-  ],
-  "next_action": "When execution is explicitly re-authorized, read the handoff and 13-02-PLAN, inspect both WIP files, run the RED test once, then finish Task 3 without redoing committed Tasks 1-2.",
-  "context_notes": "Phase 13 Plan 13-01 is complete and independently reviewed. Plan 13-02 Tasks 1-2 are committed. No 13-02 Task 3 verification, summary or completion claim exists. Planning-only mode is active."
+  "next_action": "Execute Phase 14 plans with provider_calls_allowed gate; Phase 18 may continue in parallel.",
+  "context_notes": "Planning-only lock remains cleared by user authorization 2026-07-16."
 }
