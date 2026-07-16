@@ -404,6 +404,68 @@ def test_no_evidence_requires_uncertainty_or_clarification():
     assert env.clarifying_question is not None
 
 
+def test_uncertainty_normalizes_known_reason_alias_but_keeps_extra_forbid():
+    from app.schemas.reader_chat import ReaderAnswerEnvelope
+
+    env = ReaderAnswerEnvelope.model_validate(
+        _answer_payload(
+            answer_blocks=[],
+            uncertainty={
+                "reason": "insufficient_evidence",
+                "explanation": "No usable evidence.",
+                "missing_evidence": [],
+            },
+        )
+    )
+    assert env.uncertainty is not None
+    assert env.uncertainty.reason_code == "insufficient_evidence"
+
+    with pytest.raises(ValidationError):
+        ReaderAnswerEnvelope.model_validate(
+            _answer_payload(
+                answer_blocks=[],
+                uncertainty={
+                    "reason": "insufficient_evidence",
+                    "explanation": "No usable evidence.",
+                    "missing_evidence": [],
+                    "unexpected": True,
+                },
+            )
+        )
+
+
+def test_message_request_accepts_chapter_without_selection_and_rejects_mismatch():
+    from app.schemas.reader_chat import MessageCreate
+
+    direct = MessageCreate.model_validate(
+        {"client_message_id": "direct-1", "body": "本章讲了什么？", "chapter_id": 7}
+    )
+    assert direct.chapter_id == 7
+    assert direct.selection is None
+
+    with pytest.raises(ValidationError):
+        MessageCreate.model_validate(
+            {"client_message_id": "missing-1", "body": "本章讲了什么？"}
+        )
+
+    with pytest.raises(ValidationError):
+        MessageCreate.model_validate(
+            {
+                "client_message_id": "mismatch-1",
+                "body": "这段讲了什么？",
+                "chapter_id": 8,
+                "selection": {
+                    "chapter_id": 7,
+                    "source_start": 0,
+                    "source_end": 1,
+                    "selection_text": "本",
+                    "selection_text_hash": HEX64,
+                    "chapter_content_hash": HEX64_B,
+                },
+            }
+        )
+
+
 def test_selection_request_rejects_negative_or_inverted_offsets():
     from app.schemas.reader_chat import SelectionCoordinate
 

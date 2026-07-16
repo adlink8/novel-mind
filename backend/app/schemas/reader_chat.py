@@ -113,7 +113,20 @@ class ConversationDetail(ConversationListItem):
 class MessageCreate(StrictReaderChatModel):
     client_message_id: str = Field(min_length=1, max_length=128)
     body: str = Field(min_length=1, max_length=8000)
-    selection: SelectionCoordinate
+    chapter_id: int | None = Field(default=None, gt=0)
+    selection: SelectionCoordinate | None = None
+
+    @model_validator(mode="after")
+    def require_chapter_context(self) -> MessageCreate:
+        if self.selection is None and self.chapter_id is None:
+            raise ValueError("chapter_id is required when selection is absent")
+        if (
+            self.selection is not None
+            and self.chapter_id is not None
+            and self.selection.chapter_id != self.chapter_id
+        ):
+            raise ValueError("chapter_id must match selection.chapter_id")
+        return self
 
 
 class SelectionSummary(StrictReaderChatModel):
@@ -191,6 +204,17 @@ class UncertaintyPayload(StrictReaderChatModel):
     reason_code: str = Field(min_length=1, max_length=80)
     explanation: str = Field(min_length=1, max_length=2000)
     missing_evidence: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_known_reason_alias(cls, value: Any) -> Any:
+        """Accept the provider's known ``reason`` alias without widening the schema."""
+
+        if isinstance(value, dict) and "reason_code" not in value and "reason" in value:
+            normalized = dict(value)
+            normalized["reason_code"] = normalized.pop("reason")
+            return normalized
+        return value
 
 
 class SuggestionCandidate(StrictReaderChatModel):

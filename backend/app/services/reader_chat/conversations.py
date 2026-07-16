@@ -80,9 +80,9 @@ class EvidenceRefDraft:
 class ContextGraph:
     """Validated selection + immutable manifest graph ready for one transaction."""
 
-    selection_text: str
-    selection_text_hash: str
-    chapter_content_hash: str
+    selection_text: str | None
+    selection_text_hash: str | None
+    chapter_content_hash: str | None
     hierarchy_build_id: str
     hierarchy_checksum: str
     reading_progress_snapshot: dict[str, Any]
@@ -109,8 +109,9 @@ class ContextBuilder(Protocol):
         novel: Novel,
         owner_id: int,
         conversation_id: int,
-        selection: SelectionCoordinate,
+        selection: SelectionCoordinate | None,
         body: str,
+        chapter_id: int | None = None,
     ) -> ContextGraph: ...
 
 
@@ -124,12 +125,14 @@ class ProductionContextBuilder:
         novel: Novel,
         owner_id: int,
         conversation_id: int,
-        selection: SelectionCoordinate,
+        selection: SelectionCoordinate | None,
         body: str,
+        chapter_id: int | None = None,
     ) -> ContextGraph:
         from app.services.reader_chat.context import (
             SelectionValidationError,
             assemble_context_manifest,
+            validate_chapter_context,
             validate_selection,
         )
         from app.services.reader_chat.retrieval import (
@@ -137,12 +140,24 @@ class ProductionContextBuilder:
         )
 
         try:
-            validated = await validate_selection(
-                db,
-                novel=novel,
-                owner_id=owner_id,
-                selection=selection,
-            )
+            if selection is not None:
+                validated = await validate_selection(
+                    db,
+                    novel=novel,
+                    owner_id=owner_id,
+                    selection=selection,
+                )
+            else:
+                if chapter_id is None:
+                    raise SelectionValidationError(
+                        "missing_chapter", "chapter_id is required"
+                    )
+                validated = await validate_chapter_context(
+                    db,
+                    novel=novel,
+                    owner_id=owner_id,
+                    chapter_id=chapter_id,
+                )
             manifest = await assemble_context_manifest(
                 db,
                 novel=novel,
@@ -150,6 +165,7 @@ class ProductionContextBuilder:
                 selection=validated,
                 question=body,
                 relationship_reader=Phase09RelationshipObservationReader(),
+                selection_bound=selection is not None,
             )
         except SelectionValidationError as exc:
             raise HTTPException(status_code=422, detail=exc.message) from exc
@@ -178,9 +194,13 @@ class ProductionContextBuilder:
         # Persist source_status so 10-04 freeze_manifest_from_stored can rehydrate checksum.
         prompt_inputs["source_status"] = dict(manifest.source_status)
         return ContextGraph(
-            selection_text=validated.selection_text,
-            selection_text_hash=validated.selection_text_hash,
-            chapter_content_hash=validated.chapter_content_hash,
+            selection_text=validated.selection_text if selection is not None else None,
+            selection_text_hash=(
+                validated.selection_text_hash if selection is not None else None
+            ),
+            chapter_content_hash=(
+                validated.chapter_content_hash if selection is not None else None
+            ),
             hierarchy_build_id=manifest.hierarchy_build_id,
             hierarchy_checksum=manifest.hierarchy_checksum,
             reading_progress_snapshot=dict(manifest.reading_progress_snapshot),
@@ -218,9 +238,15 @@ class DeterministicContextBuilder:
         novel: Novel,
         owner_id: int,
         conversation_id: int,
-        selection: SelectionCoordinate,
+        selection: SelectionCoordinate | None,
         body: str,
+        chapter_id: int | None = None,
     ) -> ContextGraph:
+        if selection is None:
+            raise HTTPException(
+                status_code=422,
+                detail="chapter-only messages require the production context builder",
+            )
         result = await db.execute(
             select(Chapter)
             .options(undefer(Chapter.content))
@@ -565,14 +591,16 @@ class ConversationService:
         if existing is not None:
             return await self._accepted_from_message(db, existing)
 
-        graph = await self._context_builder.build(
-            db,
-            novel=novel,
-            owner_id=owner_id,
-            conversation_id=conversation_id,
-            selection=data.selection,
-            body=data.body,
-        )
+        build_kwargs: dict[str, Any] = {
+            "novel": novel,
+            "owner_id": owner_id,
+            "conversation_id": conversation_id,
+            "selection": data.selection,
+            "body": data.body,
+        }
+        if data.selection is None:
+            build_kwargs["chapter_id"] = data.chapter_id
+        graph = await self._context_builder.build(db, **build_kwargs)
 
         sequence = int(conv.next_sequence)
         message = ReaderMessage(
@@ -593,19 +621,26 @@ class ConversationService:
         conv.next_sequence = sequence + 1
         conv.last_opened_at = _utc_now()
 
-        selection_row = ReaderMessageSelection(
-            user_message_id=message.id,
-            conversation_id=conv.id,
-            chapter_id=data.selection.chapter_id,
-            source_start=data.selection.source_start,
-            source_end=data.selection.source_end,
-            selection_text=graph.selection_text,
-            selection_text_hash=graph.selection_text_hash,
-            chapter_content_hash=graph.chapter_content_hash,
-            hierarchy_build_id=graph.hierarchy_build_id,
-            hierarchy_checksum=graph.hierarchy_checksum,
-        )
-        db.add(selection_row)
+        if data.selection is not None:
+            if (
+                graph.selection_text is None
+                or graph.selection_text_hash is None
+                or graph.chapter_content_hash is None
+            ):
+                raise HTTPException(status_code=500, detail="selection context incomplete")
+            selection_row = ReaderMessageSelection(
+                user_message_id=message.id,
+                conversation_id=conv.id,
+                chapter_id=data.selection.chapter_id,
+                source_start=data.selection.source_start,
+                source_end=data.selection.source_end,
+                selection_text=graph.selection_text,
+                selection_text_hash=graph.selection_text_hash,
+                chapter_content_hash=graph.chapter_content_hash,
+                hierarchy_build_id=graph.hierarchy_build_id,
+                hierarchy_checksum=graph.hierarchy_checksum,
+            )
+            db.add(selection_row)
 
         manifest = ReaderContextManifest(
             user_message_id=message.id,

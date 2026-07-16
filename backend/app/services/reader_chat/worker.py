@@ -105,15 +105,38 @@ class _LiteLLMTransport:
             max_tokens=max_tokens,
             stream=False,
         )
-        usage = getattr(response, "usage", {}) or {}
-        if hasattr(usage, "model_dump"):
-            usage = usage.model_dump()
+        usage_obj = getattr(response, "usage", None)
+        if isinstance(response, dict):
+            usage_obj = response.get("usage", usage_obj)
+        if hasattr(usage_obj, "model_dump"):
+            usage_obj = usage_obj.model_dump()
+        if isinstance(usage_obj, dict):
+            usage = {
+                "prompt_tokens": int(
+                    usage_obj.get("prompt_tokens")
+                    or usage_obj.get("input_tokens")
+                    or 0
+                ),
+                "completion_tokens": int(
+                    usage_obj.get("completion_tokens")
+                    or usage_obj.get("output_tokens")
+                    or 0
+                ),
+                "total_tokens": int(usage_obj.get("total_tokens") or 0),
+            }
+        else:
+            usage = {
+                "prompt_tokens": int(getattr(usage_obj, "prompt_tokens", 0) or 0),
+                "completion_tokens": int(
+                    getattr(usage_obj, "completion_tokens", 0) or 0
+                ),
+                "total_tokens": int(getattr(usage_obj, "total_tokens", 0) or 0),
+            }
         content = ""
         if hasattr(response, "choices") and response.choices:
             content = response.choices[0].message.content or ""
         elif isinstance(response, dict):
             content = str(response.get("content") or "")
-            usage = response.get("usage") or usage
         return {
             "id": getattr(response, "id", None),
             "content": content,
@@ -126,7 +149,39 @@ def _load_prompt() -> str:
 
 
 def resolve_reader_chat_deployment() -> ModelDeployment:
-    """Resolve and freeze one balanced deployment for reader_chat (no fallback)."""
+    """Resolve and freeze one deployment for reader_chat (no transparent fallback).
+
+    Prefer the project chat provider (e.g. Vertex) over static AI-router pools that
+    still list placeholder OpenAI keys — those leave jobs stuck after auth failure.
+    """
+
+    from app.config import settings
+
+    provider = (settings.chat_provider or "").strip().lower()
+    if provider in ("vertex_google", "vertex", "vertex_ai", "google_vertex"):
+        # model_id must be the bare Vertex model name. Gateway calls
+        # transport with deployment.resolved_name = f"{provider}/{model_id}".
+        # Double-prefixing (vertex_google/vertex_google/...) yields HTTP 404.
+        raw = (settings.default_chat_model or settings.vertex_model or "gemini-3.5-flash").strip()
+        for prefix in (
+            "vertex_google/",
+            "vertex_ai/",
+            "vertex/",
+            "gcp/",
+            "google/",
+        ):
+            if raw.lower().startswith(prefix):
+                raw = raw[len(prefix) :]
+                break
+        model_id = raw or "gemini-3.5-flash"
+        return ModelDeployment(
+            provider="vertex_google",
+            model_id=model_id,
+            revision=model_id,
+            supports_structured_output=True,
+            input_price_per_million=Decimal("0.15"),
+            output_price_per_million=Decimal("0.60"),
+        )
 
     from app.services.ai_router import ai_router
 
@@ -384,38 +439,50 @@ async def run_reader_chat_worker(
 async def _claim_job(
     sessions: async_sessionmaker[AsyncSession], job_id: int, lease_id: str
 ) -> bool:
-    async with sessions.begin() as session:
-        job = await session.get(ReaderGenerationJob, job_id, with_for_update=True)
-        if job is None:
-            return False
-        claimable = {
-            "queued",
-            "running",
-            "paused_budget",
-            "paused_dependency",
-        }
-        if job.status not in claimable:
-            return False
-        now = datetime.now(UTC)
-        if (
-            job.status == "running"
-            and job.lease_id
-            and job.lease_id != lease_id
-            and job.lease_expires_at
-            and job.lease_expires_at > now
-        ):
-            # Active lease held by another worker.
-            return False
-        if job.cancel_requested:
-            job.status = "cancelled"
-            job.status_reason = "user_cancel"
-            job.error_code = "user_cancel"
-            return False
-        job.lease_id = lease_id
-        job.lease_expires_at = now + timedelta(minutes=LEASE_MINUTES)
-        job.heartbeat_at = now
-        job.status = "running"
-        return True
+    import asyncio
+
+    # Brief retries cover residual races where BackgroundTasks starts before the
+    # request transaction is visible to a new session.
+    for attempt in range(10):
+        async with sessions.begin() as session:
+            job = await session.get(ReaderGenerationJob, job_id, with_for_update=True)
+            if job is None:
+                if attempt < 9:
+                    await asyncio.sleep(0.05 * (attempt + 1))
+                    continue
+                _SAFE_LOG.warning(
+                    "reader_chat claim miss job_id=%s after retries", job_id
+                )
+                return False
+            claimable = {
+                "queued",
+                "running",
+                "paused_budget",
+                "paused_dependency",
+            }
+            if job.status not in claimable:
+                return False
+            now = datetime.now(UTC)
+            if (
+                job.status == "running"
+                and job.lease_id
+                and job.lease_id != lease_id
+                and job.lease_expires_at
+                and job.lease_expires_at > now
+            ):
+                # Active lease held by another worker.
+                return False
+            if job.cancel_requested:
+                job.status = "cancelled"
+                job.status_reason = "user_cancel"
+                job.error_code = "user_cancel"
+                return False
+            job.lease_id = lease_id
+            job.lease_expires_at = now + timedelta(minutes=LEASE_MINUTES)
+            job.heartbeat_at = now
+            job.status = "running"
+            return True
+    return False
 
 
 async def _is_cancel_requested(

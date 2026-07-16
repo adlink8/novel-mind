@@ -180,7 +180,9 @@ async def create_message(
         conversation_id=conversation_id,
         data=data,
     )
-    # Durable job: dispatch after request commits (BackgroundTasks + get_db commit).
+    # Commit before BackgroundTasks so the worker session can see the new job.
+    # (get_db also commits on exit, but that can race after the response is built.)
+    await db.commit()
     if accepted.job.status.value in ("queued", "running"):
         background_tasks.add_task(dispatch_reader_chat_job, accepted.job.id)
     return accepted
@@ -245,6 +247,7 @@ async def retry_job(
         conversation_id=conversation_id,
         job_id=job_id,
     )
+    await db.commit()
     if view.status.value in ("queued", "running"):
         background_tasks.add_task(dispatch_reader_chat_job, view.id)
     return view

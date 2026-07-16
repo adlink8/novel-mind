@@ -129,6 +129,53 @@ def _message_payload(
 
 
 @pytest.mark.asyncio
+async def test_current_chapter_message_without_selection_uses_server_context(api_client):
+    client, factory, sync_url = api_client
+    ids = _seed_owner_novel(sync_url, suffix=f"direct_{uuid.uuid4().hex[:8]}")
+    headers = {"Authorization": f"Bearer {ids['owner_token']}"}
+    base = f"/api/novels/{ids['novel_id']}/conversations"
+    created = await client.post(base, json={"title": "本章讨论"}, headers=headers)
+    assert created.status_code == 201
+
+    accepted = await client.post(
+        f"{base}/{created.json()['id']}/messages",
+        json={
+            "client_message_id": "direct-question-1",
+            "body": "本章的主要冲突是什么？",
+            "chapter_id": ids["chapter_id"],
+        },
+        headers=headers,
+    )
+    assert accepted.status_code == 202, accepted.text
+    assert accepted.json()["message"]["selection"] is None
+
+    engine = create_engine(sync_url, poolclass=NullPool)
+    with Session(engine) as session:
+        message_id = accepted.json()["message"]["id"]
+        assert session.scalar(
+            select(ReaderMessageSelection).where(
+                ReaderMessageSelection.user_message_id == message_id
+            )
+        ) is None
+        manifest = session.scalar(
+            select(ReaderContextManifest).where(
+                ReaderContextManifest.user_message_id == message_id
+            )
+        )
+        assert manifest is not None
+        refs = session.scalars(
+            select(ReaderContextEvidenceRef).where(
+                ReaderContextEvidenceRef.manifest_id == manifest.id
+            )
+        ).all()
+        primary = next(ref for ref in refs if ref.evidence_key == "chapter:primary")
+        assert primary.chapter_id == ids["chapter_id"]
+        assert primary.source_type == "hierarchy"
+        assert primary.excerpt == CHAPTER_CONTENT
+    engine.dispose()
+
+
+@pytest.mark.asyncio
 async def test_conversation_lifecycle_create_list_rename_archive_restore_delete(api_client):
     client, factory, sync_url = api_client
     ids = _seed_owner_novel(sync_url, suffix=f"life_{uuid.uuid4().hex[:8]}")

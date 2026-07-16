@@ -128,6 +128,14 @@ def _response_usage(response: Any) -> dict[str, int]:
     raw = response.get("usage", {}) if isinstance(response, dict) else getattr(response, "usage", {})
     if hasattr(raw, "model_dump"):
         raw = raw.model_dump()
+    if not isinstance(raw, dict):
+        # Vertex returns SimpleNamespace(usage=SimpleNamespace(...))
+        raw = {
+            "prompt_tokens": getattr(raw, "prompt_tokens", None),
+            "completion_tokens": getattr(raw, "completion_tokens", None),
+            "input_tokens": getattr(raw, "input_tokens", None),
+            "output_tokens": getattr(raw, "output_tokens", None),
+        }
     return {
         "input_tokens": int(raw.get("input_tokens", raw.get("prompt_tokens", 0)) or 0),
         "output_tokens": int(raw.get("output_tokens", raw.get("completion_tokens", 0)) or 0),

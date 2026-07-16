@@ -27,6 +27,7 @@ from app.services.timeline.query import resolve_chapter_cutoff
 
 MAX_SELECTION_CODE_POINTS = 8000
 SELECTION_EVIDENCE_KEY = "selection:primary"
+CHAPTER_EVIDENCE_KEY = "chapter:primary"
 
 
 class SelectionValidationError(ValueError):
@@ -296,6 +297,54 @@ async def validate_selection(
     )
 
 
+async def validate_chapter_context(
+    session: AsyncSession,
+    *,
+    novel: Novel,
+    owner_id: int,
+    chapter_id: int,
+) -> ValidatedSelection:
+    """Resolve an owned, visible chapter and derive context only from server text."""
+
+    if novel.owner_id != owner_id:
+        raise SelectionValidationError("not_found", "chapter not found for owner scope")
+    chapter = await session.scalar(
+        select(Chapter)
+        .where(Chapter.id == chapter_id, Chapter.novel_id == novel.id)
+        .options(undefer(Chapter.content))
+    )
+    if chapter is None:
+        raise SelectionValidationError("not_found", "chapter not found for owner scope")
+
+    progress = await resolve_progress_snapshot(session, novel)
+    if not progress.full_book and int(chapter.chapter_number) > progress.cutoff_chapter_number:
+        raise SelectionValidationError(
+            "chapter_beyond_cutoff",
+            "chapter is beyond the visible reading cutoff",
+        )
+
+    content = chapter.content or ""
+    if not content:
+        raise SelectionValidationError("empty_chapter", "chapter content is empty")
+    excerpt = content[:MAX_SELECTION_CODE_POINTS]
+
+    from app.services.reader_chat.retrieval import resolve_active_hierarchy
+
+    meta = await resolve_active_hierarchy(session, novel_id=novel.id)
+    build_id, build_checksum = meta or ("none", "0" * 64)
+    return ValidatedSelection(
+        chapter_id=int(chapter.id),
+        chapter_number=int(chapter.chapter_number),
+        source_start=0,
+        source_end=len(excerpt),
+        selection_text=excerpt,
+        selection_text_hash=content_sha256(excerpt),
+        chapter_content_hash=content_sha256(content),
+        hierarchy_build_id=build_id,
+        hierarchy_checksum=build_checksum,
+    )
+
+
 def _dialogue_framing(
     prior_dialogue: list[dict[str, Any]] | None,
 ) -> dict[str, Any]:
@@ -328,6 +377,7 @@ async def assemble_context_manifest(
     relationship_reader: RelationshipObservationReader | None = None,
     client_evidence_keys: list[str] | None = None,
     max_evidence: int = 24,
+    selection_bound: bool = True,
 ) -> ContextManifest:
     """Build one immutable, deterministic context graph for atomic persistence.
 
@@ -369,10 +419,14 @@ async def assemble_context_manifest(
     hierarchy_build_id = retrieval.hierarchy_build_id or selection.hierarchy_build_id
     hierarchy_checksum = retrieval.hierarchy_checksum or selection.hierarchy_checksum
 
-    selection_entry = ContextEvidenceEntry(
-        evidence_key=SELECTION_EVIDENCE_KEY,
-        source_type="selection",
-        source_id=f"{selection.chapter_id}:{selection.source_start}:{selection.source_end}",
+    primary_entry = ContextEvidenceEntry(
+        evidence_key=SELECTION_EVIDENCE_KEY if selection_bound else CHAPTER_EVIDENCE_KEY,
+        source_type="selection" if selection_bound else "hierarchy",
+        source_id=(
+            f"{selection.chapter_id}:{selection.source_start}:{selection.source_end}"
+            if selection_bound
+            else f"chapter:{selection.chapter_id}"
+        ),
         chapter_id=selection.chapter_id,
         chapter_number=selection.chapter_number,
         source_start=selection.source_start,
@@ -387,7 +441,7 @@ async def assemble_context_manifest(
         },
     )
 
-    evidence_entries: list[ContextEvidenceEntry] = [selection_entry]
+    evidence_entries: list[ContextEvidenceEntry] = [primary_entry]
     sort_order = 1
     for item in retrieval.items:
         # Defensive: never admit future-chapter evidence into the canonical graph.
@@ -414,10 +468,11 @@ async def assemble_context_manifest(
         "question_hash": content_sha256(question or ""),
         "dialogue_framing": _dialogue_framing(prior_dialogue),
         "allowed_evidence_ids": [e.evidence_key for e in evidence_entries],
+        "context_mode": "selection" if selection_bound else "chapter",
     }
 
     source_status = dict(retrieval.source_status)
-    source_status.setdefault("selection", SourceStatus.OK)
+    source_status.setdefault("selection" if selection_bound else "chapter", SourceStatus.OK)
 
     draft = ContextManifest(
         reading_progress_snapshot=progress.as_dict(),

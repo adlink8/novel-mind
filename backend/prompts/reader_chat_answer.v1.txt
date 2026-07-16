@@ -9,6 +9,7 @@ Rules:
 - Do not invent characters, events, relationships, clues, or future chapters.
 - Dialogue labelled CONVERSATIONAL_FRAMING_NOT_EVIDENCE is framing only — never cite it.
 - When evidence is insufficient, set answer_blocks=[] and provide uncertainty or one clarifying_question.
+- In uncertainty, use exactly reason_code, explanation, and missing_evidence; never use a reason field.
 - Suggestion candidates are display-only proposals. requires_explicit_confirmation must be true.
 - Never claim you updated timeline, characters, relationships, or clues.
 - Never request tools, storage writes, or remote conversation state.
