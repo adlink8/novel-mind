@@ -407,7 +407,7 @@ export function RelationshipGraph(props: Props) {
                       });
                     }
                   }}
-                  className={`h-full w-full rounded-2xl border p-3 text-left transition hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                  className={`h-full w-full rounded-2xl border p-3 text-left transition-[border-color,box-shadow,background-color] motion-duration-fast motion-ease-enter hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                     selected ? "border-primary bg-primary/5" : "bg-card"
                   }`}
                 >

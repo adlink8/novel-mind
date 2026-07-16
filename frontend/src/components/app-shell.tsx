@@ -78,7 +78,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         data-testid="app-shell-nav"
         data-collapsed={navCollapsed ? "true" : "false"}
         className={cn(
-          "fixed inset-y-4 left-4 z-40 hidden flex-col rounded-[28px] border border-border/70 bg-sidebar/90 p-3 shadow-[0_24px_70px_-30px_rgba(38,31,24,0.38)] backdrop-blur-xl transition-[width] motion-duration-spatial motion-ease-enter lg:flex",
+          "fixed inset-y-4 left-4 z-40 hidden flex-col overflow-hidden rounded-[28px] border border-border/70 bg-sidebar/90 p-3 shadow-[0_24px_70px_-30px_rgba(38,31,24,0.38)] backdrop-blur-xl transition-[width,box-shadow] motion-duration-spatial motion-ease-enter lg:flex",
           navCollapsed ? "w-[4.5rem]" : "w-60",
         )}
       >

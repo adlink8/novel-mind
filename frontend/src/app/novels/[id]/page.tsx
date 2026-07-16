@@ -611,7 +611,7 @@ function NovelReaderInner() {
           {showDesktopChat ? (
             <div
               data-testid="reader-chat-column"
-              className="relative shrink-0"
+              className="relative shrink-0 overflow-hidden transition-[width] motion-duration-spatial motion-ease-enter"
               style={{
                 width: chatCollapsed ? 44 : chatWidthPx,
               }}
@@ -624,7 +624,7 @@ function NovelReaderInner() {
                   aria-label="调整对话面板宽度"
                   aria-valuenow={chatWidthPx}
                   tabIndex={0}
-                  className="absolute inset-y-0 left-0 z-20 w-1.5 cursor-col-resize touch-none bg-transparent hover:bg-primary/25 active:bg-primary/40"
+                  className="absolute inset-y-0 left-0 z-20 w-1.5 cursor-col-resize touch-none bg-transparent transition-[background-color] motion-duration-fast motion-ease-enter hover:bg-primary/25 active:bg-primary/40"
                   onPointerDown={onChatResizePointerDown}
                   onPointerMove={onChatResizePointerMove}
                   onPointerUp={onChatResizePointerUp}

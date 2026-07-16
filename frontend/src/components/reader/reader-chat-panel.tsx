@@ -433,7 +433,7 @@ export function ReaderChatPanel({
       <button
         type="button"
         data-testid="reader-chat-chip"
-        className="fixed bottom-20 right-3 z-40 flex items-center gap-2 rounded-full border border-border bg-card px-3 py-2 text-sm shadow-lg transition-[opacity,transform] motion-duration-fast motion-ease-enter"
+        className="fixed bottom-20 right-3 z-40 flex items-center gap-2 rounded-full border border-border bg-card px-3 py-2 text-sm shadow-lg transition-[opacity,transform] motion-duration-spatial motion-ease-enter"
         onClick={() => onCollapsedChange(false)}
       >
         <MessageSquarePlus className="size-4" />
@@ -448,13 +448,14 @@ export function ReaderChatPanel({
     );
   }
 
-  // Desktop collapsed: slim rail only (no full header squeezed into w-12).
+  // Desktop collapsed: slim rail (column width animates in parent).
   if (layout === "desktop" && collapsed && open) {
     return (
       <div
         data-testid="reader-chat-rail"
         className={cn(
-          "flex h-full w-full flex-col items-center gap-2 border-l border-border bg-card py-3",
+          "flex h-full w-full flex-col items-center gap-2 border-l border-border bg-card py-3 transition-[opacity,transform] motion-duration-spatial motion-ease-enter",
+          "translate-x-0 opacity-100",
           className
         )}
       >
@@ -462,7 +463,7 @@ export function ReaderChatPanel({
           type="button"
           size="sm"
           variant="ghost"
-          className="h-auto w-9 flex-col gap-1 px-1 py-2"
+          className="h-auto w-9 flex-col gap-1 px-1 py-2 motion-transition-feedback"
           aria-label="展开对话"
           data-testid="reader-chat-expand"
           onClick={() => onCollapsedChange(false)}
@@ -482,7 +483,7 @@ export function ReaderChatPanel({
           type="button"
           size="sm"
           variant="ghost"
-          className="mt-auto w-9"
+          className="mt-auto w-9 motion-transition-feedback"
           aria-label="关闭对话"
           onClick={() => onOpenChange(false)}
         >
@@ -501,19 +502,17 @@ export function ReaderChatPanel({
       data-layout={layout}
       aria-hidden={closing || undefined}
       className={cn(
-        "flex h-full min-h-0 w-full flex-col bg-card text-sm",
-        // Desktop column: no off-axis translate (avoids “stuck on right edge”).
-        layout === "desktop" &&
-          "border-l border-border transition-opacity motion-duration-spatial",
+        "flex h-full min-h-0 w-full flex-col bg-card text-sm transition-[opacity,transform] motion-duration-spatial",
+        layout === "desktop" && "border-l border-border",
         layout === "mobile" &&
-          "max-h-[45vh] rounded-t-2xl border border-border shadow-2xl transition-[opacity,transform] motion-duration-spatial motion-ease-enter",
+          "max-h-[45vh] rounded-t-2xl border border-border shadow-2xl",
         open && !closing
           ? layout === "mobile"
-            ? "translate-y-0 opacity-100"
-            : "opacity-100"
+            ? "translate-y-0 opacity-100 motion-ease-enter"
+            : "translate-x-0 opacity-100 motion-ease-enter"
           : layout === "mobile"
-            ? "pointer-events-none translate-y-2 opacity-0 motion-ease-exit"
-            : "pointer-events-none opacity-0 motion-ease-exit",
+            ? "pointer-events-none translate-y-3 opacity-0 motion-ease-exit"
+            : "pointer-events-none translate-x-2 opacity-0 motion-ease-exit",
         className
       )}
     >

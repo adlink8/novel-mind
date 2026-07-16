@@ -59,13 +59,12 @@ export function NovelUploadDialog({
   onUploadComplete,
 }: NovelUploadDialogProps) {
   const [open, setOpen] = useState(false);
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [status, setStatus] = useState<UploadStatus>("idle");
   const [progress, setProgress] = useState(0);
   const [stageMessage, setStageMessage] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [dragOver, setDragOver] = useState(false);
-  const [novelId, setNovelId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -79,13 +78,12 @@ export function NovelUploadDialog({
 
   /** 重置所有状态（关闭对话框时调用） */
   const reset = useCallback(() => {
-    setFile(null);
+    setFiles([]);
     setStatus("idle");
     setProgress(0);
     setStageMessage("");
     setErrorMsg("");
     setDragOver(false);
-    setNovelId(null);
     clearPollTimer();
   }, [clearPollTimer]);
 
@@ -106,11 +104,12 @@ export function NovelUploadDialog({
 
   /** 处理文件选择（点击或拖拽） */
   const handleFileSelect = useCallback(
-    (f: File) => {
+    (selectedFiles: File[]) => {
       setErrorMsg("");
       setStatus("idle");
-      if (validateFile(f)) {
-        setFile(f);
+      const validFiles = selectedFiles.filter(validateFile);
+      if (validFiles.length === selectedFiles.length) {
+        setFiles(validFiles);
       }
     },
     [validateFile]
@@ -121,9 +120,9 @@ export function NovelUploadDialog({
     (e: React.DragEvent) => {
       e.preventDefault();
       setDragOver(false);
-      const droppedFile = e.dataTransfer.files[0];
-      if (droppedFile) {
-        handleFileSelect(droppedFile);
+      const droppedFiles = Array.from(e.dataTransfer.files);
+      if (droppedFiles.length > 0) {
+        handleFileSelect(droppedFiles);
       }
     },
     [handleFileSelect]
@@ -141,8 +140,8 @@ export function NovelUploadDialog({
 
   const handleInputChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      const selected = e.target.files?.[0];
-      if (selected) {
+      const selected = Array.from(e.target.files ?? []);
+      if (selected.length > 0) {
         handleFileSelect(selected);
       }
     },
@@ -150,21 +149,32 @@ export function NovelUploadDialog({
   );
 
   /** 按 job_id 轮询导入进度（不是 novel_id） */
-  const startPolling = useCallback((jobId: string) => {
+  const startPolling = useCallback((jobIds: string[]) => {
     clearPollTimer();
     let ticks = 0;
     pollTimerRef.current = setInterval(async () => {
       ticks += 1;
       try {
-        const res = await novelsApi.getImportJobStatus(jobId);
-        const data = res.data;
-        setProgress(data.percent || 0);
-        setStageMessage(STAGE_LABELS[data.stage] || data.message || "处理中...");
-        if (data.novel_id != null) {
-          setNovelId(String(data.novel_id));
+        const responses = await Promise.all(
+          jobIds.map((jobId) => novelsApi.getImportJobStatus(jobId))
+        );
+        const jobs = responses.map((response) => response.data);
+        const completed = jobs.filter((job) => TERMINAL_OK.has(job.stage)).length;
+        const averageProgress = jobs.reduce((sum, job) => sum + (job.percent || 0), 0) / jobs.length;
+        setProgress(30 + averageProgress * 0.7);
+        setStageMessage(`正在导入：${completed}/${jobs.length} 本已完成`);
+
+        const failed = jobs.find((job) => TERMINAL_FAIL.has(job.stage));
+        if (failed) {
+          clearPollTimer();
+          setStatus("error");
+          setErrorMsg(failed.message || "部分文件导入失败，请重试");
+          return;
         }
 
-        if (TERMINAL_OK.has(data.stage)) {
+        if (completed === jobs.length) {
+          const data = jobs[jobs.length - 1];
+          const jobId = jobIds[jobIds.length - 1];
           clearPollTimer();
           setStatus("success");
           setProgress(100);
@@ -186,13 +196,6 @@ export function NovelUploadDialog({
           return;
         }
 
-        if (TERMINAL_FAIL.has(data.stage)) {
-          clearPollTimer();
-          setStatus("error");
-          setErrorMsg(data.message || "导入失败，请重试");
-          return;
-        }
-
         // 大文件解析可能较久：超过 ~10 分钟仍未结束则提示
         if (ticks > 1200) {
           clearPollTimer();
@@ -207,22 +210,25 @@ export function NovelUploadDialog({
 
   /** 执行上传 */
   const handleUpload = useCallback(async () => {
-    if (!file) return;
+    if (files.length === 0) return;
     setStatus("uploading");
     setProgress(5);
     setStageMessage(STAGE_LABELS.uploading);
     setErrorMsg("");
 
     try {
-      const res = await novelsApi.upload(file);
-      const data = res.data;
-      const jobId = String(data.job_id ?? data.id);
-      setNovelId(jobId);
-      setProgress(Math.max(data ? 10 : 5, 10));
-      setStageMessage(STAGE_LABELS.pending);
+      const jobIds: string[] = [];
+      for (let index = 0; index < files.length; index += 1) {
+        setStageMessage(`正在上传第 ${index + 1}/${files.length} 个文件：${files[index].name}`);
+        setProgress(Math.max(5, Math.round((index / files.length) * 30)));
+        const res = await novelsApi.upload(files[index]);
+        const data = res.data;
+        jobIds.push(String(data.job_id ?? data.id));
+      }
+      setProgress(30);
+      setStageMessage(`${files.length} 个文件已提交，等待后台导入完成...`);
 
-      // 用 job_id 轮询（upload 返回的 id 是 job_id，不是 novel_id）
-      startPolling(jobId);
+      startPolling(jobIds);
     } catch (err) {
       clearPollTimer();
       const message = err instanceof Error ? err.message : "上传失败，请重试";
@@ -230,7 +236,7 @@ export function NovelUploadDialog({
       setStatus("error");
       setProgress(0);
     }
-  }, [file, clearPollTimer, startPolling]);
+  }, [files, clearPollTimer, startPolling]);
 
   /** 对话框开关控制（关闭时重置状态） */
   const handleOpenChange = useCallback(
@@ -277,21 +283,23 @@ export function NovelUploadDialog({
               ref={inputRef}
               type="file"
               accept=".txt"
+              multiple
               onChange={handleInputChange}
               className="hidden"
             />
-            <div className="mb-3 grid size-14 place-items-center rounded-2xl bg-secondary text-primary">{file ? <FileText className="size-6" /> : <UploadCloud className="size-6" />}</div>
-            {file ? (
+            <div className="mb-3 grid size-14 place-items-center rounded-2xl bg-secondary text-primary">{files.length > 0 ? <FileText className="size-6" /> : <UploadCloud className="size-6" />}</div>
+            {files.length > 0 ? (
               <div className="text-center">
-                <p className="font-medium text-sm">{file.name}</p>
+                <p className="font-medium text-sm">已选择 {files.length} 个文件</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {(file.size / 1024 / 1024).toFixed(2)} MB
+                  {files.slice(0, 3).map((file) => file.name).join("、")}
+                  {files.length > 3 ? ` 等 ${files.length} 个文件` : ""}
                 </p>
               </div>
             ) : (
               <div className="text-center">
-                <p className="text-sm font-medium">{"拖拽文件到这里，或点击选择文件"}</p>
-                <p className="text-xs text-muted-foreground mt-1">{"支持 .txt 格式，最大 50MB（自动检测 UTF-8 / GBK / Big5 等编码）"}</p>
+                <p className="text-sm font-medium">{"拖拽多个文件到这里，或点击选择文件"}</p>
+                <p className="text-xs text-muted-foreground mt-1">{"支持批量选择 .txt 文件，单个最大 50MB，将按顺序上传"}</p>
               </div>
             )}
           </div>
@@ -301,7 +309,7 @@ export function NovelUploadDialog({
             <div className="space-y-2">
               <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
                 <div
-                  className="h-full rounded-full bg-primary transition-all duration-300"
+                  className="h-full rounded-full bg-primary transition-[width] motion-duration-spatial motion-ease-enter"
                   style={{ width: `${Math.min(progress, 100)}%` }}
                 />
               </div>
@@ -334,9 +342,9 @@ export function NovelUploadDialog({
             </DialogClose>
             <Button
               onClick={handleUpload}
-              disabled={!file || status === "uploading"}
+              disabled={files.length === 0 || status === "uploading"}
             >
-              {status === "uploading" ? "处理中..." : "开始上传"}
+              {status === "uploading" ? "处理中..." : files.length > 1 ? `导入 ${files.length} 本` : "开始上传"}
             </Button>
           </div>
         </div>
