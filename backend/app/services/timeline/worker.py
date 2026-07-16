@@ -705,36 +705,71 @@ async def _validate_and_promote(sessions, run, version) -> None:
 
 
 async def _dispatch_dependent_analysis(sessions, run, version_id: int) -> None:
-    """Continue relationship and clue tasks after a timeline version is promoted."""
+    """After timeline promote: always enqueue relationship + clue workers.
+
+    Product contract: 开始分析 → 时间线主链路；完成后并行关系与线索。
+    Clue may have been started earlier in parallel (FE); re-queue failed/paused runs.
+    """
     from app.models.clue import ClueAnalysisRun
     from app.services.clues.worker import dispatch_clue_run
     from app.services.relationships.worker import dispatch_relationship_build
 
+    clue_run_id = None
     async with sessions.begin() as session:
         clue_run = await session.scalar(
-            select(ClueAnalysisRun).where(
+            select(ClueAnalysisRun)
+            .where(
                 ClueAnalysisRun.owner_id == run.owner_id,
                 ClueAnalysisRun.novel_id == run.novel_id,
                 ClueAnalysisRun.active_key == "active",
-                ClueAnalysisRun.status == "paused_dependency",
-            ).with_for_update()
+            )
+            .with_for_update()
         )
-        clue_run_id = None
-        if clue_run is not None:
+        if clue_run is None:
+            clue_run = ClueAnalysisRun(
+                owner_id=run.owner_id,
+                novel_id=run.novel_id,
+                active_key="active",
+                status="pending",
+                progress={},
+            )
+            session.add(clue_run)
+            await session.flush()
+        elif clue_run.status in (
+            "paused_dependency",
+            "paused_budget",
+            "failed",
+            "cancelled",
+            "pending",
+        ):
             clue_run.status = "pending"
             clue_run.status_reason = None
             clue_run.cancel_requested = False
+        # completed clue stays completed (no force re-run here)
+        if clue_run.status != "completed":
             clue_run_id = clue_run.id
 
-    asyncio.create_task(
-        dispatch_relationship_build(
+    # Schedule on the running loop so uvicorn keeps the task after response.
+    try:
+        loop = asyncio.get_running_loop()
+        loop.create_task(
+            dispatch_relationship_build(
+                owner_id=run.owner_id,
+                novel_id=run.novel_id,
+                analysis_version_id=version_id,
+            )
+        )
+        if clue_run_id is not None:
+            loop.create_task(dispatch_clue_run(clue_run_id))
+    except RuntimeError:
+        # No running loop (CLI tooling): run sequentially.
+        await dispatch_relationship_build(
             owner_id=run.owner_id,
             novel_id=run.novel_id,
             analysis_version_id=version_id,
         )
-    )
-    if clue_run_id is not None:
-        asyncio.create_task(dispatch_clue_run(clue_run_id))
+        if clue_run_id is not None:
+            await dispatch_clue_run(clue_run_id)
 
 
 async def _update_progress(sessions, run_id, completed, total, stage) -> None:

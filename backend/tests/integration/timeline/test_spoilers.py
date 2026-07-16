@@ -1,6 +1,7 @@
 import pytest
+from sqlalchemy import select
 
-from app.models.analysis import AnalysisVersion
+from app.models.analysis import AnalysisRun, AnalysisVersion
 from app.models.novel import Chapter, Novel
 from app.models.timeline import (
     MachineTimelineEvent, TimelineActivePointer, TimelineCausalEdge,
@@ -86,3 +87,42 @@ async def test_full_book_requires_persisted_preference_and_story_person_filters_
                           person="隐藏人物", ordering=TimelineOrdering.STORY)
     assert [event.title for event in allowed.events] == ["SECRET OVERRIDE"]
     assert allowed.counts.events == 1
+
+
+@pytest.mark.asyncio
+async def test_running_candidate_ignores_reading_progress_cutoff(db_session):
+    """Live analysis must surface all provisional events past the reading cursor."""
+    owner, novel, chapters = await _seed(db_session)
+    # Reading progress stuck at chapter 1 would otherwise hide chapter-2 events.
+    novel.reading_progress = {"chapter_id": chapters[0].id, "timeline_full_book": False}
+    version = await db_session.scalar(
+        select(AnalysisVersion).where(AnalysisVersion.novel_id == novel.id)
+    )
+    assert version is not None
+    run = AnalysisRun(
+        owner_id=owner.id,
+        novel_id=novel.id,
+        active_key="active",
+        status="running",
+        version_id=version.id,
+        progress={"completed_chapters": 2, "total_chapters": 2},
+    )
+    db_session.add(run)
+    await db_session.commit()
+
+    candidate = await build_version_view(
+        db_session,
+        novel=novel,
+        owner_id=owner.id,
+        source=TimelineVersionSource.RUNNING_CANDIDATE,
+        ordering=TimelineOrdering.NARRATIVE,
+        person=None,
+        include_causal=False,
+        request_full_book=False,
+    )
+    assert candidate is not None
+    titles = [event.title for event in candidate.events]
+    # Active reading cutoff would only leave chapter-1 "可见"; candidate must include ch2 too.
+    assert len(candidate.events) == 2
+    assert "可见" in titles
+    assert "SECRET OVERRIDE" in titles  # chapter-2 title via active override

@@ -227,20 +227,65 @@ class PostgresCallRepository:
                 actual_input = int(usage.get("input_tokens", 0))
                 actual_output = int(usage.get("output_tokens", 0))
                 actual_cost = Decimal(cost_usd or 0)
-                if actual_input > reservation.input_tokens or actual_output > reservation.output_tokens:
-                    run = await session.get(AnalysisRun, attempt.run_id, with_for_update=True)
-                    if run is not None:
-                        run.status = "paused_budget"
-                        run.status_reason = "provider_usage_exceeded_reservation"
-                    status = "budget_exceeded"
-                    error_code = "provider_usage_exceeded_reservation"
-                    actual_input = reservation.input_tokens
-                    actual_output = reservation.output_tokens
-                    actual_cost = Decimal(reservation.cost_usd)
+                # Soft overage: Vertex 实际 token 常超 worst-case 预估。
+                # 仅当累计 settled 将突破 ledger 全书策略上限时才 paused_budget；
+                # 不再因「单次预留低估」整书暂停（否则 2/515 章就会挂）。
+                over_reserve = (
+                    actual_input > reservation.input_tokens
+                    or actual_output > reservation.output_tokens
+                )
+                if over_reserve:
+                    projected_in = (
+                        ledger.settled_input_tokens
+                        - 0  # reserved not yet released
+                        + actual_input
+                    )
+                    # release reservation first in projection
+                    projected_in = (
+                        ledger.settled_input_tokens
+                        + actual_input
+                        + max(0, ledger.reserved_input_tokens - reservation.input_tokens)
+                    )
+                    projected_out = (
+                        ledger.settled_output_tokens
+                        + actual_output
+                        + max(0, ledger.reserved_output_tokens - reservation.output_tokens)
+                    )
+                    projected_cost = (
+                        Decimal(ledger.settled_cost_usd)
+                        + actual_cost
+                        + max(
+                            Decimal(0),
+                            Decimal(ledger.reserved_cost_usd)
+                            - Decimal(reservation.cost_usd),
+                        )
+                    )
+                    policy_exceeded = (
+                        projected_in > ledger.max_input_tokens
+                        or projected_out > ledger.max_output_tokens
+                        or projected_cost > Decimal(ledger.max_cost_usd)
+                    )
+                    if policy_exceeded:
+                        run = await session.get(
+                            AnalysisRun, attempt.run_id, with_for_update=True
+                        )
+                        if run is not None:
+                            run.status = "paused_budget"
+                            run.status_reason = "provider_usage_exceeded_book_policy"
+                        status = "budget_exceeded"
+                        error_code = "provider_usage_exceeded_book_policy"
+                    else:
+                        # 接受实际用量；标记 warning 级 error_code 便于审计
+                        if status == "succeeded" or status is None:
+                            pass
+                        if error_code is None:
+                            error_code = "reservation_underestimate_settled"
                 ledger.reserved_calls -= reservation.calls
                 ledger.reserved_input_tokens -= reservation.input_tokens
                 ledger.reserved_output_tokens -= reservation.output_tokens
-                ledger.reserved_cost_usd = Decimal(ledger.reserved_cost_usd) - Decimal(reservation.cost_usd)
+                ledger.reserved_cost_usd = Decimal(ledger.reserved_cost_usd) - Decimal(
+                    reservation.cost_usd
+                )
                 ledger.settled_calls += reservation.calls
                 ledger.settled_input_tokens += actual_input
                 ledger.settled_output_tokens += actual_output
@@ -272,6 +317,37 @@ class PostgresCallRepository:
             if run is not None:
                 run.status = "paused_dependency"
                 run.status_reason = "provider_outcome_unknown"
+            # 连接失败等未知结果：释放 worst-case 预留，避免 reserved 堆满假预算
+            if attempt is not None and attempt.reservation_id is not None:
+                reservation = await session.get(
+                    AnalysisBudgetReservation,
+                    attempt.reservation_id,
+                    with_for_update=True,
+                )
+                if reservation is not None and reservation.status == "reserved":
+                    ledger = await session.get(
+                        AnalysisBudgetLedger,
+                        reservation.ledger_id,
+                        with_for_update=True,
+                    )
+                    if ledger is not None:
+                        ledger.reserved_calls = max(
+                            0, ledger.reserved_calls - reservation.calls
+                        )
+                        ledger.reserved_input_tokens = max(
+                            0,
+                            ledger.reserved_input_tokens - reservation.input_tokens,
+                        )
+                        ledger.reserved_output_tokens = max(
+                            0,
+                            ledger.reserved_output_tokens - reservation.output_tokens,
+                        )
+                        ledger.reserved_cost_usd = max(
+                            Decimal(0),
+                            Decimal(ledger.reserved_cost_usd)
+                            - Decimal(reservation.cost_usd),
+                        )
+                    reservation.status = "released"
 
     async def record_cache_hit(
         self, *, run_id: int, stage_key: str, cache_key: str,
@@ -315,6 +391,55 @@ def _response_content(response: Any) -> str:
     raise ValueError("provider response has no textual structured content")
 
 
+def _coerce_timeline_json_blob(content: str) -> str:
+    """Vertex 输出常在 story_time/evidence 上略松；校验前做最小安全修正。"""
+    text = (content or "").strip()
+    if text.startswith("```"):
+        text = text.removeprefix("```json").removeprefix("```JSON").removeprefix("```")
+        text = text.removesuffix("```").strip()
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        return text
+    if not isinstance(data, dict):
+        return text
+    events = data.get("events")
+    if not isinstance(events, list):
+        return text
+    for event in events:
+        if not isinstance(event, dict):
+            continue
+        st = event.get("story_time")
+        if isinstance(st, dict):
+            precision = (st.get("precision") or "unknown").lower()
+            if precision == "relative":
+                if not (st.get("expression") and st.get("anchor_event_id") and st.get("relation")):
+                    event["story_time"] = {"precision": "unknown"}
+            elif precision == "exact":
+                if not (st.get("expression") and st.get("exact_time")):
+                    event["story_time"] = {"precision": "unknown"}
+            elif precision == "fuzzy":
+                if not st.get("expression"):
+                    event["story_time"] = {"precision": "unknown"}
+            elif precision not in {"exact", "relative", "fuzzy", "unknown"}:
+                event["story_time"] = {"precision": "unknown"}
+        # offsets/content_hash 不在此伪造：由 rebind_extraction_to_package 用 Phase07 包权威覆写
+        evidence = event.get("evidence")
+        if isinstance(evidence, list):
+            for ref in evidence:
+                if not isinstance(ref, dict):
+                    continue
+                try:
+                    if int(ref.get("source_end", 0)) <= int(ref.get("source_start", 0)):
+                        ref["source_end"] = int(ref.get("source_start", 0)) + 1
+                except (TypeError, ValueError):
+                    ref["source_start"] = 0
+                    ref["source_end"] = 1
+    if "story_time_constraints" not in data or data["story_time_constraints"] is None:
+        data["story_time_constraints"] = []
+    return json.dumps(data, ensure_ascii=False)
+
+
 def _response_usage(response: Any) -> dict[str, int]:
     raw = response.get("usage", {}) if isinstance(response, dict) else getattr(response, "usage", {})
     if hasattr(raw, "model_dump"):
@@ -355,13 +480,16 @@ class TimelineModelGateway:
 
         attempts: list[GatewayAttempt] = []
         current_messages = list(messages)
-        for attempt_number in (1, 2):
-            reservation_key = f"{stage_key}:attempt:{attempt_number}"
+        # repair_index: 本阶段最多 1 次主调用 + 1 次同部署 repair（D-14）
+        # durable_attempt_number: PG 持久 attempt 序号，会跨进程递增，不能用来判断是否最后一次 repair
+        for repair_index in (1, 2):
+            reservation_key = f"{stage_key}:repair:{repair_index}"
             request_hash = _canonical_hash({
                 "deployment": deployment.lineage, "messages": current_messages,
                 "schema": schema.model_json_schema(), "timeout": timeout,
             })
             persistent_attempt = None
+            durable_attempt_number = repair_index
             if self.persistence is not None:
                 persistent_attempt = await self.persistence.reserve_and_start(
                     run_id=run_id, stage_key=stage_key, reservation_key=reservation_key,
@@ -370,7 +498,9 @@ class TimelineModelGateway:
                     input_price_per_million=deployment.input_price_per_million,
                     output_price_per_million=deployment.output_price_per_million,
                 )
-                attempt_number = persistent_attempt.attempt_number
+                durable_attempt_number = persistent_attempt.attempt_number
+                # reserve_and_start 会把 key 改写为 stage:attempt:N
+                reservation_key = f"{stage_key}:attempt:{durable_attempt_number}"
             else:
                 budget.reserve(
                     reservation_key, input_tokens=max_input_tokens, output_tokens=max_output_tokens,
@@ -382,6 +512,7 @@ class TimelineModelGateway:
                 response = await self.transport.complete(
                     model=deployment.resolved_name, messages=current_messages,
                     response_format=schema, timeout=timeout, num_retries=0, stream=False,
+                    max_tokens=max_output_tokens,
                 )
             except Exception as exc:
                 latency_ms = int((time.perf_counter() - started) * 1000)
@@ -391,10 +522,15 @@ class TimelineModelGateway:
                         error_code=type(exc).__name__,
                     )
                 attempts.append(GatewayAttempt(
-                    attempt_number, "outcome_unknown", reservation_key, request_hash,
+                    durable_attempt_number, "outcome_unknown", reservation_key, request_hash,
                     error_code=type(exc).__name__, latency_ms=latency_ms,
                 ))
-                raise ModelCallFailed("provider call outcome is unknown", attempts) from exc
+                # 保留根因片段，方便前端/运维区分：无 Key、Vertex 4xx、超时等
+                detail = f"{type(exc).__name__}: {str(exc)[:180]}".replace("\n", " ")
+                raise ModelCallFailed(
+                    f"provider call outcome is unknown ({detail})",
+                    attempts,
+                ) from exc
 
             usage = _response_usage(response)
             actual_cost = (
@@ -403,7 +539,12 @@ class TimelineModelGateway:
             ) / Decimal(1_000_000)
             try:
                 content = _response_content(response)
-                output = schema.model_validate_json(content, strict=True)
+                # TimelineExtraction 对 Vertex 做轻度 coerce；其它 schema 原样严格校验
+                if schema.__name__ == "TimelineExtraction":
+                    content = _coerce_timeline_json_blob(content)
+                    output = schema.model_validate_json(content, strict=False)
+                else:
+                    output = schema.model_validate_json(content, strict=True)
                 if business_validator is not None:
                     business_validator(output)
             except (ValidationError, ValueError) as exc:
@@ -423,15 +564,25 @@ class TimelineModelGateway:
                         actual_output_tokens=usage["output_tokens"], actual_cost_usd=actual_cost,
                     )
                 attempts.append(GatewayAttempt(
-                    attempt_number, "schema_rejected", reservation_key, request_hash,
+                    durable_attempt_number, "schema_rejected", reservation_key, request_hash,
                     response_hash, usage, actual_cost, type(exc).__name__,
                     latency_ms,
                 ))
-                if attempt_number == 2:
-                    raise StructuredOutputRejected("structured output failed local validation", attempts) from exc
+                if repair_index == 2:
+                    detail = str(exc)[:240].replace("\n", " ")
+                    raise StructuredOutputRejected(
+                        f"structured output failed local validation ({detail})",
+                        attempts,
+                    ) from exc
+                # 把校验错误摘要塞回 repair 提示，提高 Vertex 纠错成功率
+                err_hint = str(exc)[:500].replace("\n", " ")
                 current_messages = current_messages + [{
                     "role": "user",
-                    "content": "Local validation error. Return one corrected JSON object matching the supplied schema; do not add fields.",
+                    "content": (
+                        "Local validation error. Return one corrected JSON object matching "
+                        "the supplied schema; do not add fields. Error: "
+                        f"{err_hint}"
+                    ),
                 }]
                 continue
 
@@ -449,9 +600,12 @@ class TimelineModelGateway:
                     actual_output_tokens=usage["output_tokens"], actual_cost_usd=actual_cost,
                 )
             attempts.append(GatewayAttempt(
-                attempt_number, "succeeded", reservation_key, request_hash,
+                durable_attempt_number, "succeeded", reservation_key, request_hash,
                 response_hash, usage, actual_cost, latency_ms=latency_ms,
             ))
             return GatewayResult(output, attempts, deployment)
 
-        raise AssertionError("unreachable")
+        raise StructuredOutputRejected(
+            "structured output failed after primary and repair attempts",
+            attempts,
+        )

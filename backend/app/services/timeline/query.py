@@ -93,14 +93,18 @@ async def build_version_view(
         return None
     version_id, status, progress = resolved
     persisted_full_book = bool((novel.reading_progress or {}).get("timeline_full_book", False))
-    cutoff = None if request_full_book and persisted_full_book else await resolve_chapter_cutoff(session, novel)
+    # A running candidate represents the live analysis result, so it must expose
+    # every provisional event produced so far. The reading-progress spoiler gate
+    # applies only to the promoted active timeline.
+    candidate_view = source == TimelineVersionSource.RUNNING_CANDIDATE
+    cutoff = None if candidate_view or (request_full_book and persisted_full_book) else await resolve_chapter_cutoff(session, novel)
 
     event_query = select(MachineTimelineEvent).where(
         MachineTimelineEvent.owner_id == owner_id,
         MachineTimelineEvent.novel_id == novel.id,
         MachineTimelineEvent.version_id == version_id,
     )
-    if cutoff is None and not (request_full_book and persisted_full_book):
+    if cutoff is None and not (candidate_view or (request_full_book and persisted_full_book)):
         event_query = event_query.where(False)
     elif cutoff is not None:
         event_query = event_query.where(MachineTimelineEvent.narrative_chapter_number <= cutoff)

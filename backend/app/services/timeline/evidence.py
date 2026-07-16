@@ -65,6 +65,64 @@ class EvidencePackage:
                    hierarchy_build_id, hierarchy_checksum, tuple(units), package_hash)
 
 
+def rebind_extraction_to_package(
+    package: EvidencePackage, extraction: TimelineExtraction
+) -> TimelineExtraction:
+    """Script-owned rebind: LLM 只负责选 evidence_id，offsets/hash/chapter 由包权威覆写。
+
+    Vertex 很难逐字节复述 content_hash 与 offsets；若 evidence_id 属于本包，
+    一律用 Phase 07 冻结字段替换。未知 evidence_id 丢弃；无有效证据的事件丢弃。
+    """
+    from app.schemas.timeline import EvidenceRef
+
+    units = {unit.evidence_id: unit for unit in package.units}
+    rebound_events = []
+    for event in extraction.events:
+        unique_refs: list[EvidenceRef] = []
+        seen: set[str] = set()
+        for ref in event.evidence:
+            unit = units.get(ref.evidence_id)
+            if unit is None:
+                continue
+            if unit.evidence_id in seen:
+                continue
+            seen.add(unit.evidence_id)
+            unique_refs.append(
+                EvidenceRef(
+                    chapter_id=package.chapter_id,
+                    evidence_id=unit.evidence_id,
+                    source_start=unit.source_start,
+                    source_end=unit.source_end,
+                    content_hash=unit.content_hash,
+                )
+            )
+        if not unique_refs:
+            continue
+        rebound_events.append(
+            event.model_copy(
+                update={
+                    "narrative_chapter_number": package.chapter_id,
+                    "evidence": unique_refs,
+                }
+            )
+        )
+    valid_ids = {event.candidate_id for event in rebound_events}
+    constraints = []
+    for constraint in extraction.story_time_constraints:
+        if (
+            constraint.source_candidate_id not in valid_ids
+            or constraint.target_candidate_id not in valid_ids
+        ):
+            continue
+        eids = [eid for eid in constraint.evidence_ids if eid in units]
+        if not eids:
+            continue
+        constraints.append(constraint.model_copy(update={"evidence_ids": eids}))
+    return TimelineExtraction(
+        events=rebound_events, story_time_constraints=constraints
+    )
+
+
 def validate_extraction(package: EvidencePackage, extraction: TimelineExtraction) -> None:
     """Validate all model refs against script-owned scope, offsets and source hashes."""
     units = {unit.evidence_id: unit for unit in package.units}

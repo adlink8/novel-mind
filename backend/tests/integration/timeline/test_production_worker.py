@@ -26,6 +26,7 @@ from app.services.timeline.model_gateway import (
     TimelineModelGateway,
 )
 from app.services.timeline.worker import TimelineWorkerRuntime, run_timeline_worker
+import app.services.timeline.worker as timeline_worker
 
 pytestmark = pytest.mark.integration
 
@@ -156,6 +157,12 @@ async def test_first_entry_runs_durable_pipeline_and_repeat_entry_is_idempotent(
         extraction_deployment=_deployment("balanced-qualified"),
         reconciliation_deployment=_deployment("quality-qualified"),
     )
+    dependent_dispatches: list[tuple[int, int, int]] = []
+
+    async def dispatch_dependents(_sessions, run, version_id: int) -> None:
+        dependent_dispatches.append((run.owner_id, run.novel_id, version_id))
+
+    monkeypatch.setattr(timeline_worker, "_dispatch_dependent_analysis", dispatch_dependents)
 
     async def dispatch(run_id: int) -> None:
         await run_timeline_worker(run_id, runtime=runtime)
@@ -176,6 +183,7 @@ async def test_first_entry_runs_durable_pipeline_and_repeat_entry_is_idempotent(
         TimelineActivePointer.novel_id == novel_id,
     ))
     assert pointer is not None and pointer.version_id == run.version_id
+    assert dependent_dispatches == [(owner_id, novel_id, run.version_id)]
     events = list((await db_session.scalars(select(MachineTimelineEvent).where(
         MachineTimelineEvent.version_id == run.version_id,
     ).order_by(MachineTimelineEvent.narrative_chapter_number))).all())

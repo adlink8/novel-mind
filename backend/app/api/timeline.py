@@ -1,5 +1,7 @@
 """Durable, owner-scoped timeline orchestration and spoiler-safe reads."""
 
+from decimal import Decimal
+
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -43,6 +45,23 @@ async def _owned_run(db: AsyncSession, owner_id: int, novel_id: int) -> Analysis
 async def start_or_resume(background_tasks: BackgroundTasks,
                           novel: Novel = Depends(require_owned_novel), db: AsyncSession = Depends(get_db),
                           current_user: User = Depends(require_user)):
+    """启动或恢复时间线深度分析（Phase 08）。
+
+    编排（对齐 D-12 / REQ-TIME-03）:
+      1. 确保 Phase 07 active hierarchy 存在（结构底座服务时间线）
+      2. 幂等创建/恢复 durable analysis run
+      3. 后台 worker 按章抽取 → 调和 → 晋升
+    """
+    from app.services.analysis_service import ensure_hierarchy
+
+    # A → B: Phase 07 场景/证据层级必须先就绪
+    build_id = await ensure_hierarchy(db, novel, force=False)
+    if not build_id:
+        raise HTTPException(
+            status_code=400,
+            detail="无法准备场景层级：小说可能尚无章节，请先完成导入",
+        )
+
     row = await db.scalar(select(AnalysisRun).where(
         AnalysisRun.owner_id == current_user.id, AnalysisRun.novel_id == novel.id,
         AnalysisRun.active_key == "active",
@@ -63,12 +82,57 @@ async def start_or_resume(background_tasks: BackgroundTasks,
         except IntegrityError:
             # The owner/novel/active_key unique constraint is the concurrency authority.
             await db.rollback()
+            # hierarchy 可能已在上面写入；回滚后重新 ensure 并取 run
+            build_id = await ensure_hierarchy(db, novel, force=False)
+            if not build_id:
+                raise HTTPException(
+                    status_code=400,
+                    detail="无法准备场景层级：小说可能尚无章节，请先完成导入",
+                )
             row = await db.scalar(select(AnalysisRun).where(
                 AnalysisRun.owner_id == current_user.id, AnalysisRun.novel_id == novel.id,
                 AnalysisRun.active_key == "active",
             ))
             if row is None:
                 raise
+
+    # 可恢复的暂停/失败态：清原因后重新入队（例如旧 OpenAI / outcome_unknown）
+    if row.status in (
+        "paused_dependency",
+        "paused_budget",
+        "failed",
+        "cancelled",
+        "pending",
+    ):
+        row.status = "pending"
+        row.cancel_requested = False
+        row.status_reason = None
+        if novel.status not in ("analyzing", "analyzed"):
+            novel.status = "analyzing"
+        # 抬升旧 run 的账本上限（早期 500 calls / $25 撑不住 500+ 章）
+        from app.models.analysis import AnalysisBudgetLedger
+        from app.services.timeline.worker import production_runtime
+
+        policy = production_runtime().budget_policy
+        ledger = await db.scalar(
+            select(AnalysisBudgetLedger).where(AnalysisBudgetLedger.run_id == row.id)
+        )
+        if ledger is not None:
+            ledger.max_calls = max(ledger.max_calls, policy.max_calls)
+            ledger.max_input_tokens = max(
+                ledger.max_input_tokens, policy.max_input_tokens
+            )
+            ledger.max_output_tokens = max(
+                ledger.max_output_tokens, policy.max_output_tokens
+            )
+            if Decimal(ledger.max_cost_usd) < policy.max_cost_usd:
+                ledger.max_cost_usd = policy.max_cost_usd
+            # 释放可能卡住的 reserved（失败中断残留）
+            ledger.reserved_calls = 0
+            ledger.reserved_input_tokens = 0
+            ledger.reserved_output_tokens = 0
+            ledger.reserved_cost_usd = Decimal("0")
+
     await db.commit()
     await db.refresh(row)
     if row.status != "completed":
@@ -95,8 +159,19 @@ async def cancel(novel: Novel = Depends(require_owned_novel), db: AsyncSession =
 async def resume(background_tasks: BackgroundTasks,
                  novel: Novel = Depends(require_owned_novel), db: AsyncSession = Depends(get_db),
                  current_user: User = Depends(require_user)):
+    from app.services.analysis_service import ensure_hierarchy
+
+    build_id = await ensure_hierarchy(db, novel, force=False)
+    if not build_id:
+        raise HTTPException(
+            status_code=400,
+            detail="无法准备场景层级：小说可能尚无章节，请先完成导入",
+        )
     row = await _owned_run(db, current_user.id, novel.id)
     row.status, row.cancel_requested = "pending", False
+    row.status_reason = None
+    if novel.status not in ("analyzing", "analyzed"):
+        novel.status = "analyzing"
     await db.commit(); await db.refresh(row)
     background_tasks.add_task(dispatch_timeline_run, row.id)
     return _run_response(row)
