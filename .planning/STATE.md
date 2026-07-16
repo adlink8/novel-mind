@@ -2,16 +2,17 @@
 gsd_state_version: 1.0
 milestone: v0.8
 milestone_name: 分层叙事记忆与层级 RAG
-status: paused
-last_updated: 2026-07-16T05:09:02.163Z
+status: executing
+last_updated: 2026-07-16T12:00:00.000Z
 last_activity: 2026-07-16
 progress:
   total_phases: 16
   completed_phases: 10
-  total_plans: 52
+  total_plans: 71
   completed_plans: 57
   percent: 63
-stopped_at: Phase 13 Plan 13-02 Task 3 paused — planning only, execution requires explicit authorization
+stopped_at: null
+authorized_scope: phases 13-18 (user 2026-07-16: 查看13-18阶段任务 编排GSD子代理执行)
 ---
 
 # Project State
@@ -27,22 +28,30 @@ See `.planning/PROJECT.md` and `IMPLEMENTATION-STATUS.md`.
 
 Phase: 13 (Candidate Memory Contracts and Provenance Authority)
 Plan: 2 of 3
-Status: Paused during Task 3; Tasks 1-2 committed, Task 3 WIP unverified
+Status: EXECUTING — user authorized phases 13–18 via GSD subagent orchestration
 Last activity: 2026-07-16
 
-## Planning-only Inventory
+## Authorization (2026-07-16)
 
-- Phase 14: 4/4 plans created and plan-checked; blocking human-action gate requires Phase 13 passed verification plus explicit authorization.
-- Phase 15: 3/3 plans created and plan-checked; requires Phase 14 passed verification plus explicit authorization.
-- Phase 16: 3/3 plans created and plan-checked; carry-forward uses `decision='carried'` rebuild items and creates no Phase 14 stage row.
-- Phase 17: 3/3 plans created and plan-checked; qualification remains candidate-only with no promotion or consumer cutover.
-- Phase 18: 3/3 frontend motion plans created and plan-checked; UI-MOTION-01..06 mapped in REQUIREMENTS/ROADMAP.
-- Every Phase 14–18 plan is `autonomous: false`; each phase begins with a blocking human-action authorization checkpoint.
-- No Phase 14–18 implementation, migration or test has been executed.
+- User instruction: `查看13-18阶段任务 编排GSD子代理执行`
+- Scope: Phase 13 remainder + Phase 14–18 full plans
+- Dependency order: 13 complete+verify → 14 → 15 → 16 → 17; **Phase 18 parallel** (frontend-only, independent of RAG chain)
+- Plan gates that previously required `批准执行 Phase N` are satisfied for this orchestration run
+- Commit discipline: stage only plan-declared files; do not commit unrelated dirty WIP
+
+## Execution Inventory
+
+- Phase 13: 13-01 SUMMARY done; 13-02 T1–T2 committed; T3 WIP (`authority.py`, `test_contract_authority_pg.py`); 13-03 pending; no 13-VERIFICATION yet
+- Phase 14: 4/4 plans planned; blocked until 13-VERIFICATION `status: passed`
+- Phase 15: 3/3 plans planned; after Phase 14 verified
+- Phase 16: 3/3 plans planned; after Phase 15 verified
+- Phase 17: 3/3 plans planned; after Phases 12–16 verified; candidate-only verdict
+- Phase 18: 18-01 SUMMARY done (feat `f6280cf`); 18-02/18-03 pending
 
 ## Auto Routing
 
-Phase 11 independent verification **PARTIAL**（15/15 product truths；对抗静态扫描 1 失败）。聊天不得作为线索事实源；Phase 09 relationship reader 不可用时记录 `source_unavailable`；UI 仅 `/analysis` 线索 tab。资格与 release 入口：`backend/scripts/run_clue_qualification.py`。
+Orchestration Wave A: Phase 13 remainder + Phase 18 in parallel.
+Then 14 → 15 → 16 → 17 serially after each phase verification.
 
 ## Phase 11 Execution Metrics
 
@@ -179,12 +188,12 @@ REQ-AUTO-01..11 已交付（含 06-08 QualityRun 持久化、06-09 BaselineCandi
 
 ## Next Action
 
-1. Close Phase 11 residual: scope `test_service_files_contain_no_asyncsession_lifecycle_writes` to pure modules only.
-2. Optionally re-run dual-viewport `clue-real.spec.ts` on 5433 for independent browser authority.
-3. Never import reader-chat as clue fact source; relationship outages → `source_unavailable`.
-4. 保留当前所有非验证文档的本地 WIP，不纳入 docs(11) 验证提交。
+1. Finish Phase 13-02 Task 3 from existing WIP; write 13-02-SUMMARY; execute 13-03; write 13-VERIFICATION.
+2. Parallel: Phase 18-01 done; continue 18-02 → 18-03 with motion qualification.
+3. After Phase 13 verified: execute Phase 14-01..14-04 then verify.
+4. Then Phase 15 → 16 → 17 in order; never promote narrative-memory candidates.
 
 ## Session
 
-- Stopped at: Independent Phase 11 verification → PARTIAL; wrote `11-VERIFICATION.md`
-- Resume file: `.planning/phases/11-clue-and-foreshadow-tracking/11-VERIFICATION.md`
+- Resumed: Phase 13–18 GSD subagent orchestration authorized 2026-07-16
+- Resume file: `.planning/HANDOFF.json`

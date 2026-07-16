@@ -46,12 +46,12 @@
 | Phase 8 版本化小说分析与时间线 | 10/10 | **Complete** (35/35 must-haves verified) |
 | v0.7 / Phase 9-11 叙事关系、阅读问答与线索追踪 | Phase 09: 5/5; Phase 10: 5/5; Phase 11: 5/5 | **09 VERIFIED**; **10 PARTIAL** (real Playwright residual); **11 implement-complete** (adversarial residual closed) |
 | v0.8 / Phase 12-17 分层叙事记忆与层级 RAG | 3/19 initial plans | **IN PROGRESS** — Phase 12 verified; Phase 13 next; candidate-only/no pointer cutover |
-| Phase 18 前端动效与过渡系统 | 0/3 | **PLANNED** — 独立 UX 阶段；需重新授权后执行 |
+| Phase 18 前端动效与过渡系统 | 1/3 | **EXECUTING** — 18-01 done (`f6280cf`); 18-02 next |
 
 ## Auto Start
 
-执行当前暂停在 **Phase 13 / 13-02 Task 3**：13-01 已完成，13-02 Tasks 1–2 已提交，Task 3 有未验证 WIP。任何实现、迁移或测试都必须等待用户重新授权；详见 `.planning/HANDOFF.json`。
-Phase 14–18 仅完成规划，不得自动执行。Phase 14 的 provider 调用仍必须使用 Phase 12 的 `provider_calls_allowed` 门禁。
+**2026-07-16 已授权执行 Phase 13–18**（用户：查看13-18阶段任务 编排GSD子代理执行）。详见 `.planning/HANDOFF.json`。
+执行顺序：Phase 13 收尾并验证 → 14 → 15 → 16 → 17；**Phase 18 可并行**。Phase 14 的 provider 调用仍必须使用 Phase 12 的 `provider_calls_allowed` 门禁。
 Phase 06–11 历史实现与验证状态保持不变；Phase 10 real Playwright residual 和 v0.3 质量缺口不因 v0.8 单书 dry-run 自动关闭。
 
 ## Backlog
@@ -320,8 +320,8 @@ Plans:
 **Goal:** 在不改变业务行为、API 或数据结构的前提下，为现有 Next.js 界面建立克制、统一、可访问的动画过渡系统，并消除主题首帧闪烁、浮层退出不一致和动态内容布局跳动。
 **Requirements:** UI-MOTION-01, UI-MOTION-02, UI-MOTION-03, UI-MOTION-04, UI-MOTION-05, UI-MOTION-06
 **Depends on:** Existing frontend foundation (Phases 08–11); independent from the Phase 14–17 RAG execution chain
-**Status:** PLANNED — 3/3 plans created; explicit implementation authorization required
-**Plans:** 3/3 plans created
+**Status:** EXECUTING — 18-01 complete; authorized 2026-07-16 orchestration
+**Plans:** 1/3 plans complete
 
 **Success Criteria:**
 1. 所有目标交互使用 150/200/300ms 语义 token，进入为 ease-out、退出为 ease-in；新增代码无任意时长、linear 或 `transition-all`。
@@ -331,7 +331,7 @@ Plans:
 5. 桌面与 390px 触摸视口验证关键面板、主题、分析增量和布局边界；无水平滚动、输入框遮挡、底部进度覆盖聊天或焦点丢失。
 
 Plans:
-- [ ] 18-01 motion tokens, reduced-motion contract, pre-paint theme bootstrap and shared primitives
+- [x] 18-01 motion tokens, reduced-motion contract, pre-paint theme bootstrap and shared primitives
 - [ ] 18-02 dismissable sidebar/settings/search/chat/evidence panels with topmost outside-click and focus restoration
 - [ ] 18-03 analysis progress/list/card transitions plus desktop/mobile Playwright motion qualification
 
