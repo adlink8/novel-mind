@@ -14,7 +14,11 @@ from app.services.timeline.budget import BudgetExceeded, BudgetGate
 from app.services.timeline.model_gateway import ModelDeployment, TimelineModelGateway
 
 EdgeType = Literal["causes", "triggers", "responds_to", "blocks"]
-RECONCILIATION_PROMPT = "Reconcile only the supplied event IDs using evidence-backed constraints."
+RECONCILIATION_PROMPT = (
+    "Reconcile only the supplied event IDs using evidence-backed constraints. "
+    "Keep any human-readable titles/descriptions in Simplified Chinese if already Chinese; "
+    "do not translate Chinese fiction names into English."
+)
 
 
 @dataclass(frozen=True)
@@ -43,17 +47,30 @@ class ReconciliationCausalProposalModel(BaseModel):
     confidence: float = Field(ge=0, le=1)
 
 
+class StoryConstraintModel(BaseModel):
+    """Object form for Vertex/OpenAI structured output (tuple/prefixItems is rejected by Vertex)."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    event_a: str = Field(min_length=1, max_length=160)
+    event_b: str = Field(min_length=1, max_length=160)
+    relation: Literal["before", "after", "simultaneous"]
+
+
 class ReconciliationOutputModel(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
     duplicate_groups: list[list[str]]
-    story_constraints: list[tuple[str, str, Literal["before", "after", "simultaneous"]]]
+    story_constraints: list[StoryConstraintModel]
     causal_edges: list[ReconciliationCausalProposalModel]
 
     def as_input(self) -> ReconcileInput:
         return ReconcileInput(
             duplicate_groups=self.duplicate_groups,
-            story_constraints=[tuple(item) for item in self.story_constraints],
+            story_constraints=[
+                (item.event_a, item.event_b, item.relation)
+                for item in self.story_constraints
+            ],
             causal_edges=[CausalProposal(**item.model_dump()) for item in self.causal_edges],
         )
 

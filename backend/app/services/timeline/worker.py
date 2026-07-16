@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import uuid
@@ -22,7 +23,7 @@ from app.models.analysis import (
     AnalysisVersion,
 )
 from app.models.chunk_build import ChunkActivePointer, ChunkBuild, ChunkHierarchyNode
-from app.models.novel import Chapter
+from app.models.novel import Chapter, Novel
 from app.models.timeline import (
     MachineTimelineEvent,
     TimelineActivePointer,
@@ -32,7 +33,12 @@ from app.models.timeline import (
 )
 from app.schemas.timeline import EventCandidate, EvidenceRef, Participant, StoryTime, TimelineExtraction
 from app.services.timeline.budget import BudgetExceeded, BudgetGate, BudgetPolicy
-from app.services.timeline.evidence import EvidencePackage, EvidenceUnit, validate_extraction
+from app.services.timeline.evidence import (
+    EvidencePackage,
+    EvidenceUnit,
+    rebind_extraction_to_package,
+    validate_extraction,
+)
 from app.services.timeline.extraction import ExactCacheKey, load_persistent_exact_cache
 from app.services.timeline.model_gateway import (
     DependencyPaused,
@@ -66,10 +72,11 @@ class TimelineWorkerRuntime:
     reconciliation_deployment: ModelDeployment
     extraction_prompt: str = "Extract only evidence-backed timeline events from the supplied package."
     budget_policy: BudgetPolicy = field(default_factory=lambda: BudgetPolicy(
-        max_calls=500,
-        max_input_tokens=2_000_000,
-        max_output_tokens=500_000,
-        max_cost_usd=Decimal("25"),
+        # 长篇（500+ 章）× 每章 1–2 次 Vertex 调用；预留必须覆盖 schema+证据包
+        max_calls=5_000,
+        max_input_tokens=100_000_000,
+        max_output_tokens=20_000_000,
+        max_cost_usd=Decimal("200"),
     ))
 
 
@@ -89,8 +96,89 @@ class _LiteLLMTransport:
         }
 
 
+class _VertexTransport:
+    """Google Cloud Vertex structured calls（与剧情分析同一条 GCP 链路）。"""
+
+    async def complete(self, **kwargs: Any) -> dict[str, Any]:
+        from app.services.vertex_gemini import acomplete
+
+        model = kwargs.get("model") or ""
+        messages = list(kwargs.get("messages") or [])
+        timeout = float(kwargs.get("timeout") or 120)
+        response_format = kwargs.get("response_format")
+        max_tokens = int(kwargs.get("max_tokens") or kwargs.get("max_output_tokens") or 4096)
+
+        schema: dict[str, Any] | None = None
+        if response_format is not None and hasattr(response_format, "model_json_schema"):
+            schema = response_format.model_json_schema()
+
+        response = await acomplete(
+            messages,
+            model=str(model),
+            temperature=0.0,
+            max_tokens=max_tokens,
+            timeout=timeout,
+            response_json_schema=schema,
+        )
+        usage_obj = getattr(response, "usage", None)
+        usage = {
+            "input_tokens": int(getattr(usage_obj, "prompt_tokens", 0) or 0),
+            "output_tokens": int(getattr(usage_obj, "completion_tokens", 0) or 0),
+            "prompt_tokens": int(getattr(usage_obj, "prompt_tokens", 0) or 0),
+            "completion_tokens": int(getattr(usage_obj, "completion_tokens", 0) or 0),
+        }
+        content = response.choices[0].message.content or ""
+        # 去掉可能的 markdown fence
+        text = content.strip()
+        if text.startswith("```"):
+            text = text.removeprefix("```json").removeprefix("```JSON").removeprefix("```")
+            text = text.removesuffix("```").strip()
+        return {
+            "id": getattr(response, "id", None) or f"vertex-{model}",
+            "content": text,
+            "usage": usage,
+        }
+
+
 def production_runtime() -> TimelineWorkerRuntime:
-    """Construct the frozen no-fallback Phase 08 deployment pair."""
+    """Construct the production Phase 08 deployment pair.
+
+    默认与「数据分析」/剧情分析对齐：Google Cloud Vertex Gemini。
+    仅当 chat_provider 明确为 openai 且配置了 key 时回退 OpenAI。
+    """
+    from app.config import settings
+
+    provider = (settings.chat_provider or "vertex_google").strip().lower()
+    use_vertex = provider in (
+        "vertex_google",
+        "vertex",
+        "vertex_ai",
+        "gcp",
+        "google_cloud",
+    ) or not (settings.openai_api_key or "").strip()
+
+    if use_vertex:
+        model_id = (settings.vertex_model or "gemini-3.5-flash").strip()
+        # Flash 级单价占位（仅预算账本用；GCP 账单以项目为准）
+        deployment = ModelDeployment(
+            "vertex_google",
+            model_id,
+            model_id,
+            True,  # JSON schema via Vertex responseMimeType
+            Decimal("0.10"),
+            Decimal("0.40"),
+        )
+        return TimelineWorkerRuntime(
+            sessions=async_session_factory,
+            gateway=TimelineModelGateway(
+                _VertexTransport(),
+                persistence=PostgresCallRepository(async_session_factory),
+            ),
+            extraction_deployment=deployment,
+            reconciliation_deployment=deployment,
+            extraction_prompt=_load_prompt(),
+        )
+
     import litellm
 
     extraction_model = "gpt-4o-mini-2024-07-18"
@@ -333,11 +421,22 @@ async def _extract_and_persist(runtime, budget, run, version, build, chapter) ->
             run_id=run.id,
             stage_key=stage_key,
             cache_key=cache_key.digest,
-            max_input_tokens=max(256, sum(len(unit.text) for unit in package.units) * 2),
-            max_output_tokens=1800,
-            business_validator=lambda candidate: validate_extraction(package, candidate),
+            # 证据全文 + JSON schema/system 开销；实测单章可到 60k+ prompt tokens
+            max_input_tokens=min(
+                200_000,
+                max(
+                    128_000,
+                    sum(len(unit.text) for unit in package.units) + 80_000,
+                ),
+            ),
+            max_output_tokens=16_384,
+            business_validator=lambda candidate: validate_extraction(
+                package, rebind_extraction_to_package(package, candidate)
+            ),
         )
-        output = result.output
+        # 脚本权威：offsets/hash/chapter_id 一律以 Phase 07 证据包为准
+        output = rebind_extraction_to_package(package, result.output)
+        validate_extraction(package, output)
     await _raise_if_cancel_requested(runtime.sessions, run.id)
     await _persist_chapter(runtime.sessions, run, version, chapter, stage_key, output)
 
@@ -491,22 +590,50 @@ async def _reconcile_and_persist(runtime, budget, run, version) -> None:
                 source_attempt_id=cached.source_attempt_id,
                 artifact_checksum=cached.artifact_checksum,
             )
-    if gateway_output is None:
-        gateway_result = await runtime.gateway.generate(
-            deployment=runtime.reconciliation_deployment,
-            schema=ReconciliationOutputModel,
-            messages=[
-                {"role": "system", "content": RECONCILIATION_PROMPT},
-                {"role": "user", "content": json.dumps(payload, sort_keys=True)},
-            ],
-            budget=budget,
-            run_id=run.id,
-            stage_key=stage_key,
-            cache_key=cache_key,
-            max_input_tokens=max(512, sum(len(event.description) for event in candidates) * 2),
-            max_output_tokens=4000,
+    # Large full-book candidate sets (500+ chapters) blow Vertex/OpenAI structured
+    # reconcile payloads. Prefer LLM only for small/medium windows; otherwise
+    # deterministic pass-through so promotion and downstream rel/clue can run.
+    _MAX_LLM_RECONCILE_EVENTS = 120
+    if gateway_output is None and len(candidates) > _MAX_LLM_RECONCILE_EVENTS:
+        gateway_output = ReconciliationOutputModel(
+            duplicate_groups=[],
+            story_constraints=[],
+            causal_edges=[],
         )
-        gateway_output = gateway_result.output
+    if gateway_output is None:
+        try:
+            gateway_result = await runtime.gateway.generate(
+                deployment=runtime.reconciliation_deployment,
+                schema=ReconciliationOutputModel,
+                messages=[
+                    {"role": "system", "content": RECONCILIATION_PROMPT},
+                    {"role": "user", "content": json.dumps(payload, sort_keys=True)},
+                ],
+                budget=budget,
+                run_id=run.id,
+                stage_key=stage_key,
+                cache_key=cache_key,
+                max_input_tokens=max(
+                    32_768,
+                    sum(len(event.description) for event in candidates) * 2 + 24_000,
+                ),
+                max_output_tokens=8_192,
+            )
+            gateway_output = gateway_result.output
+        except (ModelCallFailed, DependencyPaused) as exc:
+            # Fail soft: keep extracted events and continue to promote.
+            logger = __import__("logging").getLogger(__name__)
+            logger.warning(
+                "timeline reconcile LLM failed for run %s (%s events): %s; using pass-through",
+                run.id,
+                len(candidates),
+                exc,
+            )
+            gateway_output = ReconciliationOutputModel(
+                duplicate_groups=[],
+                story_constraints=[],
+                causal_edges=[],
+            )
     await _raise_if_cancel_requested(runtime.sessions, run.id)
     reconciled = TimelineReconciler._materialize(candidates, gateway_output.as_input())
     artifact = json.dumps({
@@ -574,6 +701,40 @@ async def _validate_and_promote(sessions, run, version) -> None:
         )
     await _update_progress(sessions, run.id, None, None, "completed")
     await _finish_run(sessions, run.id, "completed", None)
+    await _dispatch_dependent_analysis(sessions, run, version.id)
+
+
+async def _dispatch_dependent_analysis(sessions, run, version_id: int) -> None:
+    """Continue relationship and clue tasks after a timeline version is promoted."""
+    from app.models.clue import ClueAnalysisRun
+    from app.services.clues.worker import dispatch_clue_run
+    from app.services.relationships.worker import dispatch_relationship_build
+
+    async with sessions.begin() as session:
+        clue_run = await session.scalar(
+            select(ClueAnalysisRun).where(
+                ClueAnalysisRun.owner_id == run.owner_id,
+                ClueAnalysisRun.novel_id == run.novel_id,
+                ClueAnalysisRun.active_key == "active",
+                ClueAnalysisRun.status == "paused_dependency",
+            ).with_for_update()
+        )
+        clue_run_id = None
+        if clue_run is not None:
+            clue_run.status = "pending"
+            clue_run.status_reason = None
+            clue_run.cancel_requested = False
+            clue_run_id = clue_run.id
+
+    asyncio.create_task(
+        dispatch_relationship_build(
+            owner_id=run.owner_id,
+            novel_id=run.novel_id,
+            analysis_version_id=version_id,
+        )
+    )
+    if clue_run_id is not None:
+        asyncio.create_task(dispatch_clue_run(clue_run_id))
 
 
 async def _update_progress(sessions, run_id, completed, total, stage) -> None:
@@ -592,15 +753,35 @@ async def _update_progress(sessions, run_id, completed, total, stage) -> None:
             run.lease_expires_at = now + timedelta(minutes=5)
 
 
+def _clip_status_reason(reason: str | None, *, limit: int = 128) -> str | None:
+    """analysis_runs.status_reason is VARCHAR(128); never let long provider errors fail flush."""
+    if reason is None:
+        return None
+    text = str(reason).replace("\n", " ").strip()
+    if len(text) <= limit:
+        return text
+    return text[: max(0, limit - 1)] + "…"
+
+
 async def _finish_run(sessions, run_id: int, status: str, reason: str | None) -> None:
     async with sessions.begin() as session:
         run = await session.get(AnalysisRun, run_id, with_for_update=True)
         if run is None:
             return
         run.status = status
-        run.status_reason = reason
+        run.status_reason = _clip_status_reason(reason)
         run.lease_id = None
         run.lease_expires_at = None
         run.heartbeat_at = datetime.now(UTC)
         if status == "completed":
             run.progress = {**(run.progress or {}), "stage": "completed"}
+        # 书架状态与时间线任务对齐（Phase 08 产品面）
+        novel = await session.get(Novel, run.novel_id)
+        if novel is not None:
+            if status == "completed":
+                novel.status = "analyzed"
+            elif status in ("running", "pending", "partial"):
+                novel.status = "analyzing"
+            elif status in ("paused_dependency", "paused_budget", "failed") and novel.status == "analyzing":
+                # 保留 analyzing 或回 ready 都不理想；失败时标 ready 便于重试入口
+                novel.status = "ready"
