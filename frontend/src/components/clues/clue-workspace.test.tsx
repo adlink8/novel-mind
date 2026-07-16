@@ -103,6 +103,9 @@ const activeClues = [
     narrative_chapter_number: 3,
     source_start: 5,
     derived_state: "paid_off",
+    first_cue_chapter: 3,
+    payoff_chapter: 3,
+    summary: "晚章当场回收",
   }),
   makeClue({
     logical_clue_id: "c-early",
@@ -110,6 +113,9 @@ const activeClues = [
     narrative_chapter_number: 1,
     source_start: 20,
     derived_state: "active",
+    first_cue_chapter: 1,
+    payoff_chapter: null, // spoiler-safe: no invented payoff
+    summary: "雾中铃声初现",
   }),
   makeClue({
     logical_clue_id: "c-mid",
@@ -117,6 +123,9 @@ const activeClues = [
     narrative_chapter_number: 1,
     source_start: 40,
     derived_state: "reinforced",
+    first_cue_chapter: 1,
+    payoff_chapter: 5,
+    summary: "回响强化中",
   }),
 ];
 
@@ -250,7 +259,7 @@ describe("ClueWorkspace", () => {
     expect(screen.getByRole("button", { name: "开始线索分析" })).toBeInTheDocument();
   });
 
-  it("shows loading then completed band/list with identical ordered IDs", async () => {
+  it("renders vertical plant→payoff cards in stable narrative order (not a timeline strip)", async () => {
     render(
       <ClueWorkspace
         novelId="11"
@@ -260,23 +269,33 @@ describe("ClueWorkspace", () => {
     );
     await screen.findByTestId("clue-band");
 
-    const bandButtons = within(screen.getByLabelText("线索时间带")).getAllByRole(
-      "button"
-    );
-    const listOptions = within(screen.getByTestId("clue-keyboard-list")).getAllByRole(
-      "option"
-    );
-    // Stable order: ch1@20, ch1@40, ch3@5
-    const bandTitles = bandButtons.map((b) => b.textContent);
-    expect(bandTitles[0]).toContain("早章雾号");
-    expect(bandTitles[1]).toContain("中章回响");
-    expect(bandTitles[2]).toContain("晚章铃铛");
+    // Horizontal “线索时间带” event strip is demoted / removed
+    expect(screen.queryByLabelText("线索时间带")).not.toBeInTheDocument();
 
-    const listTitles = listOptions.map((o) => o.textContent);
-    expect(listTitles[0]).toContain("早章雾号");
-    expect(listTitles[1]).toContain("中章回响");
-    expect(listTitles[2]).toContain("晚章铃铛");
-    expect(listOptions).toHaveLength(bandButtons.length);
+    const list = screen.getByTestId("clue-keyboard-list");
+    const cards = within(list).getAllByTestId("clue-card");
+    // Stable order: ch1@20, ch1@40, ch3@5
+    expect(cards[0]).toHaveTextContent("早章雾号");
+    expect(cards[1]).toHaveTextContent("中章回响");
+    expect(cards[2]).toHaveTextContent("晚章铃铛");
+    expect(cards).toHaveLength(3);
+
+    // Span presentation + short summary from API
+    expect(within(cards[0]).getByTestId("clue-summary")).toHaveTextContent(
+      "雾中铃声初现"
+    );
+    expect(within(cards[0]).getByTestId("clue-plant-chapter")).toHaveTextContent(
+      "埋设 第1章"
+    );
+    expect(within(cards[0]).getByTestId("clue-payoff-unknown")).toHaveTextContent(
+      "兑现未公开"
+    );
+    expect(within(cards[1]).getByTestId("clue-payoff-chapter")).toHaveTextContent(
+      "兑现 第5章"
+    );
+    expect(within(cards[0]).getByTestId("clue-state-chip")).toHaveTextContent(
+      "活跃"
+    );
   });
 
   it("filters use only server-visible states and character ids", async () => {
@@ -344,6 +363,15 @@ describe("ClueWorkspace", () => {
     );
     expect(within(panel).getByText("雾中传来铃铛")).toBeInTheDocument();
     expect(within(panel).getAllByText("跳转原文章节").length).toBeGreaterThan(0);
+    // Evidence grouped by role
+    const byRole = within(panel).getByTestId("clue-evidence-by-role");
+    expect(within(byRole).getByTestId("clue-evidence-role-cue")).toBeInTheDocument();
+    expect(
+      within(byRole).getByTestId("clue-evidence-role-reinforcement")
+    ).toBeInTheDocument();
+    expect(
+      within(byRole).getByTestId("clue-evidence-role-payoff")
+    ).toBeInTheDocument();
 
     fireEvent.change(within(panel).getByLabelText("动作原因"), {
       target: { value: "证据充分" },

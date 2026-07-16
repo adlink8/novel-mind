@@ -425,7 +425,7 @@ export function ClueWorkspace(props: Props) {
           <div>
             <p className="text-sm">暂无线索结果。</p>
             <p className="mt-2 text-xs">
-              点上方「开始线索分析」后，可见线索会出现在时间带中。
+              点上方「开始线索分析」后，可见线索会以埋设→兑现卡片列出。
             </p>
           </div>
         </div>

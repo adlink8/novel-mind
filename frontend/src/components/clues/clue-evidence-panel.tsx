@@ -7,6 +7,7 @@ import { X } from "lucide-react";
 import {
   CLUE_STATE_LABELS,
   type ClueDetailPanels,
+  type ClueEvidenceItem,
   type ClueLinkTargetKind,
   type ClueState,
   type VisibleClue,
@@ -20,6 +21,31 @@ const ROLE_LABELS: Record<string, string> = {
   payoff: "回收",
   disposition: "处置",
 };
+
+/** Stable display order for evidence roles; unknown roles append last. */
+const ROLE_ORDER = ["cue", "reinforcement", "payoff", "disposition"] as const;
+
+function groupEvidenceByRole(
+  evidence: ClueEvidenceItem[]
+): Array<{ role: string; items: ClueEvidenceItem[] }> {
+  const buckets = new Map<string, ClueEvidenceItem[]>();
+  for (const item of evidence) {
+    const role = String(item.role || "cue");
+    const list = buckets.get(role);
+    if (list) list.push(item);
+    else buckets.set(role, [item]);
+  }
+  const ordered: Array<{ role: string; items: ClueEvidenceItem[] }> = [];
+  for (const role of ROLE_ORDER) {
+    const items = buckets.get(role);
+    if (items?.length) ordered.push({ role, items });
+    buckets.delete(role);
+  }
+  for (const [role, items] of buckets) {
+    if (items.length) ordered.push({ role, items });
+  }
+  return ordered;
+}
 
 const LINK_KIND_LABELS: Record<string, string> = {
   character: "人物",
@@ -226,7 +252,7 @@ export function ClueEvidencePanel(props: Props) {
           )}
 
           <p className="mt-4 text-xs font-medium text-muted-foreground">
-            证据（cue → reinforcement → payoff）
+            证据（按角色分组：cue → reinforcement → payoff）
           </p>
           {props.loading && (
             <p className="mt-2 text-sm text-muted-foreground">加载证据…</p>
@@ -237,36 +263,47 @@ export function ClueEvidencePanel(props: Props) {
             </p>
           )}
           {!props.loading && !props.error && detail && (
-            <ul className="mt-2 grid gap-2">
-              {detail.evidence.map((item) => (
-                <li
-                  key={item.evidence_id}
-                  className="rounded-2xl border bg-card p-3 text-sm"
-                >
-                  <p className="text-xs text-muted-foreground">
-                    {ROLE_LABELS[item.role] ?? item.role} · 第
-                    {item.narrative_chapter_number}章 · 偏移{" "}
-                    {item.source_start}–{item.source_end}
+            <div className="mt-2 grid gap-3" data-testid="clue-evidence-by-role">
+              {groupEvidenceByRole(detail.evidence).map(({ role, items }) => (
+                <div key={role} data-testid={`clue-evidence-role-${role}`}>
+                  <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    {ROLE_LABELS[role] ?? role}
+                    <span className="ml-1 font-normal normal-case">
+                      ({items.length})
+                    </span>
                   </p>
-                  {item.excerpt && (
-                    <p className="mt-1 leading-6 text-muted-foreground">
-                      {item.excerpt}
-                    </p>
-                  )}
-                  <Link
-                    href={`/novels/${props.novelId}?chapter=${item.chapter_id}&start=${item.source_start}`}
-                    className="mt-2 inline-block text-xs text-primary underline-offset-2 hover:underline"
-                  >
-                    跳转原文章节
-                  </Link>
-                </li>
+                  <ul className="grid gap-2">
+                    {items.map((item) => (
+                      <li
+                        key={item.evidence_id}
+                        className="rounded-2xl border bg-card p-3 text-sm"
+                      >
+                        <p className="text-xs text-muted-foreground">
+                          第{item.narrative_chapter_number}章 · 偏移{" "}
+                          {item.source_start}–{item.source_end}
+                        </p>
+                        {item.excerpt && (
+                          <p className="mt-1 leading-6 text-muted-foreground">
+                            {item.excerpt}
+                          </p>
+                        )}
+                        <Link
+                          href={`/novels/${props.novelId}?chapter=${item.chapter_id}&start=${item.source_start}`}
+                          className="mt-2 inline-block text-xs text-primary underline-offset-2 hover:underline"
+                        >
+                          跳转原文章节
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               ))}
               {detail.evidence.length === 0 && (
-                <li className="text-sm text-muted-foreground">
+                <p className="text-sm text-muted-foreground">
                   当前可见范围内无证据。
-                </li>
+                </p>
               )}
-            </ul>
+            </div>
           )}
 
           <p className="mt-4 text-xs font-medium text-muted-foreground">
