@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v0.8
 milestone_name: 分层叙事记忆与层级 RAG
 status: paused
-last_updated: 2026-07-16T04:32:57.248Z
+last_updated: 2026-07-16T05:09:02.163Z
 last_activity: 2026-07-16
 progress:
   total_phases: 16
@@ -29,6 +29,16 @@ Phase: 13 (Candidate Memory Contracts and Provenance Authority)
 Plan: 2 of 3
 Status: Paused during Task 3; Tasks 1-2 committed, Task 3 WIP unverified
 Last activity: 2026-07-16
+
+## Planning-only Inventory
+
+- Phase 14: 4/4 plans created and plan-checked; blocking human-action gate requires Phase 13 passed verification plus explicit authorization.
+- Phase 15: 3/3 plans created and plan-checked; requires Phase 14 passed verification plus explicit authorization.
+- Phase 16: 3/3 plans created and plan-checked; carry-forward uses `decision='carried'` rebuild items and creates no Phase 14 stage row.
+- Phase 17: 3/3 plans created and plan-checked; qualification remains candidate-only with no promotion or consumer cutover.
+- Phase 18: 3/3 frontend motion plans created and plan-checked; UI-MOTION-01..06 mapped in REQUIREMENTS/ROADMAP.
+- Every Phase 14–18 plan is `autonomous: false`; each phase begins with a blocking human-action authorization checkpoint.
+- No Phase 14–18 implementation, migration or test has been executed.
 
 ## Auto Routing
 

@@ -115,6 +115,12 @@
 | V08-QUAL-03 | lineage、owner、snapshot、spoiler 或 pointer 任一违规都必须阻断资格 | P0 | PLANNED |
 | V08-QUAL-04 | 报告覆盖质量、faithfulness、延迟、成本、reuse 与 fallback 指标 | P0 | PLANNED |
 | V08-QUAL-05 | 最终结论仅允许 qualified_candidate 或 blocked，且不得执行 promotion | P0 | PLANNED |
+| UI-MOTION-01 | 全站交互动效使用统一的 150/200/300ms token、方向 easing 与 reduced-motion 规则 | P1 | PLANNED |
+| UI-MOTION-02 | Sidebar、设置、搜索、Chat 与证据浮层具有一致的打开、关闭、outside-click、Escape 与焦点返回语义 | P1 | PLANNED |
+| UI-MOTION-03 | 页面内容、分析进度、列表和卡片状态过渡不得引起布局跳动或重复播放 | P1 | PLANNED |
+| UI-MOTION-04 | Light、dark 与 custom 主题在首帧前恢复，切换无 hydration 闪烁或正文尺寸变化 | P1 | PLANNED |
+| UI-MOTION-05 | 动效不改变 API、数据、导航、阅读、分析或权限行为，且不新增动画运行时依赖 | P0 | PLANNED |
+| UI-MOTION-06 | 桌面与 390px 触摸视口自动验证键盘、触摸、reduced-motion、无遮挡和无水平滚动 | P1 | PLANNED |
 
 ## v0.8 Scope Boundaries
 
@@ -147,6 +153,7 @@
 | V08-RETR-01..05 | Phase 15 | routing/down-drill；raw citation and spoiler adversarial tests |
 | V08-REUSE-01..04 | Phase 16 | dependency dirty closure；checksum carry-forward report |
 | V08-QUAL-01..05 | Phase 17 | frozen single-book comparative qualification；candidate-only verdict |
+| UI-MOTION-01..06 | Phase 18 | motion tokens；dismissable surfaces；theme boot；responsive accessibility qualification |
 
 ## Current Evidence
 

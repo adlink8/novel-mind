@@ -46,10 +46,12 @@
 | Phase 8 版本化小说分析与时间线 | 10/10 | **Complete** (35/35 must-haves verified) |
 | v0.7 / Phase 9-11 叙事关系、阅读问答与线索追踪 | Phase 09: 5/5; Phase 10: 5/5; Phase 11: 5/5 | **09 VERIFIED**; **10 PARTIAL** (real Playwright residual); **11 implement-complete** (adversarial residual closed) |
 | v0.8 / Phase 12-17 分层叙事记忆与层级 RAG | 3/19 initial plans | **IN PROGRESS** — Phase 12 verified; Phase 13 next; candidate-only/no pointer cutover |
+| Phase 18 前端动效与过渡系统 | 0/3 | **PLANNED** — 独立 UX 阶段；需重新授权后执行 |
 
 ## Auto Start
 
-下一执行入口为 **Phase 13: Candidate Memory Contracts and Provenance Authority**。Phase 12 只读审计已独立验证通过；Phase 14 的 provider 调用仍必须使用其 `provider_calls_allowed` 门禁。
+执行当前暂停在 **Phase 13 / 13-02 Task 3**：13-01 已完成，13-02 Tasks 1–2 已提交，Task 3 有未验证 WIP。任何实现、迁移或测试都必须等待用户重新授权；详见 `.planning/HANDOFF.json`。
+Phase 14–18 仅完成规划，不得自动执行。Phase 14 的 provider 调用仍必须使用 Phase 12 的 `provider_calls_allowed` 门禁。
 Phase 06–11 历史实现与验证状态保持不变；Phase 10 real Playwright residual 和 v0.3 质量缺口不因 v0.8 单书 dry-run 自动关闭。
 
 ## Backlog
@@ -219,7 +221,7 @@ Plans:
 **Goal:** 建立与现有分析生命周期隔离的不可变叙事记忆候选契约，使每条 Chapter State、Story Arc/Volume 和 Global Story Model 主张均可由数据库权威追到同一 source snapshot 的叶子原文。
 **Requirements:** V08-MEM-01, V08-MEM-02, V08-MEM-03, V08-MEM-04, V08-MEM-05
 **Depends on:** Phase 12
-**Status:** PLANNED — 3/3 executable plans verified; ready for 13-01
+**Status:** PAUSED — 13-01 complete; 13-02 Tasks 1–2 committed; Task 3 WIP unverified; execution requires explicit authorization
 **Plans:** 3/3 plans created
 
 **Success Criteria:**
@@ -238,8 +240,8 @@ Plans:
 **Goal:** 对已通过 Phase 12 审计的单本小说，按 Chapter State → Story Arc/Volume → Global Story Model 自下而上构建可恢复候选，同时隔离章节失败并约束所有模型费用与可选来源。
 **Requirements:** V08-BUILD-01, V08-BUILD-02, V08-BUILD-03, V08-BUILD-04, V08-BUILD-05
 **Depends on:** Phase 13
-**Status:** PLANNED
-**Plans:** 4 initial plans
+**Status:** PLANNED — 4/4 plans created; execution gated on Phase 13 verification and explicit authorization
+**Plans:** 4/4 plans created
 
 **Success Criteria:**
 1. 运维者启动 candidate dry-run 后，durable worker 先逐章生成 evidence-bound Chapter State，再按显式卷界或版本化连续范围生成 Story Arc/Volume，最后只从已验证 arcs 生成单个 Global Story Model。
@@ -259,8 +261,8 @@ Plans:
 **Goal:** 在不替换现有 Reader Chat 的前提下，提供可审计、全程防剧透的离线分层检索实验，使 local/arc/global/mixed 查询能够下钻并最终只引用重验后的叶子原文。
 **Requirements:** V08-RETR-01, V08-RETR-02, V08-RETR-03, V08-RETR-04, V08-RETR-05
 **Depends on:** Phase 14
-**Status:** PLANNED
-**Plans:** 3 initial plans
+**Status:** PLANNED — 3/3 plans created; execution gated on Phase 14 verification and explicit authorization
+**Plans:** 3/3 plans created
 
 **Success Criteria:**
 1. 冻结问题进入实验入口后，确定性 router 会记录 local、arc、global 或 mixed 起始层和 reason；不同层候选确实改变检索路径，而不是仅把上层摘要附加到 leaf top-k。
@@ -279,8 +281,8 @@ Plans:
 **Goal:** 以可验证的依赖图和变更 oracle 计算 candidate 的最小安全 dirty closure，在边界不确定时保守扩散，并量化未变资产复用带来的调用与成本节省。
 **Requirements:** V08-REUSE-01, V08-REUSE-02, V08-REUSE-03, V08-REUSE-04
 **Depends on:** Phase 15
-**Status:** PLANNED
-**Plans:** 3 initial plans
+**Status:** PLANNED — 3/3 plans created; execution gated on Phase 15 verification and explicit authorization
+**Plans:** 3/3 plans created
 
 **Success Criteria:**
 1. 对 chapter edit、insert、delete、reorder 和 arc-boundary change fixture，系统可输出由 source/evidence → Chapter State → Arc/Volume → Global 构成的 dirty closure 及每个节点的失效原因。
@@ -298,8 +300,8 @@ Plans:
 **Goal:** 使用冻结单书题集和同源 leaf baseline 独立验证结构、溯源、安全、检索质量、faithfulness、成本与复用收益，只产出 `qualified_candidate` 或 `blocked`，绝不执行 promotion。
 **Requirements:** V08-QUAL-01, V08-QUAL-02, V08-QUAL-03, V08-QUAL-04, V08-QUAL-05
 **Depends on:** Phase 12, Phase 13, Phase 14, Phase 15, Phase 16
-**Status:** PLANNED
-**Plans:** 3 initial plans
+**Status:** PLANNED — 3/3 plans created; execution gated on Phases 12–16 verification and explicit authorization
+**Plans:** 3/3 plans created
 
 **Success Criteria:**
 1. 资格运行使用在查看候选结果前冻结的单书 source、policy 和问题集，且题目明确覆盖 local、跨章节/arc、whole-book/global、no-answer 和 spoiler 分桶。
@@ -312,3 +314,25 @@ Plans:
 - [ ] 17-01 frozen single-book fixture and policy: bucketed questions, no-answer/spoiler adversarial cases, same-source baseline and predeclared thresholds
 - [ ] 17-02 comparative evaluation and complete metrics: retrieval, routing, faithfulness, latency, cost, reuse and fallback reports
 - [ ] 17-03 independent PostgreSQL qualification authority: fixed commands, fresh observer, pointer-diff proof and candidate-only verdict
+
+### Phase 18: Frontend Motion and Transition System
+
+**Goal:** 在不改变业务行为、API 或数据结构的前提下，为现有 Next.js 界面建立克制、统一、可访问的动画过渡系统，并消除主题首帧闪烁、浮层退出不一致和动态内容布局跳动。
+**Requirements:** UI-MOTION-01, UI-MOTION-02, UI-MOTION-03, UI-MOTION-04, UI-MOTION-05, UI-MOTION-06
+**Depends on:** Existing frontend foundation (Phases 08–11); independent from the Phase 14–17 RAG execution chain
+**Status:** PLANNED — 3/3 plans created; explicit implementation authorization required
+**Plans:** 3/3 plans created
+
+**Success Criteria:**
+1. 所有目标交互使用 150/200/300ms 语义 token，进入为 ease-out、退出为 ease-in；新增代码无任意时长、linear 或 `transition-all`。
+2. sidebar、dialog、阅读设置、搜索、Reader Chat 与证据面板支持一致的触发切换、outside click、Escape、顶层关闭和焦点返回。
+3. light/dark/custom 主题在首个可见帧前恢复；切换期间无整页闪烁、正文尺寸变化、固定控件漂移或自定义背景位移动画。
+4. `prefers-reduced-motion` 下所有业务状态立即可用，非必要位移/缩放/脉冲被移除，loading/progress 同时提供文本或 ARIA 状态。
+5. 桌面与 390px 触摸视口验证关键面板、主题、分析增量和布局边界；无水平滚动、输入框遮挡、底部进度覆盖聊天或焦点丢失。
+
+Plans:
+- [ ] 18-01 motion tokens, reduced-motion contract, pre-paint theme bootstrap and shared primitives
+- [ ] 18-02 dismissable sidebar/settings/search/chat/evidence panels with topmost outside-click and focus restoration
+- [ ] 18-03 analysis progress/list/card transitions plus desktop/mobile Playwright motion qualification
+
+**Scope note:** Phase 18 是独立的前端体验阶段，不属于 v0.8 candidate RAG 的生产切换，不新增后端、API、动画运行时依赖、滚动劫持或持续装饰动画。
