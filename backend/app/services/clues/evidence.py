@@ -321,6 +321,63 @@ def trim_units_deterministically(
     return kept_sorted, omitted
 
 
+def clamp_later_units_to_scope(
+    units: list[ClueEvidenceUnit],
+    *,
+    max_units: int = MAX_LATER_UNITS,
+    max_chapters: int = MAX_LATER_CHAPTERS,
+    scores: dict[str, float] | None = None,
+    cue_chapter: int | None = None,
+) -> tuple[list[ClueEvidenceUnit], list[str]]:
+    """Clamp later units to chapter-span and unit bounds before package build.
+
+    Prefer chapters closest to the cue window; break ties by densest score sum,
+    then chapter number. Within kept chapters, keep highest-score units up to
+    ``max_units``. Omitted evidence ids are returned for lineage metadata.
+    """
+
+    if not units:
+        return [], []
+    if max_units <= 0 or max_chapters <= 0:
+        return [], [u.evidence_id for u in units]
+
+    score_map = scores or {}
+    by_chapter: dict[int, list[ClueEvidenceUnit]] = {}
+    for unit in units:
+        by_chapter.setdefault(unit.narrative_chapter_number, []).append(unit)
+
+    def _chapter_key(chapter: int) -> tuple[int, float, int]:
+        chapter_units = by_chapter[chapter]
+        density = sum(float(score_map.get(u.evidence_id, 0.0)) for u in chapter_units)
+        if cue_chapter is None:
+            distance = chapter
+        else:
+            distance = abs(chapter - cue_chapter)
+        # Closer first, then denser payoff chapters, then stable chapter order.
+        return (distance, -density, chapter)
+
+    selected_chapters = sorted(by_chapter.keys(), key=_chapter_key)[:max_chapters]
+    selected_set = set(selected_chapters)
+
+    in_scope: list[ClueEvidenceUnit] = []
+    out_of_scope: list[ClueEvidenceUnit] = []
+    for unit in units:
+        if unit.narrative_chapter_number in selected_set:
+            in_scope.append(unit)
+        else:
+            out_of_scope.append(unit)
+
+    kept, unit_omitted = trim_units_deterministically(
+        in_scope,
+        limit=max_units,
+        scores=score_map,
+    )
+    omitted = [u.evidence_id for u in out_of_scope] + unit_omitted
+    # Stable omitted order for package_hash determinism.
+    omitted_sorted = sorted(set(omitted))
+    return kept, omitted_sorted
+
+
 def validate_package_scope(
     package: ClueEvidencePackage,
     *,

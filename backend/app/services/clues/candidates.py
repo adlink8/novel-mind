@@ -14,12 +14,15 @@ from typing import Any
 
 from app.services.clues.evidence import (
     ClueEvidencePackage,
+    ClueEvidenceScopeError,
     ClueEvidenceUnit,
     build_clue_evidence_package,
+    clamp_later_units_to_scope,
     make_clue_evidence_unit,
     sha256_json,
     trim_units_deterministically,
     MAX_CUE_UNITS,
+    MAX_LATER_CHAPTERS,
     MAX_LATER_UNITS,
 )
 from app.services.clues.sources import (
@@ -82,6 +85,7 @@ class CandidateRecallConfig:
     max_candidates: int = 32
     max_cue_units: int = MAX_CUE_UNITS
     max_later_units: int = MAX_LATER_UNITS
+    max_later_chapters: int = MAX_LATER_CHAPTERS
     min_chapter_gap: int = 1
     adjacency_chapter_window: int = 8
     lexical_min_token_len: int = 2
@@ -383,12 +387,19 @@ class ClueCandidateRecallService:
         if not unique_reasons:
             return None
 
-        # Trim later window deterministically.
-        trimmed_later, omitted = trim_units_deterministically(
+        # Clamp later window to unit + chapter-span bounds before package build.
+        # Recall adjacency may scan farther than MAX_LATER_CHAPTERS; keep units
+        # closest to the cue (densest chapters as tie-break) instead of failing.
+        trimmed_later, omitted = clamp_later_units_to_scope(
             later_units,
-            limit=config.max_later_units,
+            max_units=config.max_later_units,
+            max_chapters=config.max_later_chapters,
             scores=later_scores,
+            cue_chapter=cue_node.narrative_chapter_number,
         )
+        if not trimmed_later:
+            return None
+
         cue_list, cue_omitted = trim_units_deterministically(
             [cue_unit],
             limit=config.max_cue_units,
@@ -401,20 +412,30 @@ class ClueCandidateRecallService:
             later_ids=[u.evidence_id for u in trimmed_later],
             reason_codes=unique_reasons,
         )
-        package = build_clue_evidence_package(
-            owner_id=owner_id,
-            novel_id=novel_id,
-            candidate_id=candidate_id,
-            source_snapshot_hash=source_snapshot_hash,
-            hierarchy_build_id=hierarchy_build_id,
-            hierarchy_checksum=hierarchy_checksum,
-            cue_units=cue_list,
-            later_units=trimmed_later,
-            timeline_version_id=timeline_version_id,
-            timeline_checksum=timeline_checksum,
-            recall_signals=recall_signals,
-            omitted_evidence_ids=omitted_all,
-        )
+        try:
+            package = build_clue_evidence_package(
+                owner_id=owner_id,
+                novel_id=novel_id,
+                candidate_id=candidate_id,
+                source_snapshot_hash=source_snapshot_hash,
+                hierarchy_build_id=hierarchy_build_id,
+                hierarchy_checksum=hierarchy_checksum,
+                cue_units=cue_list,
+                later_units=trimmed_later,
+                timeline_version_id=timeline_version_id,
+                timeline_checksum=timeline_checksum,
+                recall_signals=recall_signals,
+                omitted_evidence_ids=omitted_all,
+            )
+        except ClueEvidenceScopeError:
+            # Skip this pair; do not fail the whole novel run.
+            logger.debug(
+                "skipping clue candidate due to evidence scope: cue=%s later_count=%s",
+                cue_unit.evidence_id,
+                len(trimmed_later),
+                exc_info=True,
+            )
+            return None
         return ClueCandidateDraft(
             candidate_id=candidate_id,
             owner_id=owner_id,

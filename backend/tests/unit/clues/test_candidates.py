@@ -14,7 +14,9 @@ from app.services.clues.candidates import (
     stable_candidate_id,
 )
 from app.services.clues.evidence import (
+    MAX_LATER_CHAPTERS,
     build_clue_evidence_package,
+    clamp_later_units_to_scope,
     make_clue_evidence_unit,
     package_hash_for,
 )
@@ -256,3 +258,111 @@ def test_candidates_module_has_no_lifecycle_write_calls():
     assert "AsyncSession" not in source or "load_hierarchy" in source
     assert "reader_chat" not in source
     assert "RelationshipObservation(" not in source
+
+
+def test_clamp_later_units_prefers_chapters_closest_to_cue():
+    """Later span > MAX_LATER_CHAPTERS is clamped; package build must succeed."""
+
+    cue_chapter = 1
+    later = [
+        make_clue_evidence_unit(
+            evidence_id=f"ev-ch{ch}",
+            chapter_id=100 + ch,
+            narrative_chapter_number=ch,
+            text=f"payoff fragment in chapter {ch} about silver key",
+            role_hint="later",
+            source_start=0,
+        )
+        for ch in (2, 3, 4, 5, 6, 7, 8, 9)
+    ]
+    assert len({u.narrative_chapter_number for u in later}) > MAX_LATER_CHAPTERS
+
+    scores = {u.evidence_id: 1.0 for u in later}
+    # Far chapters would win on score alone if we did not prefer proximity.
+    scores["ev-ch9"] = 9.0
+    scores["ev-ch8"] = 8.0
+    scores["ev-ch7"] = 7.0
+    scores["ev-ch6"] = 6.0
+
+    kept, omitted = clamp_later_units_to_scope(
+        later,
+        max_units=8,
+        max_chapters=MAX_LATER_CHAPTERS,
+        scores=scores,
+        cue_chapter=cue_chapter,
+    )
+    kept_chapters = {u.narrative_chapter_number for u in kept}
+    assert len(kept_chapters) <= MAX_LATER_CHAPTERS
+    assert kept_chapters == {2, 3, 4, 5}
+    assert "ev-ch9" in omitted
+    assert kept
+
+    cue = make_clue_evidence_unit(
+        evidence_id="ev-cue",
+        chapter_id=101,
+        narrative_chapter_number=cue_chapter,
+        text="Alice found a silver key under the ash gate",
+        role_hint="cue",
+    )
+    package = build_clue_evidence_package(
+        owner_id=1,
+        novel_id=2,
+        candidate_id="clue-cand-wide-later",
+        source_snapshot_hash=HEX64_A,
+        hierarchy_build_id="build-1",
+        hierarchy_checksum=HEX64_B,
+        cue_units=[cue],
+        later_units=kept,
+        omitted_evidence_ids=omitted,
+    )
+    assert package.later_units
+    assert len({u.narrative_chapter_number for u in package.later_units}) <= MAX_LATER_CHAPTERS
+
+
+@pytest.mark.asyncio
+async def test_wide_later_span_is_clamped_not_hard_fail():
+    """Recall adjacency may cover >4 later chapters; run must keep building drafts."""
+
+    # Cue in ch1; later nodes across 8 chapters (adjacency_chapter_window default=8).
+    nodes = [
+        _node("cue", 1, 0, "Alice found a silver key under the ash gate.", entities=("Alice",)),
+    ]
+    for ch in range(2, 10):
+        nodes.append(
+            _node(
+                f"n{ch}",
+                ch,
+                0,
+                f"Chapter {ch} mentions the silver key near the ash gate again.",
+                entities=("Alice",) if ch % 2 == 0 else (),
+            )
+        )
+
+    service = ClueCandidateRecallService(
+        relationship_source=NullRelationshipObservationSource()
+    )
+    result = await service.build_candidates_from_nodes(
+        owner_id=1,
+        novel_id=91,
+        nodes=nodes,
+        source_snapshot_hash=HEX64_A,
+        hierarchy_build_id="build-slime",
+        hierarchy_checksum=HEX64_B,
+        config=CandidateRecallConfig(
+            max_candidates=32,
+            min_chapter_gap=1,
+            adjacency_chapter_window=8,
+            max_later_chapters=MAX_LATER_CHAPTERS,
+        ),
+    )
+    assert result.drafts, "wide later span must not zero-out all candidates"
+    for draft in result.drafts:
+        later_chapters = {u.narrative_chapter_number for u in draft.package.later_units}
+        assert len(later_chapters) <= MAX_LATER_CHAPTERS
+        assert draft.package.later_units
+        # Package hash remains valid after clamp.
+        assert draft.package.package_hash == package_hash_for(draft.package.to_snapshot())
+        # Distant chapters dropped when span exceeds cap.
+        cue_ch = draft.package.cue_units[0].narrative_chapter_number
+        if cue_ch == 1:
+            assert max(later_chapters) <= cue_ch + MAX_LATER_CHAPTERS
