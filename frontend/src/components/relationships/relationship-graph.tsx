@@ -50,12 +50,27 @@ const EDGE_COLORS: Record<string, string> = {
   romantic: "#be185d",
 };
 
+/** Provisional co-occurrence: slate dashed, not typed fiction colors. */
+const PROVISIONAL_EDGE_COLOR = "#94a3b8";
+
 /** Cap for on-canvas clarity (server may still return more for filters). */
 const DISPLAY_EDGE_CAP = 32;
 const DISPLAY_NODE_CAP = 28;
 
 function edgeElementId(edge: RelationshipGraphEdge): string {
   return `e${edge.source_character_id}-${edge.target_character_id}-${edge.observation_id}`;
+}
+
+export function isProvisionalEdge(edge: RelationshipGraphEdge): boolean {
+  return (
+    edge.edge_kind === "provisional_cooccurrence" ||
+    edge.relation_type === "cooccur"
+  );
+}
+
+function edgeDisplayLabel(edge: RelationshipGraphEdge): string {
+  if (isProvisionalEdge(edge)) return "共现";
+  return RELATION_LABELS[edge.relation_type] ?? edge.relation_type;
 }
 
 function degreeMap(edges: RelationshipGraphEdge[]): Map<number, number> {
@@ -73,7 +88,9 @@ function degreeMap(edges: RelationshipGraphEdge[]): Map<number, number> {
   return degree;
 }
 
-/** Keep strongest edges + induced nodes for a readable character map. */
+/** Keep strongest edges + induced nodes for a readable character map.
+ * Prefer accepted observations over provisional co-occurrence within the cap.
+ */
 function displaySlice(
   nodes: RelationshipGraphNode[],
   edges: RelationshipGraphEdge[]
@@ -81,11 +98,16 @@ function displaySlice(
   if (edges.length <= DISPLAY_EDGE_CAP && nodes.length <= DISPLAY_NODE_CAP) {
     return { nodes, edges };
   }
-  const ranked = [...edges].sort(
-    (a, b) =>
+  const ranked = [...edges].sort((a, b) => {
+    const aProv = isProvisionalEdge(a) ? 1 : 0;
+    const bProv = isProvisionalEdge(b) ? 1 : 0;
+    // Accepted first, then higher evidence, then stable id.
+    return (
+      aProv - bProv ||
       (b.evidence_count || 0) - (a.evidence_count || 0) ||
       a.observation_id - b.observation_id
-  );
+    );
+  });
   const keptEdges = ranked.slice(0, DISPLAY_EDGE_CAP);
   const keepIds = new Set<number>();
   for (const e of keptEdges) {
@@ -147,16 +169,21 @@ function buildElements(
     const id = edgeElementId(edge);
     if (seen.has(id)) continue;
     seen.add(id);
+    const provisional = isProvisionalEdge(edge);
     const w = Math.max(1, edge.evidence_count || 1);
     edgeEls.push({
       group: "edges",
+      classes: provisional ? "provisional" : "accepted",
       data: {
         id,
         observationId: edge.observation_id,
         source: `n${edge.source_character_id}`,
         target: `n${edge.target_character_id}`,
-        relationType: edge.relation_type,
-        label: RELATION_LABELS[edge.relation_type] ?? edge.relation_type,
+        relationType: provisional ? "cooccur" : edge.relation_type,
+        edgeKind: provisional
+          ? "provisional_cooccurrence"
+          : "accepted_observation",
+        label: edgeDisplayLabel(edge),
         weight: w,
         width: Math.min(5, 1.2 + Math.log2(w + 1)),
       },
@@ -324,18 +351,32 @@ export function RelationshipGraph(props: Props) {
           ? `中心人物 · 连接 ${degree.get(node.character_id) ?? 0}`
           : `连接 ${degree.get(node.character_id) ?? 0} · 首见第 ${node.first_visible_chapter} 章`,
       isHub: node.character_id === hubId,
+      provisional: false,
     }));
     const nameOf = (id: number) =>
       slice.nodes.find((n) => n.character_id === id)?.name ?? `#${id}`;
-    const edgeItems = slice.edges.map((edge) => ({
-      key: edgeElementId(edge),
-      kind: "edge" as const,
-      characterId: undefined as number | undefined,
-      observationId: edge.observation_id,
-      label: `${nameOf(edge.source_character_id)} → ${nameOf(edge.target_character_id)}`,
-      meta: RELATION_LABELS[edge.relation_type] ?? edge.relation_type,
-      isHub: false,
-    }));
+    const edgeItems = slice.edges.map((edge) => {
+      const provisional = isProvisionalEdge(edge);
+      const typeMeta = edgeDisplayLabel(edge);
+      const suggested =
+        provisional && edge.suggested_type
+          ? RELATION_LABELS[edge.suggested_type] ?? edge.suggested_type
+          : null;
+      return {
+        key: edgeElementId(edge),
+        kind: "edge" as const,
+        characterId: undefined as number | undefined,
+        observationId: edge.observation_id,
+        label: `${nameOf(edge.source_character_id)} → ${nameOf(edge.target_character_id)}`,
+        meta: provisional
+          ? suggested
+            ? `临时共现 · 提示${suggested}`
+            : "临时共现"
+          : typeMeta,
+        isHub: false,
+        provisional,
+      };
+    });
     return [...nodeItems, ...edgeItems];
   }, [slice.nodes, slice.edges, degree, hubId]);
 
@@ -462,6 +503,7 @@ export function RelationshipGraph(props: Props) {
               "target-arrow-shape": "triangle",
               "curve-style": "bezier",
               "control-point-step-size": 40,
+              "line-style": "solid",
               label: preferLabels ? "data(label)" : "",
               "font-size": 10,
               color: "#57534e",
@@ -493,14 +535,39 @@ export function RelationshipGraph(props: Props) {
               label: "",
             },
           },
-          // Type colors must come after base edge style so they win.
+          // Accepted type colors (solid). Must win over base edge style.
           ...Object.entries(EDGE_COLORS).map(([type, color]) => ({
-            selector: `edge[relationType = "${type}"]`,
+            selector: `edge.accepted[relationType = "${type}"]`,
             style: {
               "line-color": color,
               "target-arrow-color": color,
+              "line-style": "solid",
             },
           })),
+          // Provisional co-occurrence: dashed slate, label「共现」— visually honest.
+          {
+            selector: "edge.provisional, edge[relationType = \"cooccur\"]",
+            style: {
+              "line-color": PROVISIONAL_EDGE_COLOR,
+              "target-arrow-color": PROVISIONAL_EDGE_COLOR,
+              "line-style": "dashed",
+              "line-dash-pattern": [6, 4],
+              opacity: 0.75,
+              color: "#64748b",
+              label: preferLabels ? "共现" : "",
+            },
+          },
+          {
+            selector:
+              "edge.provisional:selected, edge.provisional.highlighted, edge[relationType = \"cooccur\"]:selected",
+            style: {
+              "line-color": "#64748b",
+              "target-arrow-color": "#64748b",
+              "line-style": "dashed",
+              opacity: 1,
+              label: "共现",
+            },
+          },
         ],
         layout: { name: "null" },
         minZoom: 0.2,
@@ -682,12 +749,14 @@ export function RelationshipGraph(props: Props) {
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/50 px-3 py-2.5 text-xs text-muted-foreground">
           <p>
             以 <strong className="text-foreground">{hubName}</strong>{" "}
-            为中心。边色：
+            为中心。实线边色：
             <span className="text-[#4f6f52]">同盟</span>/
             <span className="text-[#b45309]">敌对</span>/
             <span className="text-[#6366f1]">亲属</span>/
             <span className="text-[#0e7490]">师徒</span>/
             <span className="text-[#be185d]">爱慕</span>
+            ；
+            <span className="text-slate-500">灰色虚线=临时共现</span>
             。悬停聚焦邻接。
           </p>
           {truncated && (
@@ -758,7 +827,9 @@ export function RelationshipGraph(props: Props) {
                 >
                   <span className="text-xs text-muted-foreground">
                     {item.kind === "edge"
-                      ? "关系"
+                      ? item.provisional
+                        ? "共现"
+                        : "关系"
                       : item.isHub
                         ? "中心"
                         : "人物"}{" "}

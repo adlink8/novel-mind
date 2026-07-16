@@ -2,24 +2,29 @@
 
 import type {
   RelationshipEdgeType,
+  RelationshipGraphEdgeLabel,
   RelationshipGraphNode,
 } from "@/lib/api";
 
-const RELATION_LABELS: Record<RelationshipEdgeType, string> = {
+const RELATION_LABELS: Record<string, string> = {
   ally: "同盟",
   enemy: "敌对",
   family: "亲属",
   mentor: "师徒",
   romantic: "爱慕",
+  cooccur: "共现",
 };
 
 type Props = {
   nodes: RelationshipGraphNode[];
-  availableRelationTypes: RelationshipEdgeType[];
+  availableRelationTypes: RelationshipGraphEdgeLabel[];
   characterId: number | "";
   relationType: RelationshipEdgeType | "";
   throughChapter: number | "";
   maxChapter?: number;
+  /** Opt-in layer of provisional co-occurrence edges (API include_provisional). */
+  includeProvisional?: boolean;
+  onIncludeProvisionalChange?: (value: boolean) => void;
   onCharacterChange: (value: number | "") => void;
   onRelationTypeChange: (value: RelationshipEdgeType | "") => void;
   onThroughChapterChange: (value: number | "") => void;
@@ -68,11 +73,13 @@ export function RelationshipControls(props: Props) {
           className="h-10 rounded-xl border bg-background px-3 text-sm text-foreground"
         >
           <option value="">全部类型</option>
-          {props.availableRelationTypes.map((type) => (
-            <option key={type} value={type}>
-              {RELATION_LABELS[type] ?? type}
-            </option>
-          ))}
+          {props.availableRelationTypes
+            .filter((type) => type !== "cooccur")
+            .map((type) => (
+              <option key={type} value={type}>
+                {RELATION_LABELS[type] ?? type}
+              </option>
+            ))}
         </select>
       </label>
 
@@ -98,6 +105,20 @@ export function RelationshipControls(props: Props) {
           placeholder="跟随默认"
           className="h-10 w-28 rounded-xl border bg-background px-3 text-sm text-foreground"
         />
+      </label>
+
+      <label className="flex h-10 min-w-[9.5rem] cursor-pointer items-center gap-2 rounded-xl border bg-background px-3 text-sm text-foreground">
+        <input
+          type="checkbox"
+          aria-label="显示临时共现"
+          data-testid="relationship-include-provisional"
+          checked={props.includeProvisional ?? false}
+          onChange={(event) =>
+            props.onIncludeProvisionalChange?.(event.target.checked)
+          }
+          className="size-4 rounded border-border accent-primary"
+        />
+        显示临时共现
       </label>
 
       <div

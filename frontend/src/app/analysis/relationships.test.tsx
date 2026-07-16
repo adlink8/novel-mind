@@ -294,6 +294,137 @@ describe("analysis relationship workspace (09-04)", () => {
     });
     const params = mocks.getGraph.mock.calls[0][1] as Record<string, unknown>;
     expect(params).not.toHaveProperty("owner_id");
+    // Default path does not opt into provisional co-occurrence layer.
+    expect(params.include_provisional).not.toBe(true);
+  });
+
+  it("toggle 显示临时共现 refetches with include_provisional=true", async () => {
+    await selectNovelAndOpenRelationships();
+    const toggle = await screen.findByTestId("relationship-include-provisional");
+    expect(toggle).not.toBeChecked();
+
+    mocks.getGraph.mockResolvedValue({
+      data: makeEnvelope({
+        edges: [
+          {
+            ...edges[0],
+            observation_id: 101,
+            relation_type: "ally",
+            edge_kind: "accepted_observation",
+          },
+          {
+            observation_id: 202,
+            source_character_id: 1,
+            target_character_id: 2,
+            relation_type: "cooccur",
+            transition: "establish",
+            confidence: 0.4,
+            valid_from_chapter: 1,
+            valid_to_chapter: null,
+            provenance: "machine",
+            evidence_preview: "共现 · 非已确认关系",
+            evidence_count: 2,
+            edge_kind: "provisional_cooccurrence",
+            suggested_type: "ally",
+          },
+        ],
+        counts: {
+          nodes: 2,
+          edges: 2,
+          relation_types: { ally: 1, cooccur: 1 },
+        },
+        available_relation_types: ["ally", "enemy", "cooccur"],
+      }),
+    });
+
+    fireEvent.click(toggle);
+    await waitFor(() => {
+      const last = mocks.getGraph.mock.calls.at(-1)?.[1] as {
+        include_provisional?: boolean;
+      };
+      expect(last.include_provisional).toBe(true);
+    });
+    const banner = await screen.findByTestId("relationship-provisional-banner");
+    expect(banner).toBeInTheDocument();
+    expect(banner.textContent).toMatch(/临时共现/);
+  });
+
+  it("shows honesty banner when only provisional edges are returned", async () => {
+    mocks.getGraph.mockResolvedValue({
+      data: makeEnvelope({
+        edges: [
+          {
+            observation_id: 303,
+            source_character_id: 1,
+            target_character_id: 2,
+            relation_type: "cooccur",
+            transition: "establish",
+            confidence: 0.3,
+            valid_from_chapter: 1,
+            valid_to_chapter: null,
+            provenance: "machine",
+            evidence_preview: "共现 · 非已确认关系",
+            evidence_count: 1,
+            edge_kind: "provisional_cooccurrence",
+            suggested_type: "enemy",
+          },
+        ],
+        counts: { nodes: 2, edges: 1, relation_types: { cooccur: 1 } },
+        available_relation_types: ["cooccur"],
+      }),
+    });
+    await selectNovelAndOpenRelationships();
+    const banner = await screen.findByTestId("relationship-provisional-banner");
+    expect(banner.textContent).toMatch(/临时共现/);
+    expect(banner.textContent).toMatch(/不是已确认/);
+    const list = screen.getByTestId("relationship-companion-list");
+    expect(within(list).getByText(/临时共现/)).toBeInTheDocument();
+  });
+
+  it("evidence panel uses non-assertive copy for provisional edges", async () => {
+    mocks.getGraph.mockResolvedValue({
+      data: makeEnvelope({
+        edges: [
+          {
+            observation_id: 404,
+            source_character_id: 1,
+            target_character_id: 2,
+            relation_type: "cooccur",
+            transition: "establish",
+            confidence: 0.35,
+            valid_from_chapter: 1,
+            valid_to_chapter: null,
+            provenance: "machine",
+            evidence_preview: "同场出场",
+            evidence_count: 1,
+            edge_kind: "provisional_cooccurrence",
+            suggested_type: "ally",
+          },
+        ],
+        counts: { nodes: 2, edges: 1, relation_types: { cooccur: 1 } },
+      }),
+    });
+    mocks.getEvidence.mockResolvedValue({
+      data: {
+        observation_id: 404,
+        novel_id: 11,
+        version_id: 7,
+        through_chapter: 1,
+        relation_type: "ally",
+        source_character_id: 1,
+        target_character_id: 2,
+        provenance: "machine",
+        evidence: [],
+      },
+    });
+    await selectNovelAndOpenRelationships();
+    fireEvent.click(await screen.findByText(/林墨 → 顾遥/));
+    const panel = await screen.findByTestId("relationship-evidence-panel");
+    expect(
+      within(panel).getByTestId("relationship-evidence-provisional-note")
+    ).toHaveTextContent(/不是已确认/);
+    expect(within(panel).getByText(/临时共现/)).toBeInTheDocument();
+    expect(within(panel).queryByText(/^机器推断$/)).toBeNull();
   });
 
   it("renders normal mode with canvas and same companion list set", async () => {
@@ -481,5 +612,37 @@ describe("RelationshipGraph degradation unit", () => {
     expect(within(list).getAllByRole("button")).toHaveLength(
       nodes.length + edges.length
     );
+  });
+
+  it("labels provisional edges as 共现 not fiction types", () => {
+    const provisional: RelationshipGraphEdge = {
+      observation_id: 9,
+      source_character_id: 1,
+      target_character_id: 2,
+      relation_type: "cooccur",
+      transition: "establish",
+      confidence: 0.2,
+      valid_from_chapter: 1,
+      valid_to_chapter: null,
+      provenance: "machine",
+      evidence_preview: "共现",
+      evidence_count: 1,
+      edge_kind: "provisional_cooccurrence",
+      suggested_type: "romantic",
+    };
+    render(
+      <RelationshipGraph
+        nodes={nodes}
+        edges={[provisional]}
+        mode="normal"
+        selected={null}
+        onSelect={() => undefined}
+      />
+    );
+    const list = screen.getByTestId("relationship-companion-list");
+    expect(within(list).getByText(/临时共现/)).toBeInTheDocument();
+    // Must not present suggested romantic as the primary edge type claim.
+    expect(within(list).queryByText(/^关系 · 爱慕$/)).toBeNull();
+    expect(screen.getByText(/灰色虚线=临时共现/)).toBeInTheDocument();
   });
 });

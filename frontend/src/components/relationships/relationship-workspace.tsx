@@ -39,6 +39,8 @@ export function RelationshipWorkspace(props: Props) {
   const [relationType, setRelationType] = useState<RelationshipEdgeType | "">(
     ""
   );
+  /** Default off: only accepted observations unless user opts into co-occur layer. */
+  const [includeProvisional, setIncludeProvisional] = useState(false);
   const [selected, setSelected] = useState<GraphSelection>(null);
   const [evidence, setEvidence] = useState<RelationshipEvidenceResponse | null>(
     null
@@ -69,6 +71,8 @@ export function RelationshipWorkspace(props: Props) {
         full_book: props.fullBook,
         character_id: characterId === "" ? undefined : characterId,
         relation_type: relationType === "" ? undefined : relationType,
+        // Only send true when opted in; omit/false keeps default accepted path.
+        include_provisional: includeProvisional ? true : undefined,
       });
       if (requestId !== requestIdRef.current) return;
       setEnvelope(response.data);
@@ -104,6 +108,7 @@ export function RelationshipWorkspace(props: Props) {
     props.fullBook,
     characterId,
     relationType,
+    includeProvisional,
   ]);
 
   useEffect(() => {
@@ -211,6 +216,24 @@ export function RelationshipWorkspace(props: Props) {
 
   const mode = envelope?.degradation?.mode ?? "normal";
 
+  const provisionalEdgesVisible = useMemo(() => {
+    if (!envelope?.edges?.length) return false;
+    return envelope.edges.some(
+      (e) =>
+        e.edge_kind === "provisional_cooccurrence" ||
+        e.relation_type === "cooccur"
+    );
+  }, [envelope]);
+
+  const onlyProvisionalVisible = useMemo(() => {
+    if (!envelope?.edges?.length) return false;
+    return envelope.edges.every(
+      (e) =>
+        e.edge_kind === "provisional_cooccurrence" ||
+        e.relation_type === "cooccur"
+    );
+  }, [envelope]);
+
   return (
     <div className="grid min-w-0 gap-3" data-testid="relationship-workspace">
       <RelationshipControls
@@ -220,6 +243,8 @@ export function RelationshipWorkspace(props: Props) {
         relationType={relationType}
         throughChapter={props.throughChapter}
         maxChapter={props.maxChapter}
+        includeProvisional={includeProvisional}
+        onIncludeProvisionalChange={setIncludeProvisional}
         onCharacterChange={setCharacterId}
         onRelationTypeChange={setRelationType}
         onThroughChapterChange={props.onThroughChapterChange}
@@ -235,6 +260,26 @@ export function RelationshipWorkspace(props: Props) {
           可见 {envelope.counts.nodes} 人 / {envelope.counts.edges} 边
           {envelope.full_book ? " · 全书" : ""}
           {mode !== "normal" ? ` · 模式 ${mode}` : ""}
+        </p>
+      )}
+
+      {provisionalEdgesVisible && (
+        <p
+          role="status"
+          data-testid="relationship-provisional-banner"
+          className="rounded-xl border border-slate-300/80 bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-900"
+        >
+          {onlyProvisionalVisible ? (
+            <>
+              当前仅有时间线<strong>临时共现</strong>
+              （灰色虚线 · 标签「共现」），不是已确认的同盟/敌对等关系。正式观察发布后会替换。
+            </>
+          ) : (
+            <>
+              已显示<strong>临时共现</strong>
+              （灰色虚线 · 标签「共现」）叠层；实线彩色边为已接受关系观察。
+            </>
+          )}
         </p>
       )}
 
@@ -284,17 +329,6 @@ export function RelationshipWorkspace(props: Props) {
         envelope.counts.edges === 0 && (
           <p className="rounded-xl border border-amber-300/70 bg-amber-50 px-3 py-2 text-xs text-amber-950">
             已绑定版本 v{envelope.version_id}，但尚无共现/观察边。请确认时间线该版本已有事件。
-          </p>
-        )}
-      {envelope &&
-        !loading &&
-        envelope.counts.edges > 0 &&
-        envelope.edges.some((e) =>
-          (e.evidence_preview || "").includes("共现")
-        ) && (
-          <p className="rounded-xl border border-sky-300/70 bg-sky-50 px-3 py-2 text-xs text-sky-950">
-            当前为时间线<strong>共现+事件语义推断</strong>
-            的临时图（同盟/敌对/亲属/师徒/爱慕，非人工确认）。正式关系观察接受后会替换。
           </p>
         )}
 

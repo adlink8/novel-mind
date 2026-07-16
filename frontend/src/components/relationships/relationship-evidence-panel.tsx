@@ -28,6 +28,13 @@ function provenanceLabel(kind: RelationshipProvenance) {
   return kind === "manual" ? "人工修正" : "机器推断";
 }
 
+function isProvisionalEdge(edge: RelationshipGraphEdge): boolean {
+  return (
+    edge.edge_kind === "provisional_cooccurrence" ||
+    edge.relation_type === "cooccur"
+  );
+}
+
 export function RelationshipEvidencePanel(props: Props) {
   const { edge, evidence, nodesById, novelId } = props;
   const layerRef = useRef<HTMLElement>(null);
@@ -41,13 +48,20 @@ export function RelationshipEvidencePanel(props: Props) {
 
   if (!edge || !present) return null;
 
+  const provisional = isProvisionalEdge(edge);
   const sourceName =
     nodesById.get(edge.source_character_id)?.name ??
     `人物 #${edge.source_character_id}`;
   const targetName =
     nodesById.get(edge.target_character_id)?.name ??
     `人物 #${edge.target_character_id}`;
-  const typeLabel = RELATION_LABELS[edge.relation_type] ?? edge.relation_type;
+  const typeLabel = provisional
+    ? "共现"
+    : (RELATION_LABELS[edge.relation_type] ?? edge.relation_type);
+  const suggestedLabel =
+    provisional && edge.suggested_type
+      ? (RELATION_LABELS[edge.suggested_type] ?? edge.suggested_type)
+      : null;
   const provenance = evidence?.provenance ?? edge.provenance;
 
   return (
@@ -77,8 +91,16 @@ export function RelationshipEvidencePanel(props: Props) {
       >
         <div className="flex items-start justify-between gap-3 border-b px-5 py-4">
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-wider text-primary">
-              {typeLabel} · {provenanceLabel(provenance)}
+            <p
+              className={cn(
+                "text-xs font-semibold uppercase tracking-wider",
+                provisional ? "text-slate-600" : "text-primary"
+              )}
+            >
+              {typeLabel}
+              {provisional
+                ? " · 临时共现"
+                : ` · ${provenanceLabel(provenance)}`}
             </p>
             <h2 className="mt-1 font-serif text-xl font-semibold leading-snug">
               {sourceName} → {targetName}
@@ -87,8 +109,10 @@ export function RelationshipEvidencePanel(props: Props) {
               有效章节 {edge.valid_from_chapter}
               {edge.valid_to_chapter != null
                 ? ` – ${edge.valid_to_chapter}`
-                : " 起"}{" "}
-              · 置信度 {Math.round(edge.confidence * 100)}%
+                : " 起"}
+              {!provisional
+                ? ` · 置信度 ${Math.round(edge.confidence * 100)}%`
+                : ""}
             </p>
           </div>
           <button
@@ -102,8 +126,25 @@ export function RelationshipEvidencePanel(props: Props) {
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-4">
+          {provisional && (
+            <p
+              data-testid="relationship-evidence-provisional-note"
+              className="rounded-xl border border-slate-300/80 bg-slate-50 p-3 text-sm leading-6 text-slate-800"
+            >
+              这是时间线<strong>人物共现</strong>线索，不是已确认的同盟/敌对等关系。
+              {suggestedLabel
+                ? ` 启发式提示类型「${suggestedLabel}」仅供参考，不可当作事实。`
+                : " 尚未形成可断言的关系类型。"}
+            </p>
+          )}
+
           {edge.evidence_preview && (
-            <p className="rounded-xl bg-muted/60 p-3 text-sm leading-6">
+            <p
+              className={cn(
+                "rounded-xl bg-muted/60 p-3 text-sm leading-6",
+                provisional && "mt-3"
+              )}
+            >
               {edge.evidence_preview}
             </p>
           )}
@@ -111,7 +152,11 @@ export function RelationshipEvidencePanel(props: Props) {
           <p className="mt-4 text-xs font-medium text-muted-foreground">
             来源溯源
           </p>
-          <p className="mt-1 text-sm">{provenanceLabel(provenance)}</p>
+          <p className="mt-1 text-sm">
+            {provisional
+              ? "时间线共现（未确认关系）"
+              : provenanceLabel(provenance)}
+          </p>
 
           <p className="mt-4 text-xs font-medium text-muted-foreground">
             证据定位
@@ -152,7 +197,9 @@ export function RelationshipEvidencePanel(props: Props) {
               ))}
               {evidence.evidence.length === 0 && (
                 <li className="text-sm text-muted-foreground">
-                  当前可见范围内无证据条目。
+                  {provisional
+                    ? "共现线索暂无细粒度证据条目，请结合事件时间线核对。"
+                    : "当前可见范围内无证据条目。"}
                 </li>
               )}
             </ul>
