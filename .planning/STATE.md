@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v0.8
 milestone_name: 分层叙事记忆与层级 RAG
-status: executing
-last_updated: 2026-07-16T16:00:00.000Z
+status: idle
+last_updated: 2026-07-16T20:00:00.000Z
 last_activity: 2026-07-16
 progress:
-  total_phases: 16
-  completed_phases: 14
-  total_plans: 71
-  completed_plans: 70
-  percent: 88
+  total_phases: 17
+  completed_phases: 15
+  total_plans: 74
+  completed_plans: 73
+  percent: 92
 stopped_at: null
 authorized_scope: phases 13-18 (user 2026-07-16: 查看13-18阶段任务 编排GSD子代理执行)
 ---
@@ -26,9 +26,9 @@ See `.planning/PROJECT.md` and `IMPLEMENTATION-STATUS.md`.
 
 ## Current Position
 
-Phase: 16 (Dependency-aware Local Rebuild and Carry-forward)
+Phase: 17 (Frozen Single-book Qualification and Candidate Verdict)
 Plan: 3 of 3
-Status: COMPLETE — 16-VERIFICATION `status: passed`; Phase 17 unblocked (not started)
+Status: COMPLETE — 17-VERIFICATION `status: passed`; v0.8 serial RAG chain plans complete
 Last activity: 2026-07-16
 
 ## Authorization (2026-07-16)
@@ -45,14 +45,14 @@ Last activity: 2026-07-16
 - Phase 14: **COMPLETE + VERIFIED** (`14-VERIFICATION.md` status: passed). 14-01..04 SUMMARYs present. Builder control plane Alembic `14membuild01`; Chapter→Arc→Global candidate worker; optional sources; CLI dry-run; 37 tests passed.
 - Phase 15: **COMPLETE + VERIFIED** (`15-VERIFICATION.md` status: passed). 15-01..03 SUMMARYs present. Deterministic router; cutoff-first visible loaders; multi-level descent + leaf re-slice; default-off offline experiment; 59 targeted tests passed.
 - Phase 16: **COMPLETE + VERIFIED** (`16-VERIFICATION.md` status: passed). 16-01/02/03 SUMMARYs present. Rebuild authority Alembic `16memrebuild01`; provider-free oracle/carry/report; dirty-only Phase 14 stages; fixed CLI; 62 targeted tests passed.
-- Phase 17: 3/3 plans planned; **unblocked** by Phase 16 verification; candidate-only verdict
+- Phase 17: **COMPLETE + VERIFIED** (`17-VERIFICATION.md` status: passed). 17-01/02/03 SUMMARYs present. Frozen five-bucket fixture/policy; paired hierarchical vs leaf baseline; complete metrics; append-only qual authority Alembic `17memqual01`; fresh pointer verifier; fixed CLI two-verdict; 63 targeted tests passed.
 - Phase 18: COMPLETE — 18-01 `f6280cf`, 18-02 `2035b54`, 18-03 `743a524`; dual-viewport motion qualified (parallel track)
 
 ## Auto Routing
 
-Wave A Phase 13–16: **done**. Phase 18 complete in parallel.
-Next serial RAG chain: Phase 17 after verification.
-Phase 16 emits reuse mechanics only (no Phase 17 quality/promotion verdicts); candidate-only (no pointer).
+Wave A Phase 13–17: **done**. Phase 18 complete in parallel.
+v0.8 serial RAG chain (12–17) verified candidate-only; no narrative-memory promotion/pointer cutover.
+Phase 17 emits `qualified_candidate|blocked` only (never promote).
 
 ## Phase 11 Execution Metrics
 
@@ -189,9 +189,10 @@ REQ-AUTO-01..11 已交付（含 06-08 QualityRun 持久化、06-09 BaselineCandi
 
 ## Next Action
 
-1. Execute Phase 17 (frozen single-book qualification) after reading 17 plans; keep candidate-only.
-2. Never promote narrative-memory candidates; Phase 16 is reuse mechanics only.
-3. Do not touch unrelated dirty WIP outside plan-declared files.
+1. v0.8 Phase 12–17 serial chain is complete and verified (candidate-only).
+2. Never promote narrative-memory candidates; no consumer cutover without a future authorized phase.
+3. Optional operator live-provider single-book run requires separate hard-budget acknowledgement.
+4. Do not touch unrelated dirty WIP outside plan-declared files.
 
 ## Session
 

@@ -45,7 +45,7 @@
 | Phase 7 语义/层级分块 | 6/6 | **Complete** (logic+tests+PG/indexing wiring) |
 | Phase 8 版本化小说分析与时间线 | 10/10 | **Complete** (35/35 must-haves verified) |
 | v0.7 / Phase 9-11 叙事关系、阅读问答与线索追踪 | Phase 09: 5/5; Phase 10: 5/5; Phase 11: 5/5 | **09 VERIFIED**; **10 PARTIAL** (real Playwright residual); **11 implement-complete** (adversarial residual closed) |
-| v0.8 / Phase 12-17 分层叙事记忆与层级 RAG | 16/19 plans (12–16 done) | **IN PROGRESS** — Phase 12–16 verified; Phase 17 next; candidate-only/no pointer cutover |
+| v0.8 / Phase 12-17 分层叙事记忆与层级 RAG | 19/19 plans (12–17 done) | **COMPLETE** — Phase 12–17 verified; candidate-only/no pointer cutover |
 | Phase 18 前端动效与过渡系统 | 3/3 | **COMPLETE** — 18-01..03 done; dual-viewport motion qualified |
 
 ## Auto Start
@@ -304,8 +304,8 @@ Plans:
 **Goal:** 使用冻结单书题集和同源 leaf baseline 独立验证结构、溯源、安全、检索质量、faithfulness、成本与复用收益，只产出 `qualified_candidate` 或 `blocked`，绝不执行 promotion。
 **Requirements:** V08-QUAL-01, V08-QUAL-02, V08-QUAL-03, V08-QUAL-04, V08-QUAL-05
 **Depends on:** Phase 12, Phase 13, Phase 14, Phase 15, Phase 16
-**Status:** PLANNED — 3/3 plans created; execution gated on Phases 12–16 verification and explicit authorization
-**Plans:** 3/3 plans created
+**Status:** COMPLETE — 3/3 plans; independent verification passed (2026-07-16); Alembic head `17memqual01`
+**Plans:** 3/3 plans complete
 
 **Success Criteria:**
 1. 资格运行使用在查看候选结果前冻结的单书 source、policy 和问题集，且题目明确覆盖 local、跨章节/arc、whole-book/global、no-answer 和 spoiler 分桶。
@@ -315,9 +315,11 @@ Plans:
 5. 最终报告明确说明这是单书 candidate 结论，不会替换 timeline、relationship、clue 或 Reader Chat，也不会宣称关闭 v0.3 的 100 confirmed、faithfulness/cost 全项目缺口。
 
 Plans:
-- [ ] 17-01 frozen single-book fixture and policy: bucketed questions, no-answer/spoiler adversarial cases, same-source baseline and predeclared thresholds
-- [ ] 17-02 comparative evaluation and complete metrics: retrieval, routing, faithfulness, latency, cost, reuse and fallback reports
-- [ ] 17-03 independent PostgreSQL qualification authority: fixed commands, fresh observer, pointer-diff proof and candidate-only verdict
+- [x] 17-01 frozen single-book fixture and policy: bucketed questions, no-answer/spoiler adversarial cases, same-source baseline and predeclared thresholds
+- [x] 17-02 comparative evaluation and complete metrics: retrieval, routing, faithfulness, latency, cost, reuse and fallback reports
+- [x] 17-03 independent PostgreSQL qualification authority: fixed commands, fresh observer, pointer-diff proof and candidate-only verdict
+
+**Waves:** 1 → 2 → 3 complete. Verified: `.planning/phases/17-frozen-single-book-qualification-and-candidate-verdict/17-VERIFICATION.md` (63 targeted tests passed).
 
 ### Phase 18: Frontend Motion and Transition System
 

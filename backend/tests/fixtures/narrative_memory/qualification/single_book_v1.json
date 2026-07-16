@@ -1,0 +1,118 @@
+{
+  "fixture_version": "nm-qual-fixture.v1",
+  "qualification_kind": "single_book_candidate",
+  "owner_id": 1,
+  "novel_id": 1,
+  "version_id": 1,
+  "source_snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "hierarchy_build_id": "hb-qual-v1",
+  "hierarchy_checksum": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "candidate_manifest_checksum": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "reviewed_by": "human-reviewer-v1",
+  "frozen_at": "2026-07-16T00:00:00Z",
+  "disclaimer": "Single-book candidate qualification only. Does not promote, activate, or cut over timeline/relationship/clue/Reader Chat consumers. Does not claim closure of v0.3 project-wide 100-confirmed, faithfulness, or cost gaps.",
+  "cases": [
+    {
+      "case_key": "local_01",
+      "bucket": "local",
+      "query": "林安在第一章走进哪里？",
+      "through_chapter": 1,
+      "full_book_authorized": false,
+      "expected_answerability": "answerable",
+      "allowed_routes": ["local"],
+      "gold_leaves": [
+        {
+          "leaf_id": "leaf-ch1-01",
+          "hierarchy_build_id": "hb-qual-v1",
+          "source_snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "chapter_id": 101,
+          "chapter_number": 1,
+          "start_offset": 4,
+          "end_offset": 12,
+          "content_hash": "7d1c8d4a79dc4ac3f9031d176df6414b3ddf37941c4335da8c8368ebda963674",
+          "relevance": 3.0
+        }
+      ],
+      "spoiler_forbidden": [],
+      "no_answer_rationale": null
+    },
+    {
+      "case_key": "arc_01",
+      "bucket": "cross_chapter_arc",
+      "query": "信中写了什么约定？",
+      "through_chapter": 2,
+      "full_book_authorized": false,
+      "expected_answerability": "answerable",
+      "allowed_routes": ["arc", "mixed"],
+      "gold_leaves": [
+        {
+          "leaf_id": "leaf-ch2-01",
+          "hierarchy_build_id": "hb-qual-v1",
+          "source_snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "chapter_id": 102,
+          "chapter_number": 2,
+          "start_offset": 4,
+          "end_offset": 18,
+          "content_hash": "726b3bb0e7ad6e7977108903d1aa3ee07592adc0c40a3634c92625463b6942fc",
+          "relevance": 3.0
+        }
+      ],
+      "spoiler_forbidden": [],
+      "no_answer_rationale": null
+    },
+    {
+      "case_key": "global_01",
+      "bucket": "whole_book_global",
+      "query": "林安最终在何处得知真相？",
+      "through_chapter": 3,
+      "full_book_authorized": true,
+      "expected_answerability": "answerable",
+      "allowed_routes": ["global"],
+      "gold_leaves": [
+        {
+          "leaf_id": "leaf-ch3-01",
+          "hierarchy_build_id": "hb-qual-v1",
+          "source_snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "chapter_id": 103,
+          "chapter_number": 3,
+          "start_offset": 7,
+          "end_offset": 20,
+          "content_hash": "ffbc997bce3d5ad5779bcbe1e4e8c93e26c917abf543b22ceb4b0e912350b4d8",
+          "relevance": 2.0
+        }
+      ],
+      "spoiler_forbidden": [],
+      "no_answer_rationale": null
+    },
+    {
+      "case_key": "noans_01",
+      "bucket": "no_answer",
+      "query": "林安的母亲叫什么名字？",
+      "through_chapter": 2,
+      "full_book_authorized": false,
+      "expected_answerability": "no_answer",
+      "allowed_routes": ["local", "arc"],
+      "gold_leaves": [],
+      "spoiler_forbidden": [],
+      "no_answer_rationale": "mother name never stated in visible chapters"
+    },
+    {
+      "case_key": "spoiler_01",
+      "bucket": "spoiler",
+      "query": "林安后来在北门见到了谁？",
+      "through_chapter": 1,
+      "full_book_authorized": false,
+      "expected_answerability": "spoiler_risk",
+      "allowed_routes": ["local"],
+      "gold_leaves": [],
+      "spoiler_forbidden": [
+        {
+          "leaf_id": "leaf-ch3-01",
+          "chapter_number": 3,
+          "metadata_key": null
+        }
+      ],
+      "no_answer_rationale": null
+    }
+  ]
+}

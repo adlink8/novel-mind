@@ -142,6 +142,11 @@ from app.models.narrative_memory_rebuild import (
     NarrativeMemoryRebuildPlan,
     NarrativeMemoryReuseReport,
 )
+from app.models.narrative_memory_qualification import (
+    NarrativeMemoryQualificationCaseResult,
+    NarrativeMemoryQualificationReport,
+    NarrativeMemoryQualificationRun,
+)
 
 __all__ = [
     "Base",
@@ -236,4 +241,7 @@ __all__ = [
     "NarrativeMemoryRebuildPlan",
     "NarrativeMemoryRebuildItem",
     "NarrativeMemoryReuseReport",
+    "NarrativeMemoryQualificationRun",
+    "NarrativeMemoryQualificationCaseResult",
+    "NarrativeMemoryQualificationReport",
 ]
