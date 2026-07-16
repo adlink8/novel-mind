@@ -13,6 +13,10 @@ const mocks = vi.hoisted(() => ({
   clueGetClues: vi.fn(),
   clueStatus: vi.fn(),
   clueStartOrResume: vi.fn(),
+  nmListVersions: vi.fn(),
+  nmGetTree: vi.fn(),
+  nmGetClaims: vi.fn(),
+  nmGetSourceLinks: vi.fn(),
 }));
 
 vi.mock("@/lib/api", () => ({
@@ -52,6 +56,21 @@ vi.mock("@/lib/api", () => ({
     getEvidence: vi.fn(),
   },
 }));
+
+vi.mock("@/lib/narrative-memory-api", async () => {
+  const actual = await vi.importActual<
+    typeof import("@/lib/narrative-memory-api")
+  >("@/lib/narrative-memory-api");
+  return {
+    ...actual,
+    narrativeMemoryApi: {
+      listVersions: mocks.nmListVersions,
+      getTree: mocks.nmGetTree,
+      getClaims: mocks.nmGetClaims,
+      getSourceLinks: mocks.nmGetSourceLinks,
+    },
+  };
+});
 
 vi.mock("@/lib/clue-api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/clue-api")>(
@@ -232,6 +251,34 @@ describe("global analysis timeline workspace", () => {
         running_candidate: null,
       },
     });
+    // Default: no NM candidate → chapter structure fallback
+    mocks.nmListVersions.mockResolvedValue({
+      data: {
+        novel_id: 11,
+        versions: [],
+        publication_status: "candidate_preview",
+      },
+    });
+    mocks.nmGetTree.mockResolvedValue({
+      data: {
+        novel_id: 11,
+        version_id: 1,
+        through_chapter: 3,
+        publication_status: "candidate_preview",
+        readiness: "empty",
+        nodes: [],
+      },
+    });
+    mocks.nmGetClaims.mockResolvedValue({
+      data: {
+        novel_id: 11,
+        version_id: 1,
+        node_id: 1,
+        through_chapter: 3,
+        publication_status: "candidate_preview",
+        claims: [],
+      },
+    });
   });
 
   it("does not auto-start; live run prefers candidate events for chart/list", async () => {
@@ -276,6 +323,27 @@ describe("global analysis timeline workspace", () => {
   });
 
   it("orders non-contiguous chapters by chapter, source offset and event id", async () => {
+    // Structure scope uses chapter_count; must cover ch.9 for events to remain visible.
+    mocks.list.mockResolvedValue({
+      data: {
+        items: [
+          {
+            id: 11,
+            title: "雾城",
+            author: null,
+            description: null,
+            genre: null,
+            word_count: 10,
+            chapter_count: 12,
+            status: "ready",
+            reading_progress: null,
+            created_at: "",
+            updated_at: "",
+          },
+        ],
+        total: 1,
+      },
+    });
     const laterChapter = {
       ...active.events[0],
       id: 4,

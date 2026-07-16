@@ -51,6 +51,89 @@ vi.mock("@/lib/api", () => ({
   },
 }));
 
+vi.mock("@/lib/narrative-memory-api", async () => {
+  const actual = await vi.importActual<
+    typeof import("@/lib/narrative-memory-api")
+  >("@/lib/narrative-memory-api");
+  return {
+    ...actual,
+    narrativeMemoryApi: {
+      listVersions: vi.fn().mockResolvedValue({
+        data: {
+          novel_id: 11,
+          versions: [],
+          publication_status: "candidate_preview",
+        },
+      }),
+      getTree: vi.fn().mockResolvedValue({
+        data: {
+          novel_id: 11,
+          version_id: 1,
+          through_chapter: 12,
+          publication_status: "candidate_preview",
+          readiness: "empty",
+          nodes: [],
+        },
+      }),
+      getClaims: vi.fn().mockResolvedValue({
+        data: {
+          novel_id: 11,
+          version_id: 1,
+          node_id: 1,
+          through_chapter: 12,
+          publication_status: "candidate_preview",
+          claims: [],
+        },
+      }),
+      getSourceLinks: vi.fn().mockResolvedValue({
+        data: {
+          novel_id: 11,
+          version_id: 1,
+          node_id: 1,
+          through_chapter: 12,
+          publication_status: "candidate_preview",
+          source_links: [],
+        },
+      }),
+    },
+  };
+});
+
+vi.mock("@/lib/clue-api", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/clue-api")>(
+    "@/lib/clue-api"
+  );
+  return {
+    ...actual,
+    clueApi: {
+      getClues: vi.fn().mockResolvedValue({
+        data: { active: null, running_candidate: null },
+      }),
+      status: vi.fn().mockResolvedValue({
+        data: {
+          id: 1,
+          novel_id: 11,
+          version_id: null,
+          status: "empty",
+          status_reason: null,
+          progress: {},
+          cancel_requested: false,
+          updated_at: null,
+        },
+      }),
+      startOrResume: vi.fn(),
+      cancel: vi.fn(),
+      resume: vi.fn(),
+      reanalyze: vi.fn(),
+      getVersion: vi.fn(),
+      getDetail: vi.fn(),
+      compare: vi.fn(),
+      rollback: vi.fn(),
+      action: vi.fn(),
+    },
+  };
+});
+
 vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
 }));

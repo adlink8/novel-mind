@@ -14,6 +14,7 @@ import {
   type ClueVersionSource,
   type VisibleClue,
 } from "@/lib/clue-api";
+import { clueIntersectsChapterRange } from "@/components/structure/structure-types";
 import { ClueBand } from "./clue-band";
 import { ClueControls } from "./clue-controls";
 import { ClueEvidencePanel } from "./clue-evidence-panel";
@@ -23,6 +24,12 @@ type Props = {
   fullBook: boolean;
   /** Parent owns Phase 08 confirmation + timeline_full_book persistence. */
   onFullBookRequest: (enable: boolean) => void;
+  /**
+   * Structure Workspace chapter scope (Phase 20). When set, client-filters
+   * clues whose plant/payoff (or narrative chapter) intersects [start, end].
+   */
+  chapterStart?: number | null;
+  chapterEnd?: number | null;
 };
 
 function resolveClueSource(
@@ -170,10 +177,22 @@ export function ClueWorkspace(props: Props) {
   }, [props.novelId, currentRunStatus, loadEnvelope]);
 
   const view = envelope[source];
-  const orderedClues = useMemo(
-    () => sortVisibleClues(view?.clues ?? []),
-    [view]
-  );
+  const orderedClues = useMemo(() => {
+    const sorted = sortVisibleClues(view?.clues ?? []);
+    const start = props.chapterStart;
+    const end = props.chapterEnd;
+    if (
+      start == null ||
+      end == null ||
+      !Number.isFinite(start) ||
+      !Number.isFinite(end) ||
+      start < 1 ||
+      end < start
+    ) {
+      return sorted;
+    }
+    return sorted.filter((c) => clueIntersectsChapterRange(c, start, end));
+  }, [view, props.chapterStart, props.chapterEnd]);
 
   const selectedClue: VisibleClue | null = useMemo(() => {
     if (!selectedId) return null;

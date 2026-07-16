@@ -1,18 +1,31 @@
 "use client";
 
 /**
- * 全局分析工作台 — Phase 08 时间线 + Phase 09 人物关系 + Phase 11 线索与伏笔
- * 布局 C1：状态+筛选紧凑 · 主图 · 详情抽屉 · 列表折叠
- * 工作区切换：timeline | relationships | clues（不暴露中间摘要/主题/节奏）
+ * 全局分析工作台 — Phase 20 Structure Workspace
+ * 结构为脊梁；时间线 / 人物关系 / 线索与伏笔为挂载在选中结构节点上的 facets。
+ * 不暴露中间摘要/主题/节奏；NM 始终为 candidate_preview（预览·未发布）。
  */
 
-import { useEffect, useMemo, useRef, useState, Suspense } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { BookOpen, RefreshCw } from "lucide-react";
 
 import { ClueWorkspace } from "@/components/clues/clue-workspace";
 import { clueApi } from "@/lib/clue-api";
 import { RelationshipWorkspace } from "@/components/relationships/relationship-workspace";
+import {
+  buildChapterFallbackTree,
+  buildNmStructureTree,
+  pickDefaultTreeNode,
+  treeNodeToSelection,
+} from "@/components/structure/build-structure-tree";
+import { StructureWorkspaceShell } from "@/components/structure/structure-workspace-shell";
+import {
+  eventInChapterRange,
+  type StructureNodeSelection,
+  type StructureSource,
+  type StructureTreeNode,
+} from "@/components/structure/structure-types";
 import { TimelineChart } from "@/components/timeline/timeline-chart";
 import { TimelineControls } from "@/components/timeline/timeline-controls";
 import { TimelineStatus } from "@/components/timeline/timeline-status";
@@ -21,10 +34,16 @@ import {
   timelineApi,
   type Novel,
   type TimelineEnvelope,
+  type TimelineEvent,
   type TimelineOrdering,
   type TimelineRun,
   type TimelineVersionSource,
 } from "@/lib/api";
+import {
+  narrativeMemoryApi,
+  pickLatestPreviewVersion,
+  type NmClaimItem,
+} from "@/lib/narrative-memory-api";
 
 type AnalysisWorkspaceMode = "timeline" | "relationships" | "clues";
 
@@ -96,6 +115,18 @@ function AnalysisWorkspace() {
     useState<AnalysisWorkspaceMode>("timeline");
   /** Shared narrative chapter for relationship fold (server remains spoiler authority). */
   const [throughChapter, setThroughChapter] = useState<number | "">("");
+  /** Structure Workspace spine (Phase 20). */
+  const [structureSource, setStructureSource] =
+    useState<StructureSource>("chapters");
+  const [structureForest, setStructureForest] = useState<StructureTreeNode[]>(
+    []
+  );
+  const [selectedNode, setSelectedNode] =
+    useState<StructureNodeSelection | null>(null);
+  const [nmVersionId, setNmVersionId] = useState<number | null>(null);
+  const [nmClaims, setNmClaims] = useState<NmClaimItem[]>([]);
+  const [nmClaimsLoading, setNmClaimsLoading] = useState(false);
+  const [nmClaimsError, setNmClaimsError] = useState<string | null>(null);
   const [envelope, setEnvelope] = useState<TimelineEnvelope>({
     active: null,
     running_candidate: null,
@@ -110,6 +141,61 @@ function AnalysisWorkspace() {
   const runStatusRef = useRef<string | null>(null);
   sourceRef.current = source;
   runStatusRef.current = run?.status ?? null;
+
+  const applyChapterForest = useCallback((chapterCount: number) => {
+    const forest = buildChapterFallbackTree(Math.max(1, chapterCount || 1));
+    setStructureSource("chapters");
+    setStructureForest(forest);
+    setNmVersionId(null);
+    setNmClaims([]);
+    setNmClaimsError(null);
+    const def = pickDefaultTreeNode(forest);
+    setSelectedNode(def ? treeNodeToSelection(def) : null);
+  }, []);
+
+  const loadStructure = useCallback(
+    async (
+      id: string,
+      novelMeta: Novel | undefined,
+      /** When selecting a novel, pass "" so we do not reuse prior book through_chapter. */
+      throughOverride?: number | ""
+    ) => {
+      const chapterCount = novelMeta?.chapter_count ?? 1;
+      try {
+        const versionsRes = await narrativeMemoryApi.listVersions(id);
+        const latest = pickLatestPreviewVersion(versionsRes.data.versions ?? []);
+        if (!latest) {
+          applyChapterForest(chapterCount);
+          return;
+        }
+        const effectiveThrough =
+          throughOverride !== undefined ? throughOverride : throughChapter;
+        const through =
+          typeof effectiveThrough === "number" && effectiveThrough >= 1
+            ? effectiveThrough
+            : chapterCount || undefined;
+        const treeRes = await narrativeMemoryApi.getTree(id, latest.version_id, {
+          through_chapter: through,
+        });
+        const forest = buildNmStructureTree(treeRes.data.nodes ?? []);
+        if (!forest.length) {
+          applyChapterForest(chapterCount);
+          return;
+        }
+        setStructureSource("narrative_memory");
+        setStructureForest(forest);
+        setNmVersionId(latest.version_id);
+        setNmClaims([]);
+        setNmClaimsError(null);
+        const def = pickDefaultTreeNode(forest);
+        setSelectedNode(def ? treeNodeToSelection(def) : null);
+      } catch {
+        // Honest fallback: no NM or API error → chapter structure only
+        applyChapterForest(chapterCount);
+      }
+    },
+    [applyChapterForest, throughChapter]
+  );
 
   useEffect(() => {
     novelsApi
@@ -239,10 +325,16 @@ function AnalysisWorkspace() {
     envelopeSigRef.current = "";
     progressSigRef.current = "";
     runStatusRef.current = null;
+    setNmClaims([]);
+    setNmClaimsError(null);
+    setNmVersionId(null);
     if (!id) {
       setEnvelope({ active: null, running_candidate: null });
       setRun(null);
       setFullBook(false);
+      setStructureForest([]);
+      setSelectedNode(null);
+      setStructureSource("chapters");
       return;
     }
     // 同步服务端全书偏好，避免选书后还要再勾一次才看见数据
@@ -251,8 +343,11 @@ function AnalysisWorkspace() {
       novelMeta?.reading_progress?.timeline_full_book
     );
     setFullBook(preferFullBook);
+    // Structure spine first (chapters fallback immediately, then NM if any)
+    applyChapterForest(novelMeta?.chapter_count ?? 1);
     setLoading(true);
     try {
+      void loadStructure(id, novelMeta, "");
       // 读已有时间线（若有）— 选书即上数据，不点「开始分析」
       try {
         await loadTimeline(
@@ -440,16 +535,50 @@ function AnalysisWorkspace() {
 
   const selectedNovel = novels.find((novel) => String(novel.id) === novelId);
   const view = pickTimelineView(envelope, source);
+
+  /**
+   * Timeline range filter is client-side only in 20-02: server lacks
+   * chapter_start..chapter_end params. When a structure node is selected,
+   * keep events whose narrative_chapter_number is in [start, end].
+   */
+  const scopedEvents: TimelineEvent[] = useMemo(() => {
+    const events = view?.events ?? [];
+    if (!selectedNode) return events;
+    const { chapterStart, chapterEnd } = selectedNode;
+    return events.filter((e) =>
+      eventInChapterRange(e.narrative_chapter_number, chapterStart, chapterEnd)
+    );
+  }, [view, selectedNode]);
+
+  const scopedCausalEdges = useMemo(() => {
+    if (!view || !selectedNode) return view?.causal_edges ?? [];
+    const ids = new Set(scopedEvents.map((e) => e.id));
+    return (view.causal_edges ?? []).filter(
+      (edge) => ids.has(edge.source_event_id) && ids.has(edge.target_event_id)
+    );
+  }, [view, selectedNode, scopedEvents]);
+
+  /**
+   * Relationships: fold at min(user through, node.chapterEnd) when structure
+   * selection is active. Server remains spoiler authority for through_chapter.
+   */
+  const relationshipThroughChapter = useMemo((): number | "" => {
+    if (!selectedNode) return throughChapter;
+    const nodeEnd = selectedNode.chapterEnd;
+    if (throughChapter === "" || throughChapter == null) return nodeEnd;
+    return Math.min(Number(throughChapter), nodeEnd);
+  }, [selectedNode, throughChapter]);
+
   const people = useMemo(
     () =>
       Array.from(
         new Set(
-          (view?.events ?? []).flatMap((event) =>
+          scopedEvents.flatMap((event) =>
             event.participants.map((item) => item.mention)
           )
         )
       ).sort(),
-    [view]
+    [scopedEvents]
   );
 
   function selectSource(nextSource: TimelineVersionSource) {
@@ -457,16 +586,73 @@ function AnalysisWorkspace() {
     if (person) void updateQuery({ person: "" });
   }
 
+  function handleStructureSelect(node: StructureTreeNode) {
+    const selection = treeNodeToSelection(node);
+    setSelectedNode(selection);
+    // Align relationship through with node end when user has not set a lower cap
+    if (throughChapter === "" || throughChapter > selection.chapterEnd) {
+      setThroughChapter(selection.chapterEnd);
+    }
+  }
+
+  // Load NM claims for selected NM node (read-only preview; 20-03 deepens drill)
+  useEffect(() => {
+    if (
+      !novelId ||
+      structureSource !== "narrative_memory" ||
+      !nmVersionId ||
+      !selectedNode?.nmNodeId
+    ) {
+      setNmClaims([]);
+      setNmClaimsError(null);
+      setNmClaimsLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setNmClaimsLoading(true);
+    setNmClaimsError(null);
+    const through =
+      typeof relationshipThroughChapter === "number"
+        ? relationshipThroughChapter
+        : selectedNode.chapterEnd;
+    narrativeMemoryApi
+      .getClaims(novelId, nmVersionId, selectedNode.nmNodeId, {
+        through_chapter: through,
+      })
+      .then((res) => {
+        if (cancelled) return;
+        setNmClaims(res.data.claims ?? []);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setNmClaims([]);
+        setNmClaimsError("加载节点声明失败。");
+      })
+      .finally(() => {
+        if (!cancelled) setNmClaimsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    novelId,
+    structureSource,
+    nmVersionId,
+    selectedNode?.nmNodeId,
+    selectedNode?.chapterEnd,
+    relationshipThroughChapter,
+  ]);
+
   return (
     <div className="mx-auto grid w-full max-w-[1500px] gap-3 px-4 py-5 sm:px-6 lg:px-8">
       {/* 顶栏：标题 + 选书 */}
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
           <h1 className="font-serif text-2xl font-semibold sm:text-3xl">
-            小说分析
+            结构工作台
           </h1>
           <p className="mt-0.5 text-xs text-muted-foreground sm:text-sm">
-            时间线 / 人物关系 / 线索与伏笔 · 共享全书防剧透 · 点「开始分析」才调用模型
+            结构为轴 · 时间线 / 人物关系 / 线索为切片 · 防剧透 · 点「开始分析」才调用模型
           </p>
         </div>
         <label className="grid min-w-48 gap-1 text-xs text-muted-foreground">
@@ -500,280 +686,303 @@ function AnalysisWorkspace() {
           </div>
         </div>
       ) : (
-        <div className="grid gap-3">
-          {/* 工作区：时间线 / 人物关系 / 线索与伏笔（不暴露中间摘要） */}
-          <div
-            role="tablist"
-            aria-label="分析工作区"
-            className="flex flex-wrap gap-2"
-          >
-            <button
-              type="button"
-              role="tab"
-              aria-selected={workspace === "timeline"}
-              onClick={() => setWorkspace("timeline")}
-              className={`rounded-full px-4 py-2 text-sm transition-[color,background-color,border-color,box-shadow] motion-duration-standard motion-ease-enter ${
-                workspace === "timeline"
-                  ? "bg-foreground text-background"
-                  : "border bg-card"
-              }`}
-            >
-              时间线
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={workspace === "relationships"}
-              onClick={() => setWorkspace("relationships")}
-              className={`rounded-full px-4 py-2 text-sm transition-[color,background-color,border-color,box-shadow] motion-duration-standard motion-ease-enter ${
-                workspace === "relationships"
-                  ? "bg-foreground text-background"
-                  : "border bg-card"
-              }`}
-            >
-              人物关系
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={workspace === "clues"}
-              onClick={() => setWorkspace("clues")}
-              className={`rounded-full px-4 py-2 text-sm transition-[color,background-color,border-color,box-shadow] motion-duration-standard motion-ease-enter ${
-                workspace === "clues"
-                  ? "bg-foreground text-background"
-                  : "border bg-card"
-              }`}
-            >
-              线索与伏笔
-            </button>
-          </div>
-
-          {/* 线索工作台自带 run 状态与全书控件；时间线/关系保留既有顶栏 */}
-          {workspace !== "clues" && (
-            <TimelineStatus
-              run={run}
-              hasEvents={Boolean(
-                envelope.active?.events.length ||
-                  envelope.running_candidate?.events.length
-              )}
-              onPause={() => void pauseRun()}
-              onResume={() => void retryRun()}
-              onStart={() => void startAnalysis()}
-              actionBusy={loading}
-            />
-          )}
-
-          {workspace !== "clues" && (
-            <div className="grid gap-2 rounded-2xl border bg-card/60 p-2 sm:p-3">
-              {workspace === "timeline" && (
-                <TimelineControls
-                  ordering={ordering}
-                  onOrderingChange={(value) =>
-                    void updateQuery({ ordering: value })
-                  }
-                  people={people}
-                  person={person}
-                  onPersonChange={(value) =>
-                    void updateQuery({ person: value })
-                  }
-                  causal={causal}
-                  onCausalChange={(value) =>
-                    void updateQuery({ causal: value })
-                  }
-                  fullBook={fullBook}
-                  onFullBookRequest={(value) =>
-                    value
-                      ? setConfirmFullBook(true)
-                      : void timelineApi
-                          .setFullBookPreference(novelId, false)
-                          .then(() => updateQuery({ fullBook: false }))
-                  }
-                />
-              )}
-              {workspace === "relationships" && (
-                <div className="flex flex-wrap items-center gap-3 p-1">
-                  <label className="flex h-10 items-center gap-2 rounded-xl border border-amber-300/70 bg-amber-50 px-3 text-sm text-amber-950">
-                    <input
-                      type="checkbox"
-                      checked={fullBook}
-                      onChange={(event) =>
-                        event.target.checked
-                          ? setConfirmFullBook(true)
-                          : void timelineApi
-                              .setFullBookPreference(novelId, false)
-                              .then(() => updateQuery({ fullBook: false }))
-                      }
-                    />
-                    显示全书（可能剧透）
-                  </label>
-                  <p className="text-xs text-muted-foreground">
-                    与时间线共用版本与全书偏好；API 为防剧透权威。
-                  </p>
-                </div>
-              )}
-              {(envelope.active || envelope.running_candidate) && (
-                <div
-                  role="tablist"
-                  aria-label="分析版本"
-                  className="flex gap-2 overflow-x-auto px-1"
-                >
-                  {envelope.active && (
-                    <button
-                      role="tab"
-                      aria-selected={source === "active"}
-                      onClick={() => selectSource("active")}
-                      className={`whitespace-nowrap rounded-full px-3 py-1.5 text-xs ${
-                        source === "active"
-                          ? "bg-foreground text-background"
-                          : "border bg-background"
-                      }`}
-                    >
-                      当前版本 · v{envelope.active.version_id}
-                    </button>
-                  )}
-                  {envelope.running_candidate && (
-                    <button
-                      role="tab"
-                      aria-selected={source === "running_candidate"}
-                      onClick={() => selectSource("running_candidate")}
-                      className={`whitespace-nowrap rounded-full px-3 py-1.5 text-xs ${
-                        source === "running_candidate"
-                          ? "bg-foreground text-background"
-                          : "border bg-background"
-                      }`}
-                    >
-                      <RefreshCw className="mr-1 inline size-3" />
-                      {ACTIVE_RUN.has(run?.status ?? "")
-                        ? "正在生成"
-                        : "候选结果"}{" "}
-                      · v{envelope.running_candidate.version_id}
-                      {envelope.running_candidate.events?.length
-                        ? ` · ${envelope.running_candidate.events.length} 事件`
-                        : ""}
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {workspace !== "clues" &&
-            run &&
-            ACTIVE_RUN.has(run.status) && (
-            <p className="rounded-xl border border-sky-300/70 bg-sky-50 px-3 py-2 text-xs text-sky-950">
-              分析进行中：进度 {Number(run.progress?.completed_chapters ?? 0)}/
-              {Number(run.progress?.total_chapters ?? 0) || "?"} 章；时间线图/列表展示
-              <strong> 候选 </strong>
-              版本中已落库的全部事件（不受阅读进度截断）。当前可见{" "}
-              {view?.events.length ?? 0} 条。
-            </p>
-          )}
-          {workspace !== "clues" &&
-            run &&
-            (run.status === "cancelled" || run.status === "failed") &&
-            Boolean(envelope.running_candidate?.events?.length) && (
-            <p className="rounded-xl border border-sky-300/70 bg-sky-50 px-3 py-2 text-xs text-sky-950">
-              已暂停/中断，但仍有{" "}
-              <strong>{envelope.running_candidate?.events.length ?? 0}</strong>{" "}
-              条候选时间线事件可浏览。点「继续分析」可续跑；
-              <strong>人物关系</strong>与<strong>线索</strong>
-              要在时间线<strong>完成并发布</strong>后才会自动生成。
-            </p>
-          )}
-          {workspace === "relationships" &&
-            !(view?.events?.length) &&
-            !(envelope.active || envelope.running_candidate) && (
-            <p className="rounded-xl border border-amber-300/70 bg-amber-50 px-3 py-2 text-xs text-amber-950">
-              人物关系依赖时间线版本。请先在「时间线」完成分析；完成后系统会自动抽取关系观察。
-            </p>
-          )}
-          {workspace !== "clues" &&
-            !ACTIVE_RUN.has(run?.status ?? "") &&
-            source === "active" &&
-            !fullBook &&
-            !selectedNovel?.reading_progress?.timeline_full_book && (
-            <p className="rounded-xl border border-amber-300/70 bg-amber-50 px-3 py-2 text-xs text-amber-950">
-              防剧透：未勾选「显示全书」时，已发布版本只显示到阅读进度章节（无进度则仅第一章）。
-              后台可能已分析更多章；勾选「显示全书」可看全部。候选结果页签不受阅读进度截断。
-            </p>
-          )}
-          {workspace !== "clues" && prepNote && (
-            <p className="text-xs text-muted-foreground">{prepNote}</p>
-          )}
-          {workspace !== "clues" && error && (
-            <p
-              role="alert"
-              className="rounded-xl bg-destructive/10 p-3 text-sm text-destructive"
-            >
-              {error}
-            </p>
-          )}
-
-          {/* 主区：时间轴 / 人物关系 / 线索 */}
-          {workspace === "clues" ? (
-            <ClueWorkspace
-              key={novelId}
-              novelId={novelId}
-              fullBook={fullBook}
-              onFullBookRequest={(enable) => {
-                if (enable) {
-                  setConfirmFullBook(true);
-                } else {
-                  void timelineApi
-                    .setFullBookPreference(novelId, false)
-                    .then(() => updateQuery({ fullBook: false }));
-                }
-              }}
-            />
-          ) : workspace === "relationships" ? (
-            <RelationshipWorkspace
-              key={`${novelId}:${source}:${view?.version_id ?? "none"}`}
-              novelId={novelId}
-              source={source}
-              versionId={view?.version_id}
-              fullBook={fullBook}
-              throughChapter={throughChapter}
-              onThroughChapterChange={setThroughChapter}
-              maxChapter={selectedNovel?.chapter_count}
-            />
-          ) : loading && !view ? (
+        <StructureWorkspaceShell
+          structureSource={structureSource}
+          forest={structureForest}
+          selected={selectedNode}
+          onSelect={handleStructureSelect}
+          claims={nmClaims}
+          claimsLoading={nmClaimsLoading}
+          claimsError={nmClaimsError}
+        >
+          <div className="grid gap-3">
+            {/* Facet tabs: timeline | relationships | clues */}
             <div
-              className="grid h-96 min-h-96 place-items-center rounded-3xl bg-muted motion-transition-content"
-              role="status"
-              aria-busy="true"
-              aria-label="正在加载时间线"
+              role="tablist"
+              aria-label="分析切片"
+              className="flex flex-wrap gap-2"
             >
-              <p className="text-sm text-muted-foreground">正在加载时间线…</p>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={workspace === "timeline"}
+                onClick={() => setWorkspace("timeline")}
+                className={`rounded-full px-4 py-2 text-sm transition-[color,background-color,border-color,box-shadow] motion-duration-standard motion-ease-enter ${
+                  workspace === "timeline"
+                    ? "bg-foreground text-background"
+                    : "border bg-card"
+                }`}
+              >
+                时间线
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={workspace === "relationships"}
+                onClick={() => setWorkspace("relationships")}
+                className={`rounded-full px-4 py-2 text-sm transition-[color,background-color,border-color,box-shadow] motion-duration-standard motion-ease-enter ${
+                  workspace === "relationships"
+                    ? "bg-foreground text-background"
+                    : "border bg-card"
+                }`}
+              >
+                人物关系
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={workspace === "clues"}
+                onClick={() => setWorkspace("clues")}
+                className={`rounded-full px-4 py-2 text-sm transition-[color,background-color,border-color,box-shadow] motion-duration-standard motion-ease-enter ${
+                  workspace === "clues"
+                    ? "bg-foreground text-background"
+                    : "border bg-card"
+                }`}
+              >
+                线索与伏笔
+              </button>
             </div>
-          ) : view ? (
-            <TimelineChart
-              events={view.events}
-              causalEdges={causal ? view.causal_edges : []}
-              ordering={ordering}
-              novelId={novelId}
-              onNarrativePositionChange={(chapter) => {
-                if (chapter != null) setThroughChapter(chapter);
-              }}
-            />
-          ) : (
-            <div className="grid min-h-64 place-items-center rounded-3xl border border-dashed p-8 text-center text-muted-foreground">
-              <div>
-                <p className="text-sm">暂无时间线事件。</p>
-                <p className="mt-2 text-xs">
-                  点上方「开始分析」后，按章抽取的事件会显示在这里。
-                </p>
-                <button
-                  type="button"
-                  disabled={loading}
-                  onClick={() => void startAnalysis()}
-                  className="mt-4 rounded-xl bg-foreground px-5 py-2.5 text-sm text-background disabled:opacity-50"
-                >
-                  开始分析
-                </button>
+
+            {/* 线索工作台自带 run 状态与全书控件；时间线/关系保留既有顶栏 */}
+            {workspace !== "clues" && (
+              <TimelineStatus
+                run={run}
+                hasEvents={Boolean(
+                  envelope.active?.events.length ||
+                    envelope.running_candidate?.events.length
+                )}
+                onPause={() => void pauseRun()}
+                onResume={() => void retryRun()}
+                onStart={() => void startAnalysis()}
+                actionBusy={loading}
+              />
+            )}
+
+            {workspace !== "clues" && (
+              <div className="grid gap-2 rounded-2xl border bg-card/60 p-2 sm:p-3">
+                {workspace === "timeline" && (
+                  <TimelineControls
+                    ordering={ordering}
+                    onOrderingChange={(value) =>
+                      void updateQuery({ ordering: value })
+                    }
+                    people={people}
+                    person={person}
+                    onPersonChange={(value) =>
+                      void updateQuery({ person: value })
+                    }
+                    causal={causal}
+                    onCausalChange={(value) =>
+                      void updateQuery({ causal: value })
+                    }
+                    fullBook={fullBook}
+                    onFullBookRequest={(value) =>
+                      value
+                        ? setConfirmFullBook(true)
+                        : void timelineApi
+                            .setFullBookPreference(novelId, false)
+                            .then(() => updateQuery({ fullBook: false }))
+                    }
+                  />
+                )}
+                {workspace === "relationships" && (
+                  <div className="flex flex-wrap items-center gap-3 p-1">
+                    <label className="flex h-10 items-center gap-2 rounded-xl border border-amber-300/70 bg-amber-50 px-3 text-sm text-amber-950">
+                      <input
+                        type="checkbox"
+                        checked={fullBook}
+                        onChange={(event) =>
+                          event.target.checked
+                            ? setConfirmFullBook(true)
+                            : void timelineApi
+                                .setFullBookPreference(novelId, false)
+                                .then(() => updateQuery({ fullBook: false }))
+                        }
+                      />
+                      显示全书（可能剧透）
+                    </label>
+                    <p className="text-xs text-muted-foreground">
+                      与时间线共用版本与全书偏好；结构节点会收窄 through_chapter。
+                    </p>
+                  </div>
+                )}
+                {(envelope.active || envelope.running_candidate) && (
+                  <div
+                    role="tablist"
+                    aria-label="分析版本"
+                    className="flex gap-2 overflow-x-auto px-1"
+                  >
+                    {envelope.active && (
+                      <button
+                        role="tab"
+                        aria-selected={source === "active"}
+                        onClick={() => selectSource("active")}
+                        className={`whitespace-nowrap rounded-full px-3 py-1.5 text-xs ${
+                          source === "active"
+                            ? "bg-foreground text-background"
+                            : "border bg-background"
+                        }`}
+                      >
+                        当前版本 · v{envelope.active.version_id}
+                      </button>
+                    )}
+                    {envelope.running_candidate && (
+                      <button
+                        role="tab"
+                        aria-selected={source === "running_candidate"}
+                        onClick={() => selectSource("running_candidate")}
+                        className={`whitespace-nowrap rounded-full px-3 py-1.5 text-xs ${
+                          source === "running_candidate"
+                            ? "bg-foreground text-background"
+                            : "border bg-background"
+                        }`}
+                      >
+                        <RefreshCw className="mr-1 inline size-3" />
+                        {ACTIVE_RUN.has(run?.status ?? "")
+                          ? "正在生成"
+                          : "候选结果"}{" "}
+                        · v{envelope.running_candidate.version_id}
+                        {envelope.running_candidate.events?.length
+                          ? ` · ${envelope.running_candidate.events.length} 事件`
+                          : ""}
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
-            </div>
-          )}
-        </div>
+            )}
+
+            {workspace !== "clues" &&
+              run &&
+              ACTIVE_RUN.has(run.status) && (
+              <p className="rounded-xl border border-sky-300/70 bg-sky-50 px-3 py-2 text-xs text-sky-950">
+                分析进行中：进度 {Number(run.progress?.completed_chapters ?? 0)}/
+                {Number(run.progress?.total_chapters ?? 0) || "?"} 章；时间线图/列表展示
+                <strong> 候选 </strong>
+                版本中已落库的全部事件（不受阅读进度截断）。当前可见{" "}
+                {scopedEvents.length}
+                {selectedNode && view && scopedEvents.length !== view.events.length
+                  ? ` / 结构前 ${view.events.length}`
+                  : ""}{" "}
+                条。
+              </p>
+            )}
+            {workspace !== "clues" &&
+              run &&
+              (run.status === "cancelled" || run.status === "failed") &&
+              Boolean(envelope.running_candidate?.events?.length) && (
+              <p className="rounded-xl border border-sky-300/70 bg-sky-50 px-3 py-2 text-xs text-sky-950">
+                已暂停/中断，但仍有{" "}
+                <strong>{envelope.running_candidate?.events.length ?? 0}</strong>{" "}
+                条候选时间线事件可浏览。点「继续分析」可续跑；
+                <strong>人物关系</strong>与<strong>线索</strong>
+                要在时间线<strong>完成并发布</strong>后才会自动生成。
+              </p>
+            )}
+            {workspace === "relationships" &&
+              !(view?.events?.length) &&
+              !(envelope.active || envelope.running_candidate) && (
+              <p className="rounded-xl border border-amber-300/70 bg-amber-50 px-3 py-2 text-xs text-amber-950">
+                人物关系依赖时间线版本。请先在「时间线」完成分析；完成后系统会自动抽取关系观察。
+              </p>
+            )}
+            {workspace !== "clues" &&
+              !ACTIVE_RUN.has(run?.status ?? "") &&
+              source === "active" &&
+              !fullBook &&
+              !selectedNovel?.reading_progress?.timeline_full_book && (
+              <p className="rounded-xl border border-amber-300/70 bg-amber-50 px-3 py-2 text-xs text-amber-950">
+                防剧透：未勾选「显示全书」时，已发布版本只显示到阅读进度章节（无进度则仅第一章）。
+                后台可能已分析更多章；勾选「显示全书」可看全部。候选结果页签不受阅读进度截断。
+              </p>
+            )}
+            {workspace !== "clues" && prepNote && (
+              <p className="text-xs text-muted-foreground">{prepNote}</p>
+            )}
+            {workspace !== "clues" && error && (
+              <p
+                role="alert"
+                className="rounded-xl bg-destructive/10 p-3 text-sm text-destructive"
+              >
+                {error}
+              </p>
+            )}
+
+            {/* 主区：时间轴 / 人物关系 / 线索（受结构节点章节范围约束） */}
+            {workspace === "clues" ? (
+              <ClueWorkspace
+                key={novelId}
+                novelId={novelId}
+                fullBook={fullBook}
+                chapterStart={selectedNode?.chapterStart ?? null}
+                chapterEnd={selectedNode?.chapterEnd ?? null}
+                onFullBookRequest={(enable) => {
+                  if (enable) {
+                    setConfirmFullBook(true);
+                  } else {
+                    void timelineApi
+                      .setFullBookPreference(novelId, false)
+                      .then(() => updateQuery({ fullBook: false }));
+                  }
+                }}
+              />
+            ) : workspace === "relationships" ? (
+              <RelationshipWorkspace
+                key={`${novelId}:${source}:${view?.version_id ?? "none"}:${relationshipThroughChapter}`}
+                novelId={novelId}
+                source={source}
+                versionId={view?.version_id}
+                fullBook={fullBook}
+                throughChapter={relationshipThroughChapter}
+                onThroughChapterChange={setThroughChapter}
+                maxChapter={
+                  selectedNode
+                    ? Math.min(
+                        selectedNode.chapterEnd,
+                        selectedNovel?.chapter_count ?? selectedNode.chapterEnd
+                      )
+                    : selectedNovel?.chapter_count
+                }
+              />
+            ) : loading && !view ? (
+              <div
+                className="grid h-96 min-h-96 place-items-center rounded-3xl bg-muted motion-transition-content"
+                role="status"
+                aria-busy="true"
+                aria-label="正在加载时间线"
+              >
+                <p className="text-sm text-muted-foreground">正在加载时间线…</p>
+              </div>
+            ) : view ? (
+              <TimelineChart
+                events={scopedEvents}
+                causalEdges={causal ? scopedCausalEdges : []}
+                ordering={ordering}
+                novelId={novelId}
+                onNarrativePositionChange={(chapter) => {
+                  if (chapter != null) setThroughChapter(chapter);
+                }}
+              />
+            ) : (
+              <div className="grid min-h-64 place-items-center rounded-3xl border border-dashed p-8 text-center text-muted-foreground">
+                <div>
+                  <p className="text-sm">暂无时间线事件。</p>
+                  <p className="mt-2 text-xs">
+                    点上方「开始分析」后，按章抽取的事件会显示在这里。
+                  </p>
+                  <button
+                    type="button"
+                    disabled={loading}
+                    onClick={() => void startAnalysis()}
+                    className="mt-4 rounded-xl bg-foreground px-5 py-2.5 text-sm text-background disabled:opacity-50"
+                  >
+                    开始分析
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </StructureWorkspaceShell>
       )}
 
       {confirmFullBook && (

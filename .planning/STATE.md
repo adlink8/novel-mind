@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v0.9
-milestone_name: 分析工作台呈现与数据诚实
-status: phase_complete
-last_updated: 2026-07-16T22:25:00.000Z
+milestone: v1.0
+milestone_name: 结构工作台与多层呈现
+status: phase_active
+last_updated: 2026-07-16T23:30:00.000Z
 last_activity: 2026-07-16
 progress:
-  total_phases: 19
+  total_phases: 20
   completed_phases: 19
-  total_plans: 78
+  total_plans: 82
   completed_plans: 78
-  percent: 100
+  percent: 95
 last_shipped_milestone: v0.8
 last_shipped_verdict: achieved_candidate_scope
 ---
@@ -19,27 +19,31 @@ last_shipped_verdict: achieved_candidate_scope
 
 ## Current Position
 
-Phase: **19-analysis-workbench-presentation-and-truth**  
-Plan: **19-04 done** — all phase 19 plans complete  
-Status: PHASE COMPLETE — optional phase report / ship / commits remain  
+Phase: **20-structure-workspace-multilayer-presentation**  
+Plan: **20-02 complete** — wave 2 done; next 20-03  
+Status: phase_active  
 Last activity: 2026-07-16
 
 ## Authorization
 
-- User: `GSD作为指导规划后子代理执行 测试 汇报`
-- Scope: Phase 19 plans 01–04 (truth + presentation)
+- User: `GSD discuss/plan Phase 20 → 子代理执行 测试 文档 汇报`
+- Scope: Phase 20 plans 01–04 (Structure Workspace P0 + NM read-only)
 - Does **not** authorize narrative-memory promotion
 
 ## Execution cursor
 
-1. 19-01 truth contracts — **done** (see 19-01-SUMMARY)  
-2. 19-02 timeline lanes — **done** (see 19-02-SUMMARY)  
-3. 19-03 relationship honesty UI — **done** (see 19-03-SUMMARY; 16 vitest passed)  
-4. 19-04 clue span UI — **done** (see 19-04-SUMMARY; 17 vitest passed)  
-5. Phase report + optional commits (not authorized in 19-04 slice)
+1. 20-01 NM read-only structure API — **complete**
+2. 20-02 Structure Workspace shell — **complete**
+3. 20-03 Scope-bound facets + claims drill — **pending**
+4. 20-04 Docs + verification — **pending**
+
+## Locked decisions
+
+See `20-CONTEXT.md` D1–D12 (structure spine, facets mount, candidate_preview only, no promote).
 
 ## Deferred (unchanged)
 
 - v0.3 RAG eval residual  
 - Phase 10 real Playwright residual  
-- Unrelated dirty WIP outside Phase 19 file lists  
+- Unrelated dirty WIP outside Phase 20 file lists  
+- NM promotion / Reader Chat cutover  
