@@ -21,7 +21,12 @@ import {
   type Chapter,
   type SelectionCoordinate,
 } from "@/lib/api";
-import { loadReaderChatPresentation } from "@/lib/reader-selection";
+import {
+  clampReaderChatWidth,
+  loadReaderChatPresentation,
+  READER_CHAT_WIDTH_DEFAULT,
+  saveReaderChatPresentation,
+} from "@/lib/reader-selection";
 import {
   ArrowLeft,
   ChevronLeft,
@@ -126,6 +131,12 @@ function NovelReaderInner() {
     if (typeof window === "undefined") return false;
     return Boolean(loadReaderChatPresentation(novelId).collapsed);
   });
+  const [chatWidthPx, setChatWidthPx] = useState(() => {
+    if (typeof window === "undefined") return READER_CHAT_WIDTH_DEFAULT;
+    const saved = loadReaderChatPresentation(novelId).panelWidthPx;
+    return clampReaderChatWidth(saved ?? READER_CHAT_WIDTH_DEFAULT);
+  });
+  const chatResizeRef = useRef<{ startX: number; startW: number } | null>(null);
   const [pendingSelection, setPendingSelection] =
     useState<SelectionCoordinate | null>(null);
   const [highlightRange, setHighlightRange] = useState<{
@@ -142,6 +153,55 @@ function NovelReaderInner() {
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
+
+  // Persist chat presentation width (desktop).
+  useEffect(() => {
+    const prev = loadReaderChatPresentation(novelId);
+    saveReaderChatPresentation(novelId, {
+      ...prev,
+      open: chatOpen,
+      collapsed: chatCollapsed,
+      panelWidthPx: chatWidthPx,
+    });
+  }, [novelId, chatOpen, chatCollapsed, chatWidthPx]);
+
+  const onChatResizePointerDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      chatResizeRef.current = { startX: e.clientX, startW: chatWidthPx };
+      const target = e.currentTarget;
+      target.setPointerCapture(e.pointerId);
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+    },
+    [chatWidthPx]
+  );
+
+  const onChatResizePointerMove = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      const drag = chatResizeRef.current;
+      if (!drag) return;
+      // Dragging the left handle: move left → wider panel.
+      const delta = drag.startX - e.clientX;
+      setChatWidthPx(clampReaderChatWidth(drag.startW + delta));
+    },
+    []
+  );
+
+  const onChatResizePointerUp = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!chatResizeRef.current) return;
+      chatResizeRef.current = null;
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      } catch {
+        /* ignore */
+      }
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    },
+    []
+  );
 
   useEffect(() => {
     saveReaderPreferences(preferences);
@@ -551,12 +611,35 @@ function NovelReaderInner() {
           {showDesktopChat ? (
             <div
               data-testid="reader-chat-column"
-              className={
-                chatCollapsed
-                  ? "w-12 shrink-0"
-                  : "w-[min(360px,38vw)] shrink-0"
-              }
+              className="relative shrink-0"
+              style={{
+                width: chatCollapsed ? 44 : chatWidthPx,
+              }}
             >
+              {!chatCollapsed ? (
+                <div
+                  data-testid="reader-chat-resize-handle"
+                  role="separator"
+                  aria-orientation="vertical"
+                  aria-label="调整对话面板宽度"
+                  aria-valuenow={chatWidthPx}
+                  tabIndex={0}
+                  className="absolute inset-y-0 left-0 z-20 w-1.5 cursor-col-resize touch-none bg-transparent hover:bg-primary/25 active:bg-primary/40"
+                  onPointerDown={onChatResizePointerDown}
+                  onPointerMove={onChatResizePointerMove}
+                  onPointerUp={onChatResizePointerUp}
+                  onPointerCancel={onChatResizePointerUp}
+                  onKeyDown={(e) => {
+                    if (e.key === "ArrowLeft") {
+                      e.preventDefault();
+                      setChatWidthPx((w) => clampReaderChatWidth(w + 16));
+                    } else if (e.key === "ArrowRight") {
+                      e.preventDefault();
+                      setChatWidthPx((w) => clampReaderChatWidth(w - 16));
+                    }
+                  }}
+                />
+              ) : null}
               <ReaderChatPanel
                 novelId={novelId}
                 currentChapterId={currentChapterId}

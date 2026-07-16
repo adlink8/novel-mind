@@ -180,6 +180,13 @@ describe("ReaderChatPanel", () => {
     expect(screen.queryByTestId("reader-chat-panel")).not.toBeInTheDocument();
   });
 
+  it("desktop collapsed shows rail without full panel", () => {
+    renderPanel({ layout: "desktop", collapsed: true, open: true });
+    expect(screen.getByTestId("reader-chat-rail")).toBeInTheDocument();
+    expect(screen.getByTestId("reader-chat-expand")).toBeInTheDocument();
+    expect(screen.queryByTestId("reader-chat-panel")).not.toBeInTheDocument();
+  });
+
   it("mobile expanded panel is height-bounded", async () => {
     renderPanel({ layout: "mobile", collapsed: false });
     await waitFor(() =>

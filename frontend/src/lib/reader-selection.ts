@@ -211,7 +211,21 @@ export type ReaderChatPresentation = {
   open?: boolean;
   collapsed?: boolean;
   activeConversationId?: number | null;
+  /** Desktop panel width in CSS pixels (presentation only). */
+  panelWidthPx?: number;
 };
+
+export const READER_CHAT_WIDTH_MIN = 280;
+export const READER_CHAT_WIDTH_MAX = 560;
+export const READER_CHAT_WIDTH_DEFAULT = 360;
+
+export function clampReaderChatWidth(px: number): number {
+  if (!Number.isFinite(px)) return READER_CHAT_WIDTH_DEFAULT;
+  return Math.min(
+    READER_CHAT_WIDTH_MAX,
+    Math.max(READER_CHAT_WIDTH_MIN, Math.round(px))
+  );
+}
 
 export function loadReaderChatPresentation(
   novelId: string | number

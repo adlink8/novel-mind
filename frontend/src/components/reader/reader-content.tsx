@@ -5,6 +5,7 @@ import type { Chapter } from "@/lib/api";
 import type { SelectionCoordinate } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, ChevronLeft, ChevronRight, MessageSquareText } from "lucide-react";
+import type { ReaderMode } from "@/components/reader/reader-preferences";
 import {
   buildSelectionPayload,
   captureSelectionFromRange,
@@ -29,6 +30,8 @@ interface ReaderContentProps {
   onAskSelection?: (payload: SelectionCoordinate) => void;
   /** Highlight a code-point range within the current chapter (citation jump). */
   highlightRange?: { sourceStart: number; sourceEnd: number } | null;
+  /** 分页阅读或整章长页阅读。 */
+  readingMode?: ReaderMode;
 }
 
 const PAGE_CHARS = 3500;
@@ -59,6 +62,7 @@ export function ReaderContent({
   hasPrevChapter = false,
   onAskSelection,
   highlightRange = null,
+  readingMode = "paged",
 }: ReaderContentProps) {
   const [pageIndex, setPageIndex] = useState(0);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -71,12 +75,20 @@ export function ReaderContent({
 
   const pages = useMemo(
     () => splitPagesWithBases(chapter?.content || "", PAGE_CHARS),
-    [chapter?.id, chapter?.content]
+    [chapter?.content]
+  );
+  const isScrollMode = readingMode === "scroll";
+  const displayPages = useMemo(
+    () =>
+      isScrollMode
+        ? [{ text: chapter?.content || "", sourceStartUtf16: 0 }]
+        : pages,
+    [chapter?.content, isScrollMode, pages]
   );
 
   // Citation highlight: jump to the page containing the range
   useEffect(() => {
-    if (!highlightRange || !chapter?.content) return;
+    if (!highlightRange || !chapter?.content || isScrollMode) return;
     const utf16Start = codePointToUtf16Index(
       chapter.content,
       highlightRange.sourceStart
@@ -90,7 +102,7 @@ export function ReaderContent({
       // eslint-disable-next-line react-hooks/set-state-in-effect -- citation navigation
       setPageIndex(idx);
     }
-  }, [highlightRange, chapter?.content, pages, pageIndex]);
+  }, [highlightRange, chapter?.content, pages, pageIndex, isScrollMode]);
 
   // 换章：页码归零 + 滚到顶
   useEffect(() => {
@@ -104,10 +116,10 @@ export function ReaderContent({
 
   useEffect(() => {
     scrollToTop(scrollContainerRef?.current, "auto");
-  }, [pageIndex, chapterId, scrollContainerRef]);
+  }, [pageIndex, chapterId, scrollContainerRef, readingMode]);
 
   useEffect(() => {
-    if (!chapter || pages.length > 1) return;
+    if (!chapterId || (!isScrollMode && pages.length > 1)) return;
     const el = scrollContainerRef?.current;
     if (!el) return;
 
@@ -119,22 +131,33 @@ export function ReaderContent({
     onScroll();
     el.addEventListener("scroll", onScroll, { passive: true });
     return () => el.removeEventListener("scroll", onScroll);
-  }, [chapter?.id, pages.length, scrollContainerRef, onChapterProgress]);
+  }, [chapterId, pages.length, scrollContainerRef, onChapterProgress, isScrollMode]);
 
   useEffect(() => {
-    if (!chapter || pages.length <= 1) return;
+    if (!chapterId || isScrollMode || pages.length <= 1) return;
     const pct = ((pageIndex + 1) / pages.length) * 100;
     onChapterProgress?.(pct);
-  }, [pageIndex, pages.length, chapter?.id, onChapterProgress]);
+  }, [pageIndex, pages.length, chapterId, onChapterProgress, isScrollMode]);
+
+  const clearCaptured = useCallback(() => {
+    setCaptured(null);
+  }, []);
 
   const handleSelectionChange = useCallback(() => {
     if (!chapter || !pageTextRef.current || !onAskSelection) return;
     const sel = window.getSelection();
-    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
+    // Selection cleared / collapsed → hide floating 「问 AI」 immediately.
+    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
+      setCaptured(null);
+      return;
+    }
     const range = sel.getRangeAt(0);
-    if (!pageTextRef.current.contains(range.commonAncestorContainer)) return;
+    if (!pageTextRef.current.contains(range.commonAncestorContainer)) {
+      setCaptured(null);
+      return;
+    }
 
-    const page = pages[Math.min(pageIndex, Math.max(pages.length - 1, 0))];
+    const page = displayPages[Math.min(pageIndex, Math.max(displayPages.length - 1, 0))];
     const base = page?.sourceStartUtf16 ?? 0;
     const coords = captureSelectionFromRange(
       pageTextRef.current,
@@ -142,7 +165,10 @@ export function ReaderContent({
       base,
       chapter.content || ""
     );
-    if (!coords) return;
+    if (!coords) {
+      setCaptured(null);
+      return;
+    }
 
     const rect = range.getBoundingClientRect();
     const host = contentRef.current?.getBoundingClientRect();
@@ -153,7 +179,7 @@ export function ReaderContent({
 
     // Capture immutable coords before native selection can collapse (mobile/menus).
     setCaptured({ coords, anchor: { top, left } });
-  }, [chapter, onAskSelection, pageIndex, pages]);
+  }, [chapter, onAskSelection, pageIndex, displayPages]);
 
   useEffect(() => {
     if (!onAskSelection) return;
@@ -161,12 +187,22 @@ export function ReaderContent({
     // mouseup/touchend catch selection finalization on some browsers
     document.addEventListener("mouseup", handleSelectionChange);
     document.addEventListener("touchend", handleSelectionChange);
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") clearCaptured();
+    };
+    document.addEventListener("keydown", onKeyDown);
     return () => {
       document.removeEventListener("selectionchange", handleSelectionChange);
       document.removeEventListener("mouseup", handleSelectionChange);
       document.removeEventListener("touchend", handleSelectionChange);
+      document.removeEventListener("keydown", onKeyDown);
     };
-  }, [handleSelectionChange, onAskSelection]);
+  }, [handleSelectionChange, onAskSelection, clearCaptured]);
+
+  // Page flip / chapter change drops the floating action (stale anchors).
+  useEffect(() => {
+    clearCaptured();
+  }, [pageIndex, chapter?.id, clearCaptured]);
 
   const handleAsk = async () => {
     if (!chapter || !captured || !onAskSelection) return;
@@ -180,8 +216,8 @@ export function ReaderContent({
     window.getSelection()?.removeAllRanges();
   };
 
-  const safeIndex = Math.min(pageIndex, Math.max(pages.length - 1, 0));
-  const page = pages[safeIndex] || { text: "", sourceStartUtf16: 0 };
+  const safeIndex = Math.min(pageIndex, Math.max(displayPages.length - 1, 0));
+  const page = displayPages[safeIndex] || { text: "", sourceStartUtf16: 0 };
   const pageText = page.text;
 
   // Render page text with optional highlight overlay spans (hooks before early return)
@@ -270,11 +306,15 @@ export function ReaderContent({
         </h1>
         <p className="text-xs text-muted-foreground">
           {totalChars.toLocaleString()} 字
-          {pages.length > 1 ? ` · 第 ${safeIndex + 1}/${pages.length} 页` : null}
+          {!isScrollMode && pages.length > 1
+            ? ` · 第 ${safeIndex + 1}/${pages.length} 页`
+            : isScrollMode
+              ? " · 长页模式"
+              : null}
         </p>
       </header>
 
-      {isHuge && (
+      {isHuge && !isScrollMode && (
         <div className="mb-6 flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           <AlertTriangle className="mt-0.5 size-4 shrink-0" />
           <div>
@@ -316,7 +356,7 @@ export function ReaderContent({
         </div>
       ) : null}
 
-      {pages.length > 1 && (
+      {!isScrollMode && pages.length > 1 && (
         <div className="mt-10 flex items-center justify-between gap-3 border-t border-border/60 pt-6">
           <Button
             type="button"

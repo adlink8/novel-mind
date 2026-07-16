@@ -138,7 +138,9 @@ export function ReaderChatPanel({
   }
 
   useEffect(() => {
+    const prev = loadReaderChatPresentation(novelId);
     saveReaderChatPresentation(novelId, {
+      ...prev,
       open,
       collapsed,
       activeConversationId: activeId,
@@ -443,6 +445,50 @@ export function ReaderChatPanel({
     );
   }
 
+  // Desktop collapsed: slim rail only (no full header squeezed into w-12).
+  if (layout === "desktop" && collapsed && open) {
+    return (
+      <div
+        data-testid="reader-chat-rail"
+        className={cn(
+          "flex h-full w-full flex-col items-center gap-2 border-l border-border bg-card py-3",
+          className
+        )}
+      >
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          className="h-auto w-9 flex-col gap-1 px-1 py-2"
+          aria-label="展开对话"
+          data-testid="reader-chat-expand"
+          onClick={() => onCollapsedChange(false)}
+        >
+          <MessageSquarePlus className="size-4" />
+          <span
+            className="text-[10px] leading-tight text-muted-foreground"
+            style={{ writingMode: "vertical-rl" }}
+          >
+            展开
+          </span>
+          {activeJob && !isTerminalJobStatus(activeJob.status) ? (
+            <LoaderCircle className="size-3 animate-spin" aria-hidden />
+          ) : null}
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          className="mt-auto w-9"
+          aria-label="关闭对话"
+          onClick={() => onOpenChange(false)}
+        >
+          <X className="size-4" />
+        </Button>
+      </div>
+    );
+  }
+
   if (!present) return null;
 
   const panelBody = (
@@ -452,13 +498,19 @@ export function ReaderChatPanel({
       data-layout={layout}
       aria-hidden={closing || undefined}
       className={cn(
-        "flex h-full min-h-0 flex-col bg-card text-sm transition-[opacity,transform] motion-duration-spatial motion-ease-enter",
-        layout === "desktop" && "border-l border-border",
+        "flex h-full min-h-0 w-full flex-col bg-card text-sm",
+        // Desktop column: no off-axis translate (avoids “stuck on right edge”).
+        layout === "desktop" &&
+          "border-l border-border transition-opacity motion-duration-spatial",
         layout === "mobile" &&
-          "max-h-[45vh] rounded-t-2xl border border-border shadow-2xl",
+          "max-h-[45vh] rounded-t-2xl border border-border shadow-2xl transition-[opacity,transform] motion-duration-spatial motion-ease-enter",
         open && !closing
-          ? "translate-y-0 opacity-100"
-          : "pointer-events-none translate-y-2 opacity-0 motion-ease-exit",
+          ? layout === "mobile"
+            ? "translate-y-0 opacity-100"
+            : "opacity-100"
+          : layout === "mobile"
+            ? "pointer-events-none translate-y-2 opacity-0 motion-ease-exit"
+            : "pointer-events-none opacity-0 motion-ease-exit",
         className
       )}
     >
@@ -503,14 +555,7 @@ export function ReaderChatPanel({
         </div>
       </header>
 
-      {layout === "desktop" && collapsed ? (
-        <div className="flex flex-1 items-center justify-center p-3 text-xs text-muted-foreground">
-          <Button type="button" size="sm" onClick={() => onCollapsedChange(false)}>
-            展开对话
-          </Button>
-        </div>
-      ) : (
-        <>
+      <>
           <div className="flex shrink-0 items-center gap-1 overflow-x-auto border-b border-border/50 px-2 py-1.5">
             <Button
               type="button"
@@ -747,7 +792,6 @@ export function ReaderChatPanel({
             </Button>
           </div>
         </>
-      )}
     </div>
   );
 
