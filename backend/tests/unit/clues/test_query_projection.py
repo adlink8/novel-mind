@@ -7,7 +7,11 @@ from types import SimpleNamespace
 import pytest
 
 from app.schemas.clue import ClueLifecycleState
-from app.services.clues.query import derive_visible_state, _event_visible
+from app.services.clues.query import (
+    _event_visible,
+    _link_visible,
+    derive_visible_state,
+)
 
 pytestmark = pytest.mark.unit
 
@@ -35,6 +39,17 @@ def _event(
         cue_chapter=cue_chapter,
         payoff_chapter=payoff_chapter,
     )
+
+
+def _evidence(*, evidence_id: str, narrative_chapter_number: int):
+    return SimpleNamespace(
+        evidence_id=evidence_id,
+        narrative_chapter_number=narrative_chapter_number,
+    )
+
+
+def _link(*, supporting_evidence_ids: list[str] | None = None):
+    return SimpleNamespace(supporting_evidence_ids=supporting_evidence_ids or [])
 
 
 def test_before_payoff_cutoff_projects_reinforced_not_paid_off():
@@ -91,3 +106,60 @@ def test_event_visible_uses_payoff_chapter_column():
 
 def test_no_events_defaults_to_candidate():
     assert derive_visible_state([], cutoff=1) == ClueLifecycleState.CANDIDATE
+
+
+def test_link_visible_hides_when_supporting_evidence_beyond_cutoff():
+    """List link_count and detail links share this supporting-evidence rule."""
+
+    evidence = [
+        _evidence(evidence_id="cue-1", narrative_chapter_number=1),
+        _evidence(evidence_id="pay-9", narrative_chapter_number=9),
+    ]
+    early = _link(supporting_evidence_ids=["cue-1"])
+    late = _link(supporting_evidence_ids=["pay-9"])
+    both = _link(supporting_evidence_ids=["cue-1", "pay-9"])
+    empty = _link(supporting_evidence_ids=[])
+
+    assert _link_visible(early, cutoff=3, evidence_rows=evidence) is True
+    assert _link_visible(late, cutoff=3, evidence_rows=evidence) is False
+    assert _link_visible(both, cutoff=3, evidence_rows=evidence) is False
+    # Empty support has no chapter to hide on → stays visible.
+    assert _link_visible(empty, cutoff=3, evidence_rows=evidence) is True
+
+
+def test_link_visible_full_book_or_no_cutoff_keeps_all():
+    evidence = [
+        _evidence(evidence_id="pay-9", narrative_chapter_number=9),
+    ]
+    late = _link(supporting_evidence_ids=["pay-9"])
+    assert _link_visible(late, cutoff=None, evidence_rows=evidence) is True
+    assert _link_visible(late, cutoff=9, evidence_rows=evidence) is True
+
+
+def test_list_and_detail_link_filter_agree_on_visible_set():
+    """Simulate list link_count vs detail links under the same cutoff."""
+
+    evidence = [
+        _evidence(evidence_id="cue-1", narrative_chapter_number=1),
+        _evidence(evidence_id="reinf-2", narrative_chapter_number=2),
+        _evidence(evidence_id="pay-8", narrative_chapter_number=8),
+    ]
+    links = [
+        _link(supporting_evidence_ids=["cue-1"]),
+        _link(supporting_evidence_ids=["reinf-2"]),
+        _link(supporting_evidence_ids=["pay-8"]),
+        _link(supporting_evidence_ids=["cue-1", "pay-8"]),
+    ]
+    cutoff = 3
+    # Same predicate both surfaces must use.
+    visible = [
+        link for link in links if _link_visible(link, cutoff=cutoff, evidence_rows=evidence)
+    ]
+    assert len(visible) == 2
+    assert visible[0].supporting_evidence_ids == ["cue-1"]
+    assert visible[1].supporting_evidence_ids == ["reinf-2"]
+    # Full book: count matches unfiltered length.
+    full = [
+        link for link in links if _link_visible(link, cutoff=None, evidence_rows=evidence)
+    ]
+    assert len(full) == len(links)

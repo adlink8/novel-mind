@@ -165,6 +165,35 @@ def _event_visible(
     return max(chapters) <= cutoff
 
 
+def _link_visible(
+    link: Any,
+    *,
+    cutoff: int | None,
+    evidence_rows: list[Any],
+) -> bool:
+    """Link is visible when no supporting evidence chapter is beyond cutoff.
+
+    Shared by list projection (`link_count`) and detail panels (`links`) so
+    card counts cannot disagree with the detail link list under the same
+    spoiler cutoff. Links with empty supporting_evidence_ids stay visible
+    (no chapter to hide on).
+    """
+
+    if cutoff is None:
+        return True
+    support = list(getattr(link, "supporting_evidence_ids", None) or [])
+    if not support:
+        return True
+    support_set = set(support)
+    for e in evidence_rows:
+        if (
+            getattr(e, "evidence_id", None) in support_set
+            and int(e.narrative_chapter_number) > cutoff
+        ):
+            return False
+    return True
+
+
 def derive_visible_state(
     events: list[ClueLifecycleEvent],
     *,
@@ -413,20 +442,13 @@ async def build_clue_version_view(
             for e in evidence_by_logical.get(clue.logical_clue_id, [])
             if cutoff is None or e.narrative_chapter_number <= cutoff
         ]
-        visible_links = []
-        for link in links_by_logical.get(clue.logical_clue_id, []):
-            # Drop links whose supporting evidence is hidden.
-            support = list(link.supporting_evidence_ids or [])
-            if cutoff is not None and support:
-                # If any supporting evidence id maps to hidden chapter, drop link.
-                support_hidden = False
-                for e in evidence_by_logical.get(clue.logical_clue_id, []):
-                    if e.evidence_id in support and e.narrative_chapter_number > cutoff:
-                        support_hidden = True
-                        break
-                if support_hidden:
-                    continue
-            visible_links.append(link)
+        clue_evidence = evidence_by_logical.get(clue.logical_clue_id, [])
+        visible_links = [
+            link
+            for link in links_by_logical.get(clue.logical_clue_id, [])
+            if _link_visible(link, cutoff=cutoff, evidence_rows=clue_evidence)
+        ]
+        for link in visible_links:
             if link.character_id is not None:
                 character_ids.add(int(link.character_id))
 
@@ -574,7 +596,9 @@ async def clue_detail_panels(
         else await resolve_chapter_cutoff(session, novel)
     )
 
-    evidence = list(
+    # Full evidence set (unfiltered) drives link spoiler rules and lifecycle
+    # chapter maps; display evidence is cut off separately.
+    all_evidence = list(
         (
             await session.scalars(
                 select(ClueEvidenceRef)
@@ -586,8 +610,11 @@ async def clue_detail_panels(
             )
         ).all()
     )
-    if cutoff is not None:
-        evidence = [e for e in evidence if e.narrative_chapter_number <= cutoff]
+    evidence = (
+        [e for e in all_evidence if e.narrative_chapter_number <= cutoff]
+        if cutoff is not None
+        else all_evidence
+    )
 
     links = list(
         (
@@ -599,6 +626,13 @@ async def clue_detail_panels(
             )
         ).all()
     )
+    # Align with list projection link_count: hide links whose supporting
+    # evidence chapter is beyond cutoff.
+    links = [
+        link
+        for link in links
+        if _link_visible(link, cutoff=cutoff, evidence_rows=all_evidence)
+    ]
     events = list(
         (
             await session.scalars(
@@ -612,22 +646,8 @@ async def clue_detail_panels(
         ).all()
     )
     ev_map = {
-        e.evidence_identity: int(e.narrative_chapter_number)
-        for e in evidence
+        e.evidence_identity: int(e.narrative_chapter_number) for e in all_evidence
     }
-    # Re-load all evidence identities for chapter map (detail may have filtered).
-    all_ev = list(
-        (
-            await session.scalars(
-                select(ClueEvidenceRef).where(
-                    ClueEvidenceRef.version_id == version_id,
-                    ClueEvidenceRef.logical_clue_id == logical_clue_id,
-                )
-            )
-        ).all()
-    )
-    for e in all_ev:
-        ev_map[e.evidence_identity] = int(e.narrative_chapter_number)
     visible_events = [
         e
         for e in events
