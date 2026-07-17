@@ -43,10 +43,19 @@ Last activity: 2026-07-16
 - vitest structure: 14 passed
 - See `20-VERIFICATION.md`
 
+## Follow-on waves (2026-07-17)
+
+- Wave1 parallel: UAT smoke + NM build probe + quality map → reports under phase 20  
+- Wave2 parallel: clue spoiler fix `4b248e5`; clue re-run v22 novel 91; BE:8000 / FE:3005 smoke  
+- NM still blocked on hierarchy rebuild_required  
+- See `20-WAVE-NEXT-REPORT.md`
+
 ## Deferred
 
 - NM promote / active pointer
-- Sample novel NM build ops
+- Hierarchy rebuild → NM candidate build (ops)
 - Server-side timeline chapter range query
+- Relationship evolution quality
 - v0.3 RAG eval residual
 - Phase 10 Playwright residual
+
