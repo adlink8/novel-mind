@@ -510,6 +510,68 @@ describe("analysis relationship workspace (09-04)", () => {
     expect(within(panel).queryByText(/^机器推断$/)).toBeNull();
   });
 
+  it("surfaces transition badge when accepted edge is change (not establish)", async () => {
+    mocks.getGraph.mockResolvedValue({
+      data: makeEnvelope({
+        edges: [
+          {
+            observation_id: 505,
+            source_character_id: 1,
+            target_character_id: 2,
+            relation_type: "ally",
+            transition: "change",
+            confidence: 0.88,
+            valid_from_chapter: 3,
+            valid_to_chapter: null,
+            provenance: "machine",
+            evidence_preview: "立场转变",
+            evidence_count: 2,
+            edge_kind: "accepted_observation",
+          },
+        ],
+        counts: { nodes: 2, edges: 1, relation_types: { ally: 1 } },
+      }),
+    });
+    mocks.getEvidence.mockResolvedValue({
+      data: {
+        observation_id: 505,
+        novel_id: 11,
+        version_id: 7,
+        through_chapter: 3,
+        relation_type: "ally",
+        source_character_id: 1,
+        target_character_id: 2,
+        provenance: "machine",
+        evidence: [],
+      },
+    });
+    await selectNovelAndOpenRelationships();
+    const list = await screen.findByTestId("relationship-companion-list");
+    expect(within(list).getByText(/同盟 · 变化/)).toBeInTheDocument();
+    const listBadge = within(list).getByTestId("relationship-transition-badge");
+    expect(listBadge).toHaveAttribute("data-transition", "change");
+    expect(listBadge).toHaveTextContent(/关系变化/);
+    fireEvent.click(within(list).getByText(/林墨 → 顾遥/));
+    const panel = await screen.findByTestId("relationship-evidence-panel");
+    const panelBadge = within(panel).getByTestId(
+      "relationship-transition-badge"
+    );
+    expect(panelBadge).toHaveAttribute("data-transition", "change");
+    expect(panelBadge).toHaveTextContent(/变化/);
+    expect(panelBadge).toHaveTextContent(/非初次建立/);
+  });
+
+  it("does not show transition badge for default establish accepted edges", async () => {
+    await selectNovelAndOpenRelationships();
+    const list = await screen.findByTestId("relationship-companion-list");
+    expect(within(list).queryByTestId("relationship-transition-badge")).toBeNull();
+    fireEvent.click(within(list).getByText(/林墨 → 顾遥/));
+    const panel = await screen.findByTestId("relationship-evidence-panel");
+    expect(
+      within(panel).queryByTestId("relationship-transition-badge")
+    ).toBeNull();
+  });
+
   it("renders normal mode with canvas and same companion list set", async () => {
     await selectNovelAndOpenRelationships();
     expect(await screen.findByTestId("relationship-companion-list")).toBeInTheDocument();

@@ -13,6 +13,11 @@ import type {
 import { useDismissableLayer } from "@/lib/use-dismissable-layer";
 import { cn } from "@/lib/utils";
 import { RELATION_LABELS } from "./relationship-controls";
+import {
+  isProvisionalEdge,
+  nonEstablishTransitionLabel,
+  TRANSITION_LABELS,
+} from "./relationship-honesty";
 
 type Props = {
   novelId: string;
@@ -26,13 +31,6 @@ type Props = {
 
 function provenanceLabel(kind: RelationshipProvenance) {
   return kind === "manual" ? "人工修正" : "机器推断";
-}
-
-function isProvisionalEdge(edge: RelationshipGraphEdge): boolean {
-  return (
-    edge.edge_kind === "provisional_cooccurrence" ||
-    edge.relation_type === "cooccur"
-  );
 }
 
 export function RelationshipEvidencePanel(props: Props) {
@@ -62,6 +60,9 @@ export function RelationshipEvidencePanel(props: Props) {
     provisional && edge.suggested_type
       ? (RELATION_LABELS[edge.suggested_type] ?? edge.suggested_type)
       : null;
+  const transitionBadge = provisional
+    ? null
+    : nonEstablishTransitionLabel(edge.transition);
   const provenance = evidence?.provenance ?? edge.provenance;
 
   return (
@@ -114,6 +115,20 @@ export function RelationshipEvidencePanel(props: Props) {
                 ? ` · 置信度 ${Math.round(edge.confidence * 100)}%`
                 : ""}
             </p>
+            {transitionBadge && (
+              <p
+                data-testid="relationship-transition-badge"
+                data-transition={edge.transition}
+                className="mt-2 inline-flex rounded-full border border-amber-300/80 bg-amber-50 px-2.5 py-0.5 text-[11px] font-medium text-amber-950"
+              >
+                生命周期 · {TRANSITION_LABELS[edge.transition]}
+                {edge.transition === "change"
+                  ? "（非初次建立）"
+                  : edge.transition === "end"
+                    ? "（已结束，通常不显示在活动图上）"
+                    : ""}
+              </p>
+            )}
           </div>
           <button
             type="button"

@@ -21,7 +21,11 @@ import type {
   RelationshipGraphEdge,
   RelationshipGraphNode,
 } from "@/lib/api";
-import { RELATION_LABELS } from "./relationship-controls";
+import {
+  edgeCompanionMeta,
+  edgeHonestyLabel,
+  isProvisionalEdge,
+} from "./relationship-honesty";
 
 export type GraphSelection =
   | { kind: "node"; characterId: number }
@@ -61,16 +65,11 @@ function edgeElementId(edge: RelationshipGraphEdge): string {
   return `e${edge.source_character_id}-${edge.target_character_id}-${edge.observation_id}`;
 }
 
-export function isProvisionalEdge(edge: RelationshipGraphEdge): boolean {
-  return (
-    edge.edge_kind === "provisional_cooccurrence" ||
-    edge.relation_type === "cooccur"
-  );
-}
+// Re-export for existing tests / consumers.
+export { isProvisionalEdge } from "./relationship-honesty";
 
 function edgeDisplayLabel(edge: RelationshipGraphEdge): string {
-  if (isProvisionalEdge(edge)) return "共现";
-  return RELATION_LABELS[edge.relation_type] ?? edge.relation_type;
+  return edgeHonestyLabel(edge);
 }
 
 function degreeMap(edges: RelationshipGraphEdge[]): Map<number, number> {
@@ -357,24 +356,16 @@ export function RelationshipGraph(props: Props) {
       slice.nodes.find((n) => n.character_id === id)?.name ?? `#${id}`;
     const edgeItems = slice.edges.map((edge) => {
       const provisional = isProvisionalEdge(edge);
-      const typeMeta = edgeDisplayLabel(edge);
-      const suggested =
-        provisional && edge.suggested_type
-          ? RELATION_LABELS[edge.suggested_type] ?? edge.suggested_type
-          : null;
       return {
         key: edgeElementId(edge),
         kind: "edge" as const,
         characterId: undefined as number | undefined,
         observationId: edge.observation_id,
         label: `${nameOf(edge.source_character_id)} → ${nameOf(edge.target_character_id)}`,
-        meta: provisional
-          ? suggested
-            ? `临时共现 · 提示${suggested}`
-            : "临时共现"
-          : typeMeta,
+        meta: edgeCompanionMeta(edge),
         isHub: false,
         provisional,
+        transition: edge.transition,
       };
     });
     return [...nodeItems, ...edgeItems];
@@ -835,6 +826,18 @@ export function RelationshipGraph(props: Props) {
                         : "人物"}{" "}
                     · {item.meta}
                   </span>
+                  {item.kind === "edge" &&
+                    !item.provisional &&
+                    item.transition &&
+                    item.transition !== "establish" && (
+                      <span
+                        data-testid="relationship-transition-badge"
+                        data-transition={item.transition}
+                        className="mt-1 inline-flex rounded-full border border-amber-300/80 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-950"
+                      >
+                        {item.transition === "change" ? "关系变化" : "关系结束"}
+                      </span>
+                    )}
                   <p className="mt-1 line-clamp-1 font-serif text-sm font-semibold">
                     {item.label}
                   </p>
