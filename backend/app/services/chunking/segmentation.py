@@ -59,14 +59,43 @@ def _effective_decision(
     return proposal.fallback_decision, "pending_fallback"
 
 
+def _segment_text_from_source(
+    spans: list[AtomicSpan],
+    *,
+    source_content: str | None,
+) -> tuple[str, int, int]:
+    """Return (content, source_start, source_end) faithful to chapter source.
+
+    Multi-span merges must use the exact chapter slice between first and last
+    span offsets. Joining span bodies with ``\\n`` drops interstitial whitespace
+    (blank lines / indentation) and invents separators, which breaks NM audit
+    evidence fidelity: chapter[source_start:source_end] == node.content.
+    """
+    source_start = spans[0].source_start
+    source_end = spans[-1].source_end
+    if source_content is not None:
+        text = source_content[source_start:source_end]
+    elif len(spans) == 1:
+        text = spans[0].content
+    else:
+        # Last-resort fallback when callers omit source (tests / direct calls).
+        text = "\n".join(s.content for s in spans)
+    return text, source_start, source_end
+
+
 def segment_from_proposals(
     spans: list[AtomicSpan],
     proposals: list[BoundaryProposal],
     *,
     cfg: RuleEngineConfig | None = None,
     source_snapshot_hash: str | None = None,
+    source_content: str | None = None,
 ) -> CandidateSegmentation:
-    """Build non-overlapping full-coverage candidate segments for one chapter."""
+    """Build non-overlapping full-coverage candidate segments for one chapter.
+
+    When ``source_content`` is provided (preferred), segment ``content`` is the
+    exact chapter slice for [source_start, source_end) so citations stay faithful.
+    """
     cfg = cfg or RuleEngineConfig()
     if not spans:
         empty_checksum = stable_hash({"spans": [], "segments": []})
@@ -103,7 +132,9 @@ def segment_from_proposals(
         nonlocal current
         if not current:
             return
-        text = "\n".join(s.content for s in current)
+        text, source_start, source_end = _segment_text_from_source(
+            current, source_content=source_content
+        )
         c_hash = content_hash(text)
         ids = [s.span_id for s in current]
         idx = len(segments)
@@ -121,8 +152,8 @@ def segment_from_proposals(
                 span_ids=ids,
                 content=text,
                 content_hash=c_hash,
-                source_start=current[0].source_start,
-                source_end=current[-1].source_end,
+                source_start=source_start,
+                source_end=source_end,
                 char_count=len(text),
                 decision_sources=list(notes),
             )
@@ -177,7 +208,10 @@ def segment_from_proposals(
         # Repair: force one-span-per-segment if invariant broken
         segments = []
         for idx, s in enumerate(spans):
-            c_hash = content_hash(s.content)
+            text, source_start, source_end = _segment_text_from_source(
+                [s], source_content=source_content
+            )
+            c_hash = content_hash(text)
             segments.append(
                 CandidateSegment(
                     segment_id=_segment_id(
@@ -190,11 +224,11 @@ def segment_from_proposals(
                     chapter_number=chapter_number,
                     index=idx,
                     span_ids=[s.span_id],
-                    content=s.content,
+                    content=text,
                     content_hash=c_hash,
-                    source_start=s.source_start,
-                    source_end=s.source_end,
-                    char_count=s.char_count,
+                    source_start=source_start,
+                    source_end=source_end,
+                    char_count=len(text),
                     decision_sources=["repair_coverage"],
                 )
             )
@@ -248,4 +282,5 @@ def segment_chapter(
         proposals,
         cfg=cfg,
         source_snapshot_hash=source_snapshot_hash,
+        source_content=content,
     )

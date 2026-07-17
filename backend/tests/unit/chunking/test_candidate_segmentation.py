@@ -94,3 +94,34 @@ def test_dialogue_continuity_and_location():
 def test_empty_chapter():
     result = segment_chapter(chapter_id=9, chapter_number=1, content="   \n\n  ")
     assert result.segments == [] or all(s.content.strip() for s in result.segments)
+
+
+def test_segment_content_matches_chapter_source_slice():
+    """Evidence/segment content must equal chapter[source_start:source_end].
+
+    Light-novel style blank lines + indentation between atomic spans used to be
+    dropped when multi-span merges joined span bodies with a single newline.
+    """
+    text = (
+        "第一卷 序章 开场。\n\n"
+        "    台版 转自 轻之国度\n\n"
+        "    我的人生很普通，平凡无奇。\n\n"
+        "    大学毕业后进入公司，现在是独居生活。\n\n"
+        "「您好，初次见面，我是泽渡美穗。之前见过您几次。」\n\n"
+        "    紧张的人是我吧！\n\n"
+        "    说起来，我并不擅长跟女孩子对谈。\n\n"
+        "    翌日换景，他走进大殿。\n\n"
+        "    外面风雨大作，故事继续。\n\n"
+        "    收尾段落甲。" * 2
+        + "收尾段落乙。" * 2
+    )
+    result = segment_chapter(
+        chapter_id=91,
+        chapter_number=1,
+        content=text,
+        cfg=RuleEngineConfig(min_chunk_size=40, max_chunk_size=120),
+    )
+    assert result.segments
+    for seg in result.segments:
+        assert text[seg.source_start : seg.source_end] == seg.content
+        assert seg.char_count == len(seg.content)
