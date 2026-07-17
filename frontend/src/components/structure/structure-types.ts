@@ -41,7 +41,8 @@ export function hasChapterScope(node: StructureNodeSelection | null): boolean {
 
 /**
  * Client-side event filter for timeline when structure selection is active.
- * Server timeline lacks range-start params in Phase 20-02 — document limitation.
+ * Server also accepts optional chapter_start/chapter_end (intersects spoiler).
+ * Keep this as defense-in-depth for densify / people chips.
  */
 export function eventInChapterRange(
   chapterNumber: number,

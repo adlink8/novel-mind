@@ -56,7 +56,9 @@ async def _view(db_session, owner, novel, **kwargs):
     return await build_version_view(db_session, novel=novel, owner_id=owner.id,
         source=TimelineVersionSource.ACTIVE, ordering=kwargs.pop("ordering", TimelineOrdering.NARRATIVE),
         person=kwargs.pop("person", None), include_causal=kwargs.pop("causal", True),
-        request_full_book=kwargs.pop("full_book", False))
+        request_full_book=kwargs.pop("full_book", False),
+        chapter_start=kwargs.pop("chapter_start", None),
+        chapter_end=kwargs.pop("chapter_end", None))
 
 
 @pytest.mark.asyncio
@@ -126,3 +128,39 @@ async def test_running_candidate_ignores_reading_progress_cutoff(db_session):
     assert len(candidate.events) == 2
     assert "可见" in titles
     assert "SECRET OVERRIDE" in titles  # chapter-2 title via active override
+
+
+@pytest.mark.asyncio
+async def test_structure_chapter_range_intersects_spoiler_cutoff(db_session):
+    """chapter_start/end narrow visible set; spoiler still caps upper via min()."""
+    owner, novel, chapters = await _seed(db_session)
+    # Progress at chapter 2 + full_book so both events exist without structure filter.
+    novel.reading_progress = {"chapter_id": chapters[1].id, "timeline_full_book": True}
+    await db_session.commit()
+
+    both = await _view(db_session, owner, novel, full_book=True)
+    assert {e.narrative_chapter_number for e in both.events} == {1, 2}
+
+    # Structure arc covering only chapter 2
+    only_ch2 = await _view(
+        db_session, owner, novel, full_book=True, chapter_start=2, chapter_end=2
+    )
+    assert [e.narrative_chapter_number for e in only_ch2.events] == [2]
+    assert only_ch2.counts.events == 1
+
+    # Structure wants 1..10 but spoiler at chapter 1 without full_book → upper min(10,1)=1
+    novel.reading_progress = {"chapter_id": chapters[0].id, "timeline_full_book": False}
+    await db_session.commit()
+    capped = await _view(
+        db_session, owner, novel, full_book=False, chapter_start=1, chapter_end=10
+    )
+    assert [e.narrative_chapter_number for e in capped.events] == [1]
+    assert "SECRET" not in capped.model_dump_json()
+    assert "隐藏人物" not in capped.model_dump_json()
+
+    # Lower floor above spoiler upper → empty
+    empty = await _view(
+        db_session, owner, novel, full_book=False, chapter_start=2, chapter_end=2
+    )
+    assert empty.events == []
+    assert empty.counts.events == 0

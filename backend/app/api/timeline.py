@@ -182,9 +182,12 @@ async def get_timeline(novel: Novel = Depends(require_owned_novel), db: AsyncSes
                        current_user: User = Depends(require_user),
                        ordering: TimelineOrdering = TimelineOrdering.NARRATIVE,
                        person: str | None = Query(default=None, max_length=100),
-                       causal: bool = False, full_book: bool = False):
+                       causal: bool = False, full_book: bool = False,
+                       chapter_start: int | None = Query(default=None, ge=1),
+                       chapter_end: int | None = Query(default=None, ge=1)):
     common = dict(session=db, novel=novel, owner_id=current_user.id, ordering=ordering,
-                  person=person, include_causal=causal, request_full_book=full_book)
+                  person=person, include_causal=causal, request_full_book=full_book,
+                  chapter_start=chapter_start, chapter_end=chapter_end)
     return TimelineEnvelope(
         active=await build_version_view(source=TimelineVersionSource.ACTIVE, **common),
         running_candidate=await build_version_view(source=TimelineVersionSource.RUNNING_CANDIDATE, **common),
@@ -196,13 +199,17 @@ async def get_version(version_id: int, novel: Novel = Depends(require_owned_nove
                       db: AsyncSession = Depends(get_db), current_user: User = Depends(require_user),
                       ordering: TimelineOrdering = TimelineOrdering.NARRATIVE,
                       person: str | None = Query(default=None, max_length=100), causal: bool = False,
-                      full_book: bool = False):
+                      full_book: bool = False,
+                      chapter_start: int | None = Query(default=None, ge=1),
+                      chapter_end: int | None = Query(default=None, ge=1)):
     active = await build_version_view(db, novel=novel, owner_id=current_user.id,
         source=TimelineVersionSource.ACTIVE, ordering=ordering, person=person,
-        include_causal=causal, request_full_book=full_book)
+        include_causal=causal, request_full_book=full_book,
+        chapter_start=chapter_start, chapter_end=chapter_end)
     candidate = await build_version_view(db, novel=novel, owner_id=current_user.id,
         source=TimelineVersionSource.RUNNING_CANDIDATE, ordering=ordering, person=person,
-        include_causal=causal, request_full_book=full_book)
+        include_causal=causal, request_full_book=full_book,
+        chapter_start=chapter_start, chapter_end=chapter_end)
     result = next((view for view in (active, candidate) if view and view.version_id == version_id), None)
     if result is None:
         raise HTTPException(status_code=404, detail="timeline version not found")

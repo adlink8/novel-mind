@@ -337,6 +337,9 @@ export interface TimelineQuery {
   person?: string;
   causal?: boolean;
   full_book?: boolean;
+  /** Inclusive structure scope (optional; server intersects spoiler cutoff). */
+  chapter_start?: number;
+  chapter_end?: number;
 }
 
 export const timelineApi = {

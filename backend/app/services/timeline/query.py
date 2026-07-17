@@ -77,6 +77,32 @@ async def _chapter_cutoff(session: AsyncSession, novel: Novel) -> int | None:
     return await resolve_chapter_cutoff(session, novel)
 
 
+def effective_narrative_bounds(
+    *,
+    spoiler_cutoff: int | None,
+    spoiler_open: bool,
+    chapter_start: int | None = None,
+    chapter_end: int | None = None,
+) -> tuple[bool, int | None, int | None]:
+    """Combine spoiler cutoff with optional structure chapter range.
+
+    Returns ``(hide_all, lower_inclusive, upper_inclusive)``.
+
+    - Spoiler remains authoritative: when not open and cutoff is missing, hide all.
+    - ``chapter_end`` narrows the upper bound via ``min(chapter_end, spoiler_upper)``.
+    - ``chapter_start`` is a lower inclusive floor (structure scope).
+    - Params are optional; callers without range keep prior spoiler-only behavior.
+    """
+    if not spoiler_open and spoiler_cutoff is None:
+        return True, None, None
+    upper: int | None = None if spoiler_open else int(spoiler_cutoff)  # type: ignore[arg-type]
+    if chapter_end is not None:
+        end = int(chapter_end)
+        upper = end if upper is None else min(end, upper)
+    lower = int(chapter_start) if chapter_start is not None else None
+    return False, lower, upper
+
+
 async def build_version_view(
     session: AsyncSession,
     *,
@@ -87,6 +113,8 @@ async def build_version_view(
     person: str | None,
     include_causal: bool,
     request_full_book: bool,
+    chapter_start: int | None = None,
+    chapter_end: int | None = None,
 ) -> TimelineVersionView | None:
     resolved = await resolve_version_id(session, owner_id=owner_id, novel_id=novel.id, source=source)
     if resolved is None:
@@ -97,17 +125,31 @@ async def build_version_view(
     # every provisional event produced so far. The reading-progress spoiler gate
     # applies only to the promoted active timeline.
     candidate_view = source == TimelineVersionSource.RUNNING_CANDIDATE
-    cutoff = None if candidate_view or (request_full_book and persisted_full_book) else await resolve_chapter_cutoff(session, novel)
+    spoiler_open = candidate_view or (request_full_book and persisted_full_book)
+    cutoff = None if spoiler_open else await resolve_chapter_cutoff(session, novel)
 
     event_query = select(MachineTimelineEvent).where(
         MachineTimelineEvent.owner_id == owner_id,
         MachineTimelineEvent.novel_id == novel.id,
         MachineTimelineEvent.version_id == version_id,
     )
-    if cutoff is None and not (candidate_view or (request_full_book and persisted_full_book)):
+    hide_all, lower, upper = effective_narrative_bounds(
+        spoiler_cutoff=cutoff,
+        spoiler_open=spoiler_open,
+        chapter_start=chapter_start,
+        chapter_end=chapter_end,
+    )
+    if hide_all:
         event_query = event_query.where(False)
-    elif cutoff is not None:
-        event_query = event_query.where(MachineTimelineEvent.narrative_chapter_number <= cutoff)
+    else:
+        if lower is not None:
+            event_query = event_query.where(
+                MachineTimelineEvent.narrative_chapter_number >= lower
+            )
+        if upper is not None:
+            event_query = event_query.where(
+                MachineTimelineEvent.narrative_chapter_number <= upper
+            )
     visible_rows = list((await session.scalars(event_query)).all())
     visible_ids = {row.id for row in visible_rows}
 

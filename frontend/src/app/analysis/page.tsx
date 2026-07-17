@@ -171,7 +171,9 @@ function AnalysisWorkspace() {
     setNmSourceLinksError(null);
     nmTreeThroughRef.current = null;
     const def = pickDefaultTreeNode(forest);
-    setSelectedNode(def ? treeNodeToSelection(def) : null);
+    const selection = def ? treeNodeToSelection(def) : null;
+    selectedNodeRef.current = selection;
+    setSelectedNode(selection);
   }, []);
 
   const applyNmForest = useCallback(
@@ -191,25 +193,30 @@ function AnalysisWorkspace() {
       setNmSourceLinks([]);
       setNmSourceLinksError(null);
 
+      const applySelection = (node: StructureTreeNode | null) => {
+        const selection = node ? treeNodeToSelection(node) : null;
+        selectedNodeRef.current = selection;
+        setSelectedNode(selection);
+      };
+
       if (opts?.preserveSelection) {
         const prev = selectedNodeRef.current;
         if (prev?.nmNodeId != null) {
           const found = findTreeNodeByNmId(forest, prev.nmNodeId);
           if (found) {
-            setSelectedNode(treeNodeToSelection(found));
+            applySelection(found);
             return;
           }
         }
         if (prev?.id) {
           const found = findTreeNodeById(forest, prev.id);
           if (found) {
-            setSelectedNode(treeNodeToSelection(found));
+            applySelection(found);
             return;
           }
         }
       }
-      const def = pickDefaultTreeNode(forest);
-      setSelectedNode(def ? treeNodeToSelection(def) : null);
+      applySelection(pickDefaultTreeNode(forest));
     },
     []
   );
@@ -322,7 +329,21 @@ function AnalysisWorkspace() {
 
   async function loadTimeline(
     id = novelId,
-    next = { ordering, person, causal, fullBook },
+    next: {
+      ordering: TimelineOrdering;
+      person: string;
+      causal: boolean;
+      fullBook: boolean;
+      chapterStart?: number;
+      chapterEnd?: number;
+    } = {
+      ordering,
+      person,
+      causal,
+      fullBook,
+      chapterStart: selectedNodeRef.current?.chapterStart,
+      chapterEnd: selectedNodeRef.current?.chapterEnd,
+    },
     onlyIfEventsChanged = false
   ) {
     if (!id) return;
@@ -331,11 +352,24 @@ function AnalysisWorkspace() {
     const live = Boolean(
       runStatusRef.current && ACTIVE_RUN.has(runStatusRef.current)
     );
+    // Structure scope: optional chapter_start/end; server min() with spoiler.
+    // Prefer explicit next range, else current selection ref (stable for poll ticks).
+    const scopeStart =
+      next.chapterStart ?? selectedNodeRef.current?.chapterStart;
+    const scopeEnd = next.chapterEnd ?? selectedNodeRef.current?.chapterEnd;
+    const hasScope =
+      typeof scopeStart === "number" &&
+      typeof scopeEnd === "number" &&
+      scopeStart >= 1 &&
+      scopeEnd >= scopeStart;
     const response = await timelineApi.getTimeline(id, {
       ordering: next.ordering,
       person: next.person || undefined,
       causal: next.causal,
       full_book: next.fullBook || live,
+      ...(hasScope
+        ? { chapter_start: scopeStart, chapter_end: scopeEnd }
+        : {}),
     });
     const data = response.data;
     const nextSource = resolveTimelineSource(
@@ -383,6 +417,7 @@ function AnalysisWorkspace() {
       setRun(null);
       setFullBook(false);
       setStructureForest([]);
+      selectedNodeRef.current = null;
       setSelectedNode(null);
       setStructureSource("chapters");
       return;
@@ -556,9 +591,8 @@ function AnalysisWorkspace() {
   const view = pickTimelineView(envelope, source);
 
   /**
-   * Timeline range filter is client-side only: server lacks
-   * chapter_start..chapter_end params. When a structure node is selected,
-   * keep events whose narrative_chapter_number is in [start, end].
+   * Timeline is loaded with chapter_start/end when a structure node is selected
+   * (server intersects spoiler cutoff). Client filter remains defense-in-depth.
    * Multi-chapter scopes densify (cap + per-chapter counts); single-chapter
    * keeps full Phase 19 swimlane UX.
    */
@@ -632,12 +666,31 @@ function AnalysisWorkspace() {
   function handleStructureSelect(node: StructureTreeNode) {
     const selection = treeNodeToSelection(node);
     setSelectedNode(selection);
+    selectedNodeRef.current = selection;
     setSelectedClaimId(null);
     setNmSourceLinks([]);
     setNmSourceLinksError(null);
     // Align relationship through with node end when user has not set a lower cap
     if (throughChapter === "" || throughChapter > selection.chapterEnd) {
       setThroughChapter(selection.chapterEnd);
+    }
+    // Re-fetch timeline with server-side structure chapter range (progressive poll uses ref).
+    if (novelId) {
+      envelopeSigRef.current = "";
+      void loadTimeline(
+        novelId,
+        {
+          ordering,
+          person,
+          causal,
+          fullBook,
+          chapterStart: selection.chapterStart,
+          chapterEnd: selection.chapterEnd,
+        },
+        false
+      ).catch(() => {
+        /* keep previous envelope on transient failure */
+      });
     }
   }
 
