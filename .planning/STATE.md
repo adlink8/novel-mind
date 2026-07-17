@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: 结构工作台与多层呈现
 status: phase_complete
-last_updated: 2026-07-16T23:40:00.000Z
-last_activity: 2026-07-16
+last_updated: 2026-07-17T10:00:00.000Z
+last_activity: 2026-07-17
 progress:
   total_phases: 20
   completed_phases: 20
@@ -20,43 +20,46 @@ last_shipped_verdict: achieved_candidate_scope
 ## Current Position
 
 Phase: **20-structure-workspace-multilayer-presentation**  
-Plan: **20-04 done** — all phase 20 plans complete  
-Status: PHASE COMPLETE — P0 Structure Workspace delivered  
-Last activity: 2026-07-16
+Status: **PHASE COMPLETE (P0)** + **2026-07-17 ordered follow-on executed**  
+Last activity: 2026-07-17 (docs update)
 
-## Authorization (honored)
+## Authorization boundary (still)
 
-- User: GSD discuss/plan Phase 20 → subagent execute → test → docs → report
-- Scope: 20-01..04 Structure Workspace + NM read-only
-- **Did not** promote narrative memory
+- **Does not** authorize narrative-memory promotion / active pointer
+- **Does not** authorize Reader Chat cutover to NM
 
-## Execution cursor
+## Phase 20 P0 (done)
 
-1. 20-01 NM read-only structure API — **done** (`a141bac`)
-2. 20-02 Structure Workspace shell — **done** (`a3131a9`)
-3. 20-03 Scope-bound facets + claims drill — **done** (`f0e1e0c`)
-4. 20-04 Docs + verification — **done**
+1. NM read-only structure API — `a141bac`
+2. Structure Workspace shell — `a3131a9`
+3. Scope-bound facets + claims drill — `f0e1e0c`
+4. Docs + verification — `132f9b9` / `20-VERIFICATION.md`
 
-## Verification snapshot
+## Follow-on ordered steps (2026-07-17)
 
-- pytest structure_query: 13 passed
-- vitest structure: 14 passed
-- See `20-VERIFICATION.md`
+| # | Item | Status |
+|---|------|--------|
+| 1 | Hierarchy rebuild novel 91 | **done** — `cb_9f9aee6bf1cb427b`, audit EXIT=0 (`e322c45`) |
+| 2 | NM candidate build | **partial** — version 1, ~12 chapter_state; resume ops (`20-NM-BUILD-PARTIAL.md`) |
+| 3 | Rel transition honesty UI | **done** — `b986dea` |
+| 4 | Timeline server chapter range | **done** — `31be1f6` |
+| 5 | Clue live re-judge | **done ops** — v24, payoff still 0 (`20-CLUE-LIVE-REJUDGE.md`) |
+| 6 | API UAT smoke | **done** — `20-UAT-API.md` |
 
-## Follow-on waves (2026-07-17)
+Reports: `20-ORDERED-EXEC-REPORT.md`, `20-WAVE-NEXT-REPORT.md`
 
-- Wave1 parallel: UAT smoke + NM build probe + quality map → reports under phase 20  
-- Wave2 parallel: clue spoiler fix `4b248e5`; clue re-run v22 novel 91; BE:8000 / FE:3005 smoke  
-- Hierarchy rebuild novel 91: **done** — `cb_9f9aee6bf1cb427b` reusable_exact, audit EXIT=0 (see `20-HIERARCHY-REBUILD.md`); segment source-slice fix unblocked  
-- Clue live re-judge novel 91: **done** — v24 active, 29 live + 3 cache_hit; payoff_chapter still 0 (gate path); titles still meta (see `20-CLUE-LIVE-REJUDGE.md`); no NM promote  
-- See `20-WAVE-NEXT-REPORT.md`
+## Sample novel 91 (facts)
 
-## Deferred
+- Hierarchy: reusable_exact  
+- Timeline: ~1933 events  
+- Relationships: ~41 accepted (mostly establish)  
+- Clues: active v24, 32 clues, 0 payoff  
+- NM: candidate version present, incomplete chapter_state  
 
-- NM promote / active pointer
-- Hierarchy rebuild → NM candidate build (ops)
-- Server-side timeline chapter range query
-- Relationship evolution quality
-- v0.3 RAG eval residual
-- Phase 10 Playwright residual
+## Deferred / next
 
+- Resume NM build to arc/global (hours; no promote)
+- Commit/stabilize NM CLI transport WIP if still dirty
+- Clue worker gate + title builder for real payoff
+- Restart BE after timeline range deploy
+- v0.3 RAG eval residual; Phase 10 Playwright residual

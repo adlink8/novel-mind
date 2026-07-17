@@ -91,8 +91,9 @@ Summaries: `20-01`..`20-04-SUMMARY.md`.
 ## Auto Start
 
 **v1.0 / Phase 20 COMPLETE（2026-07-16）** — plans 20-01..04 verified (P0).  
+**2026-07-17 ordered follow-on** — hierarchy green (91), timeline chapter range, rel transition UI, clue live re-judge (payoff residual), API UAT; NM build **partial** (see `20-ORDERED-EXEC-REPORT.md`).  
 **禁止** narrative-memory promotion / Reader Chat cutover 无新授权时执行。  
-Next: optional UAT on `/analysis` with a novel that has NM rows; P1 NM build visibility / aggregation quality.
+Next: resume NM candidate build to arc/global; clue worker payoff/title fix; optional BE restart to serve chapter_range.
 
 ## Backlog
 

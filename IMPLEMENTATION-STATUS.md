@@ -2,15 +2,18 @@
 
 审计日期：2026-06-13 16:05（Asia/Shanghai）  
 分析工作台与关系回填补充：2026-07-16（基于代码与样例小说 runtime 证据，不推翻上方基线审计快照）  
-结构工作台（Phase 20）补充：2026-07-16（Structure Workspace + NM 只读 API；禁止 promotion）
+结构工作台（Phase 20）补充：2026-07-16（Structure Workspace + NM 只读 API；禁止 promotion）  
+有序执行补充：2026-07-17（hierarchy 修复与重建、NM partial、timeline 服务端章范围、线索 live re-judge、API UAT；仍禁止 promote）
 
-事实来源：实际代码、自动化测试、依赖审计、Next.js 构建输出和真实 PostgreSQL Alembic 命令。规划文档中的勾选不作为完成证据。
+事实来源：实际代码、自动化测试、依赖审计、Next.js 构建输出、真实 PostgreSQL 与本机 ops 运行结果。规划文档中的勾选不作为完成证据。
 
 ## Summary
 
 安全与启动基线已经修复并验证。v0.3 的持久化导入、端到端 RAG、混合搜索、前端搜索和评测基础设施已完成；但评测质量闭环仍为 PARTIAL：仅 10/100 题 confirmed，现有 6 次运行的检索指标均为 0，faithfulness/cost 尚未计算。前端已完成文学编辑台风格重构，并通过桌面与移动端浏览器验收。
 
-**分析工作台不再是 MISSING。** 前端 `/analysis` 为 **Structure Workspace**：左侧结构导航（章节降级或 NM 候选树）+ 中栏时间线/关系/线索 facet（按选中节点章范围过滤）。后端 Phase 08/09/11 仍为 facet 生产权威；Phase 20 增加 NM **只读** structure API（`/api/narrative-memory`，始终 `candidate_preview`，无 active pointer / 无 promote）。同人文生成、富文本编辑与导出仍为 MISSING。样例小说上 NM 构建产物与评测 gold 仍常为空（UI 诚实空态）。
+**分析工作台不再是 MISSING。** 前端 `/analysis` 为全视口 **Structure Workspace**：左侧结构导航 + 中栏时间线/关系/线索 facet。结构选中范围通过 `chapter_start` / `chapter_end` 传给时间线 API（服务端过滤，FE 仍有 densify 防御层）。后端 Phase 08/09/11 仍为 facet 生产权威；Phase 20 提供 NM **只读** structure API（`candidate_preview`，**无 active pointer / 无 promote**）。
+
+**样例 novel 91（史莱姆，owner=2）2026-07-17 事实：** hierarchy `cb_9f9aee6bf1cb427b` **reusable_exact**（audit EXIT=0）；timeline active 约 1933 events；relationships 约 41 accepted（多 establish）；clues active **v24**（32 machine，live re-judge 已跑，**payoff_chapter 仍 0**）；NM candidate **version 1 partial**（约十余 `chapter_state`，全书未完成，无 arc/global）。同人文/导出仍 MISSING。
 
 状态定义：
 
@@ -41,8 +44,11 @@
 | RAG 管线 | VERIFIED | 分块 → Ollama nomic-embed-text (768维) → ChromaDB → 混合搜索（向量 + BM25） |
 | 混合搜索 | VERIFIED | BM25 tsvector 全文搜索 + 向量加权融合；全局/小说内搜索 API；搜索页面 + 阅读页内搜索面板 |
 | RAG 评测基础设施 | VERIFIED | EvalDataset/EvalRun/EvalResult ORM；bm25/baseline_vector/hybrid_search；owner 隔离 API；CLI；错误案例；前端 ECharts 管理与趋势页 |
-| 分析工作台 UI 壳 | VERIFIED | `frontend/src/app/analysis/page.tsx` + `components/structure/*`：结构为主轴；facet = timeline / relationships / clues；选中节点绑定章范围；plot-density 时间线；hub-centric 关系图；progressive 时间线候选/active |
-| Phase 20 NM 结构只读 API | VERIFIED | `GET /api/narrative-memory/{novel_id}/versions|.../tree|.../claims|.../source-links`；`structure_query.py` 只读；单元测试 `tests/unit/narrative_memory/test_structure_query.py`（13 passed）；**无 promotion** |
+| 分析工作台 UI 壳 | VERIFIED | 全视口 `analysis-fullpage` + `structure/*`：结构为主轴；facet = timeline / relationships / clues；左右等高内部滚动；下划线 Tab；说明性文案已收敛；plot-density 时间线；关系 transition 诚实徽章；progressive active/candidate |
+| Phase 20 NM 结构只读 API | VERIFIED | `GET /api/narrative-memory/{novel_id}/versions|.../tree|.../claims|.../source-links`；`structure_query.py` 只读；cutoff 过滤；**无 promotion**；API UAT 对 novel 91 返回 versions 列表 |
+| 时间线服务端章范围 | VERIFIED | `GET /api/timeline/{id}` 可选 `chapter_start`/`chapter_end`；`effective_narrative_bounds` 与 spoiler 取 min；单元 `tests/unit/timeline/test_chapter_range.py`（8 passed）；FE `loadTimeline` 传结构节点范围 |
+| Phase 07 hierarchy 内容一致性 | VERIFIED | `segmentation.py` 用章节原文精确切片（`e322c45`）；novel 91 force rebuild 后 audit **reusable_exact** |
+| 线索 detail spoiler 对齐 | VERIFIED | list `link_count` 与 detail links 共用 `_link_visible`（`4b248e5`）；`tests/unit/clues` 含一致性用例 |
 
 ## PARTIAL
 
@@ -53,10 +59,10 @@
 | AI 路由与成本统计 | PARTIAL | 服务与模型骨架存在，业务生成端点仍未接入 |
 | 生产部署 | PARTIAL | 应用会拒绝弱生产密钥，但 TLS、秘密管理和网络策略由部署环境提供 |
 | RAG 评测质量闭环 | PARTIAL | 100 条数据中仅 10 confirmed；6 次运行 Recall/Precision/MRR/NDCG 均为 0；faithfulness/cost 为 null；HTTP 触发仍同步 |
-| Phase 08 时间线 | PARTIAL | Worker/query/UI 已落地。样例小说 slime（novel_id=91）存在 active version，约 1933 events。流式分析端点仍为 501 占位 |
-| Phase 09 人物关系 | PARTIAL | Observation worker + graph query 已落地；无 accepted observations 时仍走 timeline 共现 provisional 回退。关系曾依赖 KG accepted 为空导致空图；现有确定性回填：`backend/app/services/relationships/timeline_kg_backfill.py` + `backend/scripts/backfill_relationship_kg_from_timeline.py`。回填后 slime 约 40 characters、41 KG accepted、41 relationship observations（均为 establish；尚无 evolution / change / end 产出） |
-| Phase 11 线索与伏笔 | PARTIAL | 管线与 UI 已存在。候选构建曾因 `later windows span more than 4 chapters` 失败；现已在 `clues/evidence.py` + `clues/candidates.py` 于 package 构建前 clamp later units。生产样例需 re-run 后才能确认产出质量 |
-| 叙事记忆 narrative memory | PARTIAL | Builder/qualification/CLI 与 Phase 20 **产品只读** API/UI 已存在；始终 candidate 预览徽章；样例 novel 常无 NM 行（降级章节树）；**无生产 active pointer / 无 promote**；eval gold 仍为空 |
+| Phase 08 时间线 | PARTIAL | Worker/query/UI 已落地；服务端章范围已接入。样例 slime active 约 1933 events。流式 `analyze/stream` 仍 501 |
+| Phase 09 人物关系 | PARTIAL | Observation + graph + Phase 19 `edge_kind` + FE transition 徽章（change/end）已落地。样例仍以 establish / 回填种子为主；图无法低成本识别 seed `intake_kind`；演化观测生产稀疏 |
+| Phase 11 线索与伏笔 | PARTIAL | Clamp + plant→payoff UI + detail spoiler 对齐 + live re-judge（v24）已跑。样例 **payoff_chapter=0**（worker 对 provisional 上 payoff 分类短路）；标题常为 meta 截断。clamp 前 later-window 问题已修 |
+| 叙事记忆 narrative memory | PARTIAL | 只读产品 API/UI + builder；novel 91 有 candidate version 与少量 `chapter_state`（run partial，全书未完，无完整 arc/global）；CLI transport/create-version 有 WIP。**无 promote** |
 | 通用 AI 分析 API | PARTIAL | `POST/GET /api/analysis/...` 与 hierarchy 有实现；`analyze/stream` 仍 501 |
 
 ## MISSING
@@ -65,8 +71,8 @@
 |---|---|---|
 | 同人文生成 | MISSING | `fanfiction` 创建/续写端点仍返回 HTTP 501 |
 | 编辑与导出 | MISSING | 无富文本编辑、版本管理和 EPUB/Markdown 导出 |
-| 关系演化观测 | MISSING | 回填与当前观测以 establish 为主；change/end 演化链尚未在样例数据中形成 |
-| 线索生产闭环 | MISSING | clamp 修复已合入代码，但样例小说线索 run 需重新执行后才有可验收产物 |
+| 关系演化观测 | MISSING | 回填与当前观测以 establish 为主；change/end 生产链未在样例中形成 |
+| 线索 payoff 生产闭环 | MISSING | live re-judge 已调用 Vertex，但 worker gate/title 仍不产生可验收 plant→payoff 链 |
 
 ## Security Closure
 

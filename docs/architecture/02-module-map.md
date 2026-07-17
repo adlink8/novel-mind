@@ -21,7 +21,7 @@
 |---|---|
 | **职责** | HTTP 端点：认证、小说 CRUD、AI 模型配置、RAG、混合搜索与评测 |
 | **主要文件** | `backend/app/api/auth.py`、`novels.py`、`models.py`、`rag.py`、`search.py`、`eval.py`、`timeline.py`、`relationships.py`、`clues.py`、`narrative_memory.py`、`dependencies.py` |
-| **状态** | VERIFIED（认证 + 小说 + 模型 + RAG + 搜索 + timeline/rel/clue 产品路由 + **NM structure 只读**）；PARTIAL（评测质量闭环、NM 样例产出）；501 占位（同人等） |
+| **状态** | VERIFIED（认证 + 小说 + 模型 + RAG + 搜索 + timeline/rel/clue 产品路由 + **NM structure 只读** + timeline 可选章范围）；PARTIAL（评测质量闭环、NM 全书构建、线索 payoff 质量）；501 占位（同人等） |
 | **上游** | 前端 HTTP 请求 |
 | **下游** | Service 层 |
 | **文档** | `backend/app/api/README.md` |
@@ -76,10 +76,29 @@
 |---|---|
 | **职责** | 为 Structure Workspace 提供 candidate NM versions/tree/claims/source-links；cutoff 过滤；**不** promote、**不**启动 builder |
 | **主要文件** | `backend/app/services/narrative_memory/structure_query.py`、`api/narrative_memory.py`、`schemas/narrative_memory_product.py` |
-| **状态** | VERIFIED（单元测试）；样例数据常 empty → UI 降级章节树 |
+| **状态** | VERIFIED（只读 API + 单测）；样例 novel 91 有 partial candidate（少量 chapter_state）；无完整 L3/L4 前 UI 可降级章节树 |
 | **上游** | `/analysis` 前端、`require_owned_novel` |
 | **下游** | `narrative_memory_*` 表（只读） |
 | **文档** | `.planning/phases/20-structure-workspace-multilayer-presentation/` |
+
+### 时间线查询（含结构范围）
+
+| 属性 | 内容 |
+|---|---|
+| **职责** | 版本 envelope 投影；spoiler / full_book；可选 `chapter_start`/`chapter_end` 与 spoiler 合成上下界 |
+| **主要文件** | `backend/app/api/timeline.py`、`services/timeline/query.py`（`effective_narrative_bounds`） |
+| **状态** | VERIFIED（单测）；生产 BE 需加载新代码后 API 计数与范围一致 |
+| **上游** | Structure Workspace / progressive 轮询 |
+| **下游** | analysis events / versions 表 |
+
+### 层级分块（Phase 07）
+
+| 属性 | 内容 |
+|---|---|
+| **职责** | chapter→scene→evidence 树；active pointer；asset audit 要求 content/hash 与原文一致 |
+| **主要文件** | `services/chunking/hierarchy.py`、`segmentation.py`、`pg_store.py`、`analysis_service.ensure_hierarchy` |
+| **状态** | VERIFIED：segment 必须用章节原文精确切片（修 content_hash_mismatch）；force rebuild 可刷新 active build |
+| **文档** | `20-HIERARCHY-REBUILD.md` |
 
 ### 数据库迁移
 

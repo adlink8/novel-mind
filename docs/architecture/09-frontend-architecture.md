@@ -81,15 +81,17 @@ frontend/src/
 | `/search` | 跨小说混合搜索结果 | 需要登录 | VERIFIED |
 | `/eval` | RAG 评测数据、运行和可视化 | 需要登录 | VERIFIED |
 | `/settings` | AI 模型设置 | 需要登录 | VERIFIED |
-| `/analysis` | 结构工作台：结构导航 + 时间线/关系/线索 facet | 需要登录 | VERIFIED（Phase 20 壳；NM 候选只读，无 promote） |
+| `/analysis` | 结构工作台：全视口结构导航 + 时间线/关系/线索 facet | 需要登录 | VERIFIED（Phase 20；NM 候选只读，无 promote） |
 | `/writing` | 写作页 | 需要登录 | SKELETON（骨架） |
 
-### `/analysis` 信息架构（Phase 20）
+### `/analysis` 信息架构（Phase 20 + 2026-07-17 打磨）
 
+- **布局**：`AppShell` 在 `/analysis` 下主区视口高度；页内 `analysis-fullpage` + 结构轨/主区 **等高**、内部滚动（长章列表不撑爆页面）。
 - **主轴**：结构树（有 NM candidate 时 global→arc→chapter_state；否则章节列表降级）。
-- **辅轴**：Facet tabs（timeline | relationships | clues），scope = 选中节点 `chapter_start..chapter_end`。
-- **诚实**：NM 始终展示「预览·未发布」/ `candidate_preview`；无 NM 时横幅说明单层分析。
-- **非目标**：不将 NM promote 为生产 active；不复活 plot/theme 中间摘要菜单。
+- **辅轴**：下划线 Facet tabs（timeline | relationships | clues）；scope = 选中节点章范围。
+- **范围契约**：FE 将 `chapter_start` / `chapter_end` 传给 timeline API；关系用 `through_chapter`；线索按 plant/payoff 与范围相交过滤。
+- **诚实**：NM 产品面只读 candidate（无 promote UI）；关系默认 accepted，provisional 可选；transition≠establish 时展示生命周期徽章。
+- **非目标**：不将 NM promote 为生产 active；不复活 plot/theme 中间摘要菜单；不堆叠说明性文案墙。
 
 ## 视觉系统
 
