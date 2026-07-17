@@ -137,11 +137,6 @@ export function TimelineStatus({
       {run?.status_reason && (
         <p className="text-sm text-destructive">{run.status_reason}</p>
       )}
-      <p className="text-xs text-muted-foreground">
-        {status === "empty"
-          ? "已选中小说，但尚未启动分析。确认后请点「开始分析」。"
-          : "流程：准备场景层级 → 按章抽取事件 → 跨章调和 → 发布版本。已完成章节会保存，可暂停后续跑。"}
-      </p>
     </div>
   );
 }

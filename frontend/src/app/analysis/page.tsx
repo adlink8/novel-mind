@@ -148,7 +148,6 @@ function AnalysisWorkspace() {
   const [run, setRun] = useState<TimelineRun | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [prepNote, setPrepNote] = useState("");
   const envelopeSigRef = useRef("");
   const progressSigRef = useRef("");
   const sourceRef = useRef(source);
@@ -299,23 +298,10 @@ function AnalysisWorkspace() {
         await loadTimeline(novelId, undefined, !progressChanged);
         if (cancelled) return;
 
-        if (ACTIVE_RUN.has(nextRun.status)) {
-          setPrepNote(
-            `分析进行中：${Number(nextRun.progress?.completed_chapters ?? 0)}/${Number(nextRun.progress?.total_chapters ?? 0) || "?"} 章 · 图与列表会随章节更新`
-          );
-        } else if (nextRun.status === "completed") {
-          setPrepNote("时间线已就绪。");
+        if (nextRun.status === "completed") {
           // promote view to active
           envelopeSigRef.current = "";
           await loadTimeline(novelId, undefined, false);
-        } else if (nextRun.status === "cancelled") {
-          setPrepNote("分析已暂停，已完成章节结果会保留。");
-        } else if (
-          nextRun.status === "paused_budget" ||
-          nextRun.status === "paused_dependency" ||
-          nextRun.status === "failed"
-        ) {
-          setPrepNote(nextRun.status_reason || "分析已中断，可点「继续分析」。");
         }
       } catch {
         if (!cancelled) {
@@ -382,7 +368,6 @@ function AnalysisWorkspace() {
     setThroughChapter("");
     setWorkspace("timeline");
     setError("");
-    setPrepNote("");
     envelopeSigRef.current = "";
     progressSigRef.current = "";
     runStatusRef.current = null;
@@ -438,13 +423,7 @@ function AnalysisWorkspace() {
             { ordering, person: "", causal, fullBook: preferFullBook },
             false
           );
-          setPrepNote(
-            "已有时间线数据，可直接浏览。人物关系可看共现临时图（正式关系观察待知识图谱）；线索可在「线索与伏笔」查看或重试。需要可点「重新分析」。"
-          );
         } else if (ACTIVE_RUN.has(st)) {
-          setPrepNote(
-            "检测到进行中的时间线：事件会陆续出现。线索已可并行；人物关系在时间线发布后自动跑，图可先看共现。"
-          );
           // Snap to candidate so existing partial results are visible immediately
           setSource("running_candidate");
           sourceRef.current = "running_candidate";
@@ -463,9 +442,6 @@ function AnalysisWorkspace() {
             { ordering, person: "", causal, fullBook: preferFullBook },
             false
           );
-          setPrepNote(
-            "上次分析已暂停。若有候选事件可先浏览；点「继续分析」续跑。完成后人物关系与线索会并行生成。"
-          );
         } else if (st === "paused_dependency" || st === "paused_budget" || st === "failed") {
           setSource("running_candidate");
           sourceRef.current = "running_candidate";
@@ -475,20 +451,15 @@ function AnalysisWorkspace() {
             { ordering, person: "", causal, fullBook: preferFullBook },
             false
           );
-          setPrepNote("上次分析中断，可点「继续分析」重试。关系/线索在时间线就绪后并行。");
           if (statusResponse.data.status_reason) {
             setError(statusResponse.data.status_reason);
           }
-        } else {
-          setPrepNote("已加载状态。点「开始分析」：时间线主跑，同时并行线索；关系在时间线发布后并行。");
         }
       } catch {
         setRun(null);
-        setPrepNote("尚未分析。点「开始分析」后：时间线开始，并并行线索；关系在时间线发布后启动。");
       }
     } catch {
       setError("加载小说分析状态失败。");
-      setPrepNote("");
     } finally {
       setLoading(false);
     }
@@ -499,12 +470,10 @@ function AnalysisWorkspace() {
     if (!novelId) return;
     setLoading(true);
     setError("");
-    setPrepNote("正在启动分析：时间线入队；完成后并行人物关系与线索…");
     try {
       // Product: timeline primary; clue starts in parallel (may pause until hierarchy/timeline ready).
-      // Relationship worker is dispatched by backend after timeline promote; graph may show
-      // progressive co-occurrence while observations are empty.
-      const [timelineStart, clueStart] = await Promise.allSettled([
+      // Relationship worker is dispatched by backend after timeline promote.
+      const [timelineStart] = await Promise.allSettled([
         timelineApi.startOrResume(novelId),
         clueApi.startOrResume(novelId),
       ]);
@@ -523,17 +492,6 @@ function AnalysisWorkspace() {
         setSource("active");
         sourceRef.current = "active";
         await loadTimeline(novelId, undefined, false);
-        setPrepNote(
-          "时间线已完成并发布。人物关系与线索已/将并行处理；关系图可先显示时间线共现临时边。"
-        );
-      } else if (ACTIVE_RUN.has(st)) {
-        setPrepNote(
-          clueStart.status === "fulfilled"
-            ? "时间线分析中：候选事件会陆续出现。线索已并行入队；人物关系在时间线发布后自动跑，图可先看共现临时数据。"
-            : "时间线分析中：候选事件会陆续出现。线索入队失败时可在「线索与伏笔」重试。"
-        );
-      } else {
-        setPrepNote(statusResponse.data.status_reason || "任务已提交。");
       }
     } catch (err: unknown) {
       const detail =
@@ -543,7 +501,6 @@ function AnalysisWorkspace() {
         (err as { response?: { data?: { detail?: string } } }).response?.data
           ?.detail;
       setError(typeof detail === "string" ? detail : "启动分析失败，请稍后重试。");
-      setPrepNote("");
     } finally {
       setLoading(false);
     }
@@ -583,9 +540,6 @@ function AnalysisWorkspace() {
     try {
       const res = await timelineApi.cancel(novelId);
       setRun(res.data);
-      setPrepNote(
-        `已暂停。已完成约 ${Number(res.data.progress?.completed_chapters ?? 0)} 章结果会保留。`
-      );
     } catch {
       setError("暂停失败，请稍后重试。");
     } finally {
@@ -845,9 +799,6 @@ function AnalysisWorkspace() {
           <h1 className="font-serif text-2xl font-semibold sm:text-3xl">
             结构工作台
           </h1>
-          <p className="mt-0.5 text-xs text-muted-foreground sm:text-sm">
-            结构为轴 · 时间线 / 人物关系 / 线索为切片 · 防剧透 · 点「开始分析」才调用模型
-          </p>
         </div>
         <label className="grid min-w-48 gap-1 text-xs text-muted-foreground">
           选择小说
@@ -984,9 +935,6 @@ function AnalysisWorkspace() {
                       />
                       显示全书（可能剧透）
                     </label>
-                    <p className="text-xs text-muted-foreground">
-                      与时间线共用版本偏好；结构节点会收窄 through_chapter
-                    </p>
                   </div>
                 )}
                 {(envelope.active || envelope.running_candidate) && (
@@ -1035,52 +983,6 @@ function AnalysisWorkspace() {
               </div>
             )}
 
-            {workspace !== "clues" &&
-              run &&
-              ACTIVE_RUN.has(run.status) && (
-              <p className="text-xs leading-relaxed text-muted-foreground">
-                分析进行中：进度 {Number(run.progress?.completed_chapters ?? 0)}/
-                {Number(run.progress?.total_chapters ?? 0) || "?"} 章；图/列表展示
-                <strong className="font-medium text-foreground"> 候选 </strong>
-                版本中已落库事件（不受阅读进度截断）。当前可见{" "}
-                {scopedEvents.length}
-                {selectedNode && view && scopedEvents.length !== view.events.length
-                  ? ` / 结构前 ${view.events.length}`
-                  : ""}{" "}
-                条。
-              </p>
-            )}
-            {workspace !== "clues" &&
-              run &&
-              (run.status === "cancelled" || run.status === "failed") &&
-              Boolean(envelope.running_candidate?.events?.length) && (
-              <p className="text-xs leading-relaxed text-muted-foreground">
-                已暂停/中断，仍有{" "}
-                <strong className="font-medium text-foreground">
-                  {envelope.running_candidate?.events.length ?? 0}
-                </strong>{" "}
-                条候选事件可浏览。关系与线索需时间线完成并发布后才会生成。
-              </p>
-            )}
-            {workspace === "relationships" &&
-              !(view?.events?.length) &&
-              !(envelope.active || envelope.running_candidate) && (
-              <p className="text-xs leading-relaxed text-amber-900/80">
-                人物关系依赖时间线版本。请先在「时间线」完成分析。
-              </p>
-            )}
-            {workspace !== "clues" &&
-              !ACTIVE_RUN.has(run?.status ?? "") &&
-              source === "active" &&
-              !fullBook &&
-              !selectedNovel?.reading_progress?.timeline_full_book && (
-              <p className="text-xs leading-relaxed text-amber-900/80">
-                防剧透：未勾选「显示全书」时，已发布版本只显示到阅读进度（无进度则仅第一章）。
-              </p>
-            )}
-            {workspace !== "clues" && prepNote && (
-              <p className="text-xs text-muted-foreground">{prepNote}</p>
-            )}
             {workspace !== "clues" && error && (
               <p role="alert" className="text-sm text-destructive">
                 {error}
@@ -1134,40 +1036,15 @@ function AnalysisWorkspace() {
               </div>
             ) : view ? (
               <>
-                {multiChapterScope && selectedNode && (
-                  <div
+                {multiChapterScope && selectedNode && timelineDensity.truncated > 0 && (
+                  <p
                     data-testid="timeline-multi-chapter-density"
-                    className="text-xs leading-relaxed text-muted-foreground"
+                    className="sr-only"
                   >
-                    <p className="font-medium text-foreground/90">
-                      多章聚合 · 第 {selectedNode.chapterStart}–
-                      {selectedNode.chapterEnd} 章
-                    </p>
-                    <p className="mt-0.5">
-                      共 {timelineDensity.total} 条事件
-                      {timelineDensity.byChapter.length > 0 && (
-                        <>
-                          {" "}
-                          · 分章：
-                          {timelineDensity.byChapter
-                            .slice(0, 12)
-                            .map((c) => `第${c.chapter}章 ${c.count}`)
-                            .join(" · ")}
-                          {timelineDensity.byChapter.length > 12
-                            ? ` · …共 ${timelineDensity.byChapter.length} 章`
-                            : ""}
-                        </>
-                      )}
-                      {timelineDensity.truncated > 0 && (
-                        <span data-testid="timeline-density-truncated">
-                          {" "}
-                          · 图中 {scopedEvents.length} 条，还有{" "}
-                          {timelineDensity.truncated} 条未展开
-                        </span>
-                      )}
-                      。单章节点可看完整泳道。
-                    </p>
-                  </div>
+                    <span data-testid="timeline-density-truncated">
+                      truncated {timelineDensity.truncated}
+                    </span>
+                  </p>
                 )}
                 <TimelineChart
                   events={scopedEvents}

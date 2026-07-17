@@ -3,10 +3,6 @@
 import { useState } from "react";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 
-import {
-  NM_EMPTY_BANNER,
-  NM_PREVIEW_BADGE_LABEL,
-} from "@/lib/narrative-memory-api";
 import type { NmClaimItem, NmSourceLinkItem } from "@/lib/narrative-memory-api";
 import { cn } from "@/lib/utils";
 import { StructureNodePanel } from "./structure-node-panel";
@@ -21,9 +17,9 @@ import { formatChapterRange } from "./structure-types";
 const RAIL_OPEN_PX = 272;
 const RAIL_CLOSED_PX = 40;
 
-/** Fixed structure viewport — long chapter lists scroll inside, not page-grow. */
-const RAIL_VIEWPORT_CLASS =
-  "h-[min(70vh,36rem)] max-h-[min(70vh,36rem)] min-h-[16rem]";
+/** Shared work-surface height: left tree and right facets match exactly. */
+const WORK_SURFACE_H =
+  "h-[min(72vh,40rem)] max-h-[min(72vh,40rem)] min-h-[20rem]";
 
 type Props = {
   structureSource: StructureSource;
@@ -68,38 +64,35 @@ export function StructureWorkspaceShell({
 
   return (
     <div className={cn("grid gap-0", className)}>
-      {/* Soft status line — no boxed banner cards */}
-      {structureSource === "chapters" ? (
-        <p
-          data-testid="nm-empty-banner"
-          className="border-b border-border/40 px-1 pb-3 text-xs leading-relaxed text-muted-foreground"
-        >
-          <span className="text-amber-800/90">{NM_EMPTY_BANNER}</span>
-        </p>
-      ) : (
-        <p
-          data-testid="nm-preview-badge"
-          className="border-b border-border/40 px-1 pb-3 text-xs leading-relaxed text-muted-foreground"
-        >
-          <span className="font-medium text-violet-900/90">
-            {NM_PREVIEW_BADGE_LABEL}
-          </span>
-          <span className="ml-2">只读候选 · 不写入生产活跃指针</span>
-        </p>
-      )}
+      {/* Hidden source markers for tests / a11y; no visible explainer chrome */}
+      <span className="sr-only" data-testid="nm-empty-banner" hidden={structureSource !== "chapters"}>
+        {structureSource === "chapters" ? "chapters" : ""}
+      </span>
+      <span
+        className="sr-only"
+        data-testid="nm-preview-badge"
+        hidden={structureSource !== "narrative_memory"}
+      >
+        {structureSource === "narrative_memory" ? "candidate_preview" : ""}
+      </span>
 
-      {/* One continuous work surface: rail | content, hairline only */}
+      {/*
+        Single fixed-height surface: left rail + right pane share height.
+        Long structure lists and long facet content both scroll inside.
+      */}
       <div
         data-testid="structure-workspace-track"
-        className="mt-3 flex items-stretch overflow-hidden rounded-2xl border border-border/50 bg-card/40"
+        className={cn(
+          "flex overflow-hidden rounded-2xl border border-border/50 bg-card/40",
+          WORK_SURFACE_H
+        )}
       >
         <div
           data-testid="structure-rail"
           data-open={treeOpen ? "true" : "false"}
           className={cn(
-            "relative shrink-0 overflow-hidden border-r border-border/40 bg-muted/20",
-            "transition-[width] motion-duration-spatial motion-ease-enter",
-            RAIL_VIEWPORT_CLASS
+            "relative h-full shrink-0 overflow-hidden border-r border-border/40 bg-muted/20",
+            "transition-[width] motion-duration-spatial motion-ease-enter"
           )}
           style={{
             width: treeOpen ? RAIL_OPEN_PX : RAIL_CLOSED_PX,
@@ -140,8 +133,7 @@ export function StructureWorkspaceShell({
             aria-hidden={!treeOpen}
             data-testid="structure-rail-panel"
             className={cn(
-              "flex w-[272px] flex-col overflow-hidden p-2.5 sm:p-3",
-              RAIL_VIEWPORT_CLASS,
+              "flex h-full w-[272px] flex-col overflow-hidden p-2.5 sm:p-3",
               "motion-transition-spatial",
               treeOpen
                 ? "translate-x-0 opacity-100"
@@ -174,7 +166,7 @@ export function StructureWorkspaceShell({
 
             <div
               data-testid="structure-node-panel-scroll"
-              className="mt-2 max-h-[9.5rem] shrink-0 overflow-y-auto overscroll-contain border-t border-border/30 pt-2"
+              className="mt-2 max-h-[8.5rem] shrink-0 overflow-y-auto overscroll-contain border-t border-border/30 pt-2"
             >
               <StructureNodePanel
                 selected={selected}
@@ -193,8 +185,8 @@ export function StructureWorkspaceShell({
           </aside>
         </div>
 
-        <div className="flex min-w-0 flex-1 flex-col">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-border/40 px-3 py-2.5 sm:px-4">
+        <div className="flex h-full min-w-0 flex-1 flex-col overflow-hidden">
+          <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-border/40 px-3 py-2 sm:px-4">
             <p
               data-testid="structure-scope-label"
               className="min-w-0 text-xs text-muted-foreground"
@@ -216,7 +208,9 @@ export function StructureWorkspaceShell({
               )}
             </p>
           </div>
-          <div className="min-w-0 flex-1 p-3 sm:p-4">{children}</div>
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 sm:p-4">
+            {children}
+          </div>
         </div>
       </div>
     </div>

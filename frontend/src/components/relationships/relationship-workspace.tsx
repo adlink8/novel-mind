@@ -314,23 +314,11 @@ export function RelationshipWorkspace(props: Props) {
         />
       ) : (
         !loading && (
-          <div className="grid min-h-64 place-items-center rounded-3xl border border-dashed p-8 text-center text-muted-foreground">
-            <p className="text-sm">暂无人物关系数据。</p>
-            <p className="mt-2 max-w-md text-xs leading-5">
-              开始分析后，时间线事件落地即可显示<strong>共现临时图</strong>
-              ；正式关系观察在时间线发布后由 worker 生成。请先在「时间线」启动分析。
-            </p>
+          <div className="grid min-h-48 place-items-center py-10 text-center text-muted-foreground">
+            <p className="text-sm">暂无人物关系数据</p>
           </div>
         )
       )}
-      {envelope &&
-        !loading &&
-        envelope.counts.nodes === 0 &&
-        envelope.counts.edges === 0 && (
-          <p className="rounded-xl border border-amber-300/70 bg-amber-50 px-3 py-2 text-xs text-amber-950">
-            已绑定版本 v{envelope.version_id}，但尚无共现/观察边。请确认时间线该版本已有事件。
-          </p>
-        )}
 
       <RelationshipEvidencePanel
         novelId={props.novelId}

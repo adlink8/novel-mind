@@ -10,7 +10,7 @@ import {
 
 import { cn } from "@/lib/utils";
 import type { StructureSource, StructureTreeNode } from "./structure-types";
-import { formatChapterRange, nodeKindLabel } from "./structure-types";
+import { formatChapterRange } from "./structure-types";
 
 type Props = {
   forest: StructureTreeNode[];
@@ -211,17 +211,6 @@ export function StructureTree({
             />
           ))}
         </ul>
-      )}
-      {!empty && structureSource === "chapters" && (
-        <p className="mt-2 shrink-0 px-1 text-[10px] leading-relaxed text-muted-foreground">
-          长列表在上方区域内上下滚动；L3/L4 需叙事记忆候选。
-        </p>
-      )}
-      {!empty && (
-        <p className="sr-only">
-          节点类型示例：
-          {forest.map((n) => nodeKindLabel(n.kind)).join("、")}
-        </p>
       )}
     </div>
   );

@@ -299,12 +299,6 @@ describe("global analysis timeline workspace", () => {
     await expandEventList();
     expect((await screen.findAllByText("候选事件")).length).toBeGreaterThan(0);
     expect(screen.queryByText("旧版事件")).not.toBeInTheDocument();
-    // Live runs surface candidate events without the default spoiler cutoff banner.
-    expect(
-      screen.getAllByText((_, el) =>
-        Boolean(el?.textContent?.includes("不受阅读进度截断"))
-      ).length
-    ).toBeGreaterThan(0);
   });
 
   it("starts the timeline and clue pipelines from one analysis action", async () => {
@@ -317,9 +311,6 @@ describe("global analysis timeline workspace", () => {
 
     await waitFor(() => expect(mocks.startOrResume).toHaveBeenCalledWith("11"));
     expect(mocks.clueStartOrResume).toHaveBeenCalledWith("11");
-    expect(
-      await screen.findByText(/时间线已完成并发布|人物关系与线索/)
-    ).toBeInTheDocument();
   });
 
   it("orders non-contiguous chapters by chapter, source offset and event id", async () => {

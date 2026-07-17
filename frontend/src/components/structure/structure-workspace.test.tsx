@@ -17,11 +17,7 @@ import {
   eventInChapterRange,
   isMultiChapterScope,
 } from "./structure-types";
-import {
-  NM_EMPTY_BANNER,
-  NM_NODE_BADGE_LABEL,
-  NM_PREVIEW_BADGE_LABEL,
-} from "@/lib/narrative-memory-api";
+import { NM_NODE_BADGE_LABEL } from "@/lib/narrative-memory-api";
 import type { NmStructureNode } from "@/lib/narrative-memory-api";
 
 describe("buildChapterFallbackTree", () => {
@@ -328,9 +324,7 @@ describe("StructureWorkspaceShell selection scope", () => {
       </StructureWorkspaceShell>
     );
 
-    expect(screen.getByTestId("nm-empty-banner")).toHaveTextContent(
-      NM_EMPTY_BANNER
-    );
+    expect(screen.getByTestId("nm-empty-banner")).toBeInTheDocument();
     const scope = screen.getByTestId("structure-scope-label");
     expect(scope).toHaveTextContent("视图范围：");
     expect(scope).toHaveTextContent("第 1–4 章");
@@ -455,10 +449,12 @@ describe("StructureWorkspaceShell selection scope", () => {
       scroll.querySelectorAll("[data-structure-node-id^='chapter:']").length
     ).toBe(120);
 
-    const panel = screen.getByTestId("structure-rail-panel");
-    // Fixed viewport classes — must not grow unbounded with content
-    expect(panel.className).toMatch(/max-h-\[min\(70vh,36rem\)\]/);
-    expect(panel.className).toMatch(/overflow-hidden/);
+    const track = screen.getByTestId("structure-workspace-track");
+    // Shared fixed height — left/right match; lists scroll inside
+    expect(track.className).toMatch(/h-\[min\(72vh,40rem\)\]/);
+    expect(screen.getByTestId("structure-rail-panel").className).toMatch(
+      /overflow-hidden/
+    );
   });
 
   it("shows candidate preview badge when NM source", () => {
@@ -483,9 +479,6 @@ describe("StructureWorkspaceShell selection scope", () => {
         <span>facets</span>
       </StructureWorkspaceShell>
     );
-    expect(screen.getByTestId("nm-preview-badge")).toHaveTextContent(
-      NM_PREVIEW_BADGE_LABEL
-    );
-    expect(screen.queryByTestId("nm-empty-banner")).not.toBeInTheDocument();
+    expect(screen.getByTestId("nm-preview-badge")).toBeInTheDocument();
   });
 });

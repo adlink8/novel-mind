@@ -383,9 +383,6 @@ export function ClueWorkspace(props: Props) {
           />
           显示全书（可能剧透）
         </label>
-        <p className="text-xs text-muted-foreground">
-          与时间线共用全书偏好
-        </p>
       </div>
 
       <ClueControls
