@@ -14,12 +14,8 @@ import type {
 } from "./structure-types";
 import { formatChapterRange } from "./structure-types";
 
-const RAIL_OPEN_PX = 272;
+const RAIL_OPEN_PX = 280;
 const RAIL_CLOSED_PX = 40;
-
-/** Shared work-surface height: left tree and right facets match exactly. */
-const WORK_SURFACE_H =
-  "h-[min(72vh,40rem)] max-h-[min(72vh,40rem)] min-h-[20rem]";
 
 type Props = {
   structureSource: StructureSource;
@@ -63,7 +59,7 @@ export function StructureWorkspaceShell({
     : null;
 
   return (
-    <div className={cn("grid gap-0", className)}>
+    <div className={cn("flex h-full min-h-0 flex-col", className)}>
       {/* Hidden source markers for tests / a11y; no visible explainer chrome */}
       <span className="sr-only" data-testid="nm-empty-banner" hidden={structureSource !== "chapters"}>
         {structureSource === "chapters" ? "chapters" : ""}
@@ -77,15 +73,12 @@ export function StructureWorkspaceShell({
       </span>
 
       {/*
-        Single fixed-height surface: left rail + right pane share height.
-        Long structure lists and long facet content both scroll inside.
+        Fill parent height: left rail + right pane share full available space.
+        Long lists scroll inside each pane.
       */}
       <div
         data-testid="structure-workspace-track"
-        className={cn(
-          "flex overflow-hidden rounded-2xl border border-border/50 bg-card/40",
-          WORK_SURFACE_H
-        )}
+        className="flex min-h-0 flex-1 overflow-hidden border-t border-border/40 bg-card/30"
       >
         <div
           data-testid="structure-rail"

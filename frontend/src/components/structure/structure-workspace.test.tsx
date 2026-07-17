@@ -450,8 +450,9 @@ describe("StructureWorkspaceShell selection scope", () => {
     ).toBe(120);
 
     const track = screen.getByTestId("structure-workspace-track");
-    // Shared fixed height — left/right match; lists scroll inside
-    expect(track.className).toMatch(/h-\[min\(72vh,40rem\)\]/);
+    // Fills parent; left/right share height; lists scroll inside
+    expect(track.className).toMatch(/flex-1/);
+    expect(track.className).toMatch(/min-h-0/);
     expect(screen.getByTestId("structure-rail-panel").className).toMatch(
       /overflow-hidden/
     );

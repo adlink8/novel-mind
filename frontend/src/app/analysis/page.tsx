@@ -792,21 +792,24 @@ function AnalysisWorkspace() {
   ]);
 
   return (
-    <div className="mx-auto grid w-full max-w-[1500px] gap-3 px-4 py-5 sm:px-6 lg:px-8">
-      {/* 顶栏：标题 + 选书 */}
-      <header className="flex flex-wrap items-center justify-between gap-3">
+    <div
+      data-testid="analysis-fullpage"
+      className="flex h-full min-h-0 flex-col overflow-hidden"
+    >
+      {/* 顶栏：标题 + 选书 — compact strip */}
+      <header className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border/40 px-3 py-2 sm:px-4">
         <div className="min-w-0">
-          <h1 className="font-serif text-2xl font-semibold sm:text-3xl">
+          <h1 className="font-serif text-lg font-semibold sm:text-xl">
             结构工作台
           </h1>
         </div>
-        <label className="grid min-w-48 gap-1 text-xs text-muted-foreground">
-          选择小说
+        <label className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span className="sr-only sm:not-sr-only">选择小说</span>
           <select
             aria-label="选择小说"
             value={novelId}
             onChange={(event) => void selectNovel(event.target.value)}
-            className="h-10 rounded-xl border bg-card px-3 text-sm text-foreground"
+            className="h-9 min-w-[10rem] rounded-lg border-0 bg-muted/50 px-2.5 text-sm text-foreground ring-1 ring-border/50 sm:min-w-48"
           >
             <option value="">请选择一本小说</option>
             {novels.map((novel) => (
@@ -819,19 +822,17 @@ function AnalysisWorkspace() {
       </header>
 
       {!novelId ? (
-        <div className="grid min-h-72 place-items-center rounded-3xl border border-dashed bg-card/50 p-8 text-center motion-transition-content">
+        <div className="grid min-h-0 flex-1 place-items-center p-8 text-center motion-transition-content">
           <div>
             <BookOpen className="mx-auto mb-3 size-8 text-primary" />
             <h2 className="font-serif text-2xl font-semibold">
               选择一本小说
             </h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              进入后不会自动分析。确认后请点「开始分析」再跑时间线抽取。
-            </p>
           </div>
         </div>
       ) : (
         <StructureWorkspaceShell
+          className="min-h-0 flex-1"
           structureSource={structureSource}
           forest={structureForest}
           selected={selectedNode}

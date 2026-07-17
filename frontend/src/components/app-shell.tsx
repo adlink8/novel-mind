@@ -196,7 +196,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <main
         id="main-content"
         className={cn(
-          "min-h-screen pb-24 transition-[margin] motion-duration-spatial motion-ease-enter lg:pb-0",
+          "transition-[margin] motion-duration-spatial motion-ease-enter",
+          // Analysis workbench fills the viewport; other pages keep classic scroll + mobile bottom-nav pad
+          pathname.startsWith("/analysis")
+            ? "h-[calc(100dvh-4rem)] overflow-hidden pb-0 lg:h-dvh"
+            : "min-h-screen pb-24 lg:pb-0",
           navCollapsed ? "lg:ml-[5.75rem]" : "lg:ml-[276px]",
         )}
       >
