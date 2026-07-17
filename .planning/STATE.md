@@ -47,7 +47,8 @@ Last activity: 2026-07-16
 
 - Wave1 parallel: UAT smoke + NM build probe + quality map → reports under phase 20  
 - Wave2 parallel: clue spoiler fix `4b248e5`; clue re-run v22 novel 91; BE:8000 / FE:3005 smoke  
-- NM still blocked on hierarchy rebuild_required  
+- Hierarchy rebuild novel 91: **done** — `cb_9f9aee6bf1cb427b` reusable_exact, audit EXIT=0 (see `20-HIERARCHY-REBUILD.md`); segment source-slice fix unblocked  
+- Clue live re-judge novel 91: **done** — v24 active, 29 live + 3 cache_hit; payoff_chapter still 0 (gate path); titles still meta (see `20-CLUE-LIVE-REJUDGE.md`); no NM promote  
 - See `20-WAVE-NEXT-REPORT.md`
 
 ## Deferred
