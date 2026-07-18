@@ -36,6 +36,52 @@ describe("buildChapterFallbackTree", () => {
     const forest = buildChapterFallbackTree(1, { titles: { 1: "序章" } });
     expect(forest[0].children[0].label).toContain("序章");
   });
+
+  it("strips the leading chapter marker from raw heading titles", () => {
+    const forest = buildChapterFallbackTree(2, {
+      titles: { 1: "第1章 凯撒", 2: "第三章" },
+    });
+    expect(forest[0].children[0].label).toBe("第 1 章 · 凯撒");
+    // 清理后仍只是章节号 → 视为无名，不重复拼接
+    expect(forest[0].children[1].label).toBe("第 2 章");
+  });
+});
+
+describe("buildNmStructureTree chapter titles", () => {
+  const chapterNode = (
+    id: number,
+    chapter: number,
+    displayLabel: string | null
+  ): NmStructureNode => ({
+    id,
+    node_key: `c${id}`,
+    node_kind: "chapter_state",
+    display_label: displayLabel,
+    chapter_start: chapter,
+    chapter_end: chapter,
+    child_ids: [],
+  });
+
+  it("prefers real chapter titles over inconsistent LLM labels", () => {
+    const forest = buildNmStructureTree(
+      [chapterNode(1, 5, "第5章"), chapterNode(2, 6, null)],
+      { chapterTitles: { 5: "第5章 少女与魔王", 6: "第6章 森精灵大作战" } }
+    );
+    expect(forest[0].label).toBe("第 5 章 · 少女与魔王");
+    expect(forest[1].label).toBe("第 6 章 · 森精灵大作战");
+  });
+
+  it("treats stage_key labels as missing and falls back to the default label", () => {
+    const forest = buildNmStructureTree([chapterNode(1, 7, "chapter_state:7")]);
+    expect(forest[0].label).toBe("章状态 · 第 7 章");
+  });
+
+  it("keeps model labels when no real title is available", () => {
+    const forest = buildNmStructureTree([
+      chapterNode(1, 8, "第一卷 第三章 在矮人王国（3/4）"),
+    ]);
+    expect(forest[0].label).toBe("第一卷 第三章 在矮人王国（3/4）");
+  });
 });
 
 describe("buildNmStructureTree", () => {

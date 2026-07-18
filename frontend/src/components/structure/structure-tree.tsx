@@ -30,6 +30,13 @@ function kindIcon(kind: string) {
   return <Network className="size-3.5 shrink-0 text-muted-foreground" />;
 }
 
+/** 右侧范围戳仅在 label 未携带章节信息时展示，避免「第1章 … 第 1 章」重复。 */
+function shouldShowRange(label: string, rangeText: string): boolean {
+  if (!rangeText) return false;
+  const compact = (s: string) => s.replace(/\s+/g, "");
+  return !compact(label).includes(compact(rangeText));
+}
+
 function TreeRow({
   node,
   depth,
@@ -46,6 +53,8 @@ function TreeRow({
   const hasChildren = node.children.length > 0;
   const [open, setOpen] = useState(defaultOpen);
   const selected = selectedId === node.id;
+  const rangeText = formatChapterRange(node.chapterStart, node.chapterEnd);
+  const showRange = shouldShowRange(node.label, rangeText);
 
   return (
     <li className="list-none">
@@ -90,10 +99,17 @@ function TreeRow({
           )}
         >
           {kindIcon(node.kind)}
-          <span className="min-w-0 flex-1 truncate">{node.label}</span>
-          <span className="shrink-0 text-[10px] text-muted-foreground">
-            {formatChapterRange(node.chapterStart, node.chapterEnd)}
+          <span
+            className="line-clamp-2 min-w-0 flex-1 leading-snug break-words"
+            title={node.label}
+          >
+            {node.label}
           </span>
+          {showRange && (
+            <span className="shrink-0 text-[10px] text-muted-foreground">
+              {rangeText}
+            </span>
+          )}
         </button>
       </div>
 

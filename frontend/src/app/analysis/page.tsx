@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { BookOpen, RefreshCw } from "lucide-react";
+import { NovelPickerStrip } from "@/components/bookshelf/novel-picker-strip";
 
 import { ClueWorkspace } from "@/components/clues/clue-workspace";
 import { clueApi } from "@/lib/clue-api";
@@ -123,6 +124,12 @@ function AnalysisWorkspace() {
     useState<AnalysisWorkspaceMode>("timeline");
   /** Shared narrative chapter for relationship fold (server remains spoiler authority). */
   const [throughChapter, setThroughChapter] = useState<number | "">("");
+  /**
+   * 用户显式设置的剧透上限（关系/时间线点击）。
+   * 结构树只响应显式上限；节点选择对 throughChapter 的自动对齐
+   * 是 facet 过滤用途，不应让导航树收缩（否则点一章树就少一截）。
+   */
+  const [explicitThrough, setExplicitThrough] = useState<number | "">("");
   /** Structure Workspace spine (Phase 20). */
   const [structureSource, setStructureSource] =
     useState<StructureSource>("chapters");
@@ -155,12 +162,16 @@ function AnalysisWorkspace() {
   /** Last through_chapter used for NM tree fetch (re-fetch on spoiler change). */
   const nmTreeThroughRef = useRef<number | null>(null);
   const selectedNodeRef = useRef<StructureNodeSelection | null>(null);
+  /** 选中作品的章节真实标题（chapters 表），结构树标签统一用它补全章节名。 */
+  const chapterTitlesRef = useRef<Record<number, string>>({});
   sourceRef.current = source;
   runStatusRef.current = run?.status ?? null;
   selectedNodeRef.current = selectedNode;
 
   const applyChapterForest = useCallback((chapterCount: number) => {
-    const forest = buildChapterFallbackTree(Math.max(1, chapterCount || 1));
+    const forest = buildChapterFallbackTree(Math.max(1, chapterCount || 1), {
+      titles: chapterTitlesRef.current,
+    });
     setStructureSource("chapters");
     setStructureForest(forest);
     setNmVersionId(null);
@@ -231,7 +242,21 @@ function AnalysisWorkspace() {
     ) => {
       const chapterCount = novelMeta?.chapter_count ?? 1;
       try {
-        const versionsRes = await narrativeMemoryApi.listVersions(id);
+        // 章节标题与 NM 版本并行取；标题只用于树标签，失败不阻断主流程
+        const [versionsRes, chaptersSettled] = await Promise.all([
+          narrativeMemoryApi.listVersions(id),
+          Promise.allSettled([novelsApi.getChapters(id)]),
+        ]);
+        const [chaptersOutcome] = chaptersSettled;
+        if (chaptersOutcome.status === "fulfilled") {
+          const map: Record<number, string> = {};
+          for (const ch of chaptersOutcome.value.data ?? []) {
+            if (typeof ch.chapter_number === "number" && ch.title) {
+              map[ch.chapter_number] = ch.title;
+            }
+          }
+          chapterTitlesRef.current = map;
+        }
         const latest = pickLatestPreviewVersion(versionsRes.data.versions ?? []);
         if (!latest) {
           applyChapterForest(chapterCount);
@@ -246,7 +271,9 @@ function AnalysisWorkspace() {
         const treeRes = await narrativeMemoryApi.getTree(id, latest.version_id, {
           through_chapter: through,
         });
-        const forest = buildNmStructureTree(treeRes.data.nodes ?? []);
+        const forest = buildNmStructureTree(treeRes.data.nodes ?? [], {
+          chapterTitles: chapterTitlesRef.current,
+        });
         if (!forest.length) {
           applyChapterForest(chapterCount);
           return;
@@ -400,6 +427,7 @@ function AnalysisWorkspace() {
     setPerson("");
     setSource("active");
     setThroughChapter("");
+    setExplicitThrough("");
     setWorkspace("timeline");
     setError("");
     envelopeSigRef.current = "";
@@ -417,6 +445,7 @@ function AnalysisWorkspace() {
       setRun(null);
       setFullBook(false);
       setStructureForest([]);
+      chapterTitlesRef.current = {};
       selectedNodeRef.current = null;
       setSelectedNode(null);
       setStructureSource("chapters");
@@ -698,15 +727,16 @@ function AnalysisWorkspace() {
     setSelectedClaimId((prev) => (prev === claim.id ? null : claim.id));
   }
 
-  // Re-fetch NM tree when spoiler through_chapter changes (mid-session).
+  // Re-fetch NM tree only when the user sets an EXPLICIT spoiler cap
+  // (mid-session). Auto-alignment from node selection must not shrink the tree.
   useEffect(() => {
     if (!novelId || structureSource !== "narrative_memory" || !nmVersionId) {
       return;
     }
     const chapterCount = selectedNovel?.chapter_count ?? 1;
     const through =
-      typeof throughChapter === "number" && throughChapter >= 1
-        ? throughChapter
+      typeof explicitThrough === "number" && explicitThrough >= 1
+        ? explicitThrough
         : chapterCount;
     if (nmTreeThroughRef.current === through) return;
     let cancelled = false;
@@ -716,7 +746,9 @@ function AnalysisWorkspace() {
           through_chapter: through,
         });
         if (cancelled) return;
-        const forest = buildNmStructureTree(treeRes.data.nodes ?? []);
+        const forest = buildNmStructureTree(treeRes.data.nodes ?? [], {
+          chapterTitles: chapterTitlesRef.current,
+        });
         if (!forest.length) {
           applyChapterForest(chapterCount);
           return;
@@ -729,13 +761,11 @@ function AnalysisWorkspace() {
     return () => {
       cancelled = true;
     };
-    // selectedNovel chapter_count only — avoid novel object identity churn
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     novelId,
     structureSource,
     nmVersionId,
-    throughChapter,
+    explicitThrough,
     selectedNovel?.chapter_count,
     applyChapterForest,
     applyNmForest,
@@ -849,20 +879,20 @@ function AnalysisWorkspace() {
       data-testid="analysis-fullpage"
       className="flex h-full min-h-0 flex-col overflow-hidden"
     >
-      {/* 顶栏：标题 + 选书 — compact strip */}
-      <header className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border/40 px-3 py-2 sm:px-4">
-        <div className="min-w-0">
-          <h1 className="font-serif text-lg font-semibold sm:text-xl">
-            结构工作台
-          </h1>
-        </div>
-        <label className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span className="sr-only sm:not-sr-only">选择小说</span>
+      {/* 顶栏：横向书脊选书条（视觉）+ 原生 select（无障碍/测试，视觉隐藏） */}
+      <header className="flex shrink-0 items-end gap-3 border-b border-border/40 px-3 pt-2 sm:px-4">
+        <h1 className="sr-only">结构工作台</h1>
+        <NovelPickerStrip
+          novels={novels}
+          value={novelId}
+          onSelect={(id) => void selectNovel(id)}
+        />
+        <label className="sr-only">
+          选择小说
           <select
             aria-label="选择小说"
             value={novelId}
             onChange={(event) => void selectNovel(event.target.value)}
-            className="h-9 min-w-[10rem] rounded-lg border-0 bg-muted/50 px-2.5 text-sm text-foreground ring-1 ring-border/50 sm:min-w-48"
           >
             <option value="">请选择一本小说</option>
             {novels.map((novel) => (
@@ -901,34 +931,36 @@ function AnalysisWorkspace() {
           novelId={novelId}
         >
           <div className="grid gap-4">
-            {/* Facet tabs — underline style, not pill boxes */}
-            <div
-              role="tablist"
-              aria-label="分析切片"
-              className="flex flex-wrap gap-1 border-b border-border/40"
-            >
-              {(
-                [
-                  ["timeline", "时间线"],
-                  ["relationships", "人物关系"],
-                  ["clues", "线索与伏笔"],
-                ] as const
-              ).map(([id, label]) => (
-                <button
-                  key={id}
-                  type="button"
-                  role="tab"
-                  aria-selected={workspace === id}
-                  onClick={() => setWorkspace(id)}
-                  className={`-mb-px border-b-2 px-3 py-2 text-sm transition-colors motion-duration-fast ${
-                    workspace === id
-                      ? "border-foreground font-medium text-foreground"
-                      : "border-transparent text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
+            {/* Facet tabs — 分段控件（画布切换），保持 tab 语义 */}
+            <div className="flex justify-center">
+              <div
+                role="tablist"
+                aria-label="分析切片"
+                className="inline-flex gap-1 rounded-full border border-border/60 bg-card p-1 shadow-sm"
+              >
+                {(
+                  [
+                    ["timeline", "时间线"],
+                    ["relationships", "人物关系"],
+                    ["clues", "线索与伏笔"],
+                  ] as const
+                ).map(([id, label]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    role="tab"
+                    aria-selected={workspace === id}
+                    onClick={() => setWorkspace(id)}
+                    className={`rounded-full px-4 py-1.5 text-sm transition-colors motion-duration-fast ${
+                      workspace === id
+                        ? "bg-foreground font-medium text-background shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {workspace !== "clues" && (
@@ -1069,7 +1101,10 @@ function AnalysisWorkspace() {
                 versionId={view?.version_id}
                 fullBook={fullBook}
                 throughChapter={relationshipThroughChapter}
-                onThroughChapterChange={setThroughChapter}
+                onThroughChapterChange={(value) => {
+                  setThroughChapter(value);
+                  setExplicitThrough(value);
+                }}
                 maxChapter={
                   selectedNode
                     ? Math.min(
@@ -1106,7 +1141,10 @@ function AnalysisWorkspace() {
                   ordering={ordering}
                   novelId={novelId}
                   onNarrativePositionChange={(chapter) => {
-                    if (chapter != null) setThroughChapter(chapter);
+                    if (chapter != null) {
+                      setThroughChapter(chapter);
+                      setExplicitThrough(chapter);
+                    }
                   }}
                 />
               </>

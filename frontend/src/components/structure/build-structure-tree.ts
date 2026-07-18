@@ -5,6 +5,41 @@
 import type { NmStructureNode } from "@/lib/narrative-memory-api";
 import type { StructureTreeNode } from "./structure-types";
 
+const CHAPTER_MARKER =
+  /^第\s*[零一二三四五六七八九十百千万两\d]+\s*[章节回卷集篇部幕]\s*/;
+
+/** 去掉标题行首的章节序号标记（"第1章 凯撒" → "凯撒"；无标记则原样）。 */
+export function cleanChapterTitle(raw: string): string {
+  return raw
+    .trim()
+    .replace(CHAPTER_MARKER, "")
+    .replace(/^[:：·\-—–.\s]+/, "")
+    .trim();
+}
+
+/**
+ * 章节节点统一标签：有真实章节名则「第 X 章 · 名称」，否则「第 X 章」。
+ * 清理后若仍只是个章节号（如「第三章」），视为无名。
+ */
+export function formatChapterLabel(
+  chapterNumber: number,
+  rawTitle?: string | null
+): string {
+  const clean = rawTitle ? cleanChapterTitle(rawTitle) : "";
+  // 清理后仍只是个章节号（如「第三章」），视为无名
+  const bareMarker =
+    /^第\s*[零一二三四五六七八九十百千万两\d]+\s*[章节回卷集篇部幕]$/.test(
+      clean
+    );
+  const name = bareMarker ? "" : clean;
+  return name ? `第 ${chapterNumber} 章 · ${name}` : `第 ${chapterNumber} 章`;
+}
+
+/** LLM 缺省时后端会把 stage_key 存进 display_label（"chapter_state:12"），识别为无标签。 */
+function isStageKeyLabel(label: string): boolean {
+  return /^[a-z_]+:\d+(-\d+)?$/.test(label);
+}
+
 /** Fallback tree when no NM candidate: book root + one node per chapter. */
 export function buildChapterFallbackTree(
   chapterCount: number,
@@ -26,11 +61,10 @@ export function buildChapterFallbackTree(
 
   const children: StructureTreeNode[] = [];
   for (let i = 1; i <= n; i += 1) {
-    const title = options?.titles?.[i];
     children.push({
       id: `chapter:${i}`,
       kind: "chapter",
-      label: title ? `第 ${i} 章 · ${title}` : `第 ${i} 章`,
+      label: formatChapterLabel(i, options?.titles?.[i]),
       chapterStart: i,
       chapterEnd: i,
       children: [],
@@ -52,8 +86,15 @@ export function buildChapterFallbackTree(
 /**
  * Build forest from NM structure nodes (global → arc/volume → chapter_state).
  * Roots are nodes that are not referenced as anyone's child.
+ *
+ * chapter_state（单章）节点优先使用 chapters 表的真实章节名 ——
+ * LLM 生成的 display_label 有的带章节名有的只有「第X章」，展示不一致；
+ * 以原文标题为准保证每章都有名。无标题时回退 display_label → 默认标签。
  */
-export function buildNmStructureTree(nodes: NmStructureNode[]): StructureTreeNode[] {
+export function buildNmStructureTree(
+  nodes: NmStructureNode[],
+  options?: { chapterTitles?: Record<number, string> }
+): StructureTreeNode[] {
   if (!nodes.length) return [];
 
   const byId = new Map<number, NmStructureNode>();
@@ -72,12 +113,20 @@ export function buildNmStructureTree(nodes: NmStructureNode[]): StructureTreeNod
       .filter((c): c is NmStructureNode => Boolean(c))
       .map(toTree);
 
+    const rawLabel = n.display_label?.trim() || "";
+    const modelLabel = rawLabel && !isStageKeyLabel(rawLabel) ? rawLabel : "";
+    const realTitle =
+      n.node_kind === "chapter_state" && n.chapter_start === n.chapter_end
+        ? options?.chapterTitles?.[n.chapter_start]
+        : undefined;
+    const label = realTitle
+      ? formatChapterLabel(n.chapter_start, realTitle)
+      : modelLabel || defaultNmLabel(n.node_kind, n.chapter_start, n.chapter_end);
+
     return {
       id: `nm:${n.id}`,
       kind: n.node_kind,
-      label:
-        n.display_label?.trim() ||
-        defaultNmLabel(n.node_kind, n.chapter_start, n.chapter_end),
+      label,
       chapterStart: n.chapter_start,
       chapterEnd: n.chapter_end,
       nmNodeId: n.id,
