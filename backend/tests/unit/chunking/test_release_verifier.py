@@ -3,7 +3,6 @@ from __future__ import annotations
 import pytest
 from app.services.chunking.builds import InMemoryBuildStore, create_candidate_build
 from app.services.chunking.release_verifier import verify_and_qualify
-from app.services.rag_fixture import stable_hash
 
 pytestmark = pytest.mark.unit
 

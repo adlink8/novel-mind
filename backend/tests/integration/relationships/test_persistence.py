@@ -6,7 +6,6 @@ import pytest
 from pydantic import ValidationError
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.exc import DBAPIError, IntegrityError
-from sqlalchemy.orm import Session
 
 from app.models.character import CharacterRelation
 from app.models.relationship import (
@@ -24,14 +23,13 @@ from app.schemas.relationship import (
     CharacterIdentityOverrideCreate,
     NarrativeInterval,
     RelationshipEdgeType,
-    RelationshipEvidenceRef,
     RelationshipGraphEdge,
     RelationshipGraphEnvelope,
     RelationshipOverrideCreate,
     RelationshipSemanticJudgment,
     RelationshipVersionSource,
 )
-from tests.integration.conftest import reset_public_schema, run_alembic
+from tests.integration.conftest import run_alembic
 
 pytestmark = pytest.mark.integration
 

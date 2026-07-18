@@ -6,7 +6,6 @@ from app.services.chunking.incremental import plan_incremental_delta
 pytestmark = pytest.mark.unit
 
 def test_no_op_when_identical():
-    h = {"1": "a" * 64, "2": "b" * 64}
     # use int keys
     prev = {1: "a" * 64, 2: "b" * 64}
     cur = {1: "a" * 64, 2: "b" * 64}

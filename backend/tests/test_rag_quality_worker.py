@@ -9,7 +9,6 @@ import pytest
 from app.schemas.eval import CalibrationReport, ChunkerLineage, EvalCase, SourceSnapshot
 from app.services.rag_fixture import DEFAULT_SIGNING_SECRET, load_json, stable_hash
 from app.services.rag_quality import (
-    build_quality_input_hash,
     default_healthy,
     default_stub_answer,
     make_baseline_from_metrics,

@@ -35,7 +35,6 @@ async def test_only_eligible_calls_llm():
             "right_span_id": prop.right_span_id,
             "confidence": 0.9,
         }, ensure_ascii=False)
-    from app.services.chunking.budget import BudgetConfig, BudgetLedger
 
     led = BudgetLedger(
         BudgetConfig(

@@ -175,15 +175,6 @@ def score_predictions(
     cases = fixture["cases"]
     thresholds = fixture["thresholds"]
 
-    # Candidate recall: gold non-dismissed should be recalled; hard negatives
-    # may be recalled as candidates but must not publish.
-    gold_positive = [
-        c for c in cases if c["expected_state"] in PUBLICATION_STATES | {"candidate"}
-        or (
-            c["expected_state"] not in {"dismissed"}
-            and not c.get("hard_negative")
-        )
-    ]
     # Treat expected active/reinforced/paid_off as recall positives.
     gold_recall = [c for c in cases if c["expected_state"] in PUBLICATION_STATES]
     recalled = 0

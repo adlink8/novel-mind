@@ -6,7 +6,6 @@ from typing import Any
 
 import pytest
 from sqlalchemy import create_engine, select
-from sqlalchemy.orm import Session
 
 from app.models.relationship import RelationshipObservation, RelationshipProjectionAudit
 from app.services.relationships.projection import (

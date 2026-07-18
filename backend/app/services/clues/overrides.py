@@ -12,7 +12,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.clue import ClueOverride, MachineClue
 from app.schemas.clue import ClueActorSource, ClueLifecycleState, ClueOverrideAction
 from app.services.clues.lifecycle import (
-    LifecyclePersistError,
     append_lifecycle_event,
 )
 

@@ -24,7 +24,6 @@ from app.core.database import get_db
 from app.core.security import require_user
 from app.models.novel import Novel
 from app.models.user import User
-from app.schemas.analysis import AnalysisResponse
 from app.services.analysis_service import (
     SUPPORTED_TYPES,
     AnalysisError,

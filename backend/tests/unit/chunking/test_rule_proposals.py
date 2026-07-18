@@ -8,7 +8,6 @@ from pydantic import ValidationError
 from app.services.chunking.rules import (
     RuleEngineConfig,
     analyze_chapter,
-    propose_boundaries,
     scan_atomic_spans,
 )
 from app.services.chunking.schemas import BoundaryProposal, RULE_CONFIDENCE_VERSION

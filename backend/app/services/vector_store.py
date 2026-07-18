@@ -210,13 +210,13 @@ class VectorStore:
 
     async def delete_novel_chunks(self, novel_id: int) -> None:
         """
-        删除指定小说的全部向量集合。
+        删除指定小说的全部向量集合（幂等：集合不存在时静默成功）。
 
         Args:
             novel_id: 小说 ID
 
         Raises:
-            VectorStoreError: 删除失败时抛出
+            VectorStoreError: 删除失败时抛出（集合不存在除外）
         """
         def _delete():
             self.client.delete_collection(name=f"novel_{novel_id}")
@@ -225,6 +225,10 @@ class VectorStore:
             await asyncio.to_thread(_delete)
             logger.info("已删除 novel_%d 向量集合", novel_id)
         except Exception as e:
+            # 集合本就不存在视为已删除（删除语义幂等），其余错误照常抛出
+            if "does not exist" in str(e):
+                logger.info("novel_%d 向量集合不存在，跳过删除", novel_id)
+                return
             logger.error("删除向量集合失败 novel_%d: %s", novel_id, e)
             raise VectorStoreError(f"删除向量集合失败: {e}") from e
 

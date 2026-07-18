@@ -86,7 +86,7 @@ async def test_local_validation_allows_exactly_one_independently_reserved_repair
         run_id=1, stage_key="extract:1", max_input_tokens=100, max_output_tokens=50,
     )
     assert [a.status for a in result.attempts] == ["schema_rejected", "succeeded"]
-    assert set(gate.reservations) == {"extract:1:attempt:1", "extract:1:attempt:2"}
+    assert set(gate.reservations) == {"extract:1:repair:1", "extract:1:repair:2"}
     assert len(transport.calls) == 2
     assert "validation error" in transport.calls[1]["messages"][-1]["content"].lower()
 

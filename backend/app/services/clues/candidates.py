@@ -179,12 +179,6 @@ class ClueCandidateRecallService:
         """Deterministic draft construction (no I/O)."""
 
         cfg = config or CandidateRecallConfig()
-        evidence_nodes = [
-            n
-            for n in nodes
-            if n.level in {"evidence", "scene", "paragraph", "chunk"}
-            or n.level == "evidence"
-        ]
         # Prefer evidence-level; fall back to all nodes with valid offsets.
         preferred = [n for n in nodes if n.level == "evidence"]
         working = preferred or [

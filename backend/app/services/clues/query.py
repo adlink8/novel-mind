@@ -453,7 +453,7 @@ async def build_clue_version_view(
                 character_ids.add(int(link.character_id))
 
         if character_id is not None:
-            link_chars = {int(l.character_id) for l in visible_links if l.character_id}
+            link_chars = {int(link.character_id) for link in visible_links if link.character_id}
             if character_id not in link_chars:
                 continue
 
@@ -671,13 +671,13 @@ async def clue_detail_panels(
         ],
         "links": [
             {
-                "target_kind": l.target_kind,
-                "character_id": l.character_id,
-                "timeline_event_id": l.timeline_event_id,
-                "relationship_observation_ref": l.relationship_observation_ref,
-                "validation_status": l.validation_status,
+                "target_kind": link.target_kind,
+                "character_id": link.character_id,
+                "timeline_event_id": link.timeline_event_id,
+                "relationship_observation_ref": link.relationship_observation_ref,
+                "validation_status": link.validation_status,
             }
-            for l in links
+            for link in links
         ],
         "lifecycle": [
             {

@@ -2,7 +2,7 @@
 from __future__ import annotations
 import pytest
 from app.services.chunking.builds import InMemoryBuildStore, create_candidate_build
-from app.services.chunking.promotion import commit_promotion, prepare_promotion, PromotionError
+from app.services.chunking.promotion import commit_promotion, prepare_promotion
 from app.services.chunking.schemas import QualifiedChunkerEvidence
 from app.services.rag_fixture import stable_hash
 

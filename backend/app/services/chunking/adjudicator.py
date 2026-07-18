@@ -10,7 +10,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from app.services.chunking.budget import BudgetConfig, BudgetLedger
+from app.services.chunking.budget import BudgetLedger
 from app.services.chunking.manifests import content_hash
 from app.services.chunking.schemas import (
     AtomicSpan,
@@ -19,7 +19,6 @@ from app.services.chunking.schemas import (
     DecisionAudit,
     RuleDecision,
 )
-from app.services.rag_fixture import stable_hash
 
 # Optional callable: async (system, user) -> str raw JSON text
 LLMCaller = Callable[[str, str], Awaitable[str]]

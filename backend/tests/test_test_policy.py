@@ -13,7 +13,7 @@ from typing import Any
 
 import pytest
 import yaml
-from jsonschema import Draft202012Validator, ValidationError
+from jsonschema import Draft202012Validator
 
 pytestmark = pytest.mark.contract
 

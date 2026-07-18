@@ -4,8 +4,12 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 
-class BudgetExceeded(RuntimeError): pass
-class UnknownPricing(BudgetExceeded): pass
+class BudgetExceeded(RuntimeError):
+    pass
+
+
+class UnknownPricing(BudgetExceeded):
+    pass
 
 
 @dataclass(frozen=True)

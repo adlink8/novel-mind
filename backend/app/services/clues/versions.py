@@ -389,10 +389,6 @@ async def compare_machine_versions(
         if from_by[lid] != to_by[lid]
         or _lifecycle_signature(from_manifest, lid) != _lifecycle_signature(to_manifest, lid)
     )
-    from_life = {
-        row["logical_clue_id"]: row
-        for row in from_manifest["lifecycle"]
-    }
     # group lifecycle by logical for diff
     lifecycle_differences = []
     all_logical = sorted(from_ids | to_ids)

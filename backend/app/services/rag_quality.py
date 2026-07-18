@@ -13,10 +13,10 @@ import math
 import random
 import re
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Protocol
+from typing import Any, Callable
 
 from app.schemas.eval import (
     INVALID_LINEAGE_REASON,
@@ -30,7 +30,6 @@ from app.schemas.eval import (
 )
 from app.services.rag_fixture import (
     DEFAULT_SIGNING_SECRET,
-    InvalidFixtureError,
     InvalidLineageError,
     fail_closed,
     prompts_dir,
@@ -800,7 +799,6 @@ def run_case_once(
             **deterministic_claim_metrics(case, answer_text, retrieved),
         }
         # Prefer judge faithfulness; enforce critical from deterministic recount
-        det_crit_rate = det["critical_unsupported_claim_rate"]
         if "critical_unsupported_count" in judge_scores:
             # Arbiter re-checks deterministic critical rate
             pass
@@ -835,7 +833,7 @@ def run_case_once(
                 "call_id": artifact.call_id,
             }
         return artifact
-    except DependencyOutage as exc:
+    except DependencyOutage:
         return CaseRunArtifact(
             case_id=case.case_id,
             repetition=repetition,

@@ -2,7 +2,6 @@
 from __future__ import annotations
 import pytest
 from app.services.chunking.builds import InMemoryBuildStore, create_candidate_build
-from app.services.chunking.hierarchy import build_chapter_hierarchy
 
 pytestmark = pytest.mark.integration
 

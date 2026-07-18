@@ -6,8 +6,7 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.eval import ActiveBaseline, BaselineCandidate, QualityRun
-from app.models.novel import Novel
+from app.models.eval import BaselineCandidate, QualityRun
 from app.models.user import User
 from app.services.rag_fixture import stable_hash
 from app.services.rag_quality import (
@@ -91,7 +90,7 @@ async def _eligible_run(
 @pytest.mark.asyncio
 async def test_baseline_candidate_persists_prepare_evidence(db_session: AsyncSession):
     user = await _user(db_session, "prep1")
-    run = await _eligible_run(db_session, user, job_id="job-prep-1")
+    await _eligible_run(db_session, user, job_id="job-prep-1")
     await db_session.commit()
 
     cand = await prepare_baseline_candidate(

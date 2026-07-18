@@ -5,7 +5,6 @@ from app.services.chunking.builds import InMemoryBuildStore, create_candidate_bu
 from app.services.chunking.eval import run_ab_qualification
 from app.services.chunking.promotion import commit_promotion, prepare_promotion
 from app.services.chunking.release_verifier import verify_and_qualify
-from app.services.rag_fixture import stable_hash
 
 pytestmark = pytest.mark.integration
 

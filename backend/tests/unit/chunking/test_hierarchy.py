@@ -2,13 +2,10 @@
 from __future__ import annotations
 import pytest
 from app.services.chunking.hierarchy import (
-    assemble_hierarchy,
     build_chapter_hierarchy,
     expand_evidence_to_scene,
     validate_hierarchy_invariants,
 )
-from app.services.chunking.segmentation import segment_chapter
-from app.services.chunking.rules import RuleEngineConfig
 
 pytestmark = pytest.mark.unit
 

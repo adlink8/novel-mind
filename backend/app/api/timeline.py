@@ -151,7 +151,8 @@ async def cancel(novel: Novel = Depends(require_owned_novel), db: AsyncSession =
                  current_user: User = Depends(require_user)):
     row = await _owned_run(db, current_user.id, novel.id)
     row.status, row.cancel_requested = "cancelled", True
-    await db.commit(); await db.refresh(row)
+    await db.commit()
+    await db.refresh(row)
     return _run_response(row)
 
 
@@ -172,7 +173,8 @@ async def resume(background_tasks: BackgroundTasks,
     row.status_reason = None
     if novel.status not in ("analyzing", "analyzed"):
         novel.status = "analyzing"
-    await db.commit(); await db.refresh(row)
+    await db.commit()
+    await db.refresh(row)
     background_tasks.add_task(dispatch_timeline_run, row.id)
     return _run_response(row)
 
@@ -244,7 +246,9 @@ async def edit_event(logical_event_id: str, data: TimelineEditRequest,
     row = TimelineOverride(owner_id=current_user.id, novel_id=novel.id,
         logical_event_id=logical_event_id, field_name=data.field_name,
         value=data.value, supersedes_id=current.id if current else None)
-    db.add(row); await db.commit(); await db.refresh(row)
+    db.add(row)
+    await db.commit()
+    await db.refresh(row)
     return {"override_id": row.id, "logical_event_id": logical_event_id,
             "field_name": data.field_name, "provenance": "manual"}
 

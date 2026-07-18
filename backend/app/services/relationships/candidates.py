@@ -20,7 +20,6 @@ from app.models.character import Character
 from app.models.knowledge import (
     KnowledgeEntityCandidate,
     KnowledgeEvidenceRef,
-    KnowledgeRelationCandidate,
     KnowledgeRelationJudgment,
 )
 from app.models.novel import Chapter, Novel

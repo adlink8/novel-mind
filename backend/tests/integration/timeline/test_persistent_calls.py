@@ -162,16 +162,11 @@ async def test_unknown_price_and_missing_schema_capability_make_zero_provider_ca
 async def test_gateway_uses_strict_validation_and_one_persisted_repair(db_session):
     run_id = await _run_with_ledger(db_session, "strict")
     sessions = async_sessionmaker(db_session.bind, expire_on_commit=False)
-    coercible = (
-        '{"events":[{"candidate_id":"e","title":"t","description":"d",'
-        '"event_type":"plot","narrative_chapter_number":1,"narrative_index":0,'
-        '"participants":[{"mention":"Mira","entity_id":"7"}],'
-        '"story_time":{"precision":"unknown"},"evidence":[{"chapter_id":1,'
-        '"evidence_id":"ev","source_start":0,"source_end":1,"content_hash":"'
-        + "a" * 64 + '"}],"confidence":0.9}],"story_time_constraints":[]}'
-    )
+    # TimelineExtraction 校验前会做轻度 coerce（宽容 Vertex 常见偏差），
+    # 因此用 schema 未声明的多余字段（extra="forbid"）触发真正的 schema_rejected。
+    invalid = '{"events": [], "unexpected": true}'
     transport = RecordingTransport([
-        {"id": "bad", "content": coercible, "usage": {}},
+        {"id": "bad", "content": invalid, "usage": {}},
         {"id": "good", "content": VALID, "usage": {}},
     ])
     gateway = TimelineModelGateway(transport, persistence=PostgresCallRepository(sessions))

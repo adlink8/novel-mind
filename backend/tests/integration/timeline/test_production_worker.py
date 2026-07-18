@@ -248,7 +248,7 @@ async def test_resume_skips_completed_chapter_after_interruption(
 
 
 @pytest.mark.asyncio
-async def test_invalid_reconciliation_never_promotes_partial_candidate(
+async def test_invalid_reconciliation_falls_back_to_deterministic_pass_through(
     db_session, auth_client, monkeypatch,
 ):
     owner, novel, _ = await _seed_hierarchy(db_session)
@@ -264,6 +264,13 @@ async def test_invalid_reconciliation_never_promotes_partial_candidate(
         reconciliation_deployment=_deployment("quality-qualified"),
     )
 
+    dependent_dispatches: list[tuple[int, int, int]] = []
+
+    async def dispatch_dependents(_sessions, run, version_id: int) -> None:
+        dependent_dispatches.append((run.owner_id, run.novel_id, version_id))
+
+    monkeypatch.setattr(timeline_worker, "_dispatch_dependent_analysis", dispatch_dependents)
+
     async def dispatch(run_id: int) -> None:
         await run_timeline_worker(run_id, runtime=runtime)
 
@@ -273,11 +280,19 @@ async def test_invalid_reconciliation_never_promotes_partial_candidate(
     run_id = response.json()["id"]
     db_session.expire_all()
     run = await db_session.get(AnalysisRun, run_id)
-    assert run.status == "paused_dependency"
-    assert await db_session.scalar(select(TimelineActivePointer.id).where(
+    # fail-soft：reconcile 两次校验失败后改用确定性 pass-through，
+    # 保留全部已抽取事件并正常完成、晋级（绝不晋级 LLM 的半截产物）。
+    assert run.status == "completed"
+    pointer = await db_session.scalar(select(TimelineActivePointer).where(
         TimelineActivePointer.owner_id == owner_id,
         TimelineActivePointer.novel_id == novel_id,
-    )) is None
+    ))
+    assert pointer is not None and pointer.version_id == run.version_id
+    assert dependent_dispatches == [(owner_id, novel_id, run.version_id)]
+    events = list((await db_session.scalars(select(MachineTimelineEvent).where(
+        MachineTimelineEvent.version_id == run.version_id,
+    ).order_by(MachineTimelineEvent.narrative_chapter_number))).all())
+    assert [event.narrative_chapter_number for event in events] == [10, 20]
     attempts = list((await db_session.scalars(select(ModelCallAttempt).where(
         ModelCallAttempt.run_id == run_id,
         ModelCallAttempt.stage_key == "cross_chapter_reconcile:book",

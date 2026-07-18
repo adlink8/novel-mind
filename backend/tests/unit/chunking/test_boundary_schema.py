@@ -3,9 +3,8 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 from app.services.chunking.adjudicator import validate_boundary_decision
-from app.services.chunking.manifests import content_hash
 from app.services.chunking.rules import analyze_chapter, RuleEngineConfig
-from app.services.chunking.schemas import BoundaryDecision, ContextPreserve
+from app.services.chunking.schemas import BoundaryDecision
 
 pytestmark = pytest.mark.unit
 

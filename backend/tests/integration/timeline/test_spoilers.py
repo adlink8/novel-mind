@@ -17,16 +17,20 @@ pytestmark = pytest.mark.integration
 async def _seed(db_session):
     owner = User(username="spoiler-owner", email="spoiler@example.test", hashed_password="x")
     other = User(username="spoiler-other", email="other@example.test", hashed_password="x")
-    db_session.add_all([owner, other]); await db_session.flush()
+    db_session.add_all([owner, other])
+    await db_session.flush()
     novel = Novel(owner_id=owner.id, title="防剧透", status="ready", reading_progress={})
-    db_session.add(novel); await db_session.flush()
+    db_session.add(novel)
+    await db_session.flush()
     chapters = [Chapter(novel_id=novel.id, chapter_number=n, title=f"第{n}章", content="正文") for n in (1, 2)]
-    db_session.add_all(chapters); await db_session.flush()
+    db_session.add_all(chapters)
+    await db_session.flush()
     version = AnalysisVersion(owner_id=owner.id, novel_id=novel.id, version_key="v1", status="active",
         source_snapshot_hash="a"*64, hierarchy_build_id="build", hierarchy_checksum="b"*64,
         prompt_hash="c"*64, schema_hash="d"*64, model_lineage={}, decoding_hash="e"*64,
         config_hash="f"*64, price_snapshot={}, manifest={})
-    db_session.add(version); await db_session.flush()
+    db_session.add(version)
+    await db_session.flush()
     first = MachineTimelineEvent(version_id=version.id, owner_id=owner.id, novel_id=novel.id,
         logical_event_id="first", title="可见", description="第一章", event_type="plot",
         time_precision="unknown", narrative_chapter_number=1, narrative_index=1, story_rank=2,
@@ -37,7 +41,8 @@ async def _seed(db_session):
         time_precision="unknown", narrative_chapter_number=2, narrative_index=0, story_rank=1,
         story_constraints=[], confidence=.9, prompt_hash="c"*64, schema_hash="d"*64,
         model_lineage={}, publication_status="published")
-    db_session.add_all([first, future]); await db_session.flush()
+    db_session.add_all([first, future])
+    await db_session.flush()
     db_session.add_all([
         TimelineParticipant(event_id=first.id, mention="阿宁"),
         TimelineParticipant(event_id=future.id, mention="隐藏人物"),

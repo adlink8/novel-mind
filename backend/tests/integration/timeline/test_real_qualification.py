@@ -11,7 +11,6 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.models.analysis import AnalysisRun, AnalysisVersion

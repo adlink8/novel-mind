@@ -33,7 +33,6 @@ from app.services.rag_quality import (
     context_recall_at_k,
     default_healthy,
     default_stub_answer,
-    default_stub_answer_judge,
     default_stub_retrieve,
     load_policy,
     make_baseline_from_metrics,

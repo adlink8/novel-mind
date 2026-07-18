@@ -10,7 +10,6 @@ from sqlalchemy import select
 from app.models.clue import (
     ClueAnalysisVersion,
     ClueEvidenceRef,
-    ClueLifecycleEvent,
     ClueOverride,
     MachineClue,
 )

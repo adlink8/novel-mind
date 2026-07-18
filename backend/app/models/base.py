@@ -11,8 +11,13 @@ Alembic 迁移通过 Base.metadata 发现所有表定义。
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, func
+from sqlalchemy import JSON, DateTime, func
+from sqlalchemy.dialects.postgresql import JSONB as _PG_JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+# PostgreSQL 生产库用 JSONB；SQLite（测试）退化为通用 JSON。
+# 供模型字段使用，保持两边 DDL 一致（alembic check 在 PG 上仍渲染 JSONB）。
+JSONB = _PG_JSONB().with_variant(JSON(), "sqlite")
 
 
 class Base(DeclarativeBase):

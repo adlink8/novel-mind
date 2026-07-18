@@ -6,7 +6,6 @@ from typing import Any
 
 import pytest
 
-from app.schemas.clue import ClueLifecycleState, ClueSemanticJudgment
 from app.services.clues.evidence import (
     build_clue_evidence_package,
     make_clue_evidence_unit,

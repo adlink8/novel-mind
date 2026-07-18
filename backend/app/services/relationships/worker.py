@@ -40,7 +40,6 @@ from app.services.relationships.gates import (
 from app.services.relationships.judgment import (
     JudgmentCallResult,
     RelationshipJudgmentService,
-    relationship_judgment_service,
 )
 
 logger = logging.getLogger(__name__)

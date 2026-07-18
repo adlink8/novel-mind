@@ -125,7 +125,6 @@ def scan_atomic_spans(
 
     # Split into sentence-like units while preserving offsets in normalized text
     pieces: list[tuple[str, int, int]] = []
-    cursor = 0
     # Prefer sentence boundaries; fallback to whole paragraph lines
     parts = _SENTENCE_SPLIT.split(normalized)
     buf = ""
@@ -214,7 +213,6 @@ def scan_atomic_spans(
 
 def _unbalanced_quotes(text: str) -> bool:
     # Count Chinese / English / corner quotes
-    pairs = [('"', '"'), ("“", "”"), ("「", "」")]
     # Simple parity on each open/close class
     opens = text.count("“") + text.count("「") + text.count('"')
     closes = text.count("”") + text.count("」")

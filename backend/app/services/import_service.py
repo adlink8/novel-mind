@@ -34,7 +34,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.import_job import ImportJob
-from app.models.novel import Chapter, Novel
+from app.models.novel import Novel
 from app.services.novel_service import novel_service
 
 logger = logging.getLogger(__name__)

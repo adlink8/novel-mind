@@ -28,7 +28,6 @@ def test_noop_zero_index_writes():
     chapters = [{"chapter_id": 1, "chapter_number": 1, "content": "无变化章节。" * 25}]
     a = create_candidate_build(store, novel_id=2, chapters=chapters, source_snapshot_hash="c" * 64, force_full=True)
     store.active[2] = a.build_id
-    writes_before = store.index_writes
     b = create_candidate_build(
         store,
         novel_id=2,

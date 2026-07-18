@@ -37,7 +37,7 @@ from app.services.relationships.query import (
     RelationshipGraphQueryService,
 )
 from tests.integration.conftest import run_alembic
-from tests.integration.relationships.test_api import _async_session, _async_url
+from tests.integration.relationships.test_api import _async_session
 
 pytestmark = pytest.mark.integration
 

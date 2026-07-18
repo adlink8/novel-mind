@@ -2,7 +2,7 @@
 from __future__ import annotations
 import json
 import pytest
-from app.services.chunking.adjudicator import BoundaryAdjudicator, validate_boundary_decision
+from app.services.chunking.adjudicator import BoundaryAdjudicator
 from app.services.chunking.rules import analyze_chapter, RuleEngineConfig
 
 pytestmark = [pytest.mark.unit]

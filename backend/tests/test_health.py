@@ -5,7 +5,7 @@
 - FastAPI 应用能正常启动
 - /api/health 端点返回正确响应
 - 基本的请求/响应流程正常
-- 占位端点正确返回 501
+- 未实现占位端点正确返回 501；已实现端点对不存在的小说返回 404
 """
 
 import pytest
@@ -47,17 +47,17 @@ async def test_models_list_empty(auth_client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_analysis_not_implemented(auth_client: AsyncClient):
-    """测试占位端点返回 501"""
-    response = await auth_client.post("/api/analysis/1/analyze")
-    assert response.status_code == 501
+async def test_analysis_missing_novel_returns_404(auth_client: AsyncClient):
+    """分析端点已实现：小说不存在时返回 404（不再是 501 桩）"""
+    response = await auth_client.post("/api/analysis/99999999/analyze")
+    assert response.status_code == 404
 
 
 @pytest.mark.asyncio
-async def test_timeline_not_implemented(auth_client: AsyncClient):
-    """测试时间线提取端点返回 501"""
-    response = await auth_client.post("/api/timeline/1/extract")
-    assert response.status_code == 501
+async def test_timeline_missing_novel_returns_404(auth_client: AsyncClient):
+    """时间线端点已实现：小说不存在时返回 404（不再是 501 桩）"""
+    response = await auth_client.post("/api/timeline/99999999/extract")
+    assert response.status_code == 404
 
 
 @pytest.mark.asyncio

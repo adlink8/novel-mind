@@ -7,15 +7,13 @@ active pointer only via CAS. Failed candidates never move active.
 
 from __future__ import annotations
 
-import hashlib
-import json
 import logging
 import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from typing import Any, Callable
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -28,14 +26,12 @@ from app.models.clue import (
     ClueAnalysisVersion,
     ClueBudgetLedger,
     ClueEvidenceRef,
-    ClueModelCallAttempt,
     MachineClue,
 )
 from app.models.novel import Chapter
-from app.models.timeline import MachineTimelineEvent, TimelineActivePointer, TimelineEvidenceRef
+from app.models.timeline import MachineTimelineEvent, TimelineActivePointer
 from app.schemas.clue import (
     ClueActorSource,
-    ClueEvidenceRole,
     ClueLifecycleState,
     ClueSemanticJudgment,
 )

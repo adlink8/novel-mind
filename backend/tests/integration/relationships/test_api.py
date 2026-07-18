@@ -7,7 +7,7 @@ import json
 from typing import Any
 
 import pytest
-from sqlalchemy import create_engine, select, text
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
 from app.models.analysis import AnalysisRun, AnalysisVersion
@@ -691,7 +691,7 @@ async def test_filters_required_over_cap_returns_empty_elements(
             KnowledgeRelationJudgment,
         )
 
-        krun = session.execute(
+        session.execute(
             select(KnowledgeExtractionRun).where(
                 KnowledgeExtractionRun.novel_id == novel_id
             )

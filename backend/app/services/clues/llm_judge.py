@@ -330,10 +330,8 @@ class ClueLLMJudgeService:
 
         # Cue IDs should prefer package cue window when classification needs cue.
         cue_set = set(package.cue_ids())
-        later_set = set(package.later_ids())
         if output.classification.value in {"cue_only", "reinforcement", "payoff"}:
-            bad_cue = sorted(set(output.cue_evidence_ids) - cue_set - later_set)
-            # already covered by allowed; additionally flag cue not in cue window
+            # additionally flag cue not in cue window
             cue_not_in_window = sorted(set(output.cue_evidence_ids) - cue_set)
             if cue_not_in_window and set(output.cue_evidence_ids) <= allowed:
                 failures.append(
