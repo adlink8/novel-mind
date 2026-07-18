@@ -1,0 +1,21 @@
+# NovelMind local Cloudflare Tunnel (Windows)
+# Tunnel: novelmind-win
+# FE: https://novelmind.shuoyan.me  -> 127.0.0.1:3005
+# API direct (optional): https://novelmind-api.shuoyan.me -> 127.0.0.1:8010
+# Prefer FE /api rewrite to local backend when only using the FE hostname.
+
+tunnel: 4dd3a4e7-e83d-4e8a-9c99-f2960359fb1f
+credentials-file: C:\Users\li\.cloudflared\4dd3a4e7-e83d-4e8a-9c99-f2960359fb1f.json
+
+ingress:
+  - hostname: novelmind.shuoyan.me
+    service: http://127.0.0.1:3005
+    originRequest:
+      noTLSVerify: true
+      connectTimeout: 30s
+  - hostname: novelmind-api.shuoyan.me
+    service: http://127.0.0.1:8010
+    originRequest:
+      noTLSVerify: true
+      connectTimeout: 30s
+  - service: http_status:404
