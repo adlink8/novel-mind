@@ -38,12 +38,13 @@
 import React, { useState, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { NovelCard } from "@/components/novel-card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { BookShelf } from "@/components/bookshelf/book-shelf";
 import { NovelUploadDialog } from "@/components/novel-upload-dialog";
 import { EmptyState } from "@/components/empty-state";
 import { useNovels } from "@/hooks/use-novels";
 import type { Novel } from "@/lib/api";
-import { BookOpenText, Plus, Search, SlidersHorizontal } from "lucide-react";
+import { BookOpenText, CheckSquare, Plus, Search, SlidersHorizontal, Trash2, X } from "lucide-react";
 import { PageContainer, PageHeader } from "@/components/page-header";
 
 /** 排序选项类型：按日期、按标题、按字数 */
@@ -62,10 +63,13 @@ type FilterStatus = "all" | string;
  */
 export default function NovelsPage() {
   // 从 Hook 获取小说列表、加载状态和刷新方法
-  const { novels, loading, fetchNovels, deleteNovel } = useNovels();
+  const { novels, loading, fetchNovels, deleteNovel, deleteNovels, renameNovel } = useNovels();
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<SortOption>("date");
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("all");
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   /**
    * 派生数据：根据搜索、筛选、排序条件计算最终显示的小说列表
@@ -142,6 +146,36 @@ export default function NovelsPage() {
     await deleteNovel(String(id));
   };
 
+  const handleSelectedChange = (id: number, selected: boolean) => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (selected) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
+
+  const exitSelectionMode = () => {
+    setSelectionMode(false);
+    setSelectedIds(new Set());
+  };
+
+  const handleBulkDelete = async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    const ok = window.confirm(
+      `确定删除选中的 ${ids.length} 本书？\n将同时移除章节与相关索引，此操作不可恢复。`
+    );
+    if (!ok) return;
+    setBulkDeleting(true);
+    try {
+      await deleteNovels(ids);
+      exitSelectionMode();
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
   /** 排序下拉框选项 */
   const sortOptions: { value: SortOption; label: string }[] = [
     { value: "date", label: "最新上传" },
@@ -153,10 +187,48 @@ export default function NovelsPage() {
     <PageContainer className="space-y-7">
       {/* ========== 页面头部：标题 + 上传按钮 ========== */}
       <PageHeader eyebrow="Library" title="我的书架" description={`管理已导入的长篇文本${novels.length > 0 ? `，当前共 ${novels.length} 本作品` : "，从第一本作品开始建立故事记忆"}`} action={
-        <NovelUploadDialog onUploadComplete={handleUploadComplete}>
-          <Button size="lg" className="rounded-full px-5"><Plus className="mr-2 size-4" />导入小说</Button>
-        </NovelUploadDialog>
+        <div className="flex flex-wrap justify-end gap-2">
+          {novels.length > 0 && (
+            <Button
+              type="button"
+              variant="outline"
+              size="lg"
+              className="rounded-full px-5"
+              onClick={() => selectionMode ? exitSelectionMode() : setSelectionMode(true)}
+            >
+              {selectionMode ? <X className="mr-2 size-4" /> : <CheckSquare className="mr-2 size-4" />}
+              {selectionMode ? "退出批量管理" : "批量管理"}
+            </Button>
+          )}
+          <NovelUploadDialog onUploadComplete={handleUploadComplete}>
+            <Button size="lg" className="rounded-full px-5" data-upload-trigger><Plus className="mr-2 size-4" />批量导入</Button>
+          </NovelUploadDialog>
+        </div>
       } />
+
+      {selectionMode && (
+        <div className="paper-surface flex flex-wrap items-center gap-3 rounded-2xl px-4 py-3" role="toolbar" aria-label="批量管理书籍">
+          <span className="mr-auto text-sm font-medium">已选择 {selectedIds.size} 本</span>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setSelectedIds(new Set(filteredNovels.map((novel) => novel.id)))}
+          >
+            全选当前结果
+          </Button>
+          <Button
+            type="button"
+            variant="destructive"
+            size="sm"
+            disabled={selectedIds.size === 0 || bulkDeleting}
+            onClick={() => void handleBulkDelete()}
+          >
+            <Trash2 className="mr-2 size-4" />
+            {bulkDeleting ? "删除中..." : "删除所选"}
+          </Button>
+        </div>
+      )}
 
       {/* ========== 搜索栏和筛选/排序控件 ========== */}
       <div className="paper-surface flex flex-col gap-3 rounded-3xl p-3 sm:flex-row sm:items-center">
@@ -205,12 +277,17 @@ export default function NovelsPage() {
       </div>
 
       {/* ========== 加载中状态 ========== */}
-      {/* 仅在首次加载（列表为空且正在加载）时显示加载动画 */}
+      {/* 仅在首次加载（列表为空且正在加载）时显示书架形态骨架 */}
       {loading && novels.length === 0 && (
-        <div className="flex items-center justify-center py-20">
-          <div className="text-center">
-            <BookOpenText className="mx-auto mb-4 size-8 animate-pulse text-primary" />
-            <p className="text-muted-foreground">{"加载中..."}</p>
+        <div className="rounded-[20px] bg-gradient-to-b from-[#e6cda1] to-[#b98f5c] p-3 shadow-[0_24px_50px_-30px_rgba(90,65,30,0.45)]">
+          <div className="flex min-h-56 flex-wrap items-end justify-start gap-2.5 rounded-xl bg-[#eee0c2] px-4 pb-2 pt-10">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <Skeleton
+                key={i}
+                className="w-10 rounded-[3px] bg-[#d9c49c]"
+                style={{ height: 150 + (i % 4) * 18 }}
+              />
+            ))}
           </div>
         </div>
       )}
@@ -249,14 +326,17 @@ export default function NovelsPage() {
         />
       )}
 
-      {/* ========== 小说卡片网格 ========== */}
-      {/* 响应式网格布局：1列(sm) -> 2列(md) -> 3列(lg) -> 4列(xl) */}
+      {/* ========== 仿真书架 ========== */}
+      {/* 已入库的书竖立摆上木框层架；点击书本播放取出动画后进入阅读 */}
       {filteredNovels.length > 0 && (
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-          {filteredNovels.map((novel) => (
-            <NovelCard key={novel.id} novel={novel} onDelete={handleDelete} />
-          ))}
-        </div>
+        <BookShelf
+          novels={filteredNovels}
+          onDelete={handleDelete}
+          onRename={renameNovel}
+          selectionMode={selectionMode}
+          selectedIds={selectedIds}
+          onSelectedChange={handleSelectedChange}
+        />
       )}
     </PageContainer>
   );

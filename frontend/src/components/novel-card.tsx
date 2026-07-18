@@ -104,6 +104,24 @@ function getCoverTone(title: string): string {
   return tones[Math.abs(hash) % tones.length];
 }
 
+/** 封面朱砂印章字：按书籍状态取一个单字（传统印章白文风格） */
+function sealChar(status: string): string {
+  switch (status) {
+    case "importing":
+      return "入";
+    case "chunking":
+    case "embedding":
+      return "索";
+    case "analyzing":
+      return "析";
+    case "analyzed":
+      return "线";
+    case "ready":
+    default:
+      return "读";
+  }
+}
+
 function formatWordCount(count: number): string {
   if (count >= 10000) {
     return `${(count / 10000).toFixed(1)}万字`;
@@ -177,13 +195,23 @@ export function NovelCard({
 
   return (
     <div className="group">
-      <Card className={`paper-surface flex flex-col overflow-hidden rounded-3xl border-border/70 transition-[border-color,box-shadow] motion-duration-standard motion-ease-enter hover:border-primary/25 hover:shadow-[0_24px_60px_-35px_rgba(52,42,32,0.6)] focus-within:border-primary/25 focus-within:shadow-[0_24px_60px_-35px_rgba(52,42,32,0.6)] ${selected ? "ring-2 ring-primary/50" : ""}`}>
+      <Card className={`paper-surface flex flex-col overflow-hidden rounded-3xl border-border/70 transition-[border-color,box-shadow,transform] motion-duration-standard motion-ease-enter hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-[0_24px_60px_-35px_rgba(52,42,32,0.6)] focus-within:border-primary/25 focus-within:shadow-[0_24px_60px_-35px_rgba(52,42,32,0.6)] ${selected ? "ring-2 ring-primary/50" : ""}`}>
         <Link href={`/novels/${novel.id}`} className="block cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           <div
             className={`relative h-40 overflow-hidden bg-gradient-to-br ${getCoverTone(novel.title)} p-5 text-white`}
           >
+            {/* 书脊：左侧装订阴影 + 高光，模拟实体书脊 */}
+            <div aria-hidden className="absolute inset-y-0 left-0 w-2 bg-black/30" />
+            <div aria-hidden className="absolute inset-y-0 left-2 w-px bg-white/15" />
             <div className="absolute -right-8 -top-10 size-32 rounded-full border border-white/10" />
             <div className="absolute -bottom-12 -left-6 size-28 rounded-full bg-white/[0.06]" />
+            {/* 朱砂印章：状态单字，白文风格 */}
+            <span
+              aria-hidden
+              className="absolute bottom-4 right-4 grid size-9 rotate-3 place-items-center rounded-[4px] border border-white/60 bg-[#b03a2e]/90 font-serif text-base font-semibold text-white shadow-sm"
+            >
+              {sealChar(novel.status)}
+            </span>
             <div className="relative flex h-full flex-col justify-between">
               <div className="flex items-center justify-between">
                 <BookOpenText className="size-5 text-white/70" />
@@ -216,7 +244,7 @@ export function NovelCard({
               )}
               <span
                 title={meta.hint}
-                className={`inline-flex h-5 items-center rounded-4xl px-2 text-xs font-medium ${meta.className}`}
+                className={`inline-flex h-5 items-center rounded-full px-2 text-xs font-medium ${meta.className}`}
               >
                 {meta.label}
               </span>
@@ -226,7 +254,7 @@ export function NovelCard({
                     ? `已建检索索引（${novel.chunk_count} 块）`
                     : "尚未建检索索引，全局/语义搜索可能搜不到本书"
                 }
-                className={`inline-flex h-5 items-center rounded-4xl px-2 text-xs font-medium ${
+                className={`inline-flex h-5 items-center rounded-full px-2 text-xs font-medium ${
                   indexed
                     ? "bg-emerald-50 text-emerald-800"
                     : "bg-orange-50 text-orange-800"
@@ -242,7 +270,7 @@ export function NovelCard({
                       ? "时间线任务进行中"
                       : "未做时间线分析：点击「时间线」进入分析页自动启动"
                 }
-                className={`inline-flex h-5 items-center rounded-4xl px-2 text-xs font-medium ${
+                className={`inline-flex h-5 items-center rounded-full px-2 text-xs font-medium ${
                   analyzed
                     ? "bg-violet-50 text-violet-800"
                     : "bg-slate-100 text-slate-600"
