@@ -97,6 +97,13 @@ Next: resume NM candidate build to arc/global; clue worker payoff/title fix; opt
 
 ## Backlog
 
+### Cross-cutting architecture/data governance gaps
+
+- Source of truth: [`ARCHITECTURE-LAYERING-DATA-GOVERNANCE-AUDIT-2026-07-17.md`](./ARCHITECTURE-LAYERING-DATA-GOVERNANCE-AUDIT-2026-07-17.md)
+- Expected-goal distance and staged path: [`TARGET-GAP-ANALYSIS-2026-07-17.md`](./TARGET-GAP-ANALYSIS-2026-07-17.md)
+- Before adding more semantic layers, close or explicitly accept the audit's P0/P1 contracts: `S/D/R/A` layer registry, Narrative Unit vs Narrative Memory boundary, storage/projection authority, index consistency, lifecycle/provenance, and reproducible verification baseline.
+- This entry records backlog only; it does not authorize NM promotion, pointer mutation, data deletion, or automatic cleanup.
+
 ### Phase 999.1: 首页 UI 优化 (BACKLOG)
 - 删除占位统计卡片（小说总数/章节总数/AI分析次数/同人文作品）
 - 已扩展为全站 UI/UX 重构并完成：2006-06-13

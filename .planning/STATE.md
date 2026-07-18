@@ -48,6 +48,13 @@ Last activity: 2026-07-17 (docs update)
 
 Reports: `20-ORDERED-EXEC-REPORT.md`, `20-WAVE-NEXT-REPORT.md`
 
+## Cross-cutting architecture/data governance audit
+
+- **Authoritative issue inventory:** [`ARCHITECTURE-LAYERING-DATA-GOVERNANCE-AUDIT-2026-07-17.md`](./ARCHITECTURE-LAYERING-DATA-GOVERNANCE-AUDIT-2026-07-17.md)
+- **Expected target gap:** [`TARGET-GAP-ANALYSIS-2026-07-17.md`](./TARGET-GAP-ANALYSIS-2026-07-17.md) — separately evaluates foundation readiness, v0.8 candidate scope, real-book data readiness, stable understanding product, and the full understanding/creation vision.
+- Scope: layer naming, SSOT/projection authority, lineage/rebuild/promotion boundaries, API dual tracks, documentation drift, and current engineering baseline.
+- Verdict: **gaps_found**. This audit records issues only and does **not** authorize Narrative Memory promotion, pointer changes, data deletion, or workspace cleanup.
+
 ## Sample novel 91 (facts)
 
 - Hierarchy: reusable_exact  
