@@ -159,6 +159,8 @@
       radial-gradient(circle at 10% 10%, hsl(16 70% 52% / 0.07), transparent 28rem),
       radial-gradient(circle at 90% 0%, hsl(229 45% 42% / 0.06), transparent 30rem);
     background-attachment: fixed;
+    /* 离屏抽屉（搜索面板等 fixed 面板）滑出时不撑出横向滚动（clip 不破坏 sticky） */
+    overflow-x: clip;
   }
 
   /* Custom reader surface consumes pre-paint CSS variables (no FOUC). */

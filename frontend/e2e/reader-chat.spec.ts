@@ -313,8 +313,10 @@ test("reader chat panel is collapsible and does not replace the reader", async (
     await expect(page.getByTestId("reader-page-text")).toBeVisible();
   }
 
-  // Citation jump
-  await page.getByTestId("reader-chat-open").click().catch(() => {});
+  // Citation jump — 先确保面板处于打开状态（桌面端上一步未收起，移动端刚收起）
+  if (!(await page.getByTestId("reader-chat-panel").isVisible().catch(() => false))) {
+    await page.getByTestId("reader-chat-open").click().catch(() => {});
+  }
   if (await page.getByTestId("reader-chat-chip").isVisible().catch(() => false)) {
     await page.getByTestId("reader-chat-chip").click();
   }

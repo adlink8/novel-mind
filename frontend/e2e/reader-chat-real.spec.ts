@@ -148,10 +148,18 @@ test("real API multi-session chat with citations, spoiler safety and refresh rep
   // Spoiler: default UI must not show future chapter secret
   await expect(page.getByText("SECRET_FUTURE")).toHaveCount(0);
 
-  // Refresh replays PostgreSQL conversations
+  // Refresh replays PostgreSQL conversations — 等阅读器就绪再判断面板状态，
+  // 避免在加载中误判把已持久化的打开状态切换成关闭
   await page.reload();
-  await page.getByTestId("reader-chat-open").click();
+  await expect(page.getByTestId("reader-scroll-column")).toBeVisible({
+    timeout: 30_000,
+  });
+  if (!(await page.getByTestId("reader-chat-panel").isVisible().catch(() => false))) {
+    await page.getByTestId("reader-chat-open").click();
+  }
   await expect(page.getByTestId("reader-chat-panel")).toBeVisible();
+  // 此前新建了第二个（空）会话排在列表首位；切回有消息的「新会话」验证 PostgreSQL 回放
+  await page.getByTestId(/reader-chat-conv-/).filter({ hasText: "新会话" }).click();
   await expect
     .poll(async () => page.getByTestId(/reader-chat-msg-/).count())
     .toBeGreaterThan(0);

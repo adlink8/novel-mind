@@ -420,6 +420,21 @@ export function TimelineChart({
     [events, ordering]
   );
   const windows = useMemo(() => buildEventWindows(sorted), [sorted]);
+  // 事件集合刷新（续跑/显示全书等）后，按章节范围重配当前阶段窗口：
+  // 窗口存的是旧数组下标，直接用会展示陈旧切片；范围匹配不到就退回全书概览。
+  useEffect(() => {
+    if (!activeWindow) return;
+    const matched = windows.find(
+      (w) =>
+        w.firstChapter === activeWindow.firstChapter &&
+        w.lastChapter === activeWindow.lastChapter
+    );
+    if (!matched) {
+      queueMicrotask(() => setActiveWindow(null));
+    } else if (matched !== activeWindow) {
+      queueMicrotask(() => setActiveWindow(matched));
+    }
+  }, [windows, activeWindow]);
   const visibleEvents = useMemo(
     () =>
       activeWindow

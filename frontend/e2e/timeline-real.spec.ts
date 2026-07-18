@@ -37,8 +37,9 @@ test("real API progresses partial candidate to spoiler-safe active timeline", as
 
   await page.goto("/analysis");
   await page.getByLabel("选择小说").selectOption(String(seeded.novel_id));
-  await expect(page.getByRole("tab", { name: /正在生成/ })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "第一批事件" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: /正在生成|候选结果/ })).toBeVisible();
+  await page.getByRole("button", { name: /阶段 1/ }).click();
+  await expect(page.getByRole("heading", { name: "第一批事件" }).first()).toBeVisible();
   await expect(page.getByText("后章隐藏事件")).toHaveCount(0);
   await expect.poll(() => timelineResponses.some((body) => body.active === null && body.running_candidate?.events.length === 1)).toBe(true);
 
@@ -47,13 +48,14 @@ test("real API progresses partial candidate to spoiler-safe active timeline", as
   await page.reload();
   await page.getByLabel("选择小说").selectOption(String(seeded.novel_id));
   await expect(page.getByRole("tab", { name: /当前版本/ })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "第一批事件" })).toBeVisible();
+  await page.getByRole("button", { name: /阶段 1/ }).click();
+  await expect(page.getByRole("heading", { name: "第一批事件" }).first()).toBeVisible();
   await expect(page.getByText("后章隐藏事件")).toHaveCount(0);
   await expect.poll(() => timelineResponses.some((body) => body.active?.events.length === 1 && body.running_candidate === null)).toBe(true);
 
   await page.getByRole("checkbox", { name: "显示全书（可能剧透）" }).click();
   await page.getByRole("button", { name: "确认显示全书" }).click();
-  await expect(page.getByRole("heading", { name: "后章隐藏事件" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "后章隐藏事件" }).first()).toBeVisible();
   await expect.poll(() => timelineResponses.some((body) => body.active?.events.length === 2)).toBe(true);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
 });

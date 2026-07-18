@@ -53,8 +53,8 @@ export async function registerAndLogin(page: Page, user = uniqueUser()) {
   });
   await page.getByRole("button", { name: /注册并登录/ }).click();
 
-  // Authenticated shell: logout control is always rendered (desktop + 390px).
-  await expect(page.locator('button[title="退出登录"]')).toBeVisible({
+  // Authenticated shell: main nav is always rendered (desktop + 390px).
+  await expect(page.locator('[data-testid="app-shell-nav"]')).toBeVisible({
     timeout: 30_000,
   });
   // Prefer main content when present (desktop/home); skip if navigated elsewhere.
@@ -75,7 +75,7 @@ export async function login(page: Page, username: string, password: string) {
   }
   await fillAuthForm(page, { username, password });
   await page.getByRole("button", { name: /^登录$/ }).click();
-  await expect(page.locator('button[title="退出登录"]')).toBeVisible({
+  await expect(page.locator('[data-testid="app-shell-nav"]')).toBeVisible({
     timeout: 30_000,
   });
 }
