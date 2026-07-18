@@ -166,6 +166,8 @@ interface ReaderPreferencesPanelProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   floating?: boolean;
+  /** floating 模式下的右侧偏移（px）：桌面 AI 会话打开时让位，避免重叠 */
+  floatingOffsetRight?: number;
 }
 
 export function ReaderPreferencesPanel({
@@ -174,6 +176,7 @@ export function ReaderPreferencesPanel({
   open,
   onOpenChange,
   floating = false,
+  floatingOffsetRight = 16,
 }: ReaderPreferencesPanelProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const layerRef = useRef<HTMLElement>(null);
@@ -191,7 +194,11 @@ export function ReaderPreferencesPanel({
     preferences.autoScrollSpeed !== 1 && preferences.autoScrollSpeed !== 2;
 
   return (
-    <div ref={rootRef} className={cn("relative", floating && "fixed right-4 top-4 z-50")}>
+    <div
+      ref={rootRef}
+      className={cn("relative", floating && "fixed top-4 z-50")}
+      style={floating ? { right: floatingOffsetRight } : undefined}
+    >
       <Button
         ref={triggerRef}
         type="button"

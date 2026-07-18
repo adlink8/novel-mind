@@ -29,14 +29,15 @@ import {
 } from "@/lib/reader-selection";
 import {
   ArrowLeft,
+  BookOpenText,
   ChevronLeft,
   ChevronRight,
-  LoaderCircle,
   Menu,
   MessageSquareText,
   PanelLeft,
   Search,
 } from "lucide-react";
+import { BookLoader } from "@/components/book-loader";
 
 const AUTO_SCROLL_BASE_PX_PER_SECOND = 80;
 
@@ -117,6 +118,8 @@ function NovelReaderInner() {
     loadReaderPreferences()
   );
   const [preferencesOpen, setPreferencesOpen] = useState(false);
+  /** 沉浸模式下的章节目录抽屉开关 */
+  const [immersiveTocOpen, setImmersiveTocOpen] = useState(false);
   const chaptersRef = useRef<Chapter[]>([]);
   /** 时间线定位模式：不写入阅读进度，避免污染「上次读到」 */
   const [progressWritable, setProgressWritable] = useState(!fromTimeline);
@@ -445,10 +448,7 @@ function NovelReaderInner() {
   if (loading) {
     return (
       <div className="flex min-h-[70vh] items-center justify-center">
-        <div className="text-center">
-          <LoaderCircle className="mx-auto mb-4 size-7 animate-spin text-primary" />
-          <p className="text-muted-foreground">加载中...</p>
-        </div>
+        <BookLoader label="正在翻开书本…" />
       </div>
     );
   }
@@ -667,13 +667,38 @@ function NovelReaderInner() {
       </main>
 
       {preferences.immersive ? (
-        <ReaderPreferencesPanel
-          preferences={preferences}
-          onChange={setPreferences}
-          open={preferencesOpen}
-          onOpenChange={setPreferencesOpen}
-          floating
-        />
+        <>
+          {/* 沉浸模式补回章节目录：抽屉形态 + 左上悬浮入口 */}
+          <ChapterSidebar
+            chapters={chapters}
+            currentChapterId={currentChapterId}
+            onSelectChapter={handleSelectChapter}
+            isOpen={immersiveTocOpen}
+            onToggle={() => setImmersiveTocOpen((v) => !v)}
+            forceDrawer
+          />
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setImmersiveTocOpen(true)}
+            title="章节目录"
+            className="fixed left-4 top-4 z-50 border-white/20 bg-black/65 text-white shadow-lg hover:bg-black/75 hover:text-white"
+          >
+            <BookOpenText className="size-4" />
+            目录
+          </Button>
+          <ReaderPreferencesPanel
+            preferences={preferences}
+            onChange={setPreferences}
+            open={preferencesOpen}
+            onOpenChange={setPreferencesOpen}
+            floating
+            floatingOffsetRight={
+              // 桌面 AI 会话打开时右移让位，避免与会话窗口重叠
+              showDesktopChat ? (chatCollapsed ? 44 : chatWidthPx) + 16 : 16
+            }
+          />
+        </>
       ) : null}
 
       {showMobileChat ? (
@@ -710,8 +735,8 @@ export default function NovelReaderPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-[70vh] items-center justify-center text-muted-foreground">
-          加载阅读器…
+        <div className="flex min-h-[70vh] items-center justify-center">
+          <BookLoader label="加载阅读器…" />
         </div>
       }
     >

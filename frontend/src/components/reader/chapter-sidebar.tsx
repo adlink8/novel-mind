@@ -11,6 +11,8 @@ interface ChapterSidebarProps {
   onSelectChapter: (chapterId: number) => void;
   isOpen: boolean;
   onToggle: () => void;
+  /** 沉浸模式：始终以抽屉形态呈现（含遮罩），不用桌面内嵌栏/收起轨道 */
+  forceDrawer?: boolean;
 }
 
 function prefersReducedMotion(): boolean {
@@ -24,6 +26,7 @@ export function ChapterSidebar({
   onSelectChapter,
   isOpen,
   onToggle,
+  forceDrawer = false,
 }: ChapterSidebarProps) {
   const activeRef = useRef<HTMLButtonElement | null>(null);
 
@@ -37,10 +40,11 @@ export function ChapterSidebar({
 
   return (
     <>
-      {/* Mobile backdrop */}
+      {/* Mobile backdrop（forceDrawer 时全断点显示） */}
       <div
         className={cn(
-          "fixed inset-0 z-40 bg-black/30 transition-[opacity] motion-duration-spatial lg:hidden",
+          "fixed inset-0 z-40 bg-black/30 transition-[opacity] motion-duration-spatial",
+          !forceDrawer && "lg:hidden",
           isOpen
             ? "pointer-events-auto opacity-100 motion-ease-enter"
             : "pointer-events-none opacity-0 motion-ease-exit",
@@ -52,21 +56,23 @@ export function ChapterSidebar({
       {/*
         Single aside for mobile drawer + desktop width rail.
         Desktop animates width (not display:none) so collapse/expand is smooth.
+        forceDrawer（沉浸模式）：保持抽屉形态，不转为桌面内嵌栏。
       */}
       <aside
         data-testid="chapter-sidebar"
         data-open={isOpen ? "true" : "false"}
         className={cn(
           "relative z-50 flex shrink-0 flex-col overflow-hidden border-border/70 bg-sidebar/95 backdrop-blur-xl",
-          // Mobile: fixed drawer slides
+          // Mobile/drawer: fixed drawer slides
           "fixed inset-y-0 left-0 w-72 border-r transition-[transform,opacity] motion-duration-spatial",
           isOpen
             ? "translate-x-0 opacity-100 motion-ease-enter"
             : "pointer-events-none -translate-x-full opacity-0 motion-ease-exit",
-          // Desktop: in-flow column; width transition (keep mounted)
-          "lg:pointer-events-auto lg:static lg:z-auto lg:mr-4 lg:h-full lg:translate-x-0 lg:rounded-[28px] lg:border lg:border-border/70 lg:opacity-100",
-          "lg:transition-[width] lg:motion-duration-spatial lg:motion-ease-enter",
-          isOpen ? "lg:w-64" : "lg:w-10",
+          !forceDrawer &&
+            "lg:pointer-events-auto lg:static lg:z-auto lg:mr-4 lg:h-full lg:translate-x-0 lg:rounded-[28px] lg:border lg:border-border/70 lg:opacity-100",
+          !forceDrawer &&
+            "lg:transition-[width] lg:motion-duration-spatial lg:motion-ease-enter",
+          !forceDrawer && (isOpen ? "lg:w-64" : "lg:w-10"),
         )}
       >
         {/* Expanded body — always in DOM; clipped when rail width */}
@@ -105,7 +111,10 @@ export function ChapterSidebar({
                   type="button"
                   onClick={() => {
                     onSelectChapter(chapter.id);
-                    if (typeof window !== "undefined" && window.innerWidth < 1024) {
+                    if (
+                      forceDrawer ||
+                      (typeof window !== "undefined" && window.innerWidth < 1024)
+                    ) {
                       onToggle();
                     }
                   }}
@@ -139,7 +148,8 @@ export function ChapterSidebar({
           title="展开目录"
           aria-label="展开目录"
           className={cn(
-            "absolute inset-0 hidden flex-col items-center justify-center gap-2 text-muted-foreground transition-[opacity,background-color,color] motion-duration-standard motion-ease-enter hover:bg-card hover:text-foreground lg:flex",
+            "absolute inset-0 flex-col items-center justify-center gap-2 text-muted-foreground transition-[opacity,background-color,color] motion-duration-standard motion-ease-enter hover:bg-card hover:text-foreground",
+            forceDrawer ? "hidden" : "hidden lg:flex",
             isOpen
               ? "pointer-events-none opacity-0"
               : "pointer-events-auto opacity-100",

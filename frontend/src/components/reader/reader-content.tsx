@@ -297,14 +297,14 @@ export function ReaderContent({
       className="relative mx-auto max-w-[760px] px-5 py-10 sm:px-8 sm:py-14"
       data-page-source-start-utf16={pageMeta.sourceStartUtf16}
     >
-      <header className="mb-8 border-b border-border/60 pb-8 text-center sm:mb-10">
-        <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-primary">
+      <header className="relative mb-8 text-center sm:mb-10">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-primary">
           Chapter
         </p>
-        <h1 className="mb-3 font-serif text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">
+        <h1 className="mt-3 font-serif text-3xl font-semibold leading-tight tracking-tight text-foreground sm:text-4xl">
           {chapter.title}
         </h1>
-        <p className="text-xs text-muted-foreground">
+        <p className="mt-3 text-xs text-muted-foreground">
           {totalChars.toLocaleString()} 字
           {!isScrollMode && pages.length > 1
             ? ` · 第 ${safeIndex + 1}/${pages.length} 页`
@@ -312,10 +312,15 @@ export function ReaderContent({
               ? " · 长页模式"
               : null}
         </p>
+        <div aria-hidden className="mt-6 flex items-center justify-center gap-3">
+          <span className="h-px w-16 bg-gradient-to-r from-transparent to-[#d6ab54]/50" />
+          <span className="font-serif text-sm text-[#d6ab54]/80">❦</span>
+          <span className="h-px w-16 bg-gradient-to-l from-transparent to-[#d6ab54]/50" />
+        </div>
       </header>
 
       {isHuge && !isScrollMode && (
-        <div className="mb-6 flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        <div className="relative mb-6 flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           <AlertTriangle className="mt-0.5 size-4 shrink-0" />
           <div>
             <p className="font-medium">本章体量较大，已自动分页显示</p>
@@ -332,7 +337,7 @@ export function ReaderContent({
         ref={pageTextRef}
         data-testid="reader-page-text"
         data-source-start-utf16={page.sourceStartUtf16}
-        className="whitespace-pre-wrap font-reading text-[17px] leading-[2.05] tracking-[0.015em] text-foreground/90 sm:text-[18px]"
+        className="relative whitespace-pre-wrap font-reading text-[18px] leading-[2.1] tracking-[0.02em] text-foreground/90 sm:text-[19px]"
       >
         {renderedPage}
       </div>
@@ -357,24 +362,26 @@ export function ReaderContent({
       ) : null}
 
       {!isScrollMode && pages.length > 1 && (
-        <div className="mt-10 flex items-center justify-between gap-3 border-t border-border/60 pt-6">
+        <div className="relative mt-12 flex items-center justify-between gap-3 border-t border-border/50 pt-6">
           <Button
             type="button"
             variant="outline"
             size="sm"
+            className="rounded-full px-4"
             disabled={atFirstPage && !hasPrevChapter}
             onClick={goPrevPage}
           >
             <ChevronLeft className="size-4" />
             {atFirstPage && hasPrevChapter ? "上一章" : "上一页"}
           </Button>
-          <span className="text-xs text-muted-foreground">
+          <span className="font-serif text-xs tracking-[0.2em] text-muted-foreground">
             {safeIndex + 1} / {pages.length}
           </span>
           <Button
             type="button"
             variant="outline"
             size="sm"
+            className="rounded-full px-4"
             disabled={atLastPage && !hasNextChapter}
             onClick={goNextPage}
           >
