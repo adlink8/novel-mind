@@ -56,22 +56,31 @@ const config: Config = {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
-        // 小说主题色
-        novel: {
-          50: "#faf5ff",
-          100: "#f3e8ff",
-          200: "#e9d5ff",
-          300: "#d8b4fe",
-          400: "#c084fc",
-          500: "#a855f7",
-          600: "#9333ea",
-          700: "#7e22ce",
-          800: "#6b21a8",
-          900: "#581c87",
-        },
       },
       fontFamily: {
-        reading: ['"Noto Serif SC"', "serif"],
+        // --font-sans/--font-serif 由 next/font 在 layout.tsx 注入
+        sans: [
+          "var(--font-sans)",
+          "system-ui",
+          "-apple-system",
+          '"PingFang SC"',
+          '"Microsoft YaHei"',
+          "sans-serif",
+        ],
+        serif: [
+          "var(--font-serif)",
+          '"Noto Serif SC"',
+          '"Songti SC"',
+          '"SimSun"',
+          "serif",
+        ],
+        reading: [
+          "var(--font-serif)",
+          '"Noto Serif SC"',
+          '"Songti SC"',
+          '"SimSun"',
+          "serif",
+        ],
       },
       borderRadius: {
         lg: "var(--radius)",

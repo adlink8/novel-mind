@@ -42,6 +42,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { PageContainer, PageHeader } from "@/components/page-header";
+import { ChapterOrnament } from "@/components/chapter-ornament";
 import { cn } from "@/lib/utils";
 
 /** 路由策略偏好类型 */
@@ -473,10 +474,11 @@ export default function SettingsPage() {
 
       {/* ========== 用量概览区 ========== */}
       {/* 展示费用统计和 Token 消耗，目前使用占位数据 */}
+      <ChapterOrnament />
       <section>
-        <h3 className="text-lg font-semibold mb-4">{"用量概览"}</h3>
+        <h3 className="mb-4 font-serif text-xl font-semibold">{"用量概览"}</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card>
+          <Card className="paper-surface rounded-2xl">
             <CardContent>
               <p className="text-xs text-muted-foreground mb-1">
                 {"今日花费"}
@@ -484,7 +486,7 @@ export default function SettingsPage() {
               <p className="text-xl font-bold">{costSummary.today}</p>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="paper-surface rounded-2xl">
             <CardContent>
               <p className="text-xs text-muted-foreground mb-1">
                 {"本周花费"}
@@ -492,7 +494,7 @@ export default function SettingsPage() {
               <p className="text-xl font-bold">{costSummary.thisWeek}</p>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="paper-surface rounded-2xl">
             <CardContent>
               <p className="text-xs text-muted-foreground mb-1">
                 {"本月花费"}
@@ -500,7 +502,7 @@ export default function SettingsPage() {
               <p className="text-xl font-bold">{costSummary.thisMonth}</p>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="paper-surface rounded-2xl">
             <CardContent>
               <p className="text-xs text-muted-foreground mb-1">
                 {"总 Token 数"}

@@ -73,7 +73,7 @@ describe("Phase 18 motion contract", () => {
       expect(source, file).not.toMatch(/\bease-linear\b|\bease-in-out\b/);
       // Closed/ending states must not accept pointer input.
       if (file.includes("dialog") || file.includes("sheet") || file.includes("dropdown") || file.includes("tooltip")) {
-        expect(source, file).toMatch(/data-closed:pointer-events-none|data-ending-style/);
+        expect(source, file).toMatch(/data-\[closed\]:pointer-events-none|data-\[ending-style\]/);
       }
     }
   });
@@ -85,8 +85,9 @@ describe("Phase 18 motion contract", () => {
       "components/ui/tooltip.tsx",
     ] as const) {
       const source = readSrc(file);
-      expect(source, file).toContain("data-open:motion-ease-enter");
-      expect(source, file).toContain("data-closed:motion-ease-exit");
+      // Tailwind v3 runtime: data-attribute variants require bracket syntax.
+      expect(source, file).toContain("data-[open]:motion-ease-enter");
+      expect(source, file).toContain("data-[closed]:motion-ease-exit");
     }
     const sheet = readSrc("components/ui/sheet.tsx");
     expect(sheet).toContain("motion-duration-spatial");

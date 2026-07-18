@@ -30,6 +30,10 @@ export interface EvalState {
   fetchDatasets: () => Promise<void>;
   fetchRuns: () => Promise<void>;
   fetchQualityJobs: () => Promise<void>;
+  createQualityRunFromNovel: (
+    novelId: number,
+    datasetIds?: number[]
+  ) => Promise<QualityRunResponse | null>;
   selectQualityJob: (jobId: string) => Promise<void>;
   resumeQualityJob: (jobId: string) => Promise<QualityRunResponse | null>;
   cancelQualityJob: (jobId: string) => Promise<QualityRunResponse | null>;
@@ -115,6 +119,27 @@ export const useEvalStore = create<EvalState>((set, get) => ({
         get().fetchRuns(),
         get().fetchQualityJobs(),
       ]);
+    } finally {
+      set({ loading: false });
+    }
+  },
+
+  createQualityRunFromNovel: async (novelId, datasetIds) => {
+    set({ loading: true, error: null });
+    try {
+      const res = await evalApi.createQualityRunFromNovel({
+        novel_id: novelId,
+        dataset_ids: datasetIds,
+        run_immediately: true,
+      });
+      get().applyQualityResponse(res.data);
+      set({ selectedJob: normalizeJob(res.data.data) });
+      return res.data;
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to create quality job";
+      set({ error: message });
+      return null;
     } finally {
       set({ loading: false });
     }

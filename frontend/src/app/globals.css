@@ -15,11 +15,10 @@
  * - 亮色主题定义在 :root 下，暗色主题定义在 .dark 类下
  *
  * 品牌色：
- * - 主色调 (--primary): HSL(262, 83%, 58%) - 紫色系
+ * - 主色调 (--primary): HSL(16, 70%, 52%) - 柿橙/朱砂色系，亮暗主题一致
  * - 环形色 (--ring): 同主色
  * - 侧边栏主色: 同主色
- *
- * 注意：NovelMind 的品牌色通过 tailwind.config 中定义的 novel-* 色系扩展
+ * - 亮色主题为暖纸底 + 墨色文字；暗色主题为暖墨底 + 米白文字
  */
 
 /* 引入 Tailwind CSS 的三个基础层 */
@@ -46,7 +45,7 @@
     --popover: 40 43% 99%;
     --popover-foreground: 28 20% 13%;
 
-    /* 主色调 - 紫色系，用于主要按钮、链接等 */
+    /* 主色调 - 柿橙/朱砂色系，用于主要按钮、链接等 */
     --primary: 16 70% 52%;
     --primary-foreground: 42 35% 98%;
 
@@ -93,6 +92,8 @@
     --motion-duration-spatial: 300ms;
     --motion-ease-enter: cubic-bezier(0, 0, 0.2, 1);
     --motion-ease-exit: cubic-bezier(0.4, 0, 1, 1);
+    /* List stagger step (multiplied by --stagger-index on each item) */
+    --motion-stagger-step: 40ms;
 
     /* Pre-paint custom reader surface (validated six-digit hex only) */
     --reader-custom-background: #efe4d1;
@@ -100,47 +101,47 @@
   }
 
   /* ============================================================
-   * 暗色主题 CSS 变量
+   * 暗色主题 CSS 变量（暖墨调：深墨棕底 + 米白文字 + 同一柿橙主色）
    * 通过在 <html> 上添加 .dark 类激活
    * 颜色值经过调整以确保在深色背景上的可读性
    * ============================================================ */
   .dark {
-    --background: 240 10% 3.9%;       /* 深灰背景 */
-    --foreground: 0 0% 98%;           /* 近白色文字 */
+    --background: 28 14% 8%;         /* 深墨暖棕 */
+    --foreground: 40 24% 90%;        /* 米白文字 */
 
-    --card: 240 10% 5.9%;             /* 卡片：略浅于背景 */
-    --card-foreground: 0 0% 98%;
+    --card: 30 13% 11%;              /* 卡片：略浅于背景 */
+    --card-foreground: 40 24% 90%;
 
-    --popover: 240 10% 5.9%;
-    --popover-foreground: 0 0% 98%;
+    --popover: 30 13% 11%;
+    --popover-foreground: 40 24% 90%;
 
-    --primary: 262 83% 58%;           /* 主色保持一致 */
-    --primary-foreground: 0 0% 98%;
+    --primary: 16 72% 58%;           /* 柿橙提亮，与亮色主题同色系 */
+    --primary-foreground: 42 35% 98%;
 
-    --secondary: 240 3.7% 15.9%;     /* 暗色次要色 */
-    --secondary-foreground: 0 0% 98%;
+    --secondary: 30 10% 17%;
+    --secondary-foreground: 40 20% 88%;
 
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%; /* 较亮的灰色 */
+    --muted: 30 10% 16%;
+    --muted-foreground: 36 10% 62%;  /* 暖灰辅助文字 */
 
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
+    --accent: 28 12% 18%;
+    --accent-foreground: 40 22% 90%;
 
-    --destructive: 0 62.8% 30.6%;    /* 暗色主题下更深的红色 */
+    --destructive: 0 62.8% 45%;      /* 暗色主题下更深的红色 */
 
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 262 83% 58%;
+    --border: 30 9% 20%;
+    --input: 30 9% 24%;
+    --ring: 16 72% 58%;
 
     /* 侧边栏暗色主题 */
-    --sidebar: 240 10% 5.9%;
-    --sidebar-foreground: 0 0% 98%;
-    --sidebar-primary: 262 83% 58%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 0 0% 98%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 262 83% 58%;
+    --sidebar: 29 12% 10%;
+    --sidebar-foreground: 40 24% 90%;
+    --sidebar-primary: 16 72% 58%;
+    --sidebar-primary-foreground: 42 35% 98%;
+    --sidebar-accent: 30 10% 16%;
+    --sidebar-accent-foreground: 40 20% 88%;
+    --sidebar-border: 30 9% 18%;
+    --sidebar-ring: 16 72% 58%;
   }
 }
 
@@ -234,6 +235,31 @@
   .motion-closing {
     pointer-events: none;
   }
+
+  /* Mount enter (page transitions) and list stagger — token-driven.
+     Delay uses --stagger-index set inline per item; fill mode keeps
+     items invisible before their delay starts. */
+  .motion-enter {
+    animation: motion-fade-up var(--motion-duration-standard)
+      var(--motion-ease-enter) both;
+  }
+
+  .motion-stagger-item {
+    animation: motion-fade-up var(--motion-duration-standard)
+      var(--motion-ease-enter) both;
+    animation-delay: calc(var(--stagger-index, 0) * var(--motion-stagger-step));
+  }
+}
+
+@keyframes motion-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* Color-only theme transitions after boot gate (never layout / images / bg position). */
@@ -272,7 +298,9 @@ html.theme-transition-ready [data-theme-surface] {
   /* Strip non-essential translate/scale/pulse while keeping final opacity/color state. */
   .motion-transition-spatial,
   .motion-transition-content,
-  .motion-transition-feedback {
+  .motion-transition-feedback,
+  .motion-enter,
+  .motion-stagger-item {
     transform: none !important;
   }
 }

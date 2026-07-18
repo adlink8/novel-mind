@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useCallback, useEffect, useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,6 +30,8 @@ import {
 import { CanvasRenderer } from "echarts/renderers";
 import { Check, ClipboardList, RefreshCw, TriangleAlert, X } from "lucide-react";
 import { PageContainer, PageHeader } from "@/components/page-header";
+import { ChapterOrnament } from "@/components/chapter-ornament";
+import { Skeleton } from "@/components/ui/skeleton";
 
 echarts.use([
   LineChart,
@@ -118,21 +120,6 @@ async function fetchRunReport(runId: number): Promise<{
   };
 }
 
-async function triggerEvalRun(
-  runName: string,
-  strategy: string,
-  novelId: number,
-  datasetIds: number[]
-): Promise<DeprecationMeta | undefined> {
-  const res = await evalApi.createRun({
-    run_name: runName,
-    strategy,
-    novel_id: novelId,
-    dataset_ids: datasetIds,
-  });
-  return res.data.deprecation;
-}
-
 // ── Quality status badge (exported for tests) ──────────────────────
 
 export function QualityStatusBadge({ status }: { status: string }) {
@@ -180,7 +167,7 @@ export function QualityJobsPanel({
       <EmptyState
         icon={<ClipboardList className="size-6" />}
         title="暂无质量评测任务"
-        description="通过 POST /api/eval/quality/runs 创建 durable quality job"
+        description="在“评测运行”中选择小说并运行自动评测"
       />
     );
   }
@@ -231,7 +218,7 @@ export function QualityJobsPanel({
         </Card>
       ))}
       {selected && (
-        <Card className="border-primary/30" data-testid="quality-job-report">
+        <Card className="paper-surface rounded-2xl border-primary/30" data-testid="quality-job-report">
           <CardHeader>
             <CardTitle className="text-base">
               质量报告: {selected.job_id}
@@ -265,6 +252,7 @@ export default function EvalPage() {
     selectedJob,
     lastDeprecation,
     fetchAll,
+    createQualityRunFromNovel,
     selectQualityJob,
     resumeQualityJob,
   } = useEval({ autoFetch: true });
@@ -283,16 +271,10 @@ export default function EvalPage() {
   const [filterStatus, setFilterStatus] = useState<string>("all");
 
   // 运行创建
-  const [runName, setRunName] = useState("");
-  const [runStrategy, setRunStrategy] = useState("bm25");
   const [runNovelId, setRunNovelId] = useState(1);
   const [running, setRunning] = useState(false);
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -305,7 +287,17 @@ export default function EvalPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [fetchAll]);
+
+  useEffect(() => {
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) void loadData();
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [loadData]);
 
   // 筛选数据集
   const filteredDatasets = useMemo(() => {
@@ -331,10 +323,12 @@ export default function EvalPage() {
     }
   }
 
-  // 触发评测
+  // 从服务端可信 lineage 触发自动质量评测；legacy runs 仅保留历史展示。
   async function handleRunEval() {
     const confirmedIds = datasets
-      .filter((d) => d.status === "confirmed")
+      .filter(
+        (d) => d.novel_id === runNovelId && d.status === "confirmed"
+      )
       .map((d) => d.id);
     if (confirmedIds.length === 0) {
       alert("没有已确认的测试题，请先在数据集中确认题目");
@@ -342,17 +336,14 @@ export default function EvalPage() {
     }
     setRunning(true);
     try {
-      const dep = await triggerEvalRun(
-        runName || `评测_${Date.now()}`,
-        runStrategy,
-        runNovelId,
-        confirmedIds
-      );
-      if (dep) setLegacyDeprecation(dep);
-      await loadData();
-      setActiveTab("runs");
+      const created = await createQualityRunFromNovel(runNovelId, confirmedIds);
+      if (!created) {
+        throw new Error("质量任务创建失败");
+      }
+      await fetchAll();
+      setActiveTab("quality");
     } catch {
-      alert("评测运行失败");
+      alert("自动评测启动失败：请确认题目已确认，且小说已有可信 active chunk/source lineage");
     } finally {
       setRunning(false);
     }
@@ -371,20 +362,27 @@ export default function EvalPage() {
 
   if (loading) {
     return (
-      <div className="flex-1 p-8">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 w-48 bg-muted rounded" />
-          <div className="h-64 bg-muted rounded" />
+      <PageContainer className="space-y-7">
+        <div className="space-y-3 border-b border-border/70 pb-7">
+          <Skeleton className="h-3 w-28" />
+          <Skeleton className="h-9 w-56" />
+          <Skeleton className="h-4 w-96 max-w-full" />
         </div>
-      </div>
+        <Skeleton className="h-12 w-full rounded-2xl" />
+        <div className="space-y-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-24 w-full rounded-2xl" />
+          ))}
+        </div>
+      </PageContainer>
     );
   }
 
   if (error) {
     return (
-      <div className="flex-1 p-8">
+      <PageContainer>
         <EmptyState icon={<TriangleAlert className="size-6" />} title="数据加载失败" description={error} />
-      </div>
+      </PageContainer>
     );
   }
 
@@ -434,6 +432,7 @@ export default function EvalPage() {
       </div>
 
       {/* ── 内容区 ── */}
+      <ChapterOrnament />
       <div>
 
         {/* ── 数据集面板 ── */}
@@ -551,27 +550,12 @@ export default function EvalPage() {
         {activeTab === "runs" && (
           <div className="space-y-6">
             {/* 创建 Run */}
-            <Card>
+            <Card className="paper-surface rounded-2xl">
               <CardHeader>
-                <CardTitle className="text-base">触发评测运行</CardTitle>
+                <CardTitle className="text-base">运行自动评测</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center gap-3 flex-wrap">
-                  <Input
-                    placeholder="运行名称"
-                    value={runName}
-                    onChange={(e) => setRunName(e.target.value)}
-                    className="w-48"
-                  />
-                  <select
-                    value={runStrategy}
-                    onChange={(e) => setRunStrategy(e.target.value)}
-                    className="px-3 py-1.5 rounded-lg border bg-background text-sm"
-                  >
-                    {Object.entries(STRATEGY_LABELS).map(([k, v]) => (
-                      <option key={k} value={k}>{v}</option>
-                    ))}
-                  </select>
                   <Input
                     type="number"
                     placeholder="小说 ID"
@@ -581,12 +565,15 @@ export default function EvalPage() {
                     min={1}
                   />
                   <Button onClick={handleRunEval} disabled={running} size="sm">
-                    {running ? "执行中..." : "▶ 运行评测"}
+                    {running ? "启动中..." : "运行自动评测"}
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  将使用所有 &quot;已确认&quot; 状态的测试题 (
-                  {datasets.filter((d) => d.status === "confirmed").length} 条)
+                  服务端将验证所有已确认题目、active chunk build、冻结 fixture 与模型校准谱系；
+                  缺少可信谱系时会拒绝创建，不生成伪可比较指标。（
+                  {datasets.filter(
+                    (d) => d.novel_id === runNovelId && d.status === "confirmed"
+                  ).length} 条已确认）
                 </p>
               </CardContent>
             </Card>
@@ -600,9 +587,9 @@ export default function EvalPage() {
               />
             ) : (
               <div className="space-y-3">
-                <h3 className="text-sm font-semibold">历史运行</h3>
+                <h3 className="text-sm font-semibold">Legacy 历史运行</h3>
                 {runs.map((run) => (
-                  <Card key={run.id}>
+                  <Card key={run.id} className="paper-surface rounded-2xl">
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between">
                         <div>
@@ -655,7 +642,7 @@ export default function EvalPage() {
 
             {/* 选中的报告详情 */}
             {selectedRun && (
-              <Card className="border-primary/30">
+              <Card className="paper-surface rounded-2xl border-primary/30">
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-base">
@@ -787,10 +774,13 @@ function MetricBadge({
 
 // ── Chart Components ───────────────────────────────────────────────
 
-/** 深色主题 ECharts 公共配置 */
-const darkTheme = {
-  textStyle: { color: "#94a3b8" },
-  legend: { textStyle: { color: "#94a3b8" } },
+/** 暖纸主题 ECharts 公共配置（与全局 ink/paper 设计令牌同色系） */
+const CHART_INK = "#3a342c"; // 暖墨：接近 hsl(28 20% 13%) foreground
+const CHART_MUTED = "#84786a"; // 暖灰：接近 muted-foreground
+
+const paperTheme = {
+  textStyle: { color: CHART_MUTED },
+  legend: { textStyle: { color: CHART_MUTED } },
 };
 
 /** 给最近 10 条 run 打标签：显示策略名+时间 */
@@ -827,20 +817,20 @@ function CompareCharts({ runs }: { runs: EvalRun[] }) {
   };
 
   const barOption: echarts.EChartsCoreOption = {
-    ...darkTheme,
-    title: { text: "策略指标对比", left: "center", textStyle: { color: "#e2e8f0", fontSize: 14 } },
+    ...paperTheme,
+    title: { text: "策略指标对比", left: "center", textStyle: { color: CHART_INK, fontSize: 14 } },
     tooltip: { trigger: "axis", valueFormatter: (v: unknown) => (typeof v === "number" ? (v * 100).toFixed(1) + "%" : String(v)) },
-    legend: { bottom: 0, textStyle: { color: "#94a3b8" } },
+    legend: { bottom: 0, textStyle: { color: CHART_MUTED } },
     grid: { left: "3%", right: "4%", bottom: "12%", top: "15%", containLabel: true },
     xAxis: {
       type: "category",
       data: strategyRuns.map((r) => STRATEGY_LABELS[r.strategy] || r.strategy),
-      axisLabel: { color: "#94a3b8", rotate: 15 },
+      axisLabel: { color: CHART_MUTED, rotate: 15 },
     },
     yAxis: {
       type: "value",
       name: "得分",
-      axisLabel: { color: "#94a3b8", formatter: (v: number) => (v * 100).toFixed(0) + "%" },
+      axisLabel: { color: CHART_MUTED, formatter: (v: number) => (v * 100).toFixed(0) + "%" },
       max: 1,
     },
     series: metrics.map((m, i) => ({
@@ -857,29 +847,29 @@ function CompareCharts({ runs }: { runs: EvalRun[] }) {
   };
 
   const latencyOption: echarts.EChartsCoreOption = {
-    ...darkTheme,
-    title: { text: "延迟对比 (ms)", left: "center", textStyle: { color: "#e2e8f0", fontSize: 14 } },
+    ...paperTheme,
+    title: { text: "延迟对比 (ms)", left: "center", textStyle: { color: CHART_INK, fontSize: 14 } },
     tooltip: { trigger: "axis" },
     grid: { left: "3%", right: "4%", bottom: "12%", top: "15%", containLabel: true },
     xAxis: {
       type: "category",
       data: strategyRuns.map((r) => STRATEGY_LABELS[r.strategy] || r.strategy),
-      axisLabel: { color: "#94a3b8", rotate: 15 },
+      axisLabel: { color: CHART_MUTED, rotate: 15 },
     },
-    yAxis: { type: "value", name: "ms", axisLabel: { color: "#94a3b8" } },
+    yAxis: { type: "value", name: "ms", axisLabel: { color: CHART_MUTED } },
     series: [{
       name: "延迟",
       type: "bar",
       data: strategyRuns.map((r) => r.latency_ms ?? 0),
       itemStyle: { color: "#8b5cf6" },
-      label: { show: true, position: "top", color: "#94a3b8", formatter: (p: { value: number }) => p.value > 1000 ? (p.value / 1000).toFixed(1) + "s" : p.value.toFixed(0) + "ms" },
+      label: { show: true, position: "top", color: CHART_MUTED, formatter: (p: { value: number }) => p.value > 1000 ? (p.value / 1000).toFixed(1) + "s" : p.value.toFixed(0) + "ms" },
     }],
   };
 
   return (
     <div className="space-y-6">
-      <Card><CardContent className="p-4"><ReactEChartsCore echarts={echarts} option={barOption} style={{ height: 300 }} /></CardContent></Card>
-      <Card><CardContent className="p-4"><ReactEChartsCore echarts={echarts} option={latencyOption} style={{ height: 250 }} /></CardContent></Card>
+      <Card className="paper-surface rounded-2xl"><CardContent className="p-4"><ReactEChartsCore echarts={echarts} option={barOption} style={{ height: 300 }} /></CardContent></Card>
+      <Card className="paper-surface rounded-2xl"><CardContent className="p-4"><ReactEChartsCore echarts={echarts} option={latencyOption} style={{ height: 250 }} /></CardContent></Card>
     </div>
   );
 }
@@ -895,19 +885,19 @@ function TrendCharts({ runs }: { runs: EvalRun[] }) {
   const xData = sorted.map((r) => new Date(r.created_at).toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }));
 
   const lineOption: echarts.EChartsCoreOption = {
-    ...darkTheme,
-    title: { text: "Recall / MRR / NDCG 趋势", left: "center", textStyle: { color: "#e2e8f0", fontSize: 14 } },
+    ...paperTheme,
+    title: { text: "Recall / MRR / NDCG 趋势", left: "center", textStyle: { color: CHART_INK, fontSize: 14 } },
     tooltip: { trigger: "axis", valueFormatter: (v: unknown) => typeof v === "number" ? (v * 100).toFixed(1) + "%" : String(v) },
-    legend: { bottom: 0, textStyle: { color: "#94a3b8" } },
+    legend: { bottom: 0, textStyle: { color: CHART_MUTED } },
     grid: { ...commonGrid },
-    xAxis: { type: "category", data: xData, axisLabel: { color: "#94a3b8", rotate: 30, fontSize: 10 } },
-    yAxis: { type: "value", name: "得分", axisLabel: { color: "#94a3b8", formatter: (v: number) => (v * 100).toFixed(0) + "%" }, max: 1 },
+    xAxis: { type: "category", data: xData, axisLabel: { color: CHART_MUTED, rotate: 30, fontSize: 10 } },
+    yAxis: { type: "value", name: "得分", axisLabel: { color: CHART_MUTED, formatter: (v: number) => (v * 100).toFixed(0) + "%" }, max: 1 },
     series: [
       {
         name: "Recall@5", type: "line",
         data: sorted.map((r) => r.recall_at_k),
         lineStyle: { color: "#3b82f6" }, itemStyle: { color: "#3b82f6" },
-        markLine: { silent: true, data: [{ yAxis: 0.5, label: { formatter: "目标 50%", color: "#94a3b8" } }], lineStyle: { type: "dashed", color: "#64748b" } },
+        markLine: { silent: true, data: [{ yAxis: 0.5, label: { formatter: "目标 50%", color: CHART_MUTED } }], lineStyle: { type: "dashed", color: "#64748b" } },
       },
       {
         name: "MRR", type: "line",
@@ -923,13 +913,13 @@ function TrendCharts({ runs }: { runs: EvalRun[] }) {
   };
 
   const latencyLineOption: echarts.EChartsCoreOption = {
-    ...darkTheme,
-    title: { text: "延迟趋势 (ms)", left: "center", textStyle: { color: "#e2e8f0", fontSize: 14 } },
+    ...paperTheme,
+    title: { text: "延迟趋势 (ms)", left: "center", textStyle: { color: CHART_INK, fontSize: 14 } },
     tooltip: { trigger: "axis" },
-    legend: { bottom: 0, textStyle: { color: "#94a3b8" } },
+    legend: { bottom: 0, textStyle: { color: CHART_MUTED } },
     grid: { ...commonGrid },
-    xAxis: { type: "category", data: xData, axisLabel: { color: "#94a3b8", rotate: 30, fontSize: 10 } },
-    yAxis: { type: "value", name: "ms", axisLabel: { color: "#94a3b8" } },
+    xAxis: { type: "category", data: xData, axisLabel: { color: CHART_MUTED, rotate: 30, fontSize: 10 } },
+    yAxis: { type: "value", name: "ms", axisLabel: { color: CHART_MUTED } },
     series: [{
       name: "延迟", type: "line",
       data: sorted.map((r) => r.latency_ms ?? 0),
@@ -940,8 +930,8 @@ function TrendCharts({ runs }: { runs: EvalRun[] }) {
 
   return (
     <div className="space-y-6">
-      <Card><CardContent className="p-4"><ReactEChartsCore echarts={echarts} option={lineOption} style={{ height: 300 }} /></CardContent></Card>
-      <Card><CardContent className="p-4"><ReactEChartsCore echarts={echarts} option={latencyLineOption} style={{ height: 250 }} /></CardContent></Card>
+      <Card className="paper-surface rounded-2xl"><CardContent className="p-4"><ReactEChartsCore echarts={echarts} option={lineOption} style={{ height: 300 }} /></CardContent></Card>
+      <Card className="paper-surface rounded-2xl"><CardContent className="p-4"><ReactEChartsCore echarts={echarts} option={latencyLineOption} style={{ height: 250 }} /></CardContent></Card>
     </div>
   );
 }

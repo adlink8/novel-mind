@@ -66,6 +66,18 @@ describe("API 客户端", () => {
       expect(mockDelete).toHaveBeenCalledWith("/novels/1");
     });
 
+    it("update 调用 PATCH /novels/:id", async () => {
+      await novelsApi.update("1", { title: "新书名" });
+      expect(mockPatch).toHaveBeenCalledWith("/novels/1", { title: "新书名" });
+    });
+
+    it("bulkDelete 调用 DELETE /novels/bulk", async () => {
+      await novelsApi.bulkDelete([1, 2]);
+      expect(mockDelete).toHaveBeenCalledWith("/novels/bulk", {
+        data: { novel_ids: [1, 2] },
+      });
+    });
+
     it("updateProgress 调用 PATCH /novels/:id/progress", async () => {
       await novelsApi.updateProgress("1", 5, 45.5);
       expect(mockPatch).toHaveBeenCalledWith("/novels/1/progress", {

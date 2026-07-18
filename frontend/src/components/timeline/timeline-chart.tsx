@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import ReactEChartsCore from "echarts-for-react/lib/core";
 import * as echarts from "echarts/core";
@@ -693,11 +693,11 @@ export function TimelineChart({
                       type="button"
                       aria-label={`阶段 ${index + 1} · ${chapterRangeLabel(window)} · ${window.eventCount} 个事件`}
                       onClick={() => setActiveWindow(window)}
-                      className="group rounded-xl p-1.5 text-left transition-[background-color,transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:bg-muted hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                      className="group rounded-xl p-1.5 text-left transition-[background-color,transform,box-shadow] motion-duration-standard motion-ease-enter hover:-translate-y-0.5 hover:bg-muted hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                     >
                       <div className="flex h-28 items-end rounded-lg bg-[#edf0e9] px-1.5 pb-1.5">
                         <span
-                          className="w-full rounded-md bg-[#567d5c] transition-[height,filter] duration-300 ease-out group-hover:brightness-95"
+                          className="w-full rounded-md bg-[#567d5c] transition-[height,filter] motion-duration-spatial motion-ease-enter group-hover:brightness-95"
                           style={{ height: `${density}%` }}
                         />
                       </div>
@@ -760,7 +760,7 @@ export function TimelineChart({
 
         <section className="min-w-0 border-t border-border/40 pt-4">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3"><div><h2 className="font-serif text-lg font-semibold">当前范围事件</h2><p className="mt-0.5 text-xs text-muted-foreground">{activeWindow ? `仅显示 ${chapterRangeLabel(activeWindow)} 内 ${visibleEvents.length} 个事件` : `共 ${sorted.length} 个事件`}</p></div><button type="button" aria-label={listOpen ? "收起列表" : activeWindow ? "展开当前范围列表" : "展开全部列表"} onClick={() => setListOpen((value) => !value)} className="inline-flex items-center gap-1.5 text-sm font-medium text-primary">{listOpen ? "收起列表" : "查看全部"}{listOpen ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}</button></div>
-          <ol aria-label="时间线事件列表" className="grid min-h-[6rem] gap-2 md:grid-cols-3">{displayedEvents.map((event) => <li key={event.id} data-event-id={event.id} data-insertion={freshEventIds.has(event.id) ? "fresh" : "stable"} className={freshEventIds.has(event.id) ? "motion-transition-content opacity-100" : undefined}><button type="button" onClick={() => setSelected(event)} className={`h-full w-full rounded-xl p-3 text-left transition-[background-color,color] motion-duration-standard motion-ease-enter hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${selected?.id === event.id ? "bg-foreground/[0.05]" : "bg-muted/20"}`}><p className="text-xs text-muted-foreground">{chapterLabel(event)} · {event.time_expression ?? "时间未知"}</p><h3 className="mt-1.5 line-clamp-1 font-serif text-base font-semibold">{event.title}</h3><p className="mt-2 line-clamp-2 text-xs leading-5 text-muted-foreground">{event.description}</p></button></li>)}</ol>
+          <ol aria-label="时间线事件列表" className="grid min-h-[6rem] gap-2 md:grid-cols-3">{displayedEvents.map((event, index) => <li key={event.id} data-event-id={event.id} data-insertion={freshEventIds.has(event.id) ? "fresh" : "stable"} className={`motion-stagger-item ${freshEventIds.has(event.id) ? "motion-transition-content opacity-100" : ""}`} style={{ "--stagger-index": Math.min(index, 12) } as CSSProperties}><button type="button" onClick={() => setSelected(event)} className={`h-full w-full rounded-xl p-3 text-left transition-[background-color,color] motion-duration-standard motion-ease-enter hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${selected?.id === event.id ? "bg-foreground/[0.05]" : "bg-muted/20"}`}><p className="text-xs text-muted-foreground">{chapterLabel(event)} · {event.time_expression ?? "时间未知"}</p><h3 className="mt-1.5 line-clamp-1 font-serif text-base font-semibold">{event.title}</h3><p className="mt-2 line-clamp-2 text-xs leading-5 text-muted-foreground">{event.description}</p></button></li>)}</ol>
         </section>
       </div>
 

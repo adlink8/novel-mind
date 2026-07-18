@@ -8,14 +8,14 @@ import path from "path";
  * - browser timeout 60s; retain trace/screenshots on failure
  *
  * Core success path hits real frontend + backend (no route mock).
- * webServer starts Next; backend is expected on :8000 (started by webServer
+ * webServer starts Next; backend is expected on :8010 (started by webServer
  * command when E2E_START_BACKEND=1, or externally).
  */
 
 // Default 3005: some Windows environments block bind on :3000 (EACCES).
 const PORT = Number(process.env.E2E_PORT || 3005);
 const BASE_URL = process.env.E2E_BASE_URL || `http://127.0.0.1:${PORT}`;
-const BACKEND_URL = process.env.BACKEND_URL || "http://127.0.0.1:8000";
+const BACKEND_URL = process.env.BACKEND_URL || "http://127.0.0.1:8010";
 const startBackend = process.env.E2E_START_BACKEND !== "0";
 
 // Cookie CSRF origin gate must allow the frontend origin used by Playwright.
@@ -37,8 +37,8 @@ const backendDir = path.resolve(__dirname, "../backend");
 // otherwise call the platform-specific venv binary via shell.
 const backendCmd =
   process.platform === "win32"
-    ? "venv\\Scripts\\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000"
-    : "venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000";
+    ? "venv\\Scripts\\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8010"
+    : "venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8010";
 
 export default defineConfig({
   testDir: "./e2e",

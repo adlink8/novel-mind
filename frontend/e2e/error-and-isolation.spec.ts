@@ -15,7 +15,7 @@ import {
   uniqueUser,
 } from "./helpers";
 
-const BACKEND = process.env.BACKEND_URL || "http://127.0.0.1:8000";
+const BACKEND = process.env.BACKEND_URL || "http://127.0.0.1:8010";
 
 test.describe("error and isolation", () => {
   test("wrong password shows error state", async ({ page }) => {

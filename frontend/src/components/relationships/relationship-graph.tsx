@@ -418,13 +418,14 @@ export function RelationshipGraph(props: Props) {
           // Kill gray grab/selection chrome on the canvas itself.
           {
             selector: "core",
+            // cytoscape 类型把 Core 样式属性全标为必填；只覆盖需要的几项，其余沿用运行时默认值。
             style: {
               "active-bg-opacity": 0,
               "active-bg-size": 0,
               "selection-box-opacity": 0,
               "selection-box-border-width": 0,
               "outside-texture-bg-opacity": 0,
-            },
+            } as cytoscape.Css.Core,
           },
           {
             selector: "node",
@@ -437,7 +438,7 @@ export function RelationshipGraph(props: Props) {
               "font-weight": 600,
               "text-valign": "bottom",
               "text-margin-y": 8,
-              "text-max-width": 88,
+              "text-max-width": "88px",
               "text-wrap": "ellipsis",
               width: "data(size)",
               height: "data(size)",
@@ -494,7 +495,7 @@ export function RelationshipGraph(props: Props) {
               "target-arrow-shape": "triangle",
               "curve-style": "bezier",
               "control-point-step-size": 40,
-              "line-style": "solid",
+              "line-style": "solid" as const,
               label: preferLabels ? "data(label)" : "",
               "font-size": 10,
               color: "#57534e",
@@ -532,7 +533,7 @@ export function RelationshipGraph(props: Props) {
             style: {
               "line-color": color,
               "target-arrow-color": color,
-              "line-style": "solid",
+              "line-style": "solid" as const,
             },
           })),
           // Provisional co-occurrence: dashed slate, label「共现」— visually honest.
@@ -541,7 +542,7 @@ export function RelationshipGraph(props: Props) {
             style: {
               "line-color": PROVISIONAL_EDGE_COLOR,
               "target-arrow-color": PROVISIONAL_EDGE_COLOR,
-              "line-style": "dashed",
+              "line-style": "dashed" as const,
               "line-dash-pattern": [6, 4],
               opacity: 0.75,
               color: "#64748b",
@@ -554,7 +555,7 @@ export function RelationshipGraph(props: Props) {
             style: {
               "line-color": "#64748b",
               "target-arrow-color": "#64748b",
-              "line-style": "dashed",
+              "line-style": "dashed" as const,
               opacity: 1,
               label: "共现",
             },
@@ -673,20 +674,21 @@ export function RelationshipGraph(props: Props) {
     const cy = cyRef.current;
     if (!cy || props.mode === "filters_required") return;
     cy.elements().unselect();
-    if (!props.selected) {
+    const selected = props.selected;
+    if (!selected) {
       applyNeighborhoodFocus(cy, null, null);
       if (hubId != null) safeAddClass(cy.getElementById(`n${hubId}`), "hub");
       return;
     }
-    if (props.selected.kind === "node") {
-      const id = `n${props.selected.characterId}`;
+    if (selected.kind === "node") {
+      const id = `n${selected.characterId}`;
       const el = cy.getElementById(id);
       el?.select?.();
       applyNeighborhoodFocus(cy, id, null);
       return;
     }
     const edge = slice.edges.find(
-      (e) => e.observation_id === props.selected!.observationId
+      (e) => e.observation_id === selected.observationId
     );
     if (edge) {
       const id = edgeElementId(edge);

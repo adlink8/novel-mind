@@ -93,7 +93,21 @@ async function mockReaderChat(page: Page) {
     route.fulfill({ status: 200, json: {} })
   );
 
-  const conversations = [
+  type MockConversation = {
+    id: number;
+    novel_id: number;
+    title: string;
+    status: string;
+    next_sequence: number;
+    last_opened_at: string | null;
+    created_at: string;
+    updated_at: string;
+    last_message_sequence: number | null;
+    last_message_role: string | null;
+    last_message_at: string | null;
+  };
+
+  const conversations: MockConversation[] = [
     {
       id: 1,
       novel_id: 11,

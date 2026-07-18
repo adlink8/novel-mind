@@ -5,6 +5,7 @@ const fetchAll = vi.fn().mockResolvedValue(undefined);
 const resumeQualityJob = vi.fn();
 const selectQualityJob = vi.fn();
 const cancelQualityJob = vi.fn();
+const createQualityRunFromNovel = vi.fn();
 
 vi.mock("@/stores/eval", () => ({
   useEvalStore: () => ({
@@ -50,6 +51,7 @@ vi.mock("@/stores/eval", () => ({
     fetchDatasets: vi.fn(),
     fetchRuns: vi.fn(),
     fetchQualityJobs: vi.fn(),
+    createQualityRunFromNovel,
     selectQualityJob,
     resumeQualityJob,
     cancelQualityJob,
@@ -117,8 +119,10 @@ describe("useEval", () => {
     await act(async () => {
       await result.current.resumeQualityJob("p1");
       await result.current.selectQualityJob("p1");
+      await result.current.createQualityRunFromNovel(7, [1, 2]);
     });
     expect(resumeQualityJob).toHaveBeenCalledWith("p1");
     expect(selectQualityJob).toHaveBeenCalledWith("p1");
+    expect(createQualityRunFromNovel).toHaveBeenCalledWith(7, [1, 2]);
   });
 });

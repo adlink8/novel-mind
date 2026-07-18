@@ -10,6 +10,8 @@ interface NovelState {
   fetchNovels: () => Promise<void>;
   fetchNovel: (id: string) => Promise<void>;
   deleteNovel: (id: string) => Promise<void>;
+  deleteNovels: (ids: number[]) => Promise<void>;
+  renameNovel: (id: number, title: string) => Promise<void>;
   clearError: () => void;
   setCurrentNovel: (novel: Novel | null) => void;
 }
@@ -57,6 +59,43 @@ export const useNovelStore = create<NovelState>((set, get) => ({
       const message =
         err instanceof Error ? err.message : "Failed to delete novel";
       set({ error: message, loading: false });
+    }
+  },
+
+  deleteNovels: async (ids: number[]) => {
+    if (ids.length === 0) return;
+    set({ loading: true, error: null });
+    try {
+      const res = await novelsApi.bulkDelete(ids);
+      const deleted = new Set(res.data.deleted_ids);
+      set((state) => ({
+        novels: state.novels.filter((novel) => !deleted.has(novel.id)),
+        currentNovel: state.currentNovel && deleted.has(state.currentNovel.id)
+          ? null
+          : state.currentNovel,
+        loading: false,
+      }));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to delete novels";
+      set({ error: message, loading: false });
+      throw err;
+    }
+  },
+
+  renameNovel: async (id: number, title: string) => {
+    set({ error: null });
+    try {
+      const res = await novelsApi.update(id, { title });
+      set((state) => ({
+        novels: state.novels.map((novel) => novel.id === id ? { ...novel, ...res.data } : novel),
+        currentNovel: state.currentNovel?.id === id
+          ? { ...state.currentNovel, ...res.data }
+          : state.currentNovel,
+      }));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to rename novel";
+      set({ error: message });
+      throw err;
     }
   },
 

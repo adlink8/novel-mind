@@ -13,6 +13,18 @@ import { SearchBar } from "@/components/search/search-bar";
 import { EmptyState } from "@/components/empty-state";
 import { Search, SearchX, TriangleAlert } from "lucide-react";
 import { PageContainer, PageHeader } from "@/components/page-header";
+import { Skeleton } from "@/components/ui/skeleton";
+
+/** 结果卡片形状的骨架占位 */
+function ResultSkeleton() {
+  return (
+    <div className="rounded-lg border border-border bg-muted/30 p-4">
+      <Skeleton className="mb-3 h-4 w-2/3" />
+      <Skeleton className="mb-2 h-3 w-1/3" />
+      <Skeleton className="h-3 w-full" />
+    </div>
+  );
+}
 
 function SearchContent() {
   const searchParams = useSearchParams();
@@ -141,14 +153,7 @@ function SearchContent() {
       {loading && (
         <div className="space-y-4">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div
-              key={i}
-              className="animate-pulse rounded-lg border border-border bg-muted/30 p-4"
-            >
-              <div className="mb-3 h-4 w-2/3 rounded bg-muted" />
-              <div className="mb-2 h-3 w-1/3 rounded bg-muted" />
-              <div className="h-3 w-full rounded bg-muted" />
-            </div>
+            <ResultSkeleton key={i} />
           ))}
         </div>
       )}
@@ -175,11 +180,14 @@ function SearchContent() {
 
       {!loading && !error && results.length > 0 && (
         <div className="space-y-3">
-          {results.map((result) => (
-            <SearchResultCard
+          {results.map((result, index) => (
+            <div
               key={`${result.novel_id}-${result.chunk_id}`}
-              result={result}
-            />
+              className="motion-stagger-item"
+              style={{ "--stagger-index": Math.min(index, 10) } as React.CSSProperties}
+            >
+              <SearchResultCard result={result} />
+            </div>
           ))}
         </div>
       )}
@@ -192,17 +200,10 @@ export default function SearchPage() {
     <Suspense
       fallback={
         <div className="mx-auto max-w-3xl px-4 py-8">
-          <div className="mb-6 h-10 w-64 animate-pulse rounded-lg bg-muted" />
+          <Skeleton className="mb-6 h-10 w-64" />
           <div className="space-y-4">
             {Array.from({ length: 4 }).map((_, i) => (
-              <div
-                key={i}
-                className="animate-pulse rounded-lg border border-border bg-muted/30 p-4"
-              >
-                <div className="mb-3 h-4 w-2/3 rounded bg-muted" />
-                <div className="mb-2 h-3 w-1/3 rounded bg-muted" />
-                <div className="h-3 w-full rounded bg-muted" />
-              </div>
+              <ResultSkeleton key={i} />
             ))}
           </div>
         </div>

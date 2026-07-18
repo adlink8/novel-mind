@@ -3,7 +3,7 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 
-const BACKEND = process.env.BACKEND_URL || "http://127.0.0.1:8000";
+const BACKEND = process.env.BACKEND_URL || "http://127.0.0.1:8010";
 
 export function uniqueUser(prefix = "e2e") {
   const stamp = `${Date.now()}_${Math.floor(Math.random() * 1e6)}`;

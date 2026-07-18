@@ -16,7 +16,7 @@
 
 import type { Metadata } from "next";
 import "./globals.css";
-import { Inter } from "next/font/google";
+import { Inter, Noto_Serif_SC } from "next/font/google";
 import { cn } from "@/lib/utils";
 import { AuthGate } from "@/components/auth-gate";
 import { AppShell } from "@/components/app-shell";
@@ -24,6 +24,11 @@ import { AppThemeSync } from "@/components/app-theme-sync";
 import { THEME_BOOT_SCRIPT } from "@/components/reader/reader-preferences";
 
 const inter = Inter({subsets:["latin"], variable:"--font-sans"});
+const notoSerifSC = Noto_Serif_SC({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-serif",
+});
 
 export const metadata: Metadata = {
   title: "NovelMind - AI 辅助小说创作与理解",
@@ -36,7 +41,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="zh-CN" className={cn("font-sans", inter.variable)} suppressHydrationWarning>
+    <html lang="zh-CN" className={cn("font-sans", inter.variable, notoSerifSC.variable)} suppressHydrationWarning>
       <head>
         <script
           // Defensive pre-paint theme restore — same key/validation as AppThemeSync.

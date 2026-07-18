@@ -16,16 +16,16 @@ export default function WritingPage() {
   return (
     <PageContainer className="space-y-8">
       <PageHeader eyebrow="Writing studio" title="创作中心" description="从可靠的原作记忆出发，规划故事分支、建立草稿并与 AI 协作续写。" />
-      <section className="relative overflow-hidden rounded-[32px] bg-[#28332f] p-7 text-white shadow-[0_30px_80px_-42px_rgba(25,35,31,0.7)] sm:p-10">
+      <section className="relative overflow-hidden rounded-[32px] bg-foreground p-7 text-white shadow-[0_30px_80px_-42px_rgba(25,35,31,0.7)] sm:p-10">
         <div className="absolute right-[-3rem] top-[-4rem] size-56 rounded-full border border-white/10" />
         <div className="absolute bottom-[-5rem] right-24 size-44 rounded-full bg-white/[0.04]" />
         <div className="relative grid gap-8 lg:grid-cols-[1fr_auto] lg:items-end">
           <div className="max-w-2xl">
-            <span className="mb-5 grid size-12 place-items-center rounded-2xl bg-white/10"><Feather className="size-5 text-[#f2a27b]" /></span>
+            <span className="mb-5 grid size-12 place-items-center rounded-2xl bg-white/10"><Feather className="size-5 text-primary" /></span>
             <h2 className="font-serif text-3xl font-semibold tracking-tight sm:text-4xl">不是让 AI 替你写，<br />而是让故事记得更多。</h2>
             <p className="mt-4 max-w-xl text-sm leading-7 text-white/60">创作能力仍在建设中。当前可以先完成原作导入与检索评测，为后续分支创作建立可信上下文。</p>
           </div>
-          <Link href="/novels" className={cn(buttonVariants({ size: "lg" }), "h-11 rounded-full bg-[#e7794d] px-6 text-white hover:bg-[#d8693f]")}>前往书架 <ArrowRight className="ml-2 size-4" /></Link>
+          <Link href="/novels" className={cn(buttonVariants({ size: "lg" }), "h-11 rounded-full bg-primary px-6 text-white hover:bg-primary/90")}>前往书架 <ArrowRight className="ml-2 size-4" /></Link>
         </div>
       </section>
       <section>

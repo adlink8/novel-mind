@@ -7,6 +7,7 @@ const {
   getQualityRun,
   resumeQualityRun,
   cancelQualityRun,
+  createQualityRunFromNovel,
 } = vi.hoisted(() => ({
   listDatasets: vi.fn(),
   listRuns: vi.fn(),
@@ -14,6 +15,7 @@ const {
   getQualityRun: vi.fn(),
   resumeQualityRun: vi.fn(),
   cancelQualityRun: vi.fn(),
+  createQualityRunFromNovel: vi.fn(),
 }));
 
 vi.mock("@/lib/api", async () => {
@@ -31,6 +33,7 @@ vi.mock("@/lib/api", async () => {
       getRun: vi.fn(),
       createRun: vi.fn(),
       createQualityRun: vi.fn(),
+      createQualityRunFromNovel,
     },
   };
 });
@@ -120,6 +123,35 @@ describe("useEvalStore", () => {
     const state = useEvalStore.getState();
     expect(state.qualityJobs[0].job_id).toBe("j9");
     expect(state.lastDeprecation?.deprecated).toBe(true);
+  });
+
+  it("creates a server-orchestrated quality run from a novel", async () => {
+    createQualityRunFromNovel.mockResolvedValue({
+      data: {
+        status: "queued",
+        job_id: "from-novel-1",
+        quality_comparable: false,
+        metrics: null,
+        data: {
+          job_id: "from-novel-1",
+          status: "queued",
+          quality_comparable: false,
+          metrics: null,
+        },
+      },
+    });
+
+    const response = await useEvalStore
+      .getState()
+      .createQualityRunFromNovel(42, [3, 4]);
+
+    expect(createQualityRunFromNovel).toHaveBeenCalledWith({
+      novel_id: 42,
+      dataset_ids: [3, 4],
+      run_immediately: true,
+    });
+    expect(response?.job_id).toBe("from-novel-1");
+    expect(useEvalStore.getState().selectedJob?.job_id).toBe("from-novel-1");
   });
 
   it("cancelQualityJob marks non-comparable", async () => {

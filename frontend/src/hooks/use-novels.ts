@@ -23,7 +23,7 @@ import { novelsApi, type Novel, type NovelUploadResponse } from "@/lib/api";
 export function useNovels() {
   const {
     novels, currentNovel, loading, error,
-    fetchNovels, fetchNovel, deleteNovel, clearError, setCurrentNovel,
+    fetchNovels, fetchNovel, deleteNovel, deleteNovels, renameNovel, clearError, setCurrentNovel,
   } = useNovelStore();
 
   // 组件挂载时自动加载小说列表
@@ -77,7 +77,7 @@ export function useNovels() {
 
   return {
     novels, currentNovel, loading, error,
-    fetchNovels, fetchNovel, deleteNovel, clearError, setCurrentNovel,
+    fetchNovels, fetchNovel, deleteNovel, deleteNovels, renameNovel, clearError, setCurrentNovel,
     uploadNovel, getNovelById, searchNovels, sortedNovels,
   };
 }

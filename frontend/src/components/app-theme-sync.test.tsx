@@ -194,7 +194,8 @@ describe("AppThemeSync reconciliation", () => {
     expect(document.documentElement).not.toHaveClass("theme-transition-ready");
 
     expect(rafCb).not.toBeNull();
-    rafCb?.(0);
+    // rafCb 在 mock 闭包内赋值，CFA 仍收窄为 null；先转回声明的联合类型再调用
+    (rafCb as FrameRequestCallback | null)?.(0);
     expect(document.documentElement).toHaveClass("theme-transition-ready");
   });
 
