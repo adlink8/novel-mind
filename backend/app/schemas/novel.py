@@ -43,6 +43,19 @@ class NovelUpdate(BaseModel):
     cover_url: Optional[str] = Field(None, max_length=500)
 
 
+class NovelBulkDeleteRequest(BaseModel):
+    """批量删除请求；限制单次规模，避免误操作和超长事务。"""
+
+    novel_ids: List[int] = Field(..., min_length=1, max_length=100)
+
+
+class NovelBulkDeleteResponse(BaseModel):
+    """批量删除结果。未找到或无权访问的 ID 统一计入 skipped_ids。"""
+
+    deleted_ids: List[int]
+    skipped_ids: List[int]
+
+
 class ChapterSummaryResponse(BaseModel):
     """
     章节摘要响应（不含完整 content，用于章节列表）。

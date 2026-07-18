@@ -215,7 +215,9 @@ class NarrativeMemoryBuilderWorker:
             for stage in chapter_stages:
                 if max_stages is not None and processed >= max_stages:
                     break
-                if stage.status == "completed":
+                # Skip completed and hard-failed stages so batch resume can make
+                # forward progress; operators requeue failed→pending explicitly.
+                if stage.status in {"completed", "failed", "cancelled"}:
                     continue
                 if await repo.is_cancelled(run_id):
                     await repo.update_run_status(
@@ -362,6 +364,10 @@ class NarrativeMemoryBuilderWorker:
                 request_payload=input_package.model_dump(mode="json"),
                 validate_output=validate_output,
                 is_cancelled=is_cancelled,
+                # Full chapter evidence packages routinely exceed the gateway
+                # defaults (800/1200); under-reserve causes BudgetExceeded on settle.
+                estimated_input_tokens=48_000,
+                estimated_output_tokens=8_192,
             )
             import json as _json
 
@@ -637,6 +643,8 @@ class NarrativeMemoryBuilderWorker:
                 request_payload=request_payload,
                 validate_output=validate_output,
                 is_cancelled=is_cancelled,
+                estimated_input_tokens=8_000,
+                estimated_output_tokens=4_096,
             )
             import json as _json
 
@@ -845,6 +853,8 @@ class NarrativeMemoryBuilderWorker:
                 request_payload=request_payload,
                 validate_output=validate_output,
                 is_cancelled=is_cancelled,
+                estimated_input_tokens=8_000,
+                estimated_output_tokens=4_096,
             )
             import json as _json
 
@@ -1092,13 +1102,33 @@ class NarrativeMemoryBuilderWorker:
     def _assert_eligibility_matches(
         self, version: NarrativeMemoryVersion, report: EligibilityReport
     ) -> None:
+        from app.services.narrative_memory.audit_contracts import (
+            AssetKind,
+            EligibilityStatus,
+        )
         from app.services.narrative_memory.authority import CandidateAuthority
 
-        checksum = CandidateAuthority._eligibility_checksum(report)  # noqa: SLF001
-        if checksum != version.eligibility_report_checksum:
-            raise BuilderRepositoryError("eligibility report checksum mismatch")
         if report.policy_version != version.eligibility_policy_version:
             raise BuilderRepositoryError("eligibility policy version mismatch")
+
+        # Exact full-report checksum is ideal, but multi-hour candidate builds
+        # routinely see optional-domain drift (timeline/relationship/clue). Versions
+        # are append-only, so we accept resume when the required hierarchy lineage
+        # still matches the frozen version and provider_calls remain allowed.
+        checksum = CandidateAuthority._eligibility_checksum(report)  # noqa: SLF001
+        if checksum != version.eligibility_report_checksum:
+            hierarchy = next(
+                (a for a in report.assets if a.kind == AssetKind.HIERARCHY),
+                None,
+            )
+            if (
+                hierarchy is None
+                or hierarchy.status != EligibilityStatus.REUSABLE_EXACT
+                or hierarchy.version_id != version.hierarchy_build_id
+            ):
+                raise BuilderRepositoryError(
+                    "eligibility report checksum mismatch and hierarchy lineage drifted"
+                )
         if not provider_calls_allowed(report):
             # Caller may still create run; process_run pauses before transport.
             return

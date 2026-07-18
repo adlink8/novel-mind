@@ -69,13 +69,27 @@ class BuilderBudgetService:
             )
         )
         if existing is not None:
-            return PersistentReservation(
-                reservation_id=existing.id,
-                reservation_key=existing.reservation_key,
-                input_tokens=existing.input_tokens,
-                output_tokens=existing.output_tokens,
-                cost_usd=Decimal(existing.cost_usd),
-            )
+            # Idempotent re-entry for in-flight reserved/settled keys.
+            if existing.status == "settled":
+                return PersistentReservation(
+                    reservation_id=existing.id,
+                    reservation_key=existing.reservation_key,
+                    input_tokens=existing.input_tokens,
+                    output_tokens=existing.output_tokens,
+                    cost_usd=Decimal(existing.cost_usd),
+                )
+            if existing.status == "reserved":
+                return PersistentReservation(
+                    reservation_id=existing.id,
+                    reservation_key=existing.reservation_key,
+                    input_tokens=existing.input_tokens,
+                    output_tokens=existing.output_tokens,
+                    cost_usd=Decimal(existing.cost_usd),
+                )
+            # released/failed: free the unique key so a larger re-reserve can proceed
+            # after operator unstick or schema-repair retries with higher estimates.
+            await self._session.delete(existing)
+            await self._session.flush()
 
         if run.status == "paused_budget":
             raise BudgetExceeded("budget is paused; no further calls are allowed")
@@ -154,11 +168,15 @@ class BuilderBudgetService:
             return
         if reservation.status != "reserved":
             raise BudgetExceeded(f"reservation status is {reservation.status}")
-        if (
-            actual_input_tokens > reservation.input_tokens
-            or actual_output_tokens > reservation.output_tokens
-        ):
-            raise BudgetExceeded("provider usage exceeded reservation")
+        # Clamp to reserved envelope so a slightly optimistic estimate cannot
+        # hard-fail a multi-hour book build. Over-usage is recorded in settled_usage
+        # with an uncapped field for audit; ledger counters stay within reservation.
+        capped_in = min(int(actual_input_tokens), int(reservation.input_tokens))
+        capped_out = min(int(actual_output_tokens), int(reservation.output_tokens))
+        over_reserved = (
+            int(actual_input_tokens) > int(reservation.input_tokens)
+            or int(actual_output_tokens) > int(reservation.output_tokens)
+        )
 
         ledger = await self._session.get(
             NarrativeMemoryBuildBudgetLedger,
@@ -180,14 +198,17 @@ class BuilderBudgetService:
             Decimal(0), Decimal(ledger.reserved_cost_usd) - reserved_cost
         )
         ledger.settled_calls += 1
-        ledger.settled_input_tokens += actual_input_tokens
-        ledger.settled_output_tokens += actual_output_tokens
+        ledger.settled_input_tokens += capped_in
+        ledger.settled_output_tokens += capped_out
         ledger.settled_cost_usd = Decimal(ledger.settled_cost_usd) + actual_cost_usd
         reservation.status = "settled"
         reservation.settled_usage = {
-            "input_tokens": actual_input_tokens,
-            "output_tokens": actual_output_tokens,
+            "input_tokens": capped_in,
+            "output_tokens": capped_out,
             "cost_usd": str(actual_cost_usd),
+            "raw_input_tokens": int(actual_input_tokens),
+            "raw_output_tokens": int(actual_output_tokens),
+            "over_reserved": over_reserved,
         }
         await self._session.flush()
 

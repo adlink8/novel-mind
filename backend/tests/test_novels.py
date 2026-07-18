@@ -463,3 +463,45 @@ async def test_update_reading_progress_chapter_not_belong(auth_client: AsyncClie
         json={"chapter_id": chapter_b_id, "progress_percent": 50},
     )
     assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_rename_novel(auth_client: AsyncClient):
+    upload = await auth_client.post(
+        "/api/novels/upload",
+        files={"file": ("旧书名.txt", io.BytesIO("第一章\n正文".encode("utf-8")), "text/plain")},
+    )
+    status = await _wait_for_import_job(auth_client, upload.json()["job_id"])
+    novel_id = status["novel_id"]
+
+    response = await auth_client.patch(
+        f"/api/novels/{novel_id}", json={"title": "  新书名  "}
+    )
+
+    assert response.status_code == 200
+    assert response.json()["title"] == "新书名"
+    detail = await auth_client.get(f"/api/novels/{novel_id}")
+    assert detail.json()["title"] == "新书名"
+
+
+@pytest.mark.asyncio
+async def test_bulk_delete_novels(auth_client: AsyncClient):
+    novel_ids = []
+    for filename in ("批量甲.txt", "批量乙.txt"):
+        upload = await auth_client.post(
+            "/api/novels/upload",
+            files={"file": (filename, io.BytesIO("第一章\n正文".encode("utf-8")), "text/plain")},
+        )
+        status = await _wait_for_import_job(auth_client, upload.json()["job_id"])
+        novel_ids.append(status["novel_id"])
+
+    response = await auth_client.request(
+        "DELETE", "/api/novels/bulk", json={"novel_ids": [*novel_ids, 999999]}
+    )
+
+    assert response.status_code == 200
+    assert response.json()["deleted_ids"] == novel_ids
+    assert response.json()["skipped_ids"] == [999999]
+    listing = await auth_client.get("/api/novels")
+    remaining_ids = {item["id"] for item in listing.json()["items"]}
+    assert remaining_ids.isdisjoint(novel_ids)

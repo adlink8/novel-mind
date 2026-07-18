@@ -557,6 +557,44 @@ class NovelService:
         result = await db.execute(select(Novel).where(Novel.id == novel_id))
         return result.scalar_one_or_none()
 
+    async def update_novel(
+        self, db: AsyncSession, novel: Novel, values: dict
+    ) -> Novel:
+        """更新已完成所有权校验的小说元信息。"""
+        for field, value in values.items():
+            if field == "title" and isinstance(value, str):
+                value = value.strip()
+                if not value:
+                    raise ValueError("小说名称不能为空")
+            setattr(novel, field, value)
+        await db.commit()
+        await db.refresh(novel)
+        return novel
+
+    async def delete_novels(
+        self,
+        db: AsyncSession,
+        novel_ids: List[int],
+        *,
+        owner_id: Optional[int],
+    ) -> tuple[List[int], List[int]]:
+        """按所有者批量删除；超级用户传 ``owner_id=None``。"""
+        unique_ids = list(dict.fromkeys(novel_ids))
+        query = select(Novel).where(Novel.id.in_(unique_ids))
+        if owner_id is not None:
+            query = query.where(Novel.owner_id == owner_id)
+        result = await db.execute(query)
+        owned = {novel.id: novel for novel in result.scalars().all()}
+
+        deleted_ids: List[int] = []
+        for novel_id in unique_ids:
+            if novel_id not in owned:
+                continue
+            if await self.delete_novel(db, novel_id):
+                deleted_ids.append(novel_id)
+        skipped_ids = [novel_id for novel_id in unique_ids if novel_id not in deleted_ids]
+        return deleted_ids, skipped_ids
+
     async def delete_novel(self, db: AsyncSession, novel_id: int) -> bool:
         """
         删除小说及其所有关联数据。

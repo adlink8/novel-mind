@@ -143,6 +143,7 @@ async def test_eval_report_includes_compatibility_fields(
 async def test_quality_run_endpoints_require_auth(client: AsyncClient):
     for method, path in [
         ("GET", "/api/eval/quality/runs"),
+        ("POST", "/api/eval/quality/runs/from-novel"),
         ("GET", "/api/eval/quality/runs/nope"),
         ("POST", "/api/eval/quality/runs/nope/resume"),
         ("POST", "/api/eval/quality/runs/nope/cancel"),
@@ -159,7 +160,6 @@ async def test_quality_run_endpoints_require_auth(client: AsyncClient):
 async def test_quality_job_cross_owner_and_cancel(client: AsyncClient, db_session):
     from app.models.eval import QualityRun
     from app.models.user import User
-    from pathlib import Path
 
     # Persist a QualityRun owned by a different user than the logged-in caller.
     other = User(
@@ -286,3 +286,168 @@ async def test_baseline_prepare_commit_and_report_api(
         "api-chunker",
         "api-chunker-b",
     }
+
+
+@pytest.mark.asyncio
+async def test_quality_from_novel_fails_closed_without_active_lineage(
+    client: AsyncClient, db_session: AsyncSession
+):
+    await _register_and_login(client, "qfrom_missing")
+    owner = await _user(db_session, "qfrom_missing")
+    novel, dataset, _run = await _create_eval_records(db_session, owner)
+    dataset.status = "confirmed"
+    await db_session.commit()
+
+    response = await client.post(
+        "/api/eval/quality/runs/from-novel",
+        json={"novel_id": novel.id, "dataset_ids": [dataset.id]},
+    )
+    assert response.status_code == 422
+    assert "active chunk build" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_quality_from_novel_creates_durable_run_from_server_lineage(
+    client: AsyncClient, db_session: AsyncSession
+):
+    from datetime import datetime, timezone
+
+    from app.models.chunk_build import ChunkActivePointer, ChunkBuild
+    from app.models.eval import QualityRun
+    from app.schemas.eval import CalibrationReport, EvalCase, ModelLineage
+    from app.services.rag_fixture import build_source_snapshot, freeze_eval_case, stable_hash
+    from app.services.rag_quality import default_healthy, recompute_chunker_config_hash
+
+    await _register_and_login(client, "qfrom_ok")
+    owner = await _user(db_session, "qfrom_ok")
+    novel, dataset, _run = await _create_eval_records(db_session, owner)
+    dataset.status = "confirmed"
+
+    snapshot = build_source_snapshot(
+        owner_id=owner.id,
+        work_id=novel.id,
+        texts=["trusted active source"],
+        version="v1",
+    )
+    now = datetime.now(timezone.utc)
+    generator = ModelLineage(
+        provider="test",
+        model_family="generator",
+        model_id="generator-1",
+        **{"weights/revision": "gen-rev"},
+        prompt_hash="a" * 64,
+        prompt_version="v1",
+        schema_hash="b" * 64,
+        started_at=now,
+    )
+    judge = ModelLineage(
+        provider="test",
+        model_family="judge",
+        model_id="judge-1",
+        **{"weights/revision": "judge-rev"},
+        prompt_hash="c" * 64,
+        prompt_version="v1",
+        schema_hash="d" * 64,
+        started_at=now,
+    )
+    case = freeze_eval_case(
+        EvalCase(
+            case_id="from-novel-case",
+            snapshot_hash=snapshot.manifest_hash,
+            question=dataset.question,
+            case_type="no_answer",
+            generator_lineage=generator,
+            judge_lineage=judge,
+        )
+    )
+    calibration = CalibrationReport(
+        suite_hash="e" * 64,
+        suite_signature="f" * 64,
+        prompt_hash=judge.prompt_hash,
+        schema_hash=judge.schema_hash,
+        judge_lineage=judge,
+        domain="test",
+        confusion_matrix={},
+        critical_false_accept=0,
+        consistency=1.0,
+        status="passed",
+        metrics={"consistency": 1.0},
+    )
+    config = {"size": 512}
+    config_hash = recompute_chunker_config_hash(config)
+    manifest = stable_hash({"active": novel.id})
+    build = ChunkBuild(
+        build_id="active-eval-build",
+        novel_id=novel.id,
+        status="committed",
+        source_snapshot_hash=snapshot.manifest_hash,
+        manifest_checksum=manifest,
+        chunker_name="hierarchical-v1",
+        chunker_version="1.0.0",
+        chunker_config_hash=config_hash,
+        collection_name="active-eval",
+        is_candidate=False,
+    )
+    pointer = ChunkActivePointer(
+        novel_id=novel.id,
+        build_id=build.build_id,
+        committed_at=now,
+    )
+    seed = QualityRun(
+        job_id="qjob-from-novel-seed",
+        owner_id=owner.id,
+        work_id=novel.id,
+        status="passed",
+        payload={
+            "snapshot": snapshot.model_dump(mode="json"),
+            "cases": [case.model_dump(by_alias=True, mode="json")],
+            "generator_lineage": generator.model_dump(by_alias=True, mode="json"),
+            "judge_lineage": judge.model_dump(by_alias=True, mode="json"),
+            "calibration_report": calibration.model_dump(by_alias=True, mode="json"),
+            "baseline": {
+                "context_recall_at_5_mean": 0.0,
+                "answer_relevance_mean": 0.0,
+                "cost_usd_total": 1.0,
+            },
+            "health": default_healthy(),
+            "chunker_lineage": {
+                "chunker_name": build.chunker_name,
+                "chunker_version": build.chunker_version,
+                "chunker_config": config,
+                "chunker_config_hash": config_hash,
+                "chunk_manifest_hash": manifest,
+                "source_snapshot_hash": snapshot.manifest_hash,
+            },
+        },
+        checkpoint={},
+        stage_cache={},
+        chunker_name=build.chunker_name,
+        chunker_version=build.chunker_version,
+        chunker_config_hash=config_hash,
+        chunk_manifest_hash=manifest,
+        source_snapshot_hash=snapshot.manifest_hash,
+        quality_comparable=True,
+    )
+    db_session.add_all([build, pointer, seed])
+    await db_session.commit()
+
+    response = await client.post(
+        "/api/eval/quality/runs/from-novel",
+        json={
+            "novel_id": novel.id,
+            "dataset_ids": [dataset.id],
+            "run_immediately": False,
+        },
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["status"] == "queued"
+    assert body["source"]["active_build_id"] == build.build_id
+
+    created = await db_session.scalar(
+        select(QualityRun).where(QualityRun.job_id == body["job_id"])
+    )
+    assert created is not None
+    assert created.work_id == novel.id
+    assert created.source_snapshot_hash == snapshot.manifest_hash
+    assert created.quality_comparable is False

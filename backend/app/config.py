@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     # ── 应用基础 ──
     app_name: str = "NovelMind"  # 应用名称（用于日志、API 文档标题）
     debug: bool = True  # 调试模式：True 时启用详细日志和 SQL 回显
-    cors_origins: list[str] = [  # 允许的跨域来源（前端开发服务器地址）
+    cors_origins: list[str] = [  # 允许的跨域来源（前端开发服务器 + 公网隧道）
         "http://localhost:3000",  # Next.js 默认端口
         "http://localhost:3001",  # 备用前端端口
         "http://localhost:3002",
@@ -37,6 +37,9 @@ class Settings(BaseSettings):
         "http://127.0.0.1:3003",
         "http://127.0.0.1:3004",
         "http://127.0.0.1:3005",
+        # Cloudflare Tunnel 公网域名（登录 Cookie / CSRF Origin 校验需要）
+        "https://novelmind.shuoyan.me",
+        "https://novelmind-api.shuoyan.me",
     ]
 
     # ── 数据库 ──
@@ -51,6 +54,19 @@ class Settings(BaseSettings):
     openai_api_key: str = ""  # OpenAI API Key（sk-xxx）
     openai_base_url: str = "https://api.openai.com/v1"  # OpenAI 兼容 API 地址
     anthropic_api_key: str = ""  # Anthropic API Key（sk-ant-xxx）
+    gemini_api_key: str = ""  # Google AI Studio Key（仅 chat_provider=gemini 时使用）
+    # 聊天提供商：vertex_google（与「数据分析」一致，推荐）| gemini | openai | ...
+    chat_provider: str = "vertex_google"
+    # 默认聊天模型；Vertex 下为裸模型名或 vertex_google/gemini-3.5-flash
+    default_chat_model: str = "vertex_google/gemini-3.5-flash"
+    # Google Cloud Vertex AI（gcloud token，非 AI Studio 免费 key）
+    gcp_project: str = "project-c5cbd608-1b00-454e-80f"
+    gcp_location: str = "us-central1"
+    gcp_sdk_root: str = r"C:\Users\li\google-cloud-sdk"
+    gcp_sdk_py: str = r"C:\Users\li\google-cloud-sdk\lib\gcloud.py"
+    vertex_model: str = "gemini-3.5-flash"
+    # 访问 Vertex/Google API 的出站代理（国内环境常需；留空则读 HTTPS_PROXY 环境变量）
+    https_proxy: str = ""
     ollama_base_url: str = "http://localhost:11434"  # 本地 Ollama 服务地址
 
     # ── 文件存储 ──

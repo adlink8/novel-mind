@@ -11,6 +11,9 @@ from app.schemas.novel import (
     NovelResponse,
     NovelListResponse,
     NovelUploadResponse,
+    NovelUpdate,
+    NovelBulkDeleteRequest,
+    NovelBulkDeleteResponse,
     ChapterSummaryResponse,
     ChapterResponse,
     ReadingProgressUpdate,
@@ -170,10 +173,43 @@ async def get_import_job_status(
     )
 
 
+@router.delete("/bulk", response_model=NovelBulkDeleteResponse)
+async def bulk_delete_novels(
+    data: NovelBulkDeleteRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """批量删除当前用户可管理的小说。"""
+    owner_id = None if current_user.is_superuser else current_user.id
+    deleted_ids, skipped_ids = await novel_service.delete_novels(
+        db, data.novel_ids, owner_id=owner_id
+    )
+    return NovelBulkDeleteResponse(
+        deleted_ids=deleted_ids, skipped_ids=skipped_ids
+    )
+
+
 @router.get("/{novel_id}", response_model=NovelResponse)
 async def get_novel(novel: Novel = Depends(require_owned_novel)):
     """获取小说详情（含章节列表）"""
     return NovelResponse.model_validate(novel)
+
+
+@router.patch("/{novel_id}", response_model=NovelListResponse)
+async def update_novel(
+    data: NovelUpdate,
+    novel: Novel = Depends(require_owned_novel),
+    db: AsyncSession = Depends(get_db),
+):
+    """更新小说名称等元信息（仅限所有者或超级用户）。"""
+    values = data.model_dump(exclude_unset=True)
+    if not values:
+        raise HTTPException(status_code=400, detail="没有可更新的字段")
+    try:
+        updated = await novel_service.update_novel(db, novel, values)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return NovelListResponse.model_validate(updated)
 
 
 @router.delete("/{novel_id}")

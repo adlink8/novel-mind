@@ -27,7 +27,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import require_user
 from app.core.database import get_db
-from app.models.eval import EvalDataset, EvalRun
+from app.models.chunk_build import ChunkActivePointer, ChunkBuild
+from app.models.eval import EvalDataset, EvalRun, QualityRun
 from app.models.novel import Novel
 from app.models.user import User
 from app.schemas.eval import (
@@ -45,10 +46,13 @@ from app.services.eval_service import DEPRECATION_META, eval_service, EvalServic
 from app.services.rag_quality import (
     BaselineServiceError,
     build_cross_chunker_report,
+    canonicalize_chunker_lineage,
     commit_baseline_candidate,
     default_healthy,
     get_active_baseline,
     prepare_baseline_candidate,
+    validate_calibrated_lineage,
+    validate_fixtures_for_scoring,
 )
 from app.services.rag_quality_worker import (
     QualityRunRepository,
@@ -235,6 +239,14 @@ class QualityRunCreate(BaseModel):
     run_immediately: bool = True
 
 
+class QualityRunFromNovelCreate(BaseModel):
+    """Start a product quality run from server-owned novel artifacts."""
+
+    novel_id: int = Field(..., ge=1)
+    dataset_ids: list[int] | None = None
+    run_immediately: bool = True
+
+
 @router.post("/quality/runs", response_model=dict)
 async def create_quality_run(
     body: QualityRunCreate,
@@ -298,6 +310,181 @@ async def create_quality_run(
     except Exception as e:
         logger.exception("quality run create failed")
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/quality/runs/from-novel", response_model=dict)
+async def create_quality_run_from_novel(
+    body: QualityRunFromNovelCreate,
+    current_user: User = Depends(require_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Create a durable run from confirmed datasets and active persisted lineage.
+
+    This endpoint intentionally fails closed.  The browser supplies only a novel
+    and optional confirmed dataset ids; signed fixtures, model calibration and
+    chunk/source lineage are reloaded from server-owned durable records.
+    """
+    novel = await _require_owned_novel(db, body.novel_id, current_user)
+
+    dataset_query = select(EvalDataset).where(
+        EvalDataset.novel_id == novel.id,
+        EvalDataset.status == "confirmed",
+    )
+    if body.dataset_ids is not None:
+        requested_ids = set(body.dataset_ids)
+        if not requested_ids:
+            raise HTTPException(status_code=422, detail="至少选择一个已确认评测题")
+        dataset_query = dataset_query.where(EvalDataset.id.in_(requested_ids))
+    datasets = list((await db.scalars(dataset_query)).all())
+    if not datasets:
+        raise HTTPException(status_code=422, detail="小说没有已确认的评测题")
+    if body.dataset_ids is not None and {row.id for row in datasets} != set(
+        body.dataset_ids
+    ):
+        raise HTTPException(status_code=422, detail="评测题不存在或尚未确认")
+
+    pointer = await db.scalar(
+        select(ChunkActivePointer).where(ChunkActivePointer.novel_id == novel.id)
+    )
+    if pointer is None:
+        raise HTTPException(status_code=422, detail="小说尚无 active chunk build")
+    build = await db.scalar(
+        select(ChunkBuild).where(
+            ChunkBuild.novel_id == novel.id,
+            ChunkBuild.build_id == pointer.build_id,
+        )
+    )
+    if build is None or build.status != "committed" or build.is_candidate:
+        raise HTTPException(status_code=422, detail="active chunk build 未可信发布")
+
+    # A prior durable run is the only persisted production artifact that owns
+    # the complete signed fixture + Generator/Judge calibration payload today.
+    # Never reconstruct those identities from aliases or legacy gold chunk ids.
+    seed_rows = list(
+        (
+            await db.scalars(
+                select(QualityRun)
+                .where(
+                    QualityRun.owner_id == novel.owner_id,
+                    QualityRun.work_id == novel.id,
+                    QualityRun.source_snapshot_hash == build.source_snapshot_hash,
+                    QualityRun.chunk_manifest_hash == build.manifest_checksum,
+                )
+                .order_by(QualityRun.created_at.desc())
+            )
+        ).all()
+    )
+    confirmed_questions = {row.question for row in datasets}
+    selected_artifacts = None
+    failure_reason = "缺少与 active build 匹配的可信质量谱系"
+
+    for seed in seed_rows:
+        payload = dict(seed.payload or {})
+        try:
+            snapshot = SourceSnapshot.model_validate(payload.get("snapshot"))
+            if snapshot.owner_id != novel.owner_id or snapshot.work_id != novel.id:
+                continue
+            cases = [
+                EvalCase.model_validate(case)
+                for case in (payload.get("cases") or [])
+                if case.get("question") in confirmed_questions
+            ]
+            if not cases or {case.question for case in cases} != confirmed_questions:
+                failure_reason = "已确认评测题尚未生成完整冻结 fixture"
+                continue
+            generator = ModelLineage.model_validate(payload.get("generator_lineage"))
+            judge = ModelLineage.model_validate(payload.get("judge_lineage"))
+            calibration = CalibrationReport.model_validate(
+                payload.get("calibration_report")
+            )
+            lineage, lineage_error = canonicalize_chunker_lineage(
+                payload.get("chunker_lineage"),
+                expected_source_snapshot_hash=snapshot.manifest_hash,
+            )
+            if lineage is None or lineage_error:
+                failure_reason = lineage_error or failure_reason
+                continue
+            five = lineage.five_tuple()
+            if five != {
+                "chunker_name": build.chunker_name,
+                "chunker_version": build.chunker_version,
+                "chunker_config_hash": build.chunker_config_hash,
+                "chunk_manifest_hash": build.manifest_checksum,
+                "source_snapshot_hash": build.source_snapshot_hash,
+            }:
+                failure_reason = "质量谱系与 active chunk build 不一致"
+                continue
+            fixture_error = validate_fixtures_for_scoring(
+                snapshot=snapshot, cases=cases
+            )
+            model_error = validate_calibrated_lineage(
+                generator_lineage=generator,
+                judge_lineage=judge,
+                calibration_report=calibration,
+            )
+            if fixture_error or model_error:
+                failure_reason = str(
+                    (fixture_error or model_error or {}).get("reason")
+                    or "冻结 fixture 或模型谱系无效"
+                )
+                continue
+            selected_artifacts = (
+                seed,
+                snapshot,
+                cases,
+                generator,
+                judge,
+                calibration,
+                lineage,
+                payload,
+            )
+            break
+        except (TypeError, ValueError, KeyError):
+            continue
+
+    if selected_artifacts is None:
+        raise HTTPException(status_code=422, detail=failure_reason)
+
+    seed, snapshot, cases, generator, judge, calibration, lineage, payload = (
+        selected_artifacts
+    )
+    try:
+        worker = make_quality_worker(db)
+        job = await worker.create_job(
+            owner_id=current_user.id,
+            work_id=novel.id,
+            snapshot=snapshot,
+            cases=cases,
+            generator_lineage=generator,
+            judge_lineage=judge,
+            calibration_report=calibration,
+            baseline=payload.get("baseline"),
+            health=payload.get("health"),
+            chunker_lineage=lineage,
+            extras={
+                "origin": "from_novel",
+                "dataset_ids": sorted(row.id for row in datasets),
+                "seed_job_id": seed.job_id,
+                "active_build_id": build.build_id,
+            },
+        )
+        if body.run_immediately:
+            job = await worker.resume(job.job_id, owner_id=current_user.id)
+        return {
+            "status": job.status,
+            "job_id": job.job_id,
+            "quality_comparable": job.quality_comparable,
+            "metrics": job.metrics if job.quality_comparable else None,
+            "data": job.to_public(),
+            "source": {
+                "novel_id": novel.id,
+                "dataset_ids": sorted(row.id for row in datasets),
+                "active_build_id": build.build_id,
+            },
+            "deprecation": DEPRECATION_META,
+        }
+    except QualityWorkerError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.message)
 
 
 @router.get("/quality/runs/{job_id}", response_model=dict)
@@ -467,4 +654,3 @@ async def cross_chunker_quality_report(
         return {**report, "deprecation": DEPRECATION_META}
     except BaselineServiceError as e:
         raise HTTPException(status_code=e.status_code, detail=e.message)
-

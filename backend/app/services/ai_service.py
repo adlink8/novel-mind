@@ -19,9 +19,22 @@ LiteLLM 优势:
   response = await ai_service.chat(messages=[{"role": "user", "content": "你好"}])
 """
 
+import os
+
 import litellm
 from app.config import settings
 from app.core.url_security import validate_ai_base_url
+
+
+def _sync_provider_env_keys() -> None:
+    """把 NOVELMIND_* 密钥同步到 LiteLLM 识别的环境变量（不覆盖已有值）。"""
+    if settings.gemini_api_key:
+        os.environ.setdefault("GEMINI_API_KEY", settings.gemini_api_key)
+        os.environ.setdefault("GOOGLE_API_KEY", settings.gemini_api_key)
+    if settings.openai_api_key:
+        os.environ.setdefault("OPENAI_API_KEY", settings.openai_api_key)
+    if settings.anthropic_api_key:
+        os.environ.setdefault("ANTHROPIC_API_KEY", settings.anthropic_api_key)
 
 
 class AIService:
@@ -36,8 +49,26 @@ class AIService:
     """
 
     def __init__(self):
-        self.default_model = "gpt-4o-mini"  # 默认模型（未指定时使用）
-        self.default_provider = "openai"  # 默认提供商
+        # 默认与「数据分析」一致：Google Cloud Vertex Gemini
+        self.default_model = (
+            settings.default_chat_model or "vertex_google/gemini-3.5-flash"
+        )
+        self.default_provider = settings.chat_provider or "vertex_google"
+        _sync_provider_env_keys()
+
+    def _resolve_api_key(self, model: str, api_key: str | None) -> str | None:
+        if api_key:
+            return api_key
+        m = (model or "").lower()
+        if m.startswith(("vertex_google/", "vertex_ai/", "vertex/", "gcp/")):
+            return None  # Vertex 用 gcloud token，不用 API Key
+        if m.startswith("gemini/") or m.startswith("google/"):
+            return settings.gemini_api_key or None
+        if m.startswith("claude") or m.startswith("anthropic/"):
+            return settings.anthropic_api_key or None
+        if m.startswith("gpt") or m.startswith("openai/") or m.startswith("o1"):
+            return settings.openai_api_key or None
+        return None
 
     async def chat(
         self,
@@ -46,29 +77,54 @@ class AIService:
         temperature: float = 0.7,
         max_tokens: int = 4096,
         stream: bool = False,
+        api_key: str | None = None,
+        api_base: str | None = None,
+        timeout: float | None = None,
+        **_extra: object,
     ):
         """
         统一聊天接口（非流式）。
 
         Args:
             messages: 消息列表，格式 [{"role": "user/assistant/system", "content": "..."}]
-            model: LiteLLM 模型标识（如 "gpt-4o"、"ollama/qwen2:7b"），为 None 使用默认模型
+            model: 模型标识（Vertex: vertex_google/gemini-3.5-flash；或 LiteLLM 名）
             temperature: 生成温度（0-2，越高越随机）
             max_tokens: 最大输出 token 数
             stream: 是否流式输出（此方法建议使用 stream_chat 代替流式）
+            api_key: 可选，覆盖环境变量中的密钥（来自 AIModelConfig；Vertex 忽略）
+            api_base: 可选，自定义 API 地址
 
         Returns:
-            LiteLLM 响应对象，通过 response.choices[0].message.content 获取文本
+            类 OpenAI/LiteLLM 响应：response.choices[0].message.content
         """
+        _sync_provider_env_keys()
         model = model or self.default_model
 
-        response = await litellm.acompletion(
-            model=model,
-            messages=messages,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            stream=stream,
-        )
+        from app.services.vertex_gemini import acomplete as vertex_acomplete
+        from app.services.vertex_gemini import is_vertex_model
+
+        if is_vertex_model(model) and not stream:
+            return await vertex_acomplete(
+                messages,
+                model=model,
+                temperature=temperature,
+                max_tokens=max_tokens,
+            )
+
+        kwargs: dict = {
+            "model": model,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "stream": stream,
+        }
+        resolved_key = self._resolve_api_key(model, api_key)
+        if resolved_key:
+            kwargs["api_key"] = resolved_key
+        if api_base:
+            kwargs["api_base"] = api_base
+
+        response = await litellm.acompletion(**kwargs)
         return response
 
     async def embedding(self, texts: list[str], model: str | None = None):
@@ -145,7 +201,13 @@ class AIService:
         )
         return [item["embedding"] for item in response.data]
 
-    async def stream_chat(self, messages: list[dict], model: str | None = None):
+    async def stream_chat(
+        self,
+        messages: list[dict],
+        model: str | None = None,
+        api_key: str | None = None,
+        api_base: str | None = None,
+    ):
         """
         流式聊天接口（异步生成器）。
 
@@ -156,27 +218,56 @@ class AIService:
         Args:
             messages: 消息列表
             model: 模型标识
+            api_key: 可选 API Key
+            api_base: 可选自定义地址
 
         Yields:
             每次生成的文本片段（增量式）
         """
+        _sync_provider_env_keys()
         model = model or self.default_model
+        kwargs: dict = {
+            "model": model,
+            "messages": messages,
+            "stream": True,
+        }
+        resolved_key = self._resolve_api_key(model, api_key)
+        if resolved_key:
+            kwargs["api_key"] = resolved_key
+        if api_base:
+            kwargs["api_base"] = api_base
 
-        response = await litellm.acompletion(
-            model=model,
-            messages=messages,
-            stream=True,
-        )
+        response = await litellm.acompletion(**kwargs)
         async for chunk in response:
             content = chunk.choices[0].delta.content
             if content:
                 yield content
 
+    @staticmethod
+    def litellm_model_name(provider: str, model_id: str) -> str:
+        """将 DB 中的 provider + model_id 规范为调用用模型名。"""
+        p = (provider or "").strip().lower()
+        mid = (model_id or "").strip()
+        if not mid:
+            return mid
+        # 已是完整标识
+        if "/" in mid:
+            return mid
+        if p in ("", "custom"):
+            return mid
+        # openai 常用裸名 gpt-4o-mini
+        if p == "openai" and not mid.startswith("openai/"):
+            return mid
+        # Vertex 统一前缀
+        if p in ("vertex_google", "vertex", "vertex_ai", "gcp", "google_cloud"):
+            return f"vertex_google/{mid}"
+        return f"{p}/{mid}"
+
     async def test_connection(self, model_config) -> str:
         """
         测试模型连通性。
 
-        发送一条简单消息，验证 API Key 和 base_url 是否有效。
+        发送一条简单消息，验证 API Key / gcloud token 和 base_url 是否有效。
 
         Args:
             model_config: AIModelConfig ORM 对象（包含 provider、model_id、api_key、base_url）
@@ -187,18 +278,20 @@ class AIService:
         Raises:
             Exception: 连接失败时抛出异常（由调用方捕获）
         """
-        # 构建 LiteLLM 参数
-        kwargs = {
-            "model": f"{model_config.provider}/{model_config.model_id}",
-            "messages": [{"role": "user", "content": "Please reply with 'OK'."}],
-            "max_tokens": 10,
-        }
-        if model_config.api_key:
-            kwargs["api_key"] = model_config.api_key
-        if model_config.base_url:
-            kwargs["api_base"] = await validate_ai_base_url(model_config.base_url)
-
-        response = await litellm.acompletion(**kwargs)
+        _sync_provider_env_keys()
+        model = self.litellm_model_name(model_config.provider, model_config.model_id)
+        response = await self.chat(
+            messages=[{"role": "user", "content": "Please reply with 'OK'."}],
+            model=model,
+            max_tokens=16,
+            temperature=0,
+            api_key=model_config.api_key,
+            api_base=(
+                await validate_ai_base_url(model_config.base_url)
+                if model_config.base_url
+                else None
+            ),
+        )
         return response.choices[0].message.content or ""
 
 
