@@ -92,10 +92,10 @@ def test_active_requires_cue_evidence():
     assert decision.accepted is True
     assert decision.status == "accepted"
 
-    # Wrong classification
+    # A classification that does not carry a cue (unrelated) cannot enter active.
     bad = gates.evaluate_transition(
         package=package,
-        judgment=_judgment(package, classification="payoff", later_evidence_ids=package.later_ids()[:1]),
+        judgment=_judgment(package, classification="unrelated"),
         from_status="candidate",
         to_status="active",
         owner_id=1,
