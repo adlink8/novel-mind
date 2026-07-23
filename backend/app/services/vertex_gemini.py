@@ -143,7 +143,7 @@ _token_provider = GcloudTokenProvider()
 
 
 def _strip_model_prefix(model: str) -> str:
-    """vertex_google/gemini-3.5-flash → gemini-3.5-flash。"""
+    """vertex_google/gemini-3.5-flash-lite → gemini-3.5-flash-lite。"""
     m = (model or "").strip()
     for prefix in (
         "vertex_google/",
@@ -160,9 +160,7 @@ def _strip_model_prefix(model: str) -> str:
 def is_vertex_model(model: str | None) -> bool:
     """是否走 Vertex（含全局 chat_provider 默认）。"""
     m = (model or "").strip().lower()
-    if m.startswith(
-        ("vertex_google/", "vertex_ai/", "vertex/", "gcp/")
-    ):
+    if m.startswith(("vertex_google/", "vertex_ai/", "vertex/", "gcp/")):
         return True
     provider = (settings.chat_provider or "").strip().lower()
     if provider in ("vertex_google", "vertex", "vertex_ai", "gcp", "google_cloud"):
@@ -277,7 +275,14 @@ def _vertex_json_schema(schema: dict[str, Any] | None) -> dict[str, Any] | None:
             }
         out: dict[str, Any] = {}
         for key, value in node.items():
-            if key in ("$defs", "definitions", "title", "default", "examples", "$schema"):
+            if key in (
+                "$defs",
+                "definitions",
+                "title",
+                "default",
+                "examples",
+                "$schema",
+            ):
                 continue
             if key == "type":
                 # Vertex 偏好大写 TYPE（兼容小写）
