@@ -535,11 +535,20 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
+      - name: Start locked CI services
+        run: docker compose -f docker-compose.ci.yml up -d --wait db chroma
+
       - name: Install backend
         working-directory: backend
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Alembic upgrade head
+        working-directory: backend
+        env:
+          NOVELMIND_DATABASE_URL: ${{ env.NOVELMIND_DATABASE_URL }}
+        run: alembic upgrade head
 
       - name: Install frontend + Playwright Chromium
         working-directory: frontend
@@ -551,6 +560,7 @@ jobs:
         working-directory: frontend
         env:
           CI: "true"
+          NOVELMIND_DATABASE_URL: ${{ env.NOVELMIND_DATABASE_URL }}
         run: |
           npx playwright test \
             --project=chromium-desktop \
