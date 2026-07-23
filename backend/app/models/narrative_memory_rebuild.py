@@ -19,10 +19,9 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
-from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.models.base import Base, TimestampMixin
+from app.models.base import JSONB, Base, TimestampMixin
 
 REBUILD_DECISIONS = (
     "dirty",
@@ -165,7 +164,9 @@ class NarrativeMemoryRebuildPlan(TimestampMixin, Base):
     boundary_plan_checksum: Mapped[str] = mapped_column(String(64), nullable=False)
     oracle_policy_version: Mapped[str] = mapped_column(String(80), nullable=False)
     oracle_policy_checksum: Mapped[str] = mapped_column(String(64), nullable=False)
-    compatibility_policy_checksum: Mapped[str] = mapped_column(String(64), nullable=False)
+    compatibility_policy_checksum: Mapped[str] = mapped_column(
+        String(64), nullable=False
+    )
     graph_checksum: Mapped[str] = mapped_column(String(64), nullable=False)
     plan_checksum: Mapped[str] = mapped_column(String(64), nullable=False)
     change_summary: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
@@ -239,7 +240,9 @@ class NarrativeMemoryRebuildItem(TimestampMixin, Base):
     chapter_end: Mapped[int | None] = mapped_column(Integer, nullable=True)
     decision: Mapped[str] = mapped_column(String(32), nullable=False)
     direct_reasons: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
-    propagated_reasons: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    propagated_reasons: Mapped[list] = mapped_column(
+        JSONB, nullable=False, default=list
+    )
     predecessor_keys: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
     old_content_checksum: Mapped[str | None] = mapped_column(String(64), nullable=True)
     new_content_checksum: Mapped[str | None] = mapped_column(String(64), nullable=True)
@@ -288,8 +291,12 @@ class NarrativeMemoryReuseReport(Base):
     parent_version_id: Mapped[int] = mapped_column(Integer, nullable=False)
     target_version_id: Mapped[int] = mapped_column(Integer, nullable=False)
     plan_checksum: Mapped[str] = mapped_column(String(64), nullable=False)
-    parent_manifest_checksum: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    target_manifest_checksum: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    parent_manifest_checksum: Mapped[str | None] = mapped_column(
+        String(64), nullable=True
+    )
+    target_manifest_checksum: Mapped[str | None] = mapped_column(
+        String(64), nullable=True
+    )
     rebuilt_counts: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     carried_counts: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     stale_counts: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
@@ -298,7 +305,9 @@ class NarrativeMemoryReuseReport(Base):
     full_rebuild_upper_bound: Mapped[dict] = mapped_column(
         JSONB, nullable=False, default=dict
     )
-    avoided_upper_bound: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    avoided_upper_bound: Mapped[dict] = mapped_column(
+        JSONB, nullable=False, default=dict
+    )
     cache_reuse: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     carry_reuse: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     formula_inputs: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)

@@ -177,9 +177,7 @@ def test_valid_payload_passes():
                     "evidence_set_ids": ["s1"],
                 }
             ],
-            "equivalent_evidence_sets": [
-                {"set_id": "s1", "refs": [ref.model_dump()]}
-            ],
+            "equivalent_evidence_sets": [{"set_id": "s1", "refs": [ref.model_dump()]}],
         },
         expected_owner_id=1,
         snapshot=snap,

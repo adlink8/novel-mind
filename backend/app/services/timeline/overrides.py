@@ -52,39 +52,72 @@ class OverrideStore:
         self.rows: list[FieldOverride] = []
         self.audit: list[OverrideAudit] = []
 
-    def append(self, *, owner_id: int, novel_id: int, logical_event_id: str,
-               field_name: str, value: Any) -> FieldOverride:
-        current = next((row for row in reversed(self.rows)
-                        if row.owner_id == owner_id and row.novel_id == novel_id
-                        and row.logical_event_id == logical_event_id
-                        and row.field_name == field_name and row.status == "active"), None)
+    def append(
+        self,
+        *,
+        owner_id: int,
+        novel_id: int,
+        logical_event_id: str,
+        field_name: str,
+        value: Any,
+    ) -> FieldOverride:
+        current = next(
+            (
+                row
+                for row in reversed(self.rows)
+                if row.owner_id == owner_id
+                and row.novel_id == novel_id
+                and row.logical_event_id == logical_event_id
+                and row.field_name == field_name
+                and row.status == "active"
+            ),
+            None,
+        )
         if current is not None:
             current.status = "superseded"
-        row = FieldOverride(len(self.rows) + 1, owner_id, novel_id, logical_event_id,
-                            field_name, deepcopy(value), current.id if current else None)
+        row = FieldOverride(
+            len(self.rows) + 1,
+            owner_id,
+            novel_id,
+            logical_event_id,
+            field_name,
+            deepcopy(value),
+            current.id if current else None,
+        )
         self.rows.append(row)
         self.audit.append(OverrideAudit(row.id, "append", logical_event_id, field_name))
         return row
 
     def active_for(self, owner_id: int, novel_id: int) -> list[FieldOverride]:
-        return [row for row in self.rows
-                if row.owner_id == owner_id and row.novel_id == novel_id
-                and row.status == "active"]
+        return [
+            row
+            for row in self.rows
+            if row.owner_id == owner_id
+            and row.novel_id == novel_id
+            and row.status == "active"
+        ]
 
 
-def apply_overrides(event: MachineEventView,
-                    overrides: Iterable[FieldOverride]) -> dict[str, Any]:
+def apply_overrides(
+    event: MachineEventView, overrides: Iterable[FieldOverride]
+) -> dict[str, Any]:
     visible = deepcopy(event.fields)
     for override in sorted(overrides, key=lambda row: row.id):
-        if (override.status == "active" and not override.needs_relink
-                and override.logical_event_id == event.logical_event_id):
+        if (
+            override.status == "active"
+            and not override.needs_relink
+            and override.logical_event_id == event.logical_event_id
+        ):
             visible[override.field_name] = deepcopy(override.value)
     return visible
 
 
-def relink_overrides(overrides: Iterable[FieldOverride], *,
-                     old_events: list[MachineEventView],
-                     new_events: list[MachineEventView]) -> RelinkResult:
+def relink_overrides(
+    overrides: Iterable[FieldOverride],
+    *,
+    old_events: list[MachineEventView],
+    new_events: list[MachineEventView],
+) -> RelinkResult:
     old_by_id = {event.logical_event_id: event for event in old_events}
     new_by_identity: dict[tuple[str, ...], list[MachineEventView]] = {}
     for event in new_events:
@@ -103,8 +136,11 @@ def relink_overrides(overrides: Iterable[FieldOverride], *,
     return RelinkResult(relinked, pending)
 
 
-def derive_visible_edge(source: MachineEventView, target: MachineEventView,
-                        overrides: Iterable[FieldOverride]) -> tuple[str, str] | None:
+def derive_visible_edge(
+    source: MachineEventView,
+    target: MachineEventView,
+    overrides: Iterable[FieldOverride],
+) -> tuple[str, str] | None:
     overlay = list(overrides)
     source_fields = apply_overrides(source, overlay)
     target_fields = apply_overrides(target, overlay)

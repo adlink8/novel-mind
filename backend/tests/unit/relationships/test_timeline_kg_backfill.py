@@ -25,7 +25,12 @@ HEX64_B = "b" * 64
 HEX64_C = "c" * 64
 
 
-def _unit(eid: str = "ev-1", chapter: int = 1, narrative_index: int = 0, text: str = "Alice and Bob"):
+def _unit(
+    eid: str = "ev-1",
+    chapter: int = 1,
+    narrative_index: int = 0,
+    text: str = "Alice and Bob",
+):
     from app.services.relationships.evidence import make_evidence_unit
 
     return make_evidence_unit(
@@ -123,12 +128,8 @@ def test_allowed_types_match_relationship_edge_types():
 
 def test_type_infer_uses_event_type_prior_for_conflict():
     infer = RelationshipGraphQueryService._infer_provisional_type
-    assert (
-        infer(title="对峙", description="双方僵持", event_type="conflict") == "enemy"
-    )
-    assert (
-        infer(title="会谈", description="平静交谈", event_type="character") == "ally"
-    )
+    assert infer(title="对峙", description="双方僵持", event_type="conflict") == "enemy"
+    assert infer(title="会谈", description="平静交谈", event_type="character") == "ally"
 
 
 def test_type_infer_keyword_overrides_for_family_mentor_romantic_enemy():
@@ -139,12 +140,8 @@ def test_type_infer_keyword_overrides_for_family_mentor_romantic_enemy():
     assert (
         infer(title="拜师", description="收徒传授功法", event_type="plot") == "mentor"
     )
-    assert (
-        infer(title="告白", description="两人恋爱", event_type="plot") == "romantic"
-    )
-    assert (
-        infer(title="决裂", description="仇敌厮杀", event_type="plot") == "enemy"
-    )
+    assert infer(title="告白", description="两人恋爱", event_type="plot") == "romantic"
+    assert infer(title="决裂", description="仇敌厮杀", event_type="plot") == "enemy"
 
 
 def test_backfill_service_binds_same_type_infer():
@@ -153,10 +150,9 @@ def test_backfill_service_binds_same_type_infer():
     assert callable(service._type_infer)
     kwargs = dict(title="仇敌交锋", description="决战", event_type="conflict")
     assert service._type_infer(**kwargs) == "enemy"
-    assert (
-        service._type_infer(**kwargs)
-        == RelationshipGraphQueryService._infer_provisional_type(**kwargs)
-    )
+    assert service._type_infer(
+        **kwargs
+    ) == RelationshipGraphQueryService._infer_provisional_type(**kwargs)
 
 
 @pytest.mark.asyncio
@@ -364,7 +360,10 @@ async def test_ensure_characters_filters_noise_and_ranks():
 
     service = TimelineKgBackfillService()
 
-    events = [MagicMock(id=1, narrative_chapter_number=2), MagicMock(id=2, narrative_chapter_number=1)]
+    events = [
+        MagicMock(id=1, narrative_chapter_number=2),
+        MagicMock(id=2, narrative_chapter_number=1),
+    ]
     # Alice x3, Bob x2, noise, punctuation
     parts = [
         MagicMock(event_id=1, mention="Alice"),

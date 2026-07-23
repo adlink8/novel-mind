@@ -174,7 +174,14 @@ async def test_persist_snapshot_job_and_case(db_session: AsyncSession):
         snapshot_hash=built.manifest_hash,
         question="What is alpha?",
         case_type="answerable",
-        claims=[{"claim_id": "c1", "text": "alpha", "critical": True, "evidence_set_ids": ["s1"]}],
+        claims=[
+            {
+                "claim_id": "c1",
+                "text": "alpha",
+                "critical": True,
+                "evidence_set_ids": ["s1"],
+            }
+        ],
         equivalent_evidence_sets=[
             {
                 "set_id": "s1",
@@ -317,7 +324,9 @@ async def test_quality_run_persist_with_lineage(db_session: AsyncSession):
 
 
 @pytest.mark.asyncio
-async def test_quality_run_legacy_without_lineage_incomparable(db_session: AsyncSession):
+async def test_quality_run_legacy_without_lineage_incomparable(
+    db_session: AsyncSession,
+):
     user, novel = await _user_novel(db_session, "qrun_legacy")
     row = QualityRun(
         job_id="qjob-legacy-1",

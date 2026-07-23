@@ -4,6 +4,7 @@
 服务依赖采用惰性加载，因此可以直接测试生产指标实现，不复制算法。
 Phase 06-04: legacy gold migration + quality-path exception policy helpers.
 """
+
 import pytest
 
 pytestmark = pytest.mark.unit
@@ -123,4 +124,6 @@ class TestLegacyGoldMigration:
 
     def test_deprecation_meta_present(self):
         assert DEPRECATION_META["deprecated"] is True
-        assert "POST /api/eval/quality/runs" in DEPRECATION_META["replacement"]["create"]
+        assert (
+            "POST /api/eval/quality/runs" in DEPRECATION_META["replacement"]["create"]
+        )

@@ -7,15 +7,13 @@ active pointer only via CAS. Failed candidates never move active.
 
 from __future__ import annotations
 
-import hashlib
-import json
 import logging
 import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from typing import Any, Callable
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -28,14 +26,12 @@ from app.models.clue import (
     ClueAnalysisVersion,
     ClueBudgetLedger,
     ClueEvidenceRef,
-    ClueModelCallAttempt,
     MachineClue,
 )
 from app.models.novel import Chapter
-from app.models.timeline import MachineTimelineEvent, TimelineActivePointer, TimelineEvidenceRef
+from app.models.timeline import MachineTimelineEvent, TimelineActivePointer
 from app.schemas.clue import (
     ClueActorSource,
-    ClueEvidenceRole,
     ClueLifecycleState,
     ClueSemanticJudgment,
 )
@@ -132,15 +128,19 @@ def production_runtime() -> ClueWorkerRuntime:
     from app.config import settings
 
     provider = (settings.chat_provider or "vertex_google").strip().lower()
-    use_vertex = provider in (
-        "vertex_google",
-        "vertex",
-        "vertex_ai",
-        "gcp",
-        "google_cloud",
-    ) or not (settings.openai_api_key or "").strip()
+    use_vertex = (
+        provider
+        in (
+            "vertex_google",
+            "vertex",
+            "vertex_ai",
+            "gcp",
+            "google_cloud",
+        )
+        or not (settings.openai_api_key or "").strip()
+    )
     if use_vertex:
-        model_id = (settings.vertex_model or "gemini-3.5-flash").strip()
+        model_id = (settings.vertex_model or "gemini-3.5-flash-lite").strip()
         for prefix in (
             "vertex_google/",
             "vertex_ai/",
@@ -151,7 +151,7 @@ def production_runtime() -> ClueWorkerRuntime:
             if model_id.lower().startswith(prefix):
                 model_id = model_id[len(prefix) :]
                 break
-        model_id = model_id or "gemini-3.5-flash"
+        model_id = model_id or "gemini-3.5-flash-lite"
         deployment = ClueModelDeployment(
             "vertex_google",
             model_id,
@@ -262,7 +262,9 @@ async def _prepare_run(runtime: ClueWorkerRuntime, run_id: int):
         if run is None:
             raise ClueWorkerError("clue run does not exist")
         pointer = await session.scalar(
-            select(ChunkActivePointer).where(ChunkActivePointer.novel_id == run.novel_id)
+            select(ChunkActivePointer).where(
+                ChunkActivePointer.novel_id == run.novel_id
+            )
         )
         if pointer is None:
             raise DependencyPaused("no active Phase 07 hierarchy build")
@@ -273,7 +275,9 @@ async def _prepare_run(runtime: ClueWorkerRuntime, run_id: int):
             )
         )
         if build is None or not build.immutable:
-            raise DependencyPaused("active Phase 07 hierarchy is unavailable or mutable")
+            raise DependencyPaused(
+                "active Phase 07 hierarchy is unavailable or mutable"
+            )
 
         timeline_version_id = None
         timeline_checksum = None
@@ -383,7 +387,8 @@ async def _build_candidates(
                 (
                     await session.scalars(
                         select(MachineTimelineEvent).where(
-                            MachineTimelineEvent.version_id == version.timeline_version_id,
+                            MachineTimelineEvent.version_id
+                            == version.timeline_version_id,
                             MachineTimelineEvent.owner_id == run.owner_id,
                             MachineTimelineEvent.novel_id == run.novel_id,
                         )
@@ -608,7 +613,10 @@ async def _judge_and_persist(
                     runtime.sessions,
                     run.id,
                     stage_key,
-                    {"status": "judgment_failed", "gate_failures": result.gate_failures},
+                    {
+                        "status": "judgment_failed",
+                        "gate_failures": result.gate_failures,
+                    },
                 )
                 return
             judgment = result.structured
@@ -646,10 +654,14 @@ async def _judge_and_persist(
                 latency_ms=int((time.perf_counter() - started) * 1000),
                 error_code=type(exc).__name__[:80],
             )
-            raise DependencyPaused(f"provider outcome unknown: {type(exc).__name__}") from exc
+            raise DependencyPaused(
+                f"provider outcome unknown: {type(exc).__name__}"
+            ) from exc
 
     assert judgment is not None
-    await _persist_decision(runtime, run, version, draft, judgment, used_cache=used_cache)
+    await _persist_decision(
+        runtime, run, version, draft, judgment, used_cache=used_cache
+    )
     await _mark_stage_completed(
         runtime.sessions,
         run.id,
@@ -816,7 +828,9 @@ async def _persist_decision(
             first_cue_chapter=(
                 cue_unit.narrative_chapter_number if cue_unit is not None else None
             ),
-            first_cue_source_start=cue_unit.source_start if cue_unit is not None else None,
+            first_cue_source_start=cue_unit.source_start
+            if cue_unit is not None
+            else None,
         )
         session.add(machine)
         await session.flush()
@@ -1002,7 +1016,9 @@ async def _validate_and_promote(
     version: ClueAnalysisVersion,
 ) -> None:
     async with sessions.begin() as session:
-        current = await session.get(ClueAnalysisVersion, version.id, with_for_update=True)
+        current = await session.get(
+            ClueAnalysisVersion, version.id, with_for_update=True
+        )
         if current is None:
             raise ClueWorkerError("version missing at qualify")
         manifest, checksum = await snapshot_manifest(session, version.id)

@@ -28,9 +28,7 @@ HEX = "a" * 64
 
 
 def _lineage() -> ModelLineage:
-    return ModelLineage(
-        provider="test", model="m", deployment="d", revision="1"
-    )
+    return ModelLineage(provider="test", model="m", deployment="d", revision="1")
 
 
 def _leaf() -> EvidenceLeafRef:

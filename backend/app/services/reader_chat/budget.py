@@ -300,7 +300,9 @@ class DualBudgetRepository:
                     cache_key=cache_key,
                     error_code="budget_paused",
                 )
-                rejection = BudgetExceeded("budget is paused; no further calls are allowed")
+                rejection = BudgetExceeded(
+                    "budget is paused; no further calls are allowed"
+                )
                 worst_cost = Decimal(0)
             elif input_price_per_million is None or output_price_per_million is None:
                 await self._reject_budget(
@@ -360,8 +362,12 @@ class DualBudgetRepository:
                 )
                 session.add_all([novel_res, conv_res])
                 await session.flush()
-                self._apply_reserve(novel_ledger, input_tokens, output_tokens, worst_cost)
-                self._apply_reserve(conv_ledger, input_tokens, output_tokens, worst_cost)
+                self._apply_reserve(
+                    novel_ledger, input_tokens, output_tokens, worst_cost
+                )
+                self._apply_reserve(
+                    conv_ledger, input_tokens, output_tokens, worst_cost
+                )
                 attempt = ReaderModelCallAttempt(
                     generation_job_id=job_id,
                     reservation_id=conv_res.id,
@@ -664,9 +670,9 @@ class DualBudgetRepository:
         from sqlalchemy import func
 
         current = await session.scalar(
-            select(func.coalesce(func.max(ReaderModelCallAttempt.attempt_number), 0)).where(
-                ReaderModelCallAttempt.generation_job_id == job_id
-            )
+            select(
+                func.coalesce(func.max(ReaderModelCallAttempt.attempt_number), 0)
+            ).where(ReaderModelCallAttempt.generation_job_id == job_id)
         )
         return int(current or 0) + 1
 

@@ -365,6 +365,142 @@
         "title": "AIModelTestResponse",
         "type": "object"
       },
+      "AnalyzeBody": {
+        "properties": {
+          "analysis_type": {
+            "default": "plot_summary",
+            "description": "plot_summary / character_analysis / theme / style / chapter_summary / hierarchy_map",
+            "title": "Analysis Type",
+            "type": "string"
+          },
+          "chapter_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chapter Id"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "可选 LiteLLM 模型 ID",
+            "title": "Model"
+          },
+          "rebuild_hierarchy": {
+            "default": false,
+            "description": "强制重建层级树后再分析",
+            "title": "Rebuild Hierarchy",
+            "type": "boolean"
+          },
+          "use_llm": {
+            "default": true,
+            "description": "是否尝试 LLM 精炼；失败时仍返回 Phase07 结构分析",
+            "title": "Use Llm",
+            "type": "boolean"
+          }
+        },
+        "title": "AnalyzeBody",
+        "type": "object"
+      },
+      "AssetEligibility": {
+        "additionalProperties": false,
+        "properties": {
+          "healthy_empty": {
+            "default": false,
+            "title": "Healthy Empty",
+            "type": "boolean"
+          },
+          "item_count": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Item Count",
+            "type": "integer"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/AssetKind"
+          },
+          "novel_id": {
+            "minimum": 1.0,
+            "title": "Novel Id",
+            "type": "integer"
+          },
+          "owner_id": {
+            "minimum": 1.0,
+            "title": "Owner Id",
+            "type": "integer"
+          },
+          "reason_codes": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ReasonCode"
+            },
+            "title": "Reason Codes",
+            "type": "array"
+          },
+          "rebuild_ranges": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/RebuildRange"
+            },
+            "title": "Rebuild Ranges",
+            "type": "array"
+          },
+          "requirement": {
+            "$ref": "#/components/schemas/AssetRequirement"
+          },
+          "status": {
+            "$ref": "#/components/schemas/EligibilityStatus"
+          },
+          "version_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version Id"
+          }
+        },
+        "required": [
+          "kind",
+          "requirement",
+          "owner_id",
+          "novel_id",
+          "status"
+        ],
+        "title": "AssetEligibility",
+        "type": "object"
+      },
+      "AssetKind": {
+        "enum": [
+          "hierarchy",
+          "timeline",
+          "relationship",
+          "clue"
+        ],
+        "title": "AssetKind",
+        "type": "string"
+      },
+      "AssetRequirement": {
+        "enum": [
+          "required",
+          "optional"
+        ],
+        "title": "AssetRequirement",
+        "type": "string"
+      },
       "Body_upload_novel_api_novels_upload_post": {
         "properties": {
           "file": {
@@ -497,6 +633,537 @@
         ],
         "title": "ChapterSummaryResponse",
         "type": "object"
+      },
+      "CharacterIdentityOverrideCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "analysis_version_id": {
+            "exclusiveMinimum": 0.0,
+            "title": "Analysis Version Id",
+            "type": "integer"
+          },
+          "author": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Author",
+            "type": "string"
+          },
+          "canonical_character_id": {
+            "exclusiveMinimum": 0.0,
+            "title": "Canonical Character Id",
+            "type": "integer"
+          },
+          "evidence_signature": {
+            "maxLength": 128,
+            "minLength": 8,
+            "title": "Evidence Signature",
+            "type": "string"
+          },
+          "merged_character_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "minItems": 1,
+            "title": "Merged Character Ids",
+            "type": "array"
+          },
+          "novel_id": {
+            "exclusiveMinimum": 0.0,
+            "title": "Novel Id",
+            "type": "integer"
+          },
+          "provenance": {
+            "additionalProperties": true,
+            "title": "Provenance",
+            "type": "object"
+          },
+          "reason": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/OverrideStatus",
+            "default": "active"
+          },
+          "supersedes_id": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supersedes Id"
+          }
+        },
+        "required": [
+          "author",
+          "reason",
+          "evidence_signature",
+          "novel_id",
+          "analysis_version_id",
+          "canonical_character_id",
+          "merged_character_ids"
+        ],
+        "title": "CharacterIdentityOverrideCreate",
+        "type": "object"
+      },
+      "CharacterIdentityOverrideResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "analysis_version_id": {
+            "title": "Analysis Version Id",
+            "type": "integer"
+          },
+          "author": {
+            "title": "Author",
+            "type": "string"
+          },
+          "canonical_character_id": {
+            "title": "Canonical Character Id",
+            "type": "integer"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "evidence_signature": {
+            "title": "Evidence Signature",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "merged_character_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Merged Character Ids",
+            "type": "array"
+          },
+          "novel_id": {
+            "title": "Novel Id",
+            "type": "integer"
+          },
+          "provenance": {
+            "additionalProperties": true,
+            "title": "Provenance",
+            "type": "object"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/OverrideStatus"
+          },
+          "supersedes_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supersedes Id"
+          }
+        },
+        "required": [
+          "id",
+          "novel_id",
+          "analysis_version_id",
+          "canonical_character_id",
+          "merged_character_ids",
+          "author",
+          "reason",
+          "evidence_signature",
+          "status"
+        ],
+        "title": "CharacterIdentityOverrideResponse",
+        "type": "object"
+      },
+      "CitationView": {
+        "additionalProperties": false,
+        "properties": {
+          "block_id": {
+            "title": "Block Id",
+            "type": "string"
+          },
+          "chapter_id": {
+            "title": "Chapter Id",
+            "type": "integer"
+          },
+          "context_evidence_ref_id": {
+            "title": "Context Evidence Ref Id",
+            "type": "integer"
+          },
+          "evidence_key": {
+            "title": "Evidence Key",
+            "type": "string"
+          },
+          "source_end": {
+            "title": "Source End",
+            "type": "integer"
+          },
+          "source_start": {
+            "title": "Source Start",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "block_id",
+          "evidence_key",
+          "context_evidence_ref_id",
+          "chapter_id",
+          "source_start",
+          "source_end"
+        ],
+        "title": "CitationView",
+        "type": "object"
+      },
+      "ClueHumanActionRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "$ref": "#/components/schemas/ClueOverrideAction"
+          },
+          "link": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Link"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "reason": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "action",
+          "reason"
+        ],
+        "title": "ClueHumanActionRequest",
+        "type": "object"
+      },
+      "ClueOverrideAction": {
+        "enum": [
+          "confirm",
+          "reject",
+          "annotate",
+          "adjust_link"
+        ],
+        "title": "ClueOverrideAction",
+        "type": "string"
+      },
+      "ClueRunResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "cancel_requested": {
+            "default": false,
+            "title": "Cancel Requested",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "novel_id": {
+            "title": "Novel Id",
+            "type": "integer"
+          },
+          "progress": {
+            "additionalProperties": true,
+            "title": "Progress",
+            "type": "object"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ClueRunStatus"
+          },
+          "status_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Reason"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "version_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version Id"
+          }
+        },
+        "required": [
+          "id",
+          "novel_id",
+          "status"
+        ],
+        "title": "ClueRunResponse",
+        "type": "object"
+      },
+      "ClueRunStatus": {
+        "enum": [
+          "pending",
+          "running",
+          "paused_budget",
+          "paused_dependency",
+          "cancelled",
+          "completed",
+          "failed"
+        ],
+        "title": "ClueRunStatus",
+        "type": "string"
+      },
+      "ConversationCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "title": {
+            "default": "New chat",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "title": "ConversationCreate",
+        "type": "object"
+      },
+      "ConversationDetail": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "last_message_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Message At"
+          },
+          "last_message_role": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MessageRole"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "last_message_sequence": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Message Sequence"
+          },
+          "last_opened_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Opened At"
+          },
+          "next_sequence": {
+            "title": "Next Sequence",
+            "type": "integer"
+          },
+          "novel_id": {
+            "title": "Novel Id",
+            "type": "integer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ConversationStatus"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "novel_id",
+          "title",
+          "status",
+          "next_sequence",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ConversationDetail",
+        "type": "object"
+      },
+      "ConversationPatch": {
+        "additionalProperties": false,
+        "properties": {
+          "status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConversationStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "title": "ConversationPatch",
+        "type": "object"
+      },
+      "ConversationStatus": {
+        "enum": [
+          "active",
+          "archived"
+        ],
+        "title": "ConversationStatus",
+        "type": "string"
+      },
+      "EligibilityReport": {
+        "additionalProperties": false,
+        "properties": {
+          "assets": {
+            "items": {
+              "$ref": "#/components/schemas/AssetEligibility"
+            },
+            "title": "Assets",
+            "type": "array"
+          },
+          "novel_id": {
+            "minimum": 1.0,
+            "title": "Novel Id",
+            "type": "integer"
+          },
+          "owner_id": {
+            "minimum": 1.0,
+            "title": "Owner Id",
+            "type": "integer"
+          },
+          "policy_version": {
+            "default": "asset-eligibility-policy.v1",
+            "title": "Policy Version",
+            "type": "string"
+          },
+          "provider_calls_allowed": {
+            "title": "Provider Calls Allowed",
+            "type": "boolean"
+          },
+          "schema_version": {
+            "default": "asset-eligibility.v1",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "owner_id",
+          "novel_id",
+          "assets",
+          "provider_calls_allowed"
+        ],
+        "title": "EligibilityReport",
+        "type": "object"
+      },
+      "EligibilityStatus": {
+        "enum": [
+          "reusable_exact",
+          "rebuild_required",
+          "blocked",
+          "optional_unavailable"
+        ],
+        "title": "EligibilityStatus",
+        "type": "string"
       },
       "EvalDatasetResponse": {
         "description": "评测测试题响应",
@@ -856,6 +1523,96 @@
         ],
         "title": "EvalRunResponse",
         "type": "object"
+      },
+      "GenerationJobStatus": {
+        "enum": [
+          "queued",
+          "running",
+          "paused_budget",
+          "paused_dependency",
+          "cancelled",
+          "completed",
+          "failed",
+          "failed_validation"
+        ],
+        "title": "GenerationJobStatus",
+        "type": "string"
+      },
+      "GenerationJobView": {
+        "additionalProperties": false,
+        "properties": {
+          "cancel_requested": {
+            "title": "Cancel Requested",
+            "type": "boolean"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "retry_count": {
+            "title": "Retry Count",
+            "type": "integer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/GenerationJobStatus"
+          },
+          "status_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Reason"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "user_message_id": {
+            "title": "User Message Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "user_message_id",
+          "status",
+          "cancel_requested",
+          "retry_count",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "GenerationJobView",
+        "type": "object"
+      },
+      "GraphDegradationMode": {
+        "enum": [
+          "normal",
+          "large",
+          "filters_required"
+        ],
+        "title": "GraphDegradationMode",
+        "type": "string"
       },
       "HTTPValidationError": {
         "properties": {
@@ -1656,6 +2413,812 @@
         "title": "LoginRequest",
         "type": "object"
       },
+      "MessageAccepted": {
+        "additionalProperties": false,
+        "description": "202 response after durable user-message + job commit.",
+        "properties": {
+          "job": {
+            "$ref": "#/components/schemas/GenerationJobView"
+          },
+          "message": {
+            "$ref": "#/components/schemas/MessageView"
+          }
+        },
+        "required": [
+          "message",
+          "job"
+        ],
+        "title": "MessageAccepted",
+        "type": "object"
+      },
+      "MessageCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "body": {
+            "maxLength": 8000,
+            "minLength": 1,
+            "title": "Body",
+            "type": "string"
+          },
+          "chapter_id": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chapter Id"
+          },
+          "client_message_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Client Message Id",
+            "type": "string"
+          },
+          "selection": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SelectionCoordinate"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "client_message_id",
+          "body"
+        ],
+        "title": "MessageCreate",
+        "type": "object"
+      },
+      "MessageRole": {
+        "enum": [
+          "user",
+          "assistant"
+        ],
+        "title": "MessageRole",
+        "type": "string"
+      },
+      "MessageView": {
+        "additionalProperties": false,
+        "properties": {
+          "body": {
+            "title": "Body",
+            "type": "string"
+          },
+          "citations": {
+            "items": {
+              "$ref": "#/components/schemas/CitationView"
+            },
+            "title": "Citations",
+            "type": "array"
+          },
+          "client_message_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Message Id"
+          },
+          "conversation_id": {
+            "title": "Conversation Id",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "generation_job": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GenerationJobView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "reply_to_message_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reply To Message Id"
+          },
+          "role": {
+            "$ref": "#/components/schemas/MessageRole"
+          },
+          "selection": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SelectionSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sequence": {
+            "title": "Sequence",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "conversation_id",
+          "sequence",
+          "role",
+          "body",
+          "created_at"
+        ],
+        "title": "MessageView",
+        "type": "object"
+      },
+      "NmClaimItem": {
+        "additionalProperties": false,
+        "properties": {
+          "claim_kind": {
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Claim Kind",
+            "type": "string"
+          },
+          "confidence": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence",
+            "type": "number"
+          },
+          "id": {
+            "exclusiveMinimum": 0.0,
+            "title": "Id",
+            "type": "integer"
+          },
+          "node_id": {
+            "exclusiveMinimum": 0.0,
+            "title": "Node Id",
+            "type": "integer"
+          },
+          "summary": {
+            "default": "",
+            "title": "Summary",
+            "type": "string"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "typed_payload": {
+            "additionalProperties": true,
+            "title": "Typed Payload",
+            "type": "object"
+          },
+          "uncertainty": {
+            "maxLength": 24,
+            "minLength": 1,
+            "title": "Uncertainty",
+            "type": "string"
+          },
+          "visible_from_chapter": {
+            "exclusiveMinimum": 0.0,
+            "title": "Visible From Chapter",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "claim_kind",
+          "uncertainty",
+          "confidence",
+          "visible_from_chapter",
+          "node_id"
+        ],
+        "title": "NmClaimItem",
+        "type": "object"
+      },
+      "NmClaimsResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "claims": {
+            "items": {
+              "$ref": "#/components/schemas/NmClaimItem"
+            },
+            "title": "Claims",
+            "type": "array"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "node_id": {
+            "exclusiveMinimum": 0.0,
+            "title": "Node Id",
+            "type": "integer"
+          },
+          "novel_id": {
+            "exclusiveMinimum": 0.0,
+            "title": "Novel Id",
+            "type": "integer"
+          },
+          "publication_status": {
+            "const": "candidate_preview",
+            "default": "candidate_preview",
+            "title": "Publication Status",
+            "type": "string"
+          },
+          "through_chapter": {
+            "exclusiveMinimum": 0.0,
+            "title": "Through Chapter",
+            "type": "integer"
+          },
+          "version_id": {
+            "exclusiveMinimum": 0.0,
+            "title": "Version Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "novel_id",
+          "version_id",
+          "node_id",
+          "through_chapter"
+        ],
+        "title": "NmClaimsResponse",
+        "type": "object"
+      },
+      "NmSourceLinkItem": {
+        "additionalProperties": false,
+        "properties": {
+          "chapter_number": {
+            "exclusiveMinimum": 0.0,
+            "title": "Chapter Number",
+            "type": "integer"
+          },
+          "claim_id": {
+            "exclusiveMinimum": 0.0,
+            "title": "Claim Id",
+            "type": "integer"
+          },
+          "content_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Hash"
+          },
+          "evidence_node_id": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Evidence Node Id",
+            "type": "string"
+          },
+          "hierarchy_build_id": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Hierarchy Build Id",
+            "type": "string"
+          },
+          "id": {
+            "exclusiveMinimum": 0.0,
+            "title": "Id",
+            "type": "integer"
+          },
+          "optional_source_ref": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Optional Source Ref"
+          },
+          "source_end": {
+            "exclusiveMinimum": 0.0,
+            "title": "Source End",
+            "type": "integer"
+          },
+          "source_kind": {
+            "maxLength": 24,
+            "minLength": 1,
+            "title": "Source Kind",
+            "type": "string"
+          },
+          "source_start": {
+            "minimum": 0.0,
+            "title": "Source Start",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "claim_id",
+          "source_kind",
+          "hierarchy_build_id",
+          "evidence_node_id",
+          "chapter_number",
+          "source_start",
+          "source_end"
+        ],
+        "title": "NmSourceLinkItem",
+        "type": "object"
+      },
+      "NmSourceLinksResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "node_id": {
+            "exclusiveMinimum": 0.0,
+            "title": "Node Id",
+            "type": "integer"
+          },
+          "novel_id": {
+            "exclusiveMinimum": 0.0,
+            "title": "Novel Id",
+            "type": "integer"
+          },
+          "publication_status": {
+            "const": "candidate_preview",
+            "default": "candidate_preview",
+            "title": "Publication Status",
+            "type": "string"
+          },
+          "source_links": {
+            "items": {
+              "$ref": "#/components/schemas/NmSourceLinkItem"
+            },
+            "title": "Source Links",
+            "type": "array"
+          },
+          "through_chapter": {
+            "exclusiveMinimum": 0.0,
+            "title": "Through Chapter",
+            "type": "integer"
+          },
+          "version_id": {
+            "exclusiveMinimum": 0.0,
+            "title": "Version Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "novel_id",
+          "version_id",
+          "node_id",
+          "through_chapter"
+        ],
+        "title": "NmSourceLinksResponse",
+        "type": "object"
+      },
+      "NmStructureNode": {
+        "additionalProperties": false,
+        "properties": {
+          "chapter_end": {
+            "exclusiveMinimum": 0.0,
+            "title": "Chapter End",
+            "type": "integer"
+          },
+          "chapter_start": {
+            "exclusiveMinimum": 0.0,
+            "title": "Chapter Start",
+            "type": "integer"
+          },
+          "child_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Child Ids",
+            "type": "array"
+          },
+          "display_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Label"
+          },
+          "id": {
+            "exclusiveMinimum": 0.0,
+            "title": "Id",
+            "type": "integer"
+          },
+          "node_key": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Node Key",
+            "type": "string"
+          },
+          "node_kind": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Node Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "node_key",
+          "node_kind",
+          "chapter_start",
+          "chapter_end"
+        ],
+        "title": "NmStructureNode",
+        "type": "object"
+      },
+      "NmStructureTreeResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/NmStructureNode"
+            },
+            "title": "Nodes",
+            "type": "array"
+          },
+          "novel_id": {
+            "exclusiveMinimum": 0.0,
+            "title": "Novel Id",
+            "type": "integer"
+          },
+          "publication_status": {
+            "const": "candidate_preview",
+            "default": "candidate_preview",
+            "title": "Publication Status",
+            "type": "string"
+          },
+          "readiness": {
+            "enum": [
+              "empty",
+              "incomplete",
+              "preview_eligible",
+              "sealed_candidate"
+            ],
+            "title": "Readiness",
+            "type": "string"
+          },
+          "through_chapter": {
+            "exclusiveMinimum": 0.0,
+            "title": "Through Chapter",
+            "type": "integer"
+          },
+          "version_id": {
+            "exclusiveMinimum": 0.0,
+            "title": "Version Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "novel_id",
+          "version_id",
+          "through_chapter",
+          "readiness"
+        ],
+        "title": "NmStructureTreeResponse",
+        "type": "object"
+      },
+      "NmVersionListItem": {
+        "additionalProperties": false,
+        "properties": {
+          "badge": {
+            "const": "candidate_preview",
+            "default": "candidate_preview",
+            "title": "Badge",
+            "type": "string"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "has_manifest": {
+            "default": false,
+            "title": "Has Manifest",
+            "type": "boolean"
+          },
+          "node_counts": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "integer"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Node Counts"
+          },
+          "readiness": {
+            "enum": [
+              "empty",
+              "incomplete",
+              "preview_eligible",
+              "sealed_candidate"
+            ],
+            "title": "Readiness",
+            "type": "string"
+          },
+          "validation_verdict": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Validation Verdict"
+          },
+          "version_id": {
+            "exclusiveMinimum": 0.0,
+            "title": "Version Id",
+            "type": "integer"
+          },
+          "version_key": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Version Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "version_id",
+          "version_key",
+          "readiness"
+        ],
+        "title": "NmVersionListItem",
+        "type": "object"
+      },
+      "NmVersionListResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "novel_id": {
+            "exclusiveMinimum": 0.0,
+            "title": "Novel Id",
+            "type": "integer"
+          },
+          "publication_status": {
+            "const": "candidate_preview",
+            "default": "candidate_preview",
+            "title": "Publication Status",
+            "type": "string"
+          },
+          "versions": {
+            "items": {
+              "$ref": "#/components/schemas/NmVersionListItem"
+            },
+            "title": "Versions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "novel_id",
+          "versions"
+        ],
+        "title": "NmVersionListResponse",
+        "type": "object"
+      },
+      "NovelBulkDeleteRequest": {
+        "description": "批量删除请求；限制单次规模，避免误操作和超长事务。",
+        "properties": {
+          "novel_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Novel Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "novel_ids"
+        ],
+        "title": "NovelBulkDeleteRequest",
+        "type": "object"
+      },
+      "NovelBulkDeleteResponse": {
+        "description": "批量删除结果。未找到或无权访问的 ID 统一计入 skipped_ids。",
+        "properties": {
+          "deleted_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Deleted Ids",
+            "type": "array"
+          },
+          "skipped_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Skipped Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "deleted_ids",
+          "skipped_ids"
+        ],
+        "title": "NovelBulkDeleteResponse",
+        "type": "object"
+      },
+      "NovelListResponse": {
+        "description": "小说列表项响应（用于书架页卡片展示）。\n\n与 NovelResponse 的区别: 不含 chapters 列表，减少数据传输量。",
+        "properties": {
+          "author": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author"
+          },
+          "chapter_count": {
+            "default": 0,
+            "title": "Chapter Count",
+            "type": "integer"
+          },
+          "chunk_count": {
+            "default": 0,
+            "description": "检索分块数；0 表示尚未建立搜索索引",
+            "title": "Chunk Count",
+            "type": "integer"
+          },
+          "cover_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Url"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "genre": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Genre"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "word_count": {
+            "default": 0,
+            "title": "Word Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "status",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "NovelListResponse",
+        "type": "object"
+      },
       "NovelResponse": {
         "description": "小说详情响应（含章节摘要列表，用于小说详情页）。\n\n安全设计:\n  - 不返回 source_path（服务端文件路径泄露风险）\n  - chapters 使用 ChapterSummaryResponse（不含 content），避免大 payload",
         "properties": {
@@ -1766,6 +3329,73 @@
         "title": "NovelResponse",
         "type": "object"
       },
+      "NovelUpdate": {
+        "description": "更新小说信息请求（所有字段可选，仅更新传入的字段）",
+        "properties": {
+          "author": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author"
+          },
+          "cover_url": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Url"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "genre": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Genre"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "title": "NovelUpdate",
+        "type": "object"
+      },
       "NovelUploadResponse": {
         "description": "小说上传结果响应（含处理状态和统计信息）",
         "properties": {
@@ -1824,6 +3454,50 @@
         ],
         "title": "NovelUploadResponse",
         "type": "object"
+      },
+      "OverrideStatus": {
+        "enum": [
+          "active",
+          "superseded",
+          "needs_relink"
+        ],
+        "title": "OverrideStatus",
+        "type": "string"
+      },
+      "Participant": {
+        "additionalProperties": false,
+        "properties": {
+          "entity_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entity Id"
+          },
+          "mention": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Mention",
+            "type": "string"
+          }
+        },
+        "required": [
+          "mention"
+        ],
+        "title": "Participant",
+        "type": "object"
+      },
+      "ProvenanceKind": {
+        "enum": [
+          "machine",
+          "manual"
+        ],
+        "title": "ProvenanceKind",
+        "type": "string"
       },
       "QualityRunCreate": {
         "description": "Create a durable RAG quality evaluation job from signed fixtures.",
@@ -1925,6 +3599,40 @@
           "cases"
         ],
         "title": "QualityRunCreate",
+        "type": "object"
+      },
+      "QualityRunFromNovelCreate": {
+        "description": "Start a product quality run from server-owned novel artifacts.",
+        "properties": {
+          "dataset_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dataset Ids"
+          },
+          "novel_id": {
+            "minimum": 1.0,
+            "title": "Novel Id",
+            "type": "integer"
+          },
+          "run_immediately": {
+            "default": true,
+            "title": "Run Immediately",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "novel_id"
+        ],
+        "title": "QualityRunFromNovelCreate",
         "type": "object"
       },
       "RAGSearchRequest": {
@@ -2099,6 +3807,46 @@
         "title": "ReadingProgressUpdate",
         "type": "object"
       },
+      "ReasonCode": {
+        "enum": [
+          "source_missing",
+          "source_unavailable",
+          "owner_scope_mismatch",
+          "novel_scope_mismatch",
+          "active_version_missing",
+          "source_snapshot_mismatch",
+          "manifest_mismatch",
+          "malformed_hierarchy",
+          "invalid_offset",
+          "content_hash_mismatch",
+          "incomplete_coverage",
+          "optional_lineage_mismatch",
+          "stale_asset"
+        ],
+        "title": "ReasonCode",
+        "type": "string"
+      },
+      "RebuildRange": {
+        "additionalProperties": false,
+        "properties": {
+          "end_chapter": {
+            "minimum": 0.0,
+            "title": "End Chapter",
+            "type": "integer"
+          },
+          "start_chapter": {
+            "minimum": 0.0,
+            "title": "Start Chapter",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "start_chapter",
+          "end_chapter"
+        ],
+        "title": "RebuildRange",
+        "type": "object"
+      },
       "RegisterRequest": {
         "description": "用户注册请求",
         "properties": {
@@ -2131,6 +3879,656 @@
         ],
         "title": "RegisterRequest",
         "type": "object"
+      },
+      "RelationshipCounts": {
+        "additionalProperties": false,
+        "properties": {
+          "edges": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Edges",
+            "type": "integer"
+          },
+          "nodes": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Nodes",
+            "type": "integer"
+          },
+          "relation_types": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Relation Types",
+            "type": "object"
+          }
+        },
+        "title": "RelationshipCounts",
+        "type": "object"
+      },
+      "RelationshipDegradation": {
+        "additionalProperties": false,
+        "properties": {
+          "edge_count": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Edge Count",
+            "type": "integer"
+          },
+          "hard_edge_cap": {
+            "default": 1500,
+            "minimum": 1.0,
+            "title": "Hard Edge Cap",
+            "type": "integer"
+          },
+          "hard_node_cap": {
+            "default": 500,
+            "minimum": 1.0,
+            "title": "Hard Node Cap",
+            "type": "integer"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/GraphDegradationMode",
+            "default": "normal"
+          },
+          "node_count": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Node Count",
+            "type": "integer"
+          }
+        },
+        "title": "RelationshipDegradation",
+        "type": "object"
+      },
+      "RelationshipEdgeKind": {
+        "description": "Truth tier for graph edges — accepted fact vs provisional co-occurrence.",
+        "enum": [
+          "accepted_observation",
+          "provisional_cooccurrence"
+        ],
+        "title": "RelationshipEdgeKind",
+        "type": "string"
+      },
+      "RelationshipEdgeType": {
+        "enum": [
+          "ally",
+          "enemy",
+          "family",
+          "mentor",
+          "romantic"
+        ],
+        "title": "RelationshipEdgeType",
+        "type": "string"
+      },
+      "RelationshipEvidenceRef": {
+        "additionalProperties": false,
+        "properties": {
+          "chapter_id": {
+            "exclusiveMinimum": 0.0,
+            "title": "Chapter Id",
+            "type": "integer"
+          },
+          "content_hash": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Content Hash",
+            "type": "string"
+          },
+          "evidence_id": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Evidence Id",
+            "type": "string"
+          },
+          "excerpt": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Excerpt"
+          },
+          "source_end": {
+            "exclusiveMinimum": 0.0,
+            "title": "Source End",
+            "type": "integer"
+          },
+          "source_start": {
+            "minimum": 0.0,
+            "title": "Source Start",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "evidence_id",
+          "chapter_id",
+          "source_start",
+          "source_end",
+          "content_hash"
+        ],
+        "title": "RelationshipEvidenceRef",
+        "type": "object"
+      },
+      "RelationshipEvidenceResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/RelationshipEvidenceRef"
+            },
+            "title": "Evidence",
+            "type": "array"
+          },
+          "novel_id": {
+            "exclusiveMinimum": 0.0,
+            "title": "Novel Id",
+            "type": "integer"
+          },
+          "observation_id": {
+            "exclusiveMinimum": 0.0,
+            "title": "Observation Id",
+            "type": "integer"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/ProvenanceKind",
+            "default": "machine"
+          },
+          "relation_type": {
+            "$ref": "#/components/schemas/RelationshipEdgeType"
+          },
+          "source_character_id": {
+            "exclusiveMinimum": 0.0,
+            "title": "Source Character Id",
+            "type": "integer"
+          },
+          "target_character_id": {
+            "exclusiveMinimum": 0.0,
+            "title": "Target Character Id",
+            "type": "integer"
+          },
+          "through_chapter": {
+            "exclusiveMinimum": 0.0,
+            "title": "Through Chapter",
+            "type": "integer"
+          },
+          "version_id": {
+            "exclusiveMinimum": 0.0,
+            "title": "Version Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "observation_id",
+          "novel_id",
+          "version_id",
+          "through_chapter",
+          "relation_type",
+          "source_character_id",
+          "target_character_id"
+        ],
+        "title": "RelationshipEvidenceResponse",
+        "type": "object"
+      },
+      "RelationshipGraphEdge": {
+        "additionalProperties": false,
+        "properties": {
+          "confidence": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence",
+            "type": "number"
+          },
+          "edge_kind": {
+            "$ref": "#/components/schemas/RelationshipEdgeKind",
+            "default": "accepted_observation"
+          },
+          "evidence_count": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Evidence Count",
+            "type": "integer"
+          },
+          "evidence_preview": {
+            "anyOf": [
+              {
+                "maxLength": 400,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Preview"
+          },
+          "observation_id": {
+            "exclusiveMinimum": 0.0,
+            "title": "Observation Id",
+            "type": "integer"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/ProvenanceKind",
+            "default": "machine"
+          },
+          "relation_type": {
+            "$ref": "#/components/schemas/RelationshipGraphEdgeLabel"
+          },
+          "source_character_id": {
+            "exclusiveMinimum": 0.0,
+            "title": "Source Character Id",
+            "type": "integer"
+          },
+          "suggested_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RelationshipEdgeType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "target_character_id": {
+            "exclusiveMinimum": 0.0,
+            "title": "Target Character Id",
+            "type": "integer"
+          },
+          "transition": {
+            "enum": [
+              "establish",
+              "change",
+              "end"
+            ],
+            "title": "Transition",
+            "type": "string"
+          },
+          "valid_from_chapter": {
+            "exclusiveMinimum": 0.0,
+            "title": "Valid From Chapter",
+            "type": "integer"
+          },
+          "valid_to_chapter": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid To Chapter"
+          }
+        },
+        "required": [
+          "observation_id",
+          "source_character_id",
+          "target_character_id",
+          "relation_type",
+          "transition",
+          "confidence",
+          "valid_from_chapter"
+        ],
+        "title": "RelationshipGraphEdge",
+        "type": "object"
+      },
+      "RelationshipGraphEdgeLabel": {
+        "description": "Labels allowed on graph *projection* edges.\n\nFiction enum types remain write-path authority for accepted observations.\n``cooccur`` is honesty-only for provisional timeline co-occurrence and must\nnever be written as an accepted observation relation_type.",
+        "enum": [
+          "ally",
+          "enemy",
+          "family",
+          "mentor",
+          "romantic",
+          "cooccur"
+        ],
+        "title": "RelationshipGraphEdgeLabel",
+        "type": "string"
+      },
+      "RelationshipGraphEnvelope": {
+        "additionalProperties": false,
+        "properties": {
+          "available_character_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Available Character Ids",
+            "type": "array"
+          },
+          "available_relation_types": {
+            "items": {
+              "$ref": "#/components/schemas/RelationshipGraphEdgeLabel"
+            },
+            "title": "Available Relation Types",
+            "type": "array"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/RelationshipCounts"
+          },
+          "cutoff_chapter": {
+            "exclusiveMinimum": 0.0,
+            "title": "Cutoff Chapter",
+            "type": "integer"
+          },
+          "degradation": {
+            "$ref": "#/components/schemas/RelationshipDegradation"
+          },
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/RelationshipGraphEdge"
+            },
+            "title": "Edges",
+            "type": "array"
+          },
+          "full_book": {
+            "default": false,
+            "title": "Full Book",
+            "type": "boolean"
+          },
+          "generated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Generated At"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/RelationshipGraphNode"
+            },
+            "title": "Nodes",
+            "type": "array"
+          },
+          "novel_id": {
+            "exclusiveMinimum": 0.0,
+            "title": "Novel Id",
+            "type": "integer"
+          },
+          "source": {
+            "$ref": "#/components/schemas/RelationshipVersionSource"
+          },
+          "through_chapter": {
+            "exclusiveMinimum": 0.0,
+            "title": "Through Chapter",
+            "type": "integer"
+          },
+          "version_id": {
+            "exclusiveMinimum": 0.0,
+            "title": "Version Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "novel_id",
+          "version_id",
+          "source",
+          "through_chapter",
+          "cutoff_chapter"
+        ],
+        "title": "RelationshipGraphEnvelope",
+        "type": "object"
+      },
+      "RelationshipGraphNode": {
+        "additionalProperties": false,
+        "properties": {
+          "aliases": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Aliases",
+            "type": "array"
+          },
+          "character_id": {
+            "exclusiveMinimum": 0.0,
+            "title": "Character Id",
+            "type": "integer"
+          },
+          "first_visible_chapter": {
+            "exclusiveMinimum": 0.0,
+            "title": "First Visible Chapter",
+            "type": "integer"
+          },
+          "name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "character_id",
+          "name",
+          "first_visible_chapter"
+        ],
+        "title": "RelationshipGraphNode",
+        "type": "object"
+      },
+      "RelationshipOverrideCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "analysis_version_id": {
+            "exclusiveMinimum": 0.0,
+            "title": "Analysis Version Id",
+            "type": "integer"
+          },
+          "author": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Author",
+            "type": "string"
+          },
+          "evidence_signature": {
+            "maxLength": 128,
+            "minLength": 8,
+            "title": "Evidence Signature",
+            "type": "string"
+          },
+          "field_name": {
+            "$ref": "#/components/schemas/RelationshipOverrideField"
+          },
+          "logical_relationship_key": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Logical Relationship Key",
+            "type": "string"
+          },
+          "novel_id": {
+            "exclusiveMinimum": 0.0,
+            "title": "Novel Id",
+            "type": "integer"
+          },
+          "observation_id": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observation Id"
+          },
+          "provenance": {
+            "additionalProperties": true,
+            "title": "Provenance",
+            "type": "object"
+          },
+          "reason": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/OverrideStatus",
+            "default": "active"
+          },
+          "supersedes_id": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supersedes Id"
+          },
+          "value": {
+            "additionalProperties": true,
+            "title": "Value",
+            "type": "object"
+          }
+        },
+        "required": [
+          "author",
+          "reason",
+          "evidence_signature",
+          "novel_id",
+          "analysis_version_id",
+          "logical_relationship_key",
+          "field_name",
+          "value"
+        ],
+        "title": "RelationshipOverrideCreate",
+        "type": "object"
+      },
+      "RelationshipOverrideField": {
+        "enum": [
+          "relation_type",
+          "valid_from",
+          "valid_to",
+          "transition"
+        ],
+        "title": "RelationshipOverrideField",
+        "type": "string"
+      },
+      "RelationshipOverrideResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "analysis_version_id": {
+            "title": "Analysis Version Id",
+            "type": "integer"
+          },
+          "author": {
+            "title": "Author",
+            "type": "string"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "evidence_signature": {
+            "title": "Evidence Signature",
+            "type": "string"
+          },
+          "field_name": {
+            "$ref": "#/components/schemas/RelationshipOverrideField"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "logical_relationship_key": {
+            "title": "Logical Relationship Key",
+            "type": "string"
+          },
+          "novel_id": {
+            "title": "Novel Id",
+            "type": "integer"
+          },
+          "observation_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observation Id"
+          },
+          "provenance": {
+            "additionalProperties": true,
+            "title": "Provenance",
+            "type": "object"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/OverrideStatus"
+          },
+          "supersedes_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supersedes Id"
+          },
+          "value": {
+            "additionalProperties": true,
+            "title": "Value",
+            "type": "object"
+          }
+        },
+        "required": [
+          "id",
+          "novel_id",
+          "analysis_version_id",
+          "logical_relationship_key",
+          "field_name",
+          "value",
+          "author",
+          "reason",
+          "evidence_signature",
+          "status"
+        ],
+        "title": "RelationshipOverrideResponse",
+        "type": "object"
+      },
+      "RelationshipVersionSource": {
+        "enum": [
+          "active",
+          "running_candidate",
+          "history"
+        ],
+        "title": "RelationshipVersionSource",
+        "type": "string"
       },
       "SearchRequest": {
         "description": "混合搜索请求（BM25 + 向量）",
@@ -2321,6 +4719,475 @@
         "title": "SearchResultItem",
         "type": "object"
       },
+      "SelectionCoordinate": {
+        "additionalProperties": false,
+        "description": "Client-supplied selection; server re-slices Chapter.content as authority.",
+        "properties": {
+          "chapter_content_hash": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Chapter Content Hash",
+            "type": "string"
+          },
+          "chapter_id": {
+            "exclusiveMinimum": 0.0,
+            "title": "Chapter Id",
+            "type": "integer"
+          },
+          "selection_text": {
+            "maxLength": 8000,
+            "minLength": 1,
+            "title": "Selection Text",
+            "type": "string"
+          },
+          "selection_text_hash": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Selection Text Hash",
+            "type": "string"
+          },
+          "source_end": {
+            "exclusiveMinimum": 0.0,
+            "title": "Source End",
+            "type": "integer"
+          },
+          "source_start": {
+            "minimum": 0.0,
+            "title": "Source Start",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "chapter_id",
+          "source_start",
+          "source_end",
+          "selection_text",
+          "selection_text_hash",
+          "chapter_content_hash"
+        ],
+        "title": "SelectionCoordinate",
+        "type": "object"
+      },
+      "SelectionSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "chapter_content_hash": {
+            "title": "Chapter Content Hash",
+            "type": "string"
+          },
+          "chapter_id": {
+            "title": "Chapter Id",
+            "type": "integer"
+          },
+          "selection_text_hash": {
+            "title": "Selection Text Hash",
+            "type": "string"
+          },
+          "source_end": {
+            "title": "Source End",
+            "type": "integer"
+          },
+          "source_start": {
+            "title": "Source Start",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "chapter_id",
+          "source_start",
+          "source_end",
+          "selection_text_hash",
+          "chapter_content_hash"
+        ],
+        "title": "SelectionSummary",
+        "type": "object"
+      },
+      "TimePrecision": {
+        "enum": [
+          "exact",
+          "relative",
+          "fuzzy",
+          "unknown"
+        ],
+        "title": "TimePrecision",
+        "type": "string"
+      },
+      "TimelineCounts": {
+        "additionalProperties": false,
+        "properties": {
+          "causal_edges": {
+            "default": 0,
+            "title": "Causal Edges",
+            "type": "integer"
+          },
+          "events": {
+            "default": 0,
+            "title": "Events",
+            "type": "integer"
+          },
+          "participants": {
+            "default": 0,
+            "title": "Participants",
+            "type": "integer"
+          }
+        },
+        "title": "TimelineCounts",
+        "type": "object"
+      },
+      "TimelineEditRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "field_name": {
+            "enum": [
+              "title",
+              "description",
+              "event_type",
+              "time_expression"
+            ],
+            "title": "Field Name",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value"
+          }
+        },
+        "required": [
+          "field_name",
+          "value"
+        ],
+        "title": "TimelineEditRequest",
+        "type": "object"
+      },
+      "TimelineEnvelope": {
+        "additionalProperties": false,
+        "properties": {
+          "active": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TimelineVersionView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "running_candidate": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TimelineVersionView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "TimelineEnvelope",
+        "type": "object"
+      },
+      "TimelineOrdering": {
+        "enum": [
+          "narrative",
+          "story"
+        ],
+        "title": "TimelineOrdering",
+        "type": "string"
+      },
+      "TimelinePreferenceRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "full_book": {
+            "title": "Full Book",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "full_book"
+        ],
+        "title": "TimelinePreferenceRequest",
+        "type": "object"
+      },
+      "TimelineRollbackRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_revision": {
+            "minimum": 0.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "target_version_id": {
+            "title": "Target Version Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "target_version_id",
+          "expected_revision"
+        ],
+        "title": "TimelineRollbackRequest",
+        "type": "object"
+      },
+      "TimelineRunResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "cancel_requested": {
+            "default": false,
+            "title": "Cancel Requested",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "novel_id": {
+            "title": "Novel Id",
+            "type": "integer"
+          },
+          "progress": {
+            "additionalProperties": true,
+            "title": "Progress",
+            "type": "object"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "status_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Reason"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "version_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version Id"
+          }
+        },
+        "required": [
+          "id",
+          "novel_id",
+          "status"
+        ],
+        "title": "TimelineRunResponse",
+        "type": "object"
+      },
+      "TimelineVersionSource": {
+        "enum": [
+          "active",
+          "running_candidate"
+        ],
+        "title": "TimelineVersionSource",
+        "type": "string"
+      },
+      "TimelineVersionView": {
+        "additionalProperties": false,
+        "properties": {
+          "aggregates": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Aggregates",
+            "type": "object"
+          },
+          "causal_edges": {
+            "items": {
+              "$ref": "#/components/schemas/TimelineVisibleEdge"
+            },
+            "title": "Causal Edges",
+            "type": "array"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/TimelineCounts"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/TimelineVisibleEvent"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "previews": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Previews",
+            "type": "array"
+          },
+          "progress": {
+            "additionalProperties": true,
+            "title": "Progress",
+            "type": "object"
+          },
+          "source": {
+            "$ref": "#/components/schemas/TimelineVersionSource"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "version_id": {
+            "title": "Version Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "source",
+          "version_id",
+          "status"
+        ],
+        "title": "TimelineVersionView",
+        "type": "object"
+      },
+      "TimelineVisibleEdge": {
+        "additionalProperties": false,
+        "properties": {
+          "confidence": {
+            "title": "Confidence",
+            "type": "number"
+          },
+          "edge_type": {
+            "title": "Edge Type",
+            "type": "string"
+          },
+          "source_event_id": {
+            "title": "Source Event Id",
+            "type": "integer"
+          },
+          "target_event_id": {
+            "title": "Target Event Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "source_event_id",
+          "target_event_id",
+          "edge_type",
+          "confidence"
+        ],
+        "title": "TimelineVisibleEdge",
+        "type": "object"
+      },
+      "TimelineVisibleEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "confidence": {
+            "title": "Confidence",
+            "type": "number"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "event_type": {
+            "title": "Event Type",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "logical_event_id": {
+            "title": "Logical Event Id",
+            "type": "string"
+          },
+          "narrative_chapter_number": {
+            "title": "Narrative Chapter Number",
+            "type": "integer"
+          },
+          "narrative_index": {
+            "title": "Narrative Index",
+            "type": "integer"
+          },
+          "participants": {
+            "items": {
+              "$ref": "#/components/schemas/Participant"
+            },
+            "title": "Participants",
+            "type": "array"
+          },
+          "provenance": {
+            "additionalProperties": {
+              "enum": [
+                "machine",
+                "manual"
+              ],
+              "type": "string"
+            },
+            "title": "Provenance",
+            "type": "object"
+          },
+          "source_start": {
+            "minimum": 0.0,
+            "title": "Source Start",
+            "type": "integer"
+          },
+          "story_rank": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Story Rank"
+          },
+          "time_expression": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Expression"
+          },
+          "time_precision": {
+            "$ref": "#/components/schemas/TimePrecision"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "logical_event_id",
+          "title",
+          "description",
+          "event_type",
+          "narrative_chapter_number",
+          "source_start",
+          "narrative_index",
+          "time_precision",
+          "confidence"
+        ],
+        "title": "TimelineVisibleEvent",
+        "type": "object"
+      },
       "TokenResponse": {
         "description": "登录成功响应",
         "properties": {
@@ -2434,9 +5301,67 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/admin/asset-audit/{novel_id}": {
+      "get": {
+        "description": "Reproduce a scoped eligibility report without repairing or starting work.",
+        "operationId": "get_asset_audit_api_admin_asset_audit__novel_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "novel_id",
+            "required": true,
+            "schema": {
+              "title": "Novel Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "owner_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "title": "Owner Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EligibilityReport"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Asset Audit",
+        "tags": [
+          "资产资格审计"
+        ]
+      }
+    },
     "/api/analysis/{novel_id}": {
       "get": {
-        "description": "获取已有分析结果",
+        "description": "获取已有分析结果列表（新→旧）。",
         "operationId": "get_analysis_api_analysis__novel_id__get",
         "parameters": [
           {
@@ -2446,6 +5371,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "analysis_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Analysis Type"
             }
           }
         ],
@@ -2482,7 +5423,7 @@
     },
     "/api/analysis/{novel_id}/analyze": {
       "post": {
-        "description": "对整本小说进行 AI 分析（摘要、人物、伏笔、叙事结构）",
+        "description": "对小说做 AI/结构分析（默认接入 Phase 07 场景层级）。",
         "operationId": "analyze_novel_api_analysis__novel_id__analyze_post",
         "parameters": [
           {
@@ -2495,6 +5436,23 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/AnalyzeBody"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "content": {
@@ -2528,7 +5486,7 @@
     },
     "/api/analysis/{novel_id}/analyze/stream": {
       "post": {
-        "description": "流式输出分析过程（SSE，实时展示 AI 分析进度）",
+        "description": "流式输出分析过程（SSE）— 后续迭代。",
         "operationId": "analyze_novel_stream_api_analysis__novel_id__analyze_stream_post",
         "parameters": [
           {
@@ -2574,7 +5532,7 @@
     },
     "/api/analysis/{novel_id}/chapters/{chapter_id}/analyze": {
       "post": {
-        "description": "分析单个章节（摘要、情感、人物出场）",
+        "description": "分析单个章节（基于该章下的 Phase07 场景）。",
         "operationId": "analyze_chapter_api_analysis__novel_id__chapters__chapter_id__analyze_post",
         "parameters": [
           {
@@ -2592,6 +5550,69 @@
             "required": true,
             "schema": {
               "title": "Chapter Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/AnalyzeBody"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Analyze Chapter",
+        "tags": [
+          "剧情分析"
+        ]
+      }
+    },
+    "/api/analysis/{novel_id}/hierarchy": {
+      "get": {
+        "description": "查看 Phase 07 层级是否就绪（场景/证据统计）。",
+        "operationId": "get_hierarchy_status_api_analysis__novel_id__hierarchy_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "novel_id",
+            "required": true,
+            "schema": {
+              "title": "Novel Id",
               "type": "integer"
             }
           }
@@ -2621,7 +5642,53 @@
             "HTTPBearer": []
           }
         ],
-        "summary": "Analyze Chapter",
+        "summary": "Get Hierarchy Status",
+        "tags": [
+          "剧情分析"
+        ]
+      }
+    },
+    "/api/analysis/{novel_id}/hierarchy/rebuild": {
+      "post": {
+        "description": "强制重建 Phase 07 层级树并设为 active。",
+        "operationId": "rebuild_hierarchy_api_analysis__novel_id__hierarchy_rebuild_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "novel_id",
+            "required": true,
+            "schema": {
+              "title": "Novel Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Rebuild Hierarchy",
         "tags": [
           "剧情分析"
         ]
@@ -2887,6 +5954,690 @@
         "summary": "Get Relations",
         "tags": [
           "人物关系"
+        ]
+      }
+    },
+    "/api/clues/{novel_id}": {
+      "get": {
+        "operationId": "get_clues_api_clues__novel_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "novel_id",
+            "required": true,
+            "schema": {
+              "title": "Novel Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "full_book",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Full Book",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "character_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Character Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Clues",
+        "tags": [
+          "线索与伏笔"
+        ]
+      }
+    },
+    "/api/clues/{novel_id}/cancel": {
+      "post": {
+        "operationId": "cancel_api_clues__novel_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "novel_id",
+            "required": true,
+            "schema": {
+              "title": "Novel Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClueRunResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Cancel",
+        "tags": [
+          "线索与伏笔"
+        ]
+      }
+    },
+    "/api/clues/{novel_id}/clues/{logical_clue_id}/actions": {
+      "post": {
+        "description": "Protected confirm/reject/annotate/adjust-link on an owned novel clue.",
+        "operationId": "human_action_api_clues__novel_id__clues__logical_clue_id__actions_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "logical_clue_id",
+            "required": true,
+            "schema": {
+              "title": "Logical Clue Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "novel_id",
+            "required": true,
+            "schema": {
+              "title": "Novel Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClueHumanActionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Human Action",
+        "tags": [
+          "线索与伏笔"
+        ]
+      }
+    },
+    "/api/clues/{novel_id}/compare": {
+      "get": {
+        "operationId": "compare_versions_api_clues__novel_id__compare_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "novel_id",
+            "required": true,
+            "schema": {
+              "title": "Novel Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from_version_id",
+            "required": true,
+            "schema": {
+              "title": "From Version Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to_version_id",
+            "required": true,
+            "schema": {
+              "title": "To Version Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Compare Versions",
+        "tags": [
+          "线索与伏笔"
+        ]
+      }
+    },
+    "/api/clues/{novel_id}/reanalyze": {
+      "post": {
+        "description": "Start a new candidate run for reanalysis; preserves human overrides.",
+        "operationId": "reanalyze_api_clues__novel_id__reanalyze_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "novel_id",
+            "required": true,
+            "schema": {
+              "title": "Novel Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClueRunResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Reanalyze",
+        "tags": [
+          "线索与伏笔"
+        ]
+      }
+    },
+    "/api/clues/{novel_id}/resume": {
+      "post": {
+        "operationId": "resume_api_clues__novel_id__resume_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "novel_id",
+            "required": true,
+            "schema": {
+              "title": "Novel Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClueRunResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Resume",
+        "tags": [
+          "线索与伏笔"
+        ]
+      }
+    },
+    "/api/clues/{novel_id}/rollback": {
+      "post": {
+        "operationId": "rollback_api_clues__novel_id__rollback_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "novel_id",
+            "required": true,
+            "schema": {
+              "title": "Novel Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "target_version_id",
+            "required": true,
+            "schema": {
+              "title": "Target Version Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "expected_revision",
+            "required": true,
+            "schema": {
+              "title": "Expected Revision",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Rollback",
+        "tags": [
+          "线索与伏笔"
+        ]
+      }
+    },
+    "/api/clues/{novel_id}/start-or-resume": {
+      "post": {
+        "description": "Start or resume durable clue analysis for an owned novel.",
+        "operationId": "start_or_resume_api_clues__novel_id__start_or_resume_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "novel_id",
+            "required": true,
+            "schema": {
+              "title": "Novel Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClueRunResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Start Or Resume",
+        "tags": [
+          "线索与伏笔"
+        ]
+      }
+    },
+    "/api/clues/{novel_id}/status": {
+      "get": {
+        "operationId": "status_api_clues__novel_id__status_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "novel_id",
+            "required": true,
+            "schema": {
+              "title": "Novel Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClueRunResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Status",
+        "tags": [
+          "线索与伏笔"
+        ]
+      }
+    },
+    "/api/clues/{novel_id}/versions/{version_id}": {
+      "get": {
+        "operationId": "get_version_api_clues__novel_id__versions__version_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "version_id",
+            "required": true,
+            "schema": {
+              "title": "Version Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "novel_id",
+            "required": true,
+            "schema": {
+              "title": "Novel Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "full_book",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Full Book",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "character_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Character Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Version",
+        "tags": [
+          "线索与伏笔"
+        ]
+      }
+    },
+    "/api/clues/{novel_id}/versions/{version_id}/clues/{logical_clue_id}": {
+      "get": {
+        "operationId": "get_clue_detail_api_clues__novel_id__versions__version_id__clues__logical_clue_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "version_id",
+            "required": true,
+            "schema": {
+              "title": "Version Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "logical_clue_id",
+            "required": true,
+            "schema": {
+              "title": "Logical Clue Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "novel_id",
+            "required": true,
+            "schema": {
+              "title": "Novel Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "full_book",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Full Book",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Clue Detail",
+        "tags": [
+          "线索与伏笔"
         ]
       }
     },
@@ -3299,6 +7050,55 @@
           }
         ],
         "summary": "Create Quality Run",
+        "tags": [
+          "评测"
+        ]
+      }
+    },
+    "/api/eval/quality/runs/from-novel": {
+      "post": {
+        "description": "Create a durable run from confirmed datasets and active persisted lineage.\n\nThis endpoint intentionally fails closed.  The browser supplies only a novel\nand optional confirmed dataset ids; signed fixtures, model calibration and\nchunk/source lineage are reloaded from server-owned durable records.",
+        "operationId": "create_quality_run_from_novel_api_eval_quality_runs_from_novel_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QualityRunFromNovelCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Create Quality Run From Novel Api Eval Quality Runs From Novel Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Quality Run From Novel",
         "tags": [
           "评测"
         ]
@@ -4544,6 +8344,293 @@
         ]
       }
     },
+    "/api/narrative-memory/{novel_id}/versions": {
+      "get": {
+        "description": "List candidate NM versions for an owned novel (no default active pick).",
+        "operationId": "get_versions_api_narrative_memory__novel_id__versions_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "novel_id",
+            "required": true,
+            "schema": {
+              "title": "Novel Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NmVersionListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Versions",
+        "tags": [
+          "叙事记忆结构"
+        ]
+      }
+    },
+    "/api/narrative-memory/{novel_id}/versions/{version_id}/nodes/{node_id}/claims": {
+      "get": {
+        "description": "Return claims on a node visible at through_chapter.",
+        "operationId": "get_node_claims_api_narrative_memory__novel_id__versions__version_id__nodes__node_id__claims_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "version_id",
+            "required": true,
+            "schema": {
+              "title": "Version Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "node_id",
+            "required": true,
+            "schema": {
+              "title": "Node Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "novel_id",
+            "required": true,
+            "schema": {
+              "title": "Novel Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "through_chapter",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Through Chapter"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NmClaimsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Node Claims",
+        "tags": [
+          "叙事记忆结构"
+        ]
+      }
+    },
+    "/api/narrative-memory/{novel_id}/versions/{version_id}/nodes/{node_id}/source-links": {
+      "get": {
+        "description": "Return evidence source links for claims on a node (cutoff-filtered).",
+        "operationId": "get_node_source_links_api_narrative_memory__novel_id__versions__version_id__nodes__node_id__source_links_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "version_id",
+            "required": true,
+            "schema": {
+              "title": "Version Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "node_id",
+            "required": true,
+            "schema": {
+              "title": "Node Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "novel_id",
+            "required": true,
+            "schema": {
+              "title": "Novel Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "through_chapter",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Through Chapter"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NmSourceLinksResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Node Source Links",
+        "tags": [
+          "叙事记忆结构"
+        ]
+      }
+    },
+    "/api/narrative-memory/{novel_id}/versions/{version_id}/tree": {
+      "get": {
+        "description": "Return candidate structure tree filtered by through_chapter.",
+        "operationId": "get_structure_tree_api_narrative_memory__novel_id__versions__version_id__tree_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "version_id",
+            "required": true,
+            "schema": {
+              "title": "Version Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "novel_id",
+            "required": true,
+            "schema": {
+              "title": "Novel Id",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Spoiler cutoff chapter; nodes with chapter_end beyond this are hidden",
+            "in": "query",
+            "name": "through_chapter",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Spoiler cutoff chapter; nodes with chapter_end beyond this are hidden",
+              "title": "Through Chapter"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NmStructureTreeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Structure Tree",
+        "tags": [
+          "叙事记忆结构"
+        ]
+      }
+    },
     "/api/novels": {
       "get": {
         "description": "获取小说列表（分页 + 搜索）",
@@ -4617,6 +8704,53 @@
           }
         ],
         "summary": "List Novels",
+        "tags": [
+          "小说管理"
+        ]
+      }
+    },
+    "/api/novels/bulk": {
+      "delete": {
+        "description": "批量删除当前用户可管理的小说。",
+        "operationId": "bulk_delete_novels_api_novels_bulk_delete",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NovelBulkDeleteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NovelBulkDeleteResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Bulk Delete Novels",
         "tags": [
           "小说管理"
         ]
@@ -4807,6 +8941,62 @@
         "tags": [
           "小说管理"
         ]
+      },
+      "patch": {
+        "description": "更新小说名称等元信息（仅限所有者或超级用户）。",
+        "operationId": "update_novel_api_novels__novel_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "novel_id",
+            "required": true,
+            "schema": {
+              "title": "Novel Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NovelUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NovelListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update Novel",
+        "tags": [
+          "小说管理"
+        ]
       }
     },
     "/api/novels/{novel_id}/chapters": {
@@ -4915,6 +9105,667 @@
         "summary": "Get Chapter",
         "tags": [
           "小说管理"
+        ]
+      }
+    },
+    "/api/novels/{novel_id}/conversations": {
+      "get": {
+        "operationId": "list_conversations_api_novels__novel_id__conversations_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "novel_id",
+            "required": true,
+            "schema": {
+              "title": "Novel Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "skip",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Skip",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Conversations Api Novels  Novel Id  Conversations Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Conversations",
+        "tags": [
+          "阅读器对话"
+        ]
+      },
+      "post": {
+        "operationId": "create_conversation_api_novels__novel_id__conversations_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "novel_id",
+            "required": true,
+            "schema": {
+              "title": "Novel Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConversationCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Conversation",
+        "tags": [
+          "阅读器对话"
+        ]
+      }
+    },
+    "/api/novels/{novel_id}/conversations/{conversation_id}": {
+      "delete": {
+        "operationId": "delete_conversation_api_novels__novel_id__conversations__conversation_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "title": "Conversation Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "novel_id",
+            "required": true,
+            "schema": {
+              "title": "Novel Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Delete Conversation",
+        "tags": [
+          "阅读器对话"
+        ]
+      },
+      "get": {
+        "operationId": "get_conversation_api_novels__novel_id__conversations__conversation_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "title": "Conversation Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "novel_id",
+            "required": true,
+            "schema": {
+              "title": "Novel Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Conversation",
+        "tags": [
+          "阅读器对话"
+        ]
+      },
+      "patch": {
+        "operationId": "patch_conversation_api_novels__novel_id__conversations__conversation_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "title": "Conversation Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "novel_id",
+            "required": true,
+            "schema": {
+              "title": "Novel Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConversationPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Patch Conversation",
+        "tags": [
+          "阅读器对话"
+        ]
+      }
+    },
+    "/api/novels/{novel_id}/conversations/{conversation_id}/jobs/{job_id}": {
+      "get": {
+        "operationId": "get_job_api_novels__novel_id__conversations__conversation_id__jobs__job_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "title": "Conversation Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "novel_id",
+            "required": true,
+            "schema": {
+              "title": "Novel Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerationJobView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Job",
+        "tags": [
+          "阅读器对话"
+        ]
+      }
+    },
+    "/api/novels/{novel_id}/conversations/{conversation_id}/jobs/{job_id}/cancel": {
+      "post": {
+        "operationId": "cancel_job_api_novels__novel_id__conversations__conversation_id__jobs__job_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "title": "Conversation Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "novel_id",
+            "required": true,
+            "schema": {
+              "title": "Novel Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerationJobView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Cancel Job",
+        "tags": [
+          "阅读器对话"
+        ]
+      }
+    },
+    "/api/novels/{novel_id}/conversations/{conversation_id}/jobs/{job_id}/retry": {
+      "post": {
+        "operationId": "retry_job_api_novels__novel_id__conversations__conversation_id__jobs__job_id__retry_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "title": "Conversation Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "novel_id",
+            "required": true,
+            "schema": {
+              "title": "Novel Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerationJobView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Retry Job",
+        "tags": [
+          "阅读器对话"
+        ]
+      }
+    },
+    "/api/novels/{novel_id}/conversations/{conversation_id}/messages": {
+      "get": {
+        "operationId": "list_messages_api_novels__novel_id__conversations__conversation_id__messages_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "title": "Conversation Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "novel_id",
+            "required": true,
+            "schema": {
+              "title": "Novel Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "after_sequence",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "After Sequence",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "skip",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Skip",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Messages Api Novels  Novel Id  Conversations  Conversation Id  Messages Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Messages",
+        "tags": [
+          "阅读器对话"
+        ]
+      },
+      "post": {
+        "operationId": "create_message_api_novels__novel_id__conversations__conversation_id__messages_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "title": "Conversation Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "novel_id",
+            "required": true,
+            "schema": {
+              "title": "Novel Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MessageCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageAccepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Message",
+        "tags": [
+          "阅读器对话"
         ]
       }
     },
@@ -5270,6 +10121,605 @@
         ]
       }
     },
+    "/api/relationships/{novel_id}/graph": {
+      "get": {
+        "description": "Spoiler-safe graph envelope for one owned novel/version.",
+        "operationId": "get_relationship_graph_api_relationships__novel_id__graph_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "novel_id",
+            "required": true,
+            "schema": {
+              "title": "Novel Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "source",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/RelationshipVersionSource",
+              "default": "active"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "exclusiveMinimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Version Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "through_chapter",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "exclusiveMinimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Through Chapter"
+            }
+          },
+          {
+            "in": "query",
+            "name": "full_book",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Full Book",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "character_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "exclusiveMinimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Character Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "relation_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 32,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Relation Type"
+            }
+          },
+          {
+            "description": "When accepted observations exist, also include provisional timeline co-occurrence edges (edge_kind=provisional_cooccurrence). When accepted is empty, provisional is already the default surface.",
+            "in": "query",
+            "name": "include_provisional",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "When accepted observations exist, also include provisional timeline co-occurrence edges (edge_kind=provisional_cooccurrence). When accepted is empty, provisional is already the default surface.",
+              "title": "Include Provisional",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RelationshipGraphEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Relationship Graph",
+        "tags": [
+          "人物关系图"
+        ]
+      }
+    },
+    "/api/relationships/{novel_id}/observations/{observation_id}/evidence": {
+      "get": {
+        "description": "Evidence is only returned for observations in the visible folded set.",
+        "operationId": "get_visible_evidence_api_relationships__novel_id__observations__observation_id__evidence_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "observation_id",
+            "required": true,
+            "schema": {
+              "title": "Observation Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "novel_id",
+            "required": true,
+            "schema": {
+              "title": "Novel Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "source",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/RelationshipVersionSource",
+              "default": "active"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "exclusiveMinimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Version Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "through_chapter",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "exclusiveMinimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Through Chapter"
+            }
+          },
+          {
+            "in": "query",
+            "name": "full_book",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Full Book",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RelationshipEvidenceResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Visible Evidence",
+        "tags": [
+          "人物关系图"
+        ]
+      }
+    },
+    "/api/relationships/{novel_id}/overrides/character-merge": {
+      "post": {
+        "operationId": "create_character_merge_override_api_relationships__novel_id__overrides_character_merge_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "novel_id",
+            "required": true,
+            "schema": {
+              "title": "Novel Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CharacterIdentityOverrideCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CharacterIdentityOverrideResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Character Merge Override",
+        "tags": [
+          "人物关系图"
+        ]
+      }
+    },
+    "/api/relationships/{novel_id}/overrides/relationship": {
+      "post": {
+        "operationId": "create_relationship_override_api_relationships__novel_id__overrides_relationship_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "novel_id",
+            "required": true,
+            "schema": {
+              "title": "Novel Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RelationshipOverrideCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RelationshipOverrideResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Relationship Override",
+        "tags": [
+          "人物关系图"
+        ]
+      }
+    },
+    "/api/relationships/{novel_id}/overrides/relationship/{override_id}/relink": {
+      "post": {
+        "operationId": "relink_relationship_override_api_relationships__novel_id__overrides_relationship__override_id__relink_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "override_id",
+            "required": true,
+            "schema": {
+              "title": "Override Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "novel_id",
+            "required": true,
+            "schema": {
+              "title": "Novel Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "target_version_id",
+            "required": true,
+            "schema": {
+              "exclusiveMinimum": 0,
+              "title": "Target Version Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RelationshipOverrideResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Relink Relationship Override",
+        "tags": [
+          "人物关系图"
+        ]
+      }
+    },
+    "/api/relationships/{novel_id}/projection/manifest": {
+      "get": {
+        "description": "Deterministic accepted-observation projection manifest (non-authoritative).",
+        "operationId": "get_projection_manifest_api_relationships__novel_id__projection_manifest_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "novel_id",
+            "required": true,
+            "schema": {
+              "title": "Novel Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "exclusiveMinimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Version Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "source",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/RelationshipVersionSource",
+              "default": "active"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Projection Manifest Api Relationships  Novel Id  Projection Manifest Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Projection Manifest",
+        "tags": [
+          "人物关系图"
+        ]
+      }
+    },
+    "/api/relationships/{novel_id}/projection/replay": {
+      "post": {
+        "description": "Optional one-way projection replay; disabled by default.",
+        "operationId": "replay_projection_api_relationships__novel_id__projection_replay_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "novel_id",
+            "required": true,
+            "schema": {
+              "title": "Novel Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "exclusiveMinimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Version Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "source",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/RelationshipVersionSource",
+              "default": "active"
+            }
+          },
+          {
+            "in": "query",
+            "name": "enabled",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Enabled",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Replay Projection Api Relationships  Novel Id  Projection Replay Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Replay Projection",
+        "tags": [
+          "人物关系图"
+        ]
+      }
+    },
     "/api/search": {
       "post": {
         "description": "全局混合搜索（跨所有小说）。\n\n需要认证。",
@@ -5375,18 +10825,97 @@
         ]
       }
     },
-    "/api/timeline/events/{event_id}": {
-      "delete": {
-        "description": "删除时间线事件",
-        "operationId": "delete_event_api_timeline_events__event_id__delete",
+    "/api/timeline/{novel_id}": {
+      "get": {
+        "operationId": "get_timeline_api_timeline__novel_id__get",
         "parameters": [
           {
             "in": "path",
-            "name": "event_id",
+            "name": "novel_id",
             "required": true,
             "schema": {
-              "title": "Event Id",
-              "type": "string"
+              "title": "Novel Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ordering",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/TimelineOrdering",
+              "default": "narrative"
+            }
+          },
+          {
+            "in": "query",
+            "name": "person",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Person"
+            }
+          },
+          {
+            "in": "query",
+            "name": "causal",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Causal",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "full_book",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Full Book",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "chapter_start",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Chapter Start"
+            }
+          },
+          {
+            "in": "query",
+            "name": "chapter_end",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Chapter End"
             }
           }
         ],
@@ -5394,7 +10923,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/TimelineEnvelope"
+                }
               }
             },
             "description": "Successful Response"
@@ -5415,22 +10946,79 @@
             "HTTPBearer": []
           }
         ],
-        "summary": "Delete Event",
+        "summary": "Get Timeline",
         "tags": [
           "时间线"
         ]
-      },
-      "put": {
-        "description": "更新时间线事件（手动编辑）",
-        "operationId": "update_event_api_timeline_events__event_id__put",
+      }
+    },
+    "/api/timeline/{novel_id}/cancel": {
+      "post": {
+        "operationId": "cancel_api_timeline__novel_id__cancel_post",
         "parameters": [
           {
             "in": "path",
-            "name": "event_id",
+            "name": "novel_id",
             "required": true,
             "schema": {
-              "title": "Event Id",
+              "title": "Novel Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimelineRunResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Cancel",
+        "tags": [
+          "时间线"
+        ]
+      }
+    },
+    "/api/timeline/{novel_id}/events/{logical_event_id}": {
+      "put": {
+        "operationId": "edit_event_api_timeline__novel_id__events__logical_event_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "logical_event_id",
+            "required": true,
+            "schema": {
+              "title": "Logical Event Id",
               "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "novel_id",
+            "required": true,
+            "schema": {
+              "title": "Novel Id",
+              "type": "integer"
             }
           }
         ],
@@ -5438,9 +11026,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "additionalProperties": true,
-                "title": "Data",
-                "type": "object"
+                "$ref": "#/components/schemas/TimelineEditRequest"
               }
             }
           },
@@ -5471,53 +11057,7 @@
             "HTTPBearer": []
           }
         ],
-        "summary": "Update Event",
-        "tags": [
-          "时间线"
-        ]
-      }
-    },
-    "/api/timeline/{novel_id}": {
-      "get": {
-        "description": "获取小说时间线（事件列表，按 sort_order 排序）",
-        "operationId": "get_timeline_api_timeline__novel_id__get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "novel_id",
-            "required": true,
-            "schema": {
-              "title": "Novel Id",
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Get Timeline",
+        "summary": "Edit Event",
         "tags": [
           "时间线"
         ]
@@ -5525,7 +11065,6 @@
     },
     "/api/timeline/{novel_id}/extract": {
       "post": {
-        "description": "AI 自动提取时间线事件（LLM 从全文抽取事件 + 因果链）",
         "operationId": "extract_timeline_api_timeline__novel_id__extract_post",
         "parameters": [
           {
@@ -5542,7 +11081,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/TimelineRunResponse"
+                }
               }
             },
             "description": "Successful Response"
@@ -5567,6 +11108,412 @@
         "tags": [
           "时间线"
         ]
+      }
+    },
+    "/api/timeline/{novel_id}/preference": {
+      "put": {
+        "operationId": "set_preference_api_timeline__novel_id__preference_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "novel_id",
+            "required": true,
+            "schema": {
+              "title": "Novel Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TimelinePreferenceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Set Preference",
+        "tags": [
+          "时间线"
+        ]
+      }
+    },
+    "/api/timeline/{novel_id}/resume": {
+      "post": {
+        "operationId": "resume_api_timeline__novel_id__resume_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "novel_id",
+            "required": true,
+            "schema": {
+              "title": "Novel Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimelineRunResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Resume",
+        "tags": [
+          "时间线"
+        ]
+      }
+    },
+    "/api/timeline/{novel_id}/rollback": {
+      "post": {
+        "operationId": "rollback_api_timeline__novel_id__rollback_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "novel_id",
+            "required": true,
+            "schema": {
+              "title": "Novel Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TimelineRollbackRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Rollback",
+        "tags": [
+          "时间线"
+        ]
+      }
+    },
+    "/api/timeline/{novel_id}/start-or-resume": {
+      "post": {
+        "description": "启动或恢复时间线深度分析（Phase 08）。\n\n编排（对齐 D-12 / REQ-TIME-03）:\n  1. 确保 Phase 07 active hierarchy 存在（结构底座服务时间线）\n  2. 幂等创建/恢复 durable analysis run\n  3. 后台 worker 按章抽取 → 调和 → 晋升",
+        "operationId": "start_or_resume_api_timeline__novel_id__start_or_resume_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "novel_id",
+            "required": true,
+            "schema": {
+              "title": "Novel Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimelineRunResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Start Or Resume",
+        "tags": [
+          "时间线"
+        ]
+      }
+    },
+    "/api/timeline/{novel_id}/status": {
+      "get": {
+        "operationId": "status_api_timeline__novel_id__status_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "novel_id",
+            "required": true,
+            "schema": {
+              "title": "Novel Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimelineRunResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Status",
+        "tags": [
+          "时间线"
+        ]
+      }
+    },
+    "/api/timeline/{novel_id}/versions/{version_id}": {
+      "get": {
+        "operationId": "get_version_api_timeline__novel_id__versions__version_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "version_id",
+            "required": true,
+            "schema": {
+              "title": "Version Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "novel_id",
+            "required": true,
+            "schema": {
+              "title": "Novel Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ordering",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/TimelineOrdering",
+              "default": "narrative"
+            }
+          },
+          {
+            "in": "query",
+            "name": "person",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Person"
+            }
+          },
+          {
+            "in": "query",
+            "name": "causal",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Causal",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "full_book",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Full Book",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "chapter_start",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Chapter Start"
+            }
+          },
+          {
+            "in": "query",
+            "name": "chapter_end",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Chapter End"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimelineVersionView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Version",
+        "tags": [
+          "时间线"
+        ]
+      }
+    },
+    "/api/contract-fixture/ping": {
+      "get": {
+        "summary": "Contract fixture ping",
+        "operationId": "contract_fixture_ping",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
       }
     }
   }

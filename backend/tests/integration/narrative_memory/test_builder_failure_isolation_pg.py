@@ -71,9 +71,7 @@ async def test_resume_preserves_completed_sibling_artifacts(builder_env) -> None
             )
         ).all()
         completed = {
-            s.stage_key: s.artifact_checksum
-            for s in stages
-            if s.status == "completed"
+            s.stage_key: s.artifact_checksum for s in stages if s.status == "completed"
         }
         assert completed
         nodes_before = (

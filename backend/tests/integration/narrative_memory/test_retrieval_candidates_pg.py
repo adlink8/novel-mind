@@ -140,7 +140,9 @@ def _seed_eligible_candidate(engine, *, cutoff_chapters: int = 2) -> dict:
             {"o": owner_id, "n": novel_id, "h": HEX_A},
         ).scalar_one()
 
-        def add_node(key: str, kind: str, start: int, end: int, label: str | None = None) -> int:
+        def add_node(
+            key: str, kind: str, start: int, end: int, label: str | None = None
+        ) -> int:
             return conn.execute(
                 text(
                     """
@@ -508,7 +510,9 @@ async def test_distinct_routes_load_distinct_start_levels(ret_pg):
         policy_hash=ROUTING_POLICY_HASH,
     )
 
-    q_local = build_question("这章角色是谁", selected_chapter=1, selected_start=0, selected_end=2)
+    q_local = build_question(
+        "这章角色是谁", selected_chapter=1, selected_start=0, selected_end=2
+    )
     q_arc = build_question("跨章因果是什么")
     q_mixed = build_question("随便问问剧情")
 
@@ -567,7 +571,9 @@ async def test_future_and_foreign_rows_do_not_affect_serialized_output(ret_pg):
                 "nodes": [c.model_dump(mode="json") for c in visible.nodes],
                 "claims": [c.model_dump(mode="json") for c in visible.claims],
                 "links": [c.model_dump(mode="json") for c in visible.source_links],
-                "cache": visible.cache.model_dump(mode="json") if visible.cache else None,
+                "cache": visible.cache.model_dump(mode="json")
+                if visible.cache
+                else None,
             },
             ensure_ascii=False,
             sort_keys=True,

@@ -109,7 +109,9 @@ class ClueCandidateRecallService:
         *,
         relationship_source: VersionedRelationshipObservationSource | None = None,
     ) -> None:
-        self._relationship_source = relationship_source or NullRelationshipObservationSource()
+        self._relationship_source = (
+            relationship_source or NullRelationshipObservationSource()
+        )
 
     async def build_candidates_from_nodes(
         self,
@@ -179,12 +181,6 @@ class ClueCandidateRecallService:
         """Deterministic draft construction (no I/O)."""
 
         cfg = config or CandidateRecallConfig()
-        evidence_nodes = [
-            n
-            for n in nodes
-            if n.level in {"evidence", "scene", "paragraph", "chunk"}
-            or n.level == "evidence"
-        ]
         # Prefer evidence-level; fall back to all nodes with valid offsets.
         preferred = [n for n in nodes if n.level == "evidence"]
         working = preferred or [
@@ -205,7 +201,9 @@ class ClueCandidateRecallService:
         scores = dict(vector_scores or {})
         timeline_events = list(timeline_events or [])
         rel_signals = (
-            relationship_result.recall_signals() if relationship_result is not None else {}
+            relationship_result.recall_signals()
+            if relationship_result is not None
+            else {}
         )
 
         pairs = self._enumerate_cross_chapter_pairs(ordered, cfg)
@@ -247,9 +245,15 @@ class ClueCandidateRecallService:
                 gap = later_node.narrative_chapter_number - cue.narrative_chapter_number
                 if gap < cfg.min_chapter_gap:
                     # Same chapter or earlier narrative position: not later window.
-                    if later_node.narrative_chapter_number < cue.narrative_chapter_number:
+                    if (
+                        later_node.narrative_chapter_number
+                        < cue.narrative_chapter_number
+                    ):
                         continue
-                    if later_node.narrative_chapter_number == cue.narrative_chapter_number:
+                    if (
+                        later_node.narrative_chapter_number
+                        == cue.narrative_chapter_number
+                    ):
                         if later_node.source_start <= cue.source_start:
                             continue
                         # Same-chapter later offsets allowed only when min_gap is 0.
@@ -320,7 +324,9 @@ class ClueCandidateRecallService:
                 )
                 reason_codes.append("entity_overlap")
 
-            chapter_gap = node.narrative_chapter_number - cue_node.narrative_chapter_number
+            chapter_gap = (
+                node.narrative_chapter_number - cue_node.narrative_chapter_number
+            )
             if 0 <= chapter_gap <= config.adjacency_chapter_window:
                 score += max(0.05, 0.2 - 0.02 * chapter_gap)
                 adjacency_hits.append(
@@ -354,13 +360,10 @@ class ClueCandidateRecallService:
         # Timeline optional signal.
         timeline_hits = []
         for ev in timeline_events:
-            if (
-                ev.narrative_chapter_number >= cue_node.narrative_chapter_number
-                and any(
-                    u.chapter_id == ev.chapter_id
-                    or abs(u.narrative_chapter_number - ev.narrative_chapter_number) <= 1
-                    for u in later_units
-                )
+            if ev.narrative_chapter_number >= cue_node.narrative_chapter_number and any(
+                u.chapter_id == ev.chapter_id
+                or abs(u.narrative_chapter_number - ev.narrative_chapter_number) <= 1
+                for u in later_units
             ):
                 timeline_hits.append(
                     {

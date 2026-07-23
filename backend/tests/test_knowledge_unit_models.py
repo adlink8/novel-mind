@@ -29,8 +29,11 @@ from app.models.user import User
 from app.schemas.knowledge_unit import NarrativeUnitCreate
 
 
-MIGRATION_PATH = Path(__file__).parents[1] / "migrations" / "versions" / (
-    "d4a7f19c2b61_create_narrative_unit_truth_tables.py"
+MIGRATION_PATH = (
+    Path(__file__).parents[1]
+    / "migrations"
+    / "versions"
+    / ("d4a7f19c2b61_create_narrative_unit_truth_tables.py")
 )
 
 
@@ -38,7 +41,13 @@ async def _accepted_lineage(
     db: AsyncSession,
     *,
     username: str,
-) -> tuple[User, Novel, KnowledgeRelationCandidate, KnowledgeRelationJudgment, KnowledgeEvidenceRef]:
+) -> tuple[
+    User,
+    Novel,
+    KnowledgeRelationCandidate,
+    KnowledgeRelationJudgment,
+    KnowledgeEvidenceRef,
+]:
     user = User(
         username=username,
         email=f"{username}@example.com",
@@ -142,7 +151,9 @@ def test_metadata_exposes_all_postgres_truth_contracts() -> None:
 
 def test_migration_has_scoped_lineage_and_required_indexes() -> None:
     migration = MIGRATION_PATH.read_text(encoding="utf-8")
-    assert 'down_revision: Union[str, Sequence[str], None] = "7bbf6b6c0d24"' in migration
+    assert (
+        'down_revision: Union[str, Sequence[str], None] = "7bbf6b6c0d24"' in migration
+    )
     assert "fk_snapshot_items_judgment_scope" in migration
     assert "fk_narrative_units_primary_evidence_scope" in migration
     assert "uq_narrative_snapshot_judgment" in migration

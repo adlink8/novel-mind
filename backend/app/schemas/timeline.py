@@ -58,21 +58,43 @@ class StoryTime(StrictTimelineModel):
     def validate_precision_shape(self) -> "StoryTime":
         if self.precision == TimePrecision.EXACT:
             if self.expression is None or self.exact_time is None:
-                raise ValueError("exact time requires an explicit expression and exact_time")
-            forbidden = (self.anchor_event_id, self.relation, self.fuzzy_start, self.fuzzy_end)
+                raise ValueError(
+                    "exact time requires an explicit expression and exact_time"
+                )
+            forbidden = (
+                self.anchor_event_id,
+                self.relation,
+                self.fuzzy_start,
+                self.fuzzy_end,
+            )
         elif self.precision == TimePrecision.RELATIVE:
-            if self.expression is None or self.anchor_event_id is None or self.relation is None:
-                raise ValueError("relative time requires expression, anchor_event_id, and relation")
+            if (
+                self.expression is None
+                or self.anchor_event_id is None
+                or self.relation is None
+            ):
+                raise ValueError(
+                    "relative time requires expression, anchor_event_id, and relation"
+                )
             forbidden = (self.exact_time, self.fuzzy_start, self.fuzzy_end)
         elif self.precision == TimePrecision.FUZZY:
             if self.expression is None:
                 raise ValueError("fuzzy time requires an explicit source expression")
-            if self.fuzzy_start and self.fuzzy_end and self.fuzzy_end < self.fuzzy_start:
+            if (
+                self.fuzzy_start
+                and self.fuzzy_end
+                and self.fuzzy_end < self.fuzzy_start
+            ):
                 raise ValueError("fuzzy_end must not precede fuzzy_start")
             forbidden = (self.exact_time, self.anchor_event_id, self.relation)
         else:
-            forbidden = (self.exact_time, self.anchor_event_id, self.relation,
-                         self.fuzzy_start, self.fuzzy_end)
+            forbidden = (
+                self.exact_time,
+                self.anchor_event_id,
+                self.relation,
+                self.fuzzy_start,
+                self.fuzzy_end,
+            )
         if any(value is not None for value in forbidden):
             raise ValueError(f"fields do not match {self.precision} precision")
         return self

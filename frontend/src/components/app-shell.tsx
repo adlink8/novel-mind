@@ -49,6 +49,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate nav state from localStorage
     setNavCollapsed(loadNavCollapsed());
     setHydrated(true);
   }, []);
@@ -78,21 +79,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         data-testid="app-shell-nav"
         data-collapsed={navCollapsed ? "true" : "false"}
         className={cn(
-          "fixed inset-y-4 left-4 z-40 hidden flex-col overflow-hidden rounded-[28px] border border-border/70 bg-sidebar/90 p-3 shadow-[0_24px_70px_-30px_rgba(38,31,24,0.38)] backdrop-blur-xl transition-[width,box-shadow] motion-duration-spatial motion-ease-enter lg:flex",
-          navCollapsed ? "w-[4.5rem]" : "w-60",
+          "fixed inset-y-4 left-4 z-40 hidden flex-col overflow-hidden rounded-[28px] border border-border/70 bg-sidebar/90 p-3 shadow-[0_24px_70px_-30px_rgba(38,31,24,0.38)] backdrop-blur-xl transition-[width,box-shadow] motion-duration-spatial motion-ease-enter md:flex",
+          // 平板（md–lg）恒为图标轨；桌面（lg+）按用户偏好展开/收起
+          navCollapsed ? "w-[4.5rem]" : "w-[4.5rem] lg:w-60",
         )}
       >
         <div
           className={cn(
             "flex items-center gap-2",
-            navCollapsed ? "flex-col" : "justify-between",
+            navCollapsed ? "flex-col" : "flex-col lg:flex-row lg:justify-between",
           )}
         >
           <Link
             href="/"
             className={cn(
               "flex min-w-0 items-center gap-3 rounded-2xl py-2",
-              navCollapsed ? "px-0" : "px-3",
+              navCollapsed ? "px-0" : "px-0 lg:px-3",
             )}
             title="NovelMind"
           >
@@ -100,7 +102,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <BookOpenText className="size-5" />
             </span>
             {!navCollapsed ? (
-              <span className="min-w-0">
+              <span className="hidden min-w-0 lg:block">
                 <span className="block font-serif text-xl font-semibold tracking-tight">
                   NovelMind
                 </span>
@@ -115,7 +117,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             data-testid="app-shell-nav-toggle"
             aria-label={navCollapsed ? "展开工作台导航" : "收起工作台导航"}
             aria-expanded={!navCollapsed}
-            className="grid size-9 shrink-0 place-items-center rounded-xl text-muted-foreground transition-colors hover:bg-card/80 hover:text-foreground"
+            className="hidden size-9 shrink-0 place-items-center rounded-xl text-muted-foreground transition-colors hover:bg-card/80 hover:text-foreground lg:grid"
             onClick={toggleNav}
           >
             {navCollapsed ? (
@@ -138,7 +140,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 title={item.label}
                 className={cn(
                   "group flex items-center gap-3 rounded-2xl py-2.5 text-sm font-medium transition-[color,background-color,box-shadow] motion-duration-standard motion-ease-enter",
-                  navCollapsed ? "justify-center px-2" : "px-3",
+                  navCollapsed ? "justify-center px-2" : "justify-center px-2 lg:justify-start lg:px-3",
                   active
                     ? "bg-foreground text-background shadow-sm"
                     : "text-muted-foreground hover:bg-card/75 hover:text-foreground",
@@ -147,9 +149,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <Icon className="size-[18px] shrink-0" strokeWidth={active ? 2.2 : 1.8} />
                 {!navCollapsed ? (
                   <>
-                    <span>{item.label}</span>
+                    <span className="hidden lg:inline">{item.label}</span>
                     {active ? (
-                      <span className="ml-auto size-1.5 rounded-full bg-primary" />
+                      <span className="ml-auto hidden size-1.5 rounded-full bg-primary lg:block" />
                     ) : null}
                   </>
                 ) : (
@@ -161,7 +163,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </nav>
 
         {!navCollapsed ? (
-          <div className="mt-auto rounded-2xl border border-border/70 bg-card/65 p-4">
+          <div className="mt-auto hidden rounded-2xl border border-border/70 bg-card/65 p-4 lg:block">
             <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
               <Sparkles className="size-3.5 text-primary" />
               AI workspace
@@ -177,7 +179,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         )}
       </aside>
 
-      <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border/70 bg-background/85 px-4 backdrop-blur-xl lg:hidden">
+      <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border/70 bg-background/85 px-4 backdrop-blur-xl md:hidden">
         <Link href="/" className="flex items-center gap-2.5">
           <span className="grid size-9 place-items-center rounded-xl bg-foreground text-background">
             <BookOpenText className="size-4" />
@@ -186,7 +188,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </Link>
         <Link
           href="/search"
-          className="grid size-10 place-items-center rounded-full border bg-card"
+          className="grid size-11 place-items-center rounded-full border bg-card"
           aria-label="搜索"
         >
           <Search className="size-4" />
@@ -199,9 +201,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           "transition-[margin] motion-duration-spatial motion-ease-enter",
           // Analysis workbench fills the viewport; other pages keep classic scroll + mobile bottom-nav pad
           pathname.startsWith("/analysis")
-            ? "h-[calc(100dvh-4rem)] overflow-hidden pb-0 lg:h-dvh"
-            : "min-h-screen pb-24 lg:pb-0",
-          navCollapsed ? "lg:ml-[5.75rem]" : "lg:ml-[276px]",
+            ? "h-[calc(100dvh-4rem)] overflow-hidden pb-[calc(4.75rem_+_env(safe-area-inset-bottom))] md:h-dvh md:pb-0"
+            : "min-h-screen pb-24 md:pb-0",
+          navCollapsed ? "md:ml-[5.75rem]" : "md:ml-[5.75rem] lg:ml-[276px]",
         )}
       >
         {children}
@@ -209,7 +211,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <nav
         aria-label="移动导航"
-        className="fixed inset-x-3 bottom-3 z-50 grid grid-cols-6 rounded-[22px] border border-border/70 bg-sidebar/95 p-1.5 shadow-[0_18px_50px_-22px_rgba(38,31,24,0.65)] backdrop-blur-xl lg:hidden"
+        className="fixed inset-x-3 bottom-[calc(0.75rem_+_env(safe-area-inset-bottom))] z-50 grid grid-cols-6 rounded-[22px] border border-border/70 bg-sidebar/95 p-1.5 shadow-[0_18px_50px_-22px_rgba(38,31,24,0.65)] backdrop-blur-xl md:hidden"
       >
         {navigation.map((item) => {
           const active = isActive(pathname, item.href);

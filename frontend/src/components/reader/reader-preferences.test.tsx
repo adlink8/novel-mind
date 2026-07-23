@@ -62,6 +62,20 @@ describe("reader preferences", () => {
     });
   });
 
+  it("persists typography preferences within bounded ranges", () => {
+    saveReaderPreferences({
+      ...DEFAULT_READER_PREFERENCES,
+      fontSize: 30,
+      lineHeight: 9,
+      contentWidth: 10,
+    });
+    expect(loadReaderPreferences()).toMatchObject({
+      fontSize: 24,
+      lineHeight: 2.6,
+      contentWidth: 600,
+    });
+  });
+
   it("enables long-page auto scroll and custom background controls", () => {
     render(<Harness />);
 
@@ -86,6 +100,19 @@ describe("reader preferences", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "自定义" }));
     expect(screen.getByLabelText("自定义阅读背景")).toBeInTheDocument();
+  });
+
+  it("exposes typography sliders and a follow-system theme option", () => {
+    render(<Harness />);
+    expect(screen.getByLabelText("正文字号")).toBeInTheDocument();
+    expect(screen.getByLabelText("正文行距")).toBeInTheDocument();
+    expect(screen.getByLabelText("正文行宽")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "系统" }));
+    expect(screen.getByRole("button", { name: "系统" })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
   });
 
   it("offers an explicit immersive mode exit path", async () => {

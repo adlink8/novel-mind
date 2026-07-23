@@ -145,7 +145,9 @@ async def test_knowledge_endpoints_require_authentication(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_knowledge_run_start_and_review_flow(client: AsyncClient, db_session: AsyncSession):
+async def test_knowledge_run_start_and_review_flow(
+    client: AsyncClient, db_session: AsyncSession
+):
     await _register_and_login(client, "kgapiowner")
     owner = await _user(db_session, "kgapiowner")
     novel, run, _, judgment = await _create_knowledge_records(db_session, owner)
@@ -163,8 +165,12 @@ async def test_knowledge_run_start_and_review_flow(client: AsyncClient, db_sessi
     assert response.json()["owner_id"] == owner.id
 
     assert len((await client.get("/api/knowledge/runs")).json()) == 2
-    assert len((await client.get(f"/api/knowledge/runs/{run.id}/candidates")).json()) == 1
-    assert len((await client.get(f"/api/knowledge/runs/{run.id}/judgments")).json()) == 1
+    assert (
+        len((await client.get(f"/api/knowledge/runs/{run.id}/candidates")).json()) == 1
+    )
+    assert (
+        len((await client.get(f"/api/knowledge/runs/{run.id}/judgments")).json()) == 1
+    )
 
     response = await client.post(f"/api/knowledge/runs/{run.id}/gate")
     assert response.status_code == 200
@@ -201,12 +207,8 @@ async def test_knowledge_resources_are_isolated_by_owner(
     assert (
         await client.get(f"/api/knowledge/runs/{run.id}/judgments")
     ).status_code == 404
-    assert (
-        await client.get(f"/api/knowledge/runs/{run.id}/review")
-    ).status_code == 404
-    assert (
-        await client.post(f"/api/knowledge/runs/{run.id}/gate")
-    ).status_code == 404
+    assert (await client.get(f"/api/knowledge/runs/{run.id}/review")).status_code == 404
+    assert (await client.post(f"/api/knowledge/runs/{run.id}/gate")).status_code == 404
     assert (
         await client.post(f"/api/knowledge/judgments/{judgment.id}/accept")
     ).status_code == 404

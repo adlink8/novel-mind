@@ -92,7 +92,9 @@ async def _source_context(
         source_type=evidence_source_type,
         text_chunk_id=chunk.id if evidence_source_type == "text_chunk" else None,
         chapter_id=chapter.id if evidence_source_type != "accepted_relation" else None,
-        accepted_relation_id=99 if evidence_source_type == "accepted_relation" else None,
+        accepted_relation_id=99
+        if evidence_source_type == "accepted_relation"
+        else None,
         excerpt="刘备与关羽结义",
         source_locator={"chapter": 1},
     )
@@ -136,7 +138,9 @@ async def _source_context(
 
 
 @pytest.mark.asyncio
-async def test_same_accepted_set_returns_same_snapshot(db_session: AsyncSession) -> None:
+async def test_same_accepted_set_returns_same_snapshot(
+    db_session: AsyncSession,
+) -> None:
     user, novel, _, _, _, _ = await _source_context(db_session)
     first = await source_snapshot_service.create_snapshot(
         db_session,
@@ -225,12 +229,16 @@ async def test_owner_scope_does_not_mix_accepted_sets(db_session: AsyncSession) 
         domain_profile="fiction",
     )
     items = (
-        await db_session.execute(
-            select(NarrativeSourceSnapshotItem).where(
-                NarrativeSourceSnapshotItem.snapshot_id == snapshot.id
+        (
+            await db_session.execute(
+                select(NarrativeSourceSnapshotItem).where(
+                    NarrativeSourceSnapshotItem.snapshot_id == snapshot.id
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     assert len(items) == 1
     assert all(item.owner_id == user_a.id for item in items)
 

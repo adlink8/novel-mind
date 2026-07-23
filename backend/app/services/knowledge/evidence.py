@@ -75,11 +75,15 @@ def build_evidence_package(
         raise ValueError(f"Unsupported domain_profile: {domain_profile}")
 
     ontology = ontology_profile or f"{domain_profile}.v1"
-    evidence = [_chunk_to_evidence_item(chunk, max_excerpt_chars) for chunk in evidence_chunks]
+    evidence = [
+        _chunk_to_evidence_item(chunk, max_excerpt_chars) for chunk in evidence_chunks
+    ]
     allowed_evidence_ids = [item["evidence_id"] for item in evidence]
 
     candidate_payload = {
-        "candidate_id": int(getattr(candidate, "candidate_id", getattr(candidate, "id", 0))),
+        "candidate_id": int(
+            getattr(candidate, "candidate_id", getattr(candidate, "id", 0))
+        ),
         "relation_type": getattr(candidate, "relation_type", ""),
         "source": {
             "kind": getattr(candidate, "source_kind", "text_chunk"),
@@ -97,7 +101,9 @@ def build_evidence_package(
         "package_version": EVIDENCE_PACKAGE_VERSION,
         "domain_profile": domain_profile,
         "ontology_profile": ontology,
-        "allowed_relation_types": list(RELATION_TYPES_BY_DOMAIN_PROFILE[domain_profile]),
+        "allowed_relation_types": list(
+            RELATION_TYPES_BY_DOMAIN_PROFILE[domain_profile]
+        ),
         "allowed_evidence_ids": allowed_evidence_ids,
         "candidate": candidate_payload,
         "evidence": evidence,

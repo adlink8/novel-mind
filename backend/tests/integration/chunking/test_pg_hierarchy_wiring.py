@@ -21,7 +21,9 @@ from app.services.hybrid_search import HybridSearchService
 pytestmark = pytest.mark.integration
 
 
-async def _seed_novel(db: AsyncSession, name: str = "hier") -> tuple[User, Novel, list[Chapter]]:
+async def _seed_novel(
+    db: AsyncSession, name: str = "hier"
+) -> tuple[User, Novel, list[Chapter]]:
     user = User(username=name, email=f"{name}@test.com", hashed_password="hash")
     db.add(user)
     await db.flush()
@@ -50,7 +52,11 @@ async def _seed_novel(db: AsyncSession, name: str = "hier") -> tuple[User, Novel
     idx = 0
     for ch in chapters:
         # simple split for matching evidence
-        parts = [ch.content[j : j + 80] for j in range(0, len(ch.content), 80) if ch.content[j : j + 80].strip()]
+        parts = [
+            ch.content[j : j + 80]
+            for j in range(0, len(ch.content), 80)
+            if ch.content[j : j + 80].strip()
+        ]
         for p in parts[:6]:
             db.add(
                 TextChunk(
@@ -102,21 +108,29 @@ async def test_persist_hierarchy_sets_active_and_nodes(db_session: AsyncSession)
     assert ptr.build_id == rec.build_id
 
     builds = (
-        await db_session.execute(
-            select(ChunkBuild).where(ChunkBuild.novel_id == novel.id)
+        (
+            await db_session.execute(
+                select(ChunkBuild).where(ChunkBuild.novel_id == novel.id)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     assert len(builds) == 1
     assert builds[0].status == "committed"
     assert builds[0].is_candidate is False
 
     nodes = (
-        await db_session.execute(
-            select(ChunkHierarchyNode).where(
-                ChunkHierarchyNode.build_id == rec.build_id
+        (
+            await db_session.execute(
+                select(ChunkHierarchyNode).where(
+                    ChunkHierarchyNode.build_id == rec.build_id
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     levels = {n.level for n in nodes}
     assert "chapter" in levels
     assert "scene" in levels
@@ -140,13 +154,17 @@ async def test_scene_expand_and_raw_fallback(db_session: AsyncSession):
     await db_session.commit()
 
     ev = (
-        await db_session.execute(
-            select(ChunkHierarchyNode).where(
-                ChunkHierarchyNode.build_id == rec.build_id,
-                ChunkHierarchyNode.level == "evidence",
+        (
+            await db_session.execute(
+                select(ChunkHierarchyNode).where(
+                    ChunkHierarchyNode.build_id == rec.build_id,
+                    ChunkHierarchyNode.level == "evidence",
+                )
             )
         )
-    ).scalars().first()
+        .scalars()
+        .first()
+    )
     assert ev is not None
     packed = await get_scene_for_evidence(
         db_session, novel_id=novel.id, evidence_node_id=ev.node_id
@@ -186,13 +204,17 @@ async def test_hybrid_enrich_uses_hierarchy_when_linked(db_session: AsyncSession
 
     # Find a linked text chunk if any
     chunk = (
-        await db_session.execute(
-            select(TextChunk).where(
-                TextChunk.novel_id == novel.id,
-                TextChunk.hierarchy_node_id.is_not(None),
+        (
+            await db_session.execute(
+                select(TextChunk).where(
+                    TextChunk.novel_id == novel.id,
+                    TextChunk.hierarchy_node_id.is_not(None),
+                )
             )
         )
-    ).scalars().first()
+        .scalars()
+        .first()
+    )
 
     svc = HybridSearchService()
     if chunk is None:

@@ -43,9 +43,7 @@ async def get_versions(
     """List candidate NM versions for an owned novel (no default active pick)."""
 
     try:
-        return await list_versions(
-            db, owner_id=current_user.id, novel_id=novel.id
-        )
+        return await list_versions(db, owner_id=current_user.id, novel_id=novel.id)
     except StructureQueryError as exc:
         raise _map_error(exc) from exc
 

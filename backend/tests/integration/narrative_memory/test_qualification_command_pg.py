@@ -46,9 +46,10 @@ def test_dry_run_qualified_exit_0():
     assert payload["verdict"] in ("qualified_candidate", "blocked")
     assert "output_digest" in payload
     assert len(payload["output_digest"]) == 64
-    assert "Does not promote" in payload["disclaimer"] or "promote" in payload[
-        "disclaimer"
-    ].lower()
+    assert (
+        "Does not promote" in payload["disclaimer"]
+        or "promote" in payload["disclaimer"].lower()
+    )
     # self-excluding digest
     body = {k: v for k, v in payload.items() if k != "output_digest"}
     from app.services.narrative_memory.qualification_contracts import stable_checksum

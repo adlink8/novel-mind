@@ -33,7 +33,6 @@ from app.services.rag_quality import (
     context_recall_at_k,
     default_healthy,
     default_stub_answer,
-    default_stub_answer_judge,
     default_stub_retrieve,
     load_policy,
     make_baseline_from_metrics,
@@ -102,7 +101,9 @@ def test_benchmark_fixtures_verify():
     snap, cases = _load_benchmark()
     assert verify_source_snapshot(snap, SECRET)
     assert all(verify_frozen_case(c, SECRET) for c in cases)
-    assert validate_fixtures_for_scoring(snapshot=snap, cases=cases, secret=SECRET) is None
+    assert (
+        validate_fixtures_for_scoring(snapshot=snap, cases=cases, secret=SECRET) is None
+    )
 
 
 def test_context_precision_and_recall_deterministic():
@@ -438,7 +439,11 @@ def test_invalid_calibration_blocks_run():
         generator_lineage=g,
         judge_lineage=j,
         calibration_report=bad_cal,
-        baseline={"context_recall_at_5_mean": 1.0, "answer_relevance_mean": 1.0, "cost_usd_total": 1.0},
+        baseline={
+            "context_recall_at_5_mean": 1.0,
+            "answer_relevance_mean": 1.0,
+            "cost_usd_total": 1.0,
+        },
         health=default_healthy(),
         secret=SECRET,
     )
@@ -461,7 +466,11 @@ def test_blocked_dependency_never_fake_pass():
         generator_lineage=g,
         judge_lineage=j,
         calibration_report=cal,
-        baseline={"context_recall_at_5_mean": 1.0, "answer_relevance_mean": 1.0, "cost_usd_total": 1.0},
+        baseline={
+            "context_recall_at_5_mean": 1.0,
+            "answer_relevance_mean": 1.0,
+            "cost_usd_total": 1.0,
+        },
         health=default_healthy(),
         secret=SECRET,
         retrieve_fn=boom_retrieve,
@@ -481,7 +490,11 @@ def test_unhealthy_probe_blocks():
         generator_lineage=g,
         judge_lineage=j,
         calibration_report=cal,
-        baseline={"context_recall_at_5_mean": 1.0, "answer_relevance_mean": 1.0, "cost_usd_total": 1.0},
+        baseline={
+            "context_recall_at_5_mean": 1.0,
+            "answer_relevance_mean": 1.0,
+            "cost_usd_total": 1.0,
+        },
         health={"ok": False, "reason": "ollama down"},
         secret=SECRET,
     )
@@ -503,7 +516,11 @@ def test_exception_not_swallowed_as_zero_scores():
         generator_lineage=g,
         judge_lineage=j,
         calibration_report=cal,
-        baseline={"context_recall_at_5_mean": 1.0, "answer_relevance_mean": 1.0, "cost_usd_total": 1.0},
+        baseline={
+            "context_recall_at_5_mean": 1.0,
+            "answer_relevance_mean": 1.0,
+            "cost_usd_total": 1.0,
+        },
         health=default_healthy(),
         secret=SECRET,
         answer_fn=bad_answer,
@@ -563,7 +580,12 @@ def test_idempotent_stage_cache_no_duplicate_calls():
         run_input_hash=r1.get("input_hash"),
     )
     assert calls["n"] == n_first  # no new answer calls
-    assert r2["status"] in {"passed", "qualified", "quality_regression", "failed_policy"}
+    assert r2["status"] in {
+        "passed",
+        "qualified",
+        "quality_regression",
+        "failed_policy",
+    }
 
 
 def test_validate_lineage_requires_matching_revision():
@@ -624,7 +646,11 @@ def _chunker(snap: SourceSnapshot, name: str, version: str, **cfg) -> ChunkerLin
         chunker_config=config,
         chunker_config_hash=recompute_chunker_config_hash(config),
         chunk_manifest_hash=stable_hash(
-            {"chunks": [c.content_hash for c in snap.chunks], "chunker": name, "v": version}
+            {
+                "chunks": [c.content_hash for c in snap.chunks],
+                "chunker": name,
+                "v": version,
+            }
         ),
         source_snapshot_hash=snap.manifest_hash,
     )

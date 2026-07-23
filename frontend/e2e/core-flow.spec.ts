@@ -32,7 +32,7 @@ test.describe("core success flow", () => {
 
     const title = `Core_${Date.now()}`;
     const fixture = makeNovelFixture(title);
-    await page.getByRole("button", { name: /导入小说/ }).click();
+    await page.getByRole("button", { name: /批量导入|导入小说/ }).click();
 
     const fileInput = page.locator('input[type="file"]');
     await expect(fileInput).toBeAttached({ timeout: 10_000 });

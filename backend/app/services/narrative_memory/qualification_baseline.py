@@ -60,9 +60,7 @@ async def run_leaf_raw_baseline(
     """Retrieve from cutoff-visible Phase 07 evidence leaves only."""
 
     if envelope.strategy != RetrievalStrategy.LEAF_RAW_BASELINE:
-        return BaselineRetrievalResult(
-            blocked=True, block_reason="wrong_strategy"
-        )
+        return BaselineRetrievalResult(blocked=True, block_reason="wrong_strategy")
 
     common = envelope.common
     nodes = list(

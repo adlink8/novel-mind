@@ -53,10 +53,12 @@ def test_migration_round_trip_and_single_head(empty_postgres: str) -> None:
                 for frag in FORBIDDEN_FRAGMENTS:
                     assert frag not in name
         with engine.connect() as conn:
-            heads = conn.execute(
-                text("SELECT version_num FROM alembic_version")
-            ).scalars().all()
-        assert heads == ["17memqual01"]
+            heads = (
+                conn.execute(text("SELECT version_num FROM alembic_version"))
+                .scalars()
+                .all()
+            )
+        assert heads == ["18appsetting1"]
     finally:
         engine.dispose()
 

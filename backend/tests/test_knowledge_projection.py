@@ -93,7 +93,14 @@ async def _context(
     return user, novel, run
 
 
-async def _entity(db: AsyncSession, *, user: User, novel: Novel, run: KnowledgeExtractionRun, name: str):
+async def _entity(
+    db: AsyncSession,
+    *,
+    user: User,
+    novel: Novel,
+    run: KnowledgeExtractionRun,
+    name: str,
+):
     entity = KnowledgeEntityCandidate(
         owner_id=user.id,
         novel_id=novel.id,
@@ -228,9 +235,7 @@ async def test_fiction_projection_is_idempotent_for_character_relations(
     character_count = (
         await db_session.execute(select(func.count()).select_from(Character))
     ).scalar_one()
-    relation = (
-        await db_session.execute(select(CharacterRelation))
-    ).scalar_one()
+    relation = (await db_session.execute(select(CharacterRelation))).scalar_one()
 
     assert first.status == "projected"
     assert second.status == "projected"
@@ -305,10 +310,14 @@ async def test_history_projection_is_idempotent_for_timeline_events(
         await db_session.execute(select(func.count()).select_from(TimelineEvent))
     ).scalar_one()
     events = (
-        await db_session.execute(
-            select(TimelineEvent).order_by(TimelineEvent.sort_order.asc())
+        (
+            await db_session.execute(
+                select(TimelineEvent).order_by(TimelineEvent.sort_order.asc())
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     assert first.status == "projected"
     assert second.status == "projected"

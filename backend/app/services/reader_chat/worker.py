@@ -113,9 +113,7 @@ class _LiteLLMTransport:
         if isinstance(usage_obj, dict):
             usage = {
                 "prompt_tokens": int(
-                    usage_obj.get("prompt_tokens")
-                    or usage_obj.get("input_tokens")
-                    or 0
+                    usage_obj.get("prompt_tokens") or usage_obj.get("input_tokens") or 0
                 ),
                 "completion_tokens": int(
                     usage_obj.get("completion_tokens")
@@ -162,7 +160,11 @@ def resolve_reader_chat_deployment() -> ModelDeployment:
         # model_id must be the bare Vertex model name. Gateway calls
         # transport with deployment.resolved_name = f"{provider}/{model_id}".
         # Double-prefixing (vertex_google/vertex_google/...) yields HTTP 404.
-        raw = (settings.default_chat_model or settings.vertex_model or "gemini-3.5-flash").strip()
+        raw = (
+            settings.default_chat_model
+            or settings.vertex_model
+            or "gemini-3.5-flash-lite"
+        ).strip()
         for prefix in (
             "vertex_google/",
             "vertex_ai/",
@@ -173,7 +175,7 @@ def resolve_reader_chat_deployment() -> ModelDeployment:
             if raw.lower().startswith(prefix):
                 raw = raw[len(prefix) :]
                 break
-        model_id = raw or "gemini-3.5-flash"
+        model_id = raw or "gemini-3.5-flash-lite"
         return ModelDeployment(
             provider="vertex_google",
             model_id=model_id,
@@ -216,7 +218,9 @@ class _ControlledE2ETransport:
                 user_content = str(msg.get("content") or "")
                 break
         allowed: list[str] = []
-        match = re.search(r"UNTRUSTED_DATA_BEGIN\n(.*)\nUNTRUSTED_DATA_END", user_content, re.S)
+        match = re.search(
+            r"UNTRUSTED_DATA_BEGIN\n(.*)\nUNTRUSTED_DATA_END", user_content, re.S
+        )
         if match:
             try:
                 payload = json.loads(match.group(1))
@@ -259,7 +263,11 @@ class _ControlledE2ETransport:
         return {
             "id": "e2e-controlled",
             "content": content,
-            "usage": {"prompt_tokens": 100, "completion_tokens": 40, "total_tokens": 140},
+            "usage": {
+                "prompt_tokens": 100,
+                "completion_tokens": 40,
+                "total_tokens": 140,
+            },
         }
 
 
@@ -302,9 +310,7 @@ async def dispatch_reader_chat_job(job_id: int) -> None:
     try:
         await run_reader_chat_worker(job_id, runtime=production_runtime())
     except Exception:
-        _SAFE_LOG.exception(
-            "reader_chat background dispatch failed job_id=%s", job_id
-        )
+        _SAFE_LOG.exception("reader_chat background dispatch failed job_id=%s", job_id)
 
 
 async def run_reader_chat_worker(
@@ -551,8 +557,7 @@ async def _load_frozen_context(
         ]
         prompt_inputs = dict(manifest.prompt_inputs or {})
         allowed = list(
-            prompt_inputs.get("allowed_evidence_ids")
-            or [r.evidence_key for r in refs]
+            prompt_inputs.get("allowed_evidence_ids") or [r.evidence_key for r in refs]
         )
         # Dialogue framing is non-evidence (D-05).
         dialogue = list(

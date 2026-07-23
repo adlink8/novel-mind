@@ -197,13 +197,18 @@ def fixture_integrity(repo_root: Path, corpus_path: Path = DEFAULT_CORPUS) -> di
 
 
 def scope_scan(repo_root: Path) -> dict[str, Any]:
-    """Prove Phase 10/11 product contracts remain dependencies only."""
+    """Prove chat product contracts remain dependencies only.
+
+    Clue (Phase 10/11) has since shipped as a real product
+    (``app/api/clues.py``, ``app/models/clue.py``, ``app/services/clues/``),
+    so it is no longer a forbidden leak; chat/conversation products are
+    still out of scope for the relationship release gate.
+    """
     backend = repo_root / "backend" / "app"
     forbidden_globs = [
         "**/conversation*.py",
         "**/chat*.py",
         "**/message_store*.py",
-        "**/clue*.py",
         "**/foreshadow*.py",
     ]
     hits: list[str] = []
@@ -223,19 +228,16 @@ def scope_scan(repo_root: Path) -> dict[str, Any]:
                 continue
             if path.name.startswith("test_"):
                 continue
-            # Only flag if under product packages that would implement chat/clue.
+            # Only flag if under product packages that would implement chat.
             if any(
                 token in rel
                 for token in (
                     "/services/chat",
                     "/services/conversation",
-                    "/services/clue",
                     "/api/chat",
                     "/api/conversation",
-                    "/api/clue",
                     "/models/chat",
                     "/models/conversation",
-                    "/models/clue",
                 )
             ):
                 hits.append(rel)
@@ -816,6 +818,10 @@ async def seed_browser_graph(username: str) -> dict[str, Any]:
         ]
         session.add_all(chapters)
         await session.flush()
+        # 结构树/剧透上限依赖 chapter_count；非连续章号需覆盖到最大章号，
+        # 否则「显示全书」后第 9 章的沈夜Future 仍不会进入关系图
+        novel.chapter_count = max(c.chapter_number for c in chapters)
+        novel.word_count = sum(len(c.content) for c in chapters)
         novel.reading_progress = {
             "chapter_id": chapters[0].id,
             "progress_percent": 100,

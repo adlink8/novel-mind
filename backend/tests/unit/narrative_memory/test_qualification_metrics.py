@@ -37,9 +37,7 @@ def test_leaf_recall_and_rr_and_ndcg():
     assert rec.value == 0.5
     rr = reciprocal_rank(["x", "a"], ["a"], case_id="c1", strategy=strat)
     assert rr.value == 0.5
-    nd = ndcg_at_k(
-        ["a", "b"], {"a": 3.0, "b": 1.0}, k=2, case_id="c1", strategy=strat
-    )
+    nd = ndcg_at_k(["a", "b"], {"a": 3.0, "b": 1.0}, k=2, case_id="c1", strategy=strat)
     assert nd.status == MetricStatus.OK
     assert nd.value is not None and float(nd.value) > 0.9
 

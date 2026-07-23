@@ -10,7 +10,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from app.services.chunking.budget import BudgetConfig, BudgetLedger
+from app.services.chunking.budget import BudgetLedger
 from app.services.chunking.manifests import content_hash
 from app.services.chunking.schemas import (
     AtomicSpan,
@@ -19,7 +19,6 @@ from app.services.chunking.schemas import (
     DecisionAudit,
     RuleDecision,
 )
-from app.services.rag_fixture import stable_hash
 
 # Optional callable: async (system, user) -> str raw JSON text
 LLMCaller = Callable[[str, str], Awaitable[str]]
@@ -52,7 +51,10 @@ def validate_boundary_decision(
         raise ValueError("right_span_id mismatch")
     if proposal.hard_constraint:
         raise ValueError("hard_constraint boundary cannot be adjudicated")
-    if decision.left_span_id not in spans_by_id or decision.right_span_id not in spans_by_id:
+    if (
+        decision.left_span_id not in spans_by_id
+        or decision.right_span_id not in spans_by_id
+    ):
         raise ValueError("span membership invalid")
     if decision.left_span_id in spans_by_id:
         left = spans_by_id[decision.left_span_id]
@@ -159,7 +161,9 @@ class BoundaryAdjudicator:
             audit = DecisionAudit(
                 boundary_id=proposal.proposal_id,
                 attempt=1,
-                resolved_by="hard_rule" if proposal.hard_constraint else "rule_fallback",
+                resolved_by="hard_rule"
+                if proposal.hard_constraint
+                else "rule_fallback",
                 decision=proposal.fallback_decision,
                 reason="not_eligible",
                 fallback=True,
@@ -249,7 +253,12 @@ class BoundaryAdjudicator:
                 )
                 self.audits.append(audit)
                 return decision.decision, audit
-            except (json.JSONDecodeError, ValidationError, ValueError, TimeoutError) as exc:
+            except (
+                json.JSONDecodeError,
+                ValidationError,
+                ValueError,
+                TimeoutError,
+            ) as exc:
                 last_err = str(exc)
                 continue
             except Exception as exc:  # provider outage / rate limit

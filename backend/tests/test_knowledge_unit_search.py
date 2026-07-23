@@ -120,7 +120,9 @@ async def test_units_api_uses_unit_strategy(auth_client):
 
     response = await auth_client.post(
         "/api/novels/upload",
-        files={"file": ("units.txt", io.BytesIO("第一章\n证据".encode()), "text/plain")},
+        files={
+            "file": ("units.txt", io.BytesIO("第一章\n证据".encode()), "text/plain")
+        },
     )
     novel_id = response.json()["id"]
     unit = {
@@ -171,7 +173,9 @@ async def test_api_and_candidate_eval_share_strategy_boundary_and_parity(auth_cl
 
     upload = await auth_client.post(
         "/api/novels/upload",
-        files={"file": ("parity.txt", io.BytesIO("第一章\n证据".encode()), "text/plain")},
+        files={
+            "file": ("parity.txt", io.BytesIO("第一章\n证据".encode()), "text/plain")
+        },
     )
     novel_id = upload.json()["id"]
 
@@ -243,15 +247,18 @@ async def test_api_and_candidate_eval_share_strategy_boundary_and_parity(auth_cl
         manifest_checksum="a" * 64,
         collection_name="immutable_candidate_91",
     )
-    eval_rows = await candidate_retriever(
-        build, db=object(), strategy=strategy
-    )("same query", {"strategy": "hybrid", "top_k": 5})
+    eval_rows = await candidate_retriever(build, db=object(), strategy=strategy)(
+        "same query", {"strategy": "hybrid", "top_k": 5}
+    )
 
     assert [row["id"] for row in eval_rows] == ["22", "11"]
     assert eval_rows[0]["evidence_ids"] == ["ev-22"]
     assert eval_rows[0]["metadata"]["lifecycle_status"] == "current"
     assert strategy.calls[1]["build_selector"] is not select_active_build
-    assert strategy.calls[0].get("build_selector", select_active_build) is select_active_build
+    assert (
+        strategy.calls[0].get("build_selector", select_active_build)
+        is select_active_build
+    )
 
 
 async def test_hybrid_api_fallback_is_owned_by_shared_strategy(auth_client):
@@ -266,11 +273,17 @@ async def test_hybrid_api_fallback_is_owned_by_shared_strategy(auth_client):
     strategy = NarrativeRetrievalStrategy(
         chunks=AsyncMock(
             search_novel=AsyncMock(
-                return_value=[{
-                    "chunk_id": 7, "novel_id": novel_id, "chunk_index": 0,
-                    "content_snippet": "raw", "score": 0.6,
-                    "vector_score": 0.6, "bm25_score": 0.0,
-                }]
+                return_value=[
+                    {
+                        "chunk_id": 7,
+                        "novel_id": novel_id,
+                        "chunk_index": 0,
+                        "content_snippet": "raw",
+                        "score": 0.6,
+                        "vector_score": 0.6,
+                        "bm25_score": 0.0,
+                    }
+                ]
             )
         ),
         units=AsyncMock(search_units=AsyncMock(return_value=[])),
@@ -284,13 +297,24 @@ async def test_hybrid_api_fallback_is_owned_by_shared_strategy(auth_client):
     finally:
         app.dependency_overrides.pop(production_retrieval_strategy, None)
 
-    assert response.json()["results"] == [{
-        "novel_id": novel_id, "novel_title": None, "chunk_id": 7,
-        "chunk_index": 0, "chapter_id": None, "chapter_title": None,
-        "content_snippet": "raw", "score": 0.3,
-        "vector_score": 0.6, "bm25_score": 0.0, "source_type": "chunk",
-        "unit_id": None, "evidence_refs": [], "lifecycle": None,
-    }]
+    assert response.json()["results"] == [
+        {
+            "novel_id": novel_id,
+            "novel_title": None,
+            "chunk_id": 7,
+            "chunk_index": 0,
+            "chapter_id": None,
+            "chapter_title": None,
+            "content_snippet": "raw",
+            "score": 0.3,
+            "vector_score": 0.6,
+            "bm25_score": 0.0,
+            "source_type": "chunk",
+            "unit_id": None,
+            "evidence_refs": [],
+            "lifecycle": None,
+        }
+    ]
 
 
 async def test_unauthenticated_units_are_rejected(client):

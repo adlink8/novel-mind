@@ -44,6 +44,7 @@ def _stable_json(value: object) -> str:
         default=str,
     )
 
+
 FORBIDDEN_PACKAGE_KEYS = frozenset(
     {
         "reader_chat",
@@ -214,9 +215,7 @@ class ChapterStateModelOutput(BuilderFrozenModel):
     """Strict model output before script rebinding into CandidatePackage."""
 
     node_key: Key
-    display_label: (
-        Annotated[StrictStr, StringConstraints(max_length=240)] | None
-    ) = None
+    display_label: Annotated[StrictStr, StringConstraints(max_length=240)] | None = None
     claims: Annotated[tuple[dict[str, Any], ...], Field(min_length=1)]
     source_bindings: Annotated[tuple[dict[str, Any], ...], Field(min_length=1)]
 
@@ -246,9 +245,9 @@ class CallAuditRecord(BuilderFrozenModel):
     request_hash: Hash64
     response_hash: Hash64 | None = None
     cache_key: VersionLabel | None = None
-    cost_usd: Annotated[StrictStr, StringConstraints(pattern=r"^\d+(\.\d+)?$")] | None = (
-        None
-    )
+    cost_usd: (
+        Annotated[StrictStr, StringConstraints(pattern=r"^\d+(\.\d+)?$")] | None
+    ) = None
     input_tokens: Annotated[StrictInt, Field(ge=0)] = 0
     output_tokens: Annotated[StrictInt, Field(ge=0)] = 0
     error_code: VersionLabel | None = None
@@ -260,12 +259,12 @@ class ModelDeploymentSnapshot(BuilderFrozenModel):
     deployment: VersionLabel
     revision: VersionLabel
     supports_structured_output: StrictBool
-    input_price_per_million: Annotated[
-        StrictStr, StringConstraints(pattern=r"^\d+(\.\d+)?$")
-    ] | None
-    output_price_per_million: Annotated[
-        StrictStr, StringConstraints(pattern=r"^\d+(\.\d+)?$")
-    ] | None
+    input_price_per_million: (
+        Annotated[StrictStr, StringConstraints(pattern=r"^\d+(\.\d+)?$")] | None
+    )
+    output_price_per_million: (
+        Annotated[StrictStr, StringConstraints(pattern=r"^\d+(\.\d+)?$")] | None
+    )
 
     @property
     def lineage(self) -> ModelLineage:

@@ -133,7 +133,9 @@ def _blocked_dependency(reason: str) -> None:
     Uses pytest.skip with explicit blocked_dependency reason so metrics remain null
     and the run is not treated as a quality pass/fail with fake embeddings (D-07).
     """
-    pytest.skip(f"{BLOCKED_DEPENDENCY}: {reason}; metrics=null; quality_comparable=false")
+    pytest.skip(
+        f"{BLOCKED_DEPENDENCY}: {reason}; metrics=null; quality_comparable=false"
+    )
 
 
 async def _generate_real_embedding(text: str, model: str | None = None) -> list[float]:
@@ -260,7 +262,9 @@ class TestRagChunking:
     async def test_chunking_produces_blocks(self):
         """分块产生正确的块数"""
         chunks = await chunking_service.chunk_chapter(
-            chapter_id=1, chapter_number=1, content=SAMPLE_NOVEL,
+            chapter_id=1,
+            chapter_number=1,
+            content=SAMPLE_NOVEL,
         )
         assert len(chunks) >= 2, f"期望至少 2 个块，实际 {len(chunks)} 个"
 
@@ -268,34 +272,41 @@ class TestRagChunking:
     async def test_chunking_preserves_content(self):
         """分块不丢失内容"""
         chunks = await chunking_service.chunk_chapter(
-            chapter_id=1, chapter_number=1, content=SAMPLE_NOVEL,
+            chapter_id=1,
+            chapter_number=1,
+            content=SAMPLE_NOVEL,
         )
         total_words = sum(c["word_count"] for c in chunks)
         actual_len = len(SAMPLE_NOVEL.replace("\n", "").replace(" ", ""))
         # 允许 10% 误差（分块时可能过滤部分空白）
-        assert abs(total_words - actual_len) < actual_len * 0.1, \
+        assert abs(total_words - actual_len) < actual_len * 0.1, (
             f"总字数 {total_words} 与原文字数 {actual_len} 差异过大"
+        )
 
     @pytest.mark.asyncio
     async def test_chunking_detects_types(self):
         """分块正确检测 chunk_type"""
         chunks = await chunking_service.chunk_chapter(
-            chapter_id=1, chapter_number=1, content=SAMPLE_NOVEL,
+            chapter_id=1,
+            chapter_number=1,
+            content=SAMPLE_NOVEL,
         )
         types = {c["chunk_type"] for c in chunks}
         # 应该至少包含 scene 和 paragraph 两种类型
-        assert "scene" in types or "paragraph" in types, \
+        assert "scene" in types or "paragraph" in types, (
             f"分块类型缺少 scene/paragraph，实际: {types}"
+        )
 
     @pytest.mark.asyncio
     async def test_chunk_index_continuous(self):
         """chunk_index 连续递增"""
         chunks = await chunking_service.chunk_chapter(
-            chapter_id=1, chapter_number=1, content=SAMPLE_NOVEL,
+            chapter_id=1,
+            chapter_number=1,
+            content=SAMPLE_NOVEL,
         )
         indices = [c["chunk_index"] for c in chunks]
-        assert indices == list(range(len(chunks))), \
-            f"chunk_index 不连续: {indices}"
+        assert indices == list(range(len(chunks))), f"chunk_index 不连续: {indices}"
 
 
 class TestRagEmbedding:
@@ -307,8 +318,9 @@ class TestRagEmbedding:
         texts = [SAMPLE_NOVEL[:500]]
         embeddings = await _require_live_embeddings(texts)
         assert len(embeddings) == 1
-        assert len(embeddings[0]) == settings.embedding_dimensions, \
+        assert len(embeddings[0]) == settings.embedding_dimensions, (
             f"期望维度 {settings.embedding_dimensions}，实际 {len(embeddings[0])}"
+        )
 
     @pytest.mark.asyncio
     async def test_embedding_normalized(self):
@@ -326,55 +338,64 @@ class TestRagVectorStore:
         """存储向量并验证计数"""
         novel_id = e2e_novel
         chunks = await chunking_service.chunk_chapter(
-            chapter_id=1, chapter_number=1, content=SAMPLE_NOVEL,
+            chapter_id=1,
+            chapter_number=1,
+            content=SAMPLE_NOVEL,
         )
         texts = [c["content"] for c in chunks]
         embeddings = await _require_live_embeddings(texts)
 
         chroma_chunks = []
         for i, (chunk, emb) in enumerate(zip(chunks, embeddings)):
-            chroma_chunks.append({
-                "id": f"chunk_{i + 1}",
-                "content": chunk["content"],
-                "embedding": emb,
-                "metadata": {
-                    "chunk_id": i + 1,
-                    "chapter_id": 1,
-                    "chunk_index": chunk["chunk_index"],
-                    "chunk_type": chunk["chunk_type"],
-                    "word_count": chunk["word_count"],
-                },
-            })
+            chroma_chunks.append(
+                {
+                    "id": f"chunk_{i + 1}",
+                    "content": chunk["content"],
+                    "embedding": emb,
+                    "metadata": {
+                        "chunk_id": i + 1,
+                        "chapter_id": 1,
+                        "chunk_index": chunk["chunk_index"],
+                        "chunk_type": chunk["chunk_type"],
+                        "word_count": chunk["word_count"],
+                    },
+                }
+            )
 
         await vector_store.add_chunks(novel_id, chroma_chunks)
         count = await vector_store.get_chunk_count(novel_id)
-        assert count == len(chunks), \
+        assert count == len(chunks), (
             f"ChromaDB 存储数量不匹配: 期望 {len(chunks)}, 实际 {count}"
+        )
 
     @pytest.mark.asyncio
     async def test_search_returns_results(self, e2e_novel):
         """搜索返回结果（真实 query embedding）"""
         novel_id = e2e_novel
         chunks = await chunking_service.chunk_chapter(
-            chapter_id=1, chapter_number=1, content=SAMPLE_NOVEL,
+            chapter_id=1,
+            chapter_number=1,
+            content=SAMPLE_NOVEL,
         )
         texts = [c["content"] for c in chunks]
         embeddings = await _require_live_embeddings(texts)
 
         chroma_chunks = []
         for i, (chunk, emb) in enumerate(zip(chunks, embeddings)):
-            chroma_chunks.append({
-                "id": f"chunk_search_{i + 1}",
-                "content": chunk["content"],
-                "embedding": emb,
-                "metadata": {
-                    "chunk_id": i + 1,
-                    "chapter_id": 1,
-                    "chunk_index": chunk["chunk_index"],
-                    "chunk_type": chunk["chunk_type"],
-                    "word_count": chunk["word_count"],
-                },
-            })
+            chroma_chunks.append(
+                {
+                    "id": f"chunk_search_{i + 1}",
+                    "content": chunk["content"],
+                    "embedding": emb,
+                    "metadata": {
+                        "chunk_id": i + 1,
+                        "chapter_id": 1,
+                        "chunk_index": chunk["chunk_index"],
+                        "chunk_type": chunk["chunk_type"],
+                        "word_count": chunk["word_count"],
+                    },
+                }
+            )
 
         await vector_store.add_chunks(novel_id, chroma_chunks)
 
@@ -395,31 +416,37 @@ class TestRagVectorStore:
         """按 chunk_type 过滤搜索"""
         novel_id = e2e_novel
         chunks = await chunking_service.chunk_chapter(
-            chapter_id=1, chapter_number=1, content=SAMPLE_NOVEL,
+            chapter_id=1,
+            chapter_number=1,
+            content=SAMPLE_NOVEL,
         )
         texts = [c["content"] for c in chunks]
         embeddings = await _require_live_embeddings(texts)
 
         chroma_chunks = []
         for i, (chunk, emb) in enumerate(zip(chunks, embeddings)):
-            chroma_chunks.append({
-                "id": f"chunk_filter_{i + 1}",
-                "content": chunk["content"],
-                "embedding": emb,
-                "metadata": {
-                    "chunk_id": i + 1,
-                    "chapter_id": 1,
-                    "chunk_index": chunk["chunk_index"],
-                    "chunk_type": chunk["chunk_type"],
-                    "word_count": chunk["word_count"],
-                },
-            })
+            chroma_chunks.append(
+                {
+                    "id": f"chunk_filter_{i + 1}",
+                    "content": chunk["content"],
+                    "embedding": emb,
+                    "metadata": {
+                        "chunk_id": i + 1,
+                        "chapter_id": 1,
+                        "chunk_index": chunk["chunk_index"],
+                        "chunk_type": chunk["chunk_type"],
+                        "word_count": chunk["word_count"],
+                    },
+                }
+            )
 
         await vector_store.add_chunks(novel_id, chroma_chunks)
 
         query_embedding = (await _require_live_embeddings(["练功场场景"]))[0]
         results = await vector_store.search(
-            novel_id, query_embedding, top_k=5,
+            novel_id,
+            query_embedding,
+            top_k=5,
             filters={"chunk_type": "scene"},
         )
         for r in results:
@@ -431,19 +458,23 @@ class TestRagVectorStore:
         """删除集合"""
         novel_id = e2e_novel
         chunks = await chunking_service.chunk_chapter(
-            chapter_id=1, chapter_number=1, content=SAMPLE_NOVEL[:500],
+            chapter_id=1,
+            chapter_number=1,
+            content=SAMPLE_NOVEL[:500],
         )
         texts = [c["content"] for c in chunks]
         embeddings = await _require_live_embeddings(texts)
 
         chroma_chunks = []
         for i, (chunk, emb) in enumerate(zip(chunks, embeddings)):
-            chroma_chunks.append({
-                "id": f"del_{i + 1}",
-                "content": chunk["content"],
-                "embedding": emb,
-                "metadata": {"chunk_id": i + 1},
-            })
+            chroma_chunks.append(
+                {
+                    "id": f"del_{i + 1}",
+                    "content": chunk["content"],
+                    "embedding": emb,
+                    "metadata": {"chunk_id": i + 1},
+                }
+            )
 
         await vector_store.add_chunks(novel_id, chroma_chunks)
         count_before = await vector_store.get_chunk_count(novel_id)
@@ -463,7 +494,9 @@ class TestRagFullPipeline:
         novel_id = e2e_novel
 
         chunks = await chunking_service.chunk_chapter(
-            chapter_id=1, chapter_number=1, content=SAMPLE_NOVEL,
+            chapter_id=1,
+            chapter_number=1,
+            content=SAMPLE_NOVEL,
         )
         assert len(chunks) >= 2
 
@@ -473,18 +506,20 @@ class TestRagFullPipeline:
 
         chroma_chunks = []
         for i, (chunk, emb) in enumerate(zip(chunks, embeddings)):
-            chroma_chunks.append({
-                "id": f"pipeline_{i + 1}",
-                "content": chunk["content"],
-                "embedding": emb,
-                "metadata": {
-                    "chunk_id": i + 1,
-                    "chapter_id": 1,
-                    "chunk_index": chunk["chunk_index"],
-                    "chunk_type": chunk["chunk_type"],
-                    "word_count": chunk["word_count"],
-                },
-            })
+            chroma_chunks.append(
+                {
+                    "id": f"pipeline_{i + 1}",
+                    "content": chunk["content"],
+                    "embedding": emb,
+                    "metadata": {
+                        "chunk_id": i + 1,
+                        "chapter_id": 1,
+                        "chunk_index": chunk["chunk_index"],
+                        "chunk_type": chunk["chunk_type"],
+                        "word_count": chunk["word_count"],
+                    },
+                }
+            )
 
         await vector_store.add_chunks(novel_id, chroma_chunks)
         count = await vector_store.get_chunk_count(novel_id)
@@ -504,25 +539,29 @@ class TestRagFullPipeline:
         novel_id = e2e_novel
 
         chunks = await chunking_service.chunk_chapter(
-            chapter_id=1, chapter_number=1, content=SAMPLE_NOVEL,
+            chapter_id=1,
+            chapter_number=1,
+            content=SAMPLE_NOVEL,
         )
         texts = [c["content"] for c in chunks]
         embeddings = await _require_live_embeddings(texts)
 
         chroma_chunks = []
         for i, (chunk, emb) in enumerate(zip(chunks, embeddings)):
-            chroma_chunks.append({
-                "id": f"rel_{i + 1}",
-                "content": chunk["content"],
-                "embedding": emb,
-                "metadata": {
-                    "chunk_id": i + 1,
-                    "chapter_id": 1,
-                    "chunk_index": chunk["chunk_index"],
-                    "chunk_type": chunk["chunk_type"],
-                    "word_count": chunk["word_count"],
-                },
-            })
+            chroma_chunks.append(
+                {
+                    "id": f"rel_{i + 1}",
+                    "content": chunk["content"],
+                    "embedding": emb,
+                    "metadata": {
+                        "chunk_id": i + 1,
+                        "chapter_id": 1,
+                        "chunk_index": chunk["chunk_index"],
+                        "chunk_type": chunk["chunk_type"],
+                        "word_count": chunk["word_count"],
+                    },
+                }
+            )
 
         await vector_store.add_chunks(novel_id, chroma_chunks)
 

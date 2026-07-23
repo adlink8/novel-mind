@@ -30,16 +30,24 @@ def _h(text: str) -> str:
 
 
 async def _seed(db_session):
-    owner = User(username="clue-spoiler", email="clue-spoiler@example.test", hashed_password="x")
-    other = User(username="clue-other", email="clue-other@example.test", hashed_password="x")
+    owner = User(
+        username="clue-spoiler", email="clue-spoiler@example.test", hashed_password="x"
+    )
+    other = User(
+        username="clue-other", email="clue-other@example.test", hashed_password="x"
+    )
     db_session.add_all([owner, other])
     await db_session.flush()
-    novel = Novel(owner_id=owner.id, title="spoiler novel", status="ready", reading_progress={})
+    novel = Novel(
+        owner_id=owner.id, title="spoiler novel", status="ready", reading_progress={}
+    )
     db_session.add(novel)
     await db_session.flush()
     chapters = [
         Chapter(novel_id=novel.id, chapter_number=1, title="C1", content="early cue"),
-        Chapter(novel_id=novel.id, chapter_number=5, title="C5", content="secret payoff"),
+        Chapter(
+            novel_id=novel.id, chapter_number=5, title="C5", content="secret payoff"
+        ),
     ]
     db_session.add_all(chapters)
     await db_session.flush()

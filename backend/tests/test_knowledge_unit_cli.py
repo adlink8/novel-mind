@@ -91,9 +91,7 @@ async def test_exact_05_02_build_command_executes_against_frozen_snapshot(tmp_pa
         await engine.dispose()
 
     env = os.environ.copy()
-    env["NOVELMIND_DATABASE_URL"] = (
-        f"sqlite+aiosqlite:///{database.as_posix()}"
-    )
+    env["NOVELMIND_DATABASE_URL"] = f"sqlite+aiosqlite:///{database.as_posix()}"
     result = subprocess.run(
         [
             sys.executable,

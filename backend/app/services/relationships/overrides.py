@@ -52,7 +52,9 @@ class RelinkOutcome:
 class RelationshipOverrideService:
     """Insert-only character merge and relationship field corrections."""
 
-    def __init__(self, query_service: RelationshipGraphQueryService | None = None) -> None:
+    def __init__(
+        self, query_service: RelationshipGraphQueryService | None = None
+    ) -> None:
         self._query = query_service or RelationshipGraphQueryService()
 
     async def append_character_merge(
@@ -72,7 +74,10 @@ class RelationshipOverrideService:
         await self._prove_characters(
             session,
             novel_id=novel_id,
-            character_ids=[payload.canonical_character_id, *payload.merged_character_ids],
+            character_ids=[
+                payload.canonical_character_id,
+                *payload.merged_character_ids,
+            ],
         )
 
         prior = await session.scalar(
@@ -144,9 +149,7 @@ class RelationshipOverrideService:
             if isinstance(payload.field_name, RelationshipOverrideField)
             else str(payload.field_name)
         )
-        if field_name not in {
-            f.value for f in RelationshipOverrideField
-        }:
+        if field_name not in {f.value for f in RelationshipOverrideField}:
             raise OverrideValidationError(f"unsupported override field: {field_name}")
 
         self._validate_field_value(field_name, payload.value)
@@ -342,7 +345,8 @@ class RelationshipOverrideService:
                             RelationshipOverride.owner_id == owner_id,
                             RelationshipOverride.novel_id == novel_id,
                             RelationshipOverride.analysis_version_id == version_id,
-                            RelationshipOverride.evidence_signature == evidence_signature,
+                            RelationshipOverride.evidence_signature
+                            == evidence_signature,
                             RelationshipOverride.status == OverrideStatus.ACTIVE.value,
                         )
                     )
@@ -430,7 +434,9 @@ class RelationshipOverrideService:
                 raise OverrideValidationError("valid_to requires valid_to_chapter key")
 
     @staticmethod
-    def _identity_response(row: CharacterIdentityOverride) -> CharacterIdentityOverrideResponse:
+    def _identity_response(
+        row: CharacterIdentityOverride,
+    ) -> CharacterIdentityOverrideResponse:
         return CharacterIdentityOverrideResponse(
             id=row.id,
             novel_id=row.novel_id,

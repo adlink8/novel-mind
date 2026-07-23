@@ -37,7 +37,10 @@ from app.services.narrative_memory.contracts import (
     ModelLineage,
 )
 from app.services.narrative_memory.manifests import seal_and_report
-from app.services.narrative_memory.rebuild_contracts import RebuildDecision, stable_checksum
+from app.services.narrative_memory.rebuild_contracts import (
+    RebuildDecision,
+    stable_checksum,
+)
 from tests.integration.conftest import run_alembic
 
 pytestmark = pytest.mark.integration
@@ -45,7 +48,9 @@ pytestmark = pytest.mark.integration
 HEX = "a" * 64
 
 
-def _spec(version_key: str, *, parent_version_id: int | None = None) -> CandidateVersionSpec:
+def _spec(
+    version_key: str, *, parent_version_id: int | None = None
+) -> CandidateVersionSpec:
     return CandidateVersionSpec(
         version_key=version_key,
         prompt_hash=HEX,
@@ -422,8 +427,7 @@ async def test_no_change_carry_preserves_semantic_checksums(carry_env) -> None:
         assert all(
             i.decision == RebuildDecision.CARRIED
             for i in plan.items
-            if i.asset_kind.value
-            in {"chapter_state", "story_arc", "global_story"}
+            if i.asset_kind.value in {"chapter_state", "story_arc", "global_story"}
         )
         result = await carry_forward_from_plan(
             session,
@@ -489,9 +493,7 @@ async def test_no_change_carry_preserves_semantic_checksums(carry_env) -> None:
             assert target_claims[key].typed_payload == pc.typed_payload
             assert target_claims[key].uncertainty == pc.uncertainty
             assert float(target_claims[key].confidence) == float(pc.confidence)
-            assert (
-                target_claims[key].visible_from_chapter == pc.visible_from_chapter
-            )
+            assert target_claims[key].visible_from_chapter == pc.visible_from_chapter
 
         # Idempotent retry
         result2 = await carry_forward_from_plan(
@@ -504,10 +506,7 @@ async def test_no_change_carry_preserves_semantic_checksums(carry_env) -> None:
         await session.commit()
         assert set(result2.carried_node_keys) == set(result.carried_node_keys)
         n_count = await session.scalar(
-            text(
-                "SELECT count(*) FROM narrative_memory_nodes "
-                "WHERE version_id = :v"
-            ),
+            text("SELECT count(*) FROM narrative_memory_nodes WHERE version_id = :v"),
             {"v": ctx["target_version_id"]},
         )
         assert int(n_count) == len(parent_nodes)
@@ -524,15 +523,13 @@ async def test_partial_carry_on_stable_edit(carry_env) -> None:
             i.asset_key
             for i in plan.items
             if i.decision == RebuildDecision.DIRTY
-            and i.asset_kind.value
-            in {"chapter_state", "story_arc", "global_story"}
+            and i.asset_kind.value in {"chapter_state", "story_arc", "global_story"}
         }
         carried_keys = {
             i.asset_key
             for i in plan.items
             if i.decision == RebuildDecision.CARRIED
-            and i.asset_kind.value
-            in {"chapter_state", "story_arc", "global_story"}
+            and i.asset_kind.value in {"chapter_state", "story_arc", "global_story"}
         }
         assert dirty_keys  # edit must dirty at least leaf/parent/global
 

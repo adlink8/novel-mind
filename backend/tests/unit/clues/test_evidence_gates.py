@@ -6,7 +6,6 @@ from typing import Any
 
 import pytest
 
-from app.schemas.clue import ClueLifecycleState, ClueSemanticJudgment
 from app.services.clues.evidence import (
     build_clue_evidence_package,
     make_clue_evidence_unit,
@@ -93,10 +92,10 @@ def test_active_requires_cue_evidence():
     assert decision.accepted is True
     assert decision.status == "accepted"
 
-    # Wrong classification
+    # A classification that does not carry a cue (unrelated) cannot enter active.
     bad = gates.evaluate_transition(
         package=package,
-        judgment=_judgment(package, classification="payoff", later_evidence_ids=package.later_ids()[:1]),
+        judgment=_judgment(package, classification="unrelated"),
         from_status="candidate",
         to_status="active",
         owner_id=1,
@@ -343,7 +342,9 @@ def test_threshold_bands_and_policy_hash_stable():
 
     mid = gates.evaluate_transition(
         package=package,
-        judgment=_judgment(package, confidence=(REVIEW_THRESHOLD + AUTO_ACCEPT_THRESHOLD) / 2),
+        judgment=_judgment(
+            package, confidence=(REVIEW_THRESHOLD + AUTO_ACCEPT_THRESHOLD) / 2
+        ),
         from_status="candidate",
         to_status="active",
         owner_id=1,

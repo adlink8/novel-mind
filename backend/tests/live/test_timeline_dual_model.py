@@ -71,4 +71,3 @@ def test_missing_live_dependency_is_blocked_not_a_zero_score_pass():
     assert report["status"] == "blocked_dependency"
     assert report["quality_comparable"] is False
     assert report["metrics"] is None
-

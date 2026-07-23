@@ -1,8 +1,8 @@
 """
-剧情分析 API 占位端点测试
+剧情分析 API 当前契约测试（未实现桩时代的 501 契约已随真正实现更替）。
 
-当前所有生成类端点返回 HTTP 501。
-查询类端点返回空状态。
+- 小说不存在时，分析触发/查询返回 404（归属校验先于业务逻辑）。
+- 流式分析端点仍为 501 占位。
 """
 
 import pytest
@@ -12,27 +12,24 @@ from httpx import AsyncClient
 
 
 @pytest.mark.asyncio
-async def test_analyze_novel_not_implemented(auth_client: AsyncClient):
-    """整本小说分析返回 501"""
-    response = await auth_client.post("/api/analysis/1/analyze")
-    assert response.status_code == 501
+async def test_analyze_novel_missing_novel_returns_404(auth_client: AsyncClient):
+    """小说不存在时触发整本分析返回 404"""
+    response = await auth_client.post("/api/analysis/99999999/analyze")
+    assert response.status_code == 404
 
 
 @pytest.mark.asyncio
-async def test_get_analysis_empty(auth_client: AsyncClient):
-    """获取分析结果返回空状态"""
-    response = await auth_client.get("/api/analysis/1")
-    assert response.status_code == 200
-    data = response.json()
-    assert data["novel_id"] == 1
-    assert data["status"] == "not_analyzed"
+async def test_get_analysis_missing_novel_returns_404(auth_client: AsyncClient):
+    """小说不存在时获取分析结果返回 404"""
+    response = await auth_client.get("/api/analysis/99999999")
+    assert response.status_code == 404
 
 
 @pytest.mark.asyncio
-async def test_analyze_chapter_not_implemented(auth_client: AsyncClient):
-    """章节分析返回 501"""
-    response = await auth_client.post("/api/analysis/1/chapters/1/analyze")
-    assert response.status_code == 501
+async def test_analyze_chapter_missing_novel_returns_404(auth_client: AsyncClient):
+    """小说不存在时触发章节分析返回 404"""
+    response = await auth_client.post("/api/analysis/99999999/chapters/1/analyze")
+    assert response.status_code == 404
 
 
 @pytest.mark.asyncio

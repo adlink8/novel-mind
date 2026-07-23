@@ -11,7 +11,10 @@ from app.services.narrative_memory.candidate_reader import (
     load_eligible_version,
     scope_from_eligible,
 )
-from app.services.narrative_memory.citations import resolve_citations, validate_proposed_leaf
+from app.services.narrative_memory.citations import (
+    resolve_citations,
+    validate_proposed_leaf,
+)
 from app.services.narrative_memory.descent import ProposedLeaf, run_descent
 from app.services.narrative_memory.retrieval_contracts import (
     RetrievalRunStatus,

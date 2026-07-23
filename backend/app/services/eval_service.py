@@ -280,7 +280,9 @@ class EvalService:
         metrics_block = None
         if quality_report is not None:
             quality_comparable = bool(quality_report.get("quality_comparable"))
-            metrics_block = quality_report.get("metrics") if quality_comparable else None
+            metrics_block = (
+                quality_report.get("metrics") if quality_comparable else None
+            )
             status = quality_report.get("status", status)
 
         return {

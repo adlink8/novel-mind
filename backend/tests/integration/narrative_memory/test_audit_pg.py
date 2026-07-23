@@ -32,8 +32,20 @@ async def _seed_valid_hierarchy(
     db_session.add(novel)
     await db_session.flush()
     chapters = [
-        Chapter(novel_id=novel.id, chapter_number=1, title="一", content=contents[0], word_count=len(contents[0])),
-        Chapter(novel_id=novel.id, chapter_number=2, title="二", content=contents[1], word_count=len(contents[1])),
+        Chapter(
+            novel_id=novel.id,
+            chapter_number=1,
+            title="一",
+            content=contents[0],
+            word_count=len(contents[0]),
+        ),
+        Chapter(
+            novel_id=novel.id,
+            chapter_number=2,
+            title="二",
+            content=contents[1],
+            word_count=len(contents[1]),
+        ),
     ]
     db_session.add_all(chapters)
     await db_session.flush()
@@ -41,7 +53,11 @@ async def _seed_valid_hierarchy(
         db_session,
         novel_id=novel.id,
         chapters=[
-            {"chapter_id": ch.id, "chapter_number": ch.chapter_number, "content": ch.content}
+            {
+                "chapter_id": ch.id,
+                "chapter_number": ch.chapter_number,
+                "content": ch.content,
+            }
             for ch in chapters
         ],
         promote_active=True,
@@ -52,7 +68,9 @@ async def _seed_valid_hierarchy(
 
 
 @pytest.mark.asyncio
-async def test_valid_hierarchy_is_exact_and_optional_sources_are_unavailable(audit_pg_session):
+async def test_valid_hierarchy_is_exact_and_optional_sources_are_unavailable(
+    audit_pg_session,
+):
     user, novel, _ = await _seed_valid_hierarchy(audit_pg_session)
 
     report = await audit_assets(
@@ -60,14 +78,18 @@ async def test_valid_hierarchy_is_exact_and_optional_sources_are_unavailable(aud
     )
     by_kind = {asset.kind: asset for asset in report.assets}
 
-    assert by_kind[AssetKind.HIERARCHY].status == EligibilityStatus.REUSABLE_EXACT, by_kind[AssetKind.HIERARCHY].reason_codes
+    assert by_kind[AssetKind.HIERARCHY].status == EligibilityStatus.REUSABLE_EXACT, (
+        by_kind[AssetKind.HIERARCHY].reason_codes
+    )
     assert report.provider_calls_allowed is True
     for kind in (AssetKind.TIMELINE, AssetKind.RELATIONSHIP, AssetKind.CLUE):
         assert by_kind[kind].status == EligibilityStatus.OPTIONAL_UNAVAILABLE
 
 
 @pytest.mark.asyncio
-async def test_deferred_chapter_content_is_loaded_without_async_lazy_io(audit_pg_session):
+async def test_deferred_chapter_content_is_loaded_without_async_lazy_io(
+    audit_pg_session,
+):
     user, novel, _ = await _seed_valid_hierarchy(audit_pg_session)
     owner_id, novel_id = user.id, novel.id
     audit_pg_session.expire_all()
@@ -99,14 +121,18 @@ async def test_content_hash_mismatch_reports_only_affected_chapter(audit_pg_sess
 
     assert hierarchy.status == EligibilityStatus.REBUILD_REQUIRED
     assert ReasonCode.CONTENT_HASH_MISMATCH in hierarchy.reason_codes
-    assert [(r.start_chapter, r.end_chapter) for r in hierarchy.rebuild_ranges] == [(2, 2)]
+    assert [(r.start_chapter, r.end_chapter) for r in hierarchy.rebuild_ranges] == [
+        (2, 2)
+    ]
     assert report.provider_calls_allowed is False
 
 
 @pytest.mark.asyncio
-async def test_normalized_multi_span_content_is_not_claimed_as_exact(audit_pg_session):
+async def test_normalized_multi_span_content_is_stored_exact(audit_pg_session):
+    # 分块器对 \r\n 等换行做规范化只影响偏移映射，证据节点仍按原文切片存储，
+    # 审计应确认内容精确一致（usable_exact）而非误报 mismatch
     user, novel, _ = await _seed_valid_hierarchy(
-        audit_pg_session, ("甲乙丙。丁戊己。", "庚辛壬。癸子丑。")
+        audit_pg_session, ("甲乙丙。\r\n丁戊己。", "庚辛壬。\r\n癸子丑。")
     )
 
     report = await audit_assets(
@@ -114,9 +140,9 @@ async def test_normalized_multi_span_content_is_not_claimed_as_exact(audit_pg_se
     )
     hierarchy = next(a for a in report.assets if a.kind == AssetKind.HIERARCHY)
 
-    assert hierarchy.status == EligibilityStatus.REBUILD_REQUIRED
-    assert ReasonCode.CONTENT_HASH_MISMATCH in hierarchy.reason_codes
-    assert report.provider_calls_allowed is False
+    assert hierarchy.status == EligibilityStatus.REUSABLE_EXACT
+    assert ReasonCode.CONTENT_HASH_MISMATCH not in hierarchy.reason_codes
+    assert report.provider_calls_allowed is True
 
 
 @pytest.mark.asyncio

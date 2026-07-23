@@ -113,7 +113,9 @@ _FORBIDDEN_EDGE_TYPES = frozenset(
 def _reject_forbidden_edge(value: str) -> str:
     lowered = value.strip().lower()
     if lowered in _FORBIDDEN_EDGE_TYPES:
-        raise ValueError(f"edge type {value!r} is not a Phase 09 fiction relationship edge")
+        raise ValueError(
+            f"edge type {value!r} is not a Phase 09 fiction relationship edge"
+        )
     return value
 
 
@@ -126,8 +128,13 @@ class NarrativeInterval(StrictRelationshipModel):
     @model_validator(mode="after")
     def validate_interval_order(self) -> "NarrativeInterval":
         if (self.valid_to_chapter is None) != (self.valid_to_narrative_index is None):
-            raise ValueError("valid_to chapter and narrative_index must both be set or both null")
-        if self.valid_to_chapter is not None and self.valid_to_narrative_index is not None:
+            raise ValueError(
+                "valid_to chapter and narrative_index must both be set or both null"
+            )
+        if (
+            self.valid_to_chapter is not None
+            and self.valid_to_narrative_index is not None
+        ):
             if self.valid_to_chapter < self.valid_from_chapter or (
                 self.valid_to_chapter == self.valid_from_chapter
                 and self.valid_to_narrative_index < self.valid_from_narrative_index
@@ -327,7 +334,9 @@ class RelationshipGraphEnvelope(StrictRelationshipModel):
         default_factory=list
     )
     available_character_ids: list[int] = Field(default_factory=list)
-    degradation: RelationshipDegradation = Field(default_factory=RelationshipDegradation)
+    degradation: RelationshipDegradation = Field(
+        default_factory=RelationshipDegradation
+    )
     generated_at: datetime | None = None
 
 

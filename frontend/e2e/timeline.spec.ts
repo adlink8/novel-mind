@@ -28,7 +28,8 @@ test("timeline renders a readable drill-down view with inline event detail", asy
   await mockTimeline(page);
   await page.goto("/analysis");
   await page.getByLabel("选择小说").selectOption("11");
-  await page.getByRole("button", { name: "展开查看" }).click();
+    // 阶段窗口下钻（原型页的展开查看已不存在）
+    await page.getByRole("button", { name: /阶段 1/ }).click();
   await expect(page.locator('[data-testid="timeline-canvas"] canvas')).toBeVisible();
   await expect(page.locator('[data-testid="timeline-canvas"]')).toHaveAttribute("data-zoom", "inside-slider");
   const firstEvent = page.getByRole("button", { name: /雨夜相遇/ });

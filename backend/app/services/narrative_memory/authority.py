@@ -183,16 +183,16 @@ class CandidateAuthority:
         version_id: int,
         package: CandidatePackage,
     ) -> PersistedCandidate:
-        self._require_scope(
-            owner_id=owner_id, novel_id=novel_id, version_id=version_id
-        )
+        self._require_scope(owner_id=owner_id, novel_id=novel_id, version_id=version_id)
         if not isinstance(package, CandidatePackage):
             raise TypeError("package must be a validated CandidatePackage")
         version = await self._version(
             owner_id=owner_id, novel_id=novel_id, version_id=version_id
         )
         if version is None:
-            raise CandidateNotFoundError("candidate version not found in explicit scope")
+            raise CandidateNotFoundError(
+                "candidate version not found in explicit scope"
+            )
         sealed = await self._session.scalar(
             select(NarrativeMemoryManifest.id).where(
                 NarrativeMemoryManifest.owner_id == owner_id,
@@ -411,8 +411,7 @@ class CandidateAuthority:
                 NarrativeMemorySourceLink.novel_id == version.novel_id,
                 NarrativeMemorySourceLink.version_id == version.id,
                 NarrativeMemorySourceLink.claim_id == claim_id,
-                NarrativeMemorySourceLink.hierarchy_build_id
-                == link.hierarchy_build_id,
+                NarrativeMemorySourceLink.hierarchy_build_id == link.hierarchy_build_id,
                 NarrativeMemorySourceLink.evidence_node_id == link.evidence_node_id,
                 NarrativeMemorySourceLink.source_start == link.source_start,
                 NarrativeMemorySourceLink.source_end == link.source_end,
@@ -468,7 +467,9 @@ class CandidateAuthority:
         ]
 
     @staticmethod
-    def _require_identical(row: object, expected: dict[str, object], *, label: str) -> None:
+    def _require_identical(
+        row: object, expected: dict[str, object], *, label: str
+    ) -> None:
         mismatched = [
             field for field, value in expected.items() if getattr(row, field) != value
         ]
@@ -481,6 +482,12 @@ class CandidateAuthority:
     def _require_scope(
         *, owner_id: int, novel_id: int, version_id: int | None = None
     ) -> None:
-        values = (owner_id, novel_id) if version_id is None else (owner_id, novel_id, version_id)
+        values = (
+            (owner_id, novel_id)
+            if version_id is None
+            else (owner_id, novel_id, version_id)
+        )
         if any(type(value) is not int or value <= 0 for value in values):
-            raise ScopeMismatchError("scope identifiers must be explicit positive integers")
+            raise ScopeMismatchError(
+                "scope identifiers must be explicit positive integers"
+            )

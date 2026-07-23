@@ -11,7 +11,10 @@ from typing import Any, Callable, Protocol
 
 from pydantic import ValidationError
 
-from app.schemas.reader_chat import ReaderAnswerEnvelope, validate_answer_against_manifest
+from app.schemas.reader_chat import (
+    ReaderAnswerEnvelope,
+    validate_answer_against_manifest,
+)
 from app.services.reader_chat.budget import (
     BudgetExceeded,
     DualBudgetGate,
@@ -104,7 +107,11 @@ class GatewayResult:
 def canonical_hash(value: Any) -> str:
     return hashlib.sha256(
         json.dumps(
-            value, sort_keys=True, separators=(",", ":"), default=str, ensure_ascii=False
+            value,
+            sort_keys=True,
+            separators=(",", ":"),
+            default=str,
+            ensure_ascii=False,
         ).encode("utf-8")
     ).hexdigest()
 
@@ -125,7 +132,11 @@ def _response_content(response: Any) -> str:
 
 
 def _response_usage(response: Any) -> dict[str, int]:
-    raw = response.get("usage", {}) if isinstance(response, dict) else getattr(response, "usage", {})
+    raw = (
+        response.get("usage", {})
+        if isinstance(response, dict)
+        else getattr(response, "usage", {})
+    )
     if hasattr(raw, "model_dump"):
         raw = raw.model_dump()
     if not isinstance(raw, dict):
@@ -138,7 +149,9 @@ def _response_usage(response: Any) -> dict[str, int]:
         }
     return {
         "input_tokens": int(raw.get("input_tokens", raw.get("prompt_tokens", 0)) or 0),
-        "output_tokens": int(raw.get("output_tokens", raw.get("completion_tokens", 0)) or 0),
+        "output_tokens": int(
+            raw.get("output_tokens", raw.get("completion_tokens", 0)) or 0
+        ),
     }
 
 

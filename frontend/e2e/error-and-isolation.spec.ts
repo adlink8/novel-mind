@@ -22,17 +22,14 @@ test.describe("error and isolation", () => {
     const user = uniqueUser("auth");
     await registerAndLogin(page, user);
 
-    // Logout
-    const logout = page.getByRole("button", { name: /退出|logout/i }).or(
-      page.locator('button[title="退出登录"]')
-    );
-    if (await logout.first().isVisible().catch(() => false)) {
-      await logout.first().click();
-    } else {
-      // Clear cookies to force re-auth
-      await page.context().clearCookies();
-      await page.goto("/");
-    }
+    // Logout：壳层已无退出按钮（在设置页）。后端会话是 Cookie + Bearer 双轨，
+    // 需要同时清 cookies 和 sessionStorage 才能真正登出
+    await page.context().clearCookies();
+    await page.evaluate(() => {
+      window.sessionStorage.clear();
+      window.localStorage.clear();
+    });
+    await page.goto("/");
 
     await expect(page.locator('input[name="username"]')).toBeVisible({
       timeout: 15_000,

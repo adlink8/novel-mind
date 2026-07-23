@@ -210,7 +210,9 @@ def validate_memory_graph(
             if child_key in nodes_by_key
             and nodes_by_key[child_key].node_kind in MIDDLE_KINDS
         ]
-        children = sorted(children, key=lambda node: (node.chapter_start, node.node_key))
+        children = sorted(
+            children, key=lambda node: (node.chapter_start, node.node_key)
+        )
         if children:
             cursor = global_node.chapter_start
             for index, child in enumerate(children):
@@ -269,7 +271,9 @@ def _has_cycle(adjacency: Mapping[str, Sequence[str]]) -> bool:
     return any(dfs(node) for node in adjacency)
 
 
-def node_views_from_payloads(rows: Iterable[Mapping[str, object]]) -> tuple[GraphNodeView, ...]:
+def node_views_from_payloads(
+    rows: Iterable[Mapping[str, object]],
+) -> tuple[GraphNodeView, ...]:
     """Strictly parse node mappings into graph views for pure tests."""
 
     views: list[GraphNodeView] = []

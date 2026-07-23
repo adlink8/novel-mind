@@ -174,7 +174,9 @@ async def list_eval_runs(
 @router.get("/datasets", response_model=list[EvalDatasetResponse])
 async def list_eval_datasets(
     novel_id: int | None = Query(None, description="按小说 ID 过滤"),
-    status: str | None = Query(None, description="按状态过滤: candidate/confirmed/rejected"),
+    status: str | None = Query(
+        None, description="按状态过滤: candidate/confirmed/rejected"
+    ),
     question_type: str | None = Query(None, description="按题型过滤"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_user),

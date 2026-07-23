@@ -78,7 +78,11 @@ def _parent_snapshot(*, nodes=None, claims=None, edges=None, links=None, plan=No
         "source_kind": "explicit_volume",
         "chapter_min": 1,
         "chapter_max": 3,
-        "chapter_to_parent": {"1": "story_arc:1-2", "2": "story_arc:1-2", "3": "story_arc:3-3"},
+        "chapter_to_parent": {
+            "1": "story_arc:1-2",
+            "2": "story_arc:1-2",
+            "3": "story_arc:3-3",
+        },
         "parent_to_global": {
             "story_arc:1-2": "global_story:book",
             "story_arc:3-3": "global_story:book",

@@ -19,10 +19,20 @@ def _event(logical_id: str, evidence: tuple[str, ...], **fields) -> MachineEvent
 
 def test_field_overrides_are_append_only_and_overlay_machine_rows():
     store = OverrideStore()
-    first = store.append(owner_id=1, novel_id=2, logical_event_id="old",
-                         field_name="title", value="人工标题")
-    second = store.append(owner_id=1, novel_id=2, logical_event_id="old",
-                          field_name="title", value="最终标题")
+    first = store.append(
+        owner_id=1,
+        novel_id=2,
+        logical_event_id="old",
+        field_name="title",
+        value="人工标题",
+    )
+    second = store.append(
+        owner_id=1,
+        novel_id=2,
+        logical_event_id="old",
+        field_name="title",
+        value="最终标题",
+    )
     event = _event("old", ("ev-1",))
 
     assert first.status == "superseded"
@@ -34,8 +44,13 @@ def test_field_overrides_are_append_only_and_overlay_machine_rows():
 
 def test_reanalysis_relinks_unique_stable_evidence_identity():
     store = OverrideStore()
-    override = store.append(owner_id=1, novel_id=2, logical_event_id="old",
-                            field_name="participants", value=["阿宁", "李舟"])
+    override = store.append(
+        owner_id=1,
+        novel_id=2,
+        logical_event_id="old",
+        field_name="participants",
+        value=["阿宁", "李舟"],
+    )
     result = relink_overrides(
         store.active_for(1, 2),
         old_events=[_event("old", ("ev-1", "ev-2"))],
@@ -44,18 +59,28 @@ def test_reanalysis_relinks_unique_stable_evidence_identity():
     assert result.relinked == 1
     assert override.logical_event_id == "new"
     assert override.needs_relink is False
-    assert apply_overrides(_event("new", ("ev-1", "ev-2")), [override])["participants"] == ["阿宁", "李舟"]
+    assert apply_overrides(_event("new", ("ev-1", "ev-2")), [override])[
+        "participants"
+    ] == ["阿宁", "李舟"]
 
 
-@pytest.mark.parametrize("new_events", [[], [
-    _event("new-a", ("ev-1",)), _event("new-b", ("ev-1",))
-]])
+@pytest.mark.parametrize(
+    "new_events", [[], [_event("new-a", ("ev-1",)), _event("new-b", ("ev-1",))]]
+)
 def test_missing_or_ambiguous_target_is_retained_as_needs_relink(new_events):
     store = OverrideStore()
-    override = store.append(owner_id=1, novel_id=2, logical_event_id="old",
-                            field_name="visible", value=False)
-    result = relink_overrides(store.active_for(1, 2),
-                              old_events=[_event("old", ("ev-1",))], new_events=new_events)
+    override = store.append(
+        owner_id=1,
+        novel_id=2,
+        logical_event_id="old",
+        field_name="visible",
+        value=False,
+    )
+    result = relink_overrides(
+        store.active_for(1, 2),
+        old_events=[_event("old", ("ev-1",))],
+        new_events=new_events,
+    )
     assert result.needs_relink == 1
     assert override.logical_event_id == "old"
     assert override.needs_relink is True
@@ -64,8 +89,13 @@ def test_missing_or_ambiguous_target_is_retained_as_needs_relink(new_events):
 
 def test_edges_are_derived_from_overlay_visible_fields():
     store = OverrideStore()
-    store.append(owner_id=1, novel_id=2, logical_event_id="target",
-                 field_name="visible", value=False)
+    store.append(
+        owner_id=1,
+        novel_id=2,
+        logical_event_id="target",
+        field_name="visible",
+        value=False,
+    )
     source = _event("source", ("s",))
     target = _event("target", ("t",))
     assert derive_visible_edge(source, target, store.active_for(1, 2)) is None

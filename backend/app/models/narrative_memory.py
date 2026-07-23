@@ -22,10 +22,9 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
-from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.models.base import Base, TimestampMixin
+from app.models.base import JSONB, Base, TimestampMixin
 
 
 MEMORY_NODE_KINDS = ("chapter_state", "story_arc", "volume", "global_story")
@@ -52,9 +51,7 @@ class NarrativeMemoryVersion(TimestampMixin, Base):
 
     __tablename__ = "narrative_memory_versions"
     __table_args__ = (
-        UniqueConstraint(
-            "owner_id", "novel_id", "id", name="uq_memory_versions_scope"
-        ),
+        UniqueConstraint("owner_id", "novel_id", "id", name="uq_memory_versions_scope"),
         UniqueConstraint(
             "owner_id",
             "novel_id",
@@ -236,9 +233,7 @@ class NarrativeMemoryClaim(TimestampMixin, Base):
             "confidence >= 0 AND confidence <= 1",
             name="ck_memory_claims_confidence",
         ),
-        CheckConstraint(
-            "visible_from_chapter > 0", name="ck_memory_claims_visibility"
-        ),
+        CheckConstraint("visible_from_chapter > 0", name="ck_memory_claims_visibility"),
         CheckConstraint(
             "length(claim_checksum) = 64", name="ck_memory_claims_checksum"
         ),
@@ -399,7 +394,9 @@ class NarrativeMemorySourceLink(TimestampMixin, Base):
             "source_start >= 0 AND source_end > source_start",
             name="ck_memory_links_offsets",
         ),
-        CheckConstraint("length(content_hash) = 64", name="ck_memory_links_content_hash"),
+        CheckConstraint(
+            "length(content_hash) = 64", name="ck_memory_links_content_hash"
+        ),
         CheckConstraint(
             "length(source_snapshot_hash) = 64",
             name="ck_memory_links_snapshot_hash",
@@ -410,9 +407,7 @@ class NarrativeMemorySourceLink(TimestampMixin, Base):
             name="ck_memory_links_lineage_checksum",
         ),
         Index("idx_memory_links_claim", "version_id", "claim_id"),
-        Index(
-            "idx_memory_links_evidence", "hierarchy_build_id", "evidence_node_id"
-        ),
+        Index("idx_memory_links_evidence", "hierarchy_build_id", "evidence_node_id"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -515,7 +510,9 @@ class NarrativeMemoryValidationReport(TimestampMixin, Base):
             f"verdict IN ({_quoted(MEMORY_VALIDATION_VERDICTS)})",
             name="ck_memory_reports_verdict",
         ),
-        CheckConstraint("length(report_checksum) = 64", name="ck_memory_reports_checksum"),
+        CheckConstraint(
+            "length(report_checksum) = 64", name="ck_memory_reports_checksum"
+        ),
         Index("idx_memory_reports_version", "version_id"),
         Index("idx_memory_reports_manifest", "manifest_checksum"),
     )

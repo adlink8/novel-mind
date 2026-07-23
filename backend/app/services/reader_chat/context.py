@@ -317,7 +317,10 @@ async def validate_chapter_context(
         raise SelectionValidationError("not_found", "chapter not found for owner scope")
 
     progress = await resolve_progress_snapshot(session, novel)
-    if not progress.full_book and int(chapter.chapter_number) > progress.cutoff_chapter_number:
+    if (
+        not progress.full_book
+        and int(chapter.chapter_number) > progress.cutoff_chapter_number
+    ):
         raise SelectionValidationError(
             "chapter_beyond_cutoff",
             "chapter is beyond the visible reading cutoff",
@@ -420,7 +423,9 @@ async def assemble_context_manifest(
     hierarchy_checksum = retrieval.hierarchy_checksum or selection.hierarchy_checksum
 
     primary_entry = ContextEvidenceEntry(
-        evidence_key=SELECTION_EVIDENCE_KEY if selection_bound else CHAPTER_EVIDENCE_KEY,
+        evidence_key=SELECTION_EVIDENCE_KEY
+        if selection_bound
+        else CHAPTER_EVIDENCE_KEY,
         source_type="selection" if selection_bound else "hierarchy",
         source_id=(
             f"{selection.chapter_id}:{selection.source_start}:{selection.source_end}"
@@ -472,7 +477,9 @@ async def assemble_context_manifest(
     }
 
     source_status = dict(retrieval.source_status)
-    source_status.setdefault("selection" if selection_bound else "chapter", SourceStatus.OK)
+    source_status.setdefault(
+        "selection" if selection_bound else "chapter", SourceStatus.OK
+    )
 
     draft = ContextManifest(
         reading_progress_snapshot=progress.as_dict(),
@@ -511,7 +518,9 @@ def assert_retry_uses_original_checksum(
     if stored_checksum != rebuilt_under_new_progress.manifest_checksum:
         # Document intentional divergence: rebuild under new progress is forbidden for retry.
         return
-    raise AssertionError("retry must not depend on rebuilt manifests matching by chance")
+    raise AssertionError(
+        "retry must not depend on rebuilt manifests matching by chance"
+    )
 
 
 def freeze_manifest_from_stored(

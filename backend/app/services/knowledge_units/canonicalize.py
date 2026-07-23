@@ -83,7 +83,9 @@ class NarrativeCanonicalizer:
                             (
                                 (NarrativeUnit.unit_stage == "canonical")
                                 & (NarrativeUnit.status == "candidate")
-                                & NarrativeUnit.lifecycle_status.in_(("current", "disputed"))
+                                & NarrativeUnit.lifecycle_status.in_(
+                                    ("current", "disputed")
+                                )
                             ),
                         ),
                     )
@@ -101,7 +103,10 @@ class NarrativeCanonicalizer:
         canonicalized = reused = 0
         for key, members in groups.items():
             representative, *duplicates = members
-            if representative.canonical_id == key and representative.unit_stage == "canonical":
+            if (
+                representative.canonical_id == key
+                and representative.unit_stage == "canonical"
+            ):
                 reused += 1
             else:
                 max_version = await db.scalar(
@@ -127,14 +132,19 @@ class NarrativeCanonicalizer:
             for right in units[index + 1 :]:
                 if canonical_key(left) == canonical_key(right):
                     continue
-                score = SequenceMatcher(None, normalize(left.answer), normalize(right.answer)).ratio()
+                score = SequenceMatcher(
+                    None, normalize(left.answer), normalize(right.answer)
+                ).ratio()
                 if score < similarity_threshold:
                     continue
                 reason = merge_block_reason(left, right) or "semantic_similarity_review"
                 reviews.append((left.id, right.id, reason))
         await db.flush()
         checksum = stable_hash(
-            sorted((unit.id, unit.canonical_id, unit.status, unit.lifecycle_status) for unit in units)
+            sorted(
+                (unit.id, unit.canonical_id, unit.status, unit.lifecycle_status)
+                for unit in units
+            )
         )
         return CanonicalizationReport(
             canonicalized=canonicalized,

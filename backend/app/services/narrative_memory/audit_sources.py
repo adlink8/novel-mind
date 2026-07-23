@@ -10,7 +10,9 @@ from app.services.narrative_memory.audit_contracts import AssetInventory
 
 @runtime_checkable
 class AssetInventorySource(Protocol):
-    async def inventory(self, *, owner_id: int, novel_id: int) -> tuple[AssetInventory, ...]:
+    async def inventory(
+        self, *, owner_id: int, novel_id: int
+    ) -> tuple[AssetInventory, ...]:
         """Observe assets without repairing or mutating their authority state."""
         ...
 
@@ -21,6 +23,8 @@ class InMemoryAssetInventorySource:
     def __init__(self, items: Iterable[AssetInventory]) -> None:
         self._items = tuple(items)
 
-    async def inventory(self, *, owner_id: int, novel_id: int) -> tuple[AssetInventory, ...]:
+    async def inventory(
+        self, *, owner_id: int, novel_id: int
+    ) -> tuple[AssetInventory, ...]:
         del owner_id, novel_id
         return self._items

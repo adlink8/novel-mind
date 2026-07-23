@@ -1,4 +1,5 @@
 """07-05 rollback tests."""
+
 from __future__ import annotations
 import pytest
 from app.services.chunking.builds import InMemoryBuildStore, create_candidate_build
@@ -9,12 +10,26 @@ from app.services.rag_fixture import stable_hash
 
 pytestmark = pytest.mark.integration
 
+
 def test_rollback_restores_previous_active():
     store = InMemoryBuildStore()
     chapters = [{"chapter_id": 1, "chapter_number": 1, "content": "回滚测试。" * 30}]
-    a = create_candidate_build(store, novel_id=1, chapters=chapters, source_snapshot_hash="1" * 64, force_full=True)
+    a = create_candidate_build(
+        store,
+        novel_id=1,
+        chapters=chapters,
+        source_snapshot_hash="1" * 64,
+        force_full=True,
+    )
     store.active[1] = a.build_id
-    b = create_candidate_build(store, novel_id=1, chapters=chapters, source_snapshot_hash="1" * 64, parent_build_id=a.build_id, force_full=True)
+    b = create_candidate_build(
+        store,
+        novel_id=1,
+        chapters=chapters,
+        source_snapshot_hash="1" * 64,
+        parent_build_id=a.build_id,
+        force_full=True,
+    )
     ev = QualifiedChunkerEvidence(
         build_id=b.build_id,
         manifest_checksum=b.manifest_checksum,

@@ -43,28 +43,36 @@ class ProductionTransport:
             chapter_id = payload["scope"]["chapter_id"]
             evidence = payload["evidence"][0]
             content = {
-                "events": [{
-                    "candidate_id": f"chapter-{chapter_id}-event",
-                    "title": f"Event in chapter {chapter_id}",
-                    "description": evidence["text"],
-                    "event_type": "plot",
-                    "narrative_chapter_number": chapter_id,
-                    "narrative_index": 0,
-                    "participants": [{"mention": "Mira", "entity_id": None}],
-                    "story_time": {"precision": "unknown"},
-                    "evidence": [{
-                        "chapter_id": chapter_id,
-                        "evidence_id": evidence["evidence_id"],
-                        "source_start": evidence["source_start"],
-                        "source_end": evidence["source_end"],
-                        "content_hash": evidence["content_hash"],
-                    }],
-                    "confidence": 0.95,
-                }],
+                "events": [
+                    {
+                        "candidate_id": f"chapter-{chapter_id}-event",
+                        "title": f"Event in chapter {chapter_id}",
+                        "description": evidence["text"],
+                        "event_type": "plot",
+                        "narrative_chapter_number": chapter_id,
+                        "narrative_index": 0,
+                        "participants": [{"mention": "Mira", "entity_id": None}],
+                        "story_time": {"precision": "unknown"},
+                        "evidence": [
+                            {
+                                "chapter_id": chapter_id,
+                                "evidence_id": evidence["evidence_id"],
+                                "source_start": evidence["source_start"],
+                                "source_end": evidence["source_end"],
+                                "content_hash": evidence["content_hash"],
+                            }
+                        ],
+                        "confidence": 0.95,
+                    }
+                ],
                 "story_time_constraints": [],
             }
         else:
-            content = {"duplicate_groups": [], "story_constraints": [], "causal_edges": []}
+            content = {
+                "duplicate_groups": [],
+                "story_constraints": [],
+                "causal_edges": [],
+            }
         return {
             "id": f"request-{len(self.calls)}",
             "content": json.dumps(content),
@@ -114,46 +122,75 @@ async def _seed_hierarchy(db_session):
     db_session.add(novel)
     await db_session.flush()
     chapters = [
-        Chapter(novel_id=novel.id, chapter_number=10, title="Ten", content="Mira wakes."),
-        Chapter(novel_id=novel.id, chapter_number=20, title="Twenty", content="Mira leaves."),
+        Chapter(
+            novel_id=novel.id, chapter_number=10, title="Ten", content="Mira wakes."
+        ),
+        Chapter(
+            novel_id=novel.id, chapter_number=20, title="Twenty", content="Mira leaves."
+        ),
     ]
     db_session.add_all(chapters)
     await db_session.flush()
     build = ChunkBuild(
-        build_id="worker-build", novel_id=novel.id, status="active",
-        source_snapshot_hash="a" * 64, manifest_checksum="b" * 64,
-        chunker_name="test", chunker_version="1", chunker_config_hash="c" * 64,
-        collection_name="test", is_candidate=False, immutable=True,
+        build_id="worker-build",
+        novel_id=novel.id,
+        status="active",
+        source_snapshot_hash="a" * 64,
+        manifest_checksum="b" * 64,
+        chunker_name="test",
+        chunker_version="1",
+        chunker_config_hash="c" * 64,
+        collection_name="test",
+        is_candidate=False,
+        immutable=True,
     )
     db_session.add(build)
-    db_session.add(ChunkActivePointer(
-        novel_id=novel.id, build_id=build.build_id, committed_at=datetime.now(UTC),
-    ))
+    db_session.add(
+        ChunkActivePointer(
+            novel_id=novel.id,
+            build_id=build.build_id,
+            committed_at=datetime.now(UTC),
+        )
+    )
     for index, chapter in enumerate(chapters):
         text = chapter.content
-        db_session.add(ChunkHierarchyNode(
-            build_id=build.build_id, novel_id=novel.id,
-            node_id=f"evidence-{chapter.id}", level="evidence",
-            chapter_id=chapter.id, chapter_number=chapter.chapter_number,
-            parent_id=f"scene-{chapter.id}", child_ids=[], content=text,
-            content_hash=__import__("hashlib").sha256(text.encode()).hexdigest(),
-            source_start=0, source_end=len(text), chunk_type="paragraph",
-            decision_lineage=[], order_index=index,
-        ))
+        db_session.add(
+            ChunkHierarchyNode(
+                build_id=build.build_id,
+                novel_id=novel.id,
+                node_id=f"evidence-{chapter.id}",
+                level="evidence",
+                chapter_id=chapter.id,
+                chapter_number=chapter.chapter_number,
+                parent_id=f"scene-{chapter.id}",
+                child_ids=[],
+                content=text,
+                content_hash=__import__("hashlib").sha256(text.encode()).hexdigest(),
+                source_start=0,
+                source_end=len(text),
+                chunk_type="paragraph",
+                decision_lineage=[],
+                order_index=index,
+            )
+        )
     await db_session.commit()
     return owner, novel, chapters
 
 
 @pytest.mark.asyncio
 async def test_first_entry_runs_durable_pipeline_and_repeat_entry_is_idempotent(
-    db_session, auth_client, monkeypatch,
+    db_session,
+    auth_client,
+    monkeypatch,
 ):
     owner, novel, chapters = await _seed_hierarchy(db_session)
     transport = ProductionTransport()
     sessions = async_sessionmaker(db_session.bind, expire_on_commit=False)
     runtime = TimelineWorkerRuntime(
         sessions=sessions,
-        gateway=TimelineModelGateway(transport, persistence=PostgresCallRepository(sessions)),
+        gateway=TimelineModelGateway(
+            transport, persistence=PostgresCallRepository(sessions)
+        ),
         extraction_deployment=_deployment("balanced-qualified"),
         reconciliation_deployment=_deployment("quality-qualified"),
     )
@@ -162,7 +199,9 @@ async def test_first_entry_runs_durable_pipeline_and_repeat_entry_is_idempotent(
     async def dispatch_dependents(_sessions, run, version_id: int) -> None:
         dependent_dispatches.append((run.owner_id, run.novel_id, version_id))
 
-    monkeypatch.setattr(timeline_worker, "_dispatch_dependent_analysis", dispatch_dependents)
+    monkeypatch.setattr(
+        timeline_worker, "_dispatch_dependent_analysis", dispatch_dependents
+    )
 
     async def dispatch(run_id: int) -> None:
         await run_timeline_worker(run_id, runtime=runtime)
@@ -177,42 +216,84 @@ async def test_first_entry_runs_durable_pipeline_and_repeat_entry_is_idempotent(
     db_session.expire_all()
     run = await db_session.get(AnalysisRun, run_id)
     assert run.status == "completed"
-    assert run.progress == {"completed_chapters": 2, "total_chapters": 2, "stage": "completed"}
-    pointer = await db_session.scalar(select(TimelineActivePointer).where(
-        TimelineActivePointer.owner_id == owner_id,
-        TimelineActivePointer.novel_id == novel_id,
-    ))
+    assert run.progress == {
+        "completed_chapters": 2,
+        "total_chapters": 2,
+        "stage": "completed",
+    }
+    pointer = await db_session.scalar(
+        select(TimelineActivePointer).where(
+            TimelineActivePointer.owner_id == owner_id,
+            TimelineActivePointer.novel_id == novel_id,
+        )
+    )
     assert pointer is not None and pointer.version_id == run.version_id
     assert dependent_dispatches == [(owner_id, novel_id, run.version_id)]
-    events = list((await db_session.scalars(select(MachineTimelineEvent).where(
-        MachineTimelineEvent.version_id == run.version_id,
-    ).order_by(MachineTimelineEvent.narrative_chapter_number))).all())
+    events = list(
+        (
+            await db_session.scalars(
+                select(MachineTimelineEvent)
+                .where(
+                    MachineTimelineEvent.version_id == run.version_id,
+                )
+                .order_by(MachineTimelineEvent.narrative_chapter_number)
+            )
+        ).all()
+    )
     assert [event.narrative_chapter_number for event in events] == [10, 20]
     assert await db_session.scalar(select(func.count(TimelineEvidenceRef.id))) == 2
-    completed = list((await db_session.scalars(select(AnalysisChapterStage).where(
-        AnalysisChapterStage.run_id == run.id,
-        AnalysisChapterStage.status == "completed",
-    ))).all())
+    completed = list(
+        (
+            await db_session.scalars(
+                select(AnalysisChapterStage).where(
+                    AnalysisChapterStage.run_id == run.id,
+                    AnalysisChapterStage.status == "completed",
+                )
+            )
+        ).all()
+    )
     assert {stage.stage_key for stage in completed} == {
         f"chapter_extract:{chapter_id}" for chapter_id in chapter_ids
     } | {"cross_chapter_reconcile:book"}
-    assert transport.calls == ["TimelineExtraction", "TimelineExtraction", "ReconciliationOutputModel"]
-    attempts = list((await db_session.scalars(select(ModelCallAttempt).where(
-        ModelCallAttempt.run_id == run.id,
-    ).order_by(ModelCallAttempt.id))).all())
-    assert [attempt.status for attempt in attempts] == ["succeeded", "succeeded", "succeeded"]
+    assert transport.calls == [
+        "TimelineExtraction",
+        "TimelineExtraction",
+        "ReconciliationOutputModel",
+    ]
+    attempts = list(
+        (
+            await db_session.scalars(
+                select(ModelCallAttempt)
+                .where(
+                    ModelCallAttempt.run_id == run.id,
+                )
+                .order_by(ModelCallAttempt.id)
+            )
+        ).all()
+    )
+    assert [attempt.status for attempt in attempts] == [
+        "succeeded",
+        "succeeded",
+        "succeeded",
+    ]
     assert [attempt.stage_key for attempt in attempts] == [
         f"chapter_extract:{chapter_id}" for chapter_id in chapter_ids
     ] + ["cross_chapter_reconcile:book"]
 
     again = await auth_client.post(f"/api/timeline/{novel_id}/start-or-resume")
     assert again.status_code == 200 and again.json()["id"] == run_id
-    assert transport.calls == ["TimelineExtraction", "TimelineExtraction", "ReconciliationOutputModel"]
+    assert transport.calls == [
+        "TimelineExtraction",
+        "TimelineExtraction",
+        "ReconciliationOutputModel",
+    ]
 
 
 @pytest.mark.asyncio
 async def test_resume_skips_completed_chapter_after_interruption(
-    db_session, auth_client, monkeypatch,
+    db_session,
+    auth_client,
+    monkeypatch,
 ):
     _, novel, chapters = await _seed_hierarchy(db_session)
     novel_id = novel.id
@@ -244,12 +325,18 @@ async def test_resume_skips_completed_chapter_after_interruption(
     assert resumed.status_code == 200
     db_session.expire_all()
     assert (await db_session.get(AnalysisRun, run_id)).status == "completed"
-    assert transport.extraction_attempts == [chapter_ids[0], chapter_ids[1], chapter_ids[1]]
+    assert transport.extraction_attempts == [
+        chapter_ids[0],
+        chapter_ids[1],
+        chapter_ids[1],
+    ]
 
 
 @pytest.mark.asyncio
-async def test_invalid_reconciliation_never_promotes_partial_candidate(
-    db_session, auth_client, monkeypatch,
+async def test_invalid_reconciliation_falls_back_to_deterministic_pass_through(
+    db_session,
+    auth_client,
+    monkeypatch,
 ):
     owner, novel, _ = await _seed_hierarchy(db_session)
     owner_id, novel_id = owner.id, novel.id
@@ -258,10 +345,20 @@ async def test_invalid_reconciliation_never_promotes_partial_candidate(
     runtime = TimelineWorkerRuntime(
         sessions=sessions,
         gateway=TimelineModelGateway(
-            transport, persistence=PostgresCallRepository(sessions),
+            transport,
+            persistence=PostgresCallRepository(sessions),
         ),
         extraction_deployment=_deployment("balanced-qualified"),
         reconciliation_deployment=_deployment("quality-qualified"),
+    )
+
+    dependent_dispatches: list[tuple[int, int, int]] = []
+
+    async def dispatch_dependents(_sessions, run, version_id: int) -> None:
+        dependent_dispatches.append((run.owner_id, run.novel_id, version_id))
+
+    monkeypatch.setattr(
+        timeline_worker, "_dispatch_dependent_analysis", dispatch_dependents
     )
 
     async def dispatch(run_id: int) -> None:
@@ -273,14 +370,43 @@ async def test_invalid_reconciliation_never_promotes_partial_candidate(
     run_id = response.json()["id"]
     db_session.expire_all()
     run = await db_session.get(AnalysisRun, run_id)
-    assert run.status == "paused_dependency"
-    assert await db_session.scalar(select(TimelineActivePointer.id).where(
-        TimelineActivePointer.owner_id == owner_id,
-        TimelineActivePointer.novel_id == novel_id,
-    )) is None
-    attempts = list((await db_session.scalars(select(ModelCallAttempt).where(
-        ModelCallAttempt.run_id == run_id,
-        ModelCallAttempt.stage_key == "cross_chapter_reconcile:book",
-    ).order_by(ModelCallAttempt.attempt_number))).all())
-    assert [attempt.status for attempt in attempts] == ["schema_rejected", "schema_rejected"]
+    # fail-soft：reconcile 两次校验失败后改用确定性 pass-through，
+    # 保留全部已抽取事件并正常完成、晋级（绝不晋级 LLM 的半截产物）。
+    assert run.status == "completed"
+    pointer = await db_session.scalar(
+        select(TimelineActivePointer).where(
+            TimelineActivePointer.owner_id == owner_id,
+            TimelineActivePointer.novel_id == novel_id,
+        )
+    )
+    assert pointer is not None and pointer.version_id == run.version_id
+    assert dependent_dispatches == [(owner_id, novel_id, run.version_id)]
+    events = list(
+        (
+            await db_session.scalars(
+                select(MachineTimelineEvent)
+                .where(
+                    MachineTimelineEvent.version_id == run.version_id,
+                )
+                .order_by(MachineTimelineEvent.narrative_chapter_number)
+            )
+        ).all()
+    )
+    assert [event.narrative_chapter_number for event in events] == [10, 20]
+    attempts = list(
+        (
+            await db_session.scalars(
+                select(ModelCallAttempt)
+                .where(
+                    ModelCallAttempt.run_id == run_id,
+                    ModelCallAttempt.stage_key == "cross_chapter_reconcile:book",
+                )
+                .order_by(ModelCallAttempt.attempt_number)
+            )
+        ).all()
+    )
+    assert [attempt.status for attempt in attempts] == [
+        "schema_rejected",
+        "schema_rejected",
+    ]
     assert transport.calls.count("ReconciliationOutputModel") == 2

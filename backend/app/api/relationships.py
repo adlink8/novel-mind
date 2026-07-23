@@ -127,7 +127,9 @@ async def create_character_merge_override(
             payload=payload,
         )
     except OverrideNotFoundError as exc:
-        raise HTTPException(status_code=404, detail="relationship override not found") from exc
+        raise HTTPException(
+            status_code=404, detail="relationship override not found"
+        ) from exc
     except OverrideValidationError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     await db.commit()
@@ -154,7 +156,9 @@ async def create_relationship_override(
             payload=payload,
         )
     except OverrideNotFoundError as exc:
-        raise HTTPException(status_code=404, detail="relationship override not found") from exc
+        raise HTTPException(
+            status_code=404, detail="relationship override not found"
+        ) from exc
     except OverrideValidationError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     await db.commit()
@@ -182,7 +186,9 @@ async def relink_relationship_override(
             override_kind="relationship",
         )
     except OverrideNotFoundError as exc:
-        raise HTTPException(status_code=404, detail="relationship override not found") from exc
+        raise HTTPException(
+            status_code=404, detail="relationship override not found"
+        ) from exc
     await db.commit()
     return row  # type: ignore[return-value]
 

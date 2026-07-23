@@ -7,7 +7,6 @@ deployment schema repair is allowed and audited.
 
 from __future__ import annotations
 
-import hashlib
 import json
 import logging
 import time
@@ -26,11 +25,20 @@ from app.services.relationships.evidence import (
 
 logger = logging.getLogger(__name__)
 
-PROMPT_PATH = Path(__file__).resolve().parents[3] / "prompts" / "relationship_semantic_judge.v1.txt"
+PROMPT_PATH = (
+    Path(__file__).resolve().parents[3]
+    / "prompts"
+    / "relationship_semantic_judge.v1.txt"
+)
 PROMPT_VERSION = "relationship_semantic_judge.v1"
 SCHEMA_VERSION = "relationship-semantic-judgment.v1"
 MAX_JUDGE_TOKENS = 1200
-DECODING_SPEC = {"temperature": 0.0, "stream": False, "provider_retries": 0, "max_tokens": MAX_JUDGE_TOKENS}
+DECODING_SPEC = {
+    "temperature": 0.0,
+    "stream": False,
+    "provider_retries": 0,
+    "max_tokens": MAX_JUDGE_TOKENS,
+}
 
 ChatCallable = Callable[..., Awaitable[Any]]
 
@@ -82,9 +90,7 @@ class RelationshipJudgmentService:
         self._exact_cache = exact_cache if exact_cache is not None else {}
         self._prompt_text = self._load_prompt()
         self.prompt_hash = sha256_text(self._prompt_text)
-        self.schema_hash = sha256_json(
-            RelationshipSemanticJudgment.model_json_schema()
-        )
+        self.schema_hash = sha256_json(RelationshipSemanticJudgment.model_json_schema())
         self.decoding_hash = sha256_json(DECODING_SPEC)
 
     def _load_prompt(self) -> str:
@@ -153,7 +159,10 @@ class RelationshipJudgmentService:
             parsed = self.parse_and_validate(deterministic_output, package=package)
             parsed.call_skipped = True
             parsed.model_name = model_name
-            parsed.model_lineage = {**model_lineage, "call_skipped_reason": "deterministic_output"}
+            parsed.model_lineage = {
+                **model_lineage,
+                "call_skipped_reason": "deterministic_output",
+            }
             parsed.prompt_hash = self.prompt_hash
             parsed.schema_hash = self.schema_hash
             parsed.decoding_hash = self.decoding_hash
@@ -164,7 +173,9 @@ class RelationshipJudgmentService:
         )
         cached = self._exact_cache.get(cache_key)
         if cached and cached.get("status") == "ok":
-            parsed = self.parse_and_validate(cached["structured_output"], package=package)
+            parsed = self.parse_and_validate(
+                cached["structured_output"], package=package
+            )
             parsed.call_skipped = True
             parsed.cache_hit = True
             parsed.model_name = model_name
@@ -225,7 +236,10 @@ class RelationshipJudgmentService:
         parsed.raw_output_hash = raw_hash
 
         # One same-deployment schema repair only.
-        if parsed.status in {"schema_failed", "evidence_failed"} and not parsed.repair_attempted:
+        if (
+            parsed.status in {"schema_failed", "evidence_failed"}
+            and not parsed.repair_attempted
+        ):
             repair = await self._repair_once(
                 package=package,
                 model_name=model_name,
@@ -385,7 +399,9 @@ class RelationshipJudgmentService:
             gate_status=gate_status,
             structured=output if not failures else None,
             structured_output=structured,
-            raw_output_hash=sha256_text(raw_text or json.dumps(structured, ensure_ascii=False)),
+            raw_output_hash=sha256_text(
+                raw_text or json.dumps(structured, ensure_ascii=False)
+            ),
             gate_failures=failures,
             prompt_hash=self.prompt_hash,
             schema_hash=self.schema_hash,

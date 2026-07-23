@@ -163,9 +163,10 @@ async def test_release_entry_blocks_postgres_authority_mismatch(
     )
 
     assert verdict["status"] == "blocked_release", verdict
-    assert verdict["checks"]["production_artifact_signature"] is False or verdict[
-        "checks"
-    ]["database_authority"] is False
+    assert (
+        verdict["checks"]["production_artifact_signature"] is False
+        or verdict["checks"]["database_authority"] is False
+    )
 
     await observer_engine.dispose()
     await aengine.dispose()

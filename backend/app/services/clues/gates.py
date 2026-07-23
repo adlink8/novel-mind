@@ -42,9 +42,23 @@ AUTO_ACCEPT_THRESHOLD = 0.85
 REVIEW_THRESHOLD = 0.65
 
 # Classifications that can support a given target state (necessary, not sufficient).
-CLASSIFICATION_FOR_TARGET: dict[ClueLifecycleState, frozenset[ClueSemanticClassification]] = {
-    ClueLifecycleState.ACTIVE: frozenset({ClueSemanticClassification.CUE_ONLY}),
-    ClueLifecycleState.REINFORCED: frozenset({ClueSemanticClassification.REINFORCEMENT}),
+CLASSIFICATION_FOR_TARGET: dict[
+    ClueLifecycleState, frozenset[ClueSemanticClassification]
+] = {
+    # ACTIVE is the entry state for any cue-bearing clue. A reinforcement or
+    # payoff classification still carries a cue (enforced by ClueSemanticJudgment),
+    # so it legitimately enters the active lifecycle and later progresses to
+    # REINFORCED / PAID_OFF. Only unrelated/ambiguous may not enter active.
+    ClueLifecycleState.ACTIVE: frozenset(
+        {
+            ClueSemanticClassification.CUE_ONLY,
+            ClueSemanticClassification.REINFORCEMENT,
+            ClueSemanticClassification.PAYOFF,
+        }
+    ),
+    ClueLifecycleState.REINFORCED: frozenset(
+        {ClueSemanticClassification.REINFORCEMENT}
+    ),
     ClueLifecycleState.PAID_OFF: frozenset({ClueSemanticClassification.PAYOFF}),
     ClueLifecycleState.DISMISSED: frozenset(
         {
@@ -149,7 +163,11 @@ class ClueGateService:
         if human_protected_confirm and dst == ClueLifecycleState.ACTIVE:
             # Human confirm may bypass semantic classification but not evidence.
             pass
-        elif dst == ClueLifecycleState.DISMISSED and allow_machine_dismiss and judgment is None:
+        elif (
+            dst == ClueLifecycleState.DISMISSED
+            and allow_machine_dismiss
+            and judgment is None
+        ):
             # Machine conflict disposition without judgment is allowed only with codes.
             failures.append("schema_gate:dismiss_without_judgment")
             # still need disposition path — require judgment for machine
@@ -176,7 +194,9 @@ class ClueGateService:
 
         # 3–4. evidence membership + offset/hash
         evidence_refs = self._collect_evidence_refs(package, parsed, dst)
-        evidence_failures = self._evidence_and_hash_failures(package, evidence_refs, parsed)
+        evidence_failures = self._evidence_and_hash_failures(
+            package, evidence_refs, parsed
+        )
         if evidence_failures:
             return self._reject(
                 src,
@@ -334,7 +354,9 @@ class ClueGateService:
                 return self._reject(
                     src,
                     dst,
-                    [f"threshold_conflict:classification_{parsed.classification.value}"],
+                    [
+                        f"threshold_conflict:classification_{parsed.classification.value}"
+                    ],
                     ["classification_blocks_transition"],
                     gate_status="threshold_failed",
                 )
@@ -527,7 +549,10 @@ class ClueGateService:
         laters = [units[i] for i in judgment.later_evidence_ids if i in units]
         if not cues:
             return ["temporal_gate:missing_cue"]
-        if dst in {ClueLifecycleState.REINFORCED, ClueLifecycleState.PAID_OFF} and not laters:
+        if (
+            dst in {ClueLifecycleState.REINFORCED, ClueLifecycleState.PAID_OFF}
+            and not laters
+        ):
             return ["temporal_gate:missing_later"]
         earliest_cue = min(u.narrative_key() for u in cues)
         for later in laters:

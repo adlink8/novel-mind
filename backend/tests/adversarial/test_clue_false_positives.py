@@ -215,7 +215,9 @@ def test_adversarial_false_active_and_paid_off_count_is_zero():
                 to_status=case["to"],
             )
         else:
-            judgment = case["judgment"](package) if case["judgment"] is not None else None
+            judgment = (
+                case["judgment"](package) if case["judgment"] is not None else None
+            )
             decision = gates.evaluate_transition(
                 package=package,
                 judgment=judgment,
@@ -234,7 +236,9 @@ def test_adversarial_false_active_and_paid_off_count_is_zero():
 
 def test_similarity_score_in_package_never_auto_accepts_without_valid_semantics():
     gates = ClueGateService()
-    package = _package(recall={"vector": {"score": 1.0}, "entity_overlap": {"shared": ["Alice"]}})
+    package = _package(
+        recall={"vector": {"score": 1.0}, "entity_overlap": {"shared": ["Alice"]}}
+    )
     # High-confidence motif-only must fail.
     decision = gates.evaluate_transition(
         package=package,

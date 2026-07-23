@@ -191,9 +191,7 @@ class NarrativeUnit(TimestampMixin, Base):
 
     __tablename__ = "narrative_units"
     __table_args__ = (
-        UniqueConstraint(
-            "owner_id", "novel_id", "id", name="uq_narrative_units_scope"
-        ),
+        UniqueConstraint("owner_id", "novel_id", "id", name="uq_narrative_units_scope"),
         UniqueConstraint(
             "owner_id",
             "novel_id",
@@ -242,8 +240,12 @@ class NarrativeUnit(TimestampMixin, Base):
             name="fk_narrative_units_primary_evidence_scope",
         ),
         CheckConstraint("version > 0", name="ck_narrative_units_version_positive"),
-        CheckConstraint("evidence_count > 0", name="ck_narrative_units_evidence_nonempty"),
-        CheckConstraint("confidence >= 0 AND confidence <= 1", name="ck_narrative_units_confidence"),
+        CheckConstraint(
+            "evidence_count > 0", name="ck_narrative_units_evidence_nonempty"
+        ),
+        CheckConstraint(
+            "confidence >= 0 AND confidence <= 1", name="ck_narrative_units_confidence"
+        ),
         Index("idx_narrative_units_owner_id", "owner_id"),
         Index("idx_narrative_units_novel_id", "novel_id"),
         Index("idx_narrative_units_snapshot_id", "source_snapshot_id"),
@@ -297,7 +299,11 @@ class NarrativeUnitEvidenceLink(TimestampMixin, Base):
         ),
         ForeignKeyConstraint(
             ["owner_id", "novel_id", "unit_id"],
-            ["narrative_units.owner_id", "narrative_units.novel_id", "narrative_units.id"],
+            [
+                "narrative_units.owner_id",
+                "narrative_units.novel_id",
+                "narrative_units.id",
+            ],
             ondelete="CASCADE",
             name="fk_unit_evidence_unit_scope",
         ),
@@ -462,9 +468,32 @@ class NarrativeSourceWatermark(TimestampMixin, Base):
 
     __tablename__ = "narrative_source_watermarks"
     __table_args__ = (
-        UniqueConstraint("owner_id", "novel_id", "domain_profile", name="uq_narrative_watermark_scope"),
-        ForeignKeyConstraint(["owner_id", "novel_id", "snapshot_id"], ["narrative_source_snapshots.owner_id", "narrative_source_snapshots.novel_id", "narrative_source_snapshots.id"], ondelete="RESTRICT", name="fk_narrative_watermark_snapshot_scope"),
-        ForeignKeyConstraint(["owner_id", "novel_id", "build_id"], ["narrative_index_builds.owner_id", "narrative_index_builds.novel_id", "narrative_index_builds.id"], ondelete="RESTRICT", name="fk_narrative_watermark_build_scope"),
+        UniqueConstraint(
+            "owner_id",
+            "novel_id",
+            "domain_profile",
+            name="uq_narrative_watermark_scope",
+        ),
+        ForeignKeyConstraint(
+            ["owner_id", "novel_id", "snapshot_id"],
+            [
+                "narrative_source_snapshots.owner_id",
+                "narrative_source_snapshots.novel_id",
+                "narrative_source_snapshots.id",
+            ],
+            ondelete="RESTRICT",
+            name="fk_narrative_watermark_snapshot_scope",
+        ),
+        ForeignKeyConstraint(
+            ["owner_id", "novel_id", "build_id"],
+            [
+                "narrative_index_builds.owner_id",
+                "narrative_index_builds.novel_id",
+                "narrative_index_builds.id",
+            ],
+            ondelete="RESTRICT",
+            name="fk_narrative_watermark_build_scope",
+        ),
         Index("idx_narrative_watermark_build_id", "build_id"),
     )
 
@@ -503,7 +532,9 @@ class NarrativeRefreshRun(TimestampMixin, Base):
     error_detail: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
-def _reject_snapshot_mutation(_mapper: object, _connection: object, target: object) -> None:
+def _reject_snapshot_mutation(
+    _mapper: object, _connection: object, target: object
+) -> None:
     raise ValueError(f"{type(target).__name__} records are immutable")
 
 

@@ -82,16 +82,24 @@ class AssetInventory(BaseModel):
 
     @field_validator("rebuild_ranges")
     @classmethod
-    def canonical_ranges(cls, value: tuple[RebuildRange, ...]) -> tuple[RebuildRange, ...]:
-        ordered = tuple(sorted(value, key=lambda item: (item.start_chapter, item.end_chapter)))
-        if len({(item.start_chapter, item.end_chapter) for item in ordered}) != len(ordered):
+    def canonical_ranges(
+        cls, value: tuple[RebuildRange, ...]
+    ) -> tuple[RebuildRange, ...]:
+        ordered = tuple(
+            sorted(value, key=lambda item: (item.start_chapter, item.end_chapter))
+        )
+        if len({(item.start_chapter, item.end_chapter) for item in ordered}) != len(
+            ordered
+        ):
             raise ValueError("rebuild_ranges must be unique")
         return ordered
 
     @model_validator(mode="after")
     def validate_availability(self) -> "AssetInventory":
         if self.healthy_empty and (not self.available or self.item_count != 0):
-            raise ValueError("healthy_empty requires an available source with item_count=0")
+            raise ValueError(
+                "healthy_empty requires an available source with item_count=0"
+            )
         if not self.available and self.healthy_empty:
             raise ValueError("an unavailable source cannot be healthy_empty")
         return self
@@ -120,9 +128,15 @@ class AssetEligibility(BaseModel):
 
     @field_validator("rebuild_ranges")
     @classmethod
-    def canonical_ranges(cls, value: tuple[RebuildRange, ...]) -> tuple[RebuildRange, ...]:
-        ordered = tuple(sorted(value, key=lambda item: (item.start_chapter, item.end_chapter)))
-        if len({(item.start_chapter, item.end_chapter) for item in ordered}) != len(ordered):
+    def canonical_ranges(
+        cls, value: tuple[RebuildRange, ...]
+    ) -> tuple[RebuildRange, ...]:
+        ordered = tuple(
+            sorted(value, key=lambda item: (item.start_chapter, item.end_chapter))
+        )
+        if len({(item.start_chapter, item.end_chapter) for item in ordered}) != len(
+            ordered
+        ):
             raise ValueError("rebuild_ranges must be unique")
         return ordered
 
@@ -144,21 +158,29 @@ class EligibilityReport(BaseModel):
             return value
         raw_assets = value.get("assets", ())
         assets = tuple(
-            item if isinstance(item, AssetEligibility) else AssetEligibility.model_validate(item)
+            item
+            if isinstance(item, AssetEligibility)
+            else AssetEligibility.model_validate(item)
             for item in raw_assets
         )
-        required = [item for item in assets if item.requirement == AssetRequirement.REQUIRED]
+        required = [
+            item for item in assets if item.requirement == AssetRequirement.REQUIRED
+        ]
         expected = bool(required) and all(
             item.status == EligibilityStatus.REUSABLE_EXACT for item in required
         )
         supplied = value.get("provider_calls_allowed")
         if supplied is not None and supplied != expected:
-            raise ValueError("provider_calls_allowed must be derived from required assets")
+            raise ValueError(
+                "provider_calls_allowed must be derived from required assets"
+            )
         return {**value, "provider_calls_allowed": expected}
 
     @field_validator("assets")
     @classmethod
-    def canonical_assets(cls, value: tuple[AssetEligibility, ...]) -> tuple[AssetEligibility, ...]:
+    def canonical_assets(
+        cls, value: tuple[AssetEligibility, ...]
+    ) -> tuple[AssetEligibility, ...]:
         if len({item.kind for item in value}) != len(value):
             raise ValueError("asset kinds must be unique")
         return tuple(sorted(value, key=lambda item: item.kind.value))
@@ -166,8 +188,13 @@ class EligibilityReport(BaseModel):
     @model_validator(mode="after")
     def validate_complete_scope(self) -> "EligibilityReport":
         if {item.kind for item in self.assets} != set(AssetKind):
-            raise ValueError("report must contain exactly one result for every asset kind")
-        if any(item.owner_id != self.owner_id or item.novel_id != self.novel_id for item in self.assets):
+            raise ValueError(
+                "report must contain exactly one result for every asset kind"
+            )
+        if any(
+            item.owner_id != self.owner_id or item.novel_id != self.novel_id
+            for item in self.assets
+        ):
             raise ValueError("asset scope must match report scope")
         expected_requirements = {
             AssetKind.HIERARCHY: AssetRequirement.REQUIRED,
@@ -175,6 +202,10 @@ class EligibilityReport(BaseModel):
             AssetKind.RELATIONSHIP: AssetRequirement.OPTIONAL,
             AssetKind.CLUE: AssetRequirement.OPTIONAL,
         }
-        if any(item.requirement != expected_requirements[item.kind] for item in self.assets):
-            raise ValueError("asset requirements are policy-defined and cannot be caller supplied")
+        if any(
+            item.requirement != expected_requirements[item.kind] for item in self.assets
+        ):
+            raise ValueError(
+                "asset requirements are policy-defined and cannot be caller supplied"
+            )
         return self

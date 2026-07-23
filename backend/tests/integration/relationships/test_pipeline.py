@@ -165,7 +165,10 @@ def _seed_pipeline_graph(engine, *, relation_type: str = "ally") -> dict[str, An
             source_id=ent_alice.id,
             target_kind="entity_candidate",
             target_id=ent_bob.id,
-            recall_signals={"adjacency": {"same_chapter": True}, "vector": {"score": 0.88}},
+            recall_signals={
+                "adjacency": {"same_chapter": True},
+                "vector": {"score": 0.88},
+            },
             package_snapshot={"allowed_evidence_ids": [evidence.ref_key]},
             evidence_refs=[evidence.ref_key],
             status="accepted",
@@ -324,9 +327,7 @@ async def test_pipeline_accepts_fiction_edge_and_is_idempotent(
         assert result1.provider_calls == 0  # deterministic call_skipped
         assert result1.call_skipped >= 1
 
-        obs = (
-            await db.execute(select(RelationshipObservation))
-        ).scalars().all()
+        obs = (await db.execute(select(RelationshipObservation))).scalars().all()
         assert len(obs) == 1
         assert obs[0].status == "accepted"
         assert obs[0].relation_type == "ally"
@@ -337,9 +338,7 @@ async def test_pipeline_accepts_fiction_edge_and_is_idempotent(
         assert obs[0].idempotency_key
         checksum_before = obs[0].observation_checksum
 
-        links = (
-            await db.execute(select(RelationshipEvidenceLink))
-        ).scalars().all()
+        links = (await db.execute(select(RelationshipEvidenceLink))).scalars().all()
         assert len(links) == 1
         assert links[0].evidence_id == ids["evidence_id"]
         assert links[0].content_hash
@@ -353,9 +352,7 @@ async def test_pipeline_accepts_fiction_edge_and_is_idempotent(
             deterministic_outputs=det,
         )
         await db.commit()
-        obs2 = (
-            await db.execute(select(RelationshipObservation))
-        ).scalars().all()
+        obs2 = (await db.execute(select(RelationshipObservation))).scalars().all()
         assert len(obs2) == 1
         assert obs2[0].observation_checksum == checksum_before
         assert result2.status == "completed"
@@ -407,8 +404,8 @@ async def test_pipeline_rejects_non_edges_and_threshold_review(
         assert len(obs) == 0
 
         candidates = (
-            await db.execute(select(RelationshipObservationCandidate))
-        ).scalars().all()
+            (await db.execute(select(RelationshipObservationCandidate))).scalars().all()
+        )
         assert len(candidates) == 1
         assert candidates[0].status == "needs_human_review"
         assert candidates[0].relation_type == "ally"
@@ -452,8 +449,8 @@ async def test_pipeline_forged_evidence_and_revoked_source_fail_closed(
         obs = (await db.execute(select(RelationshipObservation))).scalars().all()
         assert len(obs) == 0
         judgments = (
-            await db.execute(select(RelationshipObservationJudgment))
-        ).scalars().all()
+            (await db.execute(select(RelationshipObservationJudgment))).scalars().all()
+        )
         assert judgments
         assert judgments[0].status in {
             "rejected",

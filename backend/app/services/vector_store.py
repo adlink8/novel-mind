@@ -163,6 +163,7 @@ class VectorStore:
                 filters={"chunk_type": "dialogue"}
             )
         """
+
         def _search():
             collection = self._get_collection(novel_id)
 
@@ -192,32 +193,41 @@ class VectorStore:
         results = []
         if result and result["ids"] and result["ids"][0]:
             ids = result["ids"][0]
-            documents = result["documents"][0] if result["documents"] else [None] * len(ids)
-            distances = result["distances"][0] if result["distances"] else [0.0] * len(ids)
-            metadatas = result["metadatas"][0] if result["metadatas"] else [{}] * len(ids)
+            documents = (
+                result["documents"][0] if result["documents"] else [None] * len(ids)
+            )
+            distances = (
+                result["distances"][0] if result["distances"] else [0.0] * len(ids)
+            )
+            metadatas = (
+                result["metadatas"][0] if result["metadatas"] else [{}] * len(ids)
+            )
 
             for i, chunk_id in enumerate(ids):
                 # ChromaDB cosine distance = 1 - similarity
                 score = 1.0 - distances[i] if distances[i] is not None else 0.0
-                results.append({
-                    "chunk_id": chunk_id,
-                    "content": documents[i],
-                    "score": max(0.0, min(1.0, score)),
-                    "metadata": metadatas[i] or {},
-                })
+                results.append(
+                    {
+                        "chunk_id": chunk_id,
+                        "content": documents[i],
+                        "score": max(0.0, min(1.0, score)),
+                        "metadata": metadatas[i] or {},
+                    }
+                )
 
         return results
 
     async def delete_novel_chunks(self, novel_id: int) -> None:
         """
-        删除指定小说的全部向量集合。
+        删除指定小说的全部向量集合（幂等：集合不存在时静默成功）。
 
         Args:
             novel_id: 小说 ID
 
         Raises:
-            VectorStoreError: 删除失败时抛出
+            VectorStoreError: 删除失败时抛出（集合不存在除外）
         """
+
         def _delete():
             self.client.delete_collection(name=f"novel_{novel_id}")
 
@@ -225,6 +235,10 @@ class VectorStore:
             await asyncio.to_thread(_delete)
             logger.info("已删除 novel_%d 向量集合", novel_id)
         except Exception as e:
+            # 集合本就不存在视为已删除（删除语义幂等），其余错误照常抛出
+            if "does not exist" in str(e):
+                logger.info("novel_%d 向量集合不存在，跳过删除", novel_id)
+                return
             logger.error("删除向量集合失败 novel_%d: %s", novel_id, e)
             raise VectorStoreError(f"删除向量集合失败: {e}") from e
 
@@ -238,6 +252,7 @@ class VectorStore:
         Returns:
             向量数量（集合不存在时返回 0）
         """
+
         def _count():
             try:
                 collection = self._get_collection(novel_id)

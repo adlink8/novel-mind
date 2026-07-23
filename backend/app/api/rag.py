@@ -30,7 +30,11 @@ async def _get_novel_for_search(
     novel = result.scalar_one_or_none()
     if not novel:
         raise HTTPException(status_code=404, detail="小说不存在")
-    if current_user and novel.owner_id != current_user.id and not current_user.is_superuser:
+    if (
+        current_user
+        and novel.owner_id != current_user.id
+        and not current_user.is_superuser
+    ):
         raise HTTPException(status_code=403, detail="无权访问该小说")
     return novel
 
@@ -43,7 +47,9 @@ async def _get_owned_novel(
     """获取小说并验证所有权（必须认证）。"""
     result = await db.execute(select(Novel).where(Novel.id == novel_id))
     novel = result.scalar_one_or_none()
-    if not novel or (novel.owner_id != current_user.id and not current_user.is_superuser):
+    if not novel or (
+        novel.owner_id != current_user.id and not current_user.is_superuser
+    ):
         raise HTTPException(status_code=404, detail="小说不存在")
     return novel
 

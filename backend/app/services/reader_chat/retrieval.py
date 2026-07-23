@@ -161,7 +161,9 @@ class RetrievalResult:
     analysis_version_id: int | None
 
 
-def bound_excerpt(text: str, max_code_points: int = DEFAULT_MAX_EXCERPT_CODE_POINTS) -> str:
+def bound_excerpt(
+    text: str, max_code_points: int = DEFAULT_MAX_EXCERPT_CODE_POINTS
+) -> str:
     if code_point_len_local(text) <= max_code_points:
         return text
     return code_point_slice_local(text, 0, max_code_points - 1) + "…"
@@ -281,7 +283,11 @@ async def fetch_hierarchy_evidence(
                     "level": node.level,
                 },
                 priority=SOURCE_PRIORITY["hierarchy"],
-                rank_key=(0 if is_overlap else 1, node.chapter_number, node.source_start),
+                rank_key=(
+                    0 if is_overlap else 1,
+                    node.chapter_number,
+                    node.source_start,
+                ),
             )
         )
     return items, omitted
@@ -610,34 +616,36 @@ async def retrieve_visible_evidence(
 
     chapters = list(
         (
-            await session.scalars(
-                select(Chapter).where(Chapter.novel_id == novel.id)
-            )
+            await session.scalars(select(Chapter).where(Chapter.novel_id == novel.id))
         ).all()
     )
     chapters_by_id = {c.id: c for c in chapters}
     chapters_by_number = {c.chapter_number: c for c in chapters}
 
-    timeline_items, omitted["timeline"], source_status["timeline"] = (
-        await fetch_timeline_evidence(
-            session,
-            owner_id=owner_id,
-            novel_id=novel.id,
-            version_id=version_id,
-            cutoff_chapter=cutoff_chapter,
-            full_book=full_book,
-            chapters_by_id=chapters_by_id,
-            max_items=max_per_source,
-        )
+    (
+        timeline_items,
+        omitted["timeline"],
+        source_status["timeline"],
+    ) = await fetch_timeline_evidence(
+        session,
+        owner_id=owner_id,
+        novel_id=novel.id,
+        version_id=version_id,
+        cutoff_chapter=cutoff_chapter,
+        full_book=full_book,
+        chapters_by_id=chapters_by_id,
+        max_items=max_per_source,
     )
 
     # Knowledge units are optional; absence is explicit and never invented.
     source_status["knowledge"] = SourceStatus.ABSENT
     knowledge_items: list[RetrievedEvidence] = []
 
-    rel_items, omitted["relationship_observation"], source_status[
-        "relationship_observation"
-    ] = await fetch_relationship_evidence(
+    (
+        rel_items,
+        omitted["relationship_observation"],
+        source_status["relationship_observation"],
+    ) = await fetch_relationship_evidence(
         session,
         novel=novel,
         owner_id=owner_id,

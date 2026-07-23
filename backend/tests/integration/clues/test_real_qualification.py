@@ -44,9 +44,7 @@ def _executed_command_specs(tmp_path: Path, *, failing_index: int | None = None)
 async def _qualified_report(pg_async_url: str):
     engine = create_async_engine(pg_async_url)
     sessions = async_sessionmaker(engine, expire_on_commit=False)
-    report = await run_production_qualification(
-        sessions=sessions, repo_root=REPO_ROOT
-    )
+    report = await run_production_qualification(sessions=sessions, repo_root=REPO_ROOT)
     assert report["status"] == "qualified", report
     return engine, sessions, report
 

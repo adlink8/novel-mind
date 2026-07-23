@@ -293,7 +293,9 @@ def _seed_candidate(engine, *, seal: bool = False) -> dict[str, int | str]:
 
 def test_candidate_authority_metadata_exports_exactly_seven_sidecar_tables():
     metadata_names = {
-        name for name in models.Base.metadata.tables if name.startswith("narrative_memory_")
+        name
+        for name in models.Base.metadata.tables
+        if name.startswith("narrative_memory_")
     }
 
     # Phase 13 seven tables remain present; later phases may add builder/rebuild/qual tables.
@@ -392,7 +394,7 @@ def test_migration_roundtrip_removes_functions_triggers_and_tables(
 
     run_alembic("upgrade", "head", database_url=empty_postgres)
     current = run_alembic("current", database_url=empty_postgres)
-    assert "17memqual01" in (current.stdout + current.stderr)
+    assert "18appsetting1" in (current.stdout + current.stderr)
 
 
 def test_scope_fks_version_owner_and_source_leaf_closure_fail_closed(
@@ -510,9 +512,7 @@ def test_graph_trigger_rejects_transition_range_and_cycle(
     with engine.begin() as conn, pytest.raises(DBAPIError) as exc:
         conn.execute(
             text(edge_sql),
-            edge_params(
-                ids["global_id"], ids["chapter_node_id"], "derives_from"
-            ),
+            edge_params(ids["global_id"], ids["chapter_node_id"], "derives_from"),
         )
     assert "memory_edge_transition_violation" in str(exc.value)
 
@@ -680,7 +680,9 @@ def test_all_authority_is_append_only_and_seal_blocks_late_content(
             )
         assert "append_only_violation" in str(exc.value)
         with engine.begin() as conn, pytest.raises(DBAPIError) as exc:
-            conn.execute(text(f"DELETE FROM {table_name} WHERE id = :id"), {"id": row_id})
+            conn.execute(
+                text(f"DELETE FROM {table_name} WHERE id = :id"), {"id": row_id}
+            )
         assert "append_only_violation" in str(exc.value)
 
     late_inserts = (
@@ -746,15 +748,13 @@ def test_database_schema_has_no_memory_control_plane_or_pointer(
         # Phase 13 authority remains; Phase 14–17 may add builder/rebuild/qual tables.
         assert AUTHORITY_TABLES <= names
         assert not any(
-            fragment in name
-            for name in names
-            for fragment in FORBIDDEN_TABLE_FRAGMENTS
+            fragment in name for name in names for fragment in FORBIDDEN_TABLE_FRAGMENTS
         )
         assert "narrative_memory_active_pointers" not in names
     engine.dispose()
 
     current = run_alembic("current", database_url=empty_postgres)
-    assert "17memqual01" in (current.stdout + current.stderr)
+    assert "18appsetting1" in (current.stdout + current.stderr)
 
     engine = create_engine(empty_postgres)
     with engine.connect() as conn:
@@ -762,5 +762,7 @@ def test_database_schema_has_no_memory_control_plane_or_pointer(
         assert AUTHORITY_TABLES <= table_names
         assert "narrative_memory_active_pointers" not in table_names
         for table_name in AUTHORITY_TABLES:
-            assert conn.execute(text(f"SELECT COUNT(*) FROM {table_name}")).scalar() == 0
+            assert (
+                conn.execute(text(f"SELECT COUNT(*) FROM {table_name}")).scalar() == 0
+            )
     engine.dispose()

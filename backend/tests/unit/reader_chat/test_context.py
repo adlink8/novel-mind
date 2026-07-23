@@ -76,7 +76,9 @@ def test_content_sha256_is_utf8_bytes_digest():
 # ---------------------------------------------------------------------------
 
 
-def _selection(content: str, start: int, end: int, **overrides: Any) -> SelectionCoordinate:
+def _selection(
+    content: str, start: int, end: int, **overrides: Any
+) -> SelectionCoordinate:
     exact = content[start:end]
     payload = {
         "chapter_id": 1,
@@ -90,7 +92,9 @@ def _selection(content: str, start: int, end: int, **overrides: Any) -> Selectio
     return SelectionCoordinate(**payload)
 
 
-def _mock_session_with_chapter(*, chapter_id: int, novel_id: int, content: str, chapter_number: int = 1):
+def _mock_session_with_chapter(
+    *, chapter_id: int, novel_id: int, content: str, chapter_number: int = 1
+):
     chapter = SimpleNamespace(
         id=chapter_id,
         novel_id=novel_id,
@@ -405,9 +409,7 @@ def test_dialogue_framing_is_flagged_non_evidence_in_prompt_inputs():
     # Pure structural expectation used by assemble_context_manifest.
     from app.services.reader_chat.context import _dialogue_framing
 
-    framing = _dialogue_framing(
-        [{"role": "user", "body": "之前的问题", "sequence": 1}]
-    )
+    framing = _dialogue_framing([{"role": "user", "body": "之前的问题", "sequence": 1}])
     assert framing["label"] == "CONVERSATIONAL_FRAMING_NOT_EVIDENCE"
     assert framing["is_evidence"] is False
     assert "body" not in framing["turns"][0]
@@ -460,5 +462,7 @@ async def test_phase09_reader_binding_requires_load_filtered_contract():
     # Real Phase 09 service exposes the contract — binding must succeed.
     from app.services.relationships.query import relationship_graph_query_service
 
-    reader = Phase09RelationshipObservationReader(service=relationship_graph_query_service)
+    reader = Phase09RelationshipObservationReader(
+        service=relationship_graph_query_service
+    )
     assert reader is not None

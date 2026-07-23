@@ -433,7 +433,7 @@ export function ReaderChatPanel({
       <button
         type="button"
         data-testid="reader-chat-chip"
-        className="fixed bottom-20 right-3 z-40 flex items-center gap-2 rounded-full border border-border bg-card px-3 py-2 text-sm shadow-lg transition-[opacity,transform] motion-duration-spatial motion-ease-enter"
+        className="fixed bottom-[calc(5rem_+_env(safe-area-inset-bottom))] right-3 z-40 flex items-center gap-2 rounded-full border border-border bg-card px-3 py-2 text-sm shadow-lg transition-[opacity,transform] motion-duration-spatial motion-ease-enter md:bottom-6"
         onClick={() => onCollapsedChange(false)}
       >
         <MessageSquarePlus className="size-4" />
@@ -799,7 +799,7 @@ export function ReaderChatPanel({
 
   if (layout === "mobile") {
     return (
-      <div className="fixed inset-x-0 bottom-14 z-40 px-0 sm:px-2">
+      <div className="fixed inset-x-0 bottom-[calc(4.75rem_+_env(safe-area-inset-bottom))] z-40 px-0 sm:px-2 md:bottom-6">
         {panelBody}
       </div>
     );

@@ -258,15 +258,14 @@ async def carry_forward_from_plan(
         i.asset_key
         for i in items
         if i.decision == RebuildDecision.CARRIED.value
-        and i.asset_kind
-        in {"chapter_state", "story_arc", "volume", "global_story"}
+        and i.asset_kind in {"chapter_state", "story_arc", "volume", "global_story"}
     }
     dirty_keys = {
         i.asset_key
         for i in items
-        if i.decision in {RebuildDecision.DIRTY.value, RebuildDecision.STALE_BLOCKED.value}
-        and i.asset_kind
-        in {"chapter_state", "story_arc", "volume", "global_story"}
+        if i.decision
+        in {RebuildDecision.DIRTY.value, RebuildDecision.STALE_BLOCKED.value}
+        and i.asset_kind in {"chapter_state", "story_arc", "volume", "global_story"}
     }
 
     # Idempotent: if all carried nodes already exist under target, return.

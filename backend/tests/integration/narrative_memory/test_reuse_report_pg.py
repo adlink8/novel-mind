@@ -34,7 +34,9 @@ from app.services.narrative_memory.contracts import (
 )
 from app.services.narrative_memory.manifests import seal_and_report
 from app.services.narrative_memory.rebuild_contracts import stable_checksum
-from app.services.narrative_memory.rebuild_executor import materialize_carry_and_dirty_stages
+from app.services.narrative_memory.rebuild_executor import (
+    materialize_carry_and_dirty_stages,
+)
 from app.services.narrative_memory.reuse_report import (
     persist_reuse_report,
     recompute_reuse_report,
@@ -47,7 +49,9 @@ pytestmark = pytest.mark.integration
 HEX = "a" * 64
 
 
-def _spec(version_key: str, *, parent_version_id: int | None = None) -> CandidateVersionSpec:
+def _spec(
+    version_key: str, *, parent_version_id: int | None = None
+) -> CandidateVersionSpec:
     return CandidateVersionSpec(
         version_key=version_key,
         prompt_hash=HEX,
@@ -447,7 +451,9 @@ async def test_no_change_report_full_carry_zero_calls(report_env) -> None:
         assert body["observed_actual"]["label"] == "observed_actual"
         assert body["observed_actual"]["calls"] == 0
         assert body["carry_reuse"]["carried_item_count"] >= 3
-        assert body["carried_counts"]["total"] == body["carry_reuse"]["carried_item_count"]
+        assert (
+            body["carried_counts"]["total"] == body["carry_reuse"]["carried_item_count"]
+        )
         assert body["full_rebuild_upper_bound"]["calls"] == 5
         assert body["avoided_upper_bound"]["calls"] == 5
         assert body["full_rebuild_upper_bound"]["price_known"] is True
@@ -522,7 +528,9 @@ async def test_edit_report_separates_dirty_and_carry(report_env) -> None:
         assert body["rebuilt_counts"]["total"] >= 1
         assert body["carried_counts"]["total"] >= 1
         # Carry count from items, not stages
-        assert body["carry_reuse"]["carried_item_count"] == body["carried_counts"]["total"]
+        assert (
+            body["carry_reuse"]["carried_item_count"] == body["carried_counts"]["total"]
+        )
         assert body["observed_actual"]["calls"] == 0  # no worker provider calls yet
         assert body["observed_actual"]["dirty_stage_rows"] >= 1
         assert body["full_rebuild_upper_bound"]["price_known"] is False

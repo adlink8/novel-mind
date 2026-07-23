@@ -353,9 +353,7 @@ async def build_clue_version_view(
     for clue in clues:
         evs = evidence_by_logical.get(clue.logical_clue_id, [])
         if cutoff is not None:
-            visible_evs = [
-                e for e in evs if e.narrative_chapter_number <= cutoff
-            ]
+            visible_evs = [e for e in evs if e.narrative_chapter_number <= cutoff]
             # Hide clues whose first cue is beyond cutoff.
             cue_chapters = [
                 e.narrative_chapter_number for e in visible_evs if e.role == "cue"
@@ -372,19 +370,23 @@ async def build_clue_version_view(
     visible_logical = {c.logical_clue_id for c in visible_clues}
 
     # Overrides only for already-visible logical IDs (no future text leak).
-    override_rows = list(
-        (
-            await session.scalars(
-                select(ClueOverride)
-                .where(
-                    ClueOverride.owner_id == owner_id,
-                    ClueOverride.novel_id == novel.id,
-                    ClueOverride.logical_clue_id.in_(visible_logical),
+    override_rows = (
+        list(
+            (
+                await session.scalars(
+                    select(ClueOverride)
+                    .where(
+                        ClueOverride.owner_id == owner_id,
+                        ClueOverride.novel_id == novel.id,
+                        ClueOverride.logical_clue_id.in_(visible_logical),
+                    )
+                    .order_by(ClueOverride.id)
                 )
-                .order_by(ClueOverride.id)
-            )
-        ).all()
-    ) if visible_logical else []
+            ).all()
+        )
+        if visible_logical
+        else []
+    )
     heads = latest_overrides(override_rows)
     override_by_logical: dict[str, dict[str, Any]] = {}
     for row in heads:
@@ -416,14 +418,19 @@ async def build_clue_version_view(
         if "disposition" in ovr:
             provenance["disposition"] = "manual"
             action = getattr(ovr["disposition"], "action", None) or (
-                ovr["disposition"].action if hasattr(ovr["disposition"], "action") else None
+                ovr["disposition"].action
+                if hasattr(ovr["disposition"], "action")
+                else None
             )
             # value may hold to_status
             val = getattr(ovr["disposition"], "value", {}) or {}
             if isinstance(val, dict):
                 if val.get("to_status") == "dismissed":
                     derived = ClueLifecycleState.DISMISSED
-                elif val.get("to_status") == "active" and derived == ClueLifecycleState.CANDIDATE:
+                elif (
+                    val.get("to_status") == "active"
+                    and derived == ClueLifecycleState.CANDIDATE
+                ):
                     derived = ClueLifecycleState.ACTIVE
             if action == "reject":
                 derived = ClueLifecycleState.DISMISSED
@@ -453,7 +460,9 @@ async def build_clue_version_view(
                 character_ids.add(int(link.character_id))
 
         if character_id is not None:
-            link_chars = {int(l.character_id) for l in visible_links if l.character_id}
+            link_chars = {
+                int(link.character_id) for link in visible_links if link.character_id
+            }
             if character_id not in link_chars:
                 continue
 
@@ -502,11 +511,11 @@ async def build_clue_version_view(
         )
         state_counter[derived.value] += 1
 
-    available_states = [
-        ClueLifecycleState(s) for s in sorted(state_counter.keys())
-    ]
-    cutoff_chapter = int(cutoff or 1) if cutoff is not None else max(
-        (i.narrative_chapter_number for i in items), default=1
+    available_states = [ClueLifecycleState(s) for s in sorted(state_counter.keys())]
+    cutoff_chapter = (
+        int(cutoff or 1)
+        if cutoff is not None
+        else max((i.narrative_chapter_number for i in items), default=1)
     )
     return ClueVisibleEnvelope(
         novel_id=novel.id,
@@ -671,13 +680,13 @@ async def clue_detail_panels(
         ],
         "links": [
             {
-                "target_kind": l.target_kind,
-                "character_id": l.character_id,
-                "timeline_event_id": l.timeline_event_id,
-                "relationship_observation_ref": l.relationship_observation_ref,
-                "validation_status": l.validation_status,
+                "target_kind": link.target_kind,
+                "character_id": link.character_id,
+                "timeline_event_id": link.timeline_event_id,
+                "relationship_observation_ref": link.relationship_observation_ref,
+                "validation_status": link.validation_status,
             }
-            for l in links
+            for link in links
         ],
         "lifecycle": [
             {

@@ -12,9 +12,13 @@
  */
 
 import { create } from "zustand";
-import { aiModelsApi, type AIModelConfig, type AIModelConfigCreate } from "@/lib/api";
-
-type RoutingPreference = "quality" | "balanced" | "budget";
+import {
+  aiModelsApi,
+  settingsApi,
+  type AIModelConfig,
+  type AIModelConfigCreate,
+  type RoutingPreference,
+} from "@/lib/api";
 
 interface AIConfigState {
   models: AIModelConfig[];
@@ -29,7 +33,8 @@ interface AIConfigState {
   removeModel: (id: number) => Promise<void>;
   setDefaultModel: (id: number) => Promise<void>;
   testConnection: (id: number) => Promise<void>;
-  setRoutingPreference: (pref: RoutingPreference) => void;
+  fetchRoutingPreference: () => Promise<void>;
+  setRoutingPreference: (pref: RoutingPreference) => Promise<void>;
   clearError: () => void;
 }
 
@@ -120,6 +125,26 @@ export const useAIConfigStore = create<AIConfigState>((set, get) => ({
     }
   },
 
-  setRoutingPreference: (pref: RoutingPreference) => set({ routingPreference: pref }),
+  /** 拉取服务端持久化的路由偏好；失败时保留当前值（默认 balanced），不阻塞页面 */
+  fetchRoutingPreference: async () => {
+    try {
+      const res = await settingsApi.getRouting();
+      set({ routingPreference: res.data.preference });
+    } catch {
+      // 后端未就绪或网络失败时保持现状
+    }
+  },
+
+  /** 切换路由偏好：先 PUT 持久化，成功后更新本地状态 */
+  setRoutingPreference: async (pref: RoutingPreference) => {
+    try {
+      const res = await settingsApi.putRouting(pref);
+      set({ routingPreference: res.data.preference, error: null });
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to save routing preference";
+      set({ error: message });
+    }
+  },
   clearError: () => set({ error: null }),
 }));

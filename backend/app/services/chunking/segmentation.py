@@ -177,7 +177,10 @@ def segment_from_proposals(
         if prop is None:
             # Missing proposal — conservative merge if within hard max
             nxt = spans[i + 1]
-            if sum(s.char_count for s in current) + nxt.char_count <= cfg.max_chunk_size:
+            if (
+                sum(s.char_count for s in current) + nxt.char_count
+                <= cfg.max_chunk_size
+            ):
                 decision_notes.append("implicit_merge")
                 continue
             flush(decision_notes + ["implicit_split_hard_max"])

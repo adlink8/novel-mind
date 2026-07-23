@@ -13,9 +13,7 @@ BACKEND = Path(__file__).resolve().parents[2]
 NM = BACKEND / "app" / "services" / "narrative_memory"
 MODELS = BACKEND / "app" / "models" / "narrative_memory_qualification.py"
 SCRIPT = BACKEND / "scripts" / "run_narrative_memory_qualification.py"
-MIGRATION = (
-    BACKEND / "migrations" / "versions" / "17_narrative_memory_qualification.py"
-)
+MIGRATION = BACKEND / "migrations" / "versions" / "17_narrative_memory_qualification.py"
 API_DIR = BACKEND / "app" / "api"
 
 
@@ -29,7 +27,12 @@ def test_migration_head_chain():
 
 def test_schema_no_selector_columns():
     text = MODELS.read_text(encoding="utf-8")
-    for frag in ("active_pointer", "current_version", "promoted", "is_active_candidate"):
+    for frag in (
+        "active_pointer",
+        "current_version",
+        "promoted",
+        "is_active_candidate",
+    ):
         assert frag not in text
 
 
@@ -38,7 +41,10 @@ def test_no_fastapi_route_for_qualification():
         return
     for path in API_DIR.rglob("*.py"):
         src = path.read_text(encoding="utf-8")
-        if "narrative_memory_qualification" in src or "run_narrative_memory_qualification" in src:
+        if (
+            "narrative_memory_qualification" in src
+            or "run_narrative_memory_qualification" in src
+        ):
             pytest.fail(f"API should not expose qualification: {path}")
 
 

@@ -43,9 +43,7 @@ def test_pending_adjudication_is_llm_eligible_only():
 def test_hard_max_respected_in_segments():
     cfg = RuleEngineConfig(min_chunk_size=10, max_chunk_size=30)
     text = ("很长的句子用来撑满限制。" * 3 + "。") * 6
-    result = segment_chapter(
-        chapter_id=3, chapter_number=1, content=text, cfg=cfg
-    )
+    result = segment_chapter(chapter_id=3, chapter_number=1, content=text, cfg=cfg)
     for seg in result.segments:
         # allow small join overhead but not multi-hard-max collapse
         assert seg.char_count <= cfg.max_chunk_size * 3
@@ -62,9 +60,7 @@ def test_segmentation_deterministic():
 
 def test_low_confidence_uses_fallback_but_queues():
     text = "他说：“未闭合引号" + "继续含糊叙述。" * 8
-    spans, proposals = analyze_chapter(
-        chapter_id=5, chapter_number=1, content=text
-    )
+    spans, proposals = analyze_chapter(chapter_id=5, chapter_number=1, content=text)
     result = segment_from_proposals(spans, proposals)
     # Always produces segments (fallback present)
     assert result.segments
@@ -73,12 +69,7 @@ def test_low_confidence_uses_fallback_but_queues():
 
 
 def test_dialogue_continuity_and_location():
-    text = (
-        "「你好。」" 
-        + "「再见。」" 
-        + "他走进大殿，四周灯火通明。" 
-        + "外面风雨大作。"
-    )
+    text = "「你好。」" + "「再见。」" + "他走进大殿，四周灯火通明。" + "外面风雨大作。"
     result = segment_chapter(
         chapter_id=6,
         chapter_number=2,
@@ -112,8 +103,7 @@ def test_segment_content_matches_chapter_source_slice():
         "    说起来，我并不擅长跟女孩子对谈。\n\n"
         "    翌日换景，他走进大殿。\n\n"
         "    外面风雨大作，故事继续。\n\n"
-        "    收尾段落甲。" * 2
-        + "收尾段落乙。" * 2
+        "    收尾段落甲。" * 2 + "收尾段落乙。" * 2
     )
     result = segment_chapter(
         chapter_id=91,

@@ -222,9 +222,7 @@ class SourceSnapshotService:
         source_watermark = _content_hash(
             {
                 "manifest_checksum": manifest_checksum,
-                "source_versions": [
-                    item.source_version_hash for item in ordered_items
-                ],
+                "source_versions": [item.source_version_hash for item in ordered_items],
             }
         )
         return FrozenSourceManifest(
@@ -468,9 +466,7 @@ class SourceSnapshotService:
         }
         judgment_hash = _content_hash(judgment_payload)
         candidate_hash = _content_hash(candidate_payload)
-        evidence_hash = _content_hash(
-            [entry["content_hash"] for entry in evidence]
-        )
+        evidence_hash = _content_hash([entry["content_hash"] for entry in evidence])
         item_hash = _content_hash(
             {
                 "judgment_id": judgment.id,
@@ -519,8 +515,7 @@ class SourceSnapshotService:
                 NarrativeSourceSnapshot.owner_id == manifest.owner_id,
                 NarrativeSourceSnapshot.novel_id == manifest.novel_id,
                 NarrativeSourceSnapshot.domain_profile == manifest.domain_profile,
-                NarrativeSourceSnapshot.manifest_checksum
-                == manifest.manifest_checksum,
+                NarrativeSourceSnapshot.manifest_checksum == manifest.manifest_checksum,
                 NarrativeSourceSnapshot.source_watermark == manifest.source_watermark,
             )
             .order_by(NarrativeSourceSnapshot.id.asc())

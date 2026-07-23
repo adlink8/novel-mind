@@ -1,9 +1,14 @@
 """07-04 hierarchical retrieval behavior."""
+
 from __future__ import annotations
 import pytest
-from app.services.chunking.hierarchy import build_chapter_hierarchy, expand_evidence_to_scene
+from app.services.chunking.hierarchy import (
+    build_chapter_hierarchy,
+    expand_evidence_to_scene,
+)
 
 pytestmark = pytest.mark.integration
+
 
 def test_evidence_hit_scene_expand_raw_fallback():
     tree = build_chapter_hierarchy(

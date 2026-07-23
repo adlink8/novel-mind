@@ -48,7 +48,9 @@ async def test_exact_hierarchy_allows_provider_and_optional_empty_is_healthy() -
 
 @pytest.mark.asyncio
 async def test_required_missing_blocks_but_optional_missing_is_unavailable() -> None:
-    report = await audit_assets(InMemoryAssetInventorySource([]), owner_id=1, novel_id=2)
+    report = await audit_assets(
+        InMemoryAssetInventorySource([]), owner_id=1, novel_id=2
+    )
     statuses = {item.kind: item.status for item in report.assets}
     assert statuses[AssetKind.HIERARCHY] == EligibilityStatus.BLOCKED
     assert statuses[AssetKind.TIMELINE] == EligibilityStatus.OPTIONAL_UNAVAILABLE
@@ -90,7 +92,9 @@ async def test_scope_mismatch_fails_closed_without_copying_foreign_scope() -> No
 
 @pytest.mark.asyncio
 async def test_duplicate_inventory_is_rejected() -> None:
-    source = InMemoryAssetInventorySource([_inventory(AssetKind.HIERARCHY), _inventory(AssetKind.HIERARCHY)])
+    source = InMemoryAssetInventorySource(
+        [_inventory(AssetKind.HIERARCHY), _inventory(AssetKind.HIERARCHY)]
+    )
     with pytest.raises(ValueError, match="duplicate inventory"):
         await audit_assets(source, owner_id=1, novel_id=2)
 
@@ -98,7 +102,9 @@ async def test_duplicate_inventory_is_rejected() -> None:
 def test_package_has_no_mutation_or_provider_capabilities() -> None:
     root = Path(__file__).parents[3] / "app" / "services" / "narrative_memory"
     pure_files = ("__init__.py", "audit.py", "audit_contracts.py", "audit_sources.py")
-    pure_text = "\n".join((root / name).read_text(encoding="utf-8") for name in pure_files).lower()
+    pure_text = "\n".join(
+        (root / name).read_text(encoding="utf-8") for name in pure_files
+    ).lower()
     pure_forbidden = (
         "sqlalchemy",
         "model_gateway",

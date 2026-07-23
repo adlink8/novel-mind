@@ -24,7 +24,6 @@ from app.core.database import get_db
 from app.core.security import require_user
 from app.models.novel import Novel
 from app.models.user import User
-from app.schemas.analysis import AnalysisResponse
 from app.services.analysis_service import (
     SUPPORTED_TYPES,
     AnalysisError,
@@ -46,15 +45,11 @@ class AnalyzeBody(BaseModel):
         default=True,
         description="是否尝试 LLM 精炼；失败时仍返回 Phase07 结构分析",
     )
-    rebuild_hierarchy: bool = Field(
-        default=False, description="强制重建层级树后再分析"
-    )
+    rebuild_hierarchy: bool = Field(default=False, description="强制重建层级树后再分析")
     model: str | None = Field(default=None, description="可选 LiteLLM 模型 ID")
 
 
-async def _owned_novel(
-    novel_id: int, db: AsyncSession, user: User
-) -> Novel:
+async def _owned_novel(novel_id: int, db: AsyncSession, user: User) -> Novel:
     novel = (
         await db.execute(select(Novel).where(Novel.id == novel_id))
     ).scalar_one_or_none()
@@ -192,4 +187,6 @@ async def rebuild_hierarchy(
 @router.post("/{novel_id}/analyze/stream")
 async def analyze_novel_stream(novel_id: int):
     """流式输出分析过程（SSE）— 后续迭代。"""
-    raise HTTPException(status_code=501, detail="流式剧情分析尚未实现，请使用 POST /analyze")
+    raise HTTPException(
+        status_code=501, detail="流式剧情分析尚未实现，请使用 POST /analyze"
+    )

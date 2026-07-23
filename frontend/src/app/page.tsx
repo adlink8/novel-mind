@@ -112,8 +112,8 @@ export default function HomePage() {
 
   return (
     <PageContainer className="py-6 sm:py-8">
-      {/* ── 桌面端：整页对开 3D 动态翻页书（倾斜开卷 + 悬浮 + 金光） ── */}
-      <div className="hidden lg:flex lg:min-h-[86vh] lg:items-center lg:justify-center">
+      {/* ── 平板/桌面：整页对开 3D 动态翻页书（倾斜开卷 + 悬浮 + 金光） ── */}
+      <div className="hidden md:flex md:min-h-[86vh] md:items-center md:justify-center">
         <FlipBook
           pages={bookPages}
           tone="on-light"
@@ -138,8 +138,8 @@ export default function HomePage() {
         />
       </div>
 
-      {/* ── 窄屏：同一本书的单页竖版形态（封面即首页） ── */}
-      <div className="flex justify-center py-4 lg:hidden">
+      {/* ── 窄屏（手机）：同一本书的单页竖版形态（封面即首页） ── */}
+      <div className="flex justify-center py-4 md:hidden">
         <FlipBook
           layout="single"
           pages={bookPages}

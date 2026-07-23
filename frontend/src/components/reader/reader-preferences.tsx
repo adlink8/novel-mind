@@ -14,10 +14,11 @@ import {
   Play,
   Settings2,
   Sun,
+  SunMoon,
 } from "lucide-react";
 
 export type ReaderMode = "paged" | "scroll";
-export type ReaderTheme = "light" | "dark" | "custom";
+export type ReaderTheme = "light" | "dark" | "custom" | "system";
 
 export interface ReaderPreferences {
   immersive: boolean;
@@ -26,6 +27,12 @@ export interface ReaderPreferences {
   autoScrollSpeed: number;
   theme: ReaderTheme;
   customBackground: string;
+  /** 正文字号（px） */
+  fontSize: number;
+  /** 正文行距（倍数） */
+  lineHeight: number;
+  /** 正文最大行宽（px） */
+  contentWidth: number;
 }
 
 export const READER_PREFERENCES_KEY = "novelmind:reader-preferences:v1";
@@ -37,13 +44,35 @@ export const DEFAULT_READER_PREFERENCES: ReaderPreferences = {
   autoScrollSpeed: 1,
   theme: "light",
   customBackground: "#efe4d1",
+  fontSize: 18,
+  lineHeight: 2.1,
+  contentWidth: 760,
 };
 
-/** Accept only validated light|dark|custom — never evaluate custom as markup. */
+/** Accept only validated light|dark|custom|system — never evaluate custom as markup. */
 export function parseReaderTheme(value: unknown): ReaderTheme {
-  return value === "dark" || value === "custom" || value === "light"
+  return value === "dark" ||
+    value === "custom" ||
+    value === "light" ||
+    value === "system"
     ? value
     : "light";
+}
+
+/** Resolve "system" via prefers-color-scheme; everything else passes through. */
+export function resolveReaderTheme(
+  theme: ReaderTheme
+): "light" | "dark" | "custom" {
+  const parsed = parseReaderTheme(theme);
+  if (parsed !== "system") return parsed;
+  if (
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-color-scheme: dark)").matches
+  ) {
+    return "dark";
+  }
+  return "light";
 }
 
 /** Six-digit hex only; invalid values fall back to the safe default. */
@@ -82,6 +111,9 @@ export function loadReaderPreferences(): ReaderPreferences {
       theme: parseReaderTheme(stored.theme),
       customBackground: parseCustomBackground(stored.customBackground),
       autoScrollSpeed: normalizeAutoScrollMultiplier(stored.autoScrollSpeed),
+      fontSize: normalizeFontSize(stored.fontSize),
+      lineHeight: normalizeLineHeight(stored.lineHeight),
+      contentWidth: normalizeContentWidth(stored.contentWidth),
     };
   } catch {
     return DEFAULT_READER_PREFERENCES;
@@ -110,7 +142,7 @@ export interface ApplyReaderThemeOptions {
 }
 
 /**
- * Apply light/dark/custom to the document root.
+ * Apply light/dark/custom/system to the document root.
  * Safe for pre-paint bootstrap and React reconciliation — never injects markup.
  */
 export function applyReaderTheme(
@@ -120,10 +152,11 @@ export function applyReaderTheme(
   if (typeof document === "undefined") return;
   const root = document.documentElement;
   const resolved = parseReaderTheme(theme);
+  const effective = resolveReaderTheme(resolved);
 
-  root.classList.toggle("dark", resolved === "dark");
+  root.classList.toggle("dark", effective === "dark");
   root.dataset.readerTheme = resolved;
-  root.style.colorScheme = resolved === "dark" ? "dark" : "light";
+  root.style.colorScheme = effective === "dark" ? "dark" : "light";
 
   if (resolved === "custom") {
     const background = parseCustomBackground(options.customBackground);
@@ -148,7 +181,7 @@ export function applyReaderTheme(
  */
 export const THEME_BOOT_SCRIPT = `(function(){try{var k=${JSON.stringify(
   READER_PREFERENCES_KEY
-)};var raw=localStorage.getItem(k);if(!raw)return;var p=JSON.parse(raw);var t=p&&p.theme;if(t!=="dark"&&t!=="custom"&&t!=="light")t="light";var r=document.documentElement;r.classList.toggle("dark",t==="dark");r.setAttribute("data-reader-theme",t);r.style.colorScheme=t==="dark"?"dark":"light";if(t==="custom"){var bg=typeof p.customBackground==="string"?p.customBackground.trim():"";if(!/^#[0-9a-fA-F]{6}$/.test(bg))bg=${JSON.stringify(
+)};var raw=localStorage.getItem(k);if(!raw)return;var p=JSON.parse(raw);var t=p&&p.theme;if(t!=="dark"&&t!=="custom"&&t!=="light"&&t!=="system")t="light";var e=t;if(t==="system"){try{e=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";}catch(err){e="light";}}var r=document.documentElement;r.classList.toggle("dark",e==="dark");r.setAttribute("data-reader-theme",t);r.style.colorScheme=e==="dark"?"dark":"light";if(t==="custom"){var bg=typeof p.customBackground==="string"?p.customBackground.trim():"";if(!/^#[0-9a-fA-F]{6}$/.test(bg))bg=${JSON.stringify(
   DEFAULT_READER_PREFERENCES.customBackground
 )};r.style.setProperty("--reader-custom-background",bg);var n=bg.slice(1);var R=parseInt(n.slice(0,2),16),G=parseInt(n.slice(2,4),16),B=parseInt(n.slice(4,6),16);var L=(R*299+G*587+B*114)/1000;r.style.setProperty("--reader-custom-foreground",L>145?"28 20% 13%":"42 35% 96%");}}catch(e){}})();`;
 
@@ -158,6 +191,24 @@ function normalizeAutoScrollMultiplier(value: unknown): number {
   // Migrate the previous pixels-per-second preference to a multiplier.
   const multiplier = numeric > 4 ? numeric / 32 : numeric;
   return Math.min(4, Math.max(0.5, Math.round(multiplier * 4) / 4));
+}
+
+function normalizeFontSize(value: unknown): number {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return DEFAULT_READER_PREFERENCES.fontSize;
+  return Math.min(24, Math.max(16, Math.round(numeric)));
+}
+
+function normalizeLineHeight(value: unknown): number {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return DEFAULT_READER_PREFERENCES.lineHeight;
+  return Math.min(2.6, Math.max(1.6, Math.round(numeric * 10) / 10));
+}
+
+function normalizeContentWidth(value: unknown): number {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return DEFAULT_READER_PREFERENCES.contentWidth;
+  return Math.min(1000, Math.max(600, Math.round(numeric / 20) * 20));
 }
 
 interface ReaderPreferencesPanelProps {
@@ -255,7 +306,43 @@ export function ReaderPreferencesPanel({
             </SegmentButton>
           </SettingGroup>
 
-          <SettingGroup label="背景模式">
+          <div className="mb-4 rounded-xl border border-border/70 p-3">
+            <p className="mb-3 text-xs font-semibold">排版</p>
+            <div className="space-y-3">
+              <TypographySlider
+                label="字号"
+                display={`${preferences.fontSize}px`}
+                min={16}
+                max={24}
+                step={1}
+                value={preferences.fontSize}
+                ariaLabel="正文字号"
+                onChange={(value) => update({ fontSize: value })}
+              />
+              <TypographySlider
+                label="行距"
+                display={preferences.lineHeight.toFixed(1)}
+                min={1.6}
+                max={2.6}
+                step={0.1}
+                value={preferences.lineHeight}
+                ariaLabel="正文行距"
+                onChange={(value) => update({ lineHeight: value })}
+              />
+              <TypographySlider
+                label="行宽"
+                display={`${preferences.contentWidth}px`}
+                min={600}
+                max={1000}
+                step={20}
+                value={preferences.contentWidth}
+                ariaLabel="正文行宽"
+                onChange={(value) => update({ contentWidth: value })}
+              />
+            </div>
+          </div>
+
+          <SettingGroup label="背景模式" columns={4}>
             <SegmentButton
               active={preferences.theme === "light"}
               onClick={() => update({ theme: "light" })}
@@ -276,6 +363,13 @@ export function ReaderPreferencesPanel({
               icon={<Palette className="size-4" />}
             >
               自定义
+            </SegmentButton>
+            <SegmentButton
+              active={preferences.theme === "system"}
+              onClick={() => update({ theme: "system" })}
+              icon={<SunMoon className="size-4" />}
+            >
+              系统
             </SegmentButton>
           </SettingGroup>
 
@@ -377,15 +471,24 @@ export function ReaderPreferencesPanel({
 
 function SettingGroup({
   label,
+  columns = 3,
   children,
 }: {
   label: string;
+  columns?: 3 | 4;
   children: React.ReactNode;
 }) {
   return (
     <fieldset className="mb-4">
       <legend className="mb-2 text-xs font-semibold">{label}</legend>
-      <div className="grid grid-cols-3 gap-1 rounded-xl bg-muted/70 p-1">{children}</div>
+      <div
+        className={cn(
+          "grid gap-1 rounded-xl bg-muted/70 p-1",
+          columns === 4 ? "grid-cols-4" : "grid-cols-3"
+        )}
+      >
+        {children}
+      </div>
     </fieldset>
   );
 }
@@ -416,5 +519,44 @@ function SegmentButton({
       {icon}
       {children}
     </button>
+  );
+}
+
+function TypographySlider({
+  label,
+  display,
+  min,
+  max,
+  step,
+  value,
+  ariaLabel,
+  onChange,
+}: {
+  label: string;
+  display: string;
+  min: number;
+  max: number;
+  step: number;
+  value: number;
+  ariaLabel: string;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <label className="block text-[11px] text-muted-foreground">
+      <span className="mb-1.5 flex items-center justify-between">
+        <span>{label}</span>
+        <span className="tabular-nums">{display}</span>
+      </span>
+      <input
+        aria-label={ariaLabel}
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(event) => onChange(Number(event.target.value))}
+        className="h-1.5 w-full cursor-pointer accent-primary"
+      />
+    </label>
   );
 }

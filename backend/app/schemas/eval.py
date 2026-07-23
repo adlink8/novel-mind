@@ -22,12 +22,18 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 # ── EvalDataset ──────────────────────────────────────────────────────
 
+
 class EvalDatasetCreate(BaseModel):
     """创建评测测试题"""
+
     novel_id: int = Field(..., ge=1, description="小说 ID")
     question: str = Field(..., min_length=1, max_length=2000, description="测试问题")
     question_type: Literal[
-        "original_text", "character_relation", "event_causality", "timeline", "foreshadowing"
+        "original_text",
+        "character_relation",
+        "event_causality",
+        "timeline",
+        "foreshadowing",
     ] = Field(
         default="original_text",
         description="题型: original_text / character_relation / event_causality / timeline / foreshadowing",
@@ -52,10 +58,18 @@ class EvalDatasetCreate(BaseModel):
 
 class EvalDatasetUpdate(BaseModel):
     """更新评测测试题（人工审核）"""
+
     question: str | None = Field(None, min_length=1, max_length=2000)
-    question_type: Literal[
-        "original_text", "character_relation", "event_causality", "timeline", "foreshadowing"
-    ] | None = None
+    question_type: (
+        Literal[
+            "original_text",
+            "character_relation",
+            "event_causality",
+            "timeline",
+            "foreshadowing",
+        ]
+        | None
+    ) = None
     difficulty: Literal["easy", "medium", "hard"] | None = None
     gold_chunks: list[int] | None = None
     expected_points: list[str] | None = None
@@ -67,6 +81,7 @@ class EvalDatasetUpdate(BaseModel):
 
 class EvalDatasetResponse(BaseModel):
     """评测测试题响应"""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -85,8 +100,10 @@ class EvalDatasetResponse(BaseModel):
 
 # ── EvalRun ──────────────────────────────────────────────────────────
 
+
 class EvalRunCreate(BaseModel):
     """创建评测运行"""
+
     run_name: str = Field(..., min_length=1, max_length=200)
     strategy: Literal["bm25", "baseline_vector", "hybrid_search"] = Field(
         default="hybrid_search",
@@ -100,6 +117,7 @@ class EvalRunCreate(BaseModel):
 
 class EvalRunResponse(BaseModel):
     """评测运行响应"""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -121,8 +139,10 @@ class EvalRunResponse(BaseModel):
 
 # ── EvalResult ───────────────────────────────────────────────────────
 
+
 class EvalResultResponse(BaseModel):
     """单条评测结果响应"""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -138,8 +158,10 @@ class EvalResultResponse(BaseModel):
 
 # ── EvalReport ───────────────────────────────────────────────────────
 
+
 class EvalReportResponse(BaseModel):
     """评测报告聚合响应"""
+
     run: EvalRunResponse
     results: list[EvalResultResponse]
     error_cases: list[EvalResultResponse] = []
@@ -563,4 +585,3 @@ class CrossChunkerReportResponse(BaseModel):
     source_snapshot_hash: str
     series: list[CrossChunkerSeriesItem]
     exclusions: list[CrossChunkerExclusion] = Field(default_factory=list)
-

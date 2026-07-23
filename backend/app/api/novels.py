@@ -1,6 +1,14 @@
 """小说管理 API — 接入 novel_service + 数据库"""
 
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Query, BackgroundTasks
+from fastapi import (
+    APIRouter,
+    Depends,
+    UploadFile,
+    File,
+    HTTPException,
+    Query,
+    BackgroundTasks,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -112,9 +120,7 @@ async def upload_novel(
             filename=file.filename or "upload.txt",
             headers=Headers({"content-type": "text/plain"}),
         )
-        await import_service.process_import_file(
-            db, job.id, wrapped, current_user.id
-        )
+        await import_service.process_import_file(db, job.id, wrapped, current_user.id)
         await db.refresh(job)
         return NovelUploadResponse(
             id=job.id,
@@ -184,9 +190,7 @@ async def bulk_delete_novels(
     deleted_ids, skipped_ids = await novel_service.delete_novels(
         db, data.novel_ids, owner_id=owner_id
     )
-    return NovelBulkDeleteResponse(
-        deleted_ids=deleted_ids, skipped_ids=skipped_ids
-    )
+    return NovelBulkDeleteResponse(deleted_ids=deleted_ids, skipped_ids=skipped_ids)
 
 
 @router.get("/{novel_id}", response_model=NovelResponse)

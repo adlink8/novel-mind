@@ -124,7 +124,10 @@ def _link(**overrides: object) -> SimpleNamespace:
 
 def test_manifest_is_insertion_order_independent() -> None:
     version = _version()
-    nodes_a = (_node(id=1, node_key="chapter:1"), _node(id=2, node_key="global", node_kind="global_story", chapter_end=1))
+    nodes_a = (
+        _node(id=1, node_key="chapter:1"),
+        _node(id=2, node_key="global", node_kind="global_story", chapter_end=1),
+    )
     nodes_b = tuple(reversed(nodes_a))
     claims = (_claim(),)
     edges = (_edge(),)

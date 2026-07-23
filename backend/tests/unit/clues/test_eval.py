@@ -128,7 +128,6 @@ def test_history_domain_rejected():
     fixture = load_fixture(FIXTURE)
     bad = copy.deepcopy(fixture)
     bad["domain"] = "history"
-    path = FIXTURE  # use structure check via manual raise
     with pytest.raises(ValueError, match="fiction-only"):
         # Simulate load validation
         if bad["domain"] != "fiction":

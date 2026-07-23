@@ -126,17 +126,19 @@ export function SearchPanel({
         aria-hidden="true"
       />
 
-      <aside
-        ref={layerRef}
-        aria-label="小说内搜索"
-        aria-hidden={closing || undefined}
-        className={cn(
-          "fixed right-0 top-0 z-50 flex h-full w-[400px] max-w-[90vw] flex-col border-l border-border bg-background shadow-xl transition-[opacity,transform] motion-duration-spatial motion-ease-enter",
-          isOpen && !closing
-            ? "translate-x-0 opacity-100"
-            : "pointer-events-none translate-x-8 opacity-0 motion-ease-exit"
-        )}
-      >
+      {/* 视口裁切层：面板右滑退出时不撑出文档横向滚动 */}
+      <div className="pointer-events-none fixed inset-0 z-50 overflow-hidden">
+        <aside
+          ref={layerRef}
+          aria-label="小说内搜索"
+          aria-hidden={closing || undefined}
+          className={cn(
+            "absolute right-0 top-0 flex h-full w-[400px] max-w-[90vw] flex-col border-l border-border bg-background shadow-xl transition-[opacity,transform] motion-duration-spatial motion-ease-enter",
+            isOpen && !closing
+              ? "pointer-events-auto translate-x-0 opacity-100"
+              : "translate-x-full opacity-0 motion-ease-exit"
+          )}
+        >
         <div className="flex items-center gap-2 border-b border-border p-4">
           <Input
             ref={inputRef}
@@ -209,6 +211,7 @@ export function SearchPanel({
           )}
         </div>
       </aside>
+      </div>
     </>
   );
 }

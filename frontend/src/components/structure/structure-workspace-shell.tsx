@@ -52,7 +52,11 @@ export function StructureWorkspaceShell({
   children,
   className,
 }: Props) {
-  const [treeOpen, setTreeOpen] = useState(true);
+  // 窄屏默认收起树栏，把宽度让给画布（与阅读页目录同策略）
+  const [treeOpen, setTreeOpen] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return window.innerWidth >= 1024;
+  });
 
   const scopeLabel = selected
     ? formatChapterRange(selected.chapterStart, selected.chapterEnd)
@@ -153,7 +157,13 @@ export function StructureWorkspaceShell({
               forest={forest}
               structureSource={structureSource}
               selectedId={selected?.id ?? null}
-              onSelect={onSelect}
+              onSelect={(node) => {
+                onSelect(node);
+                // 窄屏选中节点后自动收起，露出画布
+                if (typeof window !== "undefined" && window.innerWidth < 1024) {
+                  setTreeOpen(false);
+                }
+              }}
               className="min-h-0 flex-1 overflow-hidden"
             />
 

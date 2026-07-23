@@ -164,9 +164,7 @@ async def test_arc_route_descends_contains_edges(monkeypatch):
 
     monkeypatch.setattr(d, "load_visible_nodes", fake_nodes)
     monkeypatch.setattr(d, "load_child_nodes_via_edges", fake_children)
-    monkeypatch.setattr(
-        d, "load_visible_claims", AsyncMock(return_value=(claims, 0))
-    )
+    monkeypatch.setattr(d, "load_visible_claims", AsyncMock(return_value=(claims, 0)))
     monkeypatch.setattr(
         d, "load_visible_source_links", AsyncMock(return_value=(links, 0))
     )
@@ -201,9 +199,7 @@ async def test_mixed_union_dedupes_leaves(monkeypatch):
     monkeypatch.setattr(
         d, "load_child_nodes_via_edges", AsyncMock(return_value=from_upper)
     )
-    monkeypatch.setattr(
-        d, "load_visible_claims", AsyncMock(return_value=(claims, 0))
-    )
+    monkeypatch.setattr(d, "load_visible_claims", AsyncMock(return_value=(claims, 0)))
     monkeypatch.setattr(
         d, "load_visible_source_links", AsyncMock(return_value=([link_a, link_b], 0))
     )
@@ -232,14 +228,10 @@ async def test_upper_absent_collapses_to_raw_fallback(monkeypatch):
     )
 
     session = MagicMock()
-    session.scalars = AsyncMock(
-        return_value=SimpleNamespace(all=lambda: [raw])
-    )
+    session.scalars = AsyncMock(return_value=SimpleNamespace(all=lambda: [raw]))
 
     monkeypatch.setattr(d, "load_visible_nodes", empty_nodes)
-    monkeypatch.setattr(
-        d, "load_child_nodes_via_edges", AsyncMock(return_value=[])
-    )
+    monkeypatch.setattr(d, "load_child_nodes_via_edges", AsyncMock(return_value=[]))
 
     result = await run_descent(session, _scope(), _route(RouteMode.LOCAL))
     assert result.fallback_reason is FallbackReasonCode.RAW_FALLBACK
@@ -257,8 +249,10 @@ async def test_distinct_routes_produce_distinct_traversal_shapes(monkeypatch):
     links = [_link(20, 10, "leaf-1")]
 
     async def fake_nodes(session, scope, kinds=None, node_ids=None, limit=None):
-        if kinds and StartLevel.CHAPTER_STATE in kinds and (
-            kinds == (StartLevel.CHAPTER_STATE,) or node_ids
+        if (
+            kinds
+            and StartLevel.CHAPTER_STATE in kinds
+            and (kinds == (StartLevel.CHAPTER_STATE,) or node_ids)
         ):
             if node_ids:
                 return [n for n in ch if n.id in node_ids], 0
@@ -270,12 +264,8 @@ async def test_distinct_routes_produce_distinct_traversal_shapes(monkeypatch):
         return [], 0
 
     monkeypatch.setattr(d, "load_visible_nodes", fake_nodes)
-    monkeypatch.setattr(
-        d, "load_child_nodes_via_edges", AsyncMock(return_value=ch)
-    )
-    monkeypatch.setattr(
-        d, "load_visible_claims", AsyncMock(return_value=(claims, 0))
-    )
+    monkeypatch.setattr(d, "load_child_nodes_via_edges", AsyncMock(return_value=ch))
+    monkeypatch.setattr(d, "load_visible_claims", AsyncMock(return_value=(claims, 0)))
     monkeypatch.setattr(
         d, "load_visible_source_links", AsyncMock(return_value=(links, 0))
     )

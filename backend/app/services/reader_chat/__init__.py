@@ -36,7 +36,11 @@ def __getattr__(name: str):
         from app.services.reader_chat import gateway as _gateway
 
         return getattr(_gateway, name)
-    if name in {"run_reader_chat_worker", "dispatch_reader_chat_job", "production_runtime"}:
+    if name in {
+        "run_reader_chat_worker",
+        "dispatch_reader_chat_job",
+        "production_runtime",
+    }:
         from app.services.reader_chat import worker as _worker
 
         return getattr(_worker, name)

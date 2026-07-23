@@ -20,7 +20,10 @@ from app.services.narrative_memory.qualification_runner import (
     runner_has_promotion_capability,
 )
 from app.services.narrative_memory.qualification_verdict import evaluate_verdict
-from app.services.narrative_memory.qualification_contracts import MetricCell, MetricStatus
+from app.services.narrative_memory.qualification_contracts import (
+    MetricCell,
+    MetricStatus,
+)
 
 pytestmark = [pytest.mark.unit, pytest.mark.adversarial]
 
@@ -101,7 +104,9 @@ async def test_spoiler_leak_blocks_despite_high_scores():
     result = await run_qualification(None, fixture, policy, generator=leaky_gen)
     assert result.report is not None
     assert result.report.verdict == QualificationVerdict.BLOCKED
-    assert any("spoiler" in r or "zero_tolerance" in r for r in result.report.reason_codes)
+    assert any(
+        "spoiler" in r or "zero_tolerance" in r for r in result.report.reason_codes
+    )
 
 
 @pytest.mark.asyncio
@@ -120,7 +125,9 @@ async def test_cache_namespaces_isolated_per_strategy():
 
 
 def test_judge_false_positive_cannot_clear_hard_gate():
-    from app.services.narrative_memory.qualification_fixtures import load_frozen_bundle as lfb
+    from app.services.narrative_memory.qualification_fixtures import (
+        load_frozen_bundle as lfb,
+    )
 
     _, policy, _, _ = lfb(
         FIXTURES_DIR / "single_book_v1.json",

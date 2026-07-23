@@ -151,7 +151,9 @@ class IndexingService:
         try:
             await self.vector_store.delete_novel_chunks(novel_id)
         except Exception as e:
-            logger.warning("清理旧 Chroma collection 失败 novel_%d: %s（将继续重建）", novel_id, e)
+            logger.warning(
+                "清理旧 Chroma collection 失败 novel_%d: %s（将继续重建）", novel_id, e
+            )
 
         # 5. 将分块写入 text_chunks 表
         chunk_records = []
@@ -198,7 +200,9 @@ class IndexingService:
             "sentence_transformers",
             "bge",
         ):
-            batch_size = max(16, int(getattr(settings, "embedding_batch_size", 64) or 64))
+            batch_size = max(
+                16, int(getattr(settings, "embedding_batch_size", 64) or 64)
+            )
 
         for i in range(0, total, batch_size):
             batch = chunk_records[i : i + batch_size]
@@ -209,7 +213,9 @@ class IndexingService:
             except Exception as e:
                 logger.error(
                     "批量 embedding 失败 novel_%d batch_%d: %s",
-                    novel_id, i // batch_size, e,
+                    novel_id,
+                    i // batch_size,
+                    e,
                 )
                 # 标记整个批次为失败
                 for record in batch:
@@ -228,17 +234,19 @@ class IndexingService:
             for j, record in enumerate(batch):
                 record.embedding_status = "embedded"
                 embedded_count += 1
-                chunks_for_store.append({
-                    "id": record.id,
-                    "content": record.content,
-                    "embedding": embeddings[j],
-                    "metadata": {
-                        "chapter_id": record.chapter_id,
-                        "chunk_index": record.chunk_index,
-                        "chunk_type": record.chunk_type,
-                        "word_count": record.word_count,
-                    },
-                })
+                chunks_for_store.append(
+                    {
+                        "id": record.id,
+                        "content": record.content,
+                        "embedding": embeddings[j],
+                        "metadata": {
+                            "chapter_id": record.chapter_id,
+                            "chunk_index": record.chunk_index,
+                            "chunk_type": record.chunk_type,
+                            "word_count": record.word_count,
+                        },
+                    }
+                )
 
             # 写入 ChromaDB
             try:
@@ -248,7 +256,9 @@ class IndexingService:
             except Exception as e:
                 logger.error(
                     "写入向量失败 novel_%d batch_%d: %s",
-                    novel_id, i // 100, e,
+                    novel_id,
+                    i // 100,
+                    e,
                 )
                 # 回退 embedding_status
                 for record in batch:
@@ -260,9 +270,7 @@ class IndexingService:
             await db.commit()
 
             if progress_callback:
-                await progress_callback(
-                    novel_id, embedded_count, total, "embedding"
-                )
+                await progress_callback(novel_id, embedded_count, total, "embedding")
 
         # 9. 更新最终状态
         if failed_count == 0:
@@ -391,20 +399,26 @@ class IndexingService:
             metadata = item.get("metadata", {})
             chunk_id_str = item.get("chunk_id", "")
             # 从 "chunk_123" 中提取数字 ID
-            chunk_id = int(chunk_id_str.replace("chunk_", "")) if chunk_id_str.startswith("chunk_") else 0
+            chunk_id = (
+                int(chunk_id_str.replace("chunk_", ""))
+                if chunk_id_str.startswith("chunk_")
+                else 0
+            )
 
             # 如果需要多类型过滤，在返回阶段过滤
             if chunk_types and metadata.get("chunk_type") not in chunk_types:
                 continue
 
-            results.append({
-                "chunk_id": chunk_id,
-                "content": item.get("content", ""),
-                "score": item.get("score", 0.0),
-                "chapter_id": metadata.get("chapter_id"),
-                "chunk_index": metadata.get("chunk_index"),
-                "chunk_type": metadata.get("chunk_type", "paragraph"),
-            })
+            results.append(
+                {
+                    "chunk_id": chunk_id,
+                    "content": item.get("content", ""),
+                    "score": item.get("score", 0.0),
+                    "chapter_id": metadata.get("chapter_id"),
+                    "chunk_index": metadata.get("chunk_index"),
+                    "chunk_type": metadata.get("chunk_type", "paragraph"),
+                }
+            )
 
         return results
 

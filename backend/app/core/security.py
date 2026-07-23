@@ -77,8 +77,7 @@ def validate_cookie_request_origin(request: Request) -> None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=(
-                "无效的请求来源"
-                + (f"（origin={origin!r}）" if settings.debug else "")
+                "无效的请求来源" + (f"（origin={origin!r}）" if settings.debug else "")
             ),
         )
 

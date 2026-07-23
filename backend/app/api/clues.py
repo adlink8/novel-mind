@@ -61,9 +61,7 @@ def _run_response(row: ClueAnalysisRun) -> ClueRunResponse:
     )
 
 
-async def _owned_run(
-    db: AsyncSession, owner_id: int, novel_id: int
-) -> ClueAnalysisRun:
+async def _owned_run(db: AsyncSession, owner_id: int, novel_id: int) -> ClueAnalysisRun:
     row = await db.scalar(
         select(ClueAnalysisRun).where(
             ClueAnalysisRun.owner_id == owner_id,

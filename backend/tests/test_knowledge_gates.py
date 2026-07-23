@@ -82,7 +82,14 @@ async def _base_context(db: AsyncSession, username: str = "kg_gate_owner"):
     return user, novel, run, evidence
 
 
-async def _entity(db: AsyncSession, *, user: User, novel: Novel, run: KnowledgeExtractionRun, name: str):
+async def _entity(
+    db: AsyncSession,
+    *,
+    user: User,
+    novel: Novel,
+    run: KnowledgeExtractionRun,
+    name: str,
+):
     entity = KnowledgeEntityCandidate(
         owner_id=user.id,
         novel_id=novel.id,
@@ -227,8 +234,8 @@ async def test_low_confidence_and_risk_flags_route_to_review_queue(
         judgment_id=judgment.id,
     )
     review_items = (
-        await db_session.execute(select(KnowledgeReviewQueue))
-    ).scalars().all()
+        (await db_session.execute(select(KnowledgeReviewQueue))).scalars().all()
+    )
 
     assert decision.needs_review is True
     assert judgment.status == "needs_human_review"
@@ -274,9 +281,7 @@ async def test_conflicting_accepted_judgment_routes_to_review(
 
     assert decision.needs_review is True
     assert competing.status == "needs_human_review"
-    assert competing.gate_failures == [
-        f"conflicting_accepted_judgment:{accepted.id}"
-    ]
+    assert competing.gate_failures == [f"conflicting_accepted_judgment:{accepted.id}"]
 
 
 @pytest.mark.asyncio

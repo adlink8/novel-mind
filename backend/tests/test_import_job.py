@@ -390,11 +390,19 @@ async def test_import_service_state_machine_flow(db_session: AsyncSession):
     job = await service.create_import_job(db_session, novel.id)
 
     # 模拟完整的导入流程
-    await service.update_job_status(db_session, job.id, "uploading", 10, "正在上传文件...")
-    await service.update_job_status(db_session, job.id, "detecting", 20, "正在检测编码...")
-    await service.update_job_status(db_session, job.id, "parsing", 40, "正在解析章节...")
+    await service.update_job_status(
+        db_session, job.id, "uploading", 10, "正在上传文件..."
+    )
+    await service.update_job_status(
+        db_session, job.id, "detecting", 20, "正在检测编码..."
+    )
+    await service.update_job_status(
+        db_session, job.id, "parsing", 40, "正在解析章节..."
+    )
     await service.update_job_status(db_session, job.id, "chunking", 60, "正在分块...")
-    await service.update_job_status(db_session, job.id, "embedding", 80, "正在向量化...")
+    await service.update_job_status(
+        db_session, job.id, "embedding", 80, "正在向量化..."
+    )
     await service.update_job_status(db_session, job.id, "ready", 100, "导入完成")
 
     # 验证最终状态
@@ -416,7 +424,9 @@ async def test_import_service_error_handling(db_session: AsyncSession):
     job = await service.create_import_job(db_session, novel.id)
 
     # 模拟导入失败
-    await service.update_job_status(db_session, job.id, "uploading", 10, "正在上传文件...")
+    await service.update_job_status(
+        db_session, job.id, "uploading", 10, "正在上传文件..."
+    )
     await service.update_job_status(
         db_session,
         job.id,
@@ -452,7 +462,9 @@ async def test_import_service_invalid_status_transition(db_session: AsyncSession
     service = ImportService()
 
     # 尝试非法状态转换（pending -> ready）
-    result = await service.update_job_status(db_session, job.id, "ready", 100, "导入完成")
+    result = await service.update_job_status(
+        db_session, job.id, "ready", 100, "导入完成"
+    )
 
     # 验证转换失败
     assert result is False
@@ -479,7 +491,9 @@ async def test_import_service_update_nonexistent_job(db_session: AsyncSession):
     service = ImportService()
 
     # 尝试更新不存在的任务
-    result = await service.update_job_status(db_session, 999, "uploading", 10, "正在上传...")
+    result = await service.update_job_status(
+        db_session, 999, "uploading", 10, "正在上传..."
+    )
 
     # 验证返回 False
     assert result is False
@@ -649,7 +663,9 @@ class TestImportJobIdempotency:
         assert duplicate.content_hash == content_hash
 
     @pytest.mark.asyncio
-    async def test_duplicate_not_found_for_different_content(self, db_session: AsyncSession):
+    async def test_duplicate_not_found_for_different_content(
+        self, db_session: AsyncSession
+    ):
         """测试不同内容不会匹配为重复"""
         user = await _create_test_user(db_session)
         novel = await _create_test_novel(db_session, user)

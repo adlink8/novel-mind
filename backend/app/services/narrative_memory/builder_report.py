@@ -20,7 +20,9 @@ from app.models.narrative_memory_builder import (
 from app.services.narrative_memory.builder_contracts import BuildOutcome, _stable_json
 
 
-def derive_outcome(run: NarrativeMemoryBuildRun, stages: list[NarrativeMemoryBuildStage]) -> str:
+def derive_outcome(
+    run: NarrativeMemoryBuildRun, stages: list[NarrativeMemoryBuildStage]
+) -> str:
     if run.status == "cancelled" or run.cancel_requested and run.status != "completed":
         return BuildOutcome.CANCELLED.value
     if run.status in {"paused_budget", "paused_dependency"}:
@@ -75,7 +77,9 @@ async def build_report_body(
     transport_calls = sum(1 for a in attempts if a.status == "succeeded")
     cache_hits = sum(1 for a in attempts if a.status == "cache_hit")
     input_tokens = sum(int((a.usage or {}).get("input_tokens") or 0) for a in attempts)
-    output_tokens = sum(int((a.usage or {}).get("output_tokens") or 0) for a in attempts)
+    output_tokens = sum(
+        int((a.usage or {}).get("output_tokens") or 0) for a in attempts
+    )
     cost = sum((Decimal(a.cost_usd or 0) for a in attempts), Decimal("0"))
     if ledger is not None:
         settled_cost = Decimal(ledger.settled_cost_usd)
@@ -105,7 +109,7 @@ async def build_report_body(
         "reason_codes": sorted(
             {
                 *(s.status_reason for s in stages if s.status_reason),
-                *(([run.status_reason] if run.status_reason else [])),
+                *([run.status_reason] if run.status_reason else []),
             }
         ),
     }

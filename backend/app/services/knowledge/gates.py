@@ -385,9 +385,7 @@ class KnowledgeGateService:
     ) -> list[str]:
         failures: list[str] = []
         if judgment.confidence < policy.auto_accept_min_confidence:
-            failures.append(
-                f"low_confidence:{judgment.confidence:.2f}"
-            )
+            failures.append(f"low_confidence:{judgment.confidence:.2f}")
         if judgment.risk_flags:
             failures.append(f"risk_flags:{','.join(judgment.risk_flags)}")
         if judgment.needs_human_review:
@@ -548,7 +546,9 @@ class KnowledgeGateService:
             run.status = "completed"
 
     async def _count(self, db: AsyncSession, model: Any, *clauses: Any) -> int:
-        result = await db.execute(select(func.count()).select_from(model).where(*clauses))
+        result = await db.execute(
+            select(func.count()).select_from(model).where(*clauses)
+        )
         return int(result.scalar_one())
 
     async def _load_judgment(

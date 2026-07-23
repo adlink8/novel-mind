@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from app.services.chunking.manifests import content_hash
 from app.services.chunking.schemas import (
-    CandidateSegment,
     CandidateSegmentation,
     HierarchyNode,
     HierarchyTree,

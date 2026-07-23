@@ -9,7 +9,6 @@ import pytest
 from app.schemas.eval import CalibrationReport, ChunkerLineage, EvalCase, SourceSnapshot
 from app.services.rag_fixture import DEFAULT_SIGNING_SECRET, load_json, stable_hash
 from app.services.rag_quality import (
-    build_quality_input_hash,
     default_healthy,
     default_stub_answer,
     make_baseline_from_metrics,
@@ -28,7 +27,12 @@ SECRET = DEFAULT_SIGNING_SECRET
 EVALS = Path(__file__).resolve().parents[1] / "evals"
 
 
-def _chunker_for(snap: SourceSnapshot, name: str = "baseline-fixed", version: str = "1.0.0", **cfg_extra):
+def _chunker_for(
+    snap: SourceSnapshot,
+    name: str = "baseline-fixed",
+    version: str = "1.0.0",
+    **cfg_extra,
+):
     cfg = {"size": 512, "overlap": 64, **cfg_extra}
     return ChunkerLineage(
         chunker_name=name,
@@ -110,7 +114,9 @@ async def test_create_and_run_to_terminal(worker: RagQualityWorker):
     )
     assert job.status == "queued"
     assert job.chunker_name == chunker.chunker_name
-    assert job.chunker_config_hash == recompute_chunker_config_hash(chunker.chunker_config)
+    assert job.chunker_config_hash == recompute_chunker_config_hash(
+        chunker.chunker_config
+    )
     lease = await worker.acquire_lease(job.job_id, owner_id=1)
     done = await worker.run(job.job_id, lease_id=lease, owner_id=1)
     assert done.status in {"passed", "qualified"}
@@ -218,9 +224,7 @@ async def test_crash_resume_idempotent_no_duplicate_calls(worker: RagQualityWork
     assert "scoring" in (mid.checkpoint.get("committed") or [])
     store2 = worker.store  # same backing store; new worker instance
     worker2 = RagQualityWorker(store=store2, secret=SECRET)
-    done = await worker2.resume(
-        job.job_id, owner_id=1, answer_fn=counting_answer
-    )
+    done = await worker2.resume(job.job_id, owner_id=1, answer_fn=counting_answer)
     assert done.status in {
         "passed",
         "qualified",
@@ -333,7 +337,9 @@ async def test_missing_lineage_invalid_lineage_before_scoring(worker: RagQuality
 
 
 @pytest.mark.asyncio
-async def test_same_snapshot_different_chunker_input_hashes_differ(worker: RagQualityWorker):
+async def test_same_snapshot_different_chunker_input_hashes_differ(
+    worker: RagQualityWorker,
+):
     snap, cases, g, j, cal, baseline, chunker_a = _fixtures()
     chunker_b = _chunker_for(snap, name="semantic-v2", version="2.0.0", size=256)
     job_a = await worker.create_job(

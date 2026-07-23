@@ -57,14 +57,14 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""  # Google AI Studio Key（仅 chat_provider=gemini 时使用）
     # 聊天提供商：vertex_google（与「数据分析」一致，推荐）| gemini | openai | ...
     chat_provider: str = "vertex_google"
-    # 默认聊天模型；Vertex 下为裸模型名或 vertex_google/gemini-3.5-flash
-    default_chat_model: str = "vertex_google/gemini-3.5-flash"
+    # 默认聊天模型；Vertex 下为裸模型名或 vertex_google/gemini-3.5-flash-lite
+    default_chat_model: str = "vertex_google/gemini-3.5-flash-lite"
     # Google Cloud Vertex AI（gcloud token，非 AI Studio 免费 key）
     gcp_project: str = "project-c5cbd608-1b00-454e-80f"
     gcp_location: str = "us-central1"
     gcp_sdk_root: str = r"C:\Users\li\google-cloud-sdk"
     gcp_sdk_py: str = r"C:\Users\li\google-cloud-sdk\lib\gcloud.py"
-    vertex_model: str = "gemini-3.5-flash"
+    vertex_model: str = "gemini-3.5-flash-lite"
     # 访问 Vertex/Google API 的出站代理（国内环境常需；留空则读 HTTPS_PROXY 环境变量）
     https_proxy: str = ""
     ollama_base_url: str = "http://localhost:11434"  # 本地 Ollama 服务地址

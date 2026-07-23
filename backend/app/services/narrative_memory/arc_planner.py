@@ -47,9 +47,7 @@ def plan_arc_boundaries(
             for item in ranges
             for chapter in item["chapter_numbers"]
         },
-        "parent_to_global": {
-            item["stage_key"]: "global_story:book" for item in ranges
-        },
+        "parent_to_global": {item["stage_key"]: "global_story:book" for item in ranges},
     }
     plan["checksum"] = boundary_plan_checksum(plan)
     return plan

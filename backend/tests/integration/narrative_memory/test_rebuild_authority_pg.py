@@ -53,11 +53,13 @@ def test_migration_round_trip_and_single_head(empty_postgres: str) -> None:
                 for frag in FORBIDDEN_FRAGMENTS:
                     assert frag not in name
         with engine.connect() as conn:
-            heads = conn.execute(
-                text("SELECT version_num FROM alembic_version")
-            ).scalars().all()
+            heads = (
+                conn.execute(text("SELECT version_num FROM alembic_version"))
+                .scalars()
+                .all()
+            )
         # Single live head after full upgrade (Phase 17 is tip; Phase 16 is mid-chain).
-        assert heads == ["17memqual01"]
+        assert heads == ["18appsetting1"]
     finally:
         engine.dispose()
 
@@ -102,7 +104,11 @@ def _seed_versions(conn) -> tuple[int, int, int, int]:
                 )
                 """
             ),
-            {"b": build_id, "n": novel_id, "h": HEX if build_id == "hb-parent" else HEX_B},
+            {
+                "b": build_id,
+                "n": novel_id,
+                "h": HEX if build_id == "hb-parent" else HEX_B,
+            },
         )
     parent_vid = conn.execute(
         text(
@@ -230,9 +236,7 @@ def test_append_only_and_scope_constraints(empty_postgres: str) -> None:
         with engine.begin() as conn:
             with pytest.raises(Exception):
                 conn.execute(
-                    text(
-                        "DELETE FROM narrative_memory_reuse_reports WHERE id=:id"
-                    ),
+                    text("DELETE FROM narrative_memory_reuse_reports WHERE id=:id"),
                     {"id": report_id},
                 )
                 conn.commit()

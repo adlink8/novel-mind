@@ -381,7 +381,9 @@ class ClueLifecycleEvent(TimestampMixin, Base):
     reason: Mapped[str] = mapped_column(String(500), nullable=False)
     event_key: Mapped[str] = mapped_column(String(160), nullable=False)
     # Sorted list of evidence_identity strings consumed by this event.
-    evidence_identities: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    evidence_identities: Mapped[list] = mapped_column(
+        JSON, nullable=False, default=list
+    )
     # For paid_off: store cue/payoff chapter coordinates for ordering checks.
     cue_chapter: Mapped[int | None] = mapped_column(Integer, nullable=True)
     cue_source_start: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -516,9 +518,7 @@ class ClueBudgetLedger(TimestampMixin, Base):
     """Per-run budget ceilings and settlement counters."""
 
     __tablename__ = "clue_budget_ledgers"
-    __table_args__ = (
-        UniqueConstraint("run_id", name="uq_clue_budget_ledgers_run"),
-    )
+    __table_args__ = (UniqueConstraint("run_id", name="uq_clue_budget_ledgers_run"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     run_id: Mapped[int] = mapped_column(

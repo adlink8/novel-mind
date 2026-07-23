@@ -79,7 +79,9 @@ class MissingNeo4jAdapter:
 class RelationshipProjectionService:
     """Build deterministic manifests and optionally replay to a projection adapter."""
 
-    def __init__(self, query_service: RelationshipGraphQueryService | None = None) -> None:
+    def __init__(
+        self, query_service: RelationshipGraphQueryService | None = None
+    ) -> None:
         self._query = query_service or RelationshipGraphQueryService()
 
     async def build_manifest(

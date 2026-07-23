@@ -1,13 +1,18 @@
 """07-03 adjudicator tests with fake LLM."""
+
 from __future__ import annotations
 import json
 import pytest
-from app.services.chunking.adjudicator import BoundaryAdjudicator, apply_decisions_to_proposals
+from app.services.chunking.adjudicator import (
+    BoundaryAdjudicator,
+    apply_decisions_to_proposals,
+)
 from app.services.chunking.budget import BudgetLedger, BudgetConfig
 from app.services.chunking.rules import analyze_chapter, RuleEngineConfig
 from app.services.chunking.segmentation import segment_from_proposals
 
 pytestmark = pytest.mark.unit
+
 
 @pytest.mark.asyncio
 async def test_only_eligible_calls_llm():
@@ -19,23 +24,27 @@ async def test_only_eligible_calls_llm():
         cfg=RuleEngineConfig(40, 100, auto_accept=0.99),
     )
     calls = {"n": 0}
+
     async def fake(system, user):
         calls["n"] += 1
         # parse boundary id from user payload
         import re
+
         m = re.search(r'"boundary_id":\s*"([^"]+)"', user)
         bid = m.group(1) if m else props[0].proposal_id
         prop = next(p for p in props if p.proposal_id == bid)
-        return json.dumps({
-            "schema_version": "boundary-decision.v1",
-            "boundary_id": prop.proposal_id,
-            "decision": "merge",
-            "reason_codes": ["TARGET_SIZE"],
-            "left_span_id": prop.left_span_id,
-            "right_span_id": prop.right_span_id,
-            "confidence": 0.9,
-        }, ensure_ascii=False)
-    from app.services.chunking.budget import BudgetConfig, BudgetLedger
+        return json.dumps(
+            {
+                "schema_version": "boundary-decision.v1",
+                "boundary_id": prop.proposal_id,
+                "decision": "merge",
+                "reason_codes": ["TARGET_SIZE"],
+                "left_span_id": prop.left_span_id,
+                "right_span_id": prop.right_span_id,
+                "confidence": 0.9,
+            },
+            ensure_ascii=False,
+        )
 
     led = BudgetLedger(
         BudgetConfig(
@@ -51,6 +60,7 @@ async def test_only_eligible_calls_llm():
     assert calls["n"] == len(eligible)
     assert len(decisions) == len(eligible)
 
+
 @pytest.mark.asyncio
 async def test_malformed_json_falls_back():
     text = "甲。" * 12 + "乙。" * 12
@@ -60,8 +70,10 @@ async def test_malformed_json_falls_back():
         content=text,
         cfg=RuleEngineConfig(30, 80, auto_accept=0.99),
     )
+
     async def bad(system, user):
         return "not-json{{"
+
     adj = BoundaryAdjudicator(llm=bad)
     pending = [p for p in props if p.llm_eligible]
     if not pending:
@@ -69,6 +81,7 @@ async def test_malformed_json_falls_back():
     d, audit = await adj.adjudicate_one(pending[0], spans)
     assert audit.fallback is True
     assert d == pending[0].fallback_decision
+
 
 @pytest.mark.asyncio
 async def test_apply_decisions_then_segment():
@@ -79,19 +92,24 @@ async def test_apply_decisions_then_segment():
         content=text,
         cfg=RuleEngineConfig(40, 90, auto_accept=0.99),
     )
+
     async def fake(system, user):
         import re
+
         m = re.search(r'"boundary_id":\s*"([^"]+)"', user)
         prop = next(p for p in props if p.proposal_id == m.group(1))
-        return json.dumps({
-            "schema_version": "boundary-decision.v1",
-            "boundary_id": prop.proposal_id,
-            "decision": prop.fallback_decision,
-            "reason_codes": list(prop.reason_codes)[:1] or ["TARGET_SIZE"],
-            "left_span_id": prop.left_span_id,
-            "right_span_id": prop.right_span_id,
-            "confidence": 0.85,
-        })
+        return json.dumps(
+            {
+                "schema_version": "boundary-decision.v1",
+                "boundary_id": prop.proposal_id,
+                "decision": prop.fallback_decision,
+                "reason_codes": list(prop.reason_codes)[:1] or ["TARGET_SIZE"],
+                "left_span_id": prop.left_span_id,
+                "right_span_id": prop.right_span_id,
+                "confidence": 0.85,
+            }
+        )
+
     adj = BoundaryAdjudicator(llm=fake)
     decisions = await adj.adjudicate_pending(props, spans)
     updated = apply_decisions_to_proposals(props, decisions)

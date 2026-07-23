@@ -21,7 +21,12 @@ from pydantic import (
     model_validator,
 )
 
-from app.services.narrative_memory.contracts import Hash64, Key, PositiveInt, VersionLabel
+from app.services.narrative_memory.contracts import (
+    Hash64,
+    Key,
+    PositiveInt,
+    VersionLabel,
+)
 
 
 class RebuildFrozenModel(BaseModel):

@@ -420,6 +420,21 @@ export function TimelineChart({
     [events, ordering]
   );
   const windows = useMemo(() => buildEventWindows(sorted), [sorted]);
+  // 事件集合刷新（续跑/显示全书等）后，按章节范围重配当前阶段窗口：
+  // 窗口存的是旧数组下标，直接用会展示陈旧切片；范围匹配不到就退回全书概览。
+  useEffect(() => {
+    if (!activeWindow) return;
+    const matched = windows.find(
+      (w) =>
+        w.firstChapter === activeWindow.firstChapter &&
+        w.lastChapter === activeWindow.lastChapter
+    );
+    if (!matched) {
+      queueMicrotask(() => setActiveWindow(null));
+    } else if (matched !== activeWindow) {
+      queueMicrotask(() => setActiveWindow(matched));
+    }
+  }, [windows, activeWindow]);
   const visibleEvents = useMemo(
     () =>
       activeWindow
@@ -745,7 +760,7 @@ export function TimelineChart({
           <section className="min-w-0">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3"><button type="button" onClick={() => { setActiveWindow(null); setListOpen(false); }} className="rounded-md p-2 text-muted-foreground transition hover:bg-muted/60 hover:text-foreground" aria-label="返回全书概览"><ArrowLeft className="size-4" /></button><div><p className="text-xs font-medium text-muted-foreground">阶段详情</p><h2 className="mt-0.5 font-serif text-xl font-semibold">{activeWindow ? chapterRangeLabel(activeWindow) : "当前时间线"} <span className="font-sans text-base font-normal text-muted-foreground">· {visibleEvents.length} 个事件</span></h2></div></div>
-              <p className="text-xs text-muted-foreground">横轴章节 · 纵轴类型泳道 · 滚轮缩放</p>
+              <p className="text-xs text-muted-foreground">横轴章节 · 纵轴类型泳道 · 双指/滚轮缩放</p>
             </div>
             <div data-testid="timeline-canvas" data-zoom="inside-slider" data-layout="chapter-swimlane" className="min-w-0 overflow-hidden rounded-xl bg-muted/20 p-2 sm:p-3">
               <ReactEChartsCore echarts={echarts} option={option} style={{ height: 420, width: "100%" }} notMerge={false} lazyUpdate opts={{ renderer: "canvas" }} onEvents={{ click: (params: { seriesType?: string; data?: ScatterDatum }) => { try { if (params.seriesType !== "scatter") return; const id = params.data?.eventId; const event = id == null ? undefined : eventMap.get(id); if (event) setSelected(event); } catch { /* ignore chart click glitches */ } }, datazoom: (params: { start?: number; end?: number; batch?: Array<{ start?: number; end?: number }> }) => { try { const batch = params.batch?.[0]; const start = batch?.start ?? params.start; const end = batch?.end ?? params.end; if (typeof start === "number" && typeof end === "number") zoomRef.current = clampZoom({ start, end }); } catch { /* ignore */ } } }} />

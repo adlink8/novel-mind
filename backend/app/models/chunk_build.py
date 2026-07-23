@@ -45,7 +45,9 @@ class ChunkBuild(TimestampMixin, Base):
     collection_name: Mapped[str] = mapped_column(String(128), nullable=False)
     is_candidate: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     immutable: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    changed_chapter_ids: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    changed_chapter_ids: Mapped[list] = mapped_column(
+        JSON, nullable=False, default=list
+    )
     journal: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     vector_ids: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
 
@@ -88,7 +90,9 @@ class ChunkHierarchyNode(TimestampMixin, Base):
         Integer, ForeignKey("novels.id", ondelete="CASCADE"), nullable=False
     )
     node_id: Mapped[str] = mapped_column(String(64), nullable=False)
-    level: Mapped[str] = mapped_column(String(16), nullable=False)  # chapter|scene|evidence
+    level: Mapped[str] = mapped_column(
+        String(16), nullable=False
+    )  # chapter|scene|evidence
     chapter_id: Mapped[int] = mapped_column(Integer, nullable=False)
     chapter_number: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     parent_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
@@ -97,7 +101,9 @@ class ChunkHierarchyNode(TimestampMixin, Base):
     content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     source_start: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     source_end: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    chunk_type: Mapped[str] = mapped_column(String(50), nullable=False, default="paragraph")
+    chunk_type: Mapped[str] = mapped_column(
+        String(50), nullable=False, default="paragraph"
+    )
     decision_lineage: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     order_index: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     # Optional link to raw text_chunks row when projected

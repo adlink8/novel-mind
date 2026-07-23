@@ -50,7 +50,9 @@ async def test_cross_owner_and_cross_version_produce_zero_visible_facts(
         )
         if wrong_version is not None:
             payload = wrong_version.model_dump_json()
-            assert "CANDIDATE_ONLY" in payload or wrong_version.version_id == ids["v2_id"]
+            assert (
+                "CANDIDATE_ONLY" in payload or wrong_version.version_id == ids["v2_id"]
+            )
 
         active = await svc.build_graph(
             db,

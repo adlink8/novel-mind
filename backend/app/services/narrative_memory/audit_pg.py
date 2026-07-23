@@ -32,7 +32,9 @@ class PostgresAuditSource:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
-    async def inventory(self, *, owner_id: int, novel_id: int) -> tuple[AssetInventory, ...]:
+    async def inventory(
+        self, *, owner_id: int, novel_id: int
+    ) -> tuple[AssetInventory, ...]:
         novel = await self._session.scalar(
             select(Novel).where(Novel.id == novel_id, Novel.owner_id == owner_id)
         )
@@ -51,7 +53,9 @@ class PostgresAuditSource:
         return (hierarchy, *optionals)
 
     @staticmethod
-    def _unavailable_optionals(owner_id: int, novel_id: int) -> tuple[AssetInventory, ...]:
+    def _unavailable_optionals(
+        owner_id: int, novel_id: int
+    ) -> tuple[AssetInventory, ...]:
         return tuple(
             AssetInventory(
                 kind=kind,
@@ -120,7 +124,11 @@ class PostgresAuditSource:
         )
         reasons: set[ReasonCode] = set()
         affected: set[int] = set()
-        if not build.immutable or build.is_candidate or build.status not in {"built", "committed"}:
+        if (
+            not build.immutable
+            or build.is_candidate
+            or build.status not in {"built", "committed"}
+        ):
             reasons.add(ReasonCode.STALE_ASSET)
             affected.update(chapter.chapter_number for chapter in chapters)
         if any(row.novel_id != novel.id for row in all_build_rows):
@@ -169,10 +177,18 @@ class PostgresAuditSource:
                 if node.content_hash != content_hash(node.content):
                     reasons.add(ReasonCode.CONTENT_HASH_MISMATCH)
                     affected.add(chapter.chapter_number)
-                if node.source_start < 0 or node.source_end < node.source_start or node.source_end > len(chapter.content or ""):
+                if (
+                    node.source_start < 0
+                    or node.source_end < node.source_start
+                    or node.source_end > len(chapter.content or "")
+                ):
                     reasons.add(ReasonCode.INVALID_OFFSET)
                     affected.add(chapter.chapter_number)
-                if node.level == "evidence" and (chapter.content or "")[node.source_start : node.source_end] != node.content:
+                if (
+                    node.level == "evidence"
+                    and (chapter.content or "")[node.source_start : node.source_end]
+                    != node.content
+                ):
                     reasons.add(ReasonCode.CONTENT_HASH_MISMATCH)
                     affected.add(chapter.chapter_number)
 
@@ -190,7 +206,9 @@ class PostgresAuditSource:
                         "novel_id": novel.id,
                         "chapter_id": chapter.id,
                         "node_ids": [node.node_id for node in ordered_nodes],
-                        "parents": {node.node_id: node.parent_id for node in ordered_nodes},
+                        "parents": {
+                            node.node_id: node.parent_id for node in ordered_nodes
+                        },
                     }
                 )
             )
@@ -287,7 +305,9 @@ class PostgresAuditSource:
             .limit(1)
         )
         if run is None:
-            return self._optional_unavailable(AssetKind.RELATIONSHIP, owner_id, novel_id)
+            return self._optional_unavailable(
+                AssetKind.RELATIONSHIP, owner_id, novel_id
+            )
         version = await self._session.get(AnalysisVersion, run.analysis_version_id)
         reasons = self._lineage_reasons(
             version,
@@ -302,7 +322,8 @@ class PostgresAuditSource:
                 select(func.count())
                 .select_from(RelationshipObservation)
                 .where(
-                    RelationshipObservation.analysis_version_id == run.analysis_version_id,
+                    RelationshipObservation.analysis_version_id
+                    == run.analysis_version_id,
                     RelationshipObservation.owner_id == owner_id,
                     RelationshipObservation.novel_id == novel_id,
                 )

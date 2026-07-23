@@ -8,13 +8,13 @@
  * - 主内容区: 右侧可滚动区域，渲染子页面
  *
  * 响应式:
- * - md 以上: 显示侧边栏
- * - md 以下: 隐藏侧边栏（未来可加移动端汉堡菜单）
+ * - lg 以上: 显示侧边导航栏
+ * - lg 以下: 顶部栏 + 底部移动导航
  *
  * Phase 18: pre-paint theme bootstrap (no FOUC) + AppThemeSync reconciler.
  */
 
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Inter, Noto_Serif_SC } from "next/font/google";
 import { cn } from "@/lib/utils";
@@ -33,6 +33,13 @@ const notoSerifSC = Noto_Serif_SC({
 export const metadata: Metadata = {
   title: "NovelMind - AI 辅助小说创作与理解",
   description: "让 AI 成为你的小说伙伴 —— 读懂故事、理清脉络、续写篇章",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  // 刘海屏全屏绘制；safe-area 留白由各悬浮层自行处理
+  viewportFit: "cover",
 };
 
 export default function RootLayout({

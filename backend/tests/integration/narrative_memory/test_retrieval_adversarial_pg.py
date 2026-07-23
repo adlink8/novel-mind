@@ -200,9 +200,7 @@ async def test_corrupt_leaf_lineage_fails_closed(adv_pg):
             source_snapshot_hash=HEX_A,
         ),
     ]
-    outcome = await resolve_citations(
-        session, scope, corrupt, require_minimum=1
-    )
+    outcome = await resolve_citations(session, scope, corrupt, require_minimum=1)
     assert outcome.citations == ()
     assert outcome.blocked is True
     assert outcome.dropped == 3

@@ -3,6 +3,7 @@
 
 测试 prompt 构建、AI 响应解析、参数验证。
 """
+
 import pytest
 
 pytestmark = pytest.mark.unit
@@ -37,6 +38,7 @@ def parse_ai_response(response_text: str) -> list[dict]:
             return data
     except json.JSONDecodeError:
         import re
+
         match = re.search(r"\[[\s\S]*\]", text)
         if match:
             try:
@@ -52,7 +54,12 @@ class TestPromptBuilding:
     def test_build_prompt_includes_chunk_info(self):
         chunks = [
             {"chunk_index": 0, "id": 42, "chunk_type": "scene", "content": "测试内容A"},
-            {"chunk_index": 1, "id": 43, "chunk_type": "dialogue", "content": "测试内容B"},
+            {
+                "chunk_index": 1,
+                "id": 43,
+                "chunk_type": "dialogue",
+                "content": "测试内容B",
+            },
         ]
         prompt = build_prompt(chunks, "original_text", 3)
 
@@ -76,10 +83,20 @@ class TestResponseParsing:
     """测试 AI 响应解析"""
 
     def test_parse_plain_json(self):
-        response = json.dumps([
-            {"question": "Q1", "question_type": "original_text", "gold_chunks": [1, 2]},
-            {"question": "Q2", "question_type": "character_relation", "gold_chunks": [3]},
-        ])
+        response = json.dumps(
+            [
+                {
+                    "question": "Q1",
+                    "question_type": "original_text",
+                    "gold_chunks": [1, 2],
+                },
+                {
+                    "question": "Q2",
+                    "question_type": "character_relation",
+                    "gold_chunks": [3],
+                },
+            ]
+        )
         result = parse_ai_response(response)
         assert len(result) == 2
         assert result[0]["question"] == "Q1"
@@ -107,7 +124,9 @@ class TestResponseParsing:
 
     def test_parse_garbled_json_fallback(self):
         # 文本中混合了 JSON 数组
-        response = '好的，以下是你需要的：\n[\n  {"question": "你好", "gold_chunks": []}\n]'
+        response = (
+            '好的，以下是你需要的：\n[\n  {"question": "你好", "gold_chunks": []}\n]'
+        )
         result = parse_ai_response(response)
         assert len(result) == 1
         assert result[0]["question"] == "你好"

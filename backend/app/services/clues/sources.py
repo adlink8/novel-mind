@@ -162,9 +162,15 @@ class StaticRelationshipObservationSource:
     ) -> RelationshipSourceResult:
         filtered: list[RelationshipObservationRef] = []
         for item in self._items:
-            if analysis_version_id is not None and item.analysis_version_id != analysis_version_id:
+            if (
+                analysis_version_id is not None
+                and item.analysis_version_id != analysis_version_id
+            ):
                 continue
-            if through_chapter is not None and item.valid_from_chapter > through_chapter:
+            if (
+                through_chapter is not None
+                and item.valid_from_chapter > through_chapter
+            ):
                 continue
             filtered.append(item)
         if not filtered:
@@ -334,15 +340,19 @@ def reject_freeform_chat_as_evidence(message_text: str | None) -> CitationSource
 def _coerce_selection_citation(raw: Any) -> PrimarySelectionCitationRef:
     if isinstance(raw, PrimarySelectionCitationRef):
         return raw
-    data = raw if isinstance(raw, dict) else {
-        "ref_id": getattr(raw, "ref_id"),
-        "chapter_id": getattr(raw, "chapter_id"),
-        "source_start": getattr(raw, "source_start"),
-        "source_end": getattr(raw, "source_end"),
-        "content_hash": getattr(raw, "content_hash"),
-        "kind": getattr(raw, "kind"),
-        "excerpt": getattr(raw, "excerpt", None),
-    }
+    data = (
+        raw
+        if isinstance(raw, dict)
+        else {
+            "ref_id": getattr(raw, "ref_id"),
+            "chapter_id": getattr(raw, "chapter_id"),
+            "source_start": getattr(raw, "source_start"),
+            "source_end": getattr(raw, "source_end"),
+            "content_hash": getattr(raw, "content_hash"),
+            "kind": getattr(raw, "kind"),
+            "excerpt": getattr(raw, "excerpt", None),
+        }
+    )
     # Free-form chat smuggling markers.
     if "message_text" in data or "chat_text" in data or "conversation_id" in data:
         raise ValueError("freeform chat fields are forbidden")

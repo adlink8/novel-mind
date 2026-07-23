@@ -15,12 +15,12 @@ from app.models.clue import (
     ClueActivePointer,
     ClueAnalysisRun,
     ClueAnalysisVersion,
+    ClueLifecycleEvent,
     ClueModelCallAttempt,
     MachineClue,
 )
 from app.models.novel import Chapter, Novel
 from app.models.user import User
-from app.services.clues.budget import BudgetExceeded, UnknownPricing
 from app.services.clues.versions import (
     ManifestValidationError,
     StalePointerError,
@@ -32,6 +32,11 @@ from app.services.clues.worker import (
     ClueModelDeployment,
     ClueWorkerRuntime,
     run_clue_worker,
+)
+from app.services.clues.candidates import ClueCandidateDraft, CandidateRecallResult
+from app.services.clues.evidence import (
+    make_clue_evidence_unit,
+    build_clue_evidence_package,
 )
 from app.services.clues.budget import ClueCallRepository, BudgetPolicy
 
@@ -56,8 +61,18 @@ async def _seed_hierarchy(db_session, *, title: str = "Clue worker novel"):
     db_session.add(novel)
     await db_session.flush()
     chapters = [
-        Chapter(novel_id=novel.id, chapter_number=1, title="One", content="A sealed letter appears."),
-        Chapter(novel_id=novel.id, chapter_number=3, title="Three", content="The letter is opened at last."),
+        Chapter(
+            novel_id=novel.id,
+            chapter_number=1,
+            title="One",
+            content="A sealed letter appears.",
+        ),
+        Chapter(
+            novel_id=novel.id,
+            chapter_number=3,
+            title="Three",
+            content="The letter is opened at last.",
+        ),
     ]
     db_session.add_all(chapters)
     await db_session.flush()
@@ -119,7 +134,9 @@ def _deployment(*, unknown_price: bool = False) -> ClueModelDeployment:
     )
 
 
-def _judgment_for_candidate(candidate_id: str, cue_id: str, later_id: str | None = None) -> dict:
+def _judgment_for_candidate(
+    candidate_id: str, cue_id: str, later_id: str | None = None
+) -> dict:
     payload = {
         "schema_version": "clue-semantic-judgment.v1",
         "candidate_id": candidate_id,
@@ -161,7 +178,10 @@ async def test_worker_promotes_version_and_restart_is_idempotent(
     # package-aware approach: monkeypatch recall to one draft.
 
     from app.services.clues.candidates import ClueCandidateDraft
-    from app.services.clues.evidence import make_clue_evidence_unit, build_clue_evidence_package
+    from app.services.clues.evidence import (
+        make_clue_evidence_unit,
+        build_clue_evidence_package,
+    )
 
     cue = make_clue_evidence_unit(
         evidence_id="ev-cue",
@@ -205,7 +225,9 @@ async def test_worker_promotes_version_and_restart_is_idempotent(
         async def build_candidates_from_nodes(self, **kwargs):
             from app.services.clues.candidates import CandidateRecallResult
 
-            return CandidateRecallResult(drafts=[draft], hierarchy_build_id=package.hierarchy_build_id)
+            return CandidateRecallResult(
+                drafts=[draft], hierarchy_build_id=package.hierarchy_build_id
+            )
 
     judgment = _judgment_for_candidate("clue-cand-seal", "ev-cue", "ev-later")
     runtime = await _runtime(db_session, outputs={"clue-cand-seal": judgment})
@@ -224,7 +246,12 @@ async def test_worker_promotes_version_and_restart_is_idempotent(
     db_session.expire_all()
     run = await db_session.get(ClueAnalysisRun, run_id)
     assert run is not None
-    assert run.status == "completed", (run.status, run.status_reason, run.progress, run.checkpoint)
+    assert run.status == "completed", (
+        run.status,
+        run.status_reason,
+        run.progress,
+        run.checkpoint,
+    )
     version_id = run.version_id
     pointer = await db_session.scalar(
         select(ClueActivePointer).where(
@@ -278,7 +305,10 @@ async def test_worker_promotes_version_and_restart_is_idempotent(
 async def test_unknown_pricing_pauses_before_provider_call(db_session, monkeypatch):
     owner, novel, chapters = await _seed_hierarchy(db_session, title="Budget novel")
     from app.services.clues.candidates import ClueCandidateDraft, CandidateRecallResult
-    from app.services.clues.evidence import make_clue_evidence_unit, build_clue_evidence_package
+    from app.services.clues.evidence import (
+        make_clue_evidence_unit,
+        build_clue_evidence_package,
+    )
 
     cue = make_clue_evidence_unit(
         evidence_id="ev-b",
@@ -463,3 +493,112 @@ async def test_stale_cas_failed_candidate_and_rollback(db_session):
     )
     assert rolled.version_id == v1_id
     assert rolled.manifest_checksum == v1_checksum
+
+
+@pytest.mark.asyncio
+async def test_payoff_classification_drives_full_lifecycle(db_session):
+    """NM-DATA-006: a model payoff classification must not be gated into
+    'provisional' but must materialize candidate -> active -> reinforced -> paid_off."""
+    owner, novel, chapters = await _seed_hierarchy(db_session)
+
+    cue = make_clue_evidence_unit(
+        evidence_id="ev-payoff-cue",
+        chapter_id=chapters[0].id,
+        narrative_chapter_number=1,
+        text=chapters[0].content,
+        source_start=0,
+        source_end=len(chapters[0].content),
+        role_hint="cue",
+    )
+    later = make_clue_evidence_unit(
+        evidence_id="ev-payoff-later",
+        chapter_id=chapters[1].id,
+        narrative_chapter_number=3,
+        text=chapters[1].content,
+        source_start=0,
+        source_end=len(chapters[1].content),
+        role_hint="later",
+    )
+    package = build_clue_evidence_package(
+        owner_id=owner.id,
+        novel_id=novel.id,
+        candidate_id="clue-cand-payoff",
+        source_snapshot_hash=HEX_A,
+        hierarchy_build_id=f"clue-build-{novel.id}",
+        hierarchy_checksum=HEX_B,
+        cue_units=[cue],
+        later_units=[later],
+        timeline_version_id=None,
+        timeline_checksum=None,
+    )
+    draft = ClueCandidateDraft(
+        candidate_id="clue-cand-payoff",
+        owner_id=owner.id,
+        novel_id=novel.id,
+        package=package,
+        reason_codes=["lexical"],
+    )
+
+    class FakeRecall:
+        async def build_candidates_from_nodes(self, **kwargs):
+            return CandidateRecallResult(
+                drafts=[draft], hierarchy_build_id=package.hierarchy_build_id
+            )
+
+    judgment = {
+        "schema_version": "clue-semantic-judgment.v1",
+        "candidate_id": "clue-cand-payoff",
+        "classification": "payoff",
+        "cue_evidence_ids": ["ev-payoff-cue"],
+        "later_evidence_ids": ["ev-payoff-later"],
+        "confidence": 0.95,
+        "conflict_flags": [],
+        "rationale": "The sealed letter is opened and its promise fulfilled.",
+    }
+    runtime = await _runtime(db_session, outputs={"clue-cand-payoff": judgment})
+    runtime.recall = FakeRecall()
+
+    run = ClueAnalysisRun(
+        owner_id=owner.id,
+        novel_id=novel.id,
+        active_key="active",
+        status="pending",
+        progress={},
+    )
+    db_session.add(run)
+    await db_session.commit()
+    run_id = run.id
+
+    await run_clue_worker(run_id, runtime=runtime)
+    db_session.expire_all()
+
+    refreshed = await db_session.get(ClueAnalysisRun, run_id)
+    assert refreshed.status == "completed", (refreshed.status, refreshed.status_reason)
+
+    clue = await db_session.scalar(
+        select(MachineClue).where(
+            MachineClue.version_id == refreshed.version_id,
+            MachineClue.logical_clue_id == "clue-cand-payoff",
+        )
+    )
+    assert clue is not None
+    assert clue.publication_status == "published", (
+        "payoff must not route to provisional"
+    )
+
+    events = list(
+        (
+            await db_session.scalars(
+                select(ClueLifecycleEvent)
+                .where(
+                    ClueLifecycleEvent.version_id == refreshed.version_id,
+                    ClueLifecycleEvent.logical_clue_id == "clue-cand-payoff",
+                )
+                .order_by(ClueLifecycleEvent.id)
+            )
+        ).all()
+    )
+    transitions = [(e.from_status, e.to_status) for e in events]
+    assert ("candidate", "active") in transitions
+    assert ("active", "reinforced") in transitions
+    assert ("reinforced", "paid_off") in transitions

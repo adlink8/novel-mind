@@ -22,11 +22,18 @@ class EvidenceUnit:
     content_hash: str
 
     @classmethod
-    def create(cls, evidence_id: str, source_start: int, source_end: int, text: str) -> "EvidenceUnit":
+    def create(
+        cls, evidence_id: str, source_start: int, source_end: int, text: str
+    ) -> "EvidenceUnit":
         if source_start < 0 or source_end <= source_start:
             raise EvidenceScopeError("invalid evidence offsets")
-        return cls(evidence_id, source_start, source_end, text,
-                   hashlib.sha256(text.encode("utf-8")).hexdigest())
+        return cls(
+            evidence_id,
+            source_start,
+            source_end,
+            text,
+            hashlib.sha256(text.encode("utf-8")).hexdigest(),
+        )
 
 
 @dataclass(frozen=True)
@@ -42,9 +49,18 @@ class EvidencePackage:
     package_hash: str
 
     @classmethod
-    def create(cls, *, owner_id: int, novel_id: int, chapter_id: int, unit_id: str,
-               source_snapshot_hash: str, hierarchy_build_id: str, hierarchy_checksum: str,
-               units: list[EvidenceUnit]) -> "EvidencePackage":
+    def create(
+        cls,
+        *,
+        owner_id: int,
+        novel_id: int,
+        chapter_id: int,
+        unit_id: str,
+        source_snapshot_hash: str,
+        hierarchy_build_id: str,
+        hierarchy_checksum: str,
+        units: list[EvidenceUnit],
+    ) -> "EvidencePackage":
         if owner_id <= 0 or novel_id <= 0 or chapter_id <= 0 or not units:
             raise EvidenceScopeError("evidence package scope and units are required")
         if len(source_snapshot_hash) != 64 or len(hierarchy_checksum) != 64:
@@ -53,16 +69,29 @@ class EvidencePackage:
         if len(set(identities)) != len(identities):
             raise EvidenceScopeError("evidence IDs must be unique within a package")
         payload = {
-            "owner_id": owner_id, "novel_id": novel_id, "chapter_id": chapter_id,
-            "unit_id": unit_id, "source_snapshot_hash": source_snapshot_hash,
-            "hierarchy_build_id": hierarchy_build_id, "hierarchy_checksum": hierarchy_checksum,
+            "owner_id": owner_id,
+            "novel_id": novel_id,
+            "chapter_id": chapter_id,
+            "unit_id": unit_id,
+            "source_snapshot_hash": source_snapshot_hash,
+            "hierarchy_build_id": hierarchy_build_id,
+            "hierarchy_checksum": hierarchy_checksum,
             "units": [unit.__dict__ for unit in units],
         }
-        package_hash = hashlib.sha256(json.dumps(
-            payload, sort_keys=True, separators=(",", ":")
-        ).encode()).hexdigest()
-        return cls(owner_id, novel_id, chapter_id, unit_id, source_snapshot_hash,
-                   hierarchy_build_id, hierarchy_checksum, tuple(units), package_hash)
+        package_hash = hashlib.sha256(
+            json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest()
+        return cls(
+            owner_id,
+            novel_id,
+            chapter_id,
+            unit_id,
+            source_snapshot_hash,
+            hierarchy_build_id,
+            hierarchy_checksum,
+            tuple(units),
+            package_hash,
+        )
 
 
 def rebind_extraction_to_package(
@@ -118,12 +147,12 @@ def rebind_extraction_to_package(
         if not eids:
             continue
         constraints.append(constraint.model_copy(update={"evidence_ids": eids}))
-    return TimelineExtraction(
-        events=rebound_events, story_time_constraints=constraints
-    )
+    return TimelineExtraction(events=rebound_events, story_time_constraints=constraints)
 
 
-def validate_extraction(package: EvidencePackage, extraction: TimelineExtraction) -> None:
+def validate_extraction(
+    package: EvidencePackage, extraction: TimelineExtraction
+) -> None:
     """Validate all model refs against script-owned scope, offsets and source hashes."""
     units = {unit.evidence_id: unit for unit in package.units}
     candidate_ids: set[str] = set()
@@ -132,17 +161,28 @@ def validate_extraction(package: EvidencePackage, extraction: TimelineExtraction
             raise EvidenceScopeError("candidate IDs must be unique within a chapter")
         candidate_ids.add(event.candidate_id)
         if event.narrative_chapter_number != package.chapter_id:
-            raise EvidenceScopeError("candidate narrative chapter is outside the package")
+            raise EvidenceScopeError(
+                "candidate narrative chapter is outside the package"
+            )
         for ref in event.evidence:
             unit = units.get(ref.evidence_id)
             if ref.chapter_id != package.chapter_id or unit is None:
                 raise EvidenceScopeError("cross-chapter or unknown evidence reference")
             if (ref.source_start, ref.source_end, ref.content_hash) != (
-                unit.source_start, unit.source_end, unit.content_hash
+                unit.source_start,
+                unit.source_end,
+                unit.content_hash,
             ):
                 raise EvidenceScopeError("evidence offset or content hash mismatch")
     for constraint in extraction.story_time_constraints:
-        if constraint.source_candidate_id not in candidate_ids or constraint.target_candidate_id not in candidate_ids:
-            raise EvidenceScopeError("story-time constraint references an unknown candidate")
+        if (
+            constraint.source_candidate_id not in candidate_ids
+            or constraint.target_candidate_id not in candidate_ids
+        ):
+            raise EvidenceScopeError(
+                "story-time constraint references an unknown candidate"
+            )
         if any(evidence_id not in units for evidence_id in constraint.evidence_ids):
-            raise EvidenceScopeError("story-time constraint references unknown evidence")
+            raise EvidenceScopeError(
+                "story-time constraint references unknown evidence"
+            )

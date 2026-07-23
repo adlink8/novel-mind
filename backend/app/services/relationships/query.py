@@ -177,7 +177,10 @@ class RelationshipGraphQueryService:
                     AnalysisRun.version_id == version_id,
                 )
             )
-            if run is not None and source == RelationshipVersionSource.RUNNING_CANDIDATE:
+            if (
+                run is not None
+                and source == RelationshipVersionSource.RUNNING_CANDIDATE
+            ):
                 return ResolvedVersion(
                     version_id=version_id,
                     source=RelationshipVersionSource.RUNNING_CANDIDATE,
@@ -479,8 +482,7 @@ class RelationshipGraphQueryService:
             folded = [
                 e
                 for e in folded
-                if e.relation_type == relation_type
-                or e.suggested_type == relation_type
+                if e.relation_type == relation_type or e.suggested_type == relation_type
             ]
 
         evidence_by_obs = await self._evidence_for_observations(
@@ -598,8 +600,7 @@ class RelationshipGraphQueryService:
                 edge_kind=e.edge_kind,
                 suggested_type=(
                     RelationshipEdgeType(e.suggested_type)
-                    if e.suggested_type
-                    in {t.value for t in RelationshipEdgeType}
+                    if e.suggested_type in {t.value for t in RelationshipEdgeType}
                     else None
                 ),
             )
@@ -855,9 +856,7 @@ class RelationshipGraphQueryService:
         import hashlib
 
         lo, hi = (
-            (source_id, target_id)
-            if source_id <= target_id
-            else (target_id, source_id)
+            (source_id, target_id) if source_id <= target_id else (target_id, source_id)
         )
         digest = hashlib.sha1(
             f"rel:{lo}:{hi}:{relation_type}".encode("utf-8")
@@ -1107,9 +1106,7 @@ class RelationshipGraphQueryService:
                     if p.entity_id is not None
                     else self._mention_synthetic_id(mention)
                 )
-                names[cid] = (
-                    mention if p.entity_id is None else names.get(cid, mention)
-                )
+                names[cid] = mention if p.entity_id is None else names.get(cid, mention)
                 seen[cid] = mention
             ids = sorted(seen.keys())
             ch = event.narrative_chapter_number
@@ -1306,9 +1303,11 @@ class RelationshipGraphQueryService:
                 # Try all override keys that share endpoints.
                 for okey, fields in override_fields.items():
                     parts = okey.split(":")
-                    if len(parts) == 3 and parts[0] == str(
-                        current.source_character_id
-                    ) and parts[1] == str(current.target_character_id):
+                    if (
+                        len(parts) == 3
+                        and parts[0] == str(current.source_character_id)
+                        and parts[1] == str(current.target_character_id)
+                    ):
                         patches = fields
                         break
 

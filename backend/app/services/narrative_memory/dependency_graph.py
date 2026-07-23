@@ -296,7 +296,9 @@ def evidence_fingerprint_from_leaf(leaf: ChunkHierarchyNode) -> EvidenceFingerpr
     )
 
 
-def evidence_fingerprint_from_link(link: NarrativeMemorySourceLink) -> EvidenceFingerprint:
+def evidence_fingerprint_from_link(
+    link: NarrativeMemorySourceLink,
+) -> EvidenceFingerprint:
     return EvidenceFingerprint(
         chapter_id=int(link.chapter_id),
         chapter_number=int(link.chapter_number),
@@ -506,7 +508,10 @@ def build_dependency_graph(
             raise DependencyGraphError("edge references missing node")
         if edge.edge_type == "contains":
             # parent contains child: source is parent
-            if src.node_kind in {"story_arc", "volume"} and tgt.node_kind == "chapter_state":
+            if (
+                src.node_kind in {"story_arc", "volume"}
+                and tgt.node_kind == "chapter_state"
+            ):
                 edges.append(
                     GraphEdge(
                         edge_kind=EdgeKind.CHAPTER_TO_PARENT,
@@ -525,9 +530,7 @@ def build_dependency_graph(
                         target_key=src.node_key,
                     )
                 )
-            elif (
-                src.node_kind == "global_story" and tgt.node_kind == "chapter_state"
-            ):
+            elif src.node_kind == "global_story" and tgt.node_kind == "chapter_state":
                 edges.append(
                     GraphEdge(
                         edge_kind=EdgeKind.PARENT_TO_GLOBAL,
@@ -608,9 +611,7 @@ def _chapter_id_for_node(
     return None
 
 
-def _stage_key_for_node(
-    node: NarrativeMemoryNode, plan: dict[str, Any]
-) -> str | None:
+def _stage_key_for_node(node: NarrativeMemoryNode, plan: dict[str, Any]) -> str | None:
     if node.node_kind == "chapter_state":
         # Prefer chapter_id-based stage keys when recoverable from node_key.
         if node.node_key.startswith("chapter_state:"):

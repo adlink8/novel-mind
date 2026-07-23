@@ -54,11 +54,13 @@ def test_migration_is_revision_frozen_and_single_head(empty_postgres: str) -> No
                 for frag in FORBIDDEN_FRAGMENTS:
                     assert frag not in name
         with engine.connect() as conn:
-            heads = conn.execute(
-                text("SELECT version_num FROM alembic_version")
-            ).scalars().all()
+            heads = (
+                conn.execute(text("SELECT version_num FROM alembic_version"))
+                .scalars()
+                .all()
+            )
         # Single live head after full upgrade (Phase 17 is tip; Phase 14 is mid-chain).
-        assert heads == ["17memqual01"]
+        assert heads == ["18appsetting1"]
     finally:
         engine.dispose()
 

@@ -366,7 +366,9 @@ async def run_qualification(
     else:
         reuse_flag = True if reuse_ok is None else reuse_ok
 
-    cells = build_complete_report_cells(all_arts, reuse=reuse, top_k=policy.budget.top_k)
+    cells = build_complete_report_cells(
+        all_arts, reuse=reuse, top_k=policy.budget.top_k
+    )
     result.metric_cells = cells
     _ = metric_report_checksum(cells)
 

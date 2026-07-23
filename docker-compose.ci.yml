@@ -31,7 +31,7 @@ services:
   chroma:
     image: chromadb/chroma:1.5.9@sha256:abcce7c335e2dab9f11ef629296f7309b09cb19ae4b34da32ac7e34ff5773140
     ports:
-      - "8002:8000"
+      - "8001:8000"
     volumes:
       - ci_chromadata:/chroma/chroma
     environment:

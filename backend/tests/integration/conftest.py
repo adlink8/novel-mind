@@ -37,7 +37,7 @@ DEFAULT_PG_SYNC = (
     "postgresql+psycopg2://novelmind:novelmind@127.0.0.1:5433/novelmind_ci"
 )
 DEFAULT_CHROMA_HOST = "127.0.0.1"
-DEFAULT_CHROMA_PORT = 8002
+DEFAULT_CHROMA_PORT = 8001
 
 
 def _load_service_lock() -> dict[str, Any]:
@@ -113,7 +113,9 @@ def chroma_port(service_lock: dict[str, Any]) -> int:
 
 
 @pytest.fixture(scope="session")
-def chroma_health_url(service_lock: dict[str, Any], chroma_host: str, chroma_port: int) -> str:
+def chroma_health_url(
+    service_lock: dict[str, Any], chroma_host: str, chroma_port: int
+) -> str:
     path = service_lock["chroma"].get("health_path", "/api/v2/heartbeat")
     return f"http://{chroma_host}:{chroma_port}{path}"
 
@@ -133,9 +135,7 @@ def require_postgres(pg_sync_url: str) -> None:
             conn.execute(text("SELECT 1"))
         engine.dispose()
     except Exception as exc:  # pragma: no cover - infra path
-        pytest.skip(
-            f"blocked_dependency: PostgreSQL 16 CI service unavailable: {exc}"
-        )
+        pytest.skip(f"blocked_dependency: PostgreSQL 16 CI service unavailable: {exc}")
 
 
 @pytest.fixture(scope="session")

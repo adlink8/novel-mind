@@ -72,3 +72,9 @@ frontend/test-results/
 # local one-off scripts
 backend/_up*.py
 
+# --- 运行时 PID 文件（本地进程保活产物，不提交）---
+*.pid
+
+# --- 本地数据库备份 dump（体积大，不进版本库，保留本地）---
+backups/*.dump
+

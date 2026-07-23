@@ -26,7 +26,9 @@ from app.services.clues.evidence import (
 
 logger = logging.getLogger(__name__)
 
-PROMPT_PATH = Path(__file__).resolve().parents[3] / "prompts" / "clue_semantic_judge.v1.txt"
+PROMPT_PATH = (
+    Path(__file__).resolve().parents[3] / "prompts" / "clue_semantic_judge.v1.txt"
+)
 PROMPT_VERSION = "clue_semantic_judge.v1"
 SCHEMA_VERSION = "clue-semantic-judgment.v1"
 MAX_JUDGE_TOKENS = 1200
@@ -122,7 +124,7 @@ class ClueLLMJudgeService:
                 raw = (
                     settings.default_chat_model
                     or settings.vertex_model
-                    or "gemini-3.5-flash"
+                    or "gemini-3.5-flash-lite"
                 ).strip()
                 for prefix in (
                     "vertex_google/",
@@ -134,7 +136,7 @@ class ClueLLMJudgeService:
                     if raw.lower().startswith(prefix):
                         raw = raw[len(prefix) :]
                         break
-                bare = raw or "gemini-3.5-flash"
+                bare = raw or "gemini-3.5-flash-lite"
                 return f"vertex_google/{bare}"
             if (settings.default_chat_model or "").strip():
                 return settings.default_chat_model.strip()
@@ -186,7 +188,10 @@ class ClueLLMJudgeService:
                 package_hash=package.package_hash,
                 repair_attempt=repair,
                 call_count=0,
-                model_lineage={**lineage, "call_skipped_reason": "deterministic_output"},
+                model_lineage={
+                    **lineage,
+                    "call_skipped_reason": "deterministic_output",
+                },
             )
             return parsed
 
@@ -330,15 +335,11 @@ class ClueLLMJudgeService:
 
         # Cue IDs should prefer package cue window when classification needs cue.
         cue_set = set(package.cue_ids())
-        later_set = set(package.later_ids())
         if output.classification.value in {"cue_only", "reinforcement", "payoff"}:
-            bad_cue = sorted(set(output.cue_evidence_ids) - cue_set - later_set)
-            # already covered by allowed; additionally flag cue not in cue window
+            # additionally flag cue not in cue window
             cue_not_in_window = sorted(set(output.cue_evidence_ids) - cue_set)
             if cue_not_in_window and set(output.cue_evidence_ids) <= allowed:
-                failures.append(
-                    f"cue_not_in_cue_window:{','.join(cue_not_in_window)}"
-                )
+                failures.append(f"cue_not_in_cue_window:{','.join(cue_not_in_window)}")
 
         structured = output.model_dump(mode="json")
         if failures:
@@ -359,10 +360,16 @@ class ClueLLMJudgeService:
             gate_failures=[],
         )
 
-    def _reject_tool_or_stream_artifacts(self, content: str) -> ClueJudgmentResult | None:
+    def _reject_tool_or_stream_artifacts(
+        self, content: str
+    ) -> ClueJudgmentResult | None:
         text = content or ""
         lowered = text.lower()
-        if '"tool_calls"' in lowered or "function_call" in lowered or "<|tool" in lowered:
+        if (
+            '"tool_calls"' in lowered
+            or "function_call" in lowered
+            or "<|tool" in lowered
+        ):
             return ClueJudgmentResult(
                 status="schema_failed",
                 gate_status="schema_failed",

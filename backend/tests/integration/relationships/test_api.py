@@ -7,7 +7,7 @@ import json
 from typing import Any
 
 import pytest
-from sqlalchemy import create_engine, select, text
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
 from app.models.analysis import AnalysisRun, AnalysisVersion
@@ -660,12 +660,11 @@ async def test_legacy_character_relation_does_not_change_checksum(
         d2.pop("generated_at", None)
         assert d1 == d2
         assert "MORE_LEGACY" not in second.model_dump_json()
-        checksum2 = hashlib.sha256(
-            json.dumps(d2, sort_keys=True).encode()
-        ).hexdigest()
-        assert checksum2 == hashlib.sha256(
-            json.dumps(d1, sort_keys=True).encode()
-        ).hexdigest()
+        checksum2 = hashlib.sha256(json.dumps(d2, sort_keys=True).encode()).hexdigest()
+        assert (
+            checksum2
+            == hashlib.sha256(json.dumps(d1, sort_keys=True).encode()).hexdigest()
+        )
         assert checksum1  # sanity
 
     await aengine.dispose()
@@ -691,7 +690,7 @@ async def test_filters_required_over_cap_returns_empty_elements(
             KnowledgeRelationJudgment,
         )
 
-        krun = session.execute(
+        session.execute(
             select(KnowledgeExtractionRun).where(
                 KnowledgeExtractionRun.novel_id == novel_id
             )

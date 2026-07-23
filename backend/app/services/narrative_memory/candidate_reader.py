@@ -504,22 +504,16 @@ async def load_visible_set_for_route(
         selected = [
             n
             for n in nodes
-            if n.chapter_start
-            <= question.selected_chapter
-            <= n.chapter_end
+            if n.chapter_start <= question.selected_chapter <= n.chapter_end
         ]
         if selected:
             nodes = selected
 
     node_ids = [n.id for n in nodes]
-    edges = await load_visible_edges(
-        session, scope, source_node_ids=node_ids or None
-    )
+    edges = await load_visible_edges(session, scope, source_node_ids=node_ids or None)
     # Also load edges targeting visible nodes for descent completeness
     if node_ids:
-        inbound = await load_visible_edges(
-            session, scope, target_node_ids=node_ids
-        )
+        inbound = await load_visible_edges(session, scope, target_node_ids=node_ids)
         by_id = {e.id: e for e in edges}
         for e in inbound:
             by_id[e.id] = e

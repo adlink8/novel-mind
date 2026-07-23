@@ -3,8 +3,9 @@ import path from "path";
 
 /**
  * Playwright browser matrix (06-05 / D-12 / D-16):
- * - chromium-desktop
- * - chromium-mobile-390 (390px viewport)
+ * - chromium-desktop (1280×800)
+ * - chromium-mobile-390 (390×844)
+ * - chromium-tablet-768 (768×1024)
  * - browser timeout 60s; retain trace/screenshots on failure
  *
  * Core success path hits real frontend + backend (no route mock).
@@ -79,6 +80,15 @@ export default defineConfig({
         hasTouch: true,
       },
     },
+    {
+      name: "chromium-tablet-768",
+      use: {
+        ...devices["Desktop Chrome"],
+        viewport: { width: 768, height: 1024 },
+        isMobile: true,
+        hasTouch: true,
+      },
+    },
   ],
   webServer: [
     ...(startBackend
@@ -94,6 +104,10 @@ export default defineConfig({
             env: {
               ...process.env,
               NOVELMIND_CORS_ORIGINS: CORS_ORIGINS,
+              // e2e 后端默认打到 CI 隔离库，防止测试数据污染开发库 novelmind
+              NOVELMIND_DATABASE_URL:
+                process.env.NOVELMIND_DATABASE_URL ??
+                "postgresql+asyncpg://novelmind:novelmind@127.0.0.1:5433/novelmind_ci",
             },
           },
         ]

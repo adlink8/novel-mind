@@ -20,10 +20,22 @@ def test_frozen_fiction_corpus_has_locked_coverage_and_no_deferred_products():
     assert corpus["domain"] == "fiction"
     assert len(corpus["cases"]) >= 20
     assert len(corpus["cross_chapter_groups"]) >= 10
-    assert {case["precision"] for case in corpus["cases"]} == {"exact", "relative", "fuzzy", "unknown"}
-    assert {case["shape"] for case in corpus["cases"]} >= {"forward", "flashback", "interlude"}
+    assert {case["precision"] for case in corpus["cases"]} == {
+        "exact",
+        "relative",
+        "fuzzy",
+        "unknown",
+    }
+    assert {case["shape"] for case in corpus["cases"]} >= {
+        "forward",
+        "flashback",
+        "interlude",
+    }
     assert set(corpus["deferred_products_absent"]) == {
-        "relationship_graph", "reader_ai", "clue_tracker", "history_corpus"
+        "relationship_graph",
+        "reader_ai",
+        "clue_tracker",
+        "history_corpus",
     }
 
 
@@ -59,4 +71,3 @@ def test_critical_failures_cannot_qualify(mutation, gate):
     assert report["quality_comparable"] is False
     assert report["metrics"] is None
     assert report["gates"][gate] is False
-

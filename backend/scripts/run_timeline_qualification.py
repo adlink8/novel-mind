@@ -791,6 +791,10 @@ async def seed_browser_partial(username: str) -> dict[str, Any]:
         ]
         session.add_all(chapters)
         await session.flush()
+        # 结构树按 chapter_count 建章节范围（第 1..N 章），非连续章号需覆盖到最大章号，
+        # 否则候选事件（第 2 章）会落在默认「第 1 章」范围之外而被筛掉
+        novel.chapter_count = max(c.chapter_number for c in chapters)
+        novel.word_count = sum(len(c.content) for c in chapters)
         novel.reading_progress = {"chapter_id": chapters[0].id, "progress_percent": 100}
         build = ChunkBuild(
             build_id=f"browser-{unique}", novel_id=novel.id, status="active",

@@ -31,6 +31,7 @@ from app.services.hybrid_search import HybridSearchService  # noqa: E402
 
 # ─────────── 辅助数据 ───────────
 
+
 def _make_bm25_result(
     chunk_id: int,
     novel_id: int = 1,
@@ -175,9 +176,7 @@ class TestBm25Search:
 
         mock_db.execute = capture_execute
 
-        await service._bm25_search(
-            mock_db, query="关键词", novel_id=None, owner_id=42
-        )
+        await service._bm25_search(mock_db, query="关键词", novel_id=None, owner_id=42)
 
         assert captured_params["owner_id"] == 42
 
@@ -243,7 +242,9 @@ class TestHybridRerank:
 
         bm25_results = [
             _make_bm25_result(chunk_id=1, score=0.9, content_snippet="a"),
-            _make_bm25_result(chunk_id=1, score=0.7, content_snippet="longer text here"),
+            _make_bm25_result(
+                chunk_id=1, score=0.7, content_snippet="longer text here"
+            ),
         ]
         vector_results = [
             _make_vector_result(chunk_id=1, score=0.8),
@@ -380,7 +381,9 @@ class TestSearchGlobal:
         async def mock_bm25(*args, **kwargs):
             return [
                 _make_bm25_result(chunk_id=1, novel_id=1, score=0.9),
-                _make_bm25_result(chunk_id=10, novel_id=2, score=0.7, content_snippet="another"),
+                _make_bm25_result(
+                    chunk_id=10, novel_id=2, score=0.7, content_snippet="another"
+                ),
             ]
 
         async def mock_vector(*args, **kwargs):
@@ -496,7 +499,13 @@ class TestSearchApi:
         content = "第一章 初入江湖\n\n这是第一章的内容。\n\n第二章 拜师学艺\n\n这是第二章的内容。\n"
         resp = await auth_client.post(
             "/api/novels/upload",
-            files={"file": ("search_test.txt", io.BytesIO(content.encode("utf-8")), "text/plain")},
+            files={
+                "file": (
+                    "search_test.txt",
+                    io.BytesIO(content.encode("utf-8")),
+                    "text/plain",
+                )
+            },
         )
         assert resp.status_code == 200
         novel_id = resp.json()["id"]
@@ -564,7 +573,13 @@ class TestSearchApi:
         content = "第一章 初入江湖\n\n这是第一章的内容。\n"
         resp = await auth_client.post(
             "/api/novels/upload",
-            files={"file": ("empty_test.txt", io.BytesIO(content.encode("utf-8")), "text/plain")},
+            files={
+                "file": (
+                    "empty_test.txt",
+                    io.BytesIO(content.encode("utf-8")),
+                    "text/plain",
+                )
+            },
         )
         assert resp.status_code == 200
         novel_id = resp.json()["id"]

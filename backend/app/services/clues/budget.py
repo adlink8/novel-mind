@@ -75,14 +75,21 @@ class ClueCallRepository:
             )
             if ledger is None:
                 raise BudgetExceeded("clue run has no persistent budget ledger")
-            attempt_number = int(
-                await session.scalar(
-                    select(func.coalesce(func.max(ClueModelCallAttempt.attempt_number), 0)).where(
-                        ClueModelCallAttempt.run_id == run_id,
-                        ClueModelCallAttempt.stage_key == stage_key,
+            attempt_number = (
+                int(
+                    await session.scalar(
+                        select(
+                            func.coalesce(
+                                func.max(ClueModelCallAttempt.attempt_number), 0
+                            )
+                        ).where(
+                            ClueModelCallAttempt.run_id == run_id,
+                            ClueModelCallAttempt.stage_key == stage_key,
+                        )
                     )
                 )
-            ) + 1
+                + 1
+            )
             reservation_key = f"{stage_key}:attempt:{attempt_number}"
             if run.status == "paused_budget":
                 await self._reject_budget(
@@ -94,7 +101,9 @@ class ClueCallRepository:
                     cache_key=cache_key,
                     error_code="budget_paused",
                 )
-                rejection = BudgetExceeded("budget is paused; no further calls are allowed")
+                rejection = BudgetExceeded(
+                    "budget is paused; no further calls are allowed"
+                )
                 worst_cost = Decimal(0)
             elif input_price_per_million is None or output_price_per_million is None:
                 await self._reject_budget(
@@ -140,7 +149,9 @@ class ClueCallRepository:
                     cache_key=cache_key,
                     error_code="budget_exceeded",
                 )
-                rejection = BudgetExceeded("worst-case reservation exceeds frozen policy")
+                rejection = BudgetExceeded(
+                    "worst-case reservation exceeds frozen policy"
+                )
             if rejection is None:
                 reservation = ClueBudgetReservation(
                     ledger_id=ledger.id,
@@ -157,7 +168,9 @@ class ClueCallRepository:
                 ledger.reserved_calls += 1
                 ledger.reserved_input_tokens += input_tokens
                 ledger.reserved_output_tokens += output_tokens
-                ledger.reserved_cost_usd = Decimal(ledger.reserved_cost_usd) + worst_cost
+                ledger.reserved_cost_usd = (
+                    Decimal(ledger.reserved_cost_usd) + worst_cost
+                )
                 attempt = ClueModelCallAttempt(
                     run_id=run_id,
                     reservation_id=reservation.id,
@@ -231,7 +244,9 @@ class ClueCallRepository:
                 actual_input = int(usage.get("input_tokens", 0) or 0)
                 actual_output = int(usage.get("output_tokens", 0) or 0)
                 actual_cost = Decimal(cost_usd or 0)
-                ledger.reserved_calls = max(0, ledger.reserved_calls - reservation.calls)
+                ledger.reserved_calls = max(
+                    0, ledger.reserved_calls - reservation.calls
+                )
                 ledger.reserved_input_tokens = max(
                     0, ledger.reserved_input_tokens - reservation.input_tokens
                 )
@@ -246,7 +261,9 @@ class ClueCallRepository:
                     ledger.settled_calls += 1
                     ledger.settled_input_tokens += actual_input
                     ledger.settled_output_tokens += actual_output
-                    ledger.settled_cost_usd = Decimal(ledger.settled_cost_usd) + actual_cost
+                    ledger.settled_cost_usd = (
+                        Decimal(ledger.settled_cost_usd) + actual_cost
+                    )
                     reservation.status = "settled"
                     reservation.settled_usage = {
                         "input_tokens": actual_input,
@@ -273,14 +290,21 @@ class ClueCallRepository:
         artifact_checksum: str,
     ) -> None:
         async with self.sessions.begin() as session:
-            attempt_number = int(
-                await session.scalar(
-                    select(func.coalesce(func.max(ClueModelCallAttempt.attempt_number), 0)).where(
-                        ClueModelCallAttempt.run_id == run_id,
-                        ClueModelCallAttempt.stage_key == stage_key,
+            attempt_number = (
+                int(
+                    await session.scalar(
+                        select(
+                            func.coalesce(
+                                func.max(ClueModelCallAttempt.attempt_number), 0
+                            )
+                        ).where(
+                            ClueModelCallAttempt.run_id == run_id,
+                            ClueModelCallAttempt.stage_key == stage_key,
+                        )
                     )
                 )
-            ) + 1
+                + 1
+            )
             session.add(
                 ClueModelCallAttempt(
                     run_id=run_id,

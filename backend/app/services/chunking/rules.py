@@ -25,13 +25,37 @@ RULES_VERSION = "boundary-rules.v1"
 
 # Split SCENE_MARKERS into time vs location heuristically
 _TIME_MARKERS = {
-    "翌日", "次日", "翌晨", "清晨", "黄昏", "傍晚", "深夜", "午夜",
-    "数日后", "几日后", "半月后", "一月后", "半年后", "一年后",
-    "时光飞逝", "光阴似箭", "岁月如梭",
+    "翌日",
+    "次日",
+    "翌晨",
+    "清晨",
+    "黄昏",
+    "傍晚",
+    "深夜",
+    "午夜",
+    "数日后",
+    "几日后",
+    "半月后",
+    "一月后",
+    "半年后",
+    "一年后",
+    "时光飞逝",
+    "光阴似箭",
+    "岁月如梭",
 }
 _LOCATION_MARKERS = {
-    "来到", "走进", "走出", "进入", "离开", "抵达", "到达",
-    "回到", "返回", "前往", "赶往", "奔赴",
+    "来到",
+    "走进",
+    "走出",
+    "进入",
+    "离开",
+    "抵达",
+    "到达",
+    "回到",
+    "返回",
+    "前往",
+    "赶往",
+    "奔赴",
 }
 
 _SENTENCE_SPLIT = re.compile(r"(?<=[。！？；…])")
@@ -125,7 +149,6 @@ def scan_atomic_spans(
 
     # Split into sentence-like units while preserving offsets in normalized text
     pieces: list[tuple[str, int, int]] = []
-    cursor = 0
     # Prefer sentence boundaries; fallback to whole paragraph lines
     parts = _SENTENCE_SPLIT.split(normalized)
     buf = ""
@@ -214,7 +237,6 @@ def scan_atomic_spans(
 
 def _unbalanced_quotes(text: str) -> bool:
     # Count Chinese / English / corner quotes
-    pairs = [('"', '"'), ("“", "”"), ("「", "」")]
     # Simple parity on each open/close class
     opens = text.count("“") + text.count("「") + text.count('"')
     closes = text.count("”") + text.count("」")
@@ -278,7 +300,9 @@ def _score_boundary(
         reasons.append("STRUCTURAL_BREAK")
         split_score += 0.3
 
-    if _has_marker(right.content, _TIME_MARKERS) or _has_marker(left.content[-20:], _TIME_MARKERS):
+    if _has_marker(right.content, _TIME_MARKERS) or _has_marker(
+        left.content[-20:], _TIME_MARKERS
+    ):
         reasons.append("TIME_SHIFT")
         split_score += 0.25
     if _has_marker(right.content, _LOCATION_MARKERS):

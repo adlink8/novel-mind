@@ -1,0 +1,3 @@
+[lint.per-file-ignores]
+# 测试文件约定在 import pytest 后立即写 pytestmark，再引入被测模块
+"tests/**" = ["E402"]

@@ -248,6 +248,4 @@ async def materialize_carry_and_dirty_stages(
 
 def assert_stage_allowed(mask: DirtyStageMask, stage_key: str) -> None:
     if stage_key not in mask.dirty_stage_keys:
-        raise RebuildExecutorError(
-            f"stage {stage_key} not in frozen dirty closure"
-        )
+        raise RebuildExecutorError(f"stage {stage_key} not in frozen dirty closure")

@@ -302,23 +302,33 @@ async def get_graph_neighborhood(
     accepted_judgments = judgments_result.scalars().all()
 
     characters = (
-        await db.execute(select(Character).where(Character.novel_id == novel.id))
-    ).scalars().all()
+        (await db.execute(select(Character).where(Character.novel_id == novel.id)))
+        .scalars()
+        .all()
+    )
     character_names = {character.id: character.name for character in characters}
     relations = (
-        await db.execute(
-            select(CharacterRelation)
-            .where(CharacterRelation.novel_id == novel.id)
-            .order_by(CharacterRelation.id.asc())
+        (
+            await db.execute(
+                select(CharacterRelation)
+                .where(CharacterRelation.novel_id == novel.id)
+                .order_by(CharacterRelation.id.asc())
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     timeline_events = (
-        await db.execute(
-            select(TimelineEvent)
-            .where(TimelineEvent.novel_id == novel.id)
-            .order_by(TimelineEvent.sort_order.asc(), TimelineEvent.id.asc())
+        (
+            await db.execute(
+                select(TimelineEvent)
+                .where(TimelineEvent.novel_id == novel.id)
+                .order_by(TimelineEvent.sort_order.asc(), TimelineEvent.id.asc())
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     return {
         "novel_id": novel.id,

@@ -166,8 +166,10 @@ def test_cross_owner_manifest_ids_are_not_trusted_by_citation_gate():
 
 def test_prompt_file_is_fiction_only_and_forbids_tools():
     prompt = (
-        ROOT / "prompts" / "reader_chat_answer.v1.txt"
-    ).read_text(encoding="utf-8").lower()
+        (ROOT / "prompts" / "reader_chat_answer.v1.txt")
+        .read_text(encoding="utf-8")
+        .lower()
+    )
     assert "fiction" in prompt or "novel" in prompt
     assert "tool" in prompt
     assert "timeline" in prompt

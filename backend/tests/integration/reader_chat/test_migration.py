@@ -47,7 +47,7 @@ def test_migration_from_phase09_head_creates_reader_chat_tables(
     run_alembic("upgrade", "head", database_url=empty_postgres)
     current = run_alembic("current", database_url=empty_postgres)
     out = current.stdout + current.stderr
-    assert "12readerchat01" in out
+    assert "18appsetting1" in out
 
     engine = create_engine(empty_postgres)
     with engine.connect() as conn:
@@ -81,7 +81,9 @@ def test_migration_from_phase09_head_creates_reader_chat_tables(
     engine.dispose()
 
 
-def test_alembic_single_head_after_reader_chat(empty_postgres: str, require_postgres: None):
+def test_alembic_single_head_after_reader_chat(
+    empty_postgres: str, require_postgres: None
+):
     run_alembic("upgrade", "head", database_url=empty_postgres)
     heads = run_alembic("heads", database_url=empty_postgres)
     head_lines = [
@@ -92,7 +94,7 @@ def test_alembic_single_head_after_reader_chat(empty_postgres: str, require_post
     # Exactly one head revision token
     revision_tokens = [line.split()[0] for line in head_lines if line]
     assert len(revision_tokens) == 1
-    assert revision_tokens[0] == "12readerchat01"
+    assert revision_tokens[0] == "18appsetting1"
 
 
 def test_selection_offset_check_and_role_constraints(
@@ -623,11 +625,11 @@ def test_hard_delete_conversation_cascades_private_content(
             {"id": ids["conversation_id"]},
         )
 
+        assert conn.execute(text("SELECT COUNT(*) FROM reader_messages")).scalar() == 0
         assert (
-            conn.execute(text("SELECT COUNT(*) FROM reader_messages")).scalar() == 0
-        )
-        assert (
-            conn.execute(text("SELECT COUNT(*) FROM reader_message_selections")).scalar()
+            conn.execute(
+                text("SELECT COUNT(*) FROM reader_message_selections")
+            ).scalar()
             == 0
         )
         assert (
@@ -665,16 +667,17 @@ def test_hard_delete_conversation_cascades_private_content(
         )
         assert (
             conn.execute(
-                text(
-                    "SELECT COUNT(*) FROM reader_budget_ledgers WHERE id = :id"
-                ),
+                text("SELECT COUNT(*) FROM reader_budget_ledgers WHERE id = :id"),
                 {"id": novel_ledger},
             ).scalar()
             == 1
         )
         # Domain tables untouched
         assert (
-            conn.execute(text("SELECT COUNT(*) FROM novels WHERE id = :id"), {"id": ids["novel_id"]}).scalar()
+            conn.execute(
+                text("SELECT COUNT(*) FROM novels WHERE id = :id"),
+                {"id": ids["novel_id"]},
+            ).scalar()
             == 1
         )
         assert "relationship_observations" in set(inspect(conn).get_table_names())

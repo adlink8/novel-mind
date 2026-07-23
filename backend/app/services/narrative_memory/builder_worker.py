@@ -157,7 +157,9 @@ class NarrativeMemoryBuilderWorker:
             progress["chapter_ids"] = {
                 str(chapter.chapter_number): chapter.id for chapter in chapters
             }
-            progress["chapter_numbers"] = [chapter.chapter_number for chapter in chapters]
+            progress["chapter_numbers"] = [
+                chapter.chapter_number for chapter in chapters
+            ]
             await repo.update_run_status(run.id, status=run.status, progress=progress)
             await session.commit()
             return run.id
@@ -445,7 +447,8 @@ class NarrativeMemoryBuilderWorker:
 
         run = await session.get(
             __import__(
-                "app.models.narrative_memory_builder", fromlist=["NarrativeMemoryBuildRun"]
+                "app.models.narrative_memory_builder",
+                fromlist=["NarrativeMemoryBuildRun"],
             ).NarrativeMemoryBuildRun,
             run_id,
         )
@@ -621,7 +624,9 @@ class NarrativeMemoryBuilderWorker:
                     child_claims=claims,
                     child_links=links,
                     model_claims=model_claims,
-                    display_label=str((raw or {}).get("display_label") or stage.stage_key)
+                    display_label=str(
+                        (raw or {}).get("display_label") or stage.stage_key
+                    )
                     if isinstance(raw, dict)
                     else stage.stage_key,
                 )
@@ -697,9 +702,7 @@ class NarrativeMemoryBuilderWorker:
     ) -> None:
         stages = await repo.list_stages(run_id)
         parents = [
-            s
-            for s in stages
-            if s.stage_kind == StageKind.ARC_VOLUME_AGGREGATE.value
+            s for s in stages if s.stage_kind == StageKind.ARC_VOLUME_AGGREGATE.value
         ]
         if not parents:
             return
@@ -709,7 +712,9 @@ class NarrativeMemoryBuilderWorker:
         )
         if global_stage is None:
             return
-        if any(p.status == "failed" or p.status == "blocked_dependency" for p in parents):
+        if any(
+            p.status == "failed" or p.status == "blocked_dependency" for p in parents
+        ):
             if global_stage.status != "completed":
                 await repo.mark_stage(
                     global_stage,
@@ -737,11 +742,7 @@ class NarrativeMemoryBuilderWorker:
         if global_stage.status != "completed":
             return
         manifest_stage = next(
-            (
-                s
-                for s in stages
-                if s.stage_kind == StageKind.MANIFEST_VALIDATION.value
-            ),
+            (s for s in stages if s.stage_kind == StageKind.MANIFEST_VALIDATION.value),
             None,
         )
         if manifest_stage is None or manifest_stage.status == "completed":
@@ -821,15 +822,27 @@ class NarrativeMemoryBuilderWorker:
                 "prompt_hash": policy.prompt_hash,
                 "schema_hash": policy.schema_hash,
             }
-            package_cs = package_checksum(
-                type("Tmp", (), {"model_dump": lambda self, mode=None: request_payload})()
-            ) if False else sha256(
-                __import__("json").dumps(request_payload, sort_keys=True).encode()
-            ).hexdigest()
+            package_cs = (
+                package_checksum(
+                    type(
+                        "Tmp",
+                        (),
+                        {"model_dump": lambda self, mode=None: request_payload},
+                    )()
+                )
+                if False
+                else sha256(
+                    __import__("json").dumps(request_payload, sort_keys=True).encode()
+                ).hexdigest()
+            )
             cache_key = f"nmb:global:{package_cs[:100]}"
 
             def validate_output(raw: Any) -> dict[str, Any]:
-                model_claims = list((raw or {}).get("claims") or []) if isinstance(raw, dict) else []
+                model_claims = (
+                    list((raw or {}).get("claims") or [])
+                    if isinstance(raw, dict)
+                    else []
+                )
                 package = build_global_candidate(
                     chapter_start=int(stage.chapter_start or 1),
                     chapter_end=int(stage.chapter_end or 1),
@@ -1046,7 +1059,9 @@ class NarrativeMemoryBuilderWorker:
             rows = (
                 await session.scalars(
                     select(Chapter)
-                    .where(Chapter.novel_id == novel_id, Chapter.id.in_(tuple(chapter_ids)))
+                    .where(
+                        Chapter.novel_id == novel_id, Chapter.id.in_(tuple(chapter_ids))
+                    )
                     .order_by(Chapter.chapter_number.asc())
                 )
             ).all()
@@ -1089,7 +1104,8 @@ class NarrativeMemoryBuilderWorker:
             return int(suffix)
         run = await session.get(
             __import__(
-                "app.models.narrative_memory_builder", fromlist=["NarrativeMemoryBuildRun"]
+                "app.models.narrative_memory_builder",
+                fromlist=["NarrativeMemoryBuildRun"],
             ).NarrativeMemoryBuildRun,
             run_id,
         )
@@ -1141,9 +1157,7 @@ class NarrativeMemoryBuilderWorker:
         stages = await repo.list_stages(run_id)
         completed = tuple(s.stage_key for s in stages if s.status == "completed")
         failed = tuple(s.stage_key for s in stages if s.status == "failed")
-        blocked = tuple(
-            s.stage_key for s in stages if s.status == "blocked_dependency"
-        )
+        blocked = tuple(s.stage_key for s in stages if s.status == "blocked_dependency")
         run = await session.get(NarrativeMemoryBuildRun, run_id)
         assert run is not None
         if run.cancel_requested and run.status != "completed":
@@ -1196,9 +1210,11 @@ class NarrativeMemoryBuilderWorker:
                     status = "completed"
                     reason = "completed_candidate"
                 elif chapters_done and not has_global:
-                    status = "running" if any(
-                        s.status == "pending" for s in stages
-                    ) else "partial"
+                    status = (
+                        "running"
+                        if any(s.status == "pending" for s in stages)
+                        else "partial"
+                    )
                     reason = "chapters_complete"
                 else:
                     status = "partial" if failed or blocked else "running"
@@ -1269,9 +1285,13 @@ def scan_builder_package_for_forbidden_capabilities(
                         if frag in alias.name:
                             hits.append(f"{path.name}:name:{alias.name}")
         for frag in FORBIDDEN_IMPORT_FRAGMENTS:
-            if frag in source and frag not in {
-                # allow listing in this scanner's constant
-            }:
+            if (
+                frag in source
+                and frag
+                not in {
+                    # allow listing in this scanner's constant
+                }
+            ):
                 # Skip the constant definition file lines by requiring import form.
                 pass
     # Also scan sibling modules introduced by later plans.

@@ -109,7 +109,9 @@ def test_six_claim_variants_round_trip_strict_json(payload: dict[str, object]) -
     assert restored.model_config["frozen"] is True
 
 
-def test_contracts_reject_extra_coercion_unknown_enum_and_summary_only_authority() -> None:
+def test_contracts_reject_extra_coercion_unknown_enum_and_summary_only_authority() -> (
+    None
+):
     valid = _claim(_claim_payloads()[0])
     invalid_cases = (
         {**valid, "authoritative_summary": "invented"},
@@ -336,16 +338,19 @@ def test_canonical_hashes_are_order_independent_and_authority_sensitive() -> Non
     assert canonical_json(reordered) == canonical_json(claim)
     assert claim_checksum(reordered) == claim_checksum(claim)
 
-    assert len(
-        {
-            node_checksum(node),
-            claim_checksum(claim),
-            edge_checksum(edge),
-            source_link_checksum(link),
-            model_lineage_checksum(lineage),
-            version_spec_checksum(spec),
-        }
-    ) == 6
+    assert (
+        len(
+            {
+                node_checksum(node),
+                claim_checksum(claim),
+                edge_checksum(edge),
+                source_link_checksum(link),
+                model_lineage_checksum(lineage),
+                version_spec_checksum(spec),
+            }
+        )
+        == 6
+    )
 
     changed_claim = claim.model_copy(update={"visible_from_chapter": 2})
     changed_lineage = lineage.model_copy(update={"revision": "2"})

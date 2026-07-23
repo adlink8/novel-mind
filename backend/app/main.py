@@ -23,7 +23,17 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api import novels, analysis, timeline, characters, fanfiction, models, auth, rag, search
+from app.api import (
+    novels,
+    analysis,
+    timeline,
+    characters,
+    fanfiction,
+    models,
+    auth,
+    rag,
+    search,
+)
 from app.api.clues import router as clues_router
 from app.api.asset_audit import router as asset_audit_router
 from app.api.eval import router as eval_router
@@ -31,6 +41,8 @@ from app.api.knowledge import router as knowledge_router
 from app.api.narrative_memory import router as narrative_memory_router
 from app.api.reader_chat import router as reader_chat_router
 from app.api.relationships import router as relationships_router
+from app.api.settings import router as settings_router
+from app.api.usage import router as usage_router
 from app.config import settings
 from app.core.logging import RequestLoggingMiddleware, setup_logging
 
@@ -61,11 +73,25 @@ async def lifespan(app: FastAPI):
     # 恢复过期租约的导入任务
     from app.services.import_service import import_service
     from app.core.database import async_session_factory
+
     async with async_session_factory() as db:
         recovered = await import_service.recover_stale_jobs(db)
         if recovered:
             logger.info(f"恢复 {len(recovered)} 个过期导入任务")
         await db.commit()
+
+    # 从库中恢复 AI 路由全局偏好（未设置时保持默认 "balanced"）
+    try:
+        from app.services.ai_router import ai_router
+        from app.services.settings_service import get_routing_preference
+
+        async with async_session_factory() as db:
+            preference = await get_routing_preference(db)
+        ai_router.update_preference(preference)
+        logger.info(f"AI 路由偏好: {preference}")
+    except Exception as e:
+        # 表不存在（迁移未执行）等情况不阻断启动
+        logger.warning(f"恢复 AI 路由偏好失败，使用默认值: {e}")
 
     logger.info("服务就绪 ✓")
     yield
@@ -176,6 +202,8 @@ app.include_router(
 )
 app.include_router(fanfiction.router, prefix="/api/fanfiction", tags=["同人文"])
 app.include_router(models.router, prefix="/api/models", tags=["AI 模型"])
+app.include_router(settings_router, prefix="/api/settings", tags=["设置中心"])
+app.include_router(usage_router, prefix="/api/usage", tags=["用量统计"])
 app.include_router(rag.router, prefix="/api/novels", tags=["RAG 检索"])
 app.include_router(knowledge_router)
 app.include_router(search.router, prefix="/api/search", tags=["搜索"])

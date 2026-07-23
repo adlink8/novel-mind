@@ -143,5 +143,7 @@ def test_rejects_extra_fields_and_bad_offsets():
 
 def test_config_hash_canonical():
     a = config_hash(ChunkerConfig(min_chunk_size=300, max_chunk_size=500))
-    b = config_hash({"max_chunk_size": 500, "min_chunk_size": 300, "short_paragraph_merge": 50})
+    b = config_hash(
+        {"max_chunk_size": 500, "min_chunk_size": 300, "short_paragraph_merge": 50}
+    )
     assert a == b
