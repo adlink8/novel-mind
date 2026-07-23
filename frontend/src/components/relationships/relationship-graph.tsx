@@ -567,8 +567,12 @@ export function RelationshipGraph(props: Props) {
       });
 
       const levels = hopLevels(hubId, slice.nodes, slice.edges);
+      const reduceMotion =
+        typeof window !== "undefined" &&
+        typeof window.matchMedia === "function" &&
+        window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       try {
-        cy.layout(layoutHubConcentric(levels, true)).run();
+        cy.layout(layoutHubConcentric(levels, !reduceMotion)).run();
       } catch {
         cy.layout({ name: "grid", fit: true, animate: false } as LayoutOptions).run();
       }

@@ -10,6 +10,7 @@ import {
   parseCustomBackground,
   parseReaderTheme,
   READER_PREFERENCES_KEY,
+  resolveReaderTheme,
   saveReaderPreferences,
   THEME_BOOT_SCRIPT,
 } from "@/components/reader/reader-preferences";
@@ -35,12 +36,20 @@ afterEach(() => {
 });
 
 describe("reader theme parsing contract", () => {
-  it("accepts only light|dark|custom", () => {
+  it("accepts only light|dark|custom|system", () => {
     expect(parseReaderTheme("dark")).toBe("dark");
     expect(parseReaderTheme("custom")).toBe("custom");
     expect(parseReaderTheme("light")).toBe("light");
+    expect(parseReaderTheme("system")).toBe("system");
     expect(parseReaderTheme("sepia")).toBe("light");
     expect(parseReaderTheme(null)).toBe("light");
+  });
+
+  it("resolves system theme via prefers-color-scheme with a safe fallback", () => {
+    // jsdom 无 matchMedia → 安全回退 light
+    expect(resolveReaderTheme("system")).toBe("light");
+    expect(resolveReaderTheme("dark")).toBe("dark");
+    expect(resolveReaderTheme("custom")).toBe("custom");
   });
 
   it("accepts only six-digit hex custom backgrounds", () => {
@@ -127,6 +136,21 @@ describe("THEME_BOOT_SCRIPT pre-paint protocol", () => {
       "dark"
     );
     expect(document.documentElement.style.colorScheme).toBe("dark");
+  });
+
+  it("handles system theme safely when matchMedia is unavailable", () => {
+    window.localStorage.setItem(
+      READER_PREFERENCES_KEY,
+      JSON.stringify({ theme: "system" })
+    );
+    expect(() => {
+      new Function(THEME_BOOT_SCRIPT)();
+    }).not.toThrow();
+    expect(document.documentElement.getAttribute("data-reader-theme")).toBe(
+      "system"
+    );
+    // jsdom 无 matchMedia → 回退浅色，不加 dark
+    expect(document.documentElement).not.toHaveClass("dark");
   });
 
   it("restores valid custom background variables before React", () => {

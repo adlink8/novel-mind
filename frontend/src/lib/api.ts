@@ -873,6 +873,34 @@ export const aiModelsApi = {
   delete: (id: number) => api.delete(`/models/${id}`),
 };
 
+// ==================== 用户设置 API ====================
+
+/** 智能路由策略偏好 */
+export type RoutingPreference = "quality" | "balanced" | "budget";
+
+export interface RoutingPreferenceResponse {
+  preference: RoutingPreference;
+}
+
+export const settingsApi = {
+  getRouting: () => api.get<RoutingPreferenceResponse>("/settings/routing"),
+  putRouting: (preference: RoutingPreference) =>
+    api.put<RoutingPreferenceResponse>("/settings/routing", { preference }),
+};
+
+// ==================== 用量统计 API ====================
+
+export interface UsageSummary {
+  today_cost_usd: number;
+  week_cost_usd: number;
+  month_cost_usd: number;
+  total_tokens: number;
+}
+
+export const usageApi = {
+  summary: () => api.get<UsageSummary>("/usage/summary"),
+};
+
 // ==================== 搜索 API ====================
 
 /** 单条搜索结果 */

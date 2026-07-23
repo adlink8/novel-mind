@@ -92,9 +92,10 @@ test("real API multi-session chat with citations, spoiler safety and refresh rep
       expect(panelBox.x + 2).toBeGreaterThanOrEqual(textBox.x + textBox.width - 8);
     }
   }
-  if (testInfo.project.name === "chromium-mobile-390") {
+  if (testInfo.project.name !== "chromium-desktop") {
+    const viewportHeight = page.viewportSize()?.height ?? 844;
     const box = await page.getByTestId("reader-chat-panel").boundingBox();
-    expect(box?.height ?? 9999).toBeLessThanOrEqual(844 * 0.5 + 40);
+    expect(box?.height ?? 9999).toBeLessThanOrEqual(viewportHeight * 0.5 + 40);
   }
 
   await page.getByTestId("reader-chat-input").fill("选中的这段在写什么？");
@@ -165,7 +166,7 @@ test("real API multi-session chat with citations, spoiler safety and refresh rep
     .toBeGreaterThan(0);
 
   // Mobile collapse continues reading
-  if (testInfo.project.name === "chromium-mobile-390") {
+  if (testInfo.project.name !== "chromium-desktop") {
     await page.getByLabel("收起对话").click();
     await expect(page.getByTestId("reader-chat-chip")).toBeVisible();
     await expect(page.getByTestId("reader-page-text")).toBeVisible();

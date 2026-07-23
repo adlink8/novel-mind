@@ -217,6 +217,14 @@
   color: #42330f;
 }
 
+/* 触屏：放大命中区域（书脊宽度有限，36px 为可用上限） */
+@media (hover: none) {
+  .actionBtn {
+    width: 36px;
+    height: 36px;
+  }
+}
+
 .actionBtnDanger:hover {
   background: #f6d9d4;
   color: #8c2f24;

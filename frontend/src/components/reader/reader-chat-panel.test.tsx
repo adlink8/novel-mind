@@ -193,7 +193,8 @@ describe("ReaderChatPanel", () => {
       expect(screen.getByTestId("reader-chat-panel")).toBeInTheDocument()
     );
     expect(screen.getByTestId("reader-chat-panel").className).toMatch(/max-h-\[45vh\]/);
-    expect(screen.getByTestId("reader-chat-panel").parentElement?.className).toMatch(/bottom-14/);
+    // 底部偏移需避开悬浮移动导航（含 safe-area）
+    expect(screen.getByTestId("reader-chat-panel").parentElement?.className).toMatch(/bottom-\[calc/);
   });
 
   it("does not close when clicking outside — only collapse/close buttons", async () => {

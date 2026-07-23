@@ -161,6 +161,8 @@
     background-attachment: fixed;
     /* 离屏抽屉（搜索面板等 fixed 面板）滑出时不撑出横向滚动（clip 不破坏 sticky） */
     overflow-x: clip;
+    /* 去掉移动端点按时的灰色闪块 */
+    -webkit-tap-highlight-color: transparent;
   }
 
   /* Custom reader surface consumes pre-paint CSS variables (no FOUC). */
@@ -276,6 +278,15 @@ html.theme-transition-ready [data-theme-surface] {
   transition-property: background-color, border-color, color, box-shadow;
   transition-duration: var(--motion-duration-standard);
   transition-timing-function: var(--motion-ease-enter);
+}
+
+/* 触屏设备放大常用小型关闭按钮的命中区域（≥44px），桌面视觉不变 */
+@media (pointer: coarse) {
+  [data-slot="dialog-close"],
+  [data-slot="sheet-close"] {
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+  }
 }
 
 /* Reduced-motion is final authority: instant usable state, no non-essential motion. */

@@ -32,6 +32,14 @@ interface ReaderContentProps {
   highlightRange?: { sourceStart: number; sourceEnd: number } | null;
   /** 分页阅读或整章长页阅读。 */
   readingMode?: ReaderMode;
+  /** 进入本章时要恢复的章内进度 0-100（0 = 从头开始） */
+  initialProgress?: number;
+  /** 正文字号 px */
+  fontSize?: number;
+  /** 正文行距（倍数） */
+  lineHeight?: number;
+  /** 正文最大行宽 px */
+  contentWidth?: number;
 }
 
 const PAGE_CHARS = 3500;
@@ -63,10 +71,16 @@ export function ReaderContent({
   onAskSelection,
   highlightRange = null,
   readingMode = "paged",
+  initialProgress = 0,
+  fontSize = 18,
+  lineHeight = 2.1,
+  contentWidth = 760,
 }: ReaderContentProps) {
   const [pageIndex, setPageIndex] = useState(0);
   const contentRef = useRef<HTMLDivElement>(null);
   const pageTextRef = useRef<HTMLDivElement>(null);
+  /** 章内进度恢复进行中：屏蔽滚动上报与回顶，避免 0% 覆盖存档 */
+  const restoreRef = useRef<{ percent: number } | null>(null);
   const chapterId = chapter?.id;
   const [captured, setCaptured] = useState<{
     coords: ChapterSelectionCoords;
@@ -104,17 +118,52 @@ export function ReaderContent({
     }
   }, [highlightRange, chapter?.content, pages, pageIndex, isScrollMode]);
 
-  // 换章：页码归零 + 滚到顶
+  // 换章：有存档则恢复章内位置，否则回顶从头开始
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- chapter boundary reset
-    setPageIndex(0);
     setCaptured(null);
-    onChapterProgress?.(0);
+    const target = Math.min(100, Math.max(0, initialProgress || 0));
+    // 长页（或单页短章）按滚动百分比恢复；多页翻页模式按页序恢复
+    const restoreByScroll = target > 0 && (isScrollMode || pages.length <= 1);
+
+    if (restoreByScroll) {
+      setPageIndex(0);
+      restoreRef.current = { percent: target };
+      const applyRestore = () => {
+        const el = scrollContainerRef?.current;
+        if (!el) return;
+        const max = el.scrollHeight - el.clientHeight;
+        if (max > 0) el.scrollTop = (target / 100) * max;
+      };
+      requestAnimationFrame(() => {
+        applyRestore();
+        requestAnimationFrame(() => {
+          applyRestore();
+          restoreRef.current = null;
+          onChapterProgress?.(target);
+        });
+      });
+      return;
+    }
+
+    if (target > 0 && pages.length > 1) {
+      // 翻页进度由页序推导：percent = (pageIndex + 1) / pages.length
+      const restoredPage = Math.min(
+        pages.length - 1,
+        Math.max(0, Math.ceil((target / 100) * pages.length) - 1)
+      );
+      setPageIndex(restoredPage);
+    } else {
+      setPageIndex(0);
+      onChapterProgress?.(target);
+    }
     scrollToTop(scrollContainerRef?.current, "auto");
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only on chapter change
   }, [chapterId]);
 
   useEffect(() => {
+    // 恢复章内进度期间不回顶（恢复完成后再恢复正常行为）
+    if (restoreRef.current) return;
     scrollToTop(scrollContainerRef?.current, "auto");
   }, [pageIndex, chapterId, scrollContainerRef, readingMode]);
 
@@ -124,6 +173,8 @@ export function ReaderContent({
     if (!el) return;
 
     const onScroll = () => {
+      // 恢复章内进度期间不上报，避免把存档冲掉
+      if (restoreRef.current) return;
       const max = el.scrollHeight - el.clientHeight;
       const pct = max <= 0 ? 100 : (el.scrollTop / max) * 100;
       onChapterProgress?.(Math.min(100, Math.max(0, pct)));
@@ -201,8 +252,36 @@ export function ReaderContent({
 
   // Page flip / chapter change drops the floating action (stale anchors).
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- drop stale selection anchor
     clearCaptured();
   }, [pageIndex, chapter?.id, clearCaptured]);
+
+  // 键盘翻页：←/→（仅翻页模式；输入控件聚焦、有选区或调宽手柄聚焦时不劫持）
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!chapter || isScrollMode) return;
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+      const target = e.target;
+      if (
+        target instanceof Element &&
+        target.closest(
+          "input, textarea, select, [contenteditable='true'], [role='separator']"
+        )
+      ) {
+        return;
+      }
+      const selection = window.getSelection();
+      if (selection && !selection.isCollapsed) return;
+      if (e.key === "ArrowLeft") {
+        goPrevPage();
+      } else {
+        goNextPage();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  });
 
   const handleAsk = async () => {
     if (!chapter || !captured || !onAskSelection) return;
@@ -294,7 +373,8 @@ export function ReaderContent({
   return (
     <article
       ref={contentRef}
-      className="relative mx-auto max-w-[760px] px-5 py-10 sm:px-8 sm:py-14"
+      className="relative mx-auto px-5 py-10 sm:px-8 sm:py-14"
+      style={{ maxWidth: contentWidth }}
       data-page-source-start-utf16={pageMeta.sourceStartUtf16}
     >
       <header className="relative mb-8 text-center sm:mb-10">
@@ -337,7 +417,8 @@ export function ReaderContent({
         ref={pageTextRef}
         data-testid="reader-page-text"
         data-source-start-utf16={page.sourceStartUtf16}
-        className="relative whitespace-pre-wrap font-reading text-[18px] leading-[2.1] tracking-[0.02em] text-foreground/90 sm:text-[19px]"
+        className="relative whitespace-pre-wrap font-reading tracking-[0.02em] text-foreground/90"
+        style={{ fontSize, lineHeight }}
       >
         {renderedPage}
       </div>

@@ -24,7 +24,7 @@ export function useAIModels() {
   const {
     models, defaultModel, routingPreference, loading, error, testResults,
     fetchModels, addModel, removeModel, setDefaultModel, testConnection,
-    setRoutingPreference, clearError,
+    fetchRoutingPreference, setRoutingPreference, clearError,
   } = useAIConfigStore();
 
   // 组件挂载时自动加载模型列表
@@ -57,7 +57,7 @@ export function useAIModels() {
   return {
     models, defaultModel, routingPreference, loading, error, testResults,
     fetchModels, addModel, removeModel, setDefaultModel, testConnection,
-    setRoutingPreference, clearError,
+    fetchRoutingPreference, setRoutingPreference, clearError,
     getModelById, getModelsByProvider, getTestResult, routingDescriptions,
   };
 }

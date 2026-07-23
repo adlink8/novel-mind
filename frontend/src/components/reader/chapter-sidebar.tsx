@@ -44,7 +44,7 @@ export function ChapterSidebar({
       <div
         className={cn(
           "fixed inset-0 z-40 bg-black/30 transition-[opacity] motion-duration-spatial",
-          !forceDrawer && "lg:hidden",
+          !forceDrawer && "xl:hidden",
           isOpen
             ? "pointer-events-auto opacity-100 motion-ease-enter"
             : "pointer-events-none opacity-0 motion-ease-exit",
@@ -69,10 +69,10 @@ export function ChapterSidebar({
             ? "translate-x-0 opacity-100 motion-ease-enter"
             : "pointer-events-none -translate-x-full opacity-0 motion-ease-exit",
           !forceDrawer &&
-            "lg:pointer-events-auto lg:static lg:z-auto lg:mr-4 lg:h-full lg:translate-x-0 lg:rounded-[28px] lg:border lg:border-border/70 lg:opacity-100",
+            "xl:pointer-events-auto xl:static xl:z-auto xl:mr-4 xl:h-full xl:translate-x-0 xl:rounded-[28px] xl:border xl:border-border/70 xl:opacity-100",
           !forceDrawer &&
-            "lg:transition-[width] lg:motion-duration-spatial lg:motion-ease-enter",
-          !forceDrawer && (isOpen ? "lg:w-64" : "lg:w-10"),
+            "xl:transition-[width] xl:motion-duration-spatial xl:motion-ease-enter",
+          !forceDrawer && (isOpen ? "xl:w-64" : "xl:w-10"),
         )}
       >
         {/* Expanded body — always in DOM; clipped when rail width */}
@@ -80,8 +80,8 @@ export function ChapterSidebar({
           className={cn(
             "flex h-full min-h-0 w-72 flex-col transition-[opacity,transform] motion-duration-spatial",
             isOpen
-              ? "opacity-100 motion-ease-enter lg:w-64"
-              : "pointer-events-none opacity-0 motion-ease-exit lg:absolute lg:inset-0",
+              ? "opacity-100 motion-ease-enter xl:w-64"
+              : "pointer-events-none opacity-0 motion-ease-exit xl:absolute xl:inset-0",
           )}
         >
           <div className="flex shrink-0 items-center justify-between border-b border-border/70 p-4">
@@ -96,8 +96,8 @@ export function ChapterSidebar({
               title="收起目录"
               aria-label="收起目录"
             >
-              <X className="size-4 lg:hidden" />
-              <ChevronLeft className="hidden size-4 lg:block" />
+              <X className="size-4 xl:hidden" />
+              <ChevronLeft className="hidden size-4 xl:block" />
             </button>
           </div>
 
@@ -149,7 +149,7 @@ export function ChapterSidebar({
           aria-label="展开目录"
           className={cn(
             "absolute inset-0 flex-col items-center justify-center gap-2 text-muted-foreground transition-[opacity,background-color,color] motion-duration-standard motion-ease-enter hover:bg-card hover:text-foreground",
-            forceDrawer ? "hidden" : "hidden lg:flex",
+            forceDrawer ? "hidden" : "hidden xl:flex",
             isOpen
               ? "pointer-events-none opacity-0"
               : "pointer-events-auto opacity-100",

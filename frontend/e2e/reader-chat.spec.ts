@@ -296,16 +296,17 @@ test("reader chat panel is collapsible and does not replace the reader", async (
     }
   }
 
-  if (testInfo.project.name === "chromium-mobile-390") {
+  if (testInfo.project.name !== "chromium-desktop") {
     await expect(page.getByTestId("reader-chat-panel")).toHaveAttribute(
       "data-layout",
       "mobile"
     );
+    const viewportHeight = page.viewportSize()?.height ?? 844;
     const panel = page.getByTestId("reader-chat-panel");
     const box = await panel.boundingBox();
     expect(box).toBeTruthy();
     if (box) {
-      expect(box.height).toBeLessThanOrEqual(844 * 0.5 + 20);
+      expect(box.height).toBeLessThanOrEqual(viewportHeight * 0.5 + 20);
     }
     await page.getByLabel("收起对话").click();
     await expect(page.getByTestId("reader-chat-chip")).toBeVisible();

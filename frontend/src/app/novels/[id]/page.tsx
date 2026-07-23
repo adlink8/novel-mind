@@ -103,16 +103,18 @@ function NovelReaderInner() {
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [currentChapterId, setCurrentChapterId] = useState<number>(0);
   const [chapterContent, setChapterContent] = useState<Chapter | null>(null);
-  // 桌面默认展开目录，移动默认收起
-  // 桌面默认展开；移动端默认收起（惰性初始，避免 effect 同步 setState）
+  // 桌面（≥1280）默认展开目录，窄屏默认收起
+  // 惰性初始，避免 effect 同步 setState
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     if (typeof window === "undefined") return true;
-    return window.innerWidth >= 1024;
+    return window.innerWidth >= 1280;
   });
   const [searchOpen, setSearchOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [chapterPercent, setChapterPercent] = useState(0);
+  /** 换章时要恢复的章内进度（0 = 从头开始；时间线定位章恒为 0） */
+  const [restorePercent, setRestorePercent] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [preferences, setPreferences] = useState<ReaderPreferences>(() =>
     loadReaderPreferences()
@@ -120,6 +122,8 @@ function NovelReaderInner() {
   const [preferencesOpen, setPreferencesOpen] = useState(false);
   /** 沉浸模式下的章节目录抽屉开关 */
   const [immersiveTocOpen, setImmersiveTocOpen] = useState(false);
+  /** 沉浸模式控制层显隐（点按正文切换） */
+  const [immersiveChrome, setImmersiveChrome] = useState(true);
   const chaptersRef = useRef<Chapter[]>([]);
   /** 时间线定位模式：不写入阅读进度，避免污染「上次读到」 */
   const [progressWritable, setProgressWritable] = useState(!fromTimeline);
@@ -132,7 +136,9 @@ function NovelReaderInner() {
   });
   const [chatCollapsed, setChatCollapsed] = useState(() => {
     if (typeof window === "undefined") return false;
-    return Boolean(loadReaderChatPresentation(novelId).collapsed);
+    const saved = loadReaderChatPresentation(novelId).collapsed;
+    // 无存档时，较窄桌面（<1536px）默认收成轨道：目录 + 面板同开会挤窄正文
+    return saved ?? window.innerWidth < 1536;
   });
   const [chatWidthPx, setChatWidthPx] = useState(() => {
     if (typeof window === "undefined") return READER_CHAT_WIDTH_DEFAULT;
@@ -148,11 +154,11 @@ function NovelReaderInner() {
   } | null>(null);
   const [isDesktop, setIsDesktop] = useState(() => {
     if (typeof window === "undefined") return true;
-    return window.innerWidth >= 1024;
+    return window.innerWidth >= 1280;
   });
 
   useEffect(() => {
-    const onResize = () => setIsDesktop(window.innerWidth >= 1024);
+    const onResize = () => setIsDesktop(window.innerWidth >= 1280);
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
@@ -311,20 +317,29 @@ function NovelReaderInner() {
       try {
         const res = await novelsApi.getChapter(novelId, String(currentChapterId));
         setChapterContent(res.data);
-        // 换章立刻顶到开头（instant）；布局后再顶一次，避免沿用上一章滚位
-        const el = scrollRef.current;
-        if (el) {
-          el.scrollTop = 0;
-          requestAnimationFrame(() => {
-            el.scrollTop = 0;
-          });
-        }
 
-        // 持久化当前章节：换章默认从 0% 起，不沿用上一章百分比
+        // 同章且有存档 → 恢复章内位置；新章/时间线定位章 → 从头开始
         const saved = loadProgress(novelId);
         const sameChapter = saved?.chapterId === currentChapterId;
         const pct = sameChapter ? (saved.chapterPercent ?? 0) : 0;
+        const shouldRestore =
+          sameChapter &&
+          pct > 0 &&
+          (progressWritable || jumpedChapterIdRef.current !== currentChapterId);
         setChapterPercent(pct);
+        setRestorePercent(shouldRestore ? pct : 0);
+
+        // 不恢复时换章立刻顶到开头（instant）；布局后再顶一次，避免沿用上一章滚位
+        if (!shouldRestore) {
+          const el = scrollRef.current;
+          if (el) {
+            el.scrollTop = 0;
+            requestAnimationFrame(() => {
+              el.scrollTop = 0;
+            });
+          }
+        }
+
         // 仅同章恢复才写回进度；新章由 ReaderContent 从顶部开始
         if (sameChapter) {
           saveProgress(novelId, currentChapterId, pct);
@@ -407,6 +422,33 @@ function NovelReaderInner() {
     setChatCollapsed(false);
   }, []);
 
+  /** 沉浸模式：点按正文切换控制层；选中文本或点击交互控件时不触发 */
+  const handleImmersiveSurfaceTap = useCallback(
+    (event: React.MouseEvent) => {
+      if (!preferences.immersive) return;
+      const target = event.target;
+      if (
+        target instanceof Element &&
+        target.closest("button, a, input, textarea, select")
+      ) {
+        return;
+      }
+      const selection = window.getSelection();
+      if (selection && !selection.isCollapsed) return;
+      setImmersiveChrome((visible) => !visible);
+    },
+    [preferences.immersive]
+  );
+
+  /** 阅读偏好变更：进入沉浸模式时把控制层重置为可见 */
+  const handlePreferencesChange = useCallback(
+    (next: ReaderPreferences) => {
+      if (next.immersive && !preferences.immersive) setImmersiveChrome(true);
+      setPreferences(next);
+    },
+    [preferences.immersive]
+  );
+
   const handleCitationNavigate = useCallback(
     (target: {
       chapter_id: number;
@@ -436,6 +478,26 @@ function NovelReaderInner() {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, []);
+
+  // ESC：沉浸模式下退出沉浸（搜索/目录抽屉/设置面板打开、输入控件聚焦或有选区时不抢）
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || !preferences.immersive) return;
+      if (searchOpen || immersiveTocOpen || preferencesOpen) return;
+      const target = e.target;
+      if (
+        target instanceof Element &&
+        target.closest("input, textarea, select, [contenteditable='true']")
+      ) {
+        return;
+      }
+      const selection = window.getSelection();
+      if (selection && !selection.isCollapsed) return;
+      setPreferences((current) => ({ ...current, immersive: false }));
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [preferences.immersive, searchOpen, immersiveTocOpen, preferencesOpen]);
 
   // 离开页面前再存一次（时间线定位模式且仍停在跳转章时不写）
   useEffect(() => {
@@ -472,9 +534,9 @@ function NovelReaderInner() {
   return (
     <div
       className={cn(
-        "relative flex h-[calc(100vh-4rem)] overflow-hidden bg-background text-foreground lg:h-screen lg:p-4 lg:pl-0",
+        "relative flex h-[calc(100dvh-4rem)] overflow-hidden bg-background text-foreground md:h-dvh xl:p-4 xl:pl-0",
         preferences.theme === "dark" && "dark",
-        preferences.immersive && "fixed inset-0 z-[60] h-screen p-0 lg:p-0"
+        preferences.immersive && "fixed inset-0 z-[60] h-dvh p-0 xl:p-0"
       )}
       data-reader-theme={preferences.theme}
       data-reader-mode={preferences.mode}
@@ -493,7 +555,7 @@ function NovelReaderInner() {
         className={cn(
           "relative flex min-w-0 flex-1 flex-col overflow-hidden bg-card/75",
           !preferences.immersive &&
-            "lg:rounded-[28px] lg:border lg:border-border/70 lg:shadow-[0_25px_70px_-45px_rgba(52,42,32,0.55)]"
+            "xl:rounded-[28px] xl:border xl:border-border/70 xl:shadow-[0_25px_70px_-45px_rgba(52,42,32,0.55)]"
         )}
       >
         {!preferences.immersive ? (
@@ -532,7 +594,7 @@ function NovelReaderInner() {
           <div className="flex items-center gap-2">
             <ReaderPreferencesPanel
               preferences={preferences}
-              onChange={setPreferences}
+              onChange={handlePreferencesChange}
               open={preferencesOpen}
               onOpenChange={setPreferencesOpen}
             />
@@ -588,9 +650,11 @@ function NovelReaderInner() {
             data-testid="reader-scroll-column"
             data-reader-surface
             data-reader-theme={preferences.theme}
+            onClick={handleImmersiveSurfaceTap}
             className={cn(
               "min-w-0 flex-1 overflow-y-auto",
-              preferences.immersive ? "pb-8" : "pb-6"
+              // 手机端为悬浮底部导航/沉浸控制层预留空间（md 起无底部导航）
+              preferences.immersive ? "pb-24" : "pb-24 md:pb-6"
             )}
           >
             <ReaderContent
@@ -606,6 +670,10 @@ function NovelReaderInner() {
               onAskSelection={handleAskSelection}
               highlightRange={highlightRange}
               readingMode={preferences.mode}
+              initialProgress={restorePercent}
+              fontSize={preferences.fontSize}
+              lineHeight={preferences.lineHeight}
+              contentWidth={preferences.contentWidth}
             />
           </div>
           {showDesktopChat ? (
@@ -657,12 +725,14 @@ function NovelReaderInner() {
         </div>
 
         {!preferences.immersive ? (
-          <ProgressBar
-            chapterPercent={chapterPercent}
-            chapterTitle={currentChapterTitle}
-            chapterIndex={currentIndex >= 0 ? currentIndex + 1 : 0}
-            chapterTotal={chapters.length}
-          />
+          <div className="mb-[calc(4.75rem_+_env(safe-area-inset-bottom))] shrink-0 md:mb-0">
+            <ProgressBar
+              chapterPercent={chapterPercent}
+              chapterTitle={currentChapterTitle}
+              chapterIndex={currentIndex >= 0 ? currentIndex + 1 : 0}
+              chapterTotal={chapters.length}
+            />
+          </div>
         ) : null}
       </main>
 
@@ -677,27 +747,82 @@ function NovelReaderInner() {
             onToggle={() => setImmersiveTocOpen((v) => !v)}
             forceDrawer
           />
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => setImmersiveTocOpen(true)}
-            title="章节目录"
-            className="fixed left-4 top-4 z-50 border-white/20 bg-black/65 text-white shadow-lg hover:bg-black/75 hover:text-white"
-          >
-            <BookOpenText className="size-4" />
-            目录
-          </Button>
-          <ReaderPreferencesPanel
-            preferences={preferences}
-            onChange={setPreferences}
-            open={preferencesOpen}
-            onOpenChange={setPreferencesOpen}
-            floating
-            floatingOffsetRight={
-              // 桌面 AI 会话打开时右移让位，避免与会话窗口重叠
-              showDesktopChat ? (chatCollapsed ? 44 : chatWidthPx) + 16 : 16
-            }
-          />
+          {immersiveChrome ? (
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setImmersiveTocOpen(true)}
+                title="章节目录"
+                className="fixed left-4 top-4 z-50 border-white/20 bg-black/65 text-white shadow-lg hover:bg-black/75 hover:text-white"
+              >
+                <BookOpenText className="size-4" />
+                目录
+              </Button>
+              <ReaderPreferencesPanel
+                preferences={preferences}
+                onChange={handlePreferencesChange}
+                open={preferencesOpen}
+                onOpenChange={setPreferencesOpen}
+                floating
+                floatingOffsetRight={
+                  // 桌面 AI 会话打开时右移让位，避免与会话窗口重叠
+                  showDesktopChat ? (chatCollapsed ? 44 : chatWidthPx) + 16 : 16
+                }
+              />
+              {/* 底部控制层：翻章 / 进度 / AI 对话入口；点按正文任意处可隐藏 */}
+              <div className="fixed inset-x-0 bottom-0 z-50 flex justify-center px-4 pb-[calc(0.75rem_+_env(safe-area-inset-bottom))]">
+                <div className="flex items-center gap-1 rounded-full border border-white/15 bg-black/65 px-2 py-1.5 text-white shadow-lg backdrop-blur">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={handlePrevChapter}
+                    disabled={currentIndex <= 0}
+                    className="text-white hover:bg-white/10 hover:text-white"
+                  >
+                    <ChevronLeft className="size-4" />
+                    上一章
+                  </Button>
+                  <span className="px-2 text-xs tabular-nums text-white/80">
+                    {Math.round(chapterPercent)}%
+                    {chapters.length > 0
+                      ? ` · ${currentIndex + 1}/${chapters.length} 章`
+                      : null}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleNextChapter}
+                    disabled={
+                      currentIndex < 0 || currentIndex >= chapters.length - 1
+                    }
+                    className="text-white hover:bg-white/10 hover:text-white"
+                  >
+                    下一章
+                    <ChevronRight className="size-4" />
+                  </Button>
+                  <div className="h-5 w-px bg-white/20" aria-hidden />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setChatOpen((current) => {
+                        if (!current) setChatCollapsed(false);
+                        return !current;
+                      });
+                    }}
+                    title="选区对话"
+                    className="text-white hover:bg-white/10 hover:text-white"
+                  >
+                    <MessageSquareText className="size-4" />
+                  </Button>
+                </div>
+              </div>
+            </>
+          ) : null}
         </>
       ) : null}
 
@@ -723,7 +848,7 @@ function NovelReaderInner() {
         onNavigate={(chapterId) => handleSelectChapter(chapterId)}
       />
       {fromTimeline && !progressWritable && (
-        <div className="pointer-events-none absolute bottom-20 left-1/2 z-30 -translate-x-1/2 rounded-full border border-amber-300/80 bg-amber-50 px-4 py-1.5 text-xs text-amber-950 shadow-sm">
+        <div className="pointer-events-none absolute bottom-[calc(5rem_+_env(safe-area-inset-bottom))] left-1/2 z-30 -translate-x-1/2 rounded-full border border-amber-300/80 bg-amber-50 px-4 py-1.5 text-xs text-amber-950 shadow-sm">
           时间线定位模式 · 未改动你的阅读进度
         </div>
       )}
