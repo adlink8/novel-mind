@@ -39,6 +39,16 @@ CHAPTER_CONTENT = "第一章正文：阿宁走进竹林，月光洒在青石上�
 HEX64 = hashlib.sha256(CHAPTER_CONTENT.encode("utf-8")).hexdigest()
 
 
+@pytest.fixture(autouse=True)
+def _no_background_dispatch(monkeypatch):
+    """本文件全部用例手动运行 worker；屏蔽 API 的后台自动派发，保证任务保持 queued。"""
+
+    async def _noop(job_id: int) -> None:
+        return None
+
+    monkeypatch.setattr("app.api.reader_chat.dispatch_reader_chat_job", _noop)
+
+
 def _sha256(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
@@ -142,7 +152,9 @@ def _deployment(*, priced: bool = True) -> ModelDeployment:
     )
 
 
-async def _create_queued_job(client, ids: dict[str, Any], *, body: str = "这段是什么意思？"):
+async def _create_queued_job(
+    client, ids: dict[str, Any], *, body: str = "这段是什么意思？"
+):
     headers = {"Authorization": f"Bearer {ids['owner_token']}"}
     base = f"/api/novels/{ids['novel_id']}/conversations"
     created = await client.post(base, json={"title": "gen"}, headers=headers)
@@ -197,7 +209,10 @@ async def test_worker_publishes_cited_assistant_and_settles_dual_ledgers(api_cli
 
     # Discover evidence key from committed manifest.
     async with factory() as session:
-        from app.models.reader_chat import ReaderContextEvidenceRef, ReaderContextManifest
+        from app.models.reader_chat import (
+            ReaderContextEvidenceRef,
+            ReaderContextManifest,
+        )
 
         manifest = await session.scalar(
             select(ReaderContextManifest).where(
@@ -284,7 +299,8 @@ async def test_unknown_pricing_makes_zero_provider_calls(api_client):
     _, job_id, _, _, _ = await _create_queued_job(client, ids)
     transport = RecordingTransport([{"content": "{}", "usage": {}}])
     await run_reader_chat_worker(
-        job_id, runtime=_runtime(factory, transport, deployment=_deployment(priced=False))
+        job_id,
+        runtime=_runtime(factory, transport, deployment=_deployment(priced=False)),
     )
     assert transport.calls == []
     async with factory() as session:
@@ -334,7 +350,9 @@ async def test_cancel_before_call_publishes_no_assistant(api_client):
     assert transport.calls == []
     async with factory() as session:
         assistants = await session.scalar(
-            select(func.count()).select_from(ReaderMessage).where(
+            select(func.count())
+            .select_from(ReaderMessage)
+            .where(
                 ReaderMessage.role == "assistant",
                 ReaderMessage.reply_to_message_id == user_msg_id,
             )
@@ -349,7 +367,10 @@ async def test_cancel_during_call_settles_and_discards(api_client):
     conv_id, job_id, user_msg_id, headers, base = await _create_queued_job(client, ids)
 
     async with factory() as session:
-        from app.models.reader_chat import ReaderContextEvidenceRef, ReaderContextManifest
+        from app.models.reader_chat import (
+            ReaderContextEvidenceRef,
+            ReaderContextManifest,
+        )
 
         manifest = await session.scalar(
             select(ReaderContextManifest).where(
@@ -384,7 +405,9 @@ async def test_cancel_during_call_settles_and_discards(api_client):
         job = await session.get(ReaderGenerationJob, job_id)
         assert job.status == "cancelled"
         assistants = await session.scalar(
-            select(func.count()).select_from(ReaderMessage).where(
+            select(func.count())
+            .select_from(ReaderMessage)
+            .where(
                 ReaderMessage.role == "assistant",
                 ReaderMessage.reply_to_message_id == user_msg_id,
             )
@@ -424,7 +447,10 @@ async def test_retry_reuses_frozen_manifest_checksum(api_client):
     assert retried.json()["retry_count"] >= 1
 
     async with factory() as session:
-        from app.models.reader_chat import ReaderContextEvidenceRef, ReaderContextManifest
+        from app.models.reader_chat import (
+            ReaderContextEvidenceRef,
+            ReaderContextManifest,
+        )
 
         job = await session.get(ReaderGenerationJob, job_id)
         assert job.context_manifest_checksum == original_checksum
@@ -454,7 +480,9 @@ async def test_retry_reuses_frozen_manifest_checksum(api_client):
         assert job.status == "completed"
         assert job.context_manifest_checksum == original_checksum
         assistants = await session.scalar(
-            select(func.count()).select_from(ReaderMessage).where(
+            select(func.count())
+            .select_from(ReaderMessage)
+            .where(
                 ReaderMessage.role == "assistant",
                 ReaderMessage.reply_to_message_id == user_msg_id,
             )
@@ -469,7 +497,10 @@ async def test_idempotent_completion_creates_one_assistant(api_client):
     _, job_id, user_msg_id, _, _ = await _create_queued_job(client, ids)
 
     async with factory() as session:
-        from app.models.reader_chat import ReaderContextEvidenceRef, ReaderContextManifest
+        from app.models.reader_chat import (
+            ReaderContextEvidenceRef,
+            ReaderContextManifest,
+        )
 
         manifest = await session.scalar(
             select(ReaderContextManifest).where(
@@ -502,7 +533,9 @@ async def test_idempotent_completion_creates_one_assistant(api_client):
     assert len(transport.calls) == 1
     async with factory() as session:
         count = await session.scalar(
-            select(func.count()).select_from(ReaderMessage).where(
+            select(func.count())
+            .select_from(ReaderMessage)
+            .where(
                 ReaderMessage.role == "assistant",
                 ReaderMessage.reply_to_message_id == user_msg_id,
             )
@@ -524,7 +557,9 @@ async def test_validation_failure_publishes_no_assistant(api_client):
         job = await session.get(ReaderGenerationJob, job_id)
         assert job.status == "failed_validation"
         count = await session.scalar(
-            select(func.count()).select_from(ReaderMessage).where(
+            select(func.count())
+            .select_from(ReaderMessage)
+            .where(
                 ReaderMessage.role == "assistant",
                 ReaderMessage.reply_to_message_id == user_msg_id,
             )
@@ -551,7 +586,9 @@ async def test_outcome_unknown_pauses_without_assistant(api_client):
         assert attempt is not None
         assert attempt.status == "outcome_unknown"
         count = await session.scalar(
-            select(func.count()).select_from(ReaderMessage).where(
+            select(func.count())
+            .select_from(ReaderMessage)
+            .where(
                 ReaderMessage.role == "assistant",
                 ReaderMessage.reply_to_message_id == user_msg_id,
             )

@@ -17,7 +17,11 @@ from app.models.analysis import AnalysisRun, AnalysisVersion
 from app.models.chunk_build import ChunkActivePointer, ChunkBuild, ChunkHierarchyNode
 from app.models.novel import Chapter, Novel
 from app.models.user import User
-from app.services.timeline.model_gateway import ModelDeployment, PostgresCallRepository, TimelineModelGateway
+from app.services.timeline.model_gateway import (
+    ModelDeployment,
+    PostgresCallRepository,
+    TimelineModelGateway,
+)
 from app.services.timeline.worker import TimelineWorkerRuntime
 from scripts.run_timeline_qualification import (
     REQUIRED_TEST_COMMANDS,
@@ -42,28 +46,36 @@ class QualificationTransport:
             chapter_id = payload["scope"]["chapter_id"]
             evidence = payload["evidence"][0]
             content = {
-                "events": [{
-                    "candidate_id": f"event-{chapter_id}",
-                    "title": f"Event {chapter_id}",
-                    "description": evidence["text"],
-                    "event_type": "plot",
-                    "narrative_chapter_number": chapter_id,
-                    "narrative_index": 0,
-                    "participants": [{"mention": "Mira", "entity_id": None}],
-                    "story_time": {"precision": "unknown"},
-                    "evidence": [{
-                        "chapter_id": chapter_id,
-                        "evidence_id": evidence["evidence_id"],
-                        "source_start": evidence["source_start"],
-                        "source_end": evidence["source_end"],
-                        "content_hash": evidence["content_hash"],
-                    }],
-                    "confidence": 0.95,
-                }],
+                "events": [
+                    {
+                        "candidate_id": f"event-{chapter_id}",
+                        "title": f"Event {chapter_id}",
+                        "description": evidence["text"],
+                        "event_type": "plot",
+                        "narrative_chapter_number": chapter_id,
+                        "narrative_index": 0,
+                        "participants": [{"mention": "Mira", "entity_id": None}],
+                        "story_time": {"precision": "unknown"},
+                        "evidence": [
+                            {
+                                "chapter_id": chapter_id,
+                                "evidence_id": evidence["evidence_id"],
+                                "source_start": evidence["source_start"],
+                                "source_end": evidence["source_end"],
+                                "content_hash": evidence["content_hash"],
+                            }
+                        ],
+                        "confidence": 0.95,
+                    }
+                ],
                 "story_time_constraints": [],
             }
         else:
-            content = {"duplicate_groups": [], "story_constraints": [], "causal_edges": []}
+            content = {
+                "duplicate_groups": [],
+                "story_constraints": [],
+                "causal_edges": [],
+            }
         return {
             "id": f"qualification-request-{len(self.calls)}",
             "content": json.dumps(content),
@@ -72,7 +84,9 @@ class QualificationTransport:
 
 
 def _deployment(model_id: str) -> ModelDeployment:
-    return ModelDeployment("controlled", model_id, "r1", True, Decimal("1"), Decimal("2"))
+    return ModelDeployment(
+        "controlled", model_id, "r1", True, Decimal("1"), Decimal("2")
+    )
 
 
 def _executed_command_specs(tmp_path: Path, *, failing_index: int | None = None):
@@ -101,7 +115,9 @@ async def _qualified_report(pg_async_url):
     transport = QualificationTransport()
     runtime = TimelineWorkerRuntime(
         sessions=sessions,
-        gateway=TimelineModelGateway(transport, persistence=PostgresCallRepository(sessions)),
+        gateway=TimelineModelGateway(
+            transport, persistence=PostgresCallRepository(sessions)
+        ),
         extraction_deployment=_deployment("balanced-release"),
         reconciliation_deployment=_deployment("quality-release"),
     )
@@ -127,49 +143,84 @@ async def _delete_qualification_owner(sessions, owner_id: int) -> None:
 async def _seed_run(session):
     unique = uuid.uuid4().hex
     owner = User(
-        username=f"qualification-{unique}", email=f"qualification-{unique}@example.test",
+        username=f"qualification-{unique}",
+        email=f"qualification-{unique}@example.test",
         hashed_password="not-used-by-qualification",
     )
     session.add(owner)
     await session.flush()
-    novel = Novel(owner_id=owner.id, title=f"Qualification novel {unique}", status="ready")
+    novel = Novel(
+        owner_id=owner.id, title=f"Qualification novel {unique}", status="ready"
+    )
     session.add(novel)
     await session.flush()
     chapters = [
-        Chapter(novel_id=novel.id, chapter_number=2, title="Two", content="Mira wakes."),
-        Chapter(novel_id=novel.id, chapter_number=9, title="Nine", content="Mira leaves."),
+        Chapter(
+            novel_id=novel.id, chapter_number=2, title="Two", content="Mira wakes."
+        ),
+        Chapter(
+            novel_id=novel.id, chapter_number=9, title="Nine", content="Mira leaves."
+        ),
     ]
     session.add_all(chapters)
     await session.flush()
     novel.reading_progress = {"chapter_id": chapters[0].id, "progress_percent": 100}
     build = ChunkBuild(
-        build_id=f"qualification-{unique}", novel_id=novel.id, status="active",
-        source_snapshot_hash="a" * 64, manifest_checksum="b" * 64,
-        chunker_name="test", chunker_version="1", chunker_config_hash="c" * 64,
-        collection_name="test", is_candidate=False, immutable=True,
+        build_id=f"qualification-{unique}",
+        novel_id=novel.id,
+        status="active",
+        source_snapshot_hash="a" * 64,
+        manifest_checksum="b" * 64,
+        chunker_name="test",
+        chunker_version="1",
+        chunker_config_hash="c" * 64,
+        collection_name="test",
+        is_candidate=False,
+        immutable=True,
     )
     session.add(build)
-    session.add(ChunkActivePointer(
-        novel_id=novel.id, build_id=build.build_id, committed_at=datetime.now(UTC),
-    ))
+    session.add(
+        ChunkActivePointer(
+            novel_id=novel.id,
+            build_id=build.build_id,
+            committed_at=datetime.now(UTC),
+        )
+    )
     for index, chapter in enumerate(chapters):
-        content_hash = __import__("hashlib").sha256(chapter.content.encode()).hexdigest()
-        session.add(ChunkHierarchyNode(
-            build_id=build.build_id, novel_id=novel.id,
-            node_id=f"qualification-evidence-{chapter.id}", level="evidence",
-            chapter_id=chapter.id, chapter_number=chapter.chapter_number,
-            parent_id=f"scene-{chapter.id}", child_ids=[], content=chapter.content,
-            content_hash=content_hash, source_start=0, source_end=len(chapter.content),
-            chunk_type="paragraph", decision_lineage=[], order_index=index,
-        ))
-    run = AnalysisRun(owner_id=owner.id, novel_id=novel.id, status="pending", active_key="active")
+        content_hash = (
+            __import__("hashlib").sha256(chapter.content.encode()).hexdigest()
+        )
+        session.add(
+            ChunkHierarchyNode(
+                build_id=build.build_id,
+                novel_id=novel.id,
+                node_id=f"qualification-evidence-{chapter.id}",
+                level="evidence",
+                chapter_id=chapter.id,
+                chapter_number=chapter.chapter_number,
+                parent_id=f"scene-{chapter.id}",
+                child_ids=[],
+                content=chapter.content,
+                content_hash=content_hash,
+                source_start=0,
+                source_end=len(chapter.content),
+                chunk_type="paragraph",
+                decision_lineage=[],
+                order_index=index,
+            )
+        )
+    run = AnalysisRun(
+        owner_id=owner.id, novel_id=novel.id, status="pending", active_key="active"
+    )
     session.add(run)
     await session.commit()
     return owner, novel, chapters, run
 
 
 @pytest.mark.asyncio
-async def test_qualification_executes_worker_and_measures_persisted_artifacts(pg_async_url, require_postgres):
+async def test_qualification_executes_worker_and_measures_persisted_artifacts(
+    pg_async_url, require_postgres
+):
     engine = create_async_engine(pg_async_url)
     sessions = async_sessionmaker(engine, expire_on_commit=False)
     async with sessions() as session:
@@ -177,22 +228,30 @@ async def test_qualification_executes_worker_and_measures_persisted_artifacts(pg
     transport = QualificationTransport()
     runtime = TimelineWorkerRuntime(
         sessions=sessions,
-        gateway=TimelineModelGateway(transport, persistence=PostgresCallRepository(sessions)),
+        gateway=TimelineModelGateway(
+            transport, persistence=PostgresCallRepository(sessions)
+        ),
         extraction_deployment=_deployment("balanced-qualified"),
         reconciliation_deployment=_deployment("quality-qualified"),
     )
     expected_ids = [f"event-{chapter.id}" for chapter in chapters]
 
     report = await run_production_qualification(
-        run.id, runtime=runtime, sessions=sessions,
-        expected_event_ids=expected_ids, expected_story_order=expected_ids,
+        run.id,
+        runtime=runtime,
+        sessions=sessions,
+        expected_event_ids=expected_ids,
+        expected_story_order=expected_ids,
     )
 
     assert report["status"] == "qualified", report
     assert report["artifact"]["database_dialect"] == "postgresql"
     assert report["artifact"]["run"]["status"] == "completed"
     assert report["artifact"]["counts"] == {
-        "events": 2, "evidence_refs": 2, "model_attempts": 3, "completed_stages": 3,
+        "events": 2,
+        "evidence_refs": 2,
+        "model_attempts": 3,
+        "completed_stages": 3,
     }
     assert report["artifact"]["visible_default_event_ids"] == [expected_ids[0]]
     assert report["metrics"]["event_precision"] == 1.0
@@ -201,7 +260,11 @@ async def test_qualification_executes_worker_and_measures_persisted_artifacts(pg
     assert report["metrics"]["provider_calls"] == 3
     assert report["metrics"]["cost_usd_total"] > 0
     assert report["artifact_sha256"] and report["report_sha256"]
-    assert transport.calls == ["TimelineExtraction", "TimelineExtraction", "ReconciliationOutputModel"]
+    assert transport.calls == [
+        "TimelineExtraction",
+        "TimelineExtraction",
+        "ReconciliationOutputModel",
+    ]
     if output := os.environ.get("TIMELINE_QUALIFICATION_OUT"):
         Path(output).write_text(render_markdown(report), encoding="utf-8")
     async with sessions.begin() as session:
@@ -211,7 +274,9 @@ async def test_qualification_executes_worker_and_measures_persisted_artifacts(pg
 
 
 @pytest.mark.asyncio
-async def test_qualification_cannot_pass_from_missing_expected_production_output(pg_async_url, require_postgres):
+async def test_qualification_cannot_pass_from_missing_expected_production_output(
+    pg_async_url, require_postgres
+):
     engine = create_async_engine(pg_async_url)
     sessions = async_sessionmaker(engine, expire_on_commit=False)
     async with sessions() as session:
@@ -219,14 +284,21 @@ async def test_qualification_cannot_pass_from_missing_expected_production_output
     transport = QualificationTransport()
     runtime = TimelineWorkerRuntime(
         sessions=sessions,
-        gateway=TimelineModelGateway(transport, persistence=PostgresCallRepository(sessions)),
+        gateway=TimelineModelGateway(
+            transport, persistence=PostgresCallRepository(sessions)
+        ),
         extraction_deployment=_deployment("balanced-qualified"),
         reconciliation_deployment=_deployment("quality-qualified"),
     )
 
     report = await run_production_qualification(
-        run.id, runtime=runtime, sessions=sessions,
-        expected_event_ids=[*(f"event-{chapter.id}" for chapter in chapters), "never-produced"],
+        run.id,
+        runtime=runtime,
+        sessions=sessions,
+        expected_event_ids=[
+            *(f"event-{chapter.id}" for chapter in chapters),
+            "never-produced",
+        ],
         expected_story_order=[f"event-{chapter.id}" for chapter in chapters],
     )
 
@@ -241,7 +313,9 @@ async def test_qualification_cannot_pass_from_missing_expected_production_output
 
 @pytest.mark.asyncio
 async def test_release_entry_qualifies_with_fresh_postgres_observation_and_executed_commands(
-    pg_async_url, require_postgres, tmp_path,
+    pg_async_url,
+    require_postgres,
+    tmp_path,
 ):
     engine, sessions, owner_id, report = await _qualified_report(pg_async_url)
     report_path = tmp_path / "qualification.json"
@@ -260,7 +334,9 @@ async def test_release_entry_qualifies_with_fresh_postgres_observation_and_execu
     assert verdict["quality_comparable"] is True
     assert all(item["exit_code"] == 0 for item in verdict["command_results"])
     assert all(len(item["output_sha256"]) == 64 for item in verdict["command_results"])
-    assert len({item["output_sha256"] for item in verdict["command_results"]}) == len(REQUIRED_TEST_COMMANDS)
+    assert len({item["output_sha256"] for item in verdict["command_results"]}) == len(
+        REQUIRED_TEST_COMMANDS
+    )
     await _delete_qualification_owner(sessions, owner_id)
     await observer_engine.dispose()
     await engine.dispose()
@@ -268,7 +344,9 @@ async def test_release_entry_qualifies_with_fresh_postgres_observation_and_execu
 
 @pytest.mark.asyncio
 async def test_release_entry_blocks_a_real_failed_command(
-    pg_async_url, require_postgres, tmp_path,
+    pg_async_url,
+    require_postgres,
+    tmp_path,
 ):
     engine, sessions, owner_id, report = await _qualified_report(pg_async_url)
     report_path = tmp_path / "qualification.json"
@@ -295,13 +373,17 @@ async def test_release_entry_blocks_a_real_failed_command(
 
 @pytest.mark.asyncio
 async def test_release_entry_blocks_postgres_report_authority_mismatch(
-    pg_async_url, require_postgres, tmp_path,
+    pg_async_url,
+    require_postgres,
+    tmp_path,
 ):
     engine, sessions, owner_id, report = await _qualified_report(pg_async_url)
     report_path = tmp_path / "qualification.json"
     report_path.write_text(json.dumps(report), encoding="utf-8")
     async with sessions.begin() as session:
-        version = await session.get(AnalysisVersion, report["artifact"]["run"]["version_id"])
+        version = await session.get(
+            AnalysisVersion, report["artifact"]["run"]["version_id"]
+        )
         version.manifest_checksum = "0" * 64
     observer_engine = create_async_engine(pg_async_url)
     observer_sessions = async_sessionmaker(observer_engine, expire_on_commit=False)

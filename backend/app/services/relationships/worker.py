@@ -107,7 +107,10 @@ class RelationshipObservationWorker:
             build_run_id=build_run_id,
         )
         build_run.status = "running"
-        build_run.checkpoint = {**(build_run.checkpoint or {}), "phase": "select_sources"}
+        build_run.checkpoint = {
+            **(build_run.checkpoint or {}),
+            "phase": "select_sources",
+        }
         await db.flush()
 
         try:
@@ -134,10 +137,14 @@ class RelationshipObservationWorker:
         det = deterministic_outputs or {}
 
         for draft in selection.drafts:
-            candidate_row = await self._upsert_candidate(db, build_run=build_run, draft=draft)
+            candidate_row = await self._upsert_candidate(
+                db, build_run=build_run, draft=draft
+            )
             # Skip re-processing terminal candidates with existing judgments for same package.
             if candidate_row.status in {"accepted", "needs_human_review", "rejected"}:
-                existing_j = await self._latest_judgment(db, candidate_id=candidate_row.id)
+                existing_j = await self._latest_judgment(
+                    db, candidate_id=candidate_row.id
+                )
                 if existing_j is not None:
                     continue
 
@@ -218,8 +225,10 @@ class RelationshipObservationWorker:
             )
 
             # Soft duplicate: reuse existing accepted observation (idempotent).
-            if existing_obs is not None and decision.needs_review and any(
-                f.startswith("soft:duplicate") for f in decision.gate_failures
+            if (
+                existing_obs is not None
+                and decision.needs_review
+                and any(f.startswith("soft:duplicate") for f in decision.gate_failures)
             ):
                 decision = type(decision)(
                     status="accepted",
@@ -412,7 +421,9 @@ class RelationshipObservationWorker:
         valid_from = (
             structured.valid_from_evidence_id
             if structured is not None
-            else (judge_result.valid_from_evidence_id or package.allowed_evidence_ids()[0])
+            else (
+                judge_result.valid_from_evidence_id or package.allowed_evidence_ids()[0]
+            )
         )
         valid_to = (
             structured.valid_to_evidence_id
@@ -422,7 +433,9 @@ class RelationshipObservationWorker:
         supporting = (
             list(structured.supporting_evidence_ids)
             if structured is not None
-            else list(judge_result.supporting_evidence_ids or package.allowed_evidence_ids())
+            else list(
+                judge_result.supporting_evidence_ids or package.allowed_evidence_ids()
+            )
         )
 
         row = RelationshipObservationJudgment(
@@ -434,10 +447,13 @@ class RelationshipObservationWorker:
             prompt_hash=judge_result.prompt_hash or self.judgment_service.prompt_hash,
             schema_hash=judge_result.schema_hash or self.judgment_service.schema_hash,
             policy_hash=self._policy_hash,
-            model_name=judge_result.model_name or self.judgment_service.resolve_model_name(),
+            model_name=judge_result.model_name
+            or self.judgment_service.resolve_model_name(),
             model_lineage=dict(judge_result.model_lineage or {}),
             relation_type=rel_type,
-            transition=transition if transition in {"establish", "change", "end", "uncertain"} else "uncertain",
+            transition=transition
+            if transition in {"establish", "change", "end", "uncertain"}
+            else "uncertain",
             confidence=confidence,
             valid_from_evidence_id=valid_from,
             valid_to_evidence_id=valid_to,

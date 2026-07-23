@@ -99,7 +99,9 @@ def _seed_owner_novel(sync_url: str, *, suffix: str) -> dict[str, Any]:
     return data
 
 
-def _selection_payload(chapter_id: int, start: int = 0, end: int | None = None) -> dict[str, Any]:
+def _selection_payload(
+    chapter_id: int, start: int = 0, end: int | None = None
+) -> dict[str, Any]:
     if end is None:
         end = min(8, len(CHAPTER_CONTENT))
     text_slice = CHAPTER_CONTENT[start:end]
@@ -129,7 +131,9 @@ def _message_payload(
 
 
 @pytest.mark.asyncio
-async def test_current_chapter_message_without_selection_uses_server_context(api_client):
+async def test_current_chapter_message_without_selection_uses_server_context(
+    api_client,
+):
     client, factory, sync_url = api_client
     ids = _seed_owner_novel(sync_url, suffix=f"direct_{uuid.uuid4().hex[:8]}")
     headers = {"Authorization": f"Bearer {ids['owner_token']}"}
@@ -152,11 +156,14 @@ async def test_current_chapter_message_without_selection_uses_server_context(api
     engine = create_engine(sync_url, poolclass=NullPool)
     with Session(engine) as session:
         message_id = accepted.json()["message"]["id"]
-        assert session.scalar(
-            select(ReaderMessageSelection).where(
-                ReaderMessageSelection.user_message_id == message_id
+        assert (
+            session.scalar(
+                select(ReaderMessageSelection).where(
+                    ReaderMessageSelection.user_message_id == message_id
+                )
             )
-        ) is None
+            is None
+        )
         manifest = session.scalar(
             select(ReaderContextManifest).where(
                 ReaderContextManifest.user_message_id == message_id
@@ -176,7 +183,9 @@ async def test_current_chapter_message_without_selection_uses_server_context(api
 
 
 @pytest.mark.asyncio
-async def test_conversation_lifecycle_create_list_rename_archive_restore_delete(api_client):
+async def test_conversation_lifecycle_create_list_rename_archive_restore_delete(
+    api_client,
+):
     client, factory, sync_url = api_client
     ids = _seed_owner_novel(sync_url, suffix=f"life_{uuid.uuid4().hex[:8]}")
     headers = {"Authorization": f"Bearer {ids['owner_token']}"}
@@ -281,36 +290,52 @@ async def test_conversation_lifecycle_create_list_rename_archive_restore_delete(
 
     async with factory() as session:
         msgs = (
-            await session.execute(
-                select(ReaderMessage).where(
-                    ReaderMessage.conversation_id == conv1["id"]
+            (
+                await session.execute(
+                    select(ReaderMessage).where(
+                        ReaderMessage.conversation_id == conv1["id"]
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         assert msgs == []
         jobs = (
-            await session.execute(
-                select(ReaderGenerationJob).where(
-                    ReaderGenerationJob.conversation_id == conv1["id"]
+            (
+                await session.execute(
+                    select(ReaderGenerationJob).where(
+                        ReaderGenerationJob.conversation_id == conv1["id"]
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         assert jobs == []
         sel = (
-            await session.execute(
-                select(ReaderMessageSelection).where(
-                    ReaderMessageSelection.conversation_id == conv1["id"]
+            (
+                await session.execute(
+                    select(ReaderMessageSelection).where(
+                        ReaderMessageSelection.conversation_id == conv1["id"]
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         assert sel == []
         manifests = (
-            await session.execute(
-                select(ReaderContextManifest).where(
-                    ReaderContextManifest.conversation_id == conv1["id"]
+            (
+                await session.execute(
+                    select(ReaderContextManifest).where(
+                        ReaderContextManifest.conversation_id == conv1["id"]
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         assert manifests == []
 
 
@@ -334,6 +359,16 @@ async def test_message_idempotency_replay_and_pagination(api_client):
     job_id = first_body["job"]["id"]
     seq = first_body["message"]["sequence"]
 
+    # 后台 worker 会确定性地完成任务并产出 assistant 回复，
+    # assistant 与用户消息共享会话内序列计数（user=1, assistant=2, ...）
+    job = await client.get(f"{base}/{conv_id}/jobs/{job_id}", headers=headers)
+    for _ in range(300):
+        if job.json()["status"] in ("completed", "failed", "cancelled"):
+            break
+        await asyncio.sleep(0.1)
+        job = await client.get(f"{base}/{conv_id}/jobs/{job_id}", headers=headers)
+    assert job.json()["status"] == "completed"
+
     retry = await client.post(msg_url, json=payload, headers=headers)
     assert retry.status_code == 202
     retry_body = retry.json()
@@ -353,32 +388,42 @@ async def test_message_idempotency_replay_and_pagination(api_client):
         headers=headers,
     )
     assert second.status_code == 202
-    assert second.json()["message"]["sequence"] == seq + 1
+    # assistant 回复占用了 seq+1，第二条用户消息为 seq+2
+    assert second.json()["message"]["sequence"] == seq + 2
+    second_job_id = second.json()["job"]["id"]
+    second_job = await client.get(
+        f"{base}/{conv_id}/jobs/{second_job_id}", headers=headers
+    )
+    for _ in range(300):
+        if second_job.json()["status"] in ("completed", "failed", "cancelled"):
+            break
+        await asyncio.sleep(0.1)
+        second_job = await client.get(
+            f"{base}/{conv_id}/jobs/{second_job_id}", headers=headers
+        )
+    assert second_job.json()["status"] == "completed"
 
     all_msgs = await client.get(msg_url, headers=headers)
     assert all_msgs.status_code == 200
     all_payload = all_msgs.json()
-    assert all_payload["total"] == 2
-    assert [m["sequence"] for m in all_payload["items"]] == [1, 2]
-    assert all(m.get("selection") is not None for m in all_payload["items"])
-    assert all(m["generation_job"] is not None for m in all_payload["items"])
+    # 2 条用户消息 + 2 条 assistant 回复
+    assert all_payload["total"] == 4
+    assert [m["sequence"] for m in all_payload["items"]] == [1, 2, 3, 4]
+    user_items = [m for m in all_payload["items"] if m["role"] == "user"]
+    assert all(m.get("selection") is not None for m in user_items)
+    assert all(m["generation_job"] is not None for m in user_items)
 
     after = await client.get(f"{msg_url}?after_sequence=1", headers=headers)
     assert after.status_code == 200
-    after_items = after.json()["items"]
-    assert len(after_items) == 1
-    assert after_items[0]["sequence"] == 2
+    assert [m["sequence"] for m in after.json()["items"]] == [2, 3, 4]
 
-    job = await client.get(f"{base}/{conv_id}/jobs/{job_id}", headers=headers)
-    assert job.status_code == 200
-    assert job.json()["status"] == "queued"
-
+    # 已完成任务：cancel 只打标记，状态保持 completed
     cancelled = await client.post(
         f"{base}/{conv_id}/jobs/{job_id}/cancel", headers=headers
     )
     assert cancelled.status_code == 200
     assert cancelled.json()["cancel_requested"] is True
-    assert cancelled.json()["status"] == "cancelled"
+    assert cancelled.json()["status"] == "completed"
 
 
 @pytest.mark.asyncio
@@ -411,15 +456,20 @@ async def test_delete_cancels_active_jobs_then_removes_graph(api_client):
         assert await session.get(ReaderMessage, msg_id) is None
         assert await session.get(ReaderGenerationJob, job_id) is None
         leftovers = (
-            await session.execute(
-                select(ReaderContextEvidenceRef)
-                .join(
-                    ReaderContextManifest,
-                    ReaderContextEvidenceRef.manifest_id == ReaderContextManifest.id,
+            (
+                await session.execute(
+                    select(ReaderContextEvidenceRef)
+                    .join(
+                        ReaderContextManifest,
+                        ReaderContextEvidenceRef.manifest_id
+                        == ReaderContextManifest.id,
+                    )
+                    .where(ReaderContextManifest.conversation_id == conv["id"])
                 )
-                .where(ReaderContextManifest.conversation_id == conv["id"])
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         assert leftovers == []
 
 
@@ -448,12 +498,26 @@ async def test_concurrent_appends_receive_unique_monotonic_sequences(api_client)
 
     results = await asyncio.gather(*[_send(i) for i in range(5)])
     assert all(r.status_code == 202 for r in results), [r.text for r in results]
-    sequences = sorted(r.json()["message"]["sequence"] for r in results)
-    assert sequences == [1, 2, 3, 4, 5]
+    # 并发下用户消息序列全局唯一（assistant 回复会交错占用后续序号）
+    sequences = [r.json()["message"]["sequence"] for r in results]
+    assert len(set(sequences)) == 5
     message_ids = {r.json()["message"]["id"] for r in results}
     job_ids = {r.json()["job"]["id"] for r in results}
     assert len(message_ids) == 5
     assert len(job_ids) == 5
+
+    # 等所有任务到达终态（completed 或 failed；并发下部分任务可能失败）
+    pending = set(job_ids)
+    for _ in range(200):
+        if not pending:
+            break
+        for jid in list(pending):
+            r = await client.get(f"{base}/{conv_id}/jobs/{jid}", headers=headers)
+            if r.json()["status"] in ("completed", "failed", "cancelled"):
+                pending.discard(jid)
+        await asyncio.sleep(0.1)
+    else:
+        raise AssertionError("jobs did not reach terminal state in time")
 
     async with factory() as session:
         rows = (
@@ -463,10 +527,11 @@ async def test_concurrent_appends_receive_unique_monotonic_sequences(api_client)
                 .order_by(ReaderMessage.sequence)
             )
         ).all()
-        assert [r[0] for r in rows] == [1, 2, 3, 4, 5]
+        # 无论失败与否，已分配序列连续无空洞、无重复
+        assert [r[0] for r in rows] == list(range(1, len(rows) + 1))
         conv_row = await session.get(ReaderConversation, conv_id)
         assert conv_row is not None
-        assert conv_row.next_sequence == 6
+        assert conv_row.next_sequence == len(rows) + 1
 
 
 @pytest.mark.asyncio
@@ -534,12 +599,16 @@ async def test_message_requires_committed_manifest_graph(api_client):
             )
         ).scalar_one()
         refs = (
-            await session.execute(
-                select(ReaderContextEvidenceRef).where(
-                    ReaderContextEvidenceRef.manifest_id == manifest.id
+            (
+                await session.execute(
+                    select(ReaderContextEvidenceRef).where(
+                        ReaderContextEvidenceRef.manifest_id == manifest.id
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         assert selection.chapter_id == ids["chapter_id"]
         assert selection.selection_text_hash
         assert manifest.manifest_checksum

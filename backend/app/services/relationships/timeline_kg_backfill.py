@@ -287,9 +287,7 @@ class TimelineKgBackfillService:
             if prev is None or ch < prev:
                 first_ch[name] = ch
 
-        ranked = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[
-            :max_characters
-        ]
+        ranked = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[:max_characters]
         existing = list(
             (
                 await db.scalars(
@@ -311,7 +309,10 @@ class TimelineKgBackfillService:
                 role=role,
                 first_appearance_chapter=first_ch.get(name),
                 description=f"时间线参与者回填（共现 {counts[name]} 次）",
-                extra_data={"source": "timeline_kg_backfill", "mention_count": counts[name]},
+                extra_data={
+                    "source": "timeline_kg_backfill",
+                    "mention_count": counts[name],
+                },
             )
             db.add(char)
             await db.flush()
@@ -519,7 +520,9 @@ class TimelineKgBackfillService:
                 await db.flush()
             evidence_refs = [ref_key]
 
-        confidence = min(0.92, 0.55 + 0.03 * int(pair["vote"]) + 0.01 * int(pair["count"]))
+        confidence = min(
+            0.92, 0.55 + 0.03 * int(pair["vote"]) + 0.01 * int(pair["count"])
+        )
         candidate = KnowledgeRelationCandidate(
             owner_id=run.owner_id,
             novel_id=run.novel_id,

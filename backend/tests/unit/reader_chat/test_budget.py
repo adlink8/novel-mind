@@ -54,7 +54,10 @@ def test_conversation_ceiling_rejects_without_novel_overspend_when_fresh():
         )
     assert "b" not in gate.conversation.reservations
     # Novel reservation for b must not remain reserved after conversation rejection.
-    assert "b" not in gate.novel.reservations or gate.novel.reservations["b"].status != "reserved"
+    assert (
+        "b" not in gate.novel.reservations
+        or gate.novel.reservations["b"].status != "reserved"
+    )
 
 
 def test_novel_ceiling_rejects_before_any_settlement():

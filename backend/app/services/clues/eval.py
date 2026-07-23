@@ -16,9 +16,7 @@ from typing import Any, Iterable
 from app.services.clues.evidence import sha256_json
 from app.services.clues.gates import policy_hash as runtime_policy_hash
 
-DEFAULT_FIXTURE = (
-    Path(__file__).resolve().parents[3] / "evals" / "clue_fiction.v1.json"
-)
+DEFAULT_FIXTURE = Path(__file__).resolve().parents[3] / "evals" / "clue_fiction.v1.json"
 
 REQUIRED_FIXTURE_KEYS = {
     "fixture_version",
@@ -189,9 +187,7 @@ def score_predictions(
     for state in ("active", "reinforced", "paid_off"):
         gold_ids = {c["id"] for c in cases if c["expected_state"] == state}
         pred_ids = {
-            pid
-            for pid, pred in by_id.items()
-            if pred.get("predicted_state") == state
+            pid for pid, pred in by_id.items() if pred.get("predicted_state") == state
         }
         tp = len(gold_ids & pred_ids)
         precision = _ratio(tp, len(pred_ids))
@@ -240,12 +236,8 @@ def score_predictions(
             critical["override_overwrite"] += 1
         if pred.get("chat_as_fact"):
             critical["chat_as_fact"] += 1
-        if (
-            predicted in PUBLICATION_STATES
-            and (
-                pred.get("schema_valid") is False
-                or pred.get("evidence_valid") is False
-            )
+        if predicted in PUBLICATION_STATES and (
+            pred.get("schema_valid") is False or pred.get("evidence_valid") is False
         ):
             critical["unsupported_acceptance"] += 1
 
@@ -295,9 +287,9 @@ def score_predictions(
     }
     qualified = all(gates.values())
     return {
-        "metrics": metrics if qualified or controls.get("emit_metrics_always") else (
-            metrics if controls.get("always_metrics", True) else None
-        ),
+        "metrics": metrics
+        if qualified or controls.get("emit_metrics_always")
+        else (metrics if controls.get("always_metrics", True) else None),
         "gates": gates,
         "qualified": qualified,
         "quality_comparable": qualified,
@@ -315,7 +307,11 @@ def run_offline_qualification(
     fixture_path = path or DEFAULT_FIXTURE
     fixture = load_fixture(fixture_path)
     controls = dict(controls or {})
-    preds = predictions if predictions is not None else gold_predictions_from_fixture(fixture)
+    preds = (
+        predictions
+        if predictions is not None
+        else gold_predictions_from_fixture(fixture)
+    )
     scored = score_predictions(fixture, preds, controls=controls)
 
     lineage = {

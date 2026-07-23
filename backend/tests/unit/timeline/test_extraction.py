@@ -6,7 +6,11 @@ import pytest
 
 from app.services.timeline.budget import BudgetGate, BudgetPolicy
 from app.services.timeline.evidence import EvidencePackage, EvidenceUnit
-from app.services.timeline.extraction import ExactCacheKey, InMemoryExtractionStore, TimelineChapterExtractor
+from app.services.timeline.extraction import (
+    ExactCacheKey,
+    InMemoryExtractionStore,
+    TimelineChapterExtractor,
+)
 from app.services.timeline.model_gateway import ModelDeployment, TimelineModelGateway
 
 pytestmark = pytest.mark.unit
@@ -19,14 +23,21 @@ class FakeTransport:
 
     async def complete(self, **_):
         self.calls += 1
-        return {"content": self.content, "usage": {"input_tokens": 20, "output_tokens": 10}}
+        return {
+            "content": self.content,
+            "usage": {"input_tokens": 20, "output_tokens": 10},
+        }
 
 
 def package():
     text = "At dawn, Mira opened the western gate."
     return EvidencePackage.create(
-        owner_id=3, novel_id=8, chapter_id=5, unit_id="scene-5-1",
-        source_snapshot_hash="1" * 64, hierarchy_build_id="build-8",
+        owner_id=3,
+        novel_id=8,
+        chapter_id=5,
+        unit_id="scene-5-1",
+        source_snapshot_hash="1" * 64,
+        hierarchy_build_id="build-8",
         hierarchy_checksum="2" * 64,
         units=[EvidenceUnit.create("ev-1", 0, len(text), text)],
     )
@@ -34,16 +45,27 @@ def package():
 
 def output(p):
     unit = p.units[0]
-    return """{"events":[{"candidate_id":"c5:e1","title":"Mira opens the gate","description":"Mira opens the western gate at dawn.","event_type":"plot","narrative_chapter_number":5,"narrative_index":0,"participants":[{"mention":"Mira","entity_id":null}],"story_time":{"precision":"fuzzy","expression":"At dawn"},"evidence":[{"chapter_id":5,"evidence_id":"ev-1","source_start":0,"source_end":%d,"content_hash":"%s"}],"confidence":0.9}],"story_time_constraints":[]}""" % (unit.source_end, unit.content_hash)
+    return (
+        """{"events":[{"candidate_id":"c5:e1","title":"Mira opens the gate","description":"Mira opens the western gate at dawn.","event_type":"plot","narrative_chapter_number":5,"narrative_index":0,"participants":[{"mention":"Mira","entity_id":null}],"story_time":{"precision":"fuzzy","expression":"At dawn"},"evidence":[{"chapter_id":5,"evidence_id":"ev-1","source_start":0,"source_end":%d,"content_hash":"%s"}],"confidence":0.9}],"story_time_constraints":[]}"""
+        % (unit.source_end, unit.content_hash)
+    )
 
 
 def extractor(transport, store):
-    deployment = ModelDeployment("openai", "balanced-test", "r1", True, Decimal("1"), Decimal("1"))
+    deployment = ModelDeployment(
+        "openai", "balanced-test", "r1", True, Decimal("1"), Decimal("1")
+    )
     budget = BudgetGate(BudgetPolicy(3, 10_000, 2_000, Decimal("1")))
     return TimelineChapterExtractor(
-        TimelineModelGateway(transport), store, deployment=deployment, budget=budget,
-        prompt="extract only evidence-backed events", prompt_hash="3" * 64,
-        schema_hash="4" * 64, decoding_hash="5" * 64, config_hash="6" * 64,
+        TimelineModelGateway(transport),
+        store,
+        deployment=deployment,
+        budget=budget,
+        prompt="extract only evidence-backed events",
+        prompt_hash="3" * 64,
+        schema_hash="4" * 64,
+        decoding_hash="5" * 64,
+        config_hash="6" * 64,
     )
 
 
@@ -52,7 +74,9 @@ async def test_valid_candidate_is_automatically_published_as_partial():
     p = package()
     transport = FakeTransport(output(p))
     store = InMemoryExtractionStore()
-    result = await extractor(transport, store).extract(run_id=1, version_id=2, package=p)
+    result = await extractor(transport, store).extract(
+        run_id=1, version_id=2, package=p
+    )
     assert transport.calls == 1
     assert result.events[0].publication_status == "provisional"
     assert result.events[0].owner_id == 3 and result.events[0].novel_id == 8
@@ -78,14 +102,30 @@ async def test_exact_cache_hit_skips_provider_but_writes_lineage_audit():
 
 def test_cache_key_contains_every_frozen_identity_component():
     key = ExactCacheKey.for_package(
-        package(), stage="chapter_extract", prompt_hash="3" * 64, schema_hash="4" * 64,
-        model_provider="openai", model_id="balanced-test", model_revision="r1",
-        decoding_hash="5" * 64, config_hash="6" * 64,
+        package(),
+        stage="chapter_extract",
+        prompt_hash="3" * 64,
+        schema_hash="4" * 64,
+        model_provider="openai",
+        model_id="balanced-test",
+        model_revision="r1",
+        decoding_hash="5" * 64,
+        config_hash="6" * 64,
     )
     assert list(key.as_tuple()) == [
-        "chapter_extract", "1" * 64, "build-8", "2" * 64, "scene-5-1",
-        package().package_hash, "3" * 64, "4" * 64, "openai", "balanced-test", "r1",
-        "5" * 64, "6" * 64,
+        "chapter_extract",
+        "1" * 64,
+        "build-8",
+        "2" * 64,
+        "scene-5-1",
+        package().package_hash,
+        "3" * 64,
+        "4" * 64,
+        "openai",
+        "balanced-test",
+        "r1",
+        "5" * 64,
+        "6" * 64,
     ]
 
 

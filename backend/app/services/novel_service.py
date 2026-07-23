@@ -326,9 +326,7 @@ class NovelService:
 
         if not matches:
             # 未检测到章节标记 → 按固定字数切分，避免「全文一章」卡死阅读器
-            logger.info(
-                "未检测到章节标记，按约 %d 字切分全文", _MAX_CHAPTER_CHARS
-            )
+            logger.info("未检测到章节标记，按约 %d 字切分全文", _MAX_CHAPTER_CHARS)
             chapters = self._split_by_size(content.strip(), title_prefix="第")
         else:
             # 处理第一个章节标题前的前言部分（如有）
@@ -375,9 +373,7 @@ class NovelService:
         logger.info(f"章节分割完成: 共 {len(chapters)} 章")
         return chapters
 
-    def _split_by_size(
-        self, content: str, title_prefix: str = "分段"
-    ) -> List[dict]:
+    def _split_by_size(self, content: str, title_prefix: str = "分段") -> List[dict]:
         """将无标题长文按段落边界切成可读小段。"""
         text = content.strip()
         if not text:
@@ -557,9 +553,7 @@ class NovelService:
         result = await db.execute(select(Novel).where(Novel.id == novel_id))
         return result.scalar_one_or_none()
 
-    async def update_novel(
-        self, db: AsyncSession, novel: Novel, values: dict
-    ) -> Novel:
+    async def update_novel(self, db: AsyncSession, novel: Novel, values: dict) -> Novel:
         """更新已完成所有权校验的小说元信息。"""
         for field, value in values.items():
             if field == "title" and isinstance(value, str):
@@ -592,7 +586,9 @@ class NovelService:
                 continue
             if await self.delete_novel(db, novel_id):
                 deleted_ids.append(novel_id)
-        skipped_ids = [novel_id for novel_id in unique_ids if novel_id not in deleted_ids]
+        skipped_ids = [
+            novel_id for novel_id in unique_ids if novel_id not in deleted_ids
+        ]
         return deleted_ids, skipped_ids
 
     async def delete_novel(self, db: AsyncSession, novel_id: int) -> bool:

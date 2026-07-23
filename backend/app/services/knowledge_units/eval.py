@@ -236,10 +236,7 @@ def candidate_retriever(
                 },
                 "evidence_ids": [
                     str(item)
-                    for item in (
-                        row.get("evidence_refs")
-                        or [row.get("chunk_id")]
-                    )
+                    for item in (row.get("evidence_refs") or [row.get("chunk_id")])
                     if item is not None
                 ],
             }

@@ -67,9 +67,7 @@ class EvalDataset(TimestampMixin, Base):
     gold_chunks: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     expected_points: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     must_not_say: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
-    status: Mapped[str] = mapped_column(
-        String(20), nullable=False, default="candidate"
-    )
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="candidate")
     created_by: Mapped[str | None] = mapped_column(String(50), default="auto")
 
     # 关系
@@ -453,4 +451,3 @@ class ActiveBaseline(TimestampMixin, Base):
     committed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )
-

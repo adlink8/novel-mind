@@ -7,7 +7,10 @@ from decimal import Decimal
 
 import pytest
 
-from app.schemas.reader_chat import ReaderAnswerEnvelope, validate_answer_against_manifest
+from app.schemas.reader_chat import (
+    ReaderAnswerEnvelope,
+    validate_answer_against_manifest,
+)
 from app.services.reader_chat.budget import DualBudgetGate, BudgetPolicy
 from app.services.reader_chat.gateway import (
     DependencyPaused,
@@ -87,7 +90,12 @@ def budget(calls=3):
 @pytest.mark.asyncio
 async def test_structured_call_disables_hidden_retry_stream_and_remote_thread():
     transport = FakeTransport(
-        [{"content": _valid_answer(), "usage": {"input_tokens": 20, "output_tokens": 5}}]
+        [
+            {
+                "content": _valid_answer(),
+                "usage": {"input_tokens": 20, "output_tokens": 5},
+            }
+        ]
     )
     gateway = ReaderChatGateway(transport)
     result = await gateway.generate(
@@ -103,7 +111,9 @@ async def test_structured_call_disables_hidden_retry_stream_and_remote_thread():
     assert result.output.answer_blocks[0].block_id == "b1"
     call = transport.calls[0]
     assert call["response_format"] is ReaderAnswerEnvelope
-    assert call["timeout"] == 12 and call["num_retries"] == 0 and call["stream"] is False
+    assert (
+        call["timeout"] == 12 and call["num_retries"] == 0 and call["stream"] is False
+    )
     assert call["model"] == "test/reader-balanced"
     assert "remote_thread_id" not in call and "conversation_id" not in call
     assert len(result.attempts) == 1 and result.attempts[0].status == "succeeded"
@@ -165,9 +175,9 @@ async def test_unknown_ref_and_empty_citation_rejected_with_one_repair():
     )
     assert [a.status for a in result.attempts] == ["failed", "succeeded"]
     assert len(transport.calls) == 2
-    assert "validation error" in transport.calls[1]["messages"][-1]["content"].lower() or (
-        "error" in transport.calls[1]["messages"][-1]["content"].lower()
-    )
+    assert "validation error" in transport.calls[1]["messages"][-1][
+        "content"
+    ].lower() or ("error" in transport.calls[1]["messages"][-1]["content"].lower())
 
 
 @pytest.mark.asyncio
@@ -192,7 +202,10 @@ async def test_second_invalid_response_publishes_no_success():
 @pytest.mark.asyncio
 async def test_no_evidence_rejects_factual_blocks():
     transport = FakeTransport(
-        [{"content": _valid_answer(), "usage": {}}, {"content": _uncertainty(), "usage": {}}]
+        [
+            {"content": _valid_answer(), "usage": {}},
+            {"content": _uncertainty(), "usage": {}},
+        ]
     )
     result = await ReaderChatGateway(transport).generate(
         deployment=deployment(),
@@ -211,9 +224,7 @@ def test_validate_answer_against_manifest_unit_gate():
     env = ReaderAnswerEnvelope.model_validate_json(_valid_answer())
     validate_answer_against_manifest(env, ALLOWED)
     with pytest.raises(ValueError):
-        validate_answer_against_manifest(
-            env, {"other:only"}
-        )
+        validate_answer_against_manifest(env, {"other:only"})
 
 
 def test_business_validate_rejects_domain_write_suggestion_language():

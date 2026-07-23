@@ -267,7 +267,9 @@ async def _async_session(database_url: str):
 class FakeRelationshipReader:
     """Fake Phase 09 reader returning both visible and future observations."""
 
-    def __init__(self, owner_id: int, novel_id: int, version_id: int, ch1_id: int, ch2_id: int):
+    def __init__(
+        self, owner_id: int, novel_id: int, version_id: int, ch1_id: int, ch2_id: int
+    ):
         self.owner_id = owner_id
         self.novel_id = novel_id
         self.version_id = version_id

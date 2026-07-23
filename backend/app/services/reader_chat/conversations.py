@@ -57,7 +57,9 @@ def _sha256_text(value: str) -> str:
 
 
 def _sha256_json(payload: dict[str, Any]) -> str:
-    canonical = json.dumps(payload, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    canonical = json.dumps(
+        payload, sort_keys=True, ensure_ascii=False, separators=(",", ":")
+    )
     return _sha256_text(canonical)
 
 
@@ -265,7 +267,9 @@ class DeterministicContextBuilder:
             raise HTTPException(status_code=422, detail="stale chapter content hash")
 
         if selection.source_start < 0 or selection.source_end > len(content):
-            raise HTTPException(status_code=422, detail="selection offsets out of range")
+            raise HTTPException(
+                status_code=422, detail="selection offsets out of range"
+            )
         if selection.source_end <= selection.source_start:
             raise HTTPException(status_code=422, detail="invalid selection range")
 
@@ -412,17 +416,21 @@ class ConversationService:
             ).scalar_one()
         )
         rows = (
-            await db.execute(
-                select(ReaderConversation)
-                .where(*filters)
-                .order_by(
-                    ReaderConversation.last_opened_at.desc().nullslast(),
-                    ReaderConversation.id.desc(),
+            (
+                await db.execute(
+                    select(ReaderConversation)
+                    .where(*filters)
+                    .order_by(
+                        ReaderConversation.last_opened_at.desc().nullslast(),
+                        ReaderConversation.id.desc(),
+                    )
+                    .offset(skip)
+                    .limit(limit)
                 )
-                .offset(skip)
-                .limit(limit)
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
 
         items = [await self._to_list_item(db, row) for row in rows]
         return items, total
@@ -478,15 +486,19 @@ class ConversationService:
         )
         # Cancel nonterminal jobs first (audit), then hard-delete cascade.
         jobs = (
-            await db.execute(
-                select(ReaderGenerationJob).where(
-                    ReaderGenerationJob.conversation_id == conv.id,
-                    ReaderGenerationJob.owner_id == owner_id,
-                    ReaderGenerationJob.novel_id == novel.id,
-                    ReaderGenerationJob.status.in_(READER_JOB_NONTERMINAL_STATUSES),
+            (
+                await db.execute(
+                    select(ReaderGenerationJob).where(
+                        ReaderGenerationJob.conversation_id == conv.id,
+                        ReaderGenerationJob.owner_id == owner_id,
+                        ReaderGenerationJob.novel_id == novel.id,
+                        ReaderGenerationJob.status.in_(READER_JOB_NONTERMINAL_STATUSES),
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         for job in jobs:
             job.cancel_requested = True
             job.status = GenerationJobStatus.CANCELLED.value
@@ -528,14 +540,18 @@ class ConversationService:
             ).scalar_one()
         )
         rows = (
-            await db.execute(
-                select(ReaderMessage)
-                .where(*filters)
-                .order_by(ReaderMessage.sequence.asc())
-                .offset(skip)
-                .limit(limit)
+            (
+                await db.execute(
+                    select(ReaderMessage)
+                    .where(*filters)
+                    .order_by(ReaderMessage.sequence.asc())
+                    .offset(skip)
+                    .limit(limit)
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         views = [await self._to_message_view(db, row) for row in rows]
         return views, total
 
@@ -577,7 +593,9 @@ class ConversationService:
         if conv is None:
             raise HTTPException(status_code=404, detail="会话不存在")
         if conv.status == ConversationStatus.ARCHIVED.value:
-            raise HTTPException(status_code=409, detail="archived conversation rejects messages")
+            raise HTTPException(
+                status_code=409, detail="archived conversation rejects messages"
+            )
 
         # Re-check idempotency under lock (concurrent duplicate).
         existing = (
@@ -627,7 +645,9 @@ class ConversationService:
                 or graph.selection_text_hash is None
                 or graph.chapter_content_hash is None
             ):
-                raise HTTPException(status_code=500, detail="selection context incomplete")
+                raise HTTPException(
+                    status_code=500, detail="selection context incomplete"
+                )
             selection_row = ReaderMessageSelection(
                 user_message_id=message.id,
                 conversation_id=conv.id,
@@ -732,7 +752,9 @@ class ConversationService:
                 )
             ).scalar_one_or_none()
             if existing is None:
-                raise HTTPException(status_code=409, detail="message conflict") from None
+                raise HTTPException(
+                    status_code=409, detail="message conflict"
+                ) from None
             return await self._accepted_from_message(db, existing)
 
     # ------------------------------------------------------------------
@@ -835,7 +857,9 @@ class ConversationService:
             )
         ).scalar_one_or_none()
         if other is not None:
-            raise HTTPException(status_code=409, detail="nonterminal job already exists")
+            raise HTTPException(
+                status_code=409, detail="nonterminal job already exists"
+            )
 
         job.status = GenerationJobStatus.QUEUED.value
         job.status_reason = "retry"
@@ -993,14 +1017,20 @@ class ConversationService:
         if message.role == MessageRole.ASSISTANT.value:
             # Citations loaded for replay; citation rows join evidence for keys.
             cite_rows = (
-                await db.execute(
-                    select(ReaderMessageCitation).where(
-                        ReaderMessageCitation.assistant_message_id == message.id
+                (
+                    await db.execute(
+                        select(ReaderMessageCitation).where(
+                            ReaderMessageCitation.assistant_message_id == message.id
+                        )
                     )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             for cite in cite_rows:
-                ref = await db.get(ReaderContextEvidenceRef, cite.context_evidence_ref_id)
+                ref = await db.get(
+                    ReaderContextEvidenceRef, cite.context_evidence_ref_id
+                )
                 if ref is None:
                     continue
                 from app.schemas.reader_chat import CitationView
@@ -1042,7 +1072,9 @@ class ConversationService:
             )
         ).scalar_one_or_none()
         if job is None:
-            raise HTTPException(status_code=500, detail="message missing generation job")
+            raise HTTPException(
+                status_code=500, detail="message missing generation job"
+            )
         return MessageAccepted(
             message=await self._to_message_view(db, message),
             job=self._to_job_view(job),

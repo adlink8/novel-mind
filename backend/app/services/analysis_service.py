@@ -264,7 +264,11 @@ def build_structural_result(
                 "avg_scene_length": avg,
                 "scene_count": len(scenes),
                 "pace_hint": (
-                    "短场景快切" if avg < 400 else "中等场景" if avg < 900 else "长场景铺陈"
+                    "短场景快切"
+                    if avg < 400
+                    else "中等场景"
+                    if avg < 900
+                    else "长场景铺陈"
                 ),
             },
         }
@@ -375,6 +379,7 @@ async def try_llm_enrich(
             max_tokens=1200,
             api_key=api_key,
             api_base=api_base,
+            task_type="analysis",
         )
         text = resp.choices[0].message.content or ""
         # strip fences
@@ -428,9 +433,7 @@ class AnalysisService:
         await db.commit()
 
         try:
-            build_id = await ensure_hierarchy(
-                db, novel, force=rebuild_hierarchy
-            )
+            build_id = await ensure_hierarchy(db, novel, force=rebuild_hierarchy)
             scenes = []
             if build_id:
                 scenes = await load_scene_units(
@@ -549,13 +552,17 @@ class AnalysisService:
                 "evidence_count": 0,
             }
         nodes = (
-            await db.execute(
-                select(ChunkHierarchyNode).where(
-                    ChunkHierarchyNode.novel_id == novel_id,
-                    ChunkHierarchyNode.build_id == build_id,
+            (
+                await db.execute(
+                    select(ChunkHierarchyNode).where(
+                        ChunkHierarchyNode.novel_id == novel_id,
+                        ChunkHierarchyNode.build_id == build_id,
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         scenes = [n for n in nodes if n.level == "scene"]
         chapters = {n.chapter_id for n in nodes if n.level == "chapter"}
         evidence = [n for n in nodes if n.level == "evidence"]

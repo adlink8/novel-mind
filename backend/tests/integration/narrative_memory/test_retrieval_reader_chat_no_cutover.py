@@ -60,23 +60,27 @@ async def _row_checksums(session: AsyncSession, tables: list[str]) -> dict[str, 
                 await session.execute(text(f"SELECT COUNT(*) FROM {table}"))
             ).scalar_one()
             cols = (
-                await session.execute(
-                    text(
-                        """
+                (
+                    await session.execute(
+                        text(
+                            """
                         SELECT column_name FROM information_schema.columns
                         WHERE table_schema='public' AND table_name=:t
                         ORDER BY ordinal_position
                         """
-                    ),
-                    {"t": table},
+                        ),
+                        {"t": table},
+                    )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             if "id" in cols:
                 ids = (
-                    await session.execute(
-                        text(f"SELECT id FROM {table} ORDER BY id")
-                    )
-                ).scalars().all()
+                    (await session.execute(text(f"SELECT id FROM {table} ORDER BY id")))
+                    .scalars()
+                    .all()
+                )
                 payload = json.dumps(
                     {"count": count, "ids": list(ids)},
                     sort_keys=True,
@@ -121,9 +125,7 @@ async def test_experiment_leaves_reader_chat_routes_and_pointers_unchanged(
 
     routes_before = _openapi_reader_chat_paths()
     tables = list(
-        (
-            await session.execute(text(_pointer_snapshot_sql()))
-        ).scalars().all()
+        (await session.execute(text(_pointer_snapshot_sql()))).scalars().all()
     )
     # also pin narrative memory table set (no new pointer tables)
     nm_tables_before = list(
@@ -138,7 +140,9 @@ async def test_experiment_leaves_reader_chat_routes_and_pointers_unchanged(
                     """
                 )
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     )
     ptr_before = await _row_checksums(session, tables)
 
@@ -169,7 +173,9 @@ async def test_experiment_leaves_reader_chat_routes_and_pointers_unchanged(
                     """
                 )
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     )
     assert nm_tables_before == nm_tables_after
     assert not any("pointer" in t for t in nm_tables_after)
@@ -180,12 +186,7 @@ async def test_experiment_leaves_reader_chat_routes_and_pointers_unchanged(
 
 
 def test_phase15_modules_do_not_import_reader_chat_runtime():
-    root = (
-        Path(__file__).resolve().parents[3]
-        / "app"
-        / "services"
-        / "narrative_memory"
-    )
+    root = Path(__file__).resolve().parents[3] / "app" / "services" / "narrative_memory"
     names = [
         "retrieval_contracts.py",
         "routing.py",

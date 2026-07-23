@@ -94,9 +94,16 @@ class PostgresCallRepository:
         self.sessions = sessions
 
     async def reserve_and_start(
-        self, *, run_id: int, stage_key: str, reservation_key: str,
-        request_hash: str, cache_key: str | None, input_tokens: int,
-        output_tokens: int, input_price_per_million: Decimal | None,
+        self,
+        *,
+        run_id: int,
+        stage_key: str,
+        reservation_key: str,
+        request_hash: str,
+        cache_key: str | None,
+        input_tokens: int,
+        output_tokens: int,
+        input_price_per_million: Decimal | None,
         output_price_per_million: Decimal | None,
     ) -> PersistentAttempt:
         rejection: BudgetExceeded | None = None
@@ -104,56 +111,91 @@ class PostgresCallRepository:
             run = await session.get(AnalysisRun, run_id, with_for_update=True)
             if run is None:
                 raise BudgetExceeded("timeline run does not exist")
-            ledger = await session.scalar(select(AnalysisBudgetLedger).where(
-                AnalysisBudgetLedger.run_id == run_id,
-            ).with_for_update())
+            ledger = await session.scalar(
+                select(AnalysisBudgetLedger)
+                .where(
+                    AnalysisBudgetLedger.run_id == run_id,
+                )
+                .with_for_update()
+            )
             if ledger is None:
                 raise BudgetExceeded("timeline run has no persistent budget ledger")
-            attempt_number = int(await session.scalar(select(
-                func.coalesce(func.max(ModelCallAttempt.attempt_number), 0)
-            ).where(
-                ModelCallAttempt.run_id == run_id,
-                ModelCallAttempt.stage_key == stage_key,
-            ))) + 1
+            attempt_number = (
+                int(
+                    await session.scalar(
+                        select(
+                            func.coalesce(func.max(ModelCallAttempt.attempt_number), 0)
+                        ).where(
+                            ModelCallAttempt.run_id == run_id,
+                            ModelCallAttempt.stage_key == stage_key,
+                        )
+                    )
+                )
+                + 1
+            )
             # Attempt numbering is durable; a resumed process must not reuse its local attempt:1 key.
             reservation_key = f"{stage_key}:attempt:{attempt_number}"
             if run.status == "paused_budget":
                 await self._reject_budget(
-                    session, run_id=run_id, stage_key=stage_key,
-                    attempt_number=attempt_number, request_hash=request_hash,
-                    cache_key=cache_key, error_code="budget_paused",
+                    session,
+                    run_id=run_id,
+                    stage_key=stage_key,
+                    attempt_number=attempt_number,
+                    request_hash=request_hash,
+                    cache_key=cache_key,
+                    error_code="budget_paused",
                 )
-                rejection = BudgetExceeded("budget is paused; no further calls are allowed")
+                rejection = BudgetExceeded(
+                    "budget is paused; no further calls are allowed"
+                )
                 worst_cost = Decimal(0)
             elif input_price_per_million is None or output_price_per_million is None:
                 await self._reject_budget(
-                    session, run_id=run_id, stage_key=stage_key,
-                    attempt_number=attempt_number, request_hash=request_hash,
-                    cache_key=cache_key, error_code="unknown_pricing",
+                    session,
+                    run_id=run_id,
+                    stage_key=stage_key,
+                    attempt_number=attempt_number,
+                    request_hash=request_hash,
+                    cache_key=cache_key,
+                    error_code="unknown_pricing",
                 )
-                rejection = UnknownPricing("provider pricing is unknown; cost cannot be reserved")
+                rejection = UnknownPricing(
+                    "provider pricing is unknown; cost cannot be reserved"
+                )
                 worst_cost = Decimal(0)
             else:
                 worst_cost = (
-                Decimal(input_tokens) * input_price_per_million
-                + Decimal(output_tokens) * output_price_per_million
+                    Decimal(input_tokens) * input_price_per_million
+                    + Decimal(output_tokens) * output_price_per_million
                 ) / Decimal(1_000_000)
             exceeds = (
                 ledger.reserved_calls + ledger.settled_calls + 1 > ledger.max_calls
-                or ledger.reserved_input_tokens + ledger.settled_input_tokens + input_tokens
+                or ledger.reserved_input_tokens
+                + ledger.settled_input_tokens
+                + input_tokens
                 > ledger.max_input_tokens
-                or ledger.reserved_output_tokens + ledger.settled_output_tokens + output_tokens
+                or ledger.reserved_output_tokens
+                + ledger.settled_output_tokens
+                + output_tokens
                 > ledger.max_output_tokens
-                or Decimal(ledger.reserved_cost_usd) + Decimal(ledger.settled_cost_usd) + worst_cost
+                or Decimal(ledger.reserved_cost_usd)
+                + Decimal(ledger.settled_cost_usd)
+                + worst_cost
                 > Decimal(ledger.max_cost_usd)
             )
             if rejection is None and exceeds:
                 await self._reject_budget(
-                    session, run_id=run_id, stage_key=stage_key,
-                    attempt_number=attempt_number, request_hash=request_hash,
-                    cache_key=cache_key, error_code="budget_exceeded",
+                    session,
+                    run_id=run_id,
+                    stage_key=stage_key,
+                    attempt_number=attempt_number,
+                    request_hash=request_hash,
+                    cache_key=cache_key,
+                    error_code="budget_exceeded",
                 )
-                rejection = BudgetExceeded("worst-case reservation exceeds frozen policy")
+                rejection = BudgetExceeded(
+                    "worst-case reservation exceeds frozen policy"
+                )
             if rejection is None:
                 reservation = AnalysisBudgetReservation(
                     ledger_id=ledger.id,
@@ -170,7 +212,9 @@ class PostgresCallRepository:
                 ledger.reserved_calls += 1
                 ledger.reserved_input_tokens += input_tokens
                 ledger.reserved_output_tokens += output_tokens
-                ledger.reserved_cost_usd = Decimal(ledger.reserved_cost_usd) + worst_cost
+                ledger.reserved_cost_usd = (
+                    Decimal(ledger.reserved_cost_usd) + worst_cost
+                )
                 attempt = ModelCallAttempt(
                     run_id=run_id,
                     reservation_id=reservation.id,
@@ -190,39 +234,58 @@ class PostgresCallRepository:
 
     @staticmethod
     async def _reject_budget(
-        session: AsyncSession, *, run_id: int, stage_key: str,
-        attempt_number: int, request_hash: str, cache_key: str | None,
+        session: AsyncSession,
+        *,
+        run_id: int,
+        stage_key: str,
+        attempt_number: int,
+        request_hash: str,
+        cache_key: str | None,
         error_code: str,
     ) -> None:
         run = await session.get(AnalysisRun, run_id, with_for_update=True)
         if run is not None:
             run.status = "paused_budget"
             run.status_reason = error_code
-        session.add(ModelCallAttempt(
-            run_id=run_id,
-            stage_key=stage_key,
-            attempt_number=attempt_number,
-            status="budget_rejected",
-            cache_key=cache_key,
-            request_hash=request_hash,
-            usage={},
-            error_code=error_code,
-        ))
+        session.add(
+            ModelCallAttempt(
+                run_id=run_id,
+                stage_key=stage_key,
+                attempt_number=attempt_number,
+                status="budget_rejected",
+                cache_key=cache_key,
+                request_hash=request_hash,
+                usage={},
+                error_code=error_code,
+            )
+        )
 
     async def complete_attempt(
-        self, handle: PersistentAttempt, *, status: str,
-        response_hash: str | None, provider_request_id: str | None,
-        usage: dict[str, int], cost_usd: Decimal | None,
-        latency_ms: int, error_code: str | None,
+        self,
+        handle: PersistentAttempt,
+        *,
+        status: str,
+        response_hash: str | None,
+        provider_request_id: str | None,
+        usage: dict[str, int],
+        cost_usd: Decimal | None,
+        latency_ms: int,
+        error_code: str | None,
     ) -> None:
         async with self.sessions.begin() as session:
             reservation = await session.get(
-                AnalysisBudgetReservation, handle.reservation_id, with_for_update=True,
+                AnalysisBudgetReservation,
+                handle.reservation_id,
+                with_for_update=True,
             )
-            attempt = await session.get(ModelCallAttempt, handle.attempt_id, with_for_update=True)
+            attempt = await session.get(
+                ModelCallAttempt, handle.attempt_id, with_for_update=True
+            )
             if reservation is None or attempt is None:
                 raise RuntimeError("persistent timeline call state disappeared")
-            ledger = await session.get(AnalysisBudgetLedger, reservation.ledger_id, with_for_update=True)
+            ledger = await session.get(
+                AnalysisBudgetLedger, reservation.ledger_id, with_for_update=True
+            )
             if reservation.status == "reserved":
                 actual_input = int(usage.get("input_tokens", 0))
                 actual_output = int(usage.get("output_tokens", 0))
@@ -244,12 +307,16 @@ class PostgresCallRepository:
                     projected_in = (
                         ledger.settled_input_tokens
                         + actual_input
-                        + max(0, ledger.reserved_input_tokens - reservation.input_tokens)
+                        + max(
+                            0, ledger.reserved_input_tokens - reservation.input_tokens
+                        )
                     )
                     projected_out = (
                         ledger.settled_output_tokens
                         + actual_output
-                        + max(0, ledger.reserved_output_tokens - reservation.output_tokens)
+                        + max(
+                            0, ledger.reserved_output_tokens - reservation.output_tokens
+                        )
                     )
                     projected_cost = (
                         Decimal(ledger.settled_cost_usd)
@@ -305,15 +372,25 @@ class PostgresCallRepository:
             attempt.error_code = error_code
 
     async def mark_outcome_unknown(
-        self, handle: PersistentAttempt, *, latency_ms: int, error_code: str,
+        self,
+        handle: PersistentAttempt,
+        *,
+        latency_ms: int,
+        error_code: str,
     ) -> None:
         async with self.sessions.begin() as session:
-            attempt = await session.get(ModelCallAttempt, handle.attempt_id, with_for_update=True)
+            attempt = await session.get(
+                ModelCallAttempt, handle.attempt_id, with_for_update=True
+            )
             if attempt is not None:
                 attempt.status = "outcome_unknown"
                 attempt.latency_ms = latency_ms
                 attempt.error_code = error_code
-            run = await session.get(AnalysisRun, attempt.run_id, with_for_update=True) if attempt else None
+            run = (
+                await session.get(AnalysisRun, attempt.run_id, with_for_update=True)
+                if attempt
+                else None
+            )
             if run is not None:
                 run.status = "paused_dependency"
                 run.status_reason = "provider_outcome_unknown"
@@ -350,16 +427,28 @@ class PostgresCallRepository:
                     reservation.status = "released"
 
     async def record_cache_hit(
-        self, *, run_id: int, stage_key: str, cache_key: str,
-        source_attempt_id: int, artifact_checksum: str,
+        self,
+        *,
+        run_id: int,
+        stage_key: str,
+        cache_key: str,
+        source_attempt_id: int,
+        artifact_checksum: str,
     ) -> ModelCallAttempt:
         async with self.sessions.begin() as session:
-            attempt_number = int(await session.scalar(select(
-                func.coalesce(func.max(ModelCallAttempt.attempt_number), 0)
-            ).where(
-                ModelCallAttempt.run_id == run_id,
-                ModelCallAttempt.stage_key == stage_key,
-            ))) + 1
+            attempt_number = (
+                int(
+                    await session.scalar(
+                        select(
+                            func.coalesce(func.max(ModelCallAttempt.attempt_number), 0)
+                        ).where(
+                            ModelCallAttempt.run_id == run_id,
+                            ModelCallAttempt.stage_key == stage_key,
+                        )
+                    )
+                )
+                + 1
+            )
             attempt = ModelCallAttempt(
                 run_id=run_id,
                 stage_key=stage_key,
@@ -378,8 +467,9 @@ class PostgresCallRepository:
 
 
 def _canonical_hash(value: Any) -> str:
-    return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":"),
-                                     default=str).encode()).hexdigest()
+    return hashlib.sha256(
+        json.dumps(value, sort_keys=True, separators=(",", ":"), default=str).encode()
+    ).hexdigest()
 
 
 def _response_content(response: Any) -> str:
@@ -413,7 +503,11 @@ def _coerce_timeline_json_blob(content: str) -> str:
         if isinstance(st, dict):
             precision = (st.get("precision") or "unknown").lower()
             if precision == "relative":
-                if not (st.get("expression") and st.get("anchor_event_id") and st.get("relation")):
+                if not (
+                    st.get("expression")
+                    and st.get("anchor_event_id")
+                    and st.get("relation")
+                ):
                     event["story_time"] = {"precision": "unknown"}
             elif precision == "exact":
                 if not (st.get("expression") and st.get("exact_time")):
@@ -441,7 +535,11 @@ def _coerce_timeline_json_blob(content: str) -> str:
 
 
 def _response_usage(response: Any) -> dict[str, int]:
-    raw = response.get("usage", {}) if isinstance(response, dict) else getattr(response, "usage", {})
+    raw = (
+        response.get("usage", {})
+        if isinstance(response, dict)
+        else getattr(response, "usage", {})
+    )
     if hasattr(raw, "model_dump"):
         raw = raw.model_dump()
     return {
@@ -461,16 +559,28 @@ def _response_request_id(response: Any) -> str | None:
 class TimelineModelGateway:
     """Owns timeline structured calls; callers own persistence and publication."""
 
-    def __init__(self, transport: ModelTransport, *,
-                 persistence: PostgresCallRepository | None = None) -> None:
+    def __init__(
+        self,
+        transport: ModelTransport,
+        *,
+        persistence: PostgresCallRepository | None = None,
+    ) -> None:
         self.transport = transport
         self.persistence = persistence
 
     async def generate(
-        self, *, deployment: ModelDeployment, schema: type[SchemaT],
-        messages: list[dict[str, str]], budget: BudgetGate, run_id: int,
-        stage_key: str, max_input_tokens: int, max_output_tokens: int,
-        timeout: float = 60, business_validator: Callable[[SchemaT], None] | None = None,
+        self,
+        *,
+        deployment: ModelDeployment,
+        schema: type[SchemaT],
+        messages: list[dict[str, str]],
+        budget: BudgetGate,
+        run_id: int,
+        stage_key: str,
+        max_input_tokens: int,
+        max_output_tokens: int,
+        timeout: float = 60,
+        business_validator: Callable[[SchemaT], None] | None = None,
         cache_key: str | None = None,
     ) -> GatewayResult[SchemaT]:
         if not deployment.supports_structured_output:
@@ -484,17 +594,25 @@ class TimelineModelGateway:
         # durable_attempt_number: PG 持久 attempt 序号，会跨进程递增，不能用来判断是否最后一次 repair
         for repair_index in (1, 2):
             reservation_key = f"{stage_key}:repair:{repair_index}"
-            request_hash = _canonical_hash({
-                "deployment": deployment.lineage, "messages": current_messages,
-                "schema": schema.model_json_schema(), "timeout": timeout,
-            })
+            request_hash = _canonical_hash(
+                {
+                    "deployment": deployment.lineage,
+                    "messages": current_messages,
+                    "schema": schema.model_json_schema(),
+                    "timeout": timeout,
+                }
+            )
             persistent_attempt = None
             durable_attempt_number = repair_index
             if self.persistence is not None:
                 persistent_attempt = await self.persistence.reserve_and_start(
-                    run_id=run_id, stage_key=stage_key, reservation_key=reservation_key,
-                    request_hash=request_hash, cache_key=cache_key,
-                    input_tokens=max_input_tokens, output_tokens=max_output_tokens,
+                    run_id=run_id,
+                    stage_key=stage_key,
+                    reservation_key=reservation_key,
+                    request_hash=request_hash,
+                    cache_key=cache_key,
+                    input_tokens=max_input_tokens,
+                    output_tokens=max_output_tokens,
                     input_price_per_million=deployment.input_price_per_million,
                     output_price_per_million=deployment.output_price_per_million,
                 )
@@ -503,28 +621,41 @@ class TimelineModelGateway:
                 reservation_key = f"{stage_key}:attempt:{durable_attempt_number}"
             else:
                 budget.reserve(
-                    reservation_key, input_tokens=max_input_tokens, output_tokens=max_output_tokens,
+                    reservation_key,
+                    input_tokens=max_input_tokens,
+                    output_tokens=max_output_tokens,
                     input_price_per_million=deployment.input_price_per_million,
                     output_price_per_million=deployment.output_price_per_million,
                 )
             started = time.perf_counter()
             try:
                 response = await self.transport.complete(
-                    model=deployment.resolved_name, messages=current_messages,
-                    response_format=schema, timeout=timeout, num_retries=0, stream=False,
+                    model=deployment.resolved_name,
+                    messages=current_messages,
+                    response_format=schema,
+                    timeout=timeout,
+                    num_retries=0,
+                    stream=False,
                     max_tokens=max_output_tokens,
                 )
             except Exception as exc:
                 latency_ms = int((time.perf_counter() - started) * 1000)
                 if persistent_attempt is not None:
                     await self.persistence.mark_outcome_unknown(
-                        persistent_attempt, latency_ms=latency_ms,
+                        persistent_attempt,
+                        latency_ms=latency_ms,
                         error_code=type(exc).__name__,
                     )
-                attempts.append(GatewayAttempt(
-                    durable_attempt_number, "outcome_unknown", reservation_key, request_hash,
-                    error_code=type(exc).__name__, latency_ms=latency_ms,
-                ))
+                attempts.append(
+                    GatewayAttempt(
+                        durable_attempt_number,
+                        "outcome_unknown",
+                        reservation_key,
+                        request_hash,
+                        error_code=type(exc).__name__,
+                        latency_ms=latency_ms,
+                    )
+                )
                 # 保留根因片段，方便前端/运维区分：无 Key、Vertex 4xx、超时等
                 detail = f"{type(exc).__name__}: {str(exc)[:180]}".replace("\n", " ")
                 raise ModelCallFailed(
@@ -552,22 +683,35 @@ class TimelineModelGateway:
                 latency_ms = int((time.perf_counter() - started) * 1000)
                 if persistent_attempt is not None:
                     await self.persistence.complete_attempt(
-                        persistent_attempt, status="schema_rejected",
+                        persistent_attempt,
+                        status="schema_rejected",
                         response_hash=response_hash,
                         provider_request_id=_response_request_id(response),
-                        usage=usage, cost_usd=actual_cost, latency_ms=latency_ms,
+                        usage=usage,
+                        cost_usd=actual_cost,
+                        latency_ms=latency_ms,
                         error_code=type(exc).__name__,
                     )
                 else:
                     budget.settle(
-                        reservation_key, actual_input_tokens=usage["input_tokens"],
-                        actual_output_tokens=usage["output_tokens"], actual_cost_usd=actual_cost,
+                        reservation_key,
+                        actual_input_tokens=usage["input_tokens"],
+                        actual_output_tokens=usage["output_tokens"],
+                        actual_cost_usd=actual_cost,
                     )
-                attempts.append(GatewayAttempt(
-                    durable_attempt_number, "schema_rejected", reservation_key, request_hash,
-                    response_hash, usage, actual_cost, type(exc).__name__,
-                    latency_ms,
-                ))
+                attempts.append(
+                    GatewayAttempt(
+                        durable_attempt_number,
+                        "schema_rejected",
+                        reservation_key,
+                        request_hash,
+                        response_hash,
+                        usage,
+                        actual_cost,
+                        type(exc).__name__,
+                        latency_ms,
+                    )
+                )
                 if repair_index == 2:
                     detail = str(exc)[:240].replace("\n", " ")
                     raise StructuredOutputRejected(
@@ -576,33 +720,50 @@ class TimelineModelGateway:
                     ) from exc
                 # 把校验错误摘要塞回 repair 提示，提高 Vertex 纠错成功率
                 err_hint = str(exc)[:500].replace("\n", " ")
-                current_messages = current_messages + [{
-                    "role": "user",
-                    "content": (
-                        "Local validation error. Return one corrected JSON object matching "
-                        "the supplied schema; do not add fields. Error: "
-                        f"{err_hint}"
-                    ),
-                }]
+                current_messages = current_messages + [
+                    {
+                        "role": "user",
+                        "content": (
+                            "Local validation error. Return one corrected JSON object matching "
+                            "the supplied schema; do not add fields. Error: "
+                            f"{err_hint}"
+                        ),
+                    }
+                ]
                 continue
 
             latency_ms = int((time.perf_counter() - started) * 1000)
             response_hash = _canonical_hash(response)
             if persistent_attempt is not None:
                 await self.persistence.complete_attempt(
-                    persistent_attempt, status="succeeded", response_hash=response_hash,
-                    provider_request_id=_response_request_id(response), usage=usage,
-                    cost_usd=actual_cost, latency_ms=latency_ms, error_code=None,
+                    persistent_attempt,
+                    status="succeeded",
+                    response_hash=response_hash,
+                    provider_request_id=_response_request_id(response),
+                    usage=usage,
+                    cost_usd=actual_cost,
+                    latency_ms=latency_ms,
+                    error_code=None,
                 )
             else:
                 budget.settle(
-                    reservation_key, actual_input_tokens=usage["input_tokens"],
-                    actual_output_tokens=usage["output_tokens"], actual_cost_usd=actual_cost,
+                    reservation_key,
+                    actual_input_tokens=usage["input_tokens"],
+                    actual_output_tokens=usage["output_tokens"],
+                    actual_cost_usd=actual_cost,
                 )
-            attempts.append(GatewayAttempt(
-                durable_attempt_number, "succeeded", reservation_key, request_hash,
-                response_hash, usage, actual_cost, latency_ms=latency_ms,
-            ))
+            attempts.append(
+                GatewayAttempt(
+                    durable_attempt_number,
+                    "succeeded",
+                    reservation_key,
+                    request_hash,
+                    response_hash,
+                    usage,
+                    actual_cost,
+                    latency_ms=latency_ms,
+                )
+            )
             return GatewayResult(output, attempts, deployment)
 
         raise StructuredOutputRejected(

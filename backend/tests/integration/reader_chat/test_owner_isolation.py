@@ -162,9 +162,7 @@ async def test_cross_owner_novel_conversation_message_job_matrix_404(api_client)
         elif method == "POST":
             resp = await client.post(path, headers=headers_b)
         elif method == "PATCH":
-            resp = await client.patch(
-                path, json={"title": "hijack"}, headers=headers_b
-            )
+            resp = await client.patch(path, json={"title": "hijack"}, headers=headers_b)
         else:
             resp = await client.delete(path, headers=headers_b)
         assert resp.status_code == 404, f"{method} {path} -> {resp.status_code}"

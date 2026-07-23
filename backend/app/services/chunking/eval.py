@@ -65,7 +65,10 @@ def run_ab_qualification(
             "metrics": None,
             "reason": "health_not_ok",
         }
-    if a.source_snapshot_hash != source_snapshot_hash or b.source_snapshot_hash != source_snapshot_hash:
+    if (
+        a.source_snapshot_hash != source_snapshot_hash
+        or b.source_snapshot_hash != source_snapshot_hash
+    ):
         return {
             "quality_comparable": False,
             "status": "invalid_lineage",

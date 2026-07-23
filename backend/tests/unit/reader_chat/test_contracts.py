@@ -95,13 +95,18 @@ def test_user_message_owns_selection_and_manifest_uniqueness():
     sel_unique = {
         tuple(c.name for c in u.columns)
         for u in ReaderMessageSelection.__table__.constraints
-        if getattr(u, "columns", None) is not None and u.__class__.__name__ == "UniqueConstraint"
+        if getattr(u, "columns", None) is not None
+        and u.__class__.__name__ == "UniqueConstraint"
     }
     # UniqueConstraint or unique Index on user_message_id
     col = ReaderMessageSelection.__table__.c.user_message_id
-    assert col.unique or any("user_message_id" in cols for cols in sel_unique) or any(
-        idx.unique and "user_message_id" in idx.columns
-        for idx in ReaderMessageSelection.__table__.indexes
+    assert (
+        col.unique
+        or any("user_message_id" in cols for cols in sel_unique)
+        or any(
+            idx.unique and "user_message_id" in idx.columns
+            for idx in ReaderMessageSelection.__table__.indexes
+        )
     )
 
     man_unique = {
@@ -111,16 +116,24 @@ def test_user_message_owns_selection_and_manifest_uniqueness():
         and u.__class__.__name__ == "UniqueConstraint"
     }
     man_col = ReaderContextManifest.__table__.c.user_message_id
-    assert man_col.unique or any("user_message_id" in cols for cols in man_unique) or any(
-        idx.unique and "user_message_id" in idx.columns
-        for idx in ReaderContextManifest.__table__.indexes
+    assert (
+        man_col.unique
+        or any("user_message_id" in cols for cols in man_unique)
+        or any(
+            idx.unique and "user_message_id" in idx.columns
+            for idx in ReaderContextManifest.__table__.indexes
+        )
     )
 
 
 def test_selection_offset_and_hash_columns_are_non_negative_ranges():
     from app.models.reader_chat import ReaderMessageSelection
 
-    check_names = {c.name for c in ReaderMessageSelection.__table__.constraints if hasattr(c, "name")}
+    check_names = {
+        c.name
+        for c in ReaderMessageSelection.__table__.constraints
+        if hasattr(c, "name")
+    }
     assert "ck_reader_selection_offsets" in check_names
     # SHA-256 fields are 64-char hex strings
     assert ReaderMessageSelection.__table__.c.selection_text_hash.type.length == 64
@@ -185,7 +198,9 @@ def test_generation_job_status_lease_cancel_retry_fields():
         "context_manifest_checksum",
         "model_lineage",
     } <= cols
-    check_names = {c.name for c in ReaderGenerationJob.__table__.constraints if hasattr(c, "name")}
+    check_names = {
+        c.name for c in ReaderGenerationJob.__table__.constraints if hasattr(c, "name")
+    }
     assert "ck_reader_gen_jobs_status" in check_names
 
     # Partial unique index for one nonterminal job per user message
@@ -194,15 +209,19 @@ def test_generation_job_status_lease_cancel_retry_fields():
         for idx in ReaderGenerationJob.__table__.indexes
         if idx.unique and "user_message_id" in idx.columns
     ]
-    assert partial, "expected partial unique index on user_message_id for nonterminal jobs"
-    assert any(getattr(idx, "dialect_options", {}).get("postgresql", {}).get("where") is not None
-               or getattr(idx, "kwargs", None)
-               for idx in partial) or any(
-        getattr(idx, "dialect_options", {}) for idx in partial
+    assert partial, (
+        "expected partial unique index on user_message_id for nonterminal jobs"
     )
+    assert any(
+        getattr(idx, "dialect_options", {}).get("postgresql", {}).get("where")
+        is not None
+        or getattr(idx, "kwargs", None)
+        for idx in partial
+    ) or any(getattr(idx, "dialect_options", {}) for idx in partial)
     # Dialect-agnostic: at least one unique index targets user_message_id with a where clause
     assert any(
-        getattr(idx, "dialect_options", {}).get("postgresql", {}).get("where") is not None
+        getattr(idx, "dialect_options", {}).get("postgresql", {}).get("where")
+        is not None
         for idx in ReaderGenerationJob.__table__.indexes
         if idx.unique
     )
@@ -230,7 +249,9 @@ def test_dual_scope_budget_ledgers_and_reservation_usage():
         "settled_output_tokens",
         "settled_cost_usd",
     } <= ledger_cols
-    check_names = {c.name for c in ReaderBudgetLedger.__table__.constraints if hasattr(c, "name")}
+    check_names = {
+        c.name for c in ReaderBudgetLedger.__table__.constraints if hasattr(c, "name")
+    }
     assert "ck_reader_budget_scope_type" in check_names
 
     res_cols = set(inspect(ReaderBudgetReservation).columns.keys())
@@ -323,7 +344,10 @@ def test_reader_answer_envelope_rejects_extra_fields():
 
 
 def test_reader_answer_envelope_rejects_unknown_refs_at_business_validation():
-    from app.schemas.reader_chat import ReaderAnswerEnvelope, validate_answer_against_manifest
+    from app.schemas.reader_chat import (
+        ReaderAnswerEnvelope,
+        validate_answer_against_manifest,
+    )
 
     env = ReaderAnswerEnvelope.model_validate(
         _answer_payload(
@@ -391,7 +415,9 @@ def test_no_evidence_requires_uncertainty_or_clarification():
 
     with pytest.raises(ValidationError):
         ReaderAnswerEnvelope.model_validate(
-            _answer_payload(answer_blocks=[], clarifying_question=None, uncertainty=None)
+            _answer_payload(
+                answer_blocks=[], clarifying_question=None, uncertainty=None
+            )
         )
 
     env = ReaderAnswerEnvelope.model_validate(
