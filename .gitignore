@@ -72,3 +72,6 @@ frontend/test-results/
 # local one-off scripts
 backend/_up*.py
 
+# --- 运行时 PID 文件（本地进程保活产物，不提交）---
+*.pid
+

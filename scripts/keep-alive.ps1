@@ -151,7 +151,13 @@ cd /d "$FrontendDir"
 set BACKEND_URL=http://127.0.0.1:$BePort
 set NO_PROXY=127.0.0.1,localhost
 set no_proxy=127.0.0.1,localhost
-call npm run dev -- --port $FePort --hostname 127.0.0.1 >> "$outLog" 2>&1
+rem next/font downloader fails through the local proxy; frontend must connect directly
+set HTTP_PROXY=
+set HTTPS_PROXY=
+set http_proxy=
+set https_proxy=
+rem Production mode: requires `npm run build` output in .next (rebuild after frontend changes)
+call npm run start -- --port $FePort --hostname 127.0.0.1 >> "$outLog" 2>&1
 "@
     Start-DetachedCmd -Title "novelmind-fe" -BatPath $bat -Body $body
 }

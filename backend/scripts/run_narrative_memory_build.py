@@ -710,7 +710,7 @@ def _production_transport_and_deployment(sessions, *, noop: bool):
     ) or not (settings.openai_api_key or "").strip()
 
     if use_vertex:
-        model_id = (settings.vertex_model or "gemini-3.5-flash").strip()
+        model_id = (settings.vertex_model or "gemini-3.5-flash-lite").strip()
         deployment = ModelDeploymentSnapshot(
             provider="vertex_google",
             model=model_id,
