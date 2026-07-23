@@ -42,13 +42,19 @@ AUTO_ACCEPT_THRESHOLD = 0.85
 REVIEW_THRESHOLD = 0.65
 
 # Classifications that can support a given target state (necessary, not sufficient).
-CLASSIFICATION_FOR_TARGET: dict[
-    ClueLifecycleState, frozenset[ClueSemanticClassification]
-] = {
-    ClueLifecycleState.ACTIVE: frozenset({ClueSemanticClassification.CUE_ONLY}),
-    ClueLifecycleState.REINFORCED: frozenset(
-        {ClueSemanticClassification.REINFORCEMENT}
+CLASSIFICATION_FOR_TARGET: dict[ClueLifecycleState, frozenset[ClueSemanticClassification]] = {
+    # ACTIVE is the entry state for any cue-bearing clue. A reinforcement or
+    # payoff classification still carries a cue (enforced by ClueSemanticJudgment),
+    # so it legitimately enters the active lifecycle and later progresses to
+    # REINFORCED / PAID_OFF. Only unrelated/ambiguous may not enter active.
+    ClueLifecycleState.ACTIVE: frozenset(
+        {
+            ClueSemanticClassification.CUE_ONLY,
+            ClueSemanticClassification.REINFORCEMENT,
+            ClueSemanticClassification.PAYOFF,
+        }
     ),
+    ClueLifecycleState.REINFORCED: frozenset({ClueSemanticClassification.REINFORCEMENT}),
     ClueLifecycleState.PAID_OFF: frozenset({ClueSemanticClassification.PAYOFF}),
     ClueLifecycleState.DISMISSED: frozenset(
         {

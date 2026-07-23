@@ -38,15 +38,17 @@ async def main(novel_id: int) -> None:
         print("chunk_active_build", cap.build_id if cap else None)
         print("characters", await s.scalar(select(func.count()).select_from(Character).where(Character.novel_id == novel_id)))
         try:
-            legacy = await s.scalar(
+            # CharacterRelation is keyed by novel_id directly (source/target are
+            # character FKs: source_character_id / target_character_id). Count by
+            # novel scope rather than joining on the (removed) legacy `source_id`.
+            character_relations = await s.scalar(
                 select(func.count())
                 .select_from(CharacterRelation)
-                .join(Character, Character.id == CharacterRelation.source_id)
-                .where(Character.novel_id == novel_id)
+                .where(CharacterRelation.novel_id == novel_id)
             )
-            print("legacy_character_relations", legacy)
+            print("character_relations", character_relations)
         except Exception as e:
-            print("legacy_character_relations", type(e).__name__, e)
+            print("character_relations", type(e).__name__, e)
             await s.rollback()
 
         tptr = await s.scalar(select(TimelineActivePointer).where(TimelineActivePointer.novel_id == novel_id))
@@ -153,13 +155,17 @@ async def main(novel_id: int) -> None:
         ).fetchall()
         print("related_tables", [r[0] for r in tables])
 
+        # Real schema tables (legacy names clue_cards/clue_items/clue_observations
+        # and narrative_memory_units/narrative_unit_nodes no longer exist). Use the
+        # actual ORM-backed tables so the audit reflects reality instead of erroring.
+        # NOTE: narrative_memory_* tables are candidate-only — these counts are
+        # read-only and never promote NM into the active clue/timeline pipeline.
         for tname in [
-            "clue_cards",
-            "clue_items",
-            "clue_observations",
+            "machine_clues",            # was clue_cards
+            "clue_evidence_refs",       # was clue_items
             "clue_analysis_versions",
-            "narrative_memory_units",
-            "narrative_unit_nodes",
+            "narrative_memory_nodes",   # was narrative_memory_units
+            "narrative_memory_claims",  # was narrative_unit_nodes
         ]:
             try:
                 c = await s.scalar(text(f"SELECT count(*) FROM {tname} WHERE novel_id = :nid"), {"nid": novel_id})
