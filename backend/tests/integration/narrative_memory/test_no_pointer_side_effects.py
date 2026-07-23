@@ -45,7 +45,13 @@ async def _pointer_snapshot(session: AsyncSession) -> dict[str, object]:
         ).all()
     )
     timeline = tuple(
-        (row.owner_id, row.novel_id, row.version_id, row.revision, row.manifest_checksum)
+        (
+            row.owner_id,
+            row.novel_id,
+            row.version_id,
+            row.revision,
+            row.manifest_checksum,
+        )
         for row in (
             await session.scalars(
                 select(TimelineActivePointer).order_by(TimelineActivePointer.id)
@@ -110,7 +116,9 @@ async def test_fresh_observer_sees_byte_equivalent_pointers_after_candidate_life
     try:
         async with observer_engine.connect() as conn:
             table_names = set(
-                await conn.run_sync(lambda sync_conn: inspect(sync_conn).get_table_names())
+                await conn.run_sync(
+                    lambda sync_conn: inspect(sync_conn).get_table_names()
+                )
             )
             assert "narrative_memory_active_pointers" not in table_names
             for name in POINTER_TABLES:
@@ -178,12 +186,7 @@ def test_static_package_has_zero_provider_calls_and_no_pointer_api() -> None:
     out of this package scan.
     """
 
-    root = (
-        Path(__file__).resolve().parents[3]
-        / "app"
-        / "services"
-        / "narrative_memory"
-    )
+    root = Path(__file__).resolve().parents[3] / "app" / "services" / "narrative_memory"
     package_files = (
         "authority.py",
         "contracts.py",

@@ -39,7 +39,9 @@ if not PYTHON.is_file():
     PYTHON = Path(sys.executable)
 
 
-def _spec(version_key: str, *, parent_version_id: int | None = None) -> CandidateVersionSpec:
+def _spec(
+    version_key: str, *, parent_version_id: int | None = None
+) -> CandidateVersionSpec:
     return CandidateVersionSpec(
         version_key=version_key,
         prompt_hash=HEX,
@@ -378,7 +380,9 @@ def _cli_env(pg_async_url: str) -> dict[str, str]:
     return env
 
 
-def _run_cli(args: list[str], *, env: dict | None = None) -> subprocess.CompletedProcess:
+def _run_cli(
+    args: list[str], *, env: dict | None = None
+) -> subprocess.CompletedProcess:
     cmd = [str(PYTHON), str(CLI), *args]
     return subprocess.run(
         cmd,

@@ -444,7 +444,10 @@ async def test_relationship_graph_performance_and_degradation_tiers(
         else:
             assert large.counts.nodes == len(large.nodes)
             assert large.counts.edges == len(large.edges)
-            if large.counts.nodes > NORMAL_NODE_CAP or large.counts.edges > NORMAL_EDGE_CAP:
+            if (
+                large.counts.nodes > NORMAL_NODE_CAP
+                or large.counts.edges > NORMAL_EDGE_CAP
+            ):
                 assert large.degradation.mode.value == "large"
 
         # --- normal tier via single-character filter ---
@@ -457,7 +460,9 @@ async def test_relationship_graph_performance_and_degradation_tiers(
             character_id=ids["char0_id"],
         )
         assert normal is not None
-        assert len(normal.nodes) <= NORMAL_NODE_CAP or normal.degradation.mode.value in {
+        assert len(
+            normal.nodes
+        ) <= NORMAL_NODE_CAP or normal.degradation.mode.value in {
             "normal",
             "large",
             "filters_required",

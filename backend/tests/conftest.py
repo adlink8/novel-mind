@@ -66,7 +66,9 @@ def _resolve_timeout(marker_names: set[str]) -> int | None:
     return None
 
 
-def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+def pytest_collection_modifyitems(
+    config: pytest.Config, items: list[pytest.Item]
+) -> None:
     """
     Fail closed on uncategorized tests and apply D-16 timeouts.
 
@@ -89,7 +91,11 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
 
     if uncategorized:
         preview = "\n  ".join(uncategorized[:20])
-        more = f"\n  ... and {len(uncategorized) - 20} more" if len(uncategorized) > 20 else ""
+        more = (
+            f"\n  ... and {len(uncategorized) - 20} more"
+            if len(uncategorized) > 20
+            else ""
+        )
         raise pytest.UsageError(
             "Test classification gate failed (D-04): every test must have a primary "
             f"marker from {sorted(PRIMARY_MARKERS)}. Uncategorized tests:\n  {preview}{more}"

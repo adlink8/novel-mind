@@ -103,7 +103,9 @@ def test_question_selection_bounds_validated():
         build_question("x", selected_start=0, selected_end=3)
     with pytest.raises(ValidationError):
         build_question("x", selected_chapter=1, selected_start=5, selected_end=2)
-    ok = build_question("选中这段", selected_chapter=2, selected_start=0, selected_end=4)
+    ok = build_question(
+        "选中这段", selected_chapter=2, selected_start=0, selected_end=4
+    )
     assert ok.selected_chapter == 2
 
 
@@ -162,7 +164,9 @@ def test_scope_and_cache_hashes_are_byte_stable():
     s1 = _scope()
     s2 = _scope()
     assert scope_hash(s1) == scope_hash(s2)
-    q = build_question("主线是什么", selected_chapter=1, selected_start=0, selected_end=1)
+    q = build_question(
+        "主线是什么", selected_chapter=1, selected_start=0, selected_end=1
+    )
     route = decide_route(q, full_book_authorized=False)
     env1 = build_cache_envelope(
         scope=s1, route=route, question=q, source_status=CandidateSourceStatus.OK
@@ -241,7 +245,9 @@ ROUTE_MATRIX: list[tuple[str, dict, RouteMode, set[RouteReasonCode]]] = [
 ]
 
 
-@pytest.mark.parametrize("name,kwargs,mode,must_codes", ROUTE_MATRIX, ids=[r[0] for r in ROUTE_MATRIX])
+@pytest.mark.parametrize(
+    "name,kwargs,mode,must_codes", ROUTE_MATRIX, ids=[r[0] for r in ROUTE_MATRIX]
+)
 def test_route_matrix_modes_and_reason_codes(name, kwargs, mode, must_codes):
     q = build_question(
         kwargs["raw"],
@@ -296,7 +302,9 @@ def test_router_signature_excludes_candidate_material():
     assert "openai" not in src.lower()
     assert "litellm" not in src.lower()
     assert "NarrativeMemoryNode" not in src
-    assert "provider" not in src.lower() or "provider" not in decide_route.__doc__.lower()
+    assert (
+        "provider" not in src.lower() or "provider" not in decide_route.__doc__.lower()
+    )
 
 
 def test_decide_route_for_scope_uses_cutoff_authorization():

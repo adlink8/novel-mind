@@ -118,7 +118,10 @@ def test_frozen_fiction_fixture_covers_required_surface():
 
 
 def test_forbidden_edge_types_never_validate_as_accepted_contract():
-    for bad in sorted(NON_EDGE_RELATION_TYPES | {"history", "friend", "causes", "precedes", "same_entity"}):
+    for bad in sorted(
+        NON_EDGE_RELATION_TYPES
+        | {"history", "friend", "causes", "precedes", "same_entity"}
+    ):
         with pytest.raises((ValidationError, ValueError)):
             AcceptedObservationContract.model_validate(
                 {
@@ -241,8 +244,12 @@ def test_critical_false_accepts_are_zero_on_gate_surface():
     package = _package()
     gate = RelationshipGateService()
     attacks = [
-        _judgment(package, relation_type="ally", transition="establish", confidence=0.1),
-        _judgment(package, supporting_evidence_ids=["nope"], valid_from_evidence_id="nope"),
+        _judgment(
+            package, relation_type="ally", transition="establish", confidence=0.1
+        ),
+        _judgment(
+            package, supporting_evidence_ids=["nope"], valid_from_evidence_id="nope"
+        ),
         _judgment(package, candidate_key="wrong"),
     ]
     false_accepts = 0

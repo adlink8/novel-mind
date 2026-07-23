@@ -232,10 +232,14 @@ def test_db_id_only_truth_fails_deterministic():
         snapshot_hash=snap.manifest_hash,
         question="q",
         case_type="answerable",
-        claims=[{"claim_id": "c1", "text": "x", "critical": True, "evidence_set_ids": []}],
+        claims=[
+            {"claim_id": "c1", "text": "x", "critical": True, "evidence_set_ids": []}
+        ],
         gold_chunk_db_ids=[1, 2, 3],
     )
-    checks = run_deterministic_checks(case, snap, expected_owner_id=1, expected_work_id=10)
+    checks = run_deterministic_checks(
+        case, snap, expected_owner_id=1, expected_work_id=10
+    )
     assert not checks.all_passed
     assert checks.leak_ok is False or checks.critical_claim_support_ok is False
 
@@ -332,7 +336,10 @@ def test_packaged_benchmark_fixture_loads_and_verifies():
         assert c["status"] == "frozen"
         assert c["fixture_hash"]
         # never rely solely on gold DB ids
-        assert c.get("equivalent_evidence_sets") is not None or c["case_type"] == "no_answer"
+        assert (
+            c.get("equivalent_evidence_sets") is not None
+            or c["case_type"] == "no_answer"
+        )
 
 
 def test_equivalent_evidence_sets_supported():
@@ -384,7 +391,9 @@ def test_equivalent_evidence_sets_supported():
         EquivalentEvidenceSet(set_id="s2", refs=[ref_b]),
     ]
     case.claims[0].evidence_set_ids = ["s1", "s2"]
-    checks = run_deterministic_checks(case, snap, expected_owner_id=1, expected_work_id=10)
+    checks = run_deterministic_checks(
+        case, snap, expected_owner_id=1, expected_work_id=10
+    )
     assert checks.equivalent_sets_ok
     assert checks.critical_claim_support_ok
     frozen = freeze_eval_case(case, SECRET)
@@ -428,7 +437,11 @@ def test_package_benchmark_hash_stable():
         secret=SECRET,
     )
     assert case and case.status == "frozen"
-    a = package_benchmark_suite(domain="fiction", snapshot=snap, cases=[case], secret=SECRET)
-    b = package_benchmark_suite(domain="fiction", snapshot=snap, cases=[case], secret=SECRET)
+    a = package_benchmark_suite(
+        domain="fiction", snapshot=snap, cases=[case], secret=SECRET
+    )
+    b = package_benchmark_suite(
+        domain="fiction", snapshot=snap, cases=[case], secret=SECRET
+    )
     assert a["suite_hash"] == b["suite_hash"]
     assert a["signature"] == b["signature"]

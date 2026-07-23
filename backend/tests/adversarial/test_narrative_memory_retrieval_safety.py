@@ -62,7 +62,9 @@ def test_phase15_sources_ban_reader_chat_and_provider_imports():
             if isinstance(node, ast.ImportFrom) and node.module:
                 for token in forbidden:
                     if token.startswith("app.") or token in {"litellm", "openai"}:
-                        assert not node.module.startswith(token), f"{name}:{node.module}"
+                        assert not node.module.startswith(token), (
+                            f"{name}:{node.module}"
+                        )
             if isinstance(node, ast.Import):
                 for alias in node.names:
                     assert alias.name not in {"litellm", "openai"}

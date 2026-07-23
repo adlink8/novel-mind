@@ -42,12 +42,16 @@ async def test_schema_has_no_narrative_memory_pointer_table(
     try:
         async with engine.connect() as conn:
             names = (
-                await conn.execute(
-                    text(
-                        "SELECT tablename FROM pg_tables WHERE schemaname='public'"
+                (
+                    await conn.execute(
+                        text(
+                            "SELECT tablename FROM pg_tables WHERE schemaname='public'"
+                        )
                     )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
         assert "narrative_memory_active_pointers" not in names
         assert any(n.startswith("narrative_memory_build_") for n in names)
     finally:

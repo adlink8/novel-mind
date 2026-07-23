@@ -164,9 +164,7 @@ class TestIndexNovel:
 
         # mock AI embedding
         with patch("app.services.indexing_service.ai_service") as mock_ai:
-            mock_ai.embedding = AsyncMock(
-                return_value=[[0.1, 0.2, 0.3]] * 3
-            )
+            mock_ai.embedding = AsyncMock(return_value=[[0.1, 0.2, 0.3]] * 3)
 
             result = await indexing_service.index_novel(mock_db, novel_id=1)
 
@@ -207,7 +205,12 @@ class TestIndexNovel:
 
     @pytest.mark.asyncio
     async def test_empty_chunks_after_chunking(
-        self, indexing_service, mock_db, mock_novel, mock_chapters, mock_chunking_service
+        self,
+        indexing_service,
+        mock_db,
+        mock_novel,
+        mock_chapters,
+        mock_chunking_service,
     ):
         """分块结果为空时直接标记为 ready"""
         mock_db.get.return_value = mock_novel
@@ -321,19 +324,31 @@ class TestSearchSimilar:
                 "chunk_id": "chunk_1",
                 "content": "对话内容",
                 "score": 0.9,
-                "metadata": {"chapter_id": 1, "chunk_index": 0, "chunk_type": "dialogue"},
+                "metadata": {
+                    "chapter_id": 1,
+                    "chunk_index": 0,
+                    "chunk_type": "dialogue",
+                },
             },
             {
                 "chunk_id": "chunk_2",
                 "content": "描写内容",
                 "score": 0.8,
-                "metadata": {"chapter_id": 1, "chunk_index": 1, "chunk_type": "description"},
+                "metadata": {
+                    "chapter_id": 1,
+                    "chunk_index": 1,
+                    "chunk_type": "description",
+                },
             },
             {
                 "chunk_id": "chunk_3",
                 "content": "叙述内容",
                 "score": 0.7,
-                "metadata": {"chapter_id": 1, "chunk_index": 2, "chunk_type": "narration"},
+                "metadata": {
+                    "chapter_id": 1,
+                    "chunk_index": 2,
+                    "chunk_type": "narration",
+                },
             },
         ]
 
@@ -353,7 +368,9 @@ class TestSearchSimilar:
         assert types == {"dialogue", "narration"}
 
     @pytest.mark.asyncio
-    async def test_search_empty_results(self, indexing_service, mock_db, mock_vector_store):
+    async def test_search_empty_results(
+        self, indexing_service, mock_db, mock_vector_store
+    ):
         """无匹配结果时返回空列表"""
         mock_vector_store.search.return_value = []
 
@@ -476,9 +493,10 @@ class TestErrorHandling:
                 # 第二批失败
                 raise RuntimeError("Rate limited")
 
-        with patch("app.services.indexing_service.ai_service") as mock_ai, patch(
-            "app.services.indexing_service.settings"
-        ) as mock_settings:
+        with (
+            patch("app.services.indexing_service.ai_service") as mock_ai,
+            patch("app.services.indexing_service.settings") as mock_settings,
+        ):
             # Force ollama path so batch_size stays 100 (local_st uses 64)
             mock_settings.embedding_provider = "ollama"
             mock_settings.embedding_batch_size = 64
@@ -534,9 +552,7 @@ class TestErrorHandling:
         mock_db.execute.return_value = mock_result
 
         with patch("app.services.indexing_service.ai_service") as mock_ai:
-            mock_ai.embedding = AsyncMock(
-                side_effect=RuntimeError("服务不可用")
-            )
+            mock_ai.embedding = AsyncMock(side_effect=RuntimeError("服务不可用"))
 
             result = await indexing_service.index_novel(mock_db, novel_id=1)
 
@@ -639,9 +655,7 @@ class TestProgressCallback:
             )
 
         # 验证 embedding 阶段的 current 值
-        embedding_progress = [
-            p for p in progress_values if p[2] == "embedding"
-        ]
+        embedding_progress = [p for p in progress_values if p[2] == "embedding"]
         if embedding_progress:
             # 最后一次 embedding 回调的 current 应该等于 total
             last_embedding = embedding_progress[-1]

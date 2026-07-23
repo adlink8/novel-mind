@@ -79,8 +79,12 @@ def test_relink_zero_and_multiple_matches_need_relink():
 def test_latest_overrides_heads_by_id():
     rows = [
         FieldOverride(1, 1, 1, "c1", "note", {"note": "a"}, status="active"),
-        FieldOverride(2, 1, 1, "c1", "note", {"note": "b"}, status="active", supersedes_id=1),
-        FieldOverride(3, 1, 1, "c1", "disposition", {"confirmed": True}, status="active"),
+        FieldOverride(
+            2, 1, 1, "c1", "note", {"note": "b"}, status="active", supersedes_id=1
+        ),
+        FieldOverride(
+            3, 1, 1, "c1", "disposition", {"confirmed": True}, status="active"
+        ),
     ]
     heads = latest_overrides(rows)
     by_field = {h.field_name: h for h in heads}

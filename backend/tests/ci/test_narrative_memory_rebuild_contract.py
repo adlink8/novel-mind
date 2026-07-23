@@ -54,9 +54,9 @@ def test_phase16_files_exist() -> None:
 
 
 def test_migration_revises_phase14_head() -> None:
-    source = (
-        MIGRATIONS / "16_narrative_memory_rebuild_authority.py"
-    ).read_text(encoding="utf-8")
+    source = (MIGRATIONS / "16_narrative_memory_rebuild_authority.py").read_text(
+        encoding="utf-8"
+    )
     assert 'revision = "16memrebuild01"' in source
     assert 'down_revision = "14membuild01"' in source
     assert "narrative_memory_rebuild_plans" in source

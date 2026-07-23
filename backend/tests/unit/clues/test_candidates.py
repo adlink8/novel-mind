@@ -61,10 +61,28 @@ def _node(
 
 def _base_nodes() -> list[HierarchyEvidenceNode]:
     return [
-        _node("n1", 1, 0, "Alice found a silver key under the ash gate.", entities=("Alice",)),
+        _node(
+            "n1",
+            1,
+            0,
+            "Alice found a silver key under the ash gate.",
+            entities=("Alice",),
+        ),
         _node("n2", 1, 80, "Rain washed the courtyard stones.", entities=()),
-        _node("n3", 3, 10, "Bob mentioned the silver key again near the ash gate.", entities=("Bob",)),
-        _node("n4", 5, 0, "Alice unlocked the vault with the silver key.", entities=("Alice",)),
+        _node(
+            "n3",
+            3,
+            10,
+            "Bob mentioned the silver key again near the ash gate.",
+            entities=("Bob",),
+        ),
+        _node(
+            "n4",
+            5,
+            0,
+            "Alice unlocked the vault with the silver key.",
+            entities=("Alice",),
+        ),
         _node("n5", 6, 0, "Unrelated market chatter about grain prices."),
     ]
 
@@ -316,7 +334,10 @@ def test_clamp_later_units_prefers_chapters_closest_to_cue():
         omitted_evidence_ids=omitted,
     )
     assert package.later_units
-    assert len({u.narrative_chapter_number for u in package.later_units}) <= MAX_LATER_CHAPTERS
+    assert (
+        len({u.narrative_chapter_number for u in package.later_units})
+        <= MAX_LATER_CHAPTERS
+    )
 
 
 @pytest.mark.asyncio
@@ -325,7 +346,13 @@ async def test_wide_later_span_is_clamped_not_hard_fail():
 
     # Cue in ch1; later nodes across 8 chapters (adjacency_chapter_window default=8).
     nodes = [
-        _node("cue", 1, 0, "Alice found a silver key under the ash gate.", entities=("Alice",)),
+        _node(
+            "cue",
+            1,
+            0,
+            "Alice found a silver key under the ash gate.",
+            entities=("Alice",),
+        ),
     ]
     for ch in range(2, 10):
         nodes.append(
@@ -361,7 +388,9 @@ async def test_wide_later_span_is_clamped_not_hard_fail():
         assert len(later_chapters) <= MAX_LATER_CHAPTERS
         assert draft.package.later_units
         # Package hash remains valid after clamp.
-        assert draft.package.package_hash == package_hash_for(draft.package.to_snapshot())
+        assert draft.package.package_hash == package_hash_for(
+            draft.package.to_snapshot()
+        )
         # Distant chapters dropped when span exceeds cap.
         cue_ch = draft.package.cue_units[0].narrative_chapter_number
         if cue_ch == 1:

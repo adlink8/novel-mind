@@ -95,7 +95,9 @@ def test_active_requires_cue_evidence():
     # Wrong classification
     bad = gates.evaluate_transition(
         package=package,
-        judgment=_judgment(package, classification="payoff", later_evidence_ids=package.later_ids()[:1]),
+        judgment=_judgment(
+            package, classification="payoff", later_evidence_ids=package.later_ids()[:1]
+        ),
         from_status="candidate",
         to_status="active",
         owner_id=1,
@@ -342,7 +344,9 @@ def test_threshold_bands_and_policy_hash_stable():
 
     mid = gates.evaluate_transition(
         package=package,
-        judgment=_judgment(package, confidence=(REVIEW_THRESHOLD + AUTO_ACCEPT_THRESHOLD) / 2),
+        judgment=_judgment(
+            package, confidence=(REVIEW_THRESHOLD + AUTO_ACCEPT_THRESHOLD) / 2
+        ),
         from_status="candidate",
         to_status="active",
         owner_id=1,

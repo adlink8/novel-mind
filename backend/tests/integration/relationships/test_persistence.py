@@ -147,7 +147,9 @@ def test_contract_semantic_judgment_rejects_timeline_and_identity_edges():
         "supporting_evidence_ids": ["e1"],
         "confidence": 0.9,
     }
-    assert RelationshipSemanticJudgment.model_validate(base).relation_type.value == "ally"
+    assert (
+        RelationshipSemanticJudgment.model_validate(base).relation_type.value == "ally"
+    )
     for bad in ("causes", "precedes", "same_entity"):
         with pytest.raises(ValidationError):
             RelationshipSemanticJudgment.model_validate({**base, "relation_type": bad})
@@ -274,7 +276,13 @@ def test_contract_override_columns_include_supersession_and_relink():
     identity_cols = set(inspect(CharacterIdentityOverride).columns.keys())
     override_cols = set(inspect(RelationshipOverride).columns.keys())
     for cols in (identity_cols, override_cols):
-        assert {"author", "reason", "evidence_signature", "supersedes_id", "status"} <= cols
+        assert {
+            "author",
+            "reason",
+            "evidence_signature",
+            "supersedes_id",
+            "status",
+        } <= cols
 
 
 # ---------------------------------------------------------------------------
@@ -299,7 +307,7 @@ def test_migration_from_phase08_head_creates_relationship_tables(
 
     run_alembic("upgrade", "head", database_url=empty_postgres)
     current = run_alembic("current", database_url=empty_postgres)
-    assert "11relobserve01" in (current.stdout + current.stderr)
+    assert "18appsetting1" in (current.stdout + current.stderr)
 
     engine = create_engine(empty_postgres)
     with engine.connect() as conn:
@@ -402,14 +410,14 @@ def test_postgres_append_only_rejects_update_and_delete(
             },
         )
         prior = conn.execute(
-            text(
-                "SELECT status, reason FROM relationship_overrides WHERE id = :id"
-            ),
+            text("SELECT status, reason FROM relationship_overrides WHERE id = :id"),
             {"id": ids["override_id"]},
         ).one()
         assert prior.status == "active"
         assert prior.reason == "initial correction"
-        total = conn.execute(text("SELECT COUNT(*) FROM relationship_overrides")).scalar()
+        total = conn.execute(
+            text("SELECT COUNT(*) FROM relationship_overrides")
+        ).scalar()
         assert total == 2
     engine.dispose()
 

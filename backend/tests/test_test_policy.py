@@ -64,7 +64,9 @@ def load_schema() -> dict[str, Any]:
         return json.load(fh)
 
 
-def validate_schema(policy: dict[str, Any], schema: dict[str, Any] | None = None) -> None:
+def validate_schema(
+    policy: dict[str, Any], schema: dict[str, Any] | None = None
+) -> None:
     schema = schema or load_schema()
     validator = Draft202012Validator(schema)
     errors = sorted(validator.iter_errors(policy), key=lambda e: list(e.path))
@@ -85,7 +87,9 @@ def resolve_side_globs(side_root: Path, globs: list[str]) -> list[Path]:
     return sorted({p.resolve() for p in hits})
 
 
-def assert_critical_globs_hit(policy: dict[str, Any], repo_root: Path = REPO_ROOT) -> None:
+def assert_critical_globs_hit(
+    policy: dict[str, Any], repo_root: Path = REPO_ROOT
+) -> None:
     """Critical coverage globs must resolve to at least one file (zero hits → fail)."""
     for side in ("backend", "frontend"):
         globs = policy["coverage"][side]["critical"]["globs"]
@@ -132,7 +136,10 @@ def evaluate_coverage_report(
     for side in ("backend", "frontend"):
         measured_side = report.get(side) or {}
         overall_req = cov[side]["overall"]
-        critical_req = {"line": cov[side]["critical"]["line"], "branch": cov[side]["critical"]["branch"]}
+        critical_req = {
+            "line": cov[side]["critical"]["line"],
+            "branch": cov[side]["critical"]["branch"],
+        }
         failures.extend(
             evaluate_line_branch(
                 f"{side}.overall",
@@ -159,7 +166,9 @@ def evaluate_coverage_report(
         raise PolicyError("Coverage policy failed:\n  - " + "\n  - ".join(failures))
 
 
-def evaluate_flake(policy: dict[str, Any], pr_flake_count: int, infra_retries: int) -> None:
+def evaluate_flake(
+    policy: dict[str, Any], pr_flake_count: int, infra_retries: int
+) -> None:
     if pr_flake_count > policy["flake"]["pr_max"]:
         raise PolicyError(
             f"PR flake count {pr_flake_count} exceeds pr_max={policy['flake']['pr_max']}"
@@ -305,7 +314,10 @@ class TestPolicyNegativeCases:
         low = load_yaml(FIXTURES / "coverage-policy-low.yml")
         # structure is intentionally complete enough for schema, but values are low
         validate_schema(low)
-        assert low["coverage"]["backend"]["overall"]["line"] < LOCKED_BACKEND_OVERALL["line"]
+        assert (
+            low["coverage"]["backend"]["overall"]["line"]
+            < LOCKED_BACKEND_OVERALL["line"]
+        )
 
 
 class TestMarkerAndTimeoutContract:

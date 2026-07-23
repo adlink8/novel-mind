@@ -385,10 +385,16 @@ async def test_evidence_ref_keys_are_unique_per_run(db_session: AsyncSession):
 
     await db_session.rollback()
     existing_refs = (
-        await db_session.execute(select(KnowledgeEvidenceRef).where(
-            KnowledgeEvidenceRef.run_id == run_id
-        ))
-    ).scalars().all()
+        (
+            await db_session.execute(
+                select(KnowledgeEvidenceRef).where(
+                    KnowledgeEvidenceRef.run_id == run_id
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
     assert [ref.ref_key for ref in existing_refs] == ["ev-1"]
 
 

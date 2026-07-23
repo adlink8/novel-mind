@@ -104,9 +104,5 @@ def test_infer_provisional_type_still_heuristic_for_suggested_only():
     """Heuristics remain available for suggested_type / seed backfill."""
 
     infer = RelationshipGraphQueryService._infer_provisional_type
-    assert (
-        infer(title="对峙", description="双方僵持", event_type="conflict") == "enemy"
-    )
-    assert (
-        infer(title="会谈", description="平静交谈", event_type="character") == "ally"
-    )
+    assert infer(title="对峙", description="双方僵持", event_type="conflict") == "enemy"
+    assert infer(title="会谈", description="平静交谈", event_type="character") == "ally"

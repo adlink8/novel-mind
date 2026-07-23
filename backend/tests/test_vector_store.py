@@ -100,15 +100,23 @@ class TestAddChunks:
             documents=["第一段文本", "第二段文本"],
             embeddings=[[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]],
             metadatas=[
-                {"chapter_id": 1, "chunk_index": 0, "chunk_type": "paragraph", "word_count": 100},
-                {"chapter_id": 1, "chunk_index": 1, "chunk_type": "dialogue", "word_count": 80},
+                {
+                    "chapter_id": 1,
+                    "chunk_index": 0,
+                    "chunk_type": "paragraph",
+                    "word_count": 100,
+                },
+                {
+                    "chapter_id": 1,
+                    "chunk_index": 1,
+                    "chunk_type": "dialogue",
+                    "word_count": 80,
+                },
             ],
         )
 
     @pytest.mark.asyncio
-    async def test_add_chunks_empty_list(
-        self, vector_store, mock_chroma_client
-    ):
+    async def test_add_chunks_empty_list(self, vector_store, mock_chroma_client):
         """空列表不触发任何调用"""
         await vector_store.add_chunks(novel_id=1, chunks=[])
         mock_chroma_client.get_or_create_collection.assert_not_called()
@@ -124,7 +132,9 @@ class TestAddChunks:
         with pytest.raises(VectorStoreError, match="写入向量失败"):
             await vector_store.add_chunks(
                 novel_id=1,
-                chunks=[{"id": 1, "content": "text", "embedding": [0.1], "metadata": {}}],
+                chunks=[
+                    {"id": 1, "content": "text", "embedding": [0.1], "metadata": {}}
+                ],
             )
 
 
@@ -144,10 +154,12 @@ class TestSearch:
             "ids": [["chunk_1", "chunk_2"]],
             "documents": [["文本一", "文本二"]],
             "distances": [[0.2, 0.5]],
-            "metadatas": [[
-                {"chapter_id": 1, "chunk_type": "paragraph"},
-                {"chapter_id": 2, "chunk_type": "dialogue"},
-            ]],
+            "metadatas": [
+                [
+                    {"chapter_id": 1, "chunk_type": "paragraph"},
+                    {"chapter_id": 2, "chunk_type": "dialogue"},
+                ]
+            ],
         }
 
         results = await vector_store.search(
@@ -238,9 +250,7 @@ class TestSearch:
             "metadatas": [[{}]],
         }
 
-        results = await vector_store.search(
-            novel_id=1, query_embedding=[0.1]
-        )
+        results = await vector_store.search(novel_id=1, query_embedding=[0.1])
         # score = 1 - 1.5 = -0.5，被 clamp 到 0
         assert results[0]["score"] == pytest.approx(0.0)
 
@@ -263,17 +273,13 @@ class TestDeleteNovelChunks:
     """测试 delete_novel_chunks 集合删除"""
 
     @pytest.mark.asyncio
-    async def test_delete_calls_correctly(
-        self, vector_store, mock_chroma_client
-    ):
+    async def test_delete_calls_correctly(self, vector_store, mock_chroma_client):
         """验证调用 delete_collection 且集合名正确"""
         await vector_store.delete_novel_chunks(novel_id=42)
         mock_chroma_client.delete_collection.assert_called_once_with(name="novel_42")
 
     @pytest.mark.asyncio
-    async def test_delete_raises_on_error(
-        self, vector_store, mock_chroma_client
-    ):
+    async def test_delete_raises_on_error(self, vector_store, mock_chroma_client):
         """删除失败时抛出 VectorStoreError"""
         mock_chroma_client.delete_collection.side_effect = RuntimeError("not found")
 
@@ -310,9 +316,7 @@ class TestGetChunkCount:
         assert count == 0
 
     @pytest.mark.asyncio
-    async def test_count_returns_zero_on_error(
-        self, vector_store, mock_chroma_client
-    ):
+    async def test_count_returns_zero_on_error(self, vector_store, mock_chroma_client):
         """集合不存在或其他错误时返回 0（不抛异常）"""
         mock_chroma_client.get_or_create_collection.side_effect = RuntimeError(
             "collection not found"
@@ -351,9 +355,7 @@ class TestUpdateChunkStatus:
         """支持 pending 状态"""
         mock_chroma_client.get_or_create_collection.return_value = mock_collection
 
-        await vector_store.update_chunk_status(
-            novel_id=1, chunk_id=5, status="pending"
-        )
+        await vector_store.update_chunk_status(novel_id=1, chunk_id=5, status="pending")
 
         mock_collection.update.assert_called_once_with(
             ids=["chunk_5"],
@@ -367,9 +369,7 @@ class TestUpdateChunkStatus:
         """支持 failed 状态"""
         mock_chroma_client.get_or_create_collection.return_value = mock_collection
 
-        await vector_store.update_chunk_status(
-            novel_id=1, chunk_id=3, status="failed"
-        )
+        await vector_store.update_chunk_status(novel_id=1, chunk_id=3, status="failed")
 
         mock_collection.update.assert_called_once_with(
             ids=["chunk_3"],

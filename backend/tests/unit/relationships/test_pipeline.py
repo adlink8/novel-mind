@@ -33,7 +33,12 @@ HEX64_B = "b" * 64
 HEX64_C = "c" * 64
 
 
-def _unit(eid: str = "ev-1", chapter: int = 1, narrative_index: int = 0, text: str = "Alice and Bob became allies."):
+def _unit(
+    eid: str = "ev-1",
+    chapter: int = 1,
+    narrative_index: int = 0,
+    text: str = "Alice and Bob became allies.",
+):
     return make_evidence_unit(
         evidence_id=eid,
         chapter_id=10 + chapter,
@@ -148,7 +153,10 @@ def test_evidence_package_contains_no_full_novel_and_enumerates_ids():
     assert "full_novel" not in blob
     assert "chapter_content" not in blob
     assert set(payload["allowed_evidence_ids"]) == {"ev-1", "ev-2"}
-    assert all(item["evidence_id"] in payload["allowed_evidence_ids"] for item in payload["evidence"])
+    assert all(
+        item["evidence_id"] in payload["allowed_evidence_ids"]
+        for item in payload["evidence"]
+    )
     # Recall scores stay metadata only.
     assert payload["recall_signals"]["vector"]["score"] == 0.99
     assert "confidence" not in payload["candidate"] if "candidate" in payload else True
@@ -181,7 +189,11 @@ def test_judgment_rejects_out_of_package_and_injection_noise():
     package = _package()
     service = RelationshipJudgmentService(model_name="test/model")
 
-    forged = _judgment_payload(package, supporting_evidence_ids=["ev-forged"], valid_from_evidence_id="ev-forged")
+    forged = _judgment_payload(
+        package,
+        supporting_evidence_ids=["ev-forged"],
+        valid_from_evidence_id="ev-forged",
+    )
     result = service.parse_and_validate(forged, package=package)
     assert result.status == "evidence_failed"
     assert result.structured is None
@@ -222,7 +234,11 @@ async def test_judgment_call_skipped_on_deterministic_and_cache():
     assert first.structured is not None
 
     # Populate cache via parse path.
-    service._exact_cache[service.cache_key_for(package, model_name="test/model", policy_hash_value=policy)] = {
+    service._exact_cache[
+        service.cache_key_for(
+            package, model_name="test/model", policy_hash_value=policy
+        )
+    ] = {
         "status": "ok",
         "structured_output": payload,
     }
@@ -326,8 +342,14 @@ class _FakeChat:
         if isinstance(self.content, Exception):
             raise self.content
         if isinstance(self.content, dict):
-            return {"content": json.dumps(self.content), "usage": {"prompt_tokens": 10, "completion_tokens": 5}}
-        return {"content": self.content, "usage": {"prompt_tokens": 10, "completion_tokens": 5}}
+            return {
+                "content": json.dumps(self.content),
+                "usage": {"prompt_tokens": 10, "completion_tokens": 5},
+            }
+        return {
+            "content": self.content,
+            "usage": {"prompt_tokens": 10, "completion_tokens": 5},
+        }
 
 
 @pytest.mark.asyncio

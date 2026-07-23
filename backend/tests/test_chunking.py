@@ -165,7 +165,12 @@ class TestParagraphMerging:
     async def test_short_paragraph_merging(self, chunking_service: ChunkingService):
         """短段落合并：连续短段落应合并"""
         # 构造多个短段落（每个 < 50 字）
-        paragraphs = ["短段落一。", "短段落二。", "短段落三。", "这是一个稍长一些的段落，超过五十个字的限制。" * 2]
+        paragraphs = [
+            "短段落一。",
+            "短段落二。",
+            "短段落三。",
+            "这是一个稍长一些的段落，超过五十个字的限制。" * 2,
+        ]
         content = "\n".join(paragraphs)
         chunks = await chunking_service.chunk_chapter(
             chapter_id=1, chapter_number=1, content=content
@@ -177,7 +182,9 @@ class TestParagraphMerging:
     async def test_long_paragraph_not_merged(self, chunking_service: ChunkingService):
         """长段落不合并"""
         # 构造一个长段落（> 50 字）
-        long_paragraph = "这是一个很长的段落，包含了足够的内容，不会被与其他段落合并。" * 10
+        long_paragraph = (
+            "这是一个很长的段落，包含了足够的内容，不会被与其他段落合并。" * 10
+        )
         content = long_paragraph
         chunks = await chunking_service.chunk_chapter(
             chapter_id=1, chapter_number=1, content=content
@@ -213,7 +220,7 @@ class TestLongParagraphSplitting:
             content = chunk["content"]
             # 不应以标点符号开头（除了引号）
             if content and content[0] not in '""「':
-                assert content[0] not in '。！？；'
+                assert content[0] not in "。！？；"
 
 
 class TestChunkNovel:
@@ -270,21 +277,30 @@ class TestSplitIntoParagraphs:
     def test_basic_splitting(self, chunking_service: ChunkingService):
         """基本段落分割：长段落保持独立"""
         # 每个段落超过 50 字，不会被合并
-        content = "这是一个足够长的段落，超过五十个字的限制，不会被与其他段落合并处理，确保长度足够。" * 3
+        content = (
+            "这是一个足够长的段落，超过五十个字的限制，不会被与其他段落合并处理，确保长度足够。"
+            * 3
+        )
         content = content + "\n\n" + content + "\n\n" + content
         paragraphs = chunking_service._split_into_paragraphs(content)
         assert len(paragraphs) == 3
 
     def test_empty_lines_filtered(self, chunking_service: ChunkingService):
         """空行被过滤"""
-        content = "这是一个足够长的段落，超过五十个字的限制，确保长度足够长不会被合并处理。" * 3
+        content = (
+            "这是一个足够长的段落，超过五十个字的限制，确保长度足够长不会被合并处理。"
+            * 3
+        )
         content = content + "\n\n\n\n" + content
         paragraphs = chunking_service._split_into_paragraphs(content)
         assert len(paragraphs) == 2
 
     def test_whitespace_stripped(self, chunking_service: ChunkingService):
         """首尾空白被去除"""
-        content = "这是一个足够长的段落，超过五十个字的限制，不会被合并处理，确保长度足够。" * 3
+        content = (
+            "这是一个足够长的段落，超过五十个字的限制，不会被合并处理，确保长度足够。"
+            * 3
+        )
         content = "  " + content + "  \n\n  " + content + "  "
         paragraphs = chunking_service._split_into_paragraphs(content)
         assert paragraphs[0].startswith("这是")
@@ -292,7 +308,10 @@ class TestSplitIntoParagraphs:
 
     def test_newline_normalization(self, chunking_service: ChunkingService):
         """换行符统一化"""
-        content = "这是一个足够长的段落，超过五十个字的限制，确保长度足够长不会被合并处理。" * 3
+        content = (
+            "这是一个足够长的段落，超过五十个字的限制，确保长度足够长不会被合并处理。"
+            * 3
+        )
         content = content + "\r\n" + content + "\r" + content
         paragraphs = chunking_service._split_into_paragraphs(content)
         assert len(paragraphs) == 3
@@ -300,7 +319,10 @@ class TestSplitIntoParagraphs:
     def test_short_paragraph_merging(self, chunking_service: ChunkingService):
         """短段落合并（< 50 字）：短段落持续合并直到达到阈值"""
         # 短段落会被合并在一起，直到总长度 >= 50
-        long_text = "这是一个足够长的段落，超过五十个字的限制，不会被合并处理，确保长度足够。" * 3
+        long_text = (
+            "这是一个足够长的段落，超过五十个字的限制，不会被合并处理，确保长度足够。"
+            * 3
+        )
         content = "短一\n短二\n" + long_text
         paragraphs = chunking_service._split_into_paragraphs(content)
         # "短一"、"短二" 合并后仍不足 50 字，会继续与长段落合并成一个
@@ -312,7 +334,10 @@ class TestSplitIntoParagraphs:
     def test_short_then_long_split(self, chunking_service: ChunkingService):
         """短段落合并后达到阈值则分开"""
         # 短段落合并后 >= 50 字时，下一段独立
-        long_text = "这是一个足够长的段落，超过五十个字的限制，不会被合并处理，确保长度足够。" * 3
+        long_text = (
+            "这是一个足够长的段落，超过五十个字的限制，不会被合并处理，确保长度足够。"
+            * 3
+        )
         # 用一个 50+ 字的段落作为第一个，短段落作为第二个
         content = long_text + "\n" + "短段落" + "\n" + long_text
         paragraphs = chunking_service._split_into_paragraphs(content)

@@ -76,7 +76,9 @@ def test_arc_package_retains_direct_leaf_links() -> None:
     assert package.nodes[0].node_kind == NodeKind.STORY_ARC
     assert len(package.edges) == 2
     assert all(link.source_kind.value == "hierarchy" for link in package.source_links)
-    assert all(link.evidence_node_id.startswith("leaf-") for link in package.source_links)
+    assert all(
+        link.evidence_node_id.startswith("leaf-") for link in package.source_links
+    )
 
 
 def test_arc_package_rejects_empty_children() -> None:

@@ -30,7 +30,9 @@ ARTIFACTS = BACKEND / "artifacts"
 def _run_oasdiff(base: Path, revision: Path) -> subprocess.CompletedProcess[str]:
     binary = shutil.which("oasdiff")
     if not binary:
-        pytest.skip("oasdiff not on PATH; install via go install github.com/oasdiff/oasdiff@v1.17.0")
+        pytest.skip(
+            "oasdiff not on PATH; install via go install github.com/oasdiff/oasdiff@v1.17.0"
+        )
     return subprocess.run(
         [binary, "breaking", str(base), str(revision), "--fail-on", "ERR"],
         capture_output=True,
@@ -40,7 +42,9 @@ def _run_oasdiff(base: Path, revision: Path) -> subprocess.CompletedProcess[str]
     )
 
 
-def _run_python_breaking(base: Path, revision: Path) -> subprocess.CompletedProcess[str]:
+def _run_python_breaking(
+    base: Path, revision: Path
+) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [
             sys.executable,
@@ -71,7 +75,9 @@ def _export_live_schema(dest: Path) -> Path:
 
 
 def test_baseline_exists_and_is_valid_openapi():
-    assert BASELINE.is_file(), "openapi-baseline.json missing — freeze via export_openapi.py"
+    assert BASELINE.is_file(), (
+        "openapi-baseline.json missing — freeze via export_openapi.py"
+    )
     doc = json.loads(BASELINE.read_text(encoding="utf-8"))
     assert "openapi" in doc
     assert "paths" in doc
@@ -113,10 +119,14 @@ def test_nonbreaking_fixture_passes():
     assert NONBREAKING.is_file()
     if shutil.which("oasdiff"):
         proc = _run_oasdiff(BASELINE, NONBREAKING)
-        assert proc.returncode == 0, f"nonbreaking should pass:\n{proc.stdout}\n{proc.stderr}"
+        assert proc.returncode == 0, (
+            f"nonbreaking should pass:\n{proc.stdout}\n{proc.stderr}"
+        )
     else:
         proc = _run_python_breaking(BASELINE, NONBREAKING)
-        assert proc.returncode == 0, f"nonbreaking should pass:\n{proc.stdout}\n{proc.stderr}"
+        assert proc.returncode == 0, (
+            f"nonbreaking should pass:\n{proc.stdout}\n{proc.stderr}"
+        )
 
 
 def test_breaking_fixture_fails():

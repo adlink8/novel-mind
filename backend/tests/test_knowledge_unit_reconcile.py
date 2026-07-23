@@ -109,9 +109,7 @@ async def test_active_scope_fails_closed_and_selects_one_of_multiple_pointers(
         await resolve_active_build_id(db_session, pointer_id=pointers[1].id)
         == second.id
     )
-    assert (
-        await resolve_active_build_id(db_session, domain="fiction") == first.id
-    )
+    assert await resolve_active_build_id(db_session, domain="fiction") == first.id
 
 
 @pytest.mark.integration

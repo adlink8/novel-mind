@@ -30,9 +30,7 @@ def test_scan_spans_offsets_and_stable_ids():
 
 def test_every_adjacent_pair_has_one_proposal():
     text = "甲句。" * 5 + "翌日乙句。" * 5
-    spans, proposals = analyze_chapter(
-        chapter_id=2, chapter_number=1, content=text
-    )
+    spans, proposals = analyze_chapter(chapter_id=2, chapter_number=1, content=text)
     # N spans → N-1 adjacent + 2 chapter edges
     adj = [
         p
@@ -63,18 +61,18 @@ def test_hard_max_not_llm_eligible():
 
 def test_time_shift_emits_reason():
     text = "昨夜无事。" + "翌日清晨，山间起了雾。"
-    spans, proposals = analyze_chapter(
-        chapter_id=4, chapter_number=1, content=text
-    )
+    spans, proposals = analyze_chapter(chapter_id=4, chapter_number=1, content=text)
     codes = {c for p in proposals for c in p.reason_codes}
-    assert "TIME_SHIFT" in codes or "LOCATION_SHIFT" in codes or "STRUCTURAL_BREAK" in codes
+    assert (
+        "TIME_SHIFT" in codes
+        or "LOCATION_SHIFT" in codes
+        or "STRUCTURAL_BREAK" in codes
+    )
 
 
 def test_open_quote_marks_risk_and_not_hard():
     text = "他说：“这事还没完。" + "第二天继续说下去。"
-    spans, proposals = analyze_chapter(
-        chapter_id=5, chapter_number=1, content=text
-    )
+    spans, proposals = analyze_chapter(chapter_id=5, chapter_number=1, content=text)
     open_q = [p for p in proposals if "OPEN_QUOTE" in p.reason_codes]
     # May or may not trigger depending on quote pairing; if present must be non-hard
     for p in open_q:
@@ -92,9 +90,7 @@ def test_proposals_deterministic():
 
 def test_llm_eligible_only_below_auto_accept_and_non_hard():
     text = "普通叙述一句。" * 8 + "另一段普通叙述。" * 8
-    spans, proposals = analyze_chapter(
-        chapter_id=7, chapter_number=1, content=text
-    )
+    spans, proposals = analyze_chapter(chapter_id=7, chapter_number=1, content=text)
     for p in proposals:
         if p.hard_constraint:
             assert p.llm_eligible is False

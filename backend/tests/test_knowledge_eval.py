@@ -58,7 +58,10 @@ def test_history_and_fiction_share_core_pipeline_with_different_ontology_profile
     fiction_report = evaluate_fixture(load_fixture(FICTION_FIXTURE), dry_run=True)
     history_report = evaluate_fixture(load_fixture(HISTORY_FIXTURE), dry_run=True)
 
-    assert fiction_report["pipeline"]["core_steps"] == history_report["pipeline"]["core_steps"]
+    assert (
+        fiction_report["pipeline"]["core_steps"]
+        == history_report["pipeline"]["core_steps"]
+    )
     assert fiction_report["ontology_profile"] == "fiction.v1"
     assert history_report["ontology_profile"] == "history.v1"
     assert "romantic" in RELATION_TYPES_BY_DOMAIN_PROFILE["fiction"]

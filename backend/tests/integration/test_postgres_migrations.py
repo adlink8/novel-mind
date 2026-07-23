@@ -19,7 +19,7 @@ from tests.integration.conftest import reset_public_schema, run_alembic
 
 pytestmark = pytest.mark.integration
 
-EXPECTED_HEAD = "e5b8c20d4a73"
+EXPECTED_HEAD = "18appsetting1"
 # Intermediate revision after ownership + import jobs merge path, before eval/narrative.
 HISTORICAL_REVISION = "c2860beb647d"  # tsvector restore — mid-chain checkpoint
 
@@ -55,7 +55,9 @@ def test_empty_db_upgrade_current_check_history(empty_postgres, pg_async_url):
     assert EXPECTED_HEAD in current.stdout
 
     check = run_alembic("check", database_url=sync_url)
-    assert check.returncode == 0, f"alembic check failed:\n{check.stdout}\n{check.stderr}"
+    assert check.returncode == 0, (
+        f"alembic check failed:\n{check.stdout}\n{check.stderr}"
+    )
 
     history = run_alembic("history", database_url=sync_url)
     assert EXPECTED_HEAD in history.stdout
@@ -132,7 +134,9 @@ def test_sqlite_not_used_for_postgres_conclusion(pg_sync_url, require_postgres):
     with engine.connect() as conn:
         version = conn.execute(text("SHOW server_version")).scalar()
         assert version is not None
-        assert str(version).startswith("16."), f"expected PostgreSQL 16.x, got {version}"
+        assert str(version).startswith("16."), (
+            f"expected PostgreSQL 16.x, got {version}"
+        )
     engine.dispose()
 
 
@@ -151,5 +155,5 @@ def test_reset_schema_is_isolated(empty_postgres):
         assert count == 0
     engine.dispose()
     # Re-seed so subsequent tests in the same session can rely on migrations if needed.
-    run_alembic("upgrade", "heads", database_url=empty_postgres)
     reset_public_schema(empty_postgres)
+    run_alembic("upgrade", "heads", database_url=empty_postgres)

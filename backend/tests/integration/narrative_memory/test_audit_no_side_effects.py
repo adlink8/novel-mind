@@ -33,7 +33,9 @@ async def _authority_snapshot(session) -> dict[str, object]:
         CluePointerJournal,
     )
     counts = {
-        model.__tablename__: await session.scalar(select(func.count()).select_from(model))
+        model.__tablename__: await session.scalar(
+            select(func.count()).select_from(model)
+        )
         for model in models
     }
     chunk_pointers = tuple(
@@ -55,13 +57,22 @@ async def _authority_snapshot(session) -> dict[str, object]:
     clue_pointers = tuple(
         (row.owner_id, row.novel_id, row.version_id, row.revision)
         for row in (
-            await session.scalars(select(ClueActivePointer).order_by(ClueActivePointer.id))
+            await session.scalars(
+                select(ClueActivePointer).order_by(ClueActivePointer.id)
+            )
         ).all()
     )
     return {
         "counts": counts,
         "builds": tuple(
-            (row.build_id, row.novel_id, row.status, row.immutable, row.is_candidate, row.manifest_checksum)
+            (
+                row.build_id,
+                row.novel_id,
+                row.status,
+                row.immutable,
+                row.is_candidate,
+                row.manifest_checksum,
+            )
             for row in (
                 await session.scalars(select(ChunkBuild).order_by(ChunkBuild.id))
             ).all()
@@ -165,7 +176,9 @@ async def test_fresh_observer_wraps_real_api_and_cli_for_exact_and_blocked_cases
     async with factory() as setup:
         build = await setup.scalar(
             select(ChunkBuild)
-            .join(ChunkActivePointer, ChunkActivePointer.build_id == ChunkBuild.build_id)
+            .join(
+                ChunkActivePointer, ChunkActivePointer.build_id == ChunkBuild.build_id
+            )
             .where(ChunkActivePointer.novel_id == novel_id)
         )
         build.immutable = False

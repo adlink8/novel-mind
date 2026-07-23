@@ -44,9 +44,7 @@ def _node(
 
 
 def _edge(src: int, tgt: int, edge_type: str = "contains"):
-    return SimpleNamespace(
-        source_node_id=src, target_node_id=tgt, edge_type=edge_type
-    )
+    return SimpleNamespace(source_node_id=src, target_node_id=tgt, edge_type=edge_type)
 
 
 def _claim(
@@ -152,9 +150,7 @@ def test_tree_assembly_child_ids_and_order():
 
 
 def test_candidate_preview_always_on_product_nodes():
-    nodes = assemble_structure_nodes(
-        [_node(1, "cs-1", "chapter_state", 1, 1)], []
-    )
+    nodes = assemble_structure_nodes([_node(1, "cs-1", "chapter_state", 1, 1)], [])
     assert PUBLICATION_STATUS == "candidate_preview"
     # tree response field is fixed at construction sites
     from app.schemas.narrative_memory_product import NmStructureTreeResponse
@@ -182,8 +178,7 @@ def test_claims_cutoff():
 def test_claim_summary_from_payload():
     assert claim_summary_text({"summary": "  hero leaves  "}) == "hero leaves"
     assert (
-        claim_summary_text({"outcome": {"value_kind": "text", "value": "ok"}})
-        == "ok"
+        claim_summary_text({"outcome": {"value_kind": "text", "value": "ok"}}) == "ok"
     )
     assert claim_summary_text({"event_kind": "battle"}) == "battle"
 
@@ -197,10 +192,7 @@ def test_readiness_sealed_and_incomplete():
         )
         == "sealed_candidate"
     )
-    assert (
-        compute_readiness(total_nodes=1, has_manifest=False)
-        == "incomplete"
-    )
+    assert compute_readiness(total_nodes=1, has_manifest=False) == "incomplete"
     assert (
         compute_readiness(
             total_nodes=4,

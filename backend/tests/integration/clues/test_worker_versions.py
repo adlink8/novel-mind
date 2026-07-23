@@ -55,8 +55,18 @@ async def _seed_hierarchy(db_session, *, title: str = "Clue worker novel"):
     db_session.add(novel)
     await db_session.flush()
     chapters = [
-        Chapter(novel_id=novel.id, chapter_number=1, title="One", content="A sealed letter appears."),
-        Chapter(novel_id=novel.id, chapter_number=3, title="Three", content="The letter is opened at last."),
+        Chapter(
+            novel_id=novel.id,
+            chapter_number=1,
+            title="One",
+            content="A sealed letter appears.",
+        ),
+        Chapter(
+            novel_id=novel.id,
+            chapter_number=3,
+            title="Three",
+            content="The letter is opened at last.",
+        ),
     ]
     db_session.add_all(chapters)
     await db_session.flush()
@@ -118,7 +128,9 @@ def _deployment(*, unknown_price: bool = False) -> ClueModelDeployment:
     )
 
 
-def _judgment_for_candidate(candidate_id: str, cue_id: str, later_id: str | None = None) -> dict:
+def _judgment_for_candidate(
+    candidate_id: str, cue_id: str, later_id: str | None = None
+) -> dict:
     payload = {
         "schema_version": "clue-semantic-judgment.v1",
         "candidate_id": candidate_id,
@@ -160,7 +172,10 @@ async def test_worker_promotes_version_and_restart_is_idempotent(
     # package-aware approach: monkeypatch recall to one draft.
 
     from app.services.clues.candidates import ClueCandidateDraft
-    from app.services.clues.evidence import make_clue_evidence_unit, build_clue_evidence_package
+    from app.services.clues.evidence import (
+        make_clue_evidence_unit,
+        build_clue_evidence_package,
+    )
 
     cue = make_clue_evidence_unit(
         evidence_id="ev-cue",
@@ -204,7 +219,9 @@ async def test_worker_promotes_version_and_restart_is_idempotent(
         async def build_candidates_from_nodes(self, **kwargs):
             from app.services.clues.candidates import CandidateRecallResult
 
-            return CandidateRecallResult(drafts=[draft], hierarchy_build_id=package.hierarchy_build_id)
+            return CandidateRecallResult(
+                drafts=[draft], hierarchy_build_id=package.hierarchy_build_id
+            )
 
     judgment = _judgment_for_candidate("clue-cand-seal", "ev-cue", "ev-later")
     runtime = await _runtime(db_session, outputs={"clue-cand-seal": judgment})
@@ -223,7 +240,12 @@ async def test_worker_promotes_version_and_restart_is_idempotent(
     db_session.expire_all()
     run = await db_session.get(ClueAnalysisRun, run_id)
     assert run is not None
-    assert run.status == "completed", (run.status, run.status_reason, run.progress, run.checkpoint)
+    assert run.status == "completed", (
+        run.status,
+        run.status_reason,
+        run.progress,
+        run.checkpoint,
+    )
     version_id = run.version_id
     pointer = await db_session.scalar(
         select(ClueActivePointer).where(
@@ -277,7 +299,10 @@ async def test_worker_promotes_version_and_restart_is_idempotent(
 async def test_unknown_pricing_pauses_before_provider_call(db_session, monkeypatch):
     owner, novel, chapters = await _seed_hierarchy(db_session, title="Budget novel")
     from app.services.clues.candidates import ClueCandidateDraft, CandidateRecallResult
-    from app.services.clues.evidence import make_clue_evidence_unit, build_clue_evidence_package
+    from app.services.clues.evidence import (
+        make_clue_evidence_unit,
+        build_clue_evidence_package,
+    )
 
     cue = make_clue_evidence_unit(
         evidence_id="ev-b",

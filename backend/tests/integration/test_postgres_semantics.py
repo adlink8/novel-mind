@@ -181,14 +181,10 @@ async def test_owner_isolation(session_factory):
 
     async with session_factory() as session:
         a_novels = list(
-            (
-                await session.scalars(select(Novel).where(Novel.owner_id == a_id))
-            ).all()
+            (await session.scalars(select(Novel).where(Novel.owner_id == a_id))).all()
         )
         b_novels = list(
-            (
-                await session.scalars(select(Novel).where(Novel.owner_id == b_id))
-            ).all()
+            (await session.scalars(select(Novel).where(Novel.owner_id == b_id))).all()
         )
         assert len(a_novels) == 1 and a_novels[0].title == "A Book"
         assert len(b_novels) == 1 and b_novels[0].title == "B Book"

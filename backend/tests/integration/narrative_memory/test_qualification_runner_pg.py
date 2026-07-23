@@ -124,7 +124,9 @@ async def test_paired_runner_pg(empty_postgres: str, pg_async_url: str):
             cases = []
             for case in fixture.cases:
                 golds = [
-                    leaf.model_copy(update={"chapter_id": chapters[leaf.chapter_number]})
+                    leaf.model_copy(
+                        update={"chapter_id": chapters[leaf.chapter_number]}
+                    )
                     for leaf in case.gold_leaves
                 ]
                 cases.append(case.model_copy(update={"gold_leaves": tuple(golds)}))

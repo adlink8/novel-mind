@@ -73,9 +73,7 @@ def test_legal_transition_table():
 def test_active_requires_cue_evidence():
     with pytest.raises(LifecycleTransitionError, match="cue"):
         validate_evidence_for_transition("candidate", "active", [])
-    validate_evidence_for_transition(
-        "candidate", "active", [_ev("c1", "cue", 1)]
-    )
+    validate_evidence_for_transition("candidate", "active", [_ev("c1", "cue", 1)])
 
 
 def test_reinforced_requires_new_reinforcement_identity():
@@ -98,9 +96,7 @@ def test_paid_off_requires_distinct_later_payoff():
     cue = _ev("c1", "cue", 1, start=0, end=30, content_hash=HEX64)
     payoff = _ev("p1", "payoff", 8, start=5, end=40, content_hash=HEX64_B)
 
-    validate_evidence_for_transition(
-        "reinforced", "paid_off", [cue, payoff]
-    )
+    validate_evidence_for_transition("reinforced", "paid_off", [cue, payoff])
 
     # Missing cue
     with pytest.raises(LifecycleTransitionError, match="cue"):

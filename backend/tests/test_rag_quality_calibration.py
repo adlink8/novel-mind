@@ -29,7 +29,9 @@ EVALS = Path(__file__).resolve().parents[1] / "evals"
 CREATED = datetime(2026, 7, 12, 12, 0, 0, tzinfo=timezone.utc)
 
 
-def _judge_lineage(prompt_hash: str, schema_hash: str, rev: str = "gemma-cal-rev-1") -> ModelLineage:
+def _judge_lineage(
+    prompt_hash: str, schema_hash: str, rev: str = "gemma-cal-rev-1"
+) -> ModelLineage:
     return resolve_lineage(
         provider="ollama",
         model_family="gemma",

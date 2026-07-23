@@ -141,7 +141,11 @@ async def _seed(session: AsyncSession):
             content=content,
             word_count=len(content),
         )
-        for number, content in ((1, "甲乙丙丁戊己"), (2, "庚辛壬癸子丑"), (3, "寅卯辰巳午未"))
+        for number, content in (
+            (1, "甲乙丙丁戊己"),
+            (2, "庚辛壬癸子丑"),
+            (3, "寅卯辰巳午未"),
+        )
     ]
     session.add_all(chapters)
     await session.flush()
@@ -213,6 +217,7 @@ async def test_chapter_states_complete_with_budget_and_cache(builder_env) -> Non
         transport=transport,
         deployment=_deployment(),
     )
+
     # PostgresAuditSource needs a session — wrap it.
     class _Src:
         def __init__(self, sessions):

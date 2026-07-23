@@ -87,9 +87,7 @@ async def test_failed_chapter_blocks_only_containing_parent(builder_env) -> None
         ]
         assert len(chapter_ok) >= 2
         # Containing parent for chapter 2 is blocked or missing completion.
-        parents = [
-            s for s in stages if s.stage_kind == "arc_volume_aggregate"
-        ]
+        parents = [s for s in stages if s.stage_kind == "arc_volume_aggregate"]
         if parents:
             assert any(
                 p.status in {"blocked_dependency", "pending", "failed"} for p in parents

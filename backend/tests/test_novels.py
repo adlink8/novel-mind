@@ -49,7 +49,9 @@ async def _wait_for_import_job(
     raise AssertionError(f"导入超时 ({timeout}s), job_id={job_id}")
 
 
-async def _wait_for_import(auth_client: AsyncClient, novel_id: int, timeout: float = 5.0):
+async def _wait_for_import(
+    auth_client: AsyncClient, novel_id: int, timeout: float = 5.0
+):
     """兼容旧调用：按 novel_id 等待（仅当任务已关联小说时可用）。"""
     elapsed = 0.0
     interval = 0.1
@@ -402,9 +404,9 @@ async def test_update_reading_progress_success(auth_client: AsyncClient):
         },
     )
     assert upload_resp.status_code == 200
-    novel_id = (
-        await _wait_for_import_job(auth_client, upload_resp.json()["job_id"])
-    )["novel_id"]
+    novel_id = (await _wait_for_import_job(auth_client, upload_resp.json()["job_id"]))[
+        "novel_id"
+    ]
 
     # 获取章节ID
     chapters_resp = await auth_client.get(f"/api/novels/{novel_id}/chapters")
@@ -469,7 +471,13 @@ async def test_update_reading_progress_chapter_not_belong(auth_client: AsyncClie
 async def test_rename_novel(auth_client: AsyncClient):
     upload = await auth_client.post(
         "/api/novels/upload",
-        files={"file": ("旧书名.txt", io.BytesIO("第一章\n正文".encode("utf-8")), "text/plain")},
+        files={
+            "file": (
+                "旧书名.txt",
+                io.BytesIO("第一章\n正文".encode("utf-8")),
+                "text/plain",
+            )
+        },
     )
     status = await _wait_for_import_job(auth_client, upload.json()["job_id"])
     novel_id = status["novel_id"]
@@ -490,7 +498,13 @@ async def test_bulk_delete_novels(auth_client: AsyncClient):
     for filename in ("批量甲.txt", "批量乙.txt"):
         upload = await auth_client.post(
             "/api/novels/upload",
-            files={"file": (filename, io.BytesIO("第一章\n正文".encode("utf-8")), "text/plain")},
+            files={
+                "file": (
+                    filename,
+                    io.BytesIO("第一章\n正文".encode("utf-8")),
+                    "text/plain",
+                )
+            },
         )
         status = await _wait_for_import_job(auth_client, upload.json()["job_id"])
         novel_ids.append(status["novel_id"])

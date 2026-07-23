@@ -153,13 +153,17 @@ def test_list_and_detail_link_filter_agree_on_visible_set():
     cutoff = 3
     # Same predicate both surfaces must use.
     visible = [
-        link for link in links if _link_visible(link, cutoff=cutoff, evidence_rows=evidence)
+        link
+        for link in links
+        if _link_visible(link, cutoff=cutoff, evidence_rows=evidence)
     ]
     assert len(visible) == 2
     assert visible[0].supporting_evidence_ids == ["cue-1"]
     assert visible[1].supporting_evidence_ids == ["reinf-2"]
     # Full book: count matches unfiltered length.
     full = [
-        link for link in links if _link_visible(link, cutoff=None, evidence_rows=evidence)
+        link
+        for link in links
+        if _link_visible(link, cutoff=None, evidence_rows=evidence)
     ]
     assert len(full) == len(links)

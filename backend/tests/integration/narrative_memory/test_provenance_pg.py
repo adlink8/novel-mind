@@ -52,9 +52,7 @@ async def _seed_exact(session, *, unicode_content: bool = True):
     session.add(novel)
     await session.flush()
     contents = (
-        ("甲乙丙丁戊己", "庚辛壬癸子丑")
-        if unicode_content
-        else ("abcdef", "ghijkl")
+        ("甲乙丙丁戊己", "庚辛壬癸子丑") if unicode_content else ("abcdef", "ghijkl")
     )
     chapters = [
         Chapter(
@@ -302,9 +300,7 @@ async def _persist_candidate(session, *, reverse_nodes: bool = False):
         spec=_spec(),
         eligibility_report=report,
     )
-    package = await _package_for_version(
-        session, version, reverse_nodes=reverse_nodes
-    )
+    package = await _package_for_version(session, version, reverse_nodes=reverse_nodes)
     await authority.persist_package(
         owner_id=user.id,
         novel_id=novel.id,
@@ -328,12 +324,18 @@ async def test_unicode_reslice_and_seal_qualified_candidate(audit_pg_session):
     assert result.report.verdict == "qualified_candidate"
     assert result.manifest.manifest_checksum == result.manifest_checksum
     assert len(result.manifest_checksum) == 64
-    assert await audit_pg_session.scalar(
-        select(func.count()).select_from(NarrativeMemoryManifest)
-    ) == 1
-    assert await audit_pg_session.scalar(
-        select(func.count()).select_from(NarrativeMemoryValidationReport)
-    ) == 1
+    assert (
+        await audit_pg_session.scalar(
+            select(func.count()).select_from(NarrativeMemoryManifest)
+        )
+        == 1
+    )
+    assert (
+        await audit_pg_session.scalar(
+            select(func.count()).select_from(NarrativeMemoryValidationReport)
+        )
+        == 1
+    )
 
 
 @pytest.mark.asyncio
@@ -424,8 +426,7 @@ async def test_insertion_order_independent_manifests(audit_pg_session):
         version_id=version_b.id,
     )
     assert (
-        compute_manifest_from_snapshot(snap_b_reloaded).manifest_checksum
-        == checksum_b
+        compute_manifest_from_snapshot(snap_b_reloaded).manifest_checksum == checksum_b
     )
     assert checksum_a
     assert checksum_b

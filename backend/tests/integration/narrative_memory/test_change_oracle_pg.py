@@ -34,7 +34,10 @@ from app.services.narrative_memory.dependency_graph import (
     load_target_hierarchy,
 )
 from app.services.narrative_memory.manifests import seal_and_report
-from app.services.narrative_memory.rebuild_contracts import RebuildDecision, stable_checksum
+from app.services.narrative_memory.rebuild_contracts import (
+    RebuildDecision,
+    stable_checksum,
+)
 from tests.integration.conftest import run_alembic
 
 pytestmark = pytest.mark.integration
@@ -42,7 +45,9 @@ pytestmark = pytest.mark.integration
 HEX = "a" * 64
 
 
-def _spec(version_key: str, *, parent_version_id: int | None = None) -> CandidateVersionSpec:
+def _spec(
+    version_key: str, *, parent_version_id: int | None = None
+) -> CandidateVersionSpec:
     return CandidateVersionSpec(
         version_key=version_key,
         prompt_hash=HEX,

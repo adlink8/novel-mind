@@ -138,7 +138,9 @@ def test_middle_gap_and_overlap_fail() -> None:
         GraphClaimView(f"claim:{key}", key)
         for key in ("chapter:1", "chapter:3", "chapter:4")
     )
-    links = tuple(GraphLinkView(claim.claim_key, f"s:{claim.claim_key}") for claim in claims)
+    links = tuple(
+        GraphLinkView(claim.claim_key, f"s:{claim.claim_key}") for claim in claims
+    )
     result = validate_memory_graph(
         nodes=nodes,
         edges=edges,
@@ -170,7 +172,9 @@ def test_middle_gap_and_overlap_fail() -> None:
         GraphClaimView(f"c:{key}", key)
         for key in ("chapter:1", "chapter:2", "chapter:3")
     )
-    links = tuple(GraphLinkView(claim.claim_key, f"s:{claim.claim_key}") for claim in claims)
+    links = tuple(
+        GraphLinkView(claim.claim_key, f"s:{claim.claim_key}") for claim in claims
+    )
     overlap = validate_memory_graph(
         nodes=overlap_nodes,
         edges=overlap_edges,

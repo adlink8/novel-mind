@@ -117,13 +117,20 @@ def test_malformed_json_unsupported_enum_and_refusal():
     package = _package()
     service = ClueLLMJudgeService(model_name="test/clue")
 
-    assert service.parse_and_validate("not-json", package=package).status == "schema_failed"
+    assert (
+        service.parse_and_validate("not-json", package=package).status
+        == "schema_failed"
+    )
 
     bad_enum = _judgment(package, classification="resolved")
-    assert service.parse_and_validate(bad_enum, package=package).status == "schema_failed"
+    assert (
+        service.parse_and_validate(bad_enum, package=package).status == "schema_failed"
+    )
 
     refusal = "I cannot help with that request."
-    assert service.parse_and_validate(refusal, package=package).status == "schema_failed"
+    assert (
+        service.parse_and_validate(refusal, package=package).status == "schema_failed"
+    )
 
 
 @pytest.mark.asyncio

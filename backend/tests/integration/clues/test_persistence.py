@@ -288,7 +288,7 @@ def test_migration_from_reader_chat_head_creates_clue_tables(
 
     run_alembic("upgrade", "head", database_url=empty_postgres)
     current = run_alembic("current", database_url=empty_postgres)
-    assert "11cluetrack01" in (current.stdout + current.stderr)
+    assert "18appsetting1" in (current.stdout + current.stderr)
 
     engine = create_engine(empty_postgres)
     with engine.connect() as conn:
@@ -300,7 +300,9 @@ def test_migration_from_reader_chat_head_creates_clue_tables(
         # Adjacent tables untouched by migration fabrications.
         assert conn.execute(text("SELECT COUNT(*) FROM reader_messages")).scalar() == 0
         assert (
-            conn.execute(text("SELECT COUNT(*) FROM relationship_observations")).scalar()
+            conn.execute(
+                text("SELECT COUNT(*) FROM relationship_observations")
+            ).scalar()
             == 0
         )
     engine.dispose()
@@ -468,9 +470,10 @@ def test_postgres_illegal_transition_and_paid_off_order(
                 payoff_chapter=5,
                 payoff_source_start=10,
             )
-        assert "later_payoff" in str(exc.value).lower() or "paid_off" in str(
-            exc.value
-        ).lower()
+        assert (
+            "later_payoff" in str(exc.value).lower()
+            or "paid_off" in str(exc.value).lower()
+        )
 
     with engine.begin() as conn:
         event_id = _insert_lifecycle(
@@ -657,7 +660,9 @@ def test_postgres_link_exactly_one_target_and_pointer_cas_journal(
         jid = conn.execute(text("SELECT id FROM clue_pointer_journal LIMIT 1")).scalar()
         with pytest.raises(DBAPIError) as exc:
             conn.execute(
-                text("UPDATE clue_pointer_journal SET action = 'rollback' WHERE id = :id"),
+                text(
+                    "UPDATE clue_pointer_journal SET action = 'rollback' WHERE id = :id"
+                ),
                 {"id": jid},
             )
         assert "append_only_violation" in str(exc.value).lower()

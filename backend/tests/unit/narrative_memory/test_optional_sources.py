@@ -22,9 +22,7 @@ def test_optional_signal_round_trip_and_forbidden() -> None:
         signal_keys=(),
         lineage={"version_id": 1},
     )
-    assert (
-        OptionalSourceSignal.model_validate_json(signal.model_dump_json()) == signal
-    )
+    assert OptionalSourceSignal.model_validate_json(signal.model_dump_json()) == signal
     with pytest.raises(ValidationError):
         OptionalSourceSignal.model_validate(
             {

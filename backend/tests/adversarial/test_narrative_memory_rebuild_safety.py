@@ -11,7 +11,9 @@ from app.services.narrative_memory.carry_forward import carry_has_provider_capab
 from app.services.narrative_memory.change_oracle import oracle_has_provider_capability
 from app.services.narrative_memory.dependency_graph import graph_has_provider_capability
 from app.services.narrative_memory.rebuild_contracts import RebuildDecision
-from app.services.narrative_memory.rebuild_executor import executor_has_provider_capability
+from app.services.narrative_memory.rebuild_executor import (
+    executor_has_provider_capability,
+)
 from app.services.narrative_memory.reuse_report import report_has_provider_capability
 
 
@@ -92,7 +94,9 @@ def test_phase16_modules_ban_chat_provider_pointer_imports() -> None:
             for prefix in FORBIDDEN_IMPORT_PREFIXES:
                 assert not imp.startswith(prefix), f"{name} imports {imp}"
         calls = _call_names(tree)
-        assert FORBIDDEN_CALL_NAMES.isdisjoint(calls), f"{name}: {calls & FORBIDDEN_CALL_NAMES}"
+        assert FORBIDDEN_CALL_NAMES.isdisjoint(calls), (
+            f"{name}: {calls & FORBIDDEN_CALL_NAMES}"
+        )
         assert "from app.services.reader_chat" not in source
         assert "def set_active_pointer" not in source
         assert "def promote" not in source

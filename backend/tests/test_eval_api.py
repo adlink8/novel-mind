@@ -315,7 +315,11 @@ async def test_quality_from_novel_creates_durable_run_from_server_lineage(
     from app.models.chunk_build import ChunkActivePointer, ChunkBuild
     from app.models.eval import QualityRun
     from app.schemas.eval import CalibrationReport, EvalCase, ModelLineage
-    from app.services.rag_fixture import build_source_snapshot, freeze_eval_case, stable_hash
+    from app.services.rag_fixture import (
+        build_source_snapshot,
+        freeze_eval_case,
+        stable_hash,
+    )
     from app.services.rag_quality import default_healthy, recompute_chunker_config_hash
 
     await _register_and_login(client, "qfrom_ok")

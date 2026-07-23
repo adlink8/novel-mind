@@ -14,7 +14,9 @@ from app.services.narrative_memory.qualification_fixtures import (
     FIXTURES_DIR,
     load_frozen_bundle,
 )
-from app.services.narrative_memory.qualification_metrics import build_complete_report_cells
+from app.services.narrative_memory.qualification_metrics import (
+    build_complete_report_cells,
+)
 from app.services.narrative_memory.qualification_runner import run_qualification
 from app.services.narrative_memory.qualification_verdict import (
     evaluate_verdict,
@@ -29,7 +31,9 @@ HEX = "a" * 64
 
 def _policy() -> QualificationPolicy:
     return QualificationPolicy.model_validate(
-        __import__("json").loads((FIXTURES_DIR / "policy_v1.json").read_text(encoding="utf-8"))
+        __import__("json").loads(
+            (FIXTURES_DIR / "policy_v1.json").read_text(encoding="utf-8")
+        )
     )
 
 

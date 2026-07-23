@@ -277,7 +277,9 @@ async def test_complete_refresh_executes_release_chain(db_session, tmp_path):
     assert report.writes["pointer"] == report.writes["watermark"] == 1
 
 
-@pytest.mark.parametrize("interrupted_stage", ("indexed", "promoted", "post_reconciled"))
+@pytest.mark.parametrize(
+    "interrupted_stage", ("indexed", "promoted", "post_reconciled")
+)
 async def test_committed_failure_resumes_in_new_session_without_duplicate_artifacts(
     db_session, tmp_path, interrupted_stage
 ):
@@ -381,6 +383,14 @@ async def test_committed_failure_resumes_in_new_session_without_duplicate_artifa
         assert resumed.status == "committed"
         assert await fresh.scalar(select(NarrativeSourceWatermark)) is not None
         assert await fresh.scalar(select(NarrativeActivePointer)) is not None
-        assert await fresh.scalar(select(func.count()).select_from(NarrativeIndexBuild)) == 1
-        assert await fresh.scalar(select(func.count()).select_from(NarrativePromotionJournal)) == 1
+        assert (
+            await fresh.scalar(select(func.count()).select_from(NarrativeIndexBuild))
+            == 1
+        )
+        assert (
+            await fresh.scalar(
+                select(func.count()).select_from(NarrativePromotionJournal)
+            )
+            == 1
+        )
         assert indexer.calls == 1

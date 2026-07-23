@@ -129,13 +129,17 @@ async def test_prepare_rejects_legacy_and_non_passed(db_session: AsyncSession):
         await prepare_baseline_candidate(
             db_session, owner_id=user.id, job_id="job-legacy"
         )
-    assert "comparable" in e1.value.message.lower() or "legacy" in e1.value.message.lower()
+    assert (
+        "comparable" in e1.value.message.lower() or "legacy" in e1.value.message.lower()
+    )
 
     with pytest.raises(BaselineServiceError) as e2:
         await prepare_baseline_candidate(
             db_session, owner_id=user.id, job_id="job-queued"
         )
-    assert "eligible" in e2.value.message.lower() or "queued" in e2.value.message.lower()
+    assert (
+        "eligible" in e2.value.message.lower() or "queued" in e2.value.message.lower()
+    )
 
 
 @pytest.mark.asyncio
@@ -227,10 +231,14 @@ async def test_commit_rejects_tamper_leaves_active_unchanged(db_session: AsyncSe
 
     # History preserved — two candidates
     rows = (
-        await db_session.execute(
-            select(BaselineCandidate).where(BaselineCandidate.owner_id == user.id)
+        (
+            await db_session.execute(
+                select(BaselineCandidate).where(BaselineCandidate.owner_id == user.id)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     assert len(rows) == 2
     assert {r.state for r in rows} == {"committed", "rejected"}
 

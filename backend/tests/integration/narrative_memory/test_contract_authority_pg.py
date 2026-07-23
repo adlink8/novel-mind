@@ -101,7 +101,9 @@ def _version_spec(version_key: str = "memory-v1") -> CandidateVersionSpec:
     )
 
 
-async def _candidate_package(session, version: NarrativeMemoryVersion) -> CandidatePackage:
+async def _candidate_package(
+    session, version: NarrativeMemoryVersion
+) -> CandidatePackage:
     evidence = await session.scalar(
         select(ChunkHierarchyNode)
         .where(
@@ -208,7 +210,9 @@ async def test_exact_report_creates_explicit_version_and_persists_strict_package
     )
     await audit_pg_session.flush()
 
-    hierarchy = next(asset for asset in report.assets if asset.kind == AssetKind.HIERARCHY)
+    hierarchy = next(
+        asset for asset in report.assets if asset.kind == AssetKind.HIERARCHY
+    )
     build = await audit_pg_session.scalar(
         select(ChunkBuild).where(ChunkBuild.build_id == hierarchy.version_id)
     )
@@ -220,18 +224,30 @@ async def test_exact_report_creates_explicit_version_and_persists_strict_package
     assert persisted.version_id == version.id
     assert len(persisted.node_ids) == 3
     assert len(persisted.claim_ids) == 1
-    assert await audit_pg_session.scalar(
-        select(func.count()).select_from(NarrativeMemoryNode)
-    ) == 3
-    assert await audit_pg_session.scalar(
-        select(func.count()).select_from(NarrativeMemoryClaim)
-    ) == 1
-    assert await audit_pg_session.scalar(
-        select(func.count()).select_from(NarrativeMemoryEdge)
-    ) == 2
-    assert await audit_pg_session.scalar(
-        select(func.count()).select_from(NarrativeMemorySourceLink)
-    ) == 1
+    assert (
+        await audit_pg_session.scalar(
+            select(func.count()).select_from(NarrativeMemoryNode)
+        )
+        == 3
+    )
+    assert (
+        await audit_pg_session.scalar(
+            select(func.count()).select_from(NarrativeMemoryClaim)
+        )
+        == 1
+    )
+    assert (
+        await audit_pg_session.scalar(
+            select(func.count()).select_from(NarrativeMemoryEdge)
+        )
+        == 2
+    )
+    assert (
+        await audit_pg_session.scalar(
+            select(func.count()).select_from(NarrativeMemorySourceLink)
+        )
+        == 1
+    )
 
 
 @pytest.mark.asyncio
@@ -303,9 +319,12 @@ async def test_non_exact_or_wrong_scope_report_creates_no_candidate(audit_pg_ses
             eligibility_report=report,
         )
 
-    assert await audit_pg_session.scalar(
-        select(func.count()).select_from(NarrativeMemoryVersion)
-    ) == 0
+    assert (
+        await audit_pg_session.scalar(
+            select(func.count()).select_from(NarrativeMemoryVersion)
+        )
+        == 0
+    )
 
 
 def test_authority_has_no_provider_worker_pointer_or_consumer_capability() -> None:

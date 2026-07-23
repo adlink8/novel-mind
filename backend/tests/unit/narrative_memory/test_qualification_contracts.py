@@ -183,7 +183,10 @@ def test_qualification_kind_and_verdict_closed():
         QualificationVerdict.QUALIFIED_CANDIDATE,
         QualificationVerdict.BLOCKED,
     }
-    assert "promote" not in SCOPE_DISCLAIMER.lower() or "does not promote" in SCOPE_DISCLAIMER.lower()
+    assert (
+        "promote" not in SCOPE_DISCLAIMER.lower()
+        or "does not promote" in SCOPE_DISCLAIMER.lower()
+    )
 
 
 def test_frozen_fixture_json_loads_and_hashes():
@@ -221,9 +224,13 @@ def test_duplicate_case_key_rejected():
         _fixture(
             cases=(
                 _case(case_key="dup"),
-                _case(case_key="dup", bucket=QuestionBucket.NO_ANSWER,
-                      expected_answerability=ExpectedAnswerability.NO_ANSWER,
-                      gold_leaves=(), no_answer_rationale="x"),
+                _case(
+                    case_key="dup",
+                    bucket=QuestionBucket.NO_ANSWER,
+                    expected_answerability=ExpectedAnswerability.NO_ANSWER,
+                    gold_leaves=(),
+                    no_answer_rationale="x",
+                ),
             )
         )
 

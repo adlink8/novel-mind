@@ -30,7 +30,9 @@ sys.modules.setdefault("chromadb", _mock_chromadb)
 # ─────────── 辅助函数 ───────────
 
 
-async def _upload_test_novel(client: AsyncClient, filename: str = "rag_test.txt") -> int:
+async def _upload_test_novel(
+    client: AsyncClient, filename: str = "rag_test.txt"
+) -> int:
     """上传测试小说并返回 novel_id"""
     content = "第一章 初入江湖\n\n这是第一章的内容。\n\n第二章 拜师学艺\n\n这是第二章的内容。\n"
     resp = await client.post(
@@ -50,16 +52,18 @@ async def test_search_success(mock_service: AsyncMock, auth_client: AsyncClient)
     """搜索成功返回结果"""
     novel_id = await _upload_test_novel(auth_client)
 
-    mock_service.search_similar = AsyncMock(return_value=[
-        {
-            "chunk_id": 1,
-            "content": "第一章的内容",
-            "score": 0.95,
-            "chapter_id": 1,
-            "chunk_index": 0,
-            "chunk_type": "paragraph",
-        }
-    ])
+    mock_service.search_similar = AsyncMock(
+        return_value=[
+            {
+                "chunk_id": 1,
+                "content": "第一章的内容",
+                "score": 0.95,
+                "chapter_id": 1,
+                "chunk_index": 0,
+                "chunk_type": "paragraph",
+            }
+        ]
+    )
 
     resp = await auth_client.post(
         f"/api/novels/{novel_id}/search",
@@ -108,20 +112,24 @@ async def test_search_no_auth(mock_service: AsyncMock, client: AsyncClient):
 
 @pytest.mark.asyncio
 @patch("app.services.indexing_service.indexing_service")
-async def test_search_with_chunk_types(mock_service: AsyncMock, auth_client: AsyncClient):
+async def test_search_with_chunk_types(
+    mock_service: AsyncMock, auth_client: AsyncClient
+):
     """搜索时按 chunk_type 过滤"""
     novel_id = await _upload_test_novel(auth_client)
 
-    mock_service.search_similar = AsyncMock(return_value=[
-        {
-            "chunk_id": 1,
-            "content": "对话内容",
-            "score": 0.9,
-            "chapter_id": 1,
-            "chunk_index": 0,
-            "chunk_type": "dialogue",
-        }
-    ])
+    mock_service.search_similar = AsyncMock(
+        return_value=[
+            {
+                "chunk_id": 1,
+                "content": "对话内容",
+                "score": 0.9,
+                "chapter_id": 1,
+                "chunk_index": 0,
+                "chunk_type": "dialogue",
+            }
+        ]
+    )
 
     resp = await auth_client.post(
         f"/api/novels/{novel_id}/search",

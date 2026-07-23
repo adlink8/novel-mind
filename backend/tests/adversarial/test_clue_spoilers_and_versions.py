@@ -182,7 +182,9 @@ async def test_relationship_source_unavailable_is_explicit_not_empty_success():
     assert null_result.status == "source_unavailable"
     # Must not look like healthy empty success
     assert null_result.status != "empty"
-    assert null_result.recall_signals()["relationship"]["status"] == "source_unavailable"
+    assert (
+        null_result.recall_signals()["relationship"]["status"] == "source_unavailable"
+    )
 
 
 def test_cross_owner_scope_rejected_by_gate():
@@ -223,7 +225,10 @@ def test_cross_owner_scope_rejected_by_gate():
         novel_id=20,
     )
     assert decision.accepted is False
-    assert any("scope" in f for f in decision.gate_failures) or "scope_failed" in decision.reason_codes
+    assert (
+        any("scope" in f for f in decision.gate_failures)
+        or "scope_failed" in decision.reason_codes
+    )
 
 
 def test_critical_adversarial_counts_are_zero_on_gate_set():

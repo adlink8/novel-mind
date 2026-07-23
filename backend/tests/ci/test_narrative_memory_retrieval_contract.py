@@ -42,12 +42,7 @@ FORBIDDEN_CALL_NAMES = {
 
 
 def _nm_root() -> Path:
-    return (
-        Path(__file__).resolve().parents[2]
-        / "app"
-        / "services"
-        / "narrative_memory"
-    )
+    return Path(__file__).resolve().parents[2] / "app" / "services" / "narrative_memory"
 
 
 def _cli_path() -> Path:
@@ -102,7 +97,9 @@ def test_phase15_static_import_and_call_scan():
             for prefix in FORBIDDEN_IMPORT_PREFIXES:
                 assert not imp.startswith(prefix), f"{name} imports {imp}"
         calls = _call_names(tree)
-        assert FORBIDDEN_CALL_NAMES.isdisjoint(calls), f"{name} has {calls & FORBIDDEN_CALL_NAMES}"
+        assert FORBIDDEN_CALL_NAMES.isdisjoint(calls), (
+            f"{name} has {calls & FORBIDDEN_CALL_NAMES}"
+        )
         assert "from app.services.reader_chat" not in source
         assert "from app.models.reader_chat" not in source
         assert "import reader_chat" not in source

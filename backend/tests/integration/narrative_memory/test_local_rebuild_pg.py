@@ -35,7 +35,10 @@ from app.services.narrative_memory.contracts import (
     ModelLineage,
 )
 from app.services.narrative_memory.manifests import seal_and_report
-from app.services.narrative_memory.rebuild_contracts import RebuildDecision, stable_checksum
+from app.services.narrative_memory.rebuild_contracts import (
+    RebuildDecision,
+    stable_checksum,
+)
 from app.services.narrative_memory.rebuild_executor import (
     assert_stage_allowed,
     build_dirty_stage_mask,
@@ -50,7 +53,9 @@ pytestmark = pytest.mark.integration
 HEX = "a" * 64
 
 
-def _spec(version_key: str, *, parent_version_id: int | None = None) -> CandidateVersionSpec:
+def _spec(
+    version_key: str, *, parent_version_id: int | None = None
+) -> CandidateVersionSpec:
     return CandidateVersionSpec(
         version_key=version_key,
         prompt_hash=HEX,
@@ -461,8 +466,7 @@ async def test_no_change_zero_dirty_stages(rebuild_env) -> None:
             i
             for i in plan.items
             if i.decision == RebuildDecision.DIRTY
-            and i.asset_kind.value
-            in {"chapter_state", "story_arc", "global_story"}
+            and i.asset_kind.value in {"chapter_state", "story_arc", "global_story"}
         ]
         assert not dirty_semantic
         stages = list(
@@ -545,8 +549,7 @@ async def test_edit_materializes_dirty_only_stages(rebuild_env) -> None:
             i.asset_key
             for i in plan.items
             if i.decision == RebuildDecision.DIRTY
-            and i.asset_kind.value
-            in {"chapter_state", "story_arc", "global_story"}
+            and i.asset_kind.value in {"chapter_state", "story_arc", "global_story"}
         }
         for key in mask.dirty_stage_keys:
             assert_stage_allowed(mask, key)
@@ -642,6 +645,12 @@ async def test_mask_excludes_carried_from_stage_specs(rebuild_env) -> None:
                 item.decision == "carried"
                 and item.stage_key
                 and item.asset_kind
-                in {"chapter_state", "story_arc", "volume", "global_story", "boundary_plan"}
+                in {
+                    "chapter_state",
+                    "story_arc",
+                    "volume",
+                    "global_story",
+                    "boundary_plan",
+                }
             ):
                 assert item.stage_key not in mask.dirty_stage_keys

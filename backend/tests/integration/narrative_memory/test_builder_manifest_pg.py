@@ -33,8 +33,7 @@ async def builder_env(empty_postgres: str, pg_async_url: str):
             pointer_before = (
                 await session.execute(
                     text(
-                        "SELECT count(*) FROM chunk_active_pointers "
-                        "WHERE novel_id = :n"
+                        "SELECT count(*) FROM chunk_active_pointers WHERE novel_id = :n"
                     ),
                     {"n": novel.id},
                 )
@@ -74,19 +73,21 @@ async def test_full_build_may_seal_and_never_creates_memory_pointer(
     )
     async with builder_env["factory"]() as session:
         tables = (
-            await session.execute(
-                text(
-                    "SELECT tablename FROM pg_tables "
-                    "WHERE schemaname='public' AND tablename LIKE 'narrative_memory%'"
+            (
+                await session.execute(
+                    text(
+                        "SELECT tablename FROM pg_tables "
+                        "WHERE schemaname='public' AND tablename LIKE 'narrative_memory%'"
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         assert not any("pointer" in name for name in tables)
         pointer_after = (
             await session.execute(
-                text(
-                    "SELECT count(*) FROM chunk_active_pointers WHERE novel_id = :n"
-                ),
+                text("SELECT count(*) FROM chunk_active_pointers WHERE novel_id = :n"),
                 {"n": builder_env["novel_id"]},
             )
         ).scalar_one()
@@ -99,7 +100,5 @@ async def test_full_build_may_seal_and_never_creates_memory_pointer(
                 )
             )
         ).all()
-        _reports = (
-            await session.scalars(select(NarrativeMemoryBuildReport))
-        ).all()
+        _reports = (await session.scalars(select(NarrativeMemoryBuildReport))).all()
         assert True  # observation-only structural gate

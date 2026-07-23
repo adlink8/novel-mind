@@ -127,7 +127,9 @@ def test_selection_citation_accepted_freeform_chat_rejected():
     assert freeform.status == "rejected"
     assert freeform.reason_code == "freeform_or_malformed_rejected"
 
-    chat = reject_freeform_chat_as_evidence("The silver key is definitely a foreshadow.")
+    chat = reject_freeform_chat_as_evidence(
+        "The silver key is definitely a foreshadow."
+    )
     assert chat.status == "rejected"
     assert chat.reason_code == "chat_freeform_forbidden"
 

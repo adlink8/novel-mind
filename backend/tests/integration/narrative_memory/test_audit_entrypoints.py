@@ -8,14 +8,20 @@ from app.core.database import get_db
 from app.core.security import require_user
 from app.main import app
 from app.services.narrative_memory.audit_contracts import EligibilityReport
-from scripts.run_asset_audit import canonical_report_json, collect_report, report_exit_code
+from scripts.run_asset_audit import (
+    canonical_report_json,
+    collect_report,
+    report_exit_code,
+)
 from tests.integration.narrative_memory.test_audit_pg import _seed_valid_hierarchy
 
 pytestmark = pytest.mark.integration
 
 
 @pytest.mark.asyncio
-async def test_admin_api_and_cli_return_same_canonical_report(asgi_client, audit_pg_session):
+async def test_admin_api_and_cli_return_same_canonical_report(
+    asgi_client, audit_pg_session
+):
     owner, novel, _ = await _seed_valid_hierarchy(audit_pg_session)
     owner.is_superuser = True
     await audit_pg_session.flush()
@@ -39,7 +45,9 @@ async def test_admin_api_and_cli_return_same_canonical_report(asgi_client, audit
         owner_id=owner.id, novel_id=novel.id, session=audit_pg_session
     )
     assert canonical_report_json(api_report) == canonical_report_json(cli_report)
-    assert json.loads(canonical_report_json(cli_report)) == cli_report.model_dump(mode="json")
+    assert json.loads(canonical_report_json(cli_report)) == cli_report.model_dump(
+        mode="json"
+    )
     assert report_exit_code(cli_report) == 0
 
 

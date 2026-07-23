@@ -40,7 +40,9 @@ async def _seed(db_session):
     novel = Novel(owner_id=owner.id, title="override novel", status="ready")
     db_session.add(novel)
     await db_session.flush()
-    chapter = Chapter(novel_id=novel.id, chapter_number=1, title="C1", content="cue text")
+    chapter = Chapter(
+        novel_id=novel.id, chapter_number=1, title="C1", content="cue text"
+    )
     db_session.add(chapter)
     await db_session.flush()
     version = ClueAnalysisVersion(
