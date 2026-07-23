@@ -322,9 +322,15 @@ class RelationshipDeltaClaim(StrictFrozenModel):
     def validate_endpoints_and_state(self) -> "RelationshipDeltaClaim":
         if self.source_entity_key == self.target_entity_key:
             raise ValueError("relationship endpoints must differ")
-        if self.change != RelationshipChange.END and self.current.value != self.relationship_kind.value:
+        if (
+            self.change != RelationshipChange.END
+            and self.current.value != self.relationship_kind.value
+        ):
             raise ValueError("current relationship state must match relationship_kind")
-        if self.change == RelationshipChange.END and self.current != RelationshipState.ENDED:
+        if (
+            self.change == RelationshipChange.END
+            and self.current != RelationshipState.ENDED
+        ):
             raise ValueError("end transition requires current=ended")
         return self
 
@@ -428,7 +434,10 @@ class ExactSourceLink(StrictFrozenModel):
             raise ValueError("source_end must be greater than source_start")
         if self.source_kind == SourceKind.HIERARCHY and self.optional_domain_source_key:
             raise ValueError("hierarchy source cannot carry an optional domain key")
-        if self.source_kind != SourceKind.HIERARCHY and not self.optional_domain_source_key:
+        if (
+            self.source_kind != SourceKind.HIERARCHY
+            and not self.optional_domain_source_key
+        ):
             raise ValueError("optional domain source requires its exact source key")
         return self
 
@@ -493,14 +502,19 @@ class CandidatePackage(StrictFrozenModel):
                 raise ValueError("claim visibility must be inside its node range")
             expected_sources = set(claim.source_keys)
             if expected_sources != links_by_claim.get(claim.claim_key, set()):
-                raise ValueError("claim source_keys must resolve exactly inside the package")
+                raise ValueError(
+                    "claim source_keys must resolve exactly inside the package"
+                )
             claim_links = [sources[key] for key in claim.source_keys]
             if any(
                 not node.chapter_start <= link.chapter_number <= node.chapter_end
                 for link in claim_links
             ):
                 raise ValueError("claim evidence chapter must be inside its node range")
-            if max(link.chapter_number for link in claim_links) > claim.visible_from_chapter:
+            if (
+                max(link.chapter_number for link in claim_links)
+                > claim.visible_from_chapter
+            ):
                 raise ValueError("claim cannot be visible before its latest evidence")
             if isinstance(claim.payload, EventFactClaim) and (
                 claim.payload.chapter_start < node.chapter_start

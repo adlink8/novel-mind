@@ -193,8 +193,7 @@ async def recompute_reuse_report(
                 (
                     await session.scalars(
                         select(NarrativeMemoryBuildBudgetReservation).where(
-                            NarrativeMemoryBuildBudgetReservation.ledger_id
-                            == ledger.id
+                            NarrativeMemoryBuildBudgetReservation.ledger_id == ledger.id
                         )
                     )
                 ).all()
@@ -217,7 +216,9 @@ async def recompute_reuse_report(
     transport_calls = sum(1 for a in attempts if a.status == "succeeded")
     cache_hits = sum(1 for a in attempts if a.status == "cache_hit")
     input_tokens = sum(int((a.usage or {}).get("input_tokens") or 0) for a in attempts)
-    output_tokens = sum(int((a.usage or {}).get("output_tokens") or 0) for a in attempts)
+    output_tokens = sum(
+        int((a.usage or {}).get("output_tokens") or 0) for a in attempts
+    )
     if ledger is not None:
         cost = Decimal(str(ledger.settled_cost_usd or 0))
     else:
@@ -258,11 +259,10 @@ async def recompute_reuse_report(
         price_known = True
         full_input = reservation_envelope_input * full_calls
         full_output = reservation_envelope_output * full_calls
-        full_cost = (
-            Decimal(price_input_per_million) * Decimal(full_input) / Decimal(1_000_000)
-            + Decimal(price_output_per_million)
-            * Decimal(full_output)
-            / Decimal(1_000_000)
+        full_cost = Decimal(price_input_per_million) * Decimal(full_input) / Decimal(
+            1_000_000
+        ) + Decimal(price_output_per_million) * Decimal(full_output) / Decimal(
+            1_000_000
         )
 
     full_rebuild_upper_bound = {

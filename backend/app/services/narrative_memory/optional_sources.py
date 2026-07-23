@@ -249,9 +249,7 @@ async def _clue_signal(
             lineage={"version_id": row["version_id"]},
         )
     count_row = await session.execute(
-        text(
-            "SELECT count(*) FROM machine_clues WHERE version_id = :version"
-        ),
+        text("SELECT count(*) FROM machine_clues WHERE version_id = :version"),
         {"version": row["version_id"]},
     )
     count = int(count_row.scalar_one())

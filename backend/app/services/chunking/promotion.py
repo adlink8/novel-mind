@@ -53,7 +53,11 @@ def prepare_promotion(
     evidence: QualifiedChunkerEvidence,
 ) -> dict[str, Any]:
     """Validate evidence + reconcile; mark prepared. Does not move active."""
-    prev_active = store.get_active(store.builds[build_id].novel_id) if build_id in store.builds else None
+    prev_active = (
+        store.get_active(store.builds[build_id].novel_id)
+        if build_id in store.builds
+        else None
+    )
     try:
         _validate_evidence(evidence, store, build_id)
     except PromotionError:

@@ -43,11 +43,15 @@ def collection_checkpoint_probe(store: Any) -> CollectionProbe:
             return False
         ids = payload.get("ids") or []
         metadatas = payload.get("metadatas") or []
-        return bool(ids) and len(ids) == len(metadatas) and all(
-            metadata
-            and metadata.get("build_id") == build_id
-            and metadata.get("manifest_checksum") == manifest
-            for metadata in metadatas
+        return (
+            bool(ids)
+            and len(ids) == len(metadatas)
+            and all(
+                metadata
+                and metadata.get("build_id") == build_id
+                and metadata.get("manifest_checksum") == manifest
+                for metadata in metadatas
+            )
         )
 
     return probe
@@ -134,9 +138,7 @@ async def restore_journal(
     if candidate is None:
         raise RollbackError("candidate build is missing")
     after = journal.details.get("after", {})
-    await _require_checkpoint(
-        after, build=candidate, collection_probe=collection_probe
-    )
+    await _require_checkpoint(after, build=candidate, collection_probe=collection_probe)
     if pointer is None:
         from datetime import UTC, datetime
 

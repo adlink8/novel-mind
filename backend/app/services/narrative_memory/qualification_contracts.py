@@ -25,7 +25,12 @@ from pydantic import (
     model_validator,
 )
 
-from app.services.narrative_memory.contracts import Hash64, Key, PositiveInt, VersionLabel
+from app.services.narrative_memory.contracts import (
+    Hash64,
+    Key,
+    PositiveInt,
+    VersionLabel,
+)
 
 QUALIFICATION_KIND = "single_book_candidate"
 SCOPE_DISCLAIMER = (
@@ -163,7 +168,11 @@ class SpoilerForbiddenRef(QualificationFrozenModel):
 
     @model_validator(mode="after")
     def _at_least_one(self) -> SpoilerForbiddenRef:
-        if self.leaf_id is None and self.chapter_number is None and self.metadata_key is None:
+        if (
+            self.leaf_id is None
+            and self.chapter_number is None
+            and self.metadata_key is None
+        ):
             raise ValueError("spoiler forbidden ref requires at least one identity")
         return self
 
@@ -172,7 +181,8 @@ class QuestionCase(QualificationFrozenModel):
     case_key: Key
     bucket: QuestionBucket
     query: Annotated[
-        StrictStr, StringConstraints(strip_whitespace=True, min_length=1, max_length=2000)
+        StrictStr,
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=2000),
     ]
     through_chapter: PositiveInt
     full_book_authorized: StrictBool = False
@@ -180,9 +190,9 @@ class QuestionCase(QualificationFrozenModel):
     allowed_routes: tuple[Key, ...] = ()
     gold_leaves: tuple[GoldLeafRef, ...] = ()
     spoiler_forbidden: tuple[SpoilerForbiddenRef, ...] = ()
-    no_answer_rationale: Annotated[
-        StrictStr, StringConstraints(max_length=400)
-    ] | None = None
+    no_answer_rationale: (
+        Annotated[StrictStr, StringConstraints(max_length=400)] | None
+    ) = None
 
     @field_validator(
         "allowed_routes", "gold_leaves", "spoiler_forbidden", mode="before"
@@ -197,12 +207,16 @@ class QuestionCase(QualificationFrozenModel):
     def _bucket_rules(self) -> QuestionCase:
         if self.bucket == QuestionBucket.NO_ANSWER:
             if self.expected_answerability != ExpectedAnswerability.NO_ANSWER:
-                raise ValueError("no_answer bucket requires expected_answerability=no_answer")
+                raise ValueError(
+                    "no_answer bucket requires expected_answerability=no_answer"
+                )
         if self.bucket == QuestionBucket.SPOILER:
             if not self.spoiler_forbidden:
                 raise ValueError("spoiler bucket requires non-empty spoiler_forbidden")
             if self.expected_answerability != ExpectedAnswerability.SPOILER_RISK:
-                raise ValueError("spoiler bucket requires expected_answerability=spoiler_risk")
+                raise ValueError(
+                    "spoiler bucket requires expected_answerability=spoiler_risk"
+                )
         if self.bucket in {
             QuestionBucket.LOCAL,
             QuestionBucket.CROSS_CHAPTER_ARC,
@@ -225,7 +239,9 @@ class ModelLineageSpec(QualificationFrozenModel):
     calibrated: StrictBool = False
 
     def lineage_key(self) -> str:
-        return f"{self.role}:{self.deployment_id}:{self.model_revision}:{self.prompt_hash}"
+        return (
+            f"{self.role}:{self.deployment_id}:{self.model_revision}:{self.prompt_hash}"
+        )
 
 
 class PriceSnapshot(QualificationFrozenModel):
@@ -282,8 +298,14 @@ class ThresholdSpec(QualificationFrozenModel):
     def _direction(self) -> ThresholdSpec:
         if self.zero_tolerance:
             return self
-        if self.minimum is None and self.maximum is None and self.relative_to_baseline_min_delta is None:
-            raise ValueError("threshold requires min, max, zero_tolerance, or relative delta")
+        if (
+            self.minimum is None
+            and self.maximum is None
+            and self.relative_to_baseline_min_delta is None
+        ):
+            raise ValueError(
+                "threshold requires min, max, zero_tolerance, or relative delta"
+            )
         for val in (self.minimum, self.maximum, self.relative_to_baseline_min_delta):
             if val is not None and (math.isnan(val) or math.isinf(val)):
                 raise ValueError("threshold bounds must be finite")
@@ -320,7 +342,9 @@ class QualificationPolicy(QualificationFrozenModel):
     def _policy_integrity(self) -> QualificationPolicy:
         missing = set(REQUIRED_BUCKETS) - set(self.required_buckets)
         if missing:
-            raise ValueError(f"required buckets missing: {sorted(b.value for b in missing)}")
+            raise ValueError(
+                f"required buckets missing: {sorted(b.value for b in missing)}"
+            )
         if self.generator.role != "generator":
             raise ValueError("generator lineage role must be generator")
         if self.judge.role != "judge":
@@ -337,7 +361,10 @@ class QualificationPolicy(QualificationFrozenModel):
             raise ValueError("policy requires non-empty thresholds")
         if set(self.strategy_order) != set(RetrievalStrategy):
             raise ValueError("strategy_order must include both strategies exactly")
-        if "promotion" in self.disclaimer.lower() and "does not promote" not in self.disclaimer.lower():
+        if (
+            "promotion" in self.disclaimer.lower()
+            and "does not promote" not in self.disclaimer.lower()
+        ):
             pass  # disclaimer text is fixed above
         return self
 
@@ -386,7 +413,10 @@ class QualificationFixture(QualificationFrozenModel):
                     raise ValueError(
                         f"gold leaf {leaf.leaf_id} hierarchy_build_id mismatch"
                     )
-                if leaf.chapter_number > case.through_chapter and not case.full_book_authorized:
+                if (
+                    leaf.chapter_number > case.through_chapter
+                    and not case.full_book_authorized
+                ):
                     if case.bucket != QuestionBucket.SPOILER:
                         raise ValueError(
                             f"gold leaf {leaf.leaf_id} exceeds cutoff for case {case.case_key}"
@@ -497,7 +527,11 @@ class MetricCell(QualificationFrozenModel):
                 raise ValueError("ok metric requires value")
             if float(self.denominator) <= 0:
                 raise ValueError("ok metric requires positive denominator")
-        if self.status in {MetricStatus.MISSING, MetricStatus.INVALID, MetricStatus.BLOCKED}:
+        if self.status in {
+            MetricStatus.MISSING,
+            MetricStatus.INVALID,
+            MetricStatus.BLOCKED,
+        }:
             if self.value is not None and self.status != MetricStatus.BLOCKED:
                 # blocked may carry a computed value for diagnostics
                 pass
@@ -539,7 +573,10 @@ class QualificationReport(QualificationFrozenModel):
         ordered = tuple(sorted(self.reason_codes))
         if self.reason_codes != ordered:
             raise ValueError("reason_codes must be sorted")
-        if self.verdict == QualificationVerdict.QUALIFIED_CANDIDATE and self.reason_codes:
+        if (
+            self.verdict == QualificationVerdict.QUALIFIED_CANDIDATE
+            and self.reason_codes
+        ):
             raise ValueError("qualified_candidate must have empty reason_codes")
         if self.verdict == QualificationVerdict.BLOCKED and not self.reason_codes:
             raise ValueError("blocked requires non-empty reason_codes")

@@ -396,9 +396,7 @@ class KnowledgeProjectionService:
             .order_by(KnowledgeEvidenceRef.id.asc())
             .limit(1)
         )
-        result = await db.execute(
-            stmt
-        )
+        result = await db.execute(stmt)
         return result.scalar_one_or_none()
 
 

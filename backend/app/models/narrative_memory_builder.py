@@ -138,7 +138,9 @@ class NarrativeMemoryBuildRun(TimestampMixin, Base):
     progress: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     run_policy: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     boundary_plan: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
-    boundary_plan_checksum: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    boundary_plan_checksum: Mapped[str | None] = mapped_column(
+        String(64), nullable=True
+    )
 
 
 class NarrativeMemoryBuildStage(TimestampMixin, Base):
@@ -199,9 +201,7 @@ class NarrativeMemoryBuildBudgetLedger(TimestampMixin, Base):
     """Per-run budget ceilings and counters."""
 
     __tablename__ = "narrative_memory_build_budget_ledgers"
-    __table_args__ = (
-        UniqueConstraint("run_id", name="uq_memory_build_budget_run"),
-    )
+    __table_args__ = (UniqueConstraint("run_id", name="uq_memory_build_budget_run"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     run_id: Mapped[int] = mapped_column(
@@ -320,7 +320,9 @@ class NarrativeMemoryBuildModelCallAttempt(TimestampMixin, Base):
     provider_request_id: Mapped[str | None] = mapped_column(String(160), nullable=True)
     request_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     response_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    deployment_lineage: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    deployment_lineage: Mapped[dict] = mapped_column(
+        JSONB, nullable=False, default=dict
+    )
     usage: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     cost_usd: Mapped[Decimal | None] = mapped_column(Numeric(18, 8), nullable=True)
     latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -360,7 +362,9 @@ class NarrativeMemoryBuildReport(TimestampMixin, Base):
     version_id: Mapped[int] = mapped_column(Integer, nullable=False)
     outcome: Mapped[str] = mapped_column(String(32), nullable=False)
     stage_counts: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
-    dependency_closure: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    dependency_closure: Mapped[dict] = mapped_column(
+        JSONB, nullable=False, default=dict
+    )
     call_totals: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     source_statuses: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     worker_artifact_checksum: Mapped[str | None] = mapped_column(

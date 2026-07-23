@@ -543,9 +543,7 @@ def structural_from_snapshot(snapshot: CandidateSnapshot) -> StructuralValidatio
         if link.claim_id == claim.id
     )
     globals_ = [
-        node
-        for node in snapshot.nodes
-        if node.node_kind == NodeKind.GLOBAL_STORY.value
+        node for node in snapshot.nodes if node.node_kind == NodeKind.GLOBAL_STORY.value
     ]
     if globals_:
         expected_min = globals_[0].chapter_start

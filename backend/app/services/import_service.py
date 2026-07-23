@@ -101,9 +101,7 @@ class ImportService:
 
         # 验证状态转换
         if not job.can_transition_to(status):
-            logger.warning(
-                f"非法状态转换: {job.status} -> {status} (job_id={job_id})"
-            )
+            logger.warning(f"非法状态转换: {job.status} -> {status} (job_id={job_id})")
             return False
 
         job.status = status
@@ -186,9 +184,7 @@ class ImportService:
         job.retry_count += 1
 
         await db.flush()
-        logger.info(
-            f"重试导入任务: job_id={job_id}, retry_count={job.retry_count}"
-        )
+        logger.info(f"重试导入任务: job_id={job_id}, retry_count={job.retry_count}")
         return job
 
     # ── 租约并发控制 ──
@@ -419,9 +415,7 @@ class ImportService:
                 await self.release_lease(db, job_id, lease_id)
                 return
 
-            await self.update_job_status(
-                db, job_id, "uploading", 10, "正在接收文件..."
-            )
+            await self.update_job_status(db, job_id, "uploading", 10, "正在接收文件...")
             save_path, content = await novel_service.upload_novel(file)
 
             content_hash = self.compute_content_hash(content)
@@ -441,9 +435,7 @@ class ImportService:
             await self.update_job_status(
                 db, job_id, "detecting", 20, "正在检测文件编码..."
             )
-            await self.update_job_status(
-                db, job_id, "parsing", 40, "正在解析章节..."
-            )
+            await self.update_job_status(db, job_id, "parsing", 40, "正在解析章节...")
             chapters = novel_service.parse_novel(content)
 
             job = await db.get(ImportJob, job_id)

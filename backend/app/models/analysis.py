@@ -16,7 +16,18 @@ AI 分析结果 ORM 模型
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, Numeric, String, UniqueConstraint, JSON
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    Numeric,
+    String,
+    UniqueConstraint,
+    JSON,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin
@@ -67,33 +78,58 @@ class AnalysisResult(TimestampMixin, Base):
 class AnalysisRun(TimestampMixin, Base):
     __tablename__ = "analysis_runs"
     __table_args__ = (
-        UniqueConstraint("owner_id", "novel_id", "active_key", name="uq_analysis_runs_active"),
-        CheckConstraint("status IN ('pending','running','paused_budget','paused_dependency','cancelled','completed','failed')", name="ck_analysis_runs_status"),
+        UniqueConstraint(
+            "owner_id", "novel_id", "active_key", name="uq_analysis_runs_active"
+        ),
+        CheckConstraint(
+            "status IN ('pending','running','paused_budget','paused_dependency','cancelled','completed','failed')",
+            name="ck_analysis_runs_status",
+        ),
         Index("idx_analysis_runs_scope", "owner_id", "novel_id"),
     )
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    novel_id: Mapped[int] = mapped_column(ForeignKey("novels.id", ondelete="CASCADE"), nullable=False)
-    version_id: Mapped[int | None] = mapped_column(ForeignKey("analysis_versions.id", ondelete="SET NULL"), nullable=True)
-    active_key: Mapped[str | None] = mapped_column(String(16), nullable=True, default="active")
+    owner_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    novel_id: Mapped[int] = mapped_column(
+        ForeignKey("novels.id", ondelete="CASCADE"), nullable=False
+    )
+    version_id: Mapped[int | None] = mapped_column(
+        ForeignKey("analysis_versions.id", ondelete="SET NULL"), nullable=True
+    )
+    active_key: Mapped[str | None] = mapped_column(
+        String(16), nullable=True, default="active"
+    )
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="pending")
     status_reason: Mapped[str | None] = mapped_column(String(128))
     lease_id: Mapped[str | None] = mapped_column(String(64))
     lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    cancel_requested: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    cancel_requested: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )
     checkpoint: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     progress: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
 
 
 class AnalysisVersion(TimestampMixin, Base):
     __tablename__ = "analysis_versions"
-    __table_args__ = (UniqueConstraint("owner_id", "novel_id", "version_key", name="uq_analysis_versions_scope_key"),)
+    __table_args__ = (
+        UniqueConstraint(
+            "owner_id", "novel_id", "version_key", name="uq_analysis_versions_scope_key"
+        ),
+    )
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    novel_id: Mapped[int] = mapped_column(ForeignKey("novels.id", ondelete="CASCADE"), nullable=False)
+    owner_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    novel_id: Mapped[int] = mapped_column(
+        ForeignKey("novels.id", ondelete="CASCADE"), nullable=False
+    )
     version_key: Mapped[str] = mapped_column(String(64), nullable=False)
-    parent_version_id: Mapped[int | None] = mapped_column(ForeignKey("analysis_versions.id", ondelete="SET NULL"))
+    parent_version_id: Mapped[int | None] = mapped_column(
+        ForeignKey("analysis_versions.id", ondelete="SET NULL")
+    )
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="candidate")
     source_snapshot_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     hierarchy_build_id: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -111,10 +147,16 @@ class AnalysisVersion(TimestampMixin, Base):
 
 class AnalysisChapterStage(TimestampMixin, Base):
     __tablename__ = "analysis_chapter_stages"
-    __table_args__ = (UniqueConstraint("run_id", "stage_key", name="uq_analysis_chapter_stage"),)
+    __table_args__ = (
+        UniqueConstraint("run_id", "stage_key", name="uq_analysis_chapter_stage"),
+    )
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    run_id: Mapped[int] = mapped_column(ForeignKey("analysis_runs.id", ondelete="CASCADE"), nullable=False)
-    chapter_id: Mapped[int | None] = mapped_column(ForeignKey("chapters.id", ondelete="CASCADE"))
+    run_id: Mapped[int] = mapped_column(
+        ForeignKey("analysis_runs.id", ondelete="CASCADE"), nullable=False
+    )
+    chapter_id: Mapped[int | None] = mapped_column(
+        ForeignKey("chapters.id", ondelete="CASCADE")
+    )
     stage_key: Mapped[str] = mapped_column(String(160), nullable=False)
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="pending")
     artifact_checksum: Mapped[str | None] = mapped_column(String(64))
@@ -123,15 +165,25 @@ class AnalysisChapterStage(TimestampMixin, Base):
 
 class ModelCallAttempt(TimestampMixin, Base):
     __tablename__ = "model_call_attempts"
-    __table_args__ = (UniqueConstraint("run_id", "stage_key", "attempt_number", name="uq_model_call_attempt"),)
+    __table_args__ = (
+        UniqueConstraint(
+            "run_id", "stage_key", "attempt_number", name="uq_model_call_attempt"
+        ),
+    )
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    run_id: Mapped[int] = mapped_column(ForeignKey("analysis_runs.id", ondelete="CASCADE"), nullable=False)
-    reservation_id: Mapped[int | None] = mapped_column(ForeignKey("analysis_budget_reservations.id", ondelete="SET NULL"))
+    run_id: Mapped[int] = mapped_column(
+        ForeignKey("analysis_runs.id", ondelete="CASCADE"), nullable=False
+    )
+    reservation_id: Mapped[int | None] = mapped_column(
+        ForeignKey("analysis_budget_reservations.id", ondelete="SET NULL")
+    )
     stage_key: Mapped[str] = mapped_column(String(160), nullable=False)
     attempt_number: Mapped[int] = mapped_column(Integer, nullable=False)
     status: Mapped[str] = mapped_column(String(32), nullable=False)
     cache_key: Mapped[str | None] = mapped_column(String(128))
-    cache_source_attempt_id: Mapped[int | None] = mapped_column(ForeignKey("model_call_attempts.id", ondelete="SET NULL"))
+    cache_source_attempt_id: Mapped[int | None] = mapped_column(
+        ForeignKey("model_call_attempts.id", ondelete="SET NULL")
+    )
     provider_request_id: Mapped[str | None] = mapped_column(String(160))
     request_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     response_hash: Mapped[str | None] = mapped_column(String(64))
@@ -145,26 +197,46 @@ class AnalysisBudgetLedger(TimestampMixin, Base):
     __tablename__ = "analysis_budget_ledgers"
     __table_args__ = (UniqueConstraint("run_id", name="uq_analysis_budget_run"),)
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    run_id: Mapped[int] = mapped_column(ForeignKey("analysis_runs.id", ondelete="CASCADE"), nullable=False)
+    run_id: Mapped[int] = mapped_column(
+        ForeignKey("analysis_runs.id", ondelete="CASCADE"), nullable=False
+    )
     max_calls: Mapped[int] = mapped_column(Integer, nullable=False)
     max_input_tokens: Mapped[int] = mapped_column(Integer, nullable=False)
     max_output_tokens: Mapped[int] = mapped_column(Integer, nullable=False)
     max_cost_usd: Mapped[Decimal] = mapped_column(Numeric(18, 8), nullable=False)
     reserved_calls: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    reserved_input_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    reserved_output_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    reserved_cost_usd: Mapped[Decimal] = mapped_column(Numeric(18, 8), nullable=False, default=0)
+    reserved_input_tokens: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0
+    )
+    reserved_output_tokens: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0
+    )
+    reserved_cost_usd: Mapped[Decimal] = mapped_column(
+        Numeric(18, 8), nullable=False, default=0
+    )
     settled_calls: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    settled_input_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    settled_output_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    settled_cost_usd: Mapped[Decimal] = mapped_column(Numeric(18, 8), nullable=False, default=0)
+    settled_input_tokens: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0
+    )
+    settled_output_tokens: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0
+    )
+    settled_cost_usd: Mapped[Decimal] = mapped_column(
+        Numeric(18, 8), nullable=False, default=0
+    )
 
 
 class AnalysisBudgetReservation(TimestampMixin, Base):
     __tablename__ = "analysis_budget_reservations"
-    __table_args__ = (UniqueConstraint("ledger_id", "reservation_key", name="uq_analysis_budget_reservation"),)
+    __table_args__ = (
+        UniqueConstraint(
+            "ledger_id", "reservation_key", name="uq_analysis_budget_reservation"
+        ),
+    )
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    ledger_id: Mapped[int] = mapped_column(ForeignKey("analysis_budget_ledgers.id", ondelete="CASCADE"), nullable=False)
+    ledger_id: Mapped[int] = mapped_column(
+        ForeignKey("analysis_budget_ledgers.id", ondelete="CASCADE"), nullable=False
+    )
     reservation_key: Mapped[str] = mapped_column(String(160), nullable=False)
     status: Mapped[str] = mapped_column(String(24), nullable=False, default="reserved")
     calls: Mapped[int] = mapped_column(Integer, nullable=False)

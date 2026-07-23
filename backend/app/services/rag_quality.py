@@ -83,10 +83,7 @@ def canonicalize_chunker_lineage(
     cfg = lineage.chunker_config if isinstance(lineage.chunker_config, dict) else {}
     config_hash = recompute_chunker_config_hash(cfg)
     # If caller sent a config hash and it disagrees with recomputed → invalid.
-    if (
-        lineage.chunker_config_hash
-        and lineage.chunker_config_hash != config_hash
-    ):
+    if lineage.chunker_config_hash and lineage.chunker_config_hash != config_hash:
         return None, f"{INVALID_LINEAGE_REASON}: chunker_config_hash mismatch"
 
     for label, value in (
@@ -118,7 +115,9 @@ def canonicalize_chunker_lineage(
     return canonical, None
 
 
-def lineage_five_tuple(lineage: ChunkerLineage | dict[str, Any] | None) -> dict[str, str] | None:
+def lineage_five_tuple(
+    lineage: ChunkerLineage | dict[str, Any] | None,
+) -> dict[str, str] | None:
     """Extract five-tuple for hashing; None if incomplete (never invent)."""
     canonical, err = canonicalize_chunker_lineage(lineage)
     if canonical is None or err is not None:
@@ -169,6 +168,7 @@ def build_stage_cache_key(
         }
     )
     return f"{case_id}:r{repetition}:{digest[:16]}"
+
 
 COMPARABLE_STATUSES = frozenset({"passed", "qualified"})
 NON_COMPARABLE_TERMINAL = frozenset(
@@ -247,7 +247,11 @@ def policy_hash(policy: dict[str, Any]) -> str:
 
 def answer_judge_prompt_hash() -> str:
     path = prompts_dir() / "rag_answer_judge.v1.txt"
-    return stable_hash(path.read_text(encoding="utf-8")) if path.is_file() else stable_hash("")
+    return (
+        stable_hash(path.read_text(encoding="utf-8"))
+        if path.is_file()
+        else stable_hash("")
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -355,7 +359,9 @@ def deterministic_claim_metrics(
             "refuse",
         )
         lowered = (answer or "").lower()
-        refused = any(m in lowered for m in refuse_markers) or not (answer or "").strip()
+        refused = (
+            any(m in lowered for m in refuse_markers) or not (answer or "").strip()
+        )
         if refused:
             return {
                 "faithfulness_proxy": 1.0,
@@ -536,7 +542,11 @@ def default_stub_answer(
     return {
         "answer": answer,
         "parsed_claims": [c.text for c in case.claims],
-        "token_usage": {"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150},
+        "token_usage": {
+            "prompt_tokens": 100,
+            "completion_tokens": 50,
+            "total_tokens": 150,
+        },
         "cost_usd": 0.001,
         "latency_ms": latency_ms,
         "status": "ok",
@@ -567,12 +577,15 @@ def default_stub_answer_judge(
     ):
         faith = 1.0
         crit_unsupported = 0
-    elif ref_norm and (ans_norm == ref_norm or ref_norm in ans_norm or ans_norm in ref_norm):
+    elif ref_norm and (
+        ans_norm == ref_norm or ref_norm in ans_norm or ans_norm in ref_norm
+    ):
         faith = 1.0
         crit_unsupported = 0
-    elif retrieved and claim_supported_by_evidence(answer, [
-        str(item.get("quote_text") or item.get("text") or "") for item in retrieved
-    ]):
+    elif retrieved and claim_supported_by_evidence(
+        answer,
+        [str(item.get("quote_text") or item.get("text") or "") for item in retrieved],
+    ):
         faith = max(faith, 0.95)
         crit_unsupported = 0
 
@@ -615,9 +628,7 @@ def validate_fixtures_for_scoring(
 ) -> dict[str, Any] | None:
     """Return fail-closed dict if fixtures invalid; else None."""
     if not verify_source_snapshot(snapshot, secret):
-        return fail_closed(
-            "invalid_fixture", "snapshot signature invalid"
-        ).model_dump()
+        return fail_closed("invalid_fixture", "snapshot signature invalid").model_dump()
     for case in cases:
         if case.status == "quarantined":
             return fail_closed(
@@ -656,7 +667,9 @@ def validate_calibrated_lineage(
 ) -> dict[str, Any] | None:
     """Ensure G/J isolation and calibration-passed Judge lineage."""
     if generator_lineage is None or judge_lineage is None:
-        return fail_closed("invalid_lineage", "missing generator or judge lineage").model_dump()
+        return fail_closed(
+            "invalid_lineage", "missing generator or judge lineage"
+        ).model_dump()
     try:
         validate_generator_judge_isolation(generator_lineage, judge_lineage)
     except InvalidLineageError as exc:
@@ -897,9 +910,7 @@ def aggregate_run_metrics(
 
         # Per-repeat case-level pass/fail verdict for consistency
         case_pass = (
-            crit_rate == 0.0
-            and faith >= 0.90
-            and float(j.get("relevance", 0.0)) >= 0.5
+            crit_rate == 0.0 and faith >= 0.90 and float(j.get("relevance", 0.0)) >= 0.5
         )
         per_case_verdicts.setdefault(a.case_id, []).append(
             "pass" if case_pass else "fail"
@@ -956,7 +967,9 @@ def apply_policy_arbiter(
 ) -> dict[str, Any]:
     """Deterministic final gate. Missing inputs fail closed with metrics=null."""
 
-    def _term(status: str, reason: str, detail: dict[str, Any] | None = None) -> dict[str, Any]:
+    def _term(
+        status: str, reason: str, detail: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         comparable = status in COMPARABLE_STATUSES
         return {
             "status": status,
@@ -1314,7 +1327,9 @@ def run_quality_evaluation(
             "input_hash": effective_input_hash,
         }
 
-    metrics = None if blocked else aggregate_run_metrics(artifacts, policy=loaded_policy)
+    metrics = (
+        None if blocked else aggregate_run_metrics(artifacts, policy=loaded_policy)
+    )
     decision = apply_policy_arbiter(
         metrics=metrics,
         policy=loaded_policy,
@@ -1356,7 +1371,9 @@ def run_quality_evaluation(
         },
     }
     # Sign complete unsigned report (lineage included); then bind output_hash.
-    unsigned = {k: v for k, v in report.items() if k not in ("report_signature", "output_hash")}
+    unsigned = {
+        k: v for k, v in report.items() if k not in ("report_signature", "output_hash")
+    }
     report["report_signature"] = sign_payload(unsigned, secret)
     report["output_hash"] = stable_hash(unsigned)
     return report
@@ -1750,9 +1767,7 @@ async def commit_baseline_candidate(
     }
 
 
-async def get_active_baseline(
-    session: Any, *, owner_id: int
-) -> dict[str, Any] | None:
+async def get_active_baseline(session: Any, *, owner_id: int) -> dict[str, Any] | None:
     from sqlalchemy import select
     from app.models.eval import ActiveBaseline
 
@@ -1780,19 +1795,26 @@ async def build_cross_chunker_report(
         )
 
     rows = (
-        await session.execute(
-            select(QualityRun).where(
-                QualityRun.owner_id == owner_id,
+        (
+            await session.execute(
+                select(QualityRun).where(
+                    QualityRun.owner_id == owner_id,
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     series: list[dict[str, Any]] = []
     exclusions: list[dict[str, Any]] = []
 
     for run in rows:
         # Different snapshot → skip silently (not part of this report boundary)
-        if run.source_snapshot_hash and run.source_snapshot_hash != source_snapshot_hash:
+        if (
+            run.source_snapshot_hash
+            and run.source_snapshot_hash != source_snapshot_hash
+        ):
             exclusions.append(
                 {
                     "job_id": run.job_id,

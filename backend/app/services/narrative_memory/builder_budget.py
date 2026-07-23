@@ -106,9 +106,7 @@ class BuilderBudgetService:
 
         exceeds = (
             ledger.reserved_calls + ledger.settled_calls + 1 > ledger.max_calls
-            or ledger.reserved_input_tokens
-            + ledger.settled_input_tokens
-            + input_tokens
+            or ledger.reserved_input_tokens + ledger.settled_input_tokens + input_tokens
             > ledger.max_input_tokens
             or ledger.reserved_output_tokens
             + ledger.settled_output_tokens
@@ -173,10 +171,9 @@ class BuilderBudgetService:
         # with an uncapped field for audit; ledger counters stay within reservation.
         capped_in = min(int(actual_input_tokens), int(reservation.input_tokens))
         capped_out = min(int(actual_output_tokens), int(reservation.output_tokens))
-        over_reserved = (
-            int(actual_input_tokens) > int(reservation.input_tokens)
-            or int(actual_output_tokens) > int(reservation.output_tokens)
-        )
+        over_reserved = int(actual_input_tokens) > int(reservation.input_tokens) or int(
+            actual_output_tokens
+        ) > int(reservation.output_tokens)
 
         ledger = await self._session.get(
             NarrativeMemoryBuildBudgetLedger,

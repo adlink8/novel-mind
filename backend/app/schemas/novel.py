@@ -182,9 +182,7 @@ class ImportStatusResponse(BaseModel):
     """小说导入状态响应（用于前端轮询进度）"""
 
     job_id: Optional[int] = Field(None, description="导入任务 ID")
-    novel_id: Optional[int] = Field(
-        None, description="小说 ID（创建前可能为 null）"
-    )
+    novel_id: Optional[int] = Field(None, description="小说 ID（创建前可能为 null）")
     stage: str = Field(
         ...,
         description="当前阶段: uploading / detecting / parsing / saving / ready / failed / error",
@@ -219,7 +217,9 @@ class RAGSearchRequest(BaseModel):
 
     query: str = Field(..., min_length=1, max_length=1000, description="搜索查询文本")
     top_k: int = Field(5, ge=1, le=50, description="返回结果数量上限")
-    chunk_types: list[str] | None = Field(None, description="按块类型过滤: scene/dialogue/description/narration/paragraph")
+    chunk_types: list[str] | None = Field(
+        None, description="按块类型过滤: scene/dialogue/description/narration/paragraph"
+    )
 
 
 class RAGSearchResult(BaseModel):
@@ -252,6 +252,7 @@ class IndexStatusResponse(BaseModel):
 
 
 # ─────────── 混合搜索（BM25 + 向量）───────────
+
 
 class SearchRequest(BaseModel):
     """混合搜索请求（BM25 + 向量）"""

@@ -66,9 +66,7 @@ class NarrativeMemoryQualificationRun(TimestampMixin, Base):
         CheckConstraint(
             "length(source_snapshot_hash) = 64", name="ck_nm_qual_runs_snap"
         ),
-        CheckConstraint(
-            "length(hierarchy_checksum) = 64", name="ck_nm_qual_runs_hier"
-        ),
+        CheckConstraint("length(hierarchy_checksum) = 64", name="ck_nm_qual_runs_hier"),
         CheckConstraint(
             "length(candidate_manifest_checksum) = 64", name="ck_nm_qual_runs_man"
         ),
@@ -136,9 +134,7 @@ class NarrativeMemoryQualificationCaseResult(TimestampMixin, Base):
             "strategy IN ('hierarchical_candidate','leaf_raw_baseline')",
             name="ck_nm_qual_cases_strategy",
         ),
-        CheckConstraint(
-            "length(artifact_checksum) = 64", name="ck_nm_qual_cases_art"
-        ),
+        CheckConstraint("length(artifact_checksum) = 64", name="ck_nm_qual_cases_art"),
         Index("idx_nm_qual_cases_run", "run_id"),
     )
 
@@ -195,9 +191,7 @@ class NarrativeMemoryQualificationReport(TimestampMixin, Base):
         CheckConstraint(
             "length(pointer_after_digest) = 64", name="ck_nm_qual_reports_ptr"
         ),
-        CheckConstraint(
-            "length(output_digest) = 64", name="ck_nm_qual_reports_out"
-        ),
+        CheckConstraint("length(output_digest) = 64", name="ck_nm_qual_reports_out"),
         Index("idx_nm_qual_reports_run", "run_id"),
     )
 

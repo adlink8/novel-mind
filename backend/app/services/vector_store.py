@@ -163,6 +163,7 @@ class VectorStore:
                 filters={"chunk_type": "dialogue"}
             )
         """
+
         def _search():
             collection = self._get_collection(novel_id)
 
@@ -192,19 +193,27 @@ class VectorStore:
         results = []
         if result and result["ids"] and result["ids"][0]:
             ids = result["ids"][0]
-            documents = result["documents"][0] if result["documents"] else [None] * len(ids)
-            distances = result["distances"][0] if result["distances"] else [0.0] * len(ids)
-            metadatas = result["metadatas"][0] if result["metadatas"] else [{}] * len(ids)
+            documents = (
+                result["documents"][0] if result["documents"] else [None] * len(ids)
+            )
+            distances = (
+                result["distances"][0] if result["distances"] else [0.0] * len(ids)
+            )
+            metadatas = (
+                result["metadatas"][0] if result["metadatas"] else [{}] * len(ids)
+            )
 
             for i, chunk_id in enumerate(ids):
                 # ChromaDB cosine distance = 1 - similarity
                 score = 1.0 - distances[i] if distances[i] is not None else 0.0
-                results.append({
-                    "chunk_id": chunk_id,
-                    "content": documents[i],
-                    "score": max(0.0, min(1.0, score)),
-                    "metadata": metadatas[i] or {},
-                })
+                results.append(
+                    {
+                        "chunk_id": chunk_id,
+                        "content": documents[i],
+                        "score": max(0.0, min(1.0, score)),
+                        "metadata": metadatas[i] or {},
+                    }
+                )
 
         return results
 
@@ -218,6 +227,7 @@ class VectorStore:
         Raises:
             VectorStoreError: 删除失败时抛出（集合不存在除外）
         """
+
         def _delete():
             self.client.delete_collection(name=f"novel_{novel_id}")
 
@@ -242,6 +252,7 @@ class VectorStore:
         Returns:
             向量数量（集合不存在时返回 0）
         """
+
         def _count():
             try:
                 collection = self._get_collection(novel_id)

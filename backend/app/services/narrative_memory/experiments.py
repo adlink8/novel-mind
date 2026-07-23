@@ -148,14 +148,15 @@ async def run_retrieval_experiment(
     )
 
     run_status = (
-        RetrievalRunStatus.BLOCKED
-        if outcome.blocked
-        else RetrievalRunStatus.COMPLETED
+        RetrievalRunStatus.BLOCKED if outcome.blocked else RetrievalRunStatus.COMPLETED
     )
     source_status = descent.source_status
     if outcome.blocked:
         source_status = SafeSourceStatus.BLOCKED
-    elif not outcome.citations and descent.fallback_reason is FallbackReasonCode.NO_ANSWER:
+    elif (
+        not outcome.citations
+        and descent.fallback_reason is FallbackReasonCode.NO_ANSWER
+    ):
         source_status = SafeSourceStatus.ABSENT
         run_status = RetrievalRunStatus.BLOCKED
 

@@ -37,7 +37,9 @@ class BuilderRepository:
             )
         )
         if version is None:
-            raise BuilderRepositoryError("candidate version not found in explicit scope")
+            raise BuilderRepositoryError(
+                "candidate version not found in explicit scope"
+            )
         return version
 
     async def get_run(
@@ -176,7 +178,9 @@ class BuilderRepository:
         await self._session.flush()
         return claimed
 
-    async def heartbeat(self, run_id: int, lease_id: str, *, lease_ttl_seconds: int = 120) -> None:
+    async def heartbeat(
+        self, run_id: int, lease_id: str, *, lease_ttl_seconds: int = 120
+    ) -> None:
         run = await self._session.get(
             NarrativeMemoryBuildRun, run_id, with_for_update=True
         )

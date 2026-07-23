@@ -64,7 +64,9 @@ class _MutableDecision:
     stage_key: str | None = None
     detail: dict[str, Any] = field(default_factory=dict)
 
-    def mark_dirty(self, reason: ReasonCode, *, propagated: bool = False, pred: str | None = None) -> None:
+    def mark_dirty(
+        self, reason: ReasonCode, *, propagated: bool = False, pred: str | None = None
+    ) -> None:
         if self.decision == RebuildDecision.NOT_APPLICABLE:
             return
         if self.decision == RebuildDecision.CARRIED:
@@ -162,7 +164,9 @@ def classify_chapter_changes(
             change_kind = ChangeKind.REORDER
         if old_h is not None and new_h is not None and old_h != new_h:
             reasons.append(ReasonCode.CHAPTER_EDITED)
-            change_kind = ChangeKind.EDIT if change_kind == ChangeKind.NO_CHANGE else change_kind
+            change_kind = (
+                ChangeKind.EDIT if change_kind == ChangeKind.NO_CHANGE else change_kind
+            )
         if change_kind == ChangeKind.NO_CHANGE and reasons:
             change_kind = ChangeKind.EDIT
         if not reasons:
@@ -284,7 +288,13 @@ def compute_closure(
             parents_of[e.source_key].append(e.target_key)
             children_of[e.target_key].append(e.source_key)
 
-    def dirty_key(key: str, reason: ReasonCode, *, propagated: bool = False, pred: str | None = None) -> None:
+    def dirty_key(
+        key: str,
+        reason: ReasonCode,
+        *,
+        propagated: bool = False,
+        pred: str | None = None,
+    ) -> None:
         if key not in decisions:
             return
         decisions[key].mark_dirty(reason, propagated=propagated, pred=pred)
@@ -299,7 +309,8 @@ def compute_closure(
             seen.add(key)
             r = (
                 ReasonCode.GLOBAL_PROPAGATED
-                if decisions.get(key) and decisions[key].asset_kind == AssetKind.GLOBAL_STORY
+                if decisions.get(key)
+                and decisions[key].asset_kind == AssetKind.GLOBAL_STORY
                 else ReasonCode.PARENT_PROPAGATED
             )
             dirty_key(key, r, propagated=True, pred=start_key)
@@ -316,7 +327,9 @@ def compute_closure(
                 decisions[ch.asset_key].direct_reasons = [ReasonCode.CLEAN_IDENTICAL]
             continue
 
-        dirty_key(ch.asset_key, ch.reasons[0] if ch.reasons else ReasonCode.MAPPING_UNPROVEN)
+        dirty_key(
+            ch.asset_key, ch.reasons[0] if ch.reasons else ReasonCode.MAPPING_UNPROVEN
+        )
         for r in ch.reasons:
             dirty_key(ch.asset_key, r)
 
@@ -357,7 +370,9 @@ def compute_closure(
                             pass
             # Safer: dirties all chapter_state whose source_chapter matches
             chapter_id = ch.detail.get("chapter_id")
-            source_key = f"source_chapter:{chapter_id}" if chapter_id is not None else None
+            source_key = (
+                f"source_chapter:{chapter_id}" if chapter_id is not None else None
+            )
             if source_key:
                 for parent in parents_of.get(source_key, []):
                     for r in ch.reasons:
@@ -444,7 +459,10 @@ def compute_closure(
                 dirty_key(key, ReasonCode.GLOBAL_PROPAGATED, propagated=True)
             if dec.asset_kind in {AssetKind.STORY_ARC, AssetKind.VOLUME}:
                 # Dirty parents that overlap uncertain range
-                if earliest_uncertain_chapter is not None and dec.chapter_end is not None:
+                if (
+                    earliest_uncertain_chapter is not None
+                    and dec.chapter_end is not None
+                ):
                     if dec.chapter_end >= earliest_uncertain_chapter:
                         dirty_key(key, ReasonCode.PARENT_PROPAGATED, propagated=True)
                         propagate_up(key, ReasonCode.PARENT_PROPAGATED)
@@ -601,7 +619,9 @@ async def compute_rebuild_plan(
             parent_chapters[cid] = all_novel_chapters[cid]
         else:
             # Chapter deleted from novel — synthetic stub via link metadata
-            link = next(lnk for lnk in parent.source_links if int(lnk.chapter_id) == cid)
+            link = next(
+                lnk for lnk in parent.source_links if int(lnk.chapter_id) == cid
+            )
             stub = Chapter(
                 id=cid,
                 novel_id=novel_id,
@@ -722,9 +742,7 @@ async def compute_rebuild_plan(
     for c in chapter_changes:
         if c.change_kind != ChangeKind.NO_CHANGE and c.chapter_start is not None:
             earliest = (
-                c.chapter_start
-                if earliest is None
-                else min(earliest, c.chapter_start)
+                c.chapter_start if earliest is None else min(earliest, c.chapter_start)
             )
     for c in evidence_changes:
         if ReasonCode.MAPPING_UNPROVEN in c.reasons:
@@ -863,7 +881,9 @@ async def persist_rebuild_plan(
         )
     )
     if pair is not None and pair.plan_checksum != plan_cs:
-        raise ChangeOracleError("conflicting plan already exists for parent/target pair")
+        raise ChangeOracleError(
+            "conflicting plan already exists for parent/target pair"
+        )
     if pair is not None:
         return pair
 

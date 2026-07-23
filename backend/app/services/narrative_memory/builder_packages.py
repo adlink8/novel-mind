@@ -187,7 +187,9 @@ def rebind_chapter_state_package(
         display_label=model_output.display_label,
     )
 
-    leaves_by_id = {leaf.evidence_node_id: leaf for leaf in input_package.evidence_leaves}
+    leaves_by_id = {
+        leaf.evidence_node_id: leaf for leaf in input_package.evidence_leaves
+    }
     source_links: list[ExactSourceLink] = []
     claims: list[MemoryClaim] = []
 
@@ -197,7 +199,9 @@ def rebind_chapter_state_package(
             item
             for item in model_output.source_bindings
             if str(item.get("claim_key", "")) == claim_key
-            or (index == 1 and "claim_key" not in item and len(model_output.claims) == 1)
+            or (
+                index == 1 and "claim_key" not in item and len(model_output.claims) == 1
+            )
         ]
         if not bindings:
             # Bind first leaf deterministically when model omitted explicit binding.
@@ -266,9 +270,7 @@ def rebind_chapter_state_package(
                 raw_claim.get("visible_from_chapter", input_package.chapter_number)
             ),
             "source_keys": claim_source_keys,
-            "non_authoritative_statement": raw_claim.get(
-                "non_authoritative_statement"
-            ),
+            "non_authoritative_statement": raw_claim.get("non_authoritative_statement"),
         }
         claims.append(
             MemoryClaim.model_validate_json(
@@ -293,7 +295,11 @@ async def load_child_chapter_authority(
     novel_id: int,
     version_id: int,
     chapter_numbers: Sequence[int],
-) -> tuple[list[NarrativeMemoryNode], list[NarrativeMemoryClaim], list[NarrativeMemorySourceLink]]:
+) -> tuple[
+    list[NarrativeMemoryNode],
+    list[NarrativeMemoryClaim],
+    list[NarrativeMemorySourceLink],
+]:
     nodes = (
         await session.scalars(
             select(NarrativeMemoryNode)
@@ -563,7 +569,9 @@ def build_global_candidate(
     if not claims_src:
         for index, parent_claim in enumerate(parent_claims, start=1):
             claim_key = f"{node_key}:claim:{index}"
-            matching = [link for link in parent_links if link.claim_id == parent_claim.id]
+            matching = [
+                link for link in parent_links if link.claim_id == parent_claim.id
+            ]
             if not matching:
                 matching = list(parent_links[:1])
             if not matching:

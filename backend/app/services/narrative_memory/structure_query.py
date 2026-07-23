@@ -98,22 +98,14 @@ def compute_readiness(
     return "incomplete"
 
 
-def filter_nodes_by_cutoff(
-    nodes: Sequence[Any], through_chapter: int
-) -> list[Any]:
+def filter_nodes_by_cutoff(nodes: Sequence[Any], through_chapter: int) -> list[Any]:
     """Keep nodes whose full range ends at or before the spoiler cutoff."""
 
     return [n for n in nodes if int(n.chapter_end) <= int(through_chapter)]
 
 
-def filter_claims_by_cutoff(
-    claims: Sequence[Any], through_chapter: int
-) -> list[Any]:
-    return [
-        c
-        for c in claims
-        if int(c.visible_from_chapter) <= int(through_chapter)
-    ]
+def filter_claims_by_cutoff(claims: Sequence[Any], through_chapter: int) -> list[Any]:
+    return [c for c in claims if int(c.visible_from_chapter) <= int(through_chapter)]
 
 
 def claim_summary_text(typed_payload: dict[str, Any] | None) -> str:
@@ -196,9 +188,7 @@ def resolve_through_chapter(
         return 10**9
     value = int(through_chapter)
     if value < 1:
-        raise StructureQueryError(
-            "through_chapter must be >= 1", status_code=400
-        )
+        raise StructureQueryError("through_chapter must be >= 1", status_code=400)
     if novel_chapter_count and novel_chapter_count > 0:
         return min(value, int(novel_chapter_count))
     return value

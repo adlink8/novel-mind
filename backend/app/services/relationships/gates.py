@@ -174,7 +174,11 @@ class RelationshipGateService:
         reason_codes: list[str],
     ) -> GateDecision:
         confidence = float(judgment.confidence)
-        transition = judgment.transition.value if hasattr(judgment.transition, "value") else str(judgment.transition)
+        transition = (
+            judgment.transition.value
+            if hasattr(judgment.transition, "value")
+            else str(judgment.transition)
+        )
 
         if transition in REVIEW_ONLY_TRANSITIONS:
             failures.append("threshold_gate:uncertain_transition")
@@ -211,7 +215,9 @@ class RelationshipGateService:
 
         # confidence >= AUTO_ACCEPT_THRESHOLD
         if judgment.risk_flags:
-            failures.append(f"threshold_gate:risk_flags:{','.join(judgment.risk_flags)}")
+            failures.append(
+                f"threshold_gate:risk_flags:{','.join(judgment.risk_flags)}"
+            )
             reason_codes.append("risk_flags_review")
             return GateDecision(
                 status="needs_human_review",
@@ -334,7 +340,10 @@ class RelationshipGateService:
         failures: list[str] = []
         if package.source_character_id == package.target_character_id:
             failures.append("hard:self_edge")
-        if proposed_idempotency_key and proposed_idempotency_key in existing_idempotency_keys:
+        if (
+            proposed_idempotency_key
+            and proposed_idempotency_key in existing_idempotency_keys
+        ):
             # Duplicate key is handled as idempotent reuse by the worker, not a hard fail.
             # Surface as soft conflict metadata only when caller treats it as conflict.
             failures.append("soft:duplicate_idempotency_key")

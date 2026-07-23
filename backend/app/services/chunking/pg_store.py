@@ -82,16 +82,20 @@ async def load_hierarchy_trees(
     session: AsyncSession, build_id: str
 ) -> list[HierarchyTree]:
     rows = (
-        await session.execute(
-            select(ChunkHierarchyNode)
-            .where(ChunkHierarchyNode.build_id == build_id)
-            .order_by(
-                ChunkHierarchyNode.chapter_id,
-                ChunkHierarchyNode.level,
-                ChunkHierarchyNode.order_index,
+        (
+            await session.execute(
+                select(ChunkHierarchyNode)
+                .where(ChunkHierarchyNode.build_id == build_id)
+                .order_by(
+                    ChunkHierarchyNode.chapter_id,
+                    ChunkHierarchyNode.level,
+                    ChunkHierarchyNode.order_index,
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     if not rows:
         return []
 
@@ -216,9 +220,7 @@ async def set_active_pointer(
     now = _utcnow()
     if row is None:
         session.add(
-            ChunkActivePointer(
-                novel_id=novel_id, build_id=build_id, committed_at=now
-            )
+            ChunkActivePointer(novel_id=novel_id, build_id=build_id, committed_at=now)
         )
     else:
         row.build_id = build_id
@@ -389,9 +391,7 @@ async def create_and_persist_hierarchy_build(
 
     if promote_active:
         await set_active_pointer(session, novel_id=novel_id, build_id=build_id)
-        rec = rec.model_copy(
-            update={"status": "committed", "is_candidate": False}
-        )
+        rec = rec.model_copy(update={"status": "committed", "is_candidate": False})
 
     await session.flush()
     return rec
@@ -406,22 +406,26 @@ async def _link_evidence_to_text_chunks(
 ) -> None:
     """Attach hierarchy lineage columns on matching text_chunks (non-destructive)."""
     chunks = (
-        await session.execute(
-            select(TextChunk).where(TextChunk.novel_id == novel_id)
-        )
-    ).scalars().all()
+        (await session.execute(select(TextChunk).where(TextChunk.novel_id == novel_id)))
+        .scalars()
+        .all()
+    )
     by_content: dict[str, list[TextChunk]] = {}
     for c in chunks:
         by_content.setdefault((c.content or "").strip(), []).append(c)
 
     node_rows = (
-        await session.execute(
-            select(ChunkHierarchyNode).where(
-                ChunkHierarchyNode.build_id == build_id,
-                ChunkHierarchyNode.level == "evidence",
+        (
+            await session.execute(
+                select(ChunkHierarchyNode).where(
+                    ChunkHierarchyNode.build_id == build_id,
+                    ChunkHierarchyNode.level == "evidence",
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     for nr in node_rows:
         key = (nr.content or "").strip()

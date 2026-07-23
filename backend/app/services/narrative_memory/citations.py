@@ -40,9 +40,7 @@ class CitationOutcome:
     drop_reason: str | None = None
 
 
-async def _reload_scope_authority(
-    session: AsyncSession, scope: RetrievalScope
-) -> None:
+async def _reload_scope_authority(session: AsyncSession, scope: RetrievalScope) -> None:
     version = await session.scalar(
         select(NarrativeMemoryVersion).where(
             NarrativeMemoryVersion.owner_id == scope.owner_id,

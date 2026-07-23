@@ -237,7 +237,9 @@ def validate_transition_legality(
         )
 
 
-def _require_role(evidence: list[ClueEvidenceRef], role: ClueEvidenceRole) -> list[ClueEvidenceRef]:
+def _require_role(
+    evidence: list[ClueEvidenceRef], role: ClueEvidenceRole
+) -> list[ClueEvidenceRef]:
     return [e for e in evidence if e.role == role]
 
 
@@ -391,7 +393,11 @@ class MachineClueContract(StrictClueModel):
     @field_validator("logical_clue_id", "title")
     @classmethod
     def _no_forbidden(cls, value: str) -> str:
-        return _reject_forbidden_token(value) if value.strip().lower() in _FORBIDDEN_DOMAIN_VALUES else value
+        return (
+            _reject_forbidden_token(value)
+            if value.strip().lower() in _FORBIDDEN_DOMAIN_VALUES
+            else value
+        )
 
 
 class ClueLifecycleEventContract(StrictClueModel):
@@ -434,8 +440,12 @@ class ClueLinkContract(StrictClueModel):
     target_kind: ClueLinkTargetKind
     character_id: int | None = Field(default=None, gt=0)
     timeline_event_id: int | None = Field(default=None, gt=0)
-    relationship_observation_ref: str | None = Field(default=None, min_length=1, max_length=160)
-    supporting_evidence: list[ClueEvidenceRef] = Field(default_factory=list, max_length=8)
+    relationship_observation_ref: str | None = Field(
+        default=None, min_length=1, max_length=160
+    )
+    supporting_evidence: list[ClueEvidenceRef] = Field(
+        default_factory=list, max_length=8
+    )
     validation_status: ClueLinkValidationStatus = ClueLinkValidationStatus.UNRESOLVED
     # Explicit rejection of chat/similarity as evidence carriers.
     chat_text: None = None
@@ -456,7 +466,10 @@ class ClueLinkContract(StrictClueModel):
                 f"target_kind={self.target_kind.value} does not match provided payload"
             )
         if self.target_kind == ClueLinkTargetKind.RELATIONSHIP_OBSERVATION:
-            if self.validation_status == ClueLinkValidationStatus.VALID and not self.supporting_evidence:
+            if (
+                self.validation_status == ClueLinkValidationStatus.VALID
+                and not self.supporting_evidence
+            ):
                 raise ValueError(
                     "valid relationship observation links require supporting evidence"
                 )
@@ -517,7 +530,9 @@ class ClueSemanticJudgment(StrictClueModel):
             ClueSemanticClassification.PAYOFF,
         }:
             if not self.cue_evidence_ids:
-                raise ValueError(f"{self.classification.value} requires cue_evidence_ids")
+                raise ValueError(
+                    f"{self.classification.value} requires cue_evidence_ids"
+                )
         if self.classification == ClueSemanticClassification.PAYOFF:
             if not self.later_evidence_ids:
                 raise ValueError("payoff classification requires later_evidence_ids")

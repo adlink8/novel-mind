@@ -157,12 +157,16 @@ async def _validated_version(
 ) -> ClueAnalysisVersion:
     version = await session.get(ClueAnalysisVersion, version_id)
     if version is None or version.owner_id != owner_id or version.novel_id != novel_id:
-        raise ManifestValidationError("candidate is outside the requested owner/novel scope")
+        raise ManifestValidationError(
+            "candidate is outside the requested owner/novel scope"
+        )
     if version.status not in {"candidate", "validated", "superseded"}:
         raise ManifestValidationError("version status cannot be activated")
     manifest, checksum = await snapshot_manifest(session, version.id)
     if version.manifest != manifest or version.manifest_checksum != checksum:
-        raise ManifestValidationError("stored manifest does not match immutable graph rows")
+        raise ManifestValidationError(
+            "stored manifest does not match immutable graph rows"
+        )
     return version
 
 
@@ -387,7 +391,8 @@ async def compare_machine_versions(
         lid
         for lid in (from_ids & to_ids)
         if from_by[lid] != to_by[lid]
-        or _lifecycle_signature(from_manifest, lid) != _lifecycle_signature(to_manifest, lid)
+        or _lifecycle_signature(from_manifest, lid)
+        != _lifecycle_signature(to_manifest, lid)
     )
     # group lifecycle by logical for diff
     lifecycle_differences = []

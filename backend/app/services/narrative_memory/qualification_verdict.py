@@ -119,7 +119,8 @@ def evaluate_verdict(
         if cell is None or cell.status in {MetricStatus.MISSING, MetricStatus.INVALID}:
             # cost may exist per-case; check any OK
             any_ok = any(
-                c.metric_name == name and c.status == MetricStatus.OK for c in metric_cells
+                c.metric_name == name and c.status == MetricStatus.OK
+                for c in metric_cells
             )
             if not any_ok:
                 reasons.append(f"metric_incomplete:{name}")
@@ -130,7 +131,11 @@ def evaluate_verdict(
         for c in metric_cells:
             if c.metric_name != name:
                 continue
-            if c.status == MetricStatus.OK and c.value is not None and float(c.value) > 0:
+            if (
+                c.status == MetricStatus.OK
+                and c.value is not None
+                and float(c.value) > 0
+            ):
                 reasons.append(f"zero_tolerance:{name}")
                 failing.append(name)
                 break

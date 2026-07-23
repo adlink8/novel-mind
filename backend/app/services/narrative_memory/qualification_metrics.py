@@ -302,7 +302,13 @@ def aggregate_mean_cells(
     strategy: RetrievalStrategy | None = None,
     bucket: QuestionBucket | None = None,
 ) -> MetricCell:
-    ok = [c for c in cells if c.metric_name == metric_name and c.status == MetricStatus.OK and c.value is not None]
+    ok = [
+        c
+        for c in cells
+        if c.metric_name == metric_name
+        and c.status == MetricStatus.OK
+        and c.value is not None
+    ]
     if not ok:
         return make_cell(
             metric_name,
@@ -401,11 +407,18 @@ def build_complete_report_cells(
         )
         cells.append(
             ndcg_at_k(
-                retrieved, graded, k=top_k, case_id=case_id, strategy=strat, bucket=bucket
+                retrieved,
+                graded,
+                k=top_k,
+                case_id=case_id,
+                strategy=strat,
+                bucket=bucket,
             )
         )
 
-        route_hit = 1 if art.get("route_chosen") in (art.get("route_allowed") or []) else 0
+        route_hit = (
+            1 if art.get("route_chosen") in (art.get("route_allowed") or []) else 0
+        )
         cells.append(
             rate_cell(
                 "route_hit",
@@ -564,7 +577,12 @@ def build_complete_report_cells(
 
         lat = float(art.get("latency_ms") or 0)
         cells.extend(
-            latency_cells([lat], name_prefix="end_to_end_latency", strategy=strat, case_ids=(case_id,))
+            latency_cells(
+                [lat],
+                name_prefix="end_to_end_latency",
+                strategy=strat,
+                case_ids=(case_id,),
+            )
         )
         cells.append(
             make_cell(
@@ -628,7 +646,9 @@ def build_complete_report_cells(
         lats = [float(a.get("latency_ms") or 0) for a in arts]
         ids = [a["case_key"] for a in arts]
         cells.extend(
-            latency_cells(lats, name_prefix="end_to_end_latency", strategy=strat, case_ids=ids)
+            latency_cells(
+                lats, name_prefix="end_to_end_latency", strategy=strat, case_ids=ids
+            )
         )
         cells.append(
             aggregate_mean_cells(
@@ -655,11 +675,7 @@ def build_complete_report_cells(
             strat = RetrievalStrategy(strat_name)
             cells.append(
                 aggregate_mean_cells(
-                    [
-                        c
-                        for c in cells
-                        if c.bucket == bucket and c.strategy == strat
-                    ],
+                    [c for c in cells if c.bucket == bucket and c.strategy == strat],
                     metric_name="leaf_recall_at_k",
                     strategy=strat,
                     bucket=bucket,
@@ -759,7 +775,14 @@ def build_complete_report_cells(
 def metric_report_checksum(cells: Sequence[MetricCell]) -> str:
     payload = [c.model_dump(mode="json") for c in cells]
     # sort for order independence
-    payload.sort(key=lambda d: (d["metric_name"], d.get("strategy") or "", d.get("bucket") or "", list(d.get("case_ids") or [])))
+    payload.sort(
+        key=lambda d: (
+            d["metric_name"],
+            d.get("strategy") or "",
+            d.get("bucket") or "",
+            list(d.get("case_ids") or []),
+        )
+    )
     return stable_checksum(payload)
 
 
@@ -775,12 +798,20 @@ def required_metrics_complete(cells: Sequence[MetricCell]) -> list[str]:
         bad = [
             c
             for c in cells
-            if c.metric_name == req and c.status in {MetricStatus.MISSING, MetricStatus.INVALID}
+            if c.metric_name == req
+            and c.status in {MetricStatus.MISSING, MetricStatus.INVALID}
             and c.strategy in (None, RetrievalStrategy.HIERARCHICAL_CANDIDATE)
         ]
         # reuse metrics are strategy-less
-        if req.startswith("reuse_") or req.endswith("_cost_usd") and "actual" in req or "upper_bound" in req:
-            bad = [c for c in cells if c.metric_name == req and c.status != MetricStatus.OK]
+        if (
+            req.startswith("reuse_")
+            or req.endswith("_cost_usd")
+            and "actual" in req
+            or "upper_bound" in req
+        ):
+            bad = [
+                c for c in cells if c.metric_name == req and c.status != MetricStatus.OK
+            ]
         if bad and req in {
             "spoiler_leakage",
             "critical_unsupported",

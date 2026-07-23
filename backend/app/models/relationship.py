@@ -71,7 +71,9 @@ class RelationshipBuildRun(TimestampMixin, Base):
             "'paused_budget','paused_dependency')",
             name="ck_rel_build_runs_status",
         ),
-        Index("idx_rel_build_runs_scope", "owner_id", "novel_id", "analysis_version_id"),
+        Index(
+            "idx_rel_build_runs_scope", "owner_id", "novel_id", "analysis_version_id"
+        ),
         Index("idx_rel_build_runs_status", "status"),
     )
 
@@ -138,7 +140,9 @@ class RelationshipObservationCandidate(TimestampMixin, Base):
         ),
         Index("idx_rel_obs_candidates_source_judgment", "source_judgment_id"),
         Index("idx_rel_obs_candidates_build_run", "build_run_id"),
-        Index("idx_rel_obs_candidates_pair", "source_character_id", "target_character_id"),
+        Index(
+            "idx_rel_obs_candidates_pair", "source_character_id", "target_character_id"
+        ),
         UniqueConstraint(
             "analysis_version_id",
             "package_hash",
@@ -253,13 +257,17 @@ class RelationshipObservationJudgment(TimestampMixin, Base):
     confidence: Mapped[float] = mapped_column(Float, nullable=False)
     valid_from_evidence_id: Mapped[str] = mapped_column(String(80), nullable=False)
     valid_to_evidence_id: Mapped[str | None] = mapped_column(String(80), nullable=True)
-    supporting_evidence_ids: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    supporting_evidence_ids: Mapped[list] = mapped_column(
+        JSON, nullable=False, default=list
+    )
     structured_output: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     raw_output_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     rationale: Mapped[str | None] = mapped_column(Text, nullable=True)
     risk_flags: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="pending")
-    gate_status: Mapped[str] = mapped_column(String(40), nullable=False, default="pending")
+    gate_status: Mapped[str] = mapped_column(
+        String(40), nullable=False, default="pending"
+    )
     gate_failures: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     call_skipped: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default="false"
@@ -473,7 +481,9 @@ class CharacterIdentityOverride(TimestampMixin, Base):
     canonical_character_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("characters.id", ondelete="RESTRICT"), nullable=False
     )
-    merged_character_ids: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    merged_character_ids: Mapped[list] = mapped_column(
+        JSON, nullable=False, default=list
+    )
     author: Mapped[str] = mapped_column(String(120), nullable=False)
     reason: Mapped[str] = mapped_column(Text, nullable=False)
     evidence_signature: Mapped[str] = mapped_column(String(128), nullable=False)

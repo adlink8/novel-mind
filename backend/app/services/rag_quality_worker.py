@@ -199,19 +199,13 @@ class QualityJobStore:
         with self._lock:
             return [j for j in self._jobs.values() if j.owner_id == owner_id]
 
-    async def try_acquire_lease(
-        self, job_id: str, *, lease_seconds: int
-    ) -> str | None:
+    async def try_acquire_lease(self, job_id: str, *, lease_seconds: int) -> str | None:
         with self._lock:
             job = self._jobs.get(job_id)
             if job is None:
                 return None
             now = _utcnow()
-            if (
-                job.lease_id
-                and job.lease_expires_at
-                and job.lease_expires_at > now
-            ):
+            if job.lease_id and job.lease_expires_at and job.lease_expires_at > now:
                 return None
             lease_id = uuid.uuid4().hex
             job.lease_id = lease_id
@@ -373,17 +367,19 @@ class QualityRunRepository:
 
     async def list_for_owner(self, owner_id: int) -> list[QualityJob]:
         rows = (
-            await self.session.execute(
-                select(QualityRun)
-                .where(QualityRun.owner_id == owner_id)
-                .order_by(QualityRun.created_at.desc())
+            (
+                await self.session.execute(
+                    select(QualityRun)
+                    .where(QualityRun.owner_id == owner_id)
+                    .order_by(QualityRun.created_at.desc())
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         return [_row_to_job(r) for r in rows]
 
-    async def try_acquire_lease(
-        self, job_id: str, *, lease_seconds: int
-    ) -> str | None:
+    async def try_acquire_lease(self, job_id: str, *, lease_seconds: int) -> str | None:
         """Atomic lease acquire: free or expired leases only (CAS)."""
         now = _utcnow()
         lease_id = uuid.uuid4().hex
@@ -740,14 +736,13 @@ class RagQualityWorker:
                 if require_lineage and (
                     canonical is None
                     or lin_reason == LEGACY_INCOMPARABLE_REASON
-                    or (
-                        lin_reason
-                        and lin_reason.startswith(INVALID_LINEAGE_REASON)
-                    )
+                    or (lin_reason and lin_reason.startswith(INVALID_LINEAGE_REASON))
                 ):
                     reason = lin_reason or INVALID_LINEAGE_REASON
                     if reason == LEGACY_INCOMPARABLE_REASON:
-                        reason = f"{INVALID_LINEAGE_REASON}: missing chunker/source lineage"
+                        reason = (
+                            f"{INVALID_LINEAGE_REASON}: missing chunker/source lineage"
+                        )
                     job.status = "invalid_lineage"
                     job.metrics = None
                     job.quality_comparable = False
@@ -871,9 +866,9 @@ class RagQualityWorker:
                 }
             )
             if not job.quality_comparable and report.get("status") == "invalid_lineage":
-                job.incomparable_reason = report.get("incomparable_reason") or report.get(
-                    "reason"
-                )
+                job.incomparable_reason = report.get(
+                    "incomparable_reason"
+                ) or report.get("reason")
             await self._checkpoint(job, job.status, final=True)
             return job
         except RuntimeError as exc:

@@ -99,10 +99,7 @@ async def complete_refresh(
             actual = await read_actual_collection(build, chosen_store)
             before = await reconcile_build(db, build_id=build.id, actual_items=actual)
             reconcile_payload = {
-                **{
-                    name: getattr(before, name)
-                    for name in before.__dataclass_fields__
-                },
+                **{name: getattr(before, name) for name in before.__dataclass_fields__},
                 "collection": build.collection_name,
             }
             journal = await narrative_promotion_service.prepare(

@@ -235,7 +235,11 @@ class CandidateRecallService:
             )
             .outerjoin(Chapter, Chapter.id == TextChunk.chapter_id)
             .where(TextChunk.novel_id == novel_id)
-            .order_by(TextChunk.chapter_id.asc(), TextChunk.chunk_index.asc(), TextChunk.id.asc())
+            .order_by(
+                TextChunk.chapter_id.asc(),
+                TextChunk.chunk_index.asc(),
+                TextChunk.id.asc(),
+            )
         )
         result = await db.execute(stmt)
         return [
@@ -267,12 +271,18 @@ class CandidateRecallService:
         if not query:
             return signals
 
-        for row in await self._bm25_signal_rows(db, novel_id=novel_id, query=query, limit=top_k):
+        for row in await self._bm25_signal_rows(
+            db, novel_id=novel_id, query=query, limit=top_k
+        ):
             signals.setdefault(row["chunk_id"], {})["bm25"] = {"score": row["score"]}
 
         if vector_enabled:
-            for row in await self._vector_signal_rows(novel_id=novel_id, query=query, top_k=top_k):
-                signals.setdefault(row["chunk_id"], {})["vector"] = {"score": row["score"]}
+            for row in await self._vector_signal_rows(
+                novel_id=novel_id, query=query, top_k=top_k
+            ):
+                signals.setdefault(row["chunk_id"], {})["vector"] = {
+                    "score": row["score"]
+                }
 
         if domain_profile == "history":
             for chunk_signal in signals.values():
@@ -349,7 +359,9 @@ class CandidateRecallService:
     ) -> dict[str, Any]:
         signals: dict[str, Any] = {}
 
-        same_chapter = source.chapter_id is not None and source.chapter_id == target.chapter_id
+        same_chapter = (
+            source.chapter_id is not None and source.chapter_id == target.chapter_id
+        )
         chapter_distance = _chapter_distance(source.chapter_id, target.chapter_id)
         chunk_distance = abs(target.chunk_index - source.chunk_index)
         if same_chapter or (
@@ -417,7 +429,9 @@ def _metadata_values(metadata: dict[str, Any], keys: tuple[str, ...]) -> set[str
         elif isinstance(raw, list):
             values.update(str(item).strip() for item in raw if str(item).strip())
         elif isinstance(raw, dict):
-            values.update(str(item).strip() for item in raw.values() if str(item).strip())
+            values.update(
+                str(item).strip() for item in raw.values() if str(item).strip()
+            )
     return {value for value in values if value}
 
 

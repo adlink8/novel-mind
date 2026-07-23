@@ -29,7 +29,9 @@ _BLOCKING_REASONS = {
 }
 
 
-def _evaluate(item: AssetInventory, *, owner_id: int, novel_id: int) -> AssetEligibility:
+def _evaluate(
+    item: AssetInventory, *, owner_id: int, novel_id: int
+) -> AssetEligibility:
     requirement = _REQUIREMENTS[item.kind]
     reasons = set(item.reason_codes)
     if item.owner_id != owner_id:

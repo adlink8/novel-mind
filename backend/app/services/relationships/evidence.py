@@ -128,9 +128,9 @@ def sha256_text(value: str) -> str:
 
 def sha256_json(value: Any) -> str:
     return hashlib.sha256(
-        json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode(
-            "utf-8"
-        )
+        json.dumps(
+            value, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+        ).encode("utf-8")
     ).hexdigest()
 
 
@@ -219,7 +219,11 @@ def build_relationship_evidence_package(
     if any(not u.evidence_id for u in units):
         raise ValueError("empty evidence_id is forbidden")
 
-    for required in (source_snapshot_hash, hierarchy_checksum, source_judgment_checksum):
+    for required in (
+        source_snapshot_hash,
+        hierarchy_checksum,
+        source_judgment_checksum,
+    ):
         if len(required) != 64:
             raise ValueError("lineage hashes must be 64-char SHA-256 hex digests")
 
@@ -246,7 +250,9 @@ def build_relationship_evidence_package(
     return package
 
 
-def evidence_checksum_for(units: list[RelationshipEvidenceUnit] | list[dict[str, Any]]) -> str:
+def evidence_checksum_for(
+    units: list[RelationshipEvidenceUnit] | list[dict[str, Any]],
+) -> str:
     """Checksum over ordered evidence locators for observation lineage."""
 
     rows = []

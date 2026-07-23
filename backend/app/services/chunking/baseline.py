@@ -133,9 +133,7 @@ def _flex_match_chunk(haystack: str, needle: str, start: int) -> tuple[int, int]
     return None
 
 
-def _locate_chunk_spans(
-    normalized: str, chunks: list[str]
-) -> list[tuple[int, int]]:
+def _locate_chunk_spans(normalized: str, chunks: list[str]) -> list[tuple[int, int]]:
     """Walk normalized text once; bind each chunk with forward-only flexible match."""
     spans: list[tuple[int, int]] = []
     cursor = 0

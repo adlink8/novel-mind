@@ -35,7 +35,9 @@ class AppendLifecycleResult:
     event_key: str
 
 
-def _schema_evidence(rows: Iterable[dict[str, Any] | ClueEvidenceRefSchema]) -> list[ClueEvidenceRefSchema]:
+def _schema_evidence(
+    rows: Iterable[dict[str, Any] | ClueEvidenceRefSchema],
+) -> list[ClueEvidenceRefSchema]:
     out: list[ClueEvidenceRefSchema] = []
     for item in rows:
         if isinstance(item, ClueEvidenceRefSchema):
@@ -183,16 +185,16 @@ async def append_lifecycle_event(
         session, version_id=version_id, logical_clue_id=logical_clue_id
     )
     inputs = events_to_inputs(rows)
-    current = (
-        replay_lifecycle(inputs) if inputs else ClueLifecycleState.CANDIDATE
-    )
+    current = replay_lifecycle(inputs) if inputs else ClueLifecycleState.CANDIDATE
 
     if protect_human_dismissal and rows:
         last_human_dismiss = any(
             r.to_status == "dismissed" and r.actor_source == "human" for r in rows
         )
         if last_human_dismiss and actor == ClueActorSource.MACHINE:
-            raise LifecyclePersistError("human dismissal is protected from machine transitions")
+            raise LifecyclePersistError(
+                "human dismissal is protected from machine transitions"
+            )
         last_human_confirm = any(
             r.to_status == "active" and r.actor_source == "human" for r in rows
         )
@@ -201,7 +203,9 @@ async def append_lifecycle_event(
             and actor == ClueActorSource.MACHINE
             and dst == ClueLifecycleState.DISMISSED
         ):
-            raise LifecyclePersistError("human confirm is protected from machine dismissal")
+            raise LifecyclePersistError(
+                "human confirm is protected from machine dismissal"
+            )
 
     consumed: set[str] = set()
     for item in inputs:

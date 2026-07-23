@@ -163,11 +163,8 @@ def _match_any(text: str, patterns: tuple[re.Pattern[str], ...]) -> bool:
 
 def _extract_signals(question: RetrievalQuestion) -> _Signals:
     text = question.normalized_text
-    has_selection = (
-        question.selected_chapter is not None
-        or (
-            question.selected_start is not None and question.selected_end is not None
-        )
+    has_selection = question.selected_chapter is not None or (
+        question.selected_start is not None and question.selected_end is not None
     )
     return _Signals(
         has_selection=has_selection,
@@ -202,7 +199,10 @@ def decide_route(
         return RouteDecision(
             mode=RouteMode.MIXED,
             start_levels=_START_LEVELS[RouteMode.MIXED],
-            reason_codes=(RouteReasonCode.NO_ANSWER_SHAPE, RouteReasonCode.SAFE_DEFAULT),
+            reason_codes=(
+                RouteReasonCode.NO_ANSWER_SHAPE,
+                RouteReasonCode.SAFE_DEFAULT,
+            ),
             policy_version=policy_version,
             policy_hash=policy_hash,
         )

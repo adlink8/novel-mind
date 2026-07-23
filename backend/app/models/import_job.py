@@ -85,14 +85,10 @@ class ImportJob(TimestampMixin, Base):
         String(50), default="pending"
     )  # 状态: pending / uploading / detecting / parsing / chunking / embedding / ready / failed
     progress: Mapped[int] = mapped_column(Integer, default=0)  # 进度百分比 0-100
-    message: Mapped[str] = mapped_column(
-        String(500), default=""
-    )  # 状态描述信息
+    message: Mapped[str] = mapped_column(String(500), default="")  # 状态描述信息
 
     # 错误信息
-    error_detail: Mapped[str | None] = mapped_column(
-        Text
-    )  # 失败时的详细错误信息
+    error_detail: Mapped[str | None] = mapped_column(Text)  # 失败时的详细错误信息
 
     # 重试机制
     retry_count: Mapped[int] = mapped_column(Integer, default=0)  # 已重试次数

@@ -152,7 +152,9 @@ def sign_payload(payload: dict[str, Any], secret: str) -> str:
         separators=(",", ":"),
         default=str,
     )
-    return hmac.new(secret.encode("utf-8"), body.encode("utf-8"), hashlib.sha256).hexdigest()
+    return hmac.new(
+        secret.encode("utf-8"), body.encode("utf-8"), hashlib.sha256
+    ).hexdigest()
 
 
 def verify_signature(payload: dict[str, Any], secret: str) -> bool:
@@ -297,7 +299,9 @@ def make_evidence_ref(
     chunks = snapshot_chunk_map(snapshot)
     chunk = chunks.get(content_hash_value)
     if chunk is None or chunk.text is None:
-        raise InvalidFixtureError("chunk not found or text unavailable for evidence ref")
+        raise InvalidFixtureError(
+            "chunk not found or text unavailable for evidence ref"
+        )
     if start < 0 or end > len(chunk.text) or start > end:
         raise InvalidFixtureError("evidence offsets out of range")
     quote = chunk.text[start:end]
@@ -318,12 +322,20 @@ def verify_evidence_ref(ref: EvidenceRef, snapshot: SourceSnapshot) -> bool:
         return False
     if chunk.text is None:
         # Without text we can only check structural bounds against declared length.
-        if ref.start_offset < 0 or ref.end_offset > chunk.length or ref.start_offset > ref.end_offset:
+        if (
+            ref.start_offset < 0
+            or ref.end_offset > chunk.length
+            or ref.start_offset > ref.end_offset
+        ):
             return False
         if ref.quote_text is not None:
             return hmac.compare_digest(quote_hash(ref.quote_text), ref.quote_hash)
         return True
-    if ref.start_offset < 0 or ref.end_offset > len(chunk.text) or ref.start_offset > ref.end_offset:
+    if (
+        ref.start_offset < 0
+        or ref.end_offset > len(chunk.text)
+        or ref.start_offset > ref.end_offset
+    ):
         return False
     quote = chunk.text[ref.start_offset : ref.end_offset]
     if not hmac.compare_digest(quote_hash(quote), ref.quote_hash):
@@ -375,7 +387,9 @@ def validate_generator_judge_isolation(
     generator: ModelLineage, judge: ModelLineage
 ) -> None:
     """G and J must differ in model_family AND weights/revision (fail closed)."""
-    same_family = generator.model_family.strip().lower() == judge.model_family.strip().lower()
+    same_family = (
+        generator.model_family.strip().lower() == judge.model_family.strip().lower()
+    )
     same_weights = (
         generator.weights_revision.strip().lower()
         == judge.weights_revision.strip().lower()
@@ -439,8 +453,10 @@ def run_deterministic_checks(
 
     # offset / quote
     refs = _all_refs(case)
-    offset_quote_ok = all(verify_evidence_ref(r, snapshot) for r in refs) if refs else (
-        case.case_type == "no_answer"
+    offset_quote_ok = (
+        all(verify_evidence_ref(r, snapshot) for r in refs)
+        if refs
+        else (case.case_type == "no_answer")
     )
     if case.case_type != "no_answer" and not refs:
         offset_quote_ok = False
@@ -473,12 +489,17 @@ def run_deterministic_checks(
     if case.case_type == "answerable":
         for claim in case.claims:
             if claim.critical:
-                if not claim.evidence_set_ids or not set(claim.evidence_set_ids) <= set_ids:
+                if (
+                    not claim.evidence_set_ids
+                    or not set(claim.evidence_set_ids) <= set_ids
+                ):
                     critical_ok = False
                     break
                 # At least one ref in each set must verify
                 for sid in claim.evidence_set_ids:
-                    es = next(e for e in case.equivalent_evidence_sets if e.set_id == sid)
+                    es = next(
+                        e for e in case.equivalent_evidence_sets if e.set_id == sid
+                    )
                     if not any(verify_evidence_ref(r, snapshot) for r in es.refs):
                         critical_ok = False
                         break
@@ -486,7 +507,9 @@ def run_deterministic_checks(
         DeterministicCheckResult(
             name="critical_claim_support",
             passed=critical_ok,
-            detail=None if critical_ok else "critical claim lacks verified evidence set",
+            detail=None
+            if critical_ok
+            else "critical claim lacks verified evidence set",
         )
     )
 
@@ -515,7 +538,11 @@ def run_deterministic_checks(
     leak_ok = True
     if case.reference_answer and case.case_type == "answerable":
         for chunk in snapshot.chunks:
-            if chunk.text and len(chunk.text) > 40 and chunk.text in case.reference_answer:
+            if (
+                chunk.text
+                and len(chunk.text) > 40
+                and chunk.text in case.reference_answer
+            ):
                 leak_ok = False
                 break
         for ref in refs:
@@ -549,7 +576,14 @@ def run_deterministic_checks(
             # Allow explicit refuse phrases only
             refuse = any(
                 p in case.reference_answer.lower()
-                for p in ("cannot answer", "no evidence", "unknown", "无法", "证据不足", "不足以")
+                for p in (
+                    "cannot answer",
+                    "no evidence",
+                    "unknown",
+                    "无法",
+                    "证据不足",
+                    "不足以",
+                )
             )
             if not refuse:
                 no_answer_ok = False
@@ -665,9 +699,7 @@ def freeze_eval_case(
     return frozen
 
 
-def verify_frozen_case(
-    case: EvalCase, secret: str = DEFAULT_SIGNING_SECRET
-) -> bool:
+def verify_frozen_case(case: EvalCase, secret: str = DEFAULT_SIGNING_SECRET) -> bool:
     if case.status != "frozen" or not case.fixture_hash or not case.signature:
         return False
     if not hmac.compare_digest(compute_fixture_hash(case), case.fixture_hash):
@@ -741,7 +773,9 @@ def default_stub_generator(
                 critical=c.get("critical", True),
                 evidence_set_ids=c.get("evidence_set_ids", ["s1"]),
             )
-            for i, c in enumerate(spec.get("claims", [{"text": "supported claim", "critical": True}]))
+            for i, c in enumerate(
+                spec.get("claims", [{"text": "supported claim", "critical": True}])
+            )
         ]
         if reference is None and eq_sets and eq_sets[0].refs:
             reference = eq_sets[0].refs[0].quote_text
@@ -991,7 +1025,9 @@ def validate_adversarial_payload(
     # Length / oversize
     raw = json.dumps(payload, ensure_ascii=False, default=str)
     if len(raw) > 500_000:
-        return fail_closed("invalid_fixture", "oversize payload", detail={"bytes": len(raw)})
+        return fail_closed(
+            "invalid_fixture", "oversize payload", detail={"bytes": len(raw)}
+        )
 
     question = str(payload.get("question") or "")
     if len(question) > MAX_QUESTION_LEN:
@@ -1030,7 +1066,8 @@ def validate_adversarial_payload(
     nested = {
         k: v
         for k, v in payload.items()
-        if k not in {"status", "signature", "metrics", "quality_comparable", "suite_type"}
+        if k
+        not in {"status", "signature", "metrics", "quality_comparable", "suite_type"}
     }
     smuggled = _find_smuggled_keys(nested)
     # Allow legitimate nested fields named carefully — flag only dangerous ones
@@ -1090,7 +1127,11 @@ def validate_adversarial_payload(
     # Cross-owner
     if expected_owner_id is not None:
         payload_owner = payload.get("owner_id")
-        snap_owner = snapshot.owner_id if snapshot is not None else payload.get("snapshot_owner_id")
+        snap_owner = (
+            snapshot.owner_id
+            if snapshot is not None
+            else payload.get("snapshot_owner_id")
+        )
         if payload_owner is not None and int(payload_owner) != expected_owner_id:
             return fail_closed(
                 "failed_policy",
@@ -1238,12 +1279,12 @@ def assert_calibration_benchmark_isolation(
     if not cal_domain or not bench_domain:
         raise InvalidLineageError("missing calibration or benchmark domain")
     if cal_domain == bench_domain:
-        raise InvalidLineageError("calibration domain must differ from benchmark domain")
+        raise InvalidLineageError(
+            "calibration domain must differ from benchmark domain"
+        )
 
 
-def default_stub_calibration_judge(
-    case: CalibrationCase, lineage: ModelLineage
-) -> str:
+def default_stub_calibration_judge(case: CalibrationCase, lineage: ModelLineage) -> str:
     """Oracle-aligned stub for offline tests (perfect judge)."""
     _ = lineage
     return case.gold_verdict
@@ -1277,7 +1318,10 @@ def run_judge_calibration(
         )
 
     # Bind lineage to suite prompt/schema
-    if judge_lineage.prompt_hash != suite.prompt_hash or judge_lineage.schema_hash != suite.schema_hash:
+    if (
+        judge_lineage.prompt_hash != suite.prompt_hash
+        or judge_lineage.schema_hash != suite.schema_hash
+    ):
         return CalibrationReport(
             suite_hash=suite.suite_hash,
             suite_signature=suite.signature,
@@ -1335,7 +1379,9 @@ def run_judge_calibration(
 
     # consistency: fraction of cases where all repeats agree
     consistent_cases = sum(1 for preds in per_case_predictions if len(set(preds)) == 1)
-    consistency = consistent_cases / len(per_case_predictions) if per_case_predictions else 0.0
+    consistency = (
+        consistent_cases / len(per_case_predictions) if per_case_predictions else 0.0
+    )
 
     passed = critical_false_accept == 0 and consistency >= consistency_threshold
     status: str = "passed" if passed else "invalid_lineage"
@@ -1352,7 +1398,9 @@ def run_judge_calibration(
         critical_false_accept=critical_false_accept,
         consistency=round(consistency, 4),
         status=status,  # type: ignore[arg-type]
-        metrics=None if not passed else {
+        metrics=None
+        if not passed
+        else {
             "consistency": round(consistency, 4),
             "critical_false_accept": critical_false_accept,
             "n_cases": len(suite.cases),

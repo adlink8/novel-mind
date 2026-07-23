@@ -240,7 +240,10 @@ def check_phase_verification_artifacts(
         lower = text.lower()
         if "status: passed" not in lower and "status:passed" not in lower:
             # also accept **status**: passed patterns
-            if "passed" not in lower or "failed" in lower.split("status")[0:2].__str__():
+            if (
+                "passed" not in lower
+                or "failed" in lower.split("status")[0:2].__str__()
+            ):
                 if "status" in lower and "passed" not in lower:
                     reasons.append(f"verification_not_passed:{name}")
                 elif "status: failed" in lower or "status:failed" in lower:

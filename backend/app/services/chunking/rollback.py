@@ -39,7 +39,11 @@ def rollback_to_build(
                 }
             ]
             store.builds[bid] = rec.model_copy(
-                update={"status": "rolled_back", "journal": journal, "is_candidate": True}
+                update={
+                    "status": "rolled_back",
+                    "journal": journal,
+                    "is_candidate": True,
+                }
             )
 
     report = reconcile_build(store, target_build_id, cleanup=True)

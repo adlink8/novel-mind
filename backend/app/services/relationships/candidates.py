@@ -164,7 +164,9 @@ class RelationshipCandidateService:
                 )
                 continue
 
-            relation_type = (judgment.relation_type or candidate.relation_type or "").strip()
+            relation_type = (
+                judgment.relation_type or candidate.relation_type or ""
+            ).strip()
             if relation_type in NON_EDGE_RELATION_TYPES:
                 if relation_type == "same_entity":
                     result.identity_reviews.append(
@@ -249,7 +251,9 @@ class RelationshipCandidateService:
                     owner_id=owner_id,
                     novel_id=novel_id,
                     run_id=judgment.run_id,
-                    evidence_refs=list(judgment.evidence_refs or candidate.evidence_refs or []),
+                    evidence_refs=list(
+                        judgment.evidence_refs or candidate.evidence_refs or []
+                    ),
                 )
             except ValueError as exc:
                 result.rejections.append(
@@ -270,9 +274,7 @@ class RelationshipCandidateService:
                     "gate_status": judgment.gate_status,
                 }
             )
-            candidate_key = (
-                f"sj:{judgment.id}:sc:{source_char.id}:tc:{target_char.id}:rt:{relation_type}"
-            )
+            candidate_key = f"sj:{judgment.id}:sc:{source_char.id}:tc:{target_char.id}:rt:{relation_type}"
             try:
                 package = build_relationship_evidence_package(
                     owner_id=owner_id,
@@ -416,7 +418,9 @@ class RelationshipCandidateService:
         self, db: AsyncSession, *, novel_id: int
     ) -> list[Character]:
         result = await db.execute(
-            select(Character).where(Character.novel_id == novel_id).order_by(Character.id)
+            select(Character)
+            .where(Character.novel_id == novel_id)
+            .order_by(Character.id)
         )
         return list(result.scalars().all())
 

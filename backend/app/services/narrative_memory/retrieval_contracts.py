@@ -221,10 +221,13 @@ class TraversalStep(StrictFrozenModel):
         StrictStr,
         StringConstraints(strip_whitespace=True, min_length=1, max_length=200),
     ]
-    parent_key: Annotated[
-        StrictStr,
-        StringConstraints(strip_whitespace=True, min_length=1, max_length=200),
-    ] | None = None
+    parent_key: (
+        Annotated[
+            StrictStr,
+            StringConstraints(strip_whitespace=True, min_length=1, max_length=200),
+        ]
+        | None
+    ) = None
     relation: Annotated[
         StrictStr,
         StringConstraints(strip_whitespace=True, min_length=1, max_length=40),
@@ -364,7 +367,9 @@ def retrieval_component_hash(component: str, value: BaseModel | dict) -> str:
     if isinstance(value, BaseModel):
         body = canonical_retrieval_json(value)
     else:
-        body = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        body = json.dumps(
+            value, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        )
     encoded = f"narrative-memory-retrieval.v1:{component}\n{body}"
     return sha256(encoded.encode("utf-8")).hexdigest()
 

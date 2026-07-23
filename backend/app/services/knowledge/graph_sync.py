@@ -44,7 +44,9 @@ class KnowledgeGraphSyncService:
         """Sync accepted rows. Disabled mode is a no-op."""
 
         cfg = config or GraphSyncConfig()
-        accepted_count = await self._accepted_count(db, run_id=run_id, owner_id=owner_id)
+        accepted_count = await self._accepted_count(
+            db, run_id=run_id, owner_id=owner_id
+        )
         if not cfg.enabled:
             return GraphSyncResult(
                 status="skipped",
@@ -71,10 +73,14 @@ class KnowledgeGraphSyncService:
         run_id: int,
         owner_id: int | None,
     ) -> int:
-        stmt = select(func.count()).select_from(KnowledgeRelationJudgment).where(
-            KnowledgeRelationJudgment.run_id == run_id,
-            KnowledgeRelationJudgment.status == "accepted",
-            KnowledgeRelationJudgment.gate_status == "accepted",
+        stmt = (
+            select(func.count())
+            .select_from(KnowledgeRelationJudgment)
+            .where(
+                KnowledgeRelationJudgment.run_id == run_id,
+                KnowledgeRelationJudgment.status == "accepted",
+                KnowledgeRelationJudgment.gate_status == "accepted",
+            )
         )
         if owner_id is not None:
             stmt = stmt.where(KnowledgeRelationJudgment.owner_id == owner_id)

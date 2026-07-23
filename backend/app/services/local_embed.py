@@ -42,7 +42,11 @@ _MODEL_DEVICE: str | None = None
 
 
 def _resolve_path(model_path: str | None = None) -> str:
-    path = model_path or os.environ.get("NOVELMIND_EMBEDDING_MODEL_PATH") or DEFAULT_MODEL_PATH
+    path = (
+        model_path
+        or os.environ.get("NOVELMIND_EMBEDDING_MODEL_PATH")
+        or DEFAULT_MODEL_PATH
+    )
     return path
 
 
@@ -124,6 +128,7 @@ async def aembed_batch(
 
     空文本用零向量占位会污染检索，因此空文本直接报错。
     """
+
     def _run() -> list[list[float]]:
         out = embed_batch(texts, batch_size=batch_size, model_path=model_path)
         vectors: list[list[float]] = []

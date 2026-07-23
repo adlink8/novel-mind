@@ -169,7 +169,9 @@ class HybridSearchService:
             return results
 
         try:
-            from app.services.chunking.pg_store import expand_search_result_with_hierarchy
+            from app.services.chunking.pg_store import (
+                expand_search_result_with_hierarchy,
+            )
 
             enriched: list[dict[str, Any]] = []
             for item in results:
@@ -282,7 +284,8 @@ class HybridSearchService:
                 "chapter_title": row.chapter_title or "",
                 "chunk_id": row.chunk_id,
                 "chunk_index": row.chunk_index,
-                "content_snippet": row.headline or (row.content[:100] if row.content else ""),
+                "content_snippet": row.headline
+                or (row.content[:100] if row.content else ""),
                 "score": float(row.rank),
             }
             out.append(item)
@@ -356,13 +359,15 @@ class HybridSearchService:
                     if chunk_id_str.startswith("chunk_")
                     else 0
                 )
-                results.append({
-                    "chunk_id": chunk_id,
-                    "content": item.get("content", ""),
-                    "score": item.get("score", 0.0),
-                    "chapter_id": metadata.get("chapter_id"),
-                    "chunk_index": metadata.get("chunk_index"),
-                })
+                results.append(
+                    {
+                        "chunk_id": chunk_id,
+                        "content": item.get("content", ""),
+                        "score": item.get("score", 0.0),
+                        "chapter_id": metadata.get("chapter_id"),
+                        "chunk_index": metadata.get("chunk_index"),
+                    }
+                )
 
             return results
         except Exception as e:
@@ -461,9 +466,7 @@ class HybridSearchService:
             )
 
         # 按最终分数降序排列，取 top_k
-        sorted_items = sorted(
-            merged.values(), key=lambda x: x["score"], reverse=True
-        )
+        sorted_items = sorted(merged.values(), key=lambda x: x["score"], reverse=True)
         return sorted_items[:top_k]
 
 

@@ -43,7 +43,9 @@ def endpoint_key(kind: str, identifier: int) -> str:
     return f"{kind}:{identifier}"
 
 
-def unit_text(candidate: KnowledgeRelationCandidate, judgment: KnowledgeRelationJudgment) -> tuple[str, str]:
+def unit_text(
+    candidate: KnowledgeRelationCandidate, judgment: KnowledgeRelationJudgment
+) -> tuple[str, str]:
     source = endpoint_key(candidate.source_kind, candidate.source_id)
     target = endpoint_key(candidate.target_kind, candidate.target_id)
     relation = judgment.relation_type
@@ -85,7 +87,11 @@ class NarrativeUnitMaterializer:
                 .where(
                     NarrativeSourceSnapshotItem.snapshot_id == snapshot_id,
                     *(
-                        [NarrativeSourceSnapshotItem.source_judgment_id.in_(judgment_ids)]
+                        [
+                            NarrativeSourceSnapshotItem.source_judgment_id.in_(
+                                judgment_ids
+                            )
+                        ]
                         if judgment_ids is not None
                         else []
                     ),
@@ -194,7 +200,10 @@ class NarrativeUnitMaterializer:
             raise MaterializationError("candidate is not accepted")
         if not item.evidence_manifest:
             raise MaterializationError("evidence manifest is empty")
-        if snapshot.owner_id != judgment.owner_id or snapshot.novel_id != judgment.novel_id:
+        if (
+            snapshot.owner_id != judgment.owner_id
+            or snapshot.novel_id != judgment.novel_id
+        ):
             raise MaterializationError("owner/work lineage mismatch")
         if candidate.domain_profile != snapshot.domain_profile:
             raise MaterializationError("domain profile mismatch")

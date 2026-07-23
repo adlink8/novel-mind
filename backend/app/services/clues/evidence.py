@@ -169,9 +169,9 @@ def sha256_text(value: str) -> str:
 
 def sha256_json(value: Any) -> str:
     return hashlib.sha256(
-        json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode(
-            "utf-8"
-        )
+        json.dumps(
+            value, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+        ).encode("utf-8")
     ).hexdigest()
 
 
@@ -275,7 +275,9 @@ def build_clue_evidence_package(
 
     # Sort for deterministic package_hash.
     cue_sorted = sorted(cue_units, key=lambda u: (*u.narrative_key(), u.evidence_id))
-    later_sorted = sorted(later_units, key=lambda u: (*u.narrative_key(), u.evidence_id))
+    later_sorted = sorted(
+        later_units, key=lambda u: (*u.narrative_key(), u.evidence_id)
+    )
 
     package = ClueEvidencePackage(
         owner_id=owner_id,
@@ -392,7 +394,10 @@ def validate_package_scope(
         failures.append("scope:owner_mismatch")
     if package.novel_id != novel_id:
         failures.append("scope:novel_mismatch")
-    if hierarchy_build_id is not None and package.hierarchy_build_id != hierarchy_build_id:
+    if (
+        hierarchy_build_id is not None
+        and package.hierarchy_build_id != hierarchy_build_id
+    ):
         failures.append("scope:hierarchy_build_mismatch")
     if package.domain != "fiction":
         failures.append("scope:non_fiction")

@@ -96,7 +96,9 @@ def create_candidate_build(
         # carry-forward entire hierarchy from parent
         if parent and parent.build_id in store.hierarchies:
             trees = list(store.hierarchies[parent.build_id])
-            store.vector_ids[build_id] = set(store.vector_ids.get(parent.build_id, set()))
+            store.vector_ids[build_id] = set(
+                store.vector_ids.get(parent.build_id, set())
+            )
         journal.append({"event": "noop_carry_forward", "at": _utcnow()})
     else:
         # rebuild changed chapters; carry-forward unchanged from parent

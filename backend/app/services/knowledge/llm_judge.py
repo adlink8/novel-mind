@@ -82,7 +82,10 @@ class KnowledgeLLMJudgeService:
             response = await ai_service.chat(
                 messages=[
                     {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": json.dumps(package, ensure_ascii=False)},
+                    {
+                        "role": "user",
+                        "content": json.dumps(package, ensure_ascii=False),
+                    },
                 ],
                 model=model_name,
                 temperature=0.1,
@@ -101,7 +104,9 @@ class KnowledgeLLMJudgeService:
                 latency_ms=(time.perf_counter() - started) * 1000,
                 needs_human_review=True,
             )
-            await self._persist_if_requested(result, persist=persist, db=db, candidate=candidate)
+            await self._persist_if_requested(
+                result, persist=persist, db=db, candidate=candidate
+            )
             return result
 
         latency_ms = (time.perf_counter() - started) * 1000
@@ -117,7 +122,9 @@ class KnowledgeLLMJudgeService:
             prompt_tokens=usage.get("prompt_tokens"),
             completion_tokens=usage.get("completion_tokens"),
         )
-        await self._persist_if_requested(parsed, persist=persist, db=db, candidate=candidate)
+        await self._persist_if_requested(
+            parsed, persist=persist, db=db, candidate=candidate
+        )
         return parsed
 
     def parse_judgment(
@@ -234,7 +241,9 @@ class KnowledgeLLMJudgeService:
             cost_usd=result.cost_usd,
         )
         db.add(judgment)
-        candidate.status = "needs_human_review" if result.needs_human_review else "proposed"
+        candidate.status = (
+            "needs_human_review" if result.needs_human_review else "proposed"
+        )
         await db.flush()
         return judgment
 

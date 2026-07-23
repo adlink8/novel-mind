@@ -35,7 +35,9 @@ def verify_and_qualify(
             chunker_version=rec.chunker_version if rec else "0",
             chunker_config_hash=rec.chunker_config_hash if rec else "0" * 64,
             chunk_manifest_hash=rec.manifest_checksum if rec else "0" * 64,
-            policy_hash=policy_hash if len(policy_hash) == 64 else stable_hash({"p": policy_hash}),
+            policy_hash=policy_hash
+            if len(policy_hash) == 64
+            else stable_hash({"p": policy_hash}),
             quality_comparable=False,
             status=status if status in ("rejected", "blocked") else "rejected",
             report_signature=stable_hash(payload),
@@ -48,15 +50,25 @@ def verify_and_qualify(
     if not ab_report.get("quality_comparable"):
         return _reject(
             ab_report.get("reason") or "not_comparable",
-            status="blocked" if ab_report.get("status") == "blocked_dependency" else "rejected",
+            status="blocked"
+            if ab_report.get("status") == "blocked_dependency"
+            else "rejected",
         )
     if ab_report.get("source_snapshot_hash") != rec.source_snapshot_hash:
         return _reject("snapshot_mismatch")
     if ab_report.get("policy_hash") != policy_hash:
         return _reject("policy_mismatch")
 
-    mb = (ab_report.get("metrics") or {}).get("B") or ab_report.get("B", {}).get("metrics") or {}
-    ma = (ab_report.get("metrics") or {}).get("A") or ab_report.get("A", {}).get("metrics") or {}
+    mb = (
+        (ab_report.get("metrics") or {}).get("B")
+        or ab_report.get("B", {}).get("metrics")
+        or {}
+    )
+    ma = (
+        (ab_report.get("metrics") or {}).get("A")
+        or ab_report.get("A", {}).get("metrics")
+        or {}
+    )
 
     # Gates
     if mb.get("coverage", 0) < 1.0:
@@ -106,7 +118,9 @@ def verify_and_qualify(
         chunker_version=rec.chunker_version,
         chunker_config_hash=rec.chunker_config_hash,
         chunk_manifest_hash=rec.manifest_checksum,
-        policy_hash=policy_hash if len(policy_hash) == 64 else stable_hash({"p": policy_hash}),
+        policy_hash=policy_hash
+        if len(policy_hash) == 64
+        else stable_hash({"p": policy_hash}),
         quality_comparable=True,
         status="qualified",
         report_signature=sig,

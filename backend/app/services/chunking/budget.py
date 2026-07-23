@@ -31,16 +31,24 @@ class BudgetLedger:
         cfg = self.config
         if pending_count > cfg.max_boundaries_per_run:
             return False
-        worst_in = pending_count * cfg.max_attempts_per_boundary * cfg.max_input_tokens_per_call
+        worst_in = (
+            pending_count
+            * cfg.max_attempts_per_boundary
+            * cfg.max_input_tokens_per_call
+        )
         worst_out = (
-            pending_count * cfg.max_attempts_per_boundary * cfg.max_output_tokens_per_call
+            pending_count
+            * cfg.max_attempts_per_boundary
+            * cfg.max_output_tokens_per_call
         )
         return (
             worst_in <= cfg.max_total_input_tokens
             and worst_out <= cfg.max_total_output_tokens
         )
 
-    def can_call(self, boundary_id: str, estimated_input_tokens: int) -> tuple[bool, str]:
+    def can_call(
+        self, boundary_id: str, estimated_input_tokens: int
+    ) -> tuple[bool, str]:
         cfg = self.config
         if self.boundaries_called >= cfg.max_boundaries_per_run:
             self.skipped_budget.append(boundary_id)

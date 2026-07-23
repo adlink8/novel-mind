@@ -74,8 +74,13 @@ class TimelineRunResponse(BaseModel):
     novel_id: int
     version_id: int | None = None
     status: Literal[
-        "pending", "running", "paused_budget", "paused_dependency",
-        "cancelled", "completed", "failed",
+        "pending",
+        "running",
+        "paused_budget",
+        "paused_dependency",
+        "cancelled",
+        "completed",
+        "failed",
     ]
     status_reason: str | None = None
     checkpoint: Dict[str, Any] = Field(default_factory=dict)
