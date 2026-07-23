@@ -44,7 +44,9 @@ def _extract_token_usage(response) -> tuple[int, int]:
         return getattr(obj, key, None)
 
     input_tokens = _get(usage, "prompt_tokens") or _get(usage, "input_tokens") or 0
-    output_tokens = _get(usage, "completion_tokens") or _get(usage, "output_tokens") or 0
+    output_tokens = (
+        _get(usage, "completion_tokens") or _get(usage, "output_tokens") or 0
+    )
     return int(input_tokens), int(output_tokens)
 
 
