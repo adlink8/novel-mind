@@ -6,10 +6,10 @@ status: roadmap_planned
 last_updated: 2026-07-26T00:00:00.000Z
 last_activity: 2026-07-26
 progress:
-  total_phases: 34
-  completed_phases: 20
-  total_plans: 120
-  completed_plans: 82
+  total_phases: 35
+  completed_phases: 21
+  total_plans: 123
+  completed_plans: 84
   percent: 68
 last_shipped_milestone: v0.8
 last_shipped_verdict: achieved_candidate_scope
@@ -19,12 +19,14 @@ last_shipped_verdict: achieved_candidate_scope
 
 ## Current Position
 
-Milestone: **v1.1 工程与治理基线收口**（Phase 21–25，PLANNED 2026-07-26）  
-Phase: **21-settings-routing-usage-and-debtfix**（追认待启动）∥ **22-ci-green-and-gate-enforcement**（可并行）  
-Status: **ROADMAP PLANNED** — Phase 21–34 已按标准 GSD 格式写入 `ROADMAP.md`；下一步 `/gsd-plan-phase 21` 或 `/gsd-plan-phase 22`  
-Last activity: 2026-07-26（全量路线图规划；现状核查 `AUDIT-STATUS-REFRESH-2026-07-26.md`）
+Milestone: **v1.1 工程与治理基线收口**（Phase 21–25 + 25.1）  
+Phase 21: **COMPLETE**（2026-07-26 追认与文档一致性，见 `phases/21-settings-routing-usage-and-debtfix/`）  
+Phase 22: **NEAR-COMPLETE** — PR #13 五类根因修复合入（`9f01680`），master CI 全绿（run 30204817945）；分支保护 `ci-gate` required + enforce_admins 已设；**余 3 个 nightly 全绿观察（≈2026-07-29 核销）**  
+Phase 25.1: **新立项（2026-07-26）** — 分析页对话工作台；设计契约（同底座/同剧透边界/不同锚点）已写入 ROADMAP  
+Next: `/gsd-plan-phase 23`（Layer Registry ADR）；25.1 可在 23/24 期间并行做 UI 侧  
+Last activity: 2026-07-26
 
-> 注：git 历史中 "phase21" 分支（PR #11/#12，Alembic head `18appsetting1`，后端 1085 passed）未走 GSD，由 Phase 21 追认；master CI 当前连续红（Ruff / integration 1 failed / Browser smoke 127 / ci-gate SyntaxError / CodeQL），由 Phase 22 恢复。
+> 工作流变化：分支保护生效后，**所有进 master 的变更（含文档）必须走 PR 且 ci-gate 绿**，管理员亦不可绕过。
 
 ## 历史位置（v1.0，2026-07-17）
 

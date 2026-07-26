@@ -10,7 +10,7 @@
 - [x] v0.9 分析工作台呈现与数据诚实 - Phase 19 COMPLETE
 - [x] v1.0 结构工作台与多层呈现 - Phase 20 COMPLETE（P0；NM 只读；禁止 promotion 仍有效）
 
-- [ ] v1.1 工程与治理基线收口 - Phase 21–25（PLANNED 2026-07-26；现状核查见 [AUDIT-STATUS-REFRESH-2026-07-26](./AUDIT-STATUS-REFRESH-2026-07-26.md)）
+- [ ] v1.1 工程与治理基线收口 - Phase 21✅ / 22（余 3-nightly 观察）/ 23–25 + 25.1 分析页对话工作台（现状核查见 [AUDIT-STATUS-REFRESH-2026-07-26](./AUDIT-STATUS-REFRESH-2026-07-26.md)）
 - [ ] v1.2 单书垂直证明 - Phase 26–29（PLANNED；依赖 v1.1）
 - [ ] v1.3 生产切换 - Phase 30（PLANNED；**立项需显式新授权解除 NM promotion / Reader Chat cutover 禁令**）
 - [ ] v1.4 创作域 - Phase 31–34（PLANNED；核心功能完成的收口里程碑）
@@ -56,7 +56,7 @@
 | Phase 18 前端动效与过渡系统 | 3/3 | **COMPLETE** — 18-01..03 done; dual-viewport motion qualified |
 | v0.9 / Phase 19 分析工作台呈现与数据诚实 | 4/4 | **COMPLETE** — 19-01..04 done (truth + presentation) |
 | v1.0 / Phase 20 结构工作台与多层呈现 | 4/4 | **COMPLETE** — P0 Structure Workspace + NM read-only |
-| v1.1 / Phase 21-25 工程与治理基线收口 | 0/13 | PLANNED (2026-07-26) |
+| v1.1 / Phase 21-25 + 25.1 工程与治理基线收口 | 4/16 | Phase 21 COMPLETE; 22 NEAR-COMPLETE (3-nightly watch); 23–25, 25.1 planned |
 | v1.2 / Phase 26-29 单书垂直证明 | 0/11 | PLANNED |
 | v1.3 / Phase 30 生产切换 | 0/3 | PLANNED — 立项需新授权 |
 | v1.4 / Phase 31-34 创作域 | 0/11 | PLANNED |
@@ -102,7 +102,7 @@ Summaries: `20-01`..`20-04-SUMMARY.md`.
 **Goal:** 把 2026-07-18~07-23 未走 GSD 的 "phase21" 分支工作（设置中心重构、AI 路由偏好 + 用量 API、`app_settings` 迁移 `18appsetting1`、阅读器体验、Timeline/Reader Chat 服务重写、Vertex/Gemini 实验适配）纳入规划权威，消除全部文档漂移，建立快照标识规范。  
 **Requirements:** REQ-BASE-01, REQ-BASE-02  
 **Depends on:** 无（立即可做，与 Phase 22 并行）  
-**Status:** PLANNED  
+**Status:** COMPLETE (2026-07-26) — 追认目录 `phases/21-settings-routing-usage-and-debtfix/`；IMPLEMENTATION-STATUS 2026-07-26 节；api README/`__init__` 反向漂移修正；CONCERNS.md 与 docs/路线图.md 重写  
 **Non-goals:** 不重做 phase21 代码；不清理 git 历史中的 75MB dump（需单独决策）
 
 **Success Criteria:**
@@ -123,7 +123,7 @@ Plans:
 **Goal:** master 每日 CI 恢复全绿，ci-gate 聚合脚本修复，分支保护 required check 实际阻止红色合入（PR #11 曾带红 ci-gate 合入）。  
 **Requirements:** REQ-BASE-03, REQ-BASE-04  
 **Depends on:** 无（与 Phase 21 并行）  
-**Status:** PLANNED
+**Status:** NEAR-COMPLETE (2026-07-26) — 22-01/22-02 经 PR #13 落地（五类根因；master run 30204817945 全绿）；22-03 已设 `ci-gate` required + enforce_admins（此前分支保护无任何 required check，即 PR #11 带红合入根因）；**余：连续 3 个 nightly 全绿观察（预计 2026-07-29 核销）**。豁免：pip-audit chromadb PYSEC-2026-311、npm audit `--omit=dev`（解除条件见 ci.yml 注释）
 
 **Success Criteria:**
 1. Ruff check 0 违规（import 排序、`Optional`→`| None`、TRY004 等机械清理）。
@@ -203,6 +203,34 @@ Plans:
 - [ ] 25-03 characters/stream/fanfiction API 契约收口
 
 **Waves:** 1 (25-01 ∥ 25-02) → 2 (25-03)
+
+### Phase 25.1: 分析页对话工作台（Analysis Chat Workspace）
+
+**Goal:** `/analysis` 默认呈现改为**对话窗口**，可视化（结构/时间线/关系/线索）成为可切换视图；对话与阅读器聊天共享同一数据底座与剧透边界，仅锚点不同。  
+**Requirements:** REQ-ACHAT-01, REQ-ACHAT-02, REQ-ACHAT-03  
+**Depends on:** Phase 10（reader_chat 服务栈复用）、Phase 20（NM 只读结构）；弱依赖 Phase 24（router 统一后自动获得降级链，可后补对齐）  
+**Status:** PLANNED (2026-07-26 立项)  
+**Non-goals:** 不建第二套检索/引用底座；不改变 NM candidate-only 红线；不移除可视化视图
+
+**核心设计契约（2026-07-26 决议）：**
+1. **同一数据底座**：分析页对话复用 `reader_chat` 服务栈（gateway/budget/citation/审计），新增 scope 参数区分锚点；禁止另建平行链路，否则两个窗口会对同一问题给出矛盾答案。
+2. **同一剧透边界**：两个窗口都默认按阅读进度 cutoff 裁剪上下文；仅当该小说的既有 per-novel 全书开关显式打开后才接收全书（与 REQ-TIME-08/REQ-CHAT-03 一致）。**不是"章节 vs 全书"，而是"锚点不同 + 同一边界"。**
+3. **锚点差异**：阅读器聊天 = 选区锚定（选中原文 + 章节可见上下文）；分析页聊天 = 结构锚定（cutoff 内章节树/NM 只读候选骨架 + 跨章检索证据）。citation 规则两边相同：最终引用只能回落叶子原文并服务端重验。
+4. **质量诚实**：Arc/Global 数据到位（Phase 26/27）前，跨章回答来自 leaf/raw 检索并在 UI 标注来源层级；数据闭环后无需改架构自动增强。
+
+**Success Criteria:**
+1. `/analysis` 默认打开对话视图，与可视化视图可即时切换且互不丢状态（对话历史、结构选中范围）。
+2. 分析页对话为 owner-scoped 持久多会话（复用 Phase 10 会话模型或同构扩展），每条回答带可点击 citation 跳原文。
+3. 默认模式下问未读内容得到与 Reader Chat 一致的防剧透行为（拒答/裁剪而非泄露）；全书开关状态两个窗口一致生效。
+4. 结构选中范围（章节区间/NM 节点）可作为对话上下文注入，且在回答中可见（"基于第 12–34 章"）。
+5. 对话调用走既有预算/成本/审计链；desktop + 390px Playwright 验收。
+
+Plans:
+- [ ] 25.1-01 chat scope 契约与后端扩展（structure-anchored context assembly + 会话模型复用）
+- [ ] 25.1-02 分析页对话 UI + 视图切换 + citation 跳转
+- [ ] 25.1-03 剧透一致性对抗测试 + 双视口浏览器验收
+
+**Waves:** 1 (25.1-01) → 2 (25.1-02) → 3 (25.1-03)
 
 ### Phase 26: NM 整书构建收敛
 
