@@ -11,6 +11,10 @@ import { useSearchParams } from "next/navigation";
 import { BookOpen, RefreshCw } from "lucide-react";
 import { NovelPickerStrip } from "@/components/bookshelf/novel-picker-strip";
 
+import {
+  AnalysisChatPanel,
+  type AnalysisChapterRef,
+} from "@/components/analysis/analysis-chat-panel";
 import { ClueWorkspace } from "@/components/clues/clue-workspace";
 import { clueApi } from "@/lib/clue-api";
 import { RelationshipWorkspace } from "@/components/relationships/relationship-workspace";
@@ -50,11 +54,15 @@ import {
   type NmClaimItem,
   type NmSourceLinkItem,
 } from "@/lib/narrative-memory-api";
+import { cn } from "@/lib/utils";
 
 /** Soft cap for multi-chapter scatter — full set kept for list density notes. */
 const MULTI_CHAPTER_TIMELINE_CAP = 120;
 
 type AnalysisWorkspaceMode = "timeline" | "relationships" | "clues";
+
+/** Phase 25.1-02：页面顶层视图 —— 对话（默认）| 分析可视化 */
+type AnalysisPageView = "chat" | "analysis";
 
 function eventsSignature(
   envelope: TimelineEnvelope,
@@ -122,6 +130,10 @@ function AnalysisWorkspace() {
   const [source, setSource] = useState<TimelineVersionSource>("active");
   const [workspace, setWorkspace] =
     useState<AnalysisWorkspaceMode>("timeline");
+  /** 顶层视图：默认对话；切换只做 CSS 隐藏，不卸载另一视图的状态。 */
+  const [pageView, setPageView] = useState<AnalysisPageView>("chat");
+  /** 章节 id/章号映射（对话锚点与剧透边界提示复用结构树的章节数据）。 */
+  const [chapterList, setChapterList] = useState<AnalysisChapterRef[]>([]);
   /** Shared narrative chapter for relationship fold (server remains spoiler authority). */
   const [throughChapter, setThroughChapter] = useState<number | "">("");
   /**
@@ -256,6 +268,14 @@ function AnalysisWorkspace() {
             }
           }
           chapterTitlesRef.current = map;
+          // 对话面板复用同一份章节数据（id ↔ 章号映射）
+          setChapterList(
+            (chaptersOutcome.value.data ?? []).map((ch) => ({
+              id: ch.id,
+              chapter_number: ch.chapter_number,
+              title: ch.title,
+            }))
+          );
         }
         const latest = pickLatestPreviewVersion(versionsRes.data.versions ?? []);
         if (!latest) {
@@ -440,6 +460,7 @@ function AnalysisWorkspace() {
     setNmSourceLinksError(null);
     setNmVersionId(null);
     nmTreeThroughRef.current = null;
+    setChapterList([]);
     if (!id) {
       setEnvelope({ active: null, running_candidate: null });
       setRun(null);
@@ -940,7 +961,56 @@ function AnalysisWorkspace() {
           sourceLinksError={nmSourceLinksError}
           novelId={novelId}
         >
-          <div className="grid gap-4">
+          <div className="flex h-full min-h-0 flex-col gap-4">
+            {/* 顶层视图切换：对话（默认）| 分析可视化 —— 切换仅 CSS 隐藏，不卸载另一视图 */}
+            <div className="flex shrink-0 justify-center">
+              <div
+                role="tablist"
+                aria-label="工作台视图"
+                className="inline-flex gap-1 rounded-full border border-border/60 bg-card p-1 shadow-sm"
+              >
+                {(
+                  [
+                    ["chat", "对话"],
+                    ["analysis", "分析"],
+                  ] as const
+                ).map(([id, label]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    role="tab"
+                    aria-selected={pageView === id}
+                    data-testid={`analysis-view-tab-${id}`}
+                    onClick={() => setPageView(id)}
+                    className={`rounded-full px-4 py-1.5 text-sm transition-colors motion-duration-fast ${
+                      pageView === id
+                        ? "bg-foreground font-medium text-background shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 对话视图（默认）：与阅读器聊天共享同一会话底座 */}
+            <AnalysisChatPanel
+              className={cn("min-h-0 flex-1", pageView !== "chat" && "hidden")}
+              novelId={novelId}
+              chapters={chapterList}
+              fullBook={fullBook}
+              progressChapterId={
+                selectedNovel?.reading_progress?.chapter_id ?? null
+              }
+              selection={selectedNode}
+            />
+
+            {/* 分析可视化视图（隐藏时保留状态：facet tab / 筛选 / 数据） */}
+            <div
+              data-testid="analysis-visualization-view"
+              className={cn("grid gap-4", pageView !== "analysis" && "hidden")}
+            >
             {/* Facet tabs — 分段控件（画布切换），保持 tab 语义 */}
             <div className="flex justify-center">
               <div
@@ -1176,6 +1246,7 @@ function AnalysisWorkspace() {
                 </div>
               </div>
             )}
+            </div>
           </div>
         </StructureWorkspaceShell>
       )}

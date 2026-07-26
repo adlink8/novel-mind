@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { openAnalysisVisualization } from "./helpers";
+
 const events = Array.from({ length: 8 }, (_, index) => ({
   id: index + 1,
   logical_event_id: `event-${index + 1}`,
@@ -28,6 +30,7 @@ test("timeline renders a readable drill-down view with inline event detail", asy
   await mockTimeline(page);
   await page.goto("/analysis");
   await page.getByLabel("选择小说").selectOption("11");
+  await openAnalysisVisualization(page);
     // 阶段窗口下钻（原型页的展开查看已不存在）
     await page.getByRole("button", { name: /阶段 1/ }).click();
   await expect(page.locator('[data-testid="timeline-canvas"] canvas')).toBeVisible();

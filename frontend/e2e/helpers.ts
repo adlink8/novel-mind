@@ -16,6 +16,18 @@ export async function expectAuthenticatedShell(page: Page) {
   });
 }
 
+/**
+ * Phase 25.1 起 /analysis 默认打开对话视图；可视化用例须先切到「分析」标签。
+ * 已在分析视图时为幂等 no-op。
+ */
+export async function openAnalysisVisualization(page: Page) {
+  const tab = page.getByTestId("analysis-view-tab-analysis");
+  await expect(tab).toBeVisible({ timeout: 15_000 });
+  if ((await tab.getAttribute("aria-selected")) !== "true") {
+    await tab.click();
+  }
+}
+
 /** Backend python for qualification helpers: venv locally, runner python in CI. */
 export function backendPythonBin(backendDir: string): string {
   if (process.env.E2E_PYTHON) return process.env.E2E_PYTHON;

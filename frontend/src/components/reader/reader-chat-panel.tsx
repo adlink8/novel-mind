@@ -57,14 +57,16 @@ type Props = {
   className?: string;
 };
 
-function newClientMessageId(): string {
+/** Shared with the analysis chat panel (Phase 25.1) — same conversation base. */
+export function newClientMessageId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return crypto.randomUUID();
   }
   return `cm-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-function jobStatusLabel(job: GenerationJobView | null | undefined): string | null {
+/** Shared with the analysis chat panel (Phase 25.1) — same job status copy. */
+export function jobStatusLabel(job: GenerationJobView | null | undefined): string | null {
   if (!job) return null;
   const reason = (job.status_reason || job.error_code || "").trim();
   switch (job.status) {
@@ -808,7 +810,8 @@ export function ReaderChatPanel({
   return panelBody;
 }
 
-function MessageBubble({
+/** Shared with the analysis chat panel (Phase 25.1) — same bubble + citation UI. */
+export function MessageBubble({
   message,
   onCitationNavigate,
 }: {

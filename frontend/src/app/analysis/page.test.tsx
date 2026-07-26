@@ -19,14 +19,33 @@ const mocks = vi.hoisted(() => ({
   nmGetSourceLinks: vi.fn(),
 }));
 
-vi.mock("@/lib/api", () => ({
-  novelsApi: { list: mocks.list },
+vi.mock("@/lib/api", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
+  return {
+  ...actual,
+  novelsApi: {
+    list: mocks.list,
+    getChapters: vi.fn().mockResolvedValue({ data: [] }),
+  },
   timelineApi: {
     startOrResume: mocks.startOrResume,
     getTimeline: mocks.getTimeline,
     status: mocks.status,
     setFullBookPreference: mocks.setFullBookPreference,
     cancel: vi.fn(),
+  },
+  readerChatApi: {
+    listConversations: vi
+      .fn()
+      .mockResolvedValue({ data: { items: [], total: 0, skip: 0, limit: 50 } }),
+    createConversation: vi.fn(),
+    listMessages: vi.fn().mockResolvedValue({
+      data: { items: [], total: 0, skip: 0, limit: 200, after_sequence: 0 },
+    }),
+    createMessage: vi.fn(),
+    getJob: vi.fn(),
+    cancelJob: vi.fn(),
+    retryJob: vi.fn(),
   },
   relationshipsApi: {
     getGraph: vi.fn().mockResolvedValue({
@@ -55,7 +74,8 @@ vi.mock("@/lib/api", () => ({
     }),
     getEvidence: vi.fn(),
   },
-}));
+  };
+});
 
 vi.mock("@/lib/narrative-memory-api", async () => {
   const actual = await vi.importActual<
@@ -96,6 +116,7 @@ vi.mock("@/lib/clue-api", async () => {
 
 vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
 }));
 
 vi.mock("echarts-for-react/lib/core", () => ({

@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { openAnalysisVisualization } from "./helpers";
+
 /**
  * Phase 18 motion qualification (UI-MOTION-01..06).
  * Runs on chromium-desktop (1280×800) and chromium-mobile-390 (390×844).
@@ -177,6 +179,7 @@ test.describe("Phase 18 motion and transitions", () => {
     expect(noHScroll).toBe(true);
 
     await page.getByLabel("选择小说").selectOption("11");
+    await openAnalysisVisualization(page);
     await expect(page.getByRole("tab", { name: "时间线" })).toBeVisible();
     await page.getByRole("tab", { name: "人物关系" }).click();
     await expect(page.getByRole("tab", { name: "人物关系" })).toHaveAttribute(

@@ -2,7 +2,12 @@ import { expect, test } from "@playwright/test";
 import { spawnSync } from "child_process";
 import path from "path";
 
-import { backendPythonBin, registerAndLogin, uniqueUser } from "./helpers";
+import {
+  backendPythonBin,
+  openAnalysisVisualization,
+  registerAndLogin,
+  uniqueUser,
+} from "./helpers";
 
 const backend = path.resolve(__dirname, "../../backend");
 const python = backendPythonBin(backend);
@@ -37,6 +42,7 @@ test("real API progresses partial candidate to spoiler-safe active timeline", as
 
   await page.goto("/analysis");
   await page.getByLabel("选择小说").selectOption(String(seeded.novel_id));
+  await openAnalysisVisualization(page);
   await expect(page.getByRole("tab", { name: /正在生成|候选结果/ })).toBeVisible();
   await page.getByRole("button", { name: /阶段 1/ }).click();
   await expect(page.getByRole("heading", { name: "第一批事件" }).first()).toBeVisible();
@@ -47,6 +53,7 @@ test("real API progresses partial candidate to spoiler-safe active timeline", as
   expect(completed.version_id).toBeTruthy();
   await page.reload();
   await page.getByLabel("选择小说").selectOption(String(seeded.novel_id));
+  await openAnalysisVisualization(page);
   await expect(page.getByRole("tab", { name: /当前版本/ })).toBeVisible();
   await page.getByRole("button", { name: /阶段 1/ }).click();
   await expect(page.getByRole("heading", { name: "第一批事件" }).first()).toBeVisible();
