@@ -7,7 +7,10 @@
   POST /api/analysis/{novel_id}/chapters/{chapter_id}/analyze
   GET  /api/analysis/{novel_id}/hierarchy
   POST /api/analysis/{novel_id}/hierarchy/rebuild
-  POST /api/analysis/{novel_id}/analyze/stream  (仍为 501 占位)
+
+历史说明: `POST /{novel_id}/analyze/stream` 长期为 501 占位且无前端调用方，
+已于 Phase 25 收口时删除（NM-API-002）；非流式分析 `POST /{novel_id}/analyze`
+为唯一受支持入口。
 """
 
 from __future__ import annotations
@@ -182,11 +185,3 @@ async def rebuild_hierarchy(
     build_id = await ensure_hierarchy(db, novel, force=True)
     status = await analysis_service.hierarchy_status(db, novel_id=novel_id)
     return {"build_id": build_id, **status}
-
-
-@router.post("/{novel_id}/analyze/stream")
-async def analyze_novel_stream(novel_id: int):
-    """流式输出分析过程（SSE）— 后续迭代。"""
-    raise HTTPException(
-        status_code=501, detail="流式剧情分析尚未实现，请使用 POST /analyze"
-    )

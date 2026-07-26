@@ -33,7 +33,7 @@ async def test_analyze_chapter_missing_novel_returns_404(auth_client: AsyncClien
 
 
 @pytest.mark.asyncio
-async def test_analyze_stream_not_implemented(auth_client: AsyncClient):
-    """流式分析返回 501"""
+async def test_analyze_stream_endpoint_removed(auth_client: AsyncClient):
+    """流式分析占位端点已删除（NM-API-002）：返回 404"""
     response = await auth_client.post("/api/analysis/1/analyze/stream")
-    assert response.status_code == 501
+    assert response.status_code == 404
