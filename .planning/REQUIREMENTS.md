@@ -121,6 +121,40 @@
 | UI-MOTION-04 | Light、dark 与 custom 主题在首帧前恢复，切换无 hydration 闪烁或正文尺寸变化 | P1 | VERIFIED |
 | UI-MOTION-05 | 动效不改变 API、数据、导航、阅读、分析或权限行为，且不新增动画运行时依赖 | P0 | VERIFIED |
 | UI-MOTION-06 | 桌面与 390px 触摸视口自动验证键盘、触摸、reduced-motion、无遮挡和无水平滚动 | P1 | VERIFIED |
+| REQ-BASE-01 | 规划权威与代码一致：phase21 分支工作被 GSD 追认，STATE/IMPLEMENTATION-STATUS/ROADMAP 反映真实 Alembic head 与测试规模 | P0 | PLANNED |
+| REQ-BASE-02 | 状态文档带统一快照标识（commit、日期、DB fingerprint 或未连接声明），文档漂移可检出 | P0 | PLANNED |
+| REQ-BASE-03 | master CI 全绿：Ruff、integration、Browser smoke、ci-gate 聚合、CodeQL 全部通过且连续 3 个 nightly 稳定 | P0 | PLANNED |
+| REQ-BASE-04 | ci-gate 作为 required check 实际阻止红色合入，带红合并事故有根因记录 | P0 | PLANNED |
+| REQ-GOV-01 | 唯一 Layer Registry ADR（S/D/R/A 四命名空间）被 PROJECT、REQUIREMENTS、API schema 和代码共同引用；新代码禁用裸 L0-L6 | P0 | PLANNED |
+| REQ-GOV-02 | Narrative Unit 与 Narrative Memory 的用途、边界、替代关系和消费顺序由 ADR 固定 | P0 | PLANNED |
+| REQ-GOV-03 | chunk_level / semantic_level / release_status 字段语义分离，facet 禁止无证据反写主结构且有契约测试 | P1 | PLANNED |
+| REQ-GOV-04 | raw TextChunk→Chroma 双写具备 journal、幂等键、完成标记与索引完整性 gate；部分失败 fail-closed，不得静默置 ready | P0 | PLANNED |
+| REQ-GOV-05 | raw chunk / Narrative Unit / NM 三层检索由服务端统一 router 决策，降级顺序与 citation 层规则固定，Reader Chat 优先级并入同一契约 | P0 | PLANNED |
+| REQ-GOV-06 | relationship 观察携带 intake_kind / producer_kind 来源枚举并贯穿 API/UI | P1 | PLANNED |
+| REQ-GOV-07 | 所有 LLM 调用按 price snapshot × usage 真实结算 cost_usd（clue 链路对齐 NM/timeline/reader_chat 既有实现） | P1 | PLANNED |
+| REQ-GOV-08 | 暴露的 API 契约诚实：characters 双轨收口、analyze/stream 删除或实现、fanfiction 显式 deferred，禁止占位空数组或长期 501 | P1 | PLANNED |
+| REQ-BOOK-01 | 样例长篇全部章节进入明确终态（completed 或带 reason code 的显式隔离），无静默 pending | P0 | PLANNED |
+| REQ-BOOK-02 | Arc/Volume 覆盖全部连续范围且 Global Story Model 生成，manifest 可由 DB 重算；全程 candidate-only | P0 | PLANNED |
+| REQ-BOOK-03 | 单章失败只阻断所属 Arc 在真实长篇上验证，构建报告含 calls/tokens/cost/cache/来源状态 | P0 | PLANNED |
+| REQ-BOOK-04 | 结构工作台在真实 Arc/Global 数据上联动，facet 范围正确 | P1 | PLANNED |
+| REQ-BOOK-05 | Reader Chat 在 NM 不可用或 partial 时 fallback 正确且引用回落原文（实测） | P0 | PLANNED |
+| REQ-SEM-01 | 时间线存在证据门控的因果边（caused/triggered/responded/blocked）且抽样人工核验通过 | P0 | PLANNED |
+| REQ-SEM-02 | 人物关系存在真实 change/end 演化观察，有效区间生效并可视 | P0 | PLANNED |
+| REQ-SEM-03 | 线索存在完整 cue→reinforce→payoff/dismissed 生产链，payoff_chapter > 0 且标题可读 | P0 | PLANNED |
+| REQ-QUAL-06 | 每份评测报告绑定 DB fingerprint、dataset version、source snapshot 与 commit | P0 | PLANNED |
+| REQ-QUAL-07 | NM 真实候选通过冻结单书 qualification（全桶），结论为 qualified_candidate 或 blocked 并归档 | P0 | PLANNED |
+| REQ-PROM-01 | NM promotion 具备 Active Pointer 唯一权威、CAS、before/after manifest 与 rollback journal（立项需新授权） | P0 | PLANNED |
+| REQ-PROM-02 | 生产切换只能由同源冻结 A/B 达标触发，阈值预先声明 | P0 | PLANNED |
+| REQ-PROM-03 | A/B 不达标时保持 candidate-only 并归档 blocked 原因，作为合法退出 | P0 | PLANNED |
+| REQ-CRE-01 | Original Canon / User Interpretation / Fanfiction Canon 三空间具有独立 authority、namespace、version 与 citation 规则 | P0 | PLANNED |
+| REQ-CRE-02 | 创作内容不得进入原作检索索引、评测语料或 facet 生产链（负向测试证明） | P0 | PLANNED |
+| REQ-CRE-03 | 创作项目模型：owner 隔离 CRUD、章节规划、Markdown 编辑与自动保存 | P0 | PLANNED |
+| REQ-CRE-04 | 创作版本历史可追溯、可 diff、可回滚 | P0 | PLANNED |
+| REQ-CRE-05 | 续写上下文包注入指定 cutoff 的人物/世界状态、时间线因果、未回收伏笔与证据引用，包内容可审计 | P0 | PLANNED |
+| REQ-CRE-06 | 创作一致性评测：人物行为/既定事实/时间线矛盾自动检查 + 冻结样例集门禁；偏离 override 显式记录且不回写原作空间 | P0 | PLANNED |
+| REQ-CRE-07 | 创作作品可导出 Markdown/EPUB，内容与版本一致 | P1 | PLANNED |
+| REQ-SHIP-01 | 生产部署基线：TLS、密钥管理、备份、监控与成本告警核对通过 | P1 | PLANNED |
+| REQ-SHIP-02 | 最终审计三维度（implementation/data/quality）全绿，Target C 达标条件逐项核销 | P0 | PLANNED |
 
 ## v0.8 Scope Boundaries
 
