@@ -133,6 +133,9 @@
 | REQ-GOV-06 | relationship 观察携带 intake_kind / producer_kind 来源枚举并贯穿 API/UI | P1 | PLANNED |
 | REQ-GOV-07 | 所有 LLM 调用按 price snapshot × usage 真实结算 cost_usd（clue 链路对齐 NM/timeline/reader_chat 既有实现） | P1 | PLANNED |
 | REQ-GOV-08 | 暴露的 API 契约诚实：characters 双轨收口、analyze/stream 删除或实现、fanfiction 显式 deferred，禁止占位空数组或长期 501 | P1 | PLANNED |
+| REQ-ACHAT-01 | 分析页对话与阅读器聊天共享同一检索/引用/预算底座与同一剧透边界（默认 cutoff 内，显式全书开关后才全书），仅锚点不同 | P0 | PLANNED |
+| REQ-ACHAT-02 | `/analysis` 默认对话视图，可视化为可切换视图，切换不丢会话与结构选中状态 | P1 | PLANNED |
+| REQ-ACHAT-03 | 分析页对话为 owner-scoped 持久多会话，回答带服务端重验的叶子原文 citation，可注入结构范围上下文 | P0 | PLANNED |
 | REQ-BOOK-01 | 样例长篇全部章节进入明确终态（completed 或带 reason code 的显式隔离），无静默 pending | P0 | PLANNED |
 | REQ-BOOK-02 | Arc/Volume 覆盖全部连续范围且 Global Story Model 生成，manifest 可由 DB 重算；全程 candidate-only | P0 | PLANNED |
 | REQ-BOOK-03 | 单章失败只阻断所属 Arc 在真实长篇上验证，构建报告含 calls/tokens/cost/cache/来源状态 | P0 | PLANNED |

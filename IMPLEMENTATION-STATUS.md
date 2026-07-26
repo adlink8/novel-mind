@@ -3,7 +3,8 @@
 审计日期：2026-06-13 16:05（Asia/Shanghai）  
 分析工作台与关系回填补充：2026-07-16（基于代码与样例小说 runtime 证据，不推翻上方基线审计快照）  
 结构工作台（Phase 20）补充：2026-07-16（Structure Workspace + NM 只读 API；禁止 promotion）  
-有序执行补充：2026-07-17（hierarchy 修复与重建、NM partial、timeline 服务端章范围、线索 live re-judge、API UAT；仍禁止 promote）
+有序执行补充：2026-07-17（hierarchy 修复与重建、NM partial、timeline 服务端章范围、线索 live re-judge、API UAT；仍禁止 promote）  
+**phase21 追认与 CI 恢复补充：2026-07-26**（snapshot: master @ 9f01680；详见文末 2026-07-26 节。旧节中的 Alembic head/测试计数以该节为准）
 
 事实来源：实际代码、自动化测试、依赖审计、Next.js 构建输出、真实 PostgreSQL 与本机 ops 运行结果。规划文档中的勾选不作为完成证据。
 
@@ -120,3 +121,22 @@ Key metrics:
 - Frontend: 22 tests + build passed
 - ChromeDB models: bge-m3, nomic-embed-text, qwen3.5:9b, gemma4-local (D:\Ollama\models)
 - Embedding: nomic-embed-text (768维, 与 ChromaDB 存储一致)
+
+---
+
+## 2026-07-26 快照（phase21 追认 + CI 恢复；snapshot: master @ 9f01680）
+
+以下事实覆盖上文旧节中的对应记录：
+
+| 项 | 当前值 | 证据 |
+|---|---|---|
+| Alembic head | **`18appsetting1`**（迁移目录 `backend/migrations/versions/`；旧节记 `518675fa18f8` 已过期） | `18_app_settings.py` |
+| 后端测试 | **1085 passed / 189 skipped**（unit+contract；integration 27 passed） | PR #12/#13 CI |
+| 前端测试 | **Vitest 236 passed（27 文件）**；Playwright 32/32；`next build` 通过 | PR #13 CI |
+| AI 路由与用量 | 不再是 PARTIAL："业务生成端点未接入"已过期——`GET/PUT /api/settings/routing` + `GET /api/usage/summary` + 前端 Routing/Usage section 已交付 | `10632b1`/`f4fbf06` |
+| Clue payoff 状态机 | 已修复（payoff/reinforcement 可进入 active lifecycle）；样例数据 payoff 仍 0，待 Phase 27 生产重跑 | `2cf8562` |
+| Timeline 故事序 | reconcile 无约束 tie-break 由候选 ID 字典序改为叙事顺序（生产语义修复 + 回归测试） | PR #13 |
+| master CI | **全绿**（2026-07-22 起连续红 → PR #13 五类根因修复后恢复）；分支保护 `ci-gate` required + enforce_admins | run 30204817945 |
+| 已声明豁免 | pip-audit：chromadb PYSEC-2026-311（无修复版）；npm audit `--omit=dev`（brace-expansion 5.0.8 与 eslint 链不兼容）——解除条件见 ci.yml 注释 | `.github/workflows/ci.yml` |
+| 依赖升级 | echarts 5→6.1；sharp/postcss/hono overrides；生产依赖 npm audit 0 | PR #13 |
+| Vertex/Gemini | 实验态（无测试/无文档），仅 Timeline/Clue live 调用使用 | `vertex_gemini.py` |
