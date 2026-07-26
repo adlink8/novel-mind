@@ -22,8 +22,9 @@ from app.services.knowledge_units.indexing import NarrativeIndexingService
 from tests.test_knowledge_unit_indexing import FakeStore, _candidate_build
 
 
-def test_search_request_defaults_to_chunks():
-    assert SearchRequest(query="test").mode == "chunks"
+def test_search_request_defaults_to_auto():
+    # "auto" is client intent only; the server-side router resolves the layer.
+    assert SearchRequest(query="test").mode == "auto"
 
 
 def test_fusion_keeps_source_identity_and_rank():
@@ -217,9 +218,9 @@ async def test_api_and_candidate_eval_share_strategy_boundary_and_parity(auth_cl
             super().__init__(**kwargs)
             self.calls = []
 
-        async def search_novel(self, db, **kwargs):
+        async def resolve_novel(self, db, **kwargs):
             self.calls.append(kwargs)
-            return await super().search_novel(db, **kwargs)
+            return await super().resolve_novel(db, **kwargs)
 
     strategy = BoundaryStrategy(chunks=Chunks(), units=Units())
     app.dependency_overrides[production_retrieval_strategy] = lambda: strategy
