@@ -520,6 +520,9 @@ class ClueSemanticJudgment(StrictClueModel):
     later_evidence_ids: list[str] = Field(default_factory=list, max_length=8)
     confidence: float = Field(ge=0, le=1)
     conflict_flags: list[ClueConflictFlag] = Field(default_factory=list, max_length=8)
+    # Concise display title (<= 40 chars) — presentation only, never authority.
+    # Optional so older stored outputs / caches keep validating.
+    short_title: str | None = Field(default=None, max_length=40)
     rationale: str = Field(min_length=1, max_length=1200)
 
     @model_validator(mode="after")

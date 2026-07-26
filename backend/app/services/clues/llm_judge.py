@@ -61,6 +61,8 @@ class ClueJudgmentAudit:
     repair_attempt: bool = False
     call_count: int = 0
     model_lineage: dict[str, Any] = field(default_factory=dict)
+    # Judge-provided concise display title (pass-through; presentation only).
+    short_title: str | None = None
 
 
 @dataclass(slots=True)
@@ -192,6 +194,11 @@ class ClueLLMJudgeService:
                     **lineage,
                     "call_skipped_reason": "deterministic_output",
                 },
+                short_title=(
+                    parsed.structured.short_title
+                    if parsed.structured is not None
+                    else None
+                ),
             )
             return parsed
 
@@ -293,6 +300,9 @@ class ClueLLMJudgeService:
             prompt_tokens=usage.get("prompt_tokens"),
             completion_tokens=usage.get("completion_tokens"),
             model_lineage=lineage,
+            short_title=(
+                parsed.structured.short_title if parsed.structured is not None else None
+            ),
         )
         return parsed
 
