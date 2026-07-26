@@ -1,3 +1,5 @@
+> Layer numbering superseded by docs/adr/0001-layer-registry.md
+
 # Phase 20 Context — Structure Workspace & Multi-layer Presentation
 
 ## Why this phase
