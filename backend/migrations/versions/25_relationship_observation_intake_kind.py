@@ -28,26 +28,41 @@ INTAKE_KINDS_SQL = (
 
 
 def upgrade() -> None:
-    """Upgrade schema."""
-    op.add_column(
-        "relationship_observations",
-        sa.Column(
-            "intake_kind",
-            sa.String(length=32),
-            nullable=False,
-            server_default="unknown",
-        ),
-    )
-    op.create_index(
-        "idx_rel_observations_intake_kind",
-        "relationship_observations",
-        ["intake_kind"],
-    )
-    op.create_check_constraint(
-        "ck_rel_observations_intake_kind",
-        "relationship_observations",
-        INTAKE_KINDS_SQL,
-    )
+    """Upgrade schema.
+
+    Idempotent guards: migration 11 builds relationship_observations from the
+    live ORM metadata (Base.metadata.tables[...].create), so a fresh database
+    already has intake_kind by the time this revision runs; only pre-existing
+    databases need the ALTERs.
+    """
+    insp = sa.inspect(op.get_bind())
+    columns = {c["name"] for c in insp.get_columns("relationship_observations")}
+    if "intake_kind" not in columns:
+        op.add_column(
+            "relationship_observations",
+            sa.Column(
+                "intake_kind",
+                sa.String(length=32),
+                nullable=False,
+                server_default="unknown",
+            ),
+        )
+    indexes = {i["name"] for i in insp.get_indexes("relationship_observations")}
+    if "idx_rel_observations_intake_kind" not in indexes:
+        op.create_index(
+            "idx_rel_observations_intake_kind",
+            "relationship_observations",
+            ["intake_kind"],
+        )
+    checks = {
+        c["name"] for c in insp.get_check_constraints("relationship_observations")
+    }
+    if "ck_rel_observations_intake_kind" not in checks:
+        op.create_check_constraint(
+            "ck_rel_observations_intake_kind",
+            "relationship_observations",
+            INTAKE_KINDS_SQL,
+        )
 
 
 def downgrade() -> None:
