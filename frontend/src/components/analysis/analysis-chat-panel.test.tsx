@@ -170,12 +170,9 @@ describe("AnalysisChatPanel", () => {
     expect(screen.getByTestId("analysis-chat-boundary")).toHaveTextContent(
       "基于你已读至第 2 章"
     );
-    // 区间末章超出边界 → 锚点收窄到第 2 章并明示降级
+    // 区间末章超出边界 → 发送原始区间，服务端收窄（UI 预告）
     expect(screen.getByTestId("analysis-chat-anchor-note")).toHaveTextContent(
-      "上下文锚定第 2 章（区间超出剧透边界，已收窄）"
-    );
-    expect(screen.getByTestId("analysis-chat-anchor-note")).toHaveTextContent(
-      "25.1-01"
+      "上下文范围：第 1–3 章（末章超出阅读进度，将按已读边界收窄）"
     );
   });
 
@@ -187,11 +184,11 @@ describe("AnalysisChatPanel", () => {
       )
     );
     expect(screen.getByTestId("analysis-chat-anchor-note")).toHaveTextContent(
-      "上下文锚定第 3 章"
+      "上下文范围：第 1–3 章"
     );
     expect(
       screen.getByTestId("analysis-chat-anchor-note")
-    ).not.toHaveTextContent("已收窄");
+    ).not.toHaveTextContent("收窄");
   });
 
   it("falls back to first chapter boundary without reading progress", async () => {
@@ -203,7 +200,7 @@ describe("AnalysisChatPanel", () => {
     );
   });
 
-  it("sends anchored to the clamped structure-range chapter id without fabricating a selection", async () => {
+  it("sends the requested chapter_range without fabricating a selection", async () => {
     renderPanel();
     await waitFor(() => expect(mocks.listConversations).toHaveBeenCalled());
 
@@ -214,8 +211,9 @@ describe("AnalysisChatPanel", () => {
 
     await waitFor(() => expect(mocks.createMessage).toHaveBeenCalled());
     const body = mocks.createMessage.mock.calls[0][2];
-    // 结构范围末章第 3 章超出进度边界（第 2 章）→ 锚定第 2 章（id=22）
-    expect(body.chapter_id).toBe(22);
+    // 发送原始请求区间（章号语义）；收窄由服务端完成并经 anchor 回显
+    expect(body.chapter_range).toEqual({ chapter_start: 1, chapter_end: 3 });
+    expect(body.chapter_id).toBeUndefined();
     expect(body.selection).toBeUndefined();
     expect(body.body).toBe("这一卷的主线是什么？");
     expect(body.client_message_id).toBeTruthy();
@@ -225,6 +223,60 @@ describe("AnalysisChatPanel", () => {
         "这一卷的主线是什么？"
       )
     );
+  });
+
+  it("renders the server-narrowed anchor above replayed messages", async () => {
+    mocks.listMessages.mockResolvedValue({
+      data: {
+        items: [
+          {
+            id: 55,
+            conversation_id: 1,
+            sequence: 0,
+            role: "user",
+            body: "第一二章发生了什么？",
+            client_message_id: null,
+            reply_to_message_id: null,
+            selection: null,
+            anchor: { kind: "chapter_range", chapter_start: 1, chapter_end: 2 },
+            citations: [],
+            generation_job: null,
+            created_at: "2026-07-15T00:00:00Z",
+          },
+        ],
+        total: 1,
+        skip: 0,
+        limit: 200,
+        after_sequence: 0,
+      },
+    });
+    renderPanel();
+    await waitFor(() =>
+      expect(
+        screen.getByTestId("analysis-chat-msg-anchor-55")
+      ).toHaveTextContent("范围：第 1–2 章")
+    );
+  });
+
+  it("blocks sending when the range starts beyond reading progress", async () => {
+    renderPanel({
+      selection: {
+        id: "late",
+        kind: "book",
+        chapterStart: 3,
+        chapterEnd: 3,
+        label: "后段",
+      } as StructureNodeSelection,
+    });
+    await waitFor(() => expect(mocks.listConversations).toHaveBeenCalled());
+    expect(screen.getByTestId("analysis-chat-anchor-note")).toHaveTextContent(
+      "起始章超出阅读进度，无法发送"
+    );
+    fireEvent.change(screen.getByTestId("analysis-chat-input"), {
+      target: { value: "问点什么" },
+    });
+    expect(screen.getByTestId("analysis-chat-send")).toBeDisabled();
+    expect(mocks.createMessage).not.toHaveBeenCalled();
   });
 
   it("disables send and explains when chapter data is unavailable", async () => {

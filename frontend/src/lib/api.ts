@@ -626,6 +626,13 @@ export interface ConversationListItem {
 
 export type ConversationDetail = ConversationListItem;
 
+/** 25.1-01：结构区间锚点回显（服务端已按剧透边界收窄后的实际区间）。 */
+export interface ChapterRangeAnchor {
+  kind: "chapter_range";
+  chapter_start: number;
+  chapter_end: number;
+}
+
 export interface MessageView {
   id: number;
   conversation_id: number;
@@ -635,6 +642,7 @@ export interface MessageView {
   client_message_id: string | null;
   reply_to_message_id: number | null;
   selection: SelectionSummary | null;
+  anchor?: ChapterRangeAnchor | null;
   citations: CitationView[];
   generation_job: GenerationJobView | null;
   created_at: string;
@@ -665,6 +673,8 @@ export interface MessageCreateBody {
   body: string;
   chapter_id?: number;
   selection?: SelectionCoordinate;
+  /** 与 chapter_id/selection 互斥；章号语义，服务端按剧透边界收窄 chapter_end。 */
+  chapter_range?: { chapter_start: number; chapter_end: number };
 }
 
 const TERMINAL_JOB_STATUSES: ReadonlySet<GenerationJobStatus> = new Set([
