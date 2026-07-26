@@ -6,9 +6,11 @@
 
 ## Current Milestone
 
-**No active v0.8 work** — v0.8 已于 2026-07-16 以 **candidate scope** 收口归档。
+**v1.1 工程与治理基线收口（PLANNED，2026-07-26 立项规划）** — Phase 21–25，详见 `ROADMAP.md`。
 
-下一里程碑未立项；可选：`/gsd-new-milestone`，或处理 v0.3 评测 / Phase 10 residual / WIP 分拣。
+后续里程碑已按标准 GSD 格式写入 `ROADMAP.md`：v1.1 基线收口（Phase 21–25）→ v1.2 单书垂直证明（Phase 26–29）→ v1.3 生产切换（Phase 30，需新授权）→ v1.4 创作域（Phase 31–34，核心功能完成）。现状核查事实：`AUDIT-STATUS-REFRESH-2026-07-26.md`。
+
+首个动作：Phase 21（phase21 分支工作追认与文档一致性）∥ Phase 22（CI 恢复绿与门禁生效），两者无依赖可并行。
 
 ## Current State (shipped)
 
@@ -20,9 +22,11 @@
 
 ## Active Requirements (cross-milestone residuals)
 
-- [ ] v0.3 RAG 评测质量闭环（100 confirmed、有效非零指标、faithfulness/cost）。
-- [ ] Phase 10 real Playwright residual（reader-chat-real）。
-- [ ] （可选）live-provider 单书 qualification（需 hard-budget，非 CI 权威）。
+- [ ] v0.3 RAG 评测质量闭环（100 confirmed、有效非零指标、faithfulness/cost）→ 归入 Phase 28。
+- [ ] Phase 10 real Playwright residual（reader-chat-real）→ 归入 Phase 28。
+- [ ] （可选）live-provider 单书 qualification（需 hard-budget，非 CI 权威）→ 归入 Phase 28。
+- [ ] master CI 全红恢复 + 分支保护实际生效（2026-07-26 新发现）→ Phase 22。
+- [ ] phase21 分支工作 GSD 追认与文档漂移消除（2026-07-26 新发现）→ Phase 21。
 
 ## Current Reality
 

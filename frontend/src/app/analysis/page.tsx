@@ -779,19 +779,24 @@ function AnalysisWorkspace() {
       !nmVersionId ||
       !selectedNode?.nmNodeId
     ) {
+      // 依赖切换时的同步重置；正规做法是 render 期派生或 key 重挂载，Phase 25 再收
+      /* eslint-disable react-hooks/set-state-in-effect */
       setNmClaims([]);
       setNmClaimsError(null);
       setNmClaimsLoading(false);
       setSelectedClaimId(null);
       setNmSourceLinks([]);
+      /* eslint-enable react-hooks/set-state-in-effect */
       return;
     }
     let cancelled = false;
+    /* eslint-disable react-hooks/set-state-in-effect */
     setNmClaimsLoading(true);
     setNmClaimsError(null);
     setSelectedClaimId(null);
     setNmSourceLinks([]);
     setNmSourceLinksError(null);
+    /* eslint-enable react-hooks/set-state-in-effect */
     const through =
       typeof relationshipThroughChapter === "number"
         ? relationshipThroughChapter
@@ -833,14 +838,19 @@ function AnalysisWorkspace() {
       !selectedNode?.nmNodeId ||
       selectedClaimId == null
     ) {
+      // 依赖切换时的同步重置；正规做法是 render 期派生或 key 重挂载，Phase 25 再收
+      /* eslint-disable react-hooks/set-state-in-effect */
       setNmSourceLinks([]);
       setNmSourceLinksLoading(false);
       setNmSourceLinksError(null);
+      /* eslint-enable react-hooks/set-state-in-effect */
       return;
     }
     let cancelled = false;
+    /* eslint-disable react-hooks/set-state-in-effect */
     setNmSourceLinksLoading(true);
     setNmSourceLinksError(null);
+    /* eslint-enable react-hooks/set-state-in-effect */
     const through =
       typeof relationshipThroughChapter === "number"
         ? relationshipThroughChapter

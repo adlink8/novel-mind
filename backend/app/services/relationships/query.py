@@ -844,7 +844,9 @@ class RelationshipGraphQueryService:
         """Stable positive graph id for mention-only nodes (no characters row yet)."""
         import hashlib
 
-        digest = hashlib.sha1(mention.strip().lower().encode("utf-8")).hexdigest()
+        digest = hashlib.sha1(
+            mention.strip().lower().encode("utf-8"), usedforsecurity=False
+        ).hexdigest()
         # Keep in positive int32-ish range, avoid 0.
         return (int(digest[:8], 16) % 1_900_000_000) + 1
 
@@ -859,7 +861,7 @@ class RelationshipGraphQueryService:
             (source_id, target_id) if source_id <= target_id else (target_id, source_id)
         )
         digest = hashlib.sha1(
-            f"rel:{lo}:{hi}:{relation_type}".encode("utf-8")
+            f"rel:{lo}:{hi}:{relation_type}".encode("utf-8"), usedforsecurity=False
         ).hexdigest()
         return (int(digest[:8], 16) % 1_900_000_000) + 1
 

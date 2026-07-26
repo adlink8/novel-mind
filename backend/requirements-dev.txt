@@ -13,6 +13,8 @@ pytest-timeout==2.4.0
 aiosqlite>=0.20
 
 # --- Code quality ---
-ruff>=0.6
+# ruff 锁定：0.16.0 扩大了默认规则集（I/UP/TRY 等），未锁版本曾使 CI 凭空产生
+# 1096 个风格错误（run 30189436828）。升级需显式过一遍新规则再提版本。
+ruff==0.15.22
 bandit>=1.9
 pip-audit>=2.9

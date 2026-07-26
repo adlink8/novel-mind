@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: 结构工作台与多层呈现
-status: phase_complete
-last_updated: 2026-07-17T10:00:00.000Z
-last_activity: 2026-07-17
+milestone: v1.1
+milestone_name: 工程与治理基线收口
+status: roadmap_planned
+last_updated: 2026-07-26T00:00:00.000Z
+last_activity: 2026-07-26
 progress:
-  total_phases: 20
+  total_phases: 34
   completed_phases: 20
-  total_plans: 82
+  total_plans: 120
   completed_plans: 82
-  percent: 100
+  percent: 68
 last_shipped_milestone: v0.8
 last_shipped_verdict: achieved_candidate_scope
 ---
@@ -19,9 +19,17 @@ last_shipped_verdict: achieved_candidate_scope
 
 ## Current Position
 
+Milestone: **v1.1 工程与治理基线收口**（Phase 21–25，PLANNED 2026-07-26）  
+Phase: **21-settings-routing-usage-and-debtfix**（追认待启动）∥ **22-ci-green-and-gate-enforcement**（可并行）  
+Status: **ROADMAP PLANNED** — Phase 21–34 已按标准 GSD 格式写入 `ROADMAP.md`；下一步 `/gsd-plan-phase 21` 或 `/gsd-plan-phase 22`  
+Last activity: 2026-07-26（全量路线图规划；现状核查 `AUDIT-STATUS-REFRESH-2026-07-26.md`）
+
+> 注：git 历史中 "phase21" 分支（PR #11/#12，Alembic head `18appsetting1`，后端 1085 passed）未走 GSD，由 Phase 21 追认；master CI 当前连续红（Ruff / integration 1 failed / Browser smoke 127 / ci-gate SyntaxError / CodeQL），由 Phase 22 恢复。
+
+## 历史位置（v1.0，2026-07-17）
+
 Phase: **20-structure-workspace-multilayer-presentation**  
-Status: **PHASE COMPLETE (P0)** + **2026-07-17 ordered follow-on executed**  
-Last activity: 2026-07-17 (docs update)
+Status: **PHASE COMPLETE (P0)** + **2026-07-17 ordered follow-on executed**
 
 ## Authorization boundary (still)
 
@@ -63,10 +71,10 @@ Reports: `20-ORDERED-EXEC-REPORT.md`, `20-WAVE-NEXT-REPORT.md`
 - Clues: active v24, 32 clues, 0 payoff  
 - NM: candidate version present, incomplete chapter_state  
 
-## Deferred / next
+## Deferred / next（2026-07-26 已全部归入 Phase 21–34）
 
-- Resume NM build to arc/global (hours; no promote)
-- Commit/stabilize NM CLI transport WIP if still dirty
-- Clue worker gate + title builder for real payoff
-- Restart BE after timeline range deploy
-- v0.3 RAG eval residual; Phase 10 Playwright residual
+- Resume NM build to arc/global（no promote）→ **Phase 26**
+- Clue worker gate 已修（`2cf8562`）；title builder（short_title）→ **Phase 25**；payoff 生产重跑 → **Phase 27**
+- v0.3 RAG eval residual + Phase 10 Playwright residual → **Phase 28**
+- master CI 全红恢复 + 分支保护生效 → **Phase 22**
+- phase21 追认与文档漂移 → **Phase 21**

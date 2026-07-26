@@ -193,9 +193,12 @@ jobs:
         working-directory: backend
         run: bandit -r app -lll -q
 
+      # PYSEC-2026-311 (chromadb 1.5.9, 即 CVE-2026-45829): 无可用修复版本，
+      # 且 docker-compose.ci.yml 按 digest 锁定同版本 server，客户端必须匹配。
+      # chromadb 发布修复版本后移除此豁免并同步升级镜像 digest。
       - name: pip-audit
         working-directory: backend
-        run: pip-audit
+        run: pip-audit --ignore-vuln PYSEC-2026-311
 
       - name: TypeScript
         working-directory: frontend
@@ -205,9 +208,12 @@ jobs:
         working-directory: frontend
         run: npm run lint
 
+      # --omit=dev：GHSA-mh99-v99m-4gvg 仅 5.0.8 修复且与 eslint→minimatch@3
+      # 的 brace-expansion@1 API 不兼容（全局 override 会使 eslint 崩溃），
+      # 开发链无法洗绿。生产依赖树保持全量审计门禁。
       - name: npm audit
         working-directory: frontend
-        run: npm audit --registry=https://registry.npmjs.org
+        run: npm audit --omit=dev --registry=https://registry.npmjs.org
 
   # ---------------------------------------------------------------------------
   # actionlint (locked v1.7.12)
@@ -589,6 +595,9 @@ jobs:
     permissions:
       contents: read
       security-events: write
+      # codeql-action/analyze 上传结果时需要读取 workflow run 元数据；
+      # 缺少该权限时报 "Resource not accessible by integration" 并判 configuration error。
+      actions: read
     strategy:
       fail-fast: false
       matrix:
@@ -607,10 +616,24 @@ jobs:
       - name: Autobuild
         uses: github/codeql-action/autobuild@v3
 
+      # Private repo without GitHub Advanced Security: the code-scanning upload
+      # endpoint is unavailable ("Code scanning is not enabled"), so analysis
+      # runs locally and SARIF is kept as a build artifact instead.
       - name: Analyze
         uses: github/codeql-action/analyze@v3
         with:
           category: "/language:${{ matrix.language }}"
+          upload: never
+          output: codeql-results
+
+      - name: Upload CodeQL SARIF artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: codeql-sarif-${{ matrix.language }}
+          path: codeql-results/**
+          if-no-files-found: warn
+          retention-days: 14
 
   # ---------------------------------------------------------------------------
   # Live smoke — protected main / schedule / dispatch only (45m — D-16)
@@ -961,7 +984,7 @@ jobs:
           def r(key: str) -> str:
               return (os.environ.get(key) or "missing").strip().lower()
 
-          run_nightly_raw = (os.environ.get("RUN_NIGHTLY") || "false").strip().lower()
+          run_nightly_raw = (os.environ.get("RUN_NIGHTLY") or "false").strip().lower()
           run_nightly = run_nightly_raw in ("true", "1", "yes")
           payload = {
               "event": os.environ.get("EVENT_NAME") or "",

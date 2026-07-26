@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import fs from "fs";
 import path from "path";
 
 /**
@@ -34,12 +35,14 @@ const CORS_ORIGINS = JSON.stringify([
 ]);
 
 const backendDir = path.resolve(__dirname, "../backend");
-// Prefer PATH-resolved python when running under backend venv activation;
-// otherwise call the platform-specific venv binary via shell.
-const backendCmd =
-  process.platform === "win32"
-    ? "venv\\Scripts\\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8010"
-    : "venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8010";
+// Dev machines run the backend from a venv; CI installs into the runner's
+// system Python with no venv (a hardcoded venv path exits 127 there).
+const venvPython =
+  process.platform === "win32" ? "venv\\Scripts\\python.exe" : "venv/bin/python";
+const pythonBin =
+  process.env.E2E_PYTHON ??
+  (fs.existsSync(path.join(backendDir, venvPython)) ? venvPython : "python");
+const backendCmd = `${pythonBin} -m uvicorn app.main:app --host 127.0.0.1 --port 8010`;
 
 export default defineConfig({
   testDir: "./e2e",

@@ -10,6 +10,11 @@
 - [x] v0.9 分析工作台呈现与数据诚实 - Phase 19 COMPLETE
 - [x] v1.0 结构工作台与多层呈现 - Phase 20 COMPLETE（P0；NM 只读；禁止 promotion 仍有效）
 
+- [ ] v1.1 工程与治理基线收口 - Phase 21–25（PLANNED 2026-07-26；现状核查见 [AUDIT-STATUS-REFRESH-2026-07-26](./AUDIT-STATUS-REFRESH-2026-07-26.md)）
+- [ ] v1.2 单书垂直证明 - Phase 26–29（PLANNED；依赖 v1.1）
+- [ ] v1.3 生产切换 - Phase 30（PLANNED；**立项需显式新授权解除 NM promotion / Reader Chat cutover 禁令**）
+- [ ] v1.4 创作域 - Phase 31–34（PLANNED；核心功能完成的收口里程碑）
+
 第一个 active milestone 已按要求设为并完成"审计与启动修复"。v0.3 经 2006-06-13 复审后恢复为 active，详见 `.planning/v0.3-MILESTONE-AUDIT.md`。
 
 ## v0.3 Plans
@@ -51,6 +56,10 @@
 | Phase 18 前端动效与过渡系统 | 3/3 | **COMPLETE** — 18-01..03 done; dual-viewport motion qualified |
 | v0.9 / Phase 19 分析工作台呈现与数据诚实 | 4/4 | **COMPLETE** — 19-01..04 done (truth + presentation) |
 | v1.0 / Phase 20 结构工作台与多层呈现 | 4/4 | **COMPLETE** — P0 Structure Workspace + NM read-only |
+| v1.1 / Phase 21-25 工程与治理基线收口 | 0/13 | PLANNED (2026-07-26) |
+| v1.2 / Phase 26-29 单书垂直证明 | 0/11 | PLANNED |
+| v1.3 / Phase 30 生产切换 | 0/3 | PLANNED — 立项需新授权 |
+| v1.4 / Phase 31-34 创作域 | 0/11 | PLANNED |
 
 ### Phase 19: Analysis Workbench Presentation & Truth
 
@@ -88,12 +97,308 @@ Research: `20-RESEARCH.md`.
 Verification: `20-VERIFICATION.md`.  
 Summaries: `20-01`..`20-04-SUMMARY.md`.
 
+### Phase 21: phase21 追认与文档一致性恢复
+
+**Goal:** 把 2026-07-18~07-23 未走 GSD 的 "phase21" 分支工作（设置中心重构、AI 路由偏好 + 用量 API、`app_settings` 迁移 `18appsetting1`、阅读器体验、Timeline/Reader Chat 服务重写、Vertex/Gemini 实验适配）纳入规划权威，消除全部文档漂移，建立快照标识规范。  
+**Requirements:** REQ-BASE-01, REQ-BASE-02  
+**Depends on:** 无（立即可做，与 Phase 22 并行）  
+**Status:** PLANNED  
+**Non-goals:** 不重做 phase21 代码；不清理 git 历史中的 75MB dump（需单独决策）
+
+**Success Criteria:**
+1. `.planning/phases/21-settings-routing-usage-and-debtfix/` 存在 CONTEXT + SUMMARY，追认实际交付与验证证据（后端 1085 passed / 189 skipped 基线、迁移 `18appsetting1`）。
+2. `IMPLEMENTATION-STATUS.md` 刷新：Alembic head（当前误记 `518675fa18f8`）、测试计数（当前误记 239）、AI 路由/用量条目、Vertex 实验态标注。
+3. `backend/app/api/README.md` 与 `api/__init__.py` 的反向漂移修正（timeline/analysis 不再标 501）。
+4. `docs/路线图.md`、`.planning/codebase/CONCERNS.md` 重写或标记 superseded。
+5. 被更新的状态文档头部含统一快照标识（commit、日期、DB fingerprint 或"未连接 DB"声明）。
+
+Plans:
+- [ ] 21-01 phase21 追认目录 + IMPLEMENTATION-STATUS/STATE/ROADMAP 刷新
+- [ ] 21-02 api README/__init__ 反向漂移修正 + codebase map 与 docs/路线图.md 重写 + 快照标识规范
+
+**Waves:** 1 (21-01) → 2 (21-02)
+
+### Phase 22: CI 恢复绿与门禁真实生效
+
+**Goal:** master 每日 CI 恢复全绿，ci-gate 聚合脚本修复，分支保护 required check 实际阻止红色合入（PR #11 曾带红 ci-gate 合入）。  
+**Requirements:** REQ-BASE-03, REQ-BASE-04  
+**Depends on:** 无（与 Phase 21 并行）  
+**Status:** PLANNED
+
+**Success Criteria:**
+1. Ruff check 0 违规（import 排序、`Optional`→`| None`、TRY004 等机械清理）。
+2. `tests/integration/timeline/test_real_qualification.py::test_release_entry_blocks_postgres_report_authority_mismatch` 按根因修复（区分测试契约漂移 vs qualification 逻辑回归）。
+3. Browser smoke 的 Playwright webServer exit 127 修复。
+4. ci-gate "Write producer results envelope" SyntaxError 修复，聚合逻辑有自身单测。
+5. CodeQL 两语言 Analyze 恢复通过或按官方指引调整配置。
+6. 分支保护验证：ci-gate 为 required 且演练证明红色无法合入；PR #11 带红合入的原因记录在案。
+7. 连续 3 个 nightly 运行全绿。
+
+Plans:
+- [ ] 22-01 Ruff/静态清理 + ci-gate 聚合脚本修复与单测
+- [ ] 22-02 integration timeline 资格测试 + Browser smoke webServer + CodeQL 修复
+- [ ] 22-03 分支保护强制验证 + 带红合入根因记录 + 3 天绿色观察
+
+**Waves:** 1 (22-01 ∥ 22-02) → 2 (22-03)
+
+### Phase 23: 层级注册表与叙事系统边界
+
+**Goal:** 建立唯一 Layer Registry ADR（S/D/R/A 四命名空间），固定 Narrative Unit 与 Narrative Memory 的用途、边界与消费顺序，分离三种 level 字段语义。关闭 NM-ARCH-001..004、NM-GOV-001。  
+**Requirements:** REQ-GOV-01, REQ-GOV-02, REQ-GOV-03  
+**Depends on:** Phase 21  
+**Status:** PLANNED  
+**Non-goals:** 不新增语义层；不做存量字段强制迁移
+
+**Success Criteria:**
+1. `docs/adr/0001-layer-registry.md`：S0-S6 语义层、D* 数据成熟度、R* 发布生命周期、A* 架构层；每层输入/输出/SSOT/可重建性/模型写入权/失效传播/对应表与 API。
+2. `docs/adr/0002-narrative-unit-vs-narrative-memory.md`：两系统用途、依赖、是否替代、各自 Active 含义、消费顺序；PROJECT/REQUIREMENTS 引用。
+3. 新增代码/schema 禁用裸 `L0-L6`；`chunk_level`/`semantic_level`/`release_status` 命名规范落入 API schema 约定（新字段强制）。
+4. 旧 L* 文档批量标注 "superseded by ADR-0001"。
+5. Facet（Timeline/Relationship/Clue）作为只读投影、禁止无证据反写主结构的规则写入 ADR 并有契约测试。
+
+Plans:
+- [ ] 23-01 Layer Registry ADR + 文档引用与 superseded 标注
+- [ ] 23-02 NU/NM 边界 ADR + 字段语义规范 + facet 反馈环禁止契约测试
+
+**Waves:** 1 (23-01) → 2 (23-02)
+
+### Phase 24: 存储一致性与检索统一
+
+**Goal:** 关闭 raw TextChunk→Chroma 双写一致性缺口（fail-closed），统一 raw chunk / Narrative Unit / NM 三层检索的路由、降级与 citation 规则，并入 Reader Chat 优先级契约。关闭 NM-GOV-002/003/006、NM-DATA-010。  
+**Requirements:** REQ-GOV-04, REQ-GOV-05  
+**Depends on:** Phase 23（ADR 先固定权威顺序）  
+**Status:** PLANNED
+
+**Success Criteria:**
+1. `indexing_service.py`：索引写入带 journal/幂等键/完成标记；`failed_count > 0` 时 novel 状态不得为 `ready`（fail-closed 或显式 `partial` 且检索侧感知）；重建消除"DB 已删、旧向量残留"窗口。
+2. 索引完整性 gate：DB chunk 集与 Chroma collection 可 reconcile，缺失/孤儿可检出可修复；manifest 绑定数据库版本。
+3. 统一检索策略：mode 决策移到服务端 router；units 为空/损坏时自动降级 raw chunks 并标注 fallback reason；citation 只能来自叶子原文层的规则代码化。
+4. NM hierarchical retrieval 在 router 中有显式接入点（candidate-only 保持关闭但降级顺序已定义）；Reader Chat `SOURCE_PRIORITY` 与 router 契约合并或引用同一 ADR。
+5. Neo4j 投影防双写自动化约束（只读 accepted facts、可全量 replay）有契约测试。
+
+Plans:
+- [ ] 24-01 TextChunk→Chroma journal/幂等/fail-closed + 删除窗口修复
+- [ ] 24-02 索引 reconcile/完整性 gate + manifest 绑定
+- [ ] 24-03 统一 router/fallback/citation + Reader Chat 优先级并轨 + Neo4j 约束测试
+
+**Waves:** 1 (24-01) → 2 (24-02 ∥ 24-03)
+
+### Phase 25: Facet 数据诚实与 API 契约收口
+
+**Goal:** 补齐 clue/relationship 的数据诚实字段与成本结算，收口三个占位 API 双轨。关闭 NM-DATA-005/007/008、NM-API-001/002/003。  
+**Requirements:** REQ-GOV-06, REQ-GOV-07, REQ-GOV-08  
+**Depends on:** Phase 23  
+**Status:** PLANNED
+
+**Success Criteria:**
+1. Clue judge schema 增加独立 `short_title`（展示与审计 rationale 分离）；标题不再截断 rationale；存量标题可批量重建。
+2. Clue LLM 调用按 provider price snapshot × usage 真实结算 `cost_usd`（对齐 narrative_memory/timeline/reader_chat 已有实现）；DB 合计不再恒 0。
+3. `RelationshipObservation`/`CharacterRelation` 增加 `intake_kind`/`producer_kind` 枚举列并贯穿 API/UI（区分 LLM 多阶段观察 / timeline seed-backfill / 共现候选）。
+4. `api/characters.py` 适配到 Phase 09 Relationship 或返回 410 deprecated，禁止返回看似合法的空数组；`analyze/stream` 删除契约或实现；`fanfiction` 标记 deferred（v1.4 接管）。
+5. 变更均有迁移 + 契约测试，CI 保持绿。
+
+Plans:
+- [ ] 25-01 clue short_title + cost_usd 真实结算
+- [ ] 25-02 relationship intake/producer lineage 迁移与贯穿
+- [ ] 25-03 characters/stream/fanfiction API 契约收口
+
+**Waves:** 1 (25-01 ∥ 25-02) → 2 (25-03)
+
+### Phase 26: NM 整书构建收敛
+
+**Goal:** novel 91 全部 515 章进入明确终态，Arc/Volume 与 Global 真实生成，失败隔离与恢复在长篇上被证明，产出完整成本/复用报告；全程 candidate-only。关闭 NM-DATA-001/002 数据侧。  
+**Requirements:** REQ-BOOK-01, REQ-BOOK-02, REQ-BOOK-03  
+**Depends on:** Phase 22（CI 绿）、Phase 24（索引一致性）  
+**Status:** PLANNED
+
+**Success Criteria:**
+1. 515 章 chapter_state 全部 completed 或显式隔离（隔离章带 reason code，不静默 pending）；33 个历史 failed 恢复或归类。
+2. Arc/Volume 覆盖全部连续章节范围，Global Story Model 生成且 manifest 可由 DB 重算。
+3. 单章失败只阻断所属 Arc 在真实长篇上验证（非仅 fixture）；是否允许 qualified partial Arc 有决策记录。
+4. 构建报告：calls/tokens/cost/cache hits/来源状态完整；`cost_usd` 真实（依赖 Phase 25）。
+5. 无任何 active pointer 创建或移动（负向测试）。
+
+Plans:
+- [ ] 26-01 失败章诊断与恢复策略（schema/package/budget/transport 分类处理）
+- [ ] 26-02 全书 chapter_state 收敛运行 + 断点续跑运维记录
+- [ ] 26-03 Arc/Global 生成 + manifest 重算验证 + 成本报告
+
+**Waves:** 1 (26-01) → 2 (26-02) → 3 (26-03)
+
+### Phase 27: 跨章语义闭环
+
+**Goal:** 在真实数据上把"事件目录"升级为因果链、"关系建立"升级为演化链、"线索发现"升级为 plant→payoff 闭环。关闭 NM-DATA-003/004 数据侧。  
+**Requirements:** REQ-SEM-01, REQ-SEM-02, REQ-SEM-03  
+**Depends on:** Phase 25（诚实字段）、Phase 26（全书数据）  
+**Status:** PLANNED
+
+**Success Criteria:**
+1. novel 91 时间线存在证据门控的 caused/triggered/responded/blocked 因果边（数量 > 0 且抽样人工核验）。
+2. relationship 存在真实 change/end 观察（生产链产出，非仅 seed establish），`valid_from/valid_to` 生效并在 UI 可见。
+3. clue 存在完整 cue→reinforce→payoff/dismissed 链（payoff 状态机修复 `2cf8562` 后的生产重跑，payoff_chapter > 0），标题可读。
+4. 三者保持只读 facet 契约：证据引用完整、unavailable 不解释为零事实。
+
+Plans:
+- [ ] 27-01 timeline 因果边生产运行 + 门控与抽样核验
+- [ ] 27-02 relationship 演化观察生产链 + intake 区分验证
+- [ ] 27-03 clue 全书 re-judge 生产重跑 + payoff 链验收
+
+**Waves:** 1 (27-01 ∥ 27-02 ∥ 27-03)
+
+### Phase 28: 质量证据与 v0.3 收口
+
+**Goal:** 重建当前环境的评测权威：100 confirmed 金标、非零检索指标、faithfulness/cost 报告，全部绑定 DB fingerprint；对真实 NM 候选跑 qualification；关闭 v0.3 与 Phase 10 residual。关闭 NM-DATA-009。  
+**Requirements:** REQ-EVAL-02, REQ-EVAL-03, REQ-QUAL-06, REQ-QUAL-07  
+**Depends on:** Phase 26、Phase 27  
+**Status:** PLANNED
+
+**Success Criteria:**
+1. 100 条 confirmed 评测题（复用 Phase 06 双模型仲裁链自动 qualify + 人工抽检），当前 DB 中 dataset/run 非零。
+2. baseline/hybrid/units Recall/MRR/NDCG 非零且可复现；faithfulness/cost 完整计算。
+3. 每份报告绑定 DB fingerprint、dataset version、source snapshot、commit。
+4. NM 真实候选（Phase 26 产物）通过 Phase 17 冻结 qualification：local/arc/global/no-answer/spoiler 全桶，结论 `qualified_candidate` 或 `blocked` 并归档。
+5. `reader-chat-real.spec.ts` 在真实 Postgres 下通过（Phase 10 residual 关闭）。
+6. v0.3 里程碑标记完成。
+
+Plans:
+- [ ] 28-01 评测金标重建 + 指标非零验证 + 快照绑定
+- [ ] 28-02 faithfulness/cost 报告 + NM 候选真实 qualification
+- [ ] 28-03 Phase 10 real Playwright residual + v0.3 收口审计
+
+**Waves:** 1 (28-01) → 2 (28-02 ∥ 28-03)
+
+### Phase 29: 统一消费验证（v1.2 收口）
+
+**Goal:** 结构工作台与 Reader Chat 在真实 Arc/Global 数据上联动验证，降级路径实测，完成 v1.2 里程碑审计。  
+**Requirements:** REQ-BOOK-04, REQ-BOOK-05  
+**Depends on:** Phase 26–28  
+**Status:** PLANNED
+
+**Success Criteria:**
+1. `/analysis` Structure Workspace 展示真实 Arc/Global 骨架（非降级章节树），facet 范围联动正确。
+2. Reader Chat 在 NM 不可用/partial 时 fallback 正确且引用仍回落原文（实测）。
+3. 桌面 + 390px 浏览器验收通过；全站 build/test/Playwright 绿。
+4. v1.2 里程碑审计报告按 `implementation_readiness / sample_data_coverage / quality_qualification` 三维度归档。
+
+Plans:
+- [ ] 29-01 工作台真实数据联动 + fallback 实测
+- [ ] 29-02 双视口浏览器验收 + v1.2 里程碑审计
+
+**Waves:** 1 (29-01) → 2 (29-02)
+
+### Phase 30: NM Promotion 契约、A/B 与切换决策
+
+**Goal:** 设计并实现 NM 生产 promotion 全链，用 A/B 数据决定是否切换 Reader Chat 与工作台的默认消费层。**本阶段立项需显式新授权解除 promotion/cutover 禁令。**  
+**Requirements:** REQ-PROM-01, REQ-PROM-02, REQ-PROM-03  
+**Depends on:** v1.2 全部  
+**Status:** PLANNED (blocked on authorization)
+
+**Success Criteria:**
+1. Active Pointer 唯一权威、CAS promotion、before/after manifest、rollback journal 实现并测试（对齐 Narrative Unit 已有 promotion 模式）。
+2. A/B：NM hierarchical vs Narrative Unit vs raw hybrid 在同一冻结题集/预算下对比，阈值预先声明。
+3. 达标 → 切换默认层并保留回退开关；不达标 → 记录 blocked 原因保持 candidate-only（两种结论均为合法退出）。
+4. 切换后 spoiler/owner/citation 对抗测试全绿。
+
+Plans:
+- [ ] 30-01 promotion 契约实现（pointer/CAS/manifest/rollback）
+- [ ] 30-02 A/B 冻结对比 + 阈值判定
+- [ ] 30-03 切换执行（或 blocked 归档）+ 回归与回退演练
+
+**Waves:** 1 (30-01) → 2 (30-02) → 3 (30-03)
+
+### Phase 31: 三重知识空间契约
+
+**Goal:** 建立 Original Canon / User Interpretation / Fanfiction Canon 的隔离契约：不同 authority、namespace、version、citation 规则；禁止创作内容污染原作分析层。  
+**Requirements:** REQ-CRE-01, REQ-CRE-02  
+**Depends on:** Phase 23 ADR 体系（可与 v1.3 并行）  
+**Status:** PLANNED
+
+**Success Criteria:**
+1. ADR + 数据模型：三空间各自的表/namespace/版本语义；fanfiction 内容不得进入原作检索索引、评测语料或 facet 生产链（负向测试）。
+2. 用户 override 与原作事实冲突的表达与展示规则固定。
+3. Reader Chat / 检索 / NM 构建的输入边界更新：创作空间内容显式排除。
+
+Plans:
+- [ ] 31-01 三空间 ADR + 数据模型与迁移
+- [ ] 31-02 隔离负向测试 + 既有管线输入边界更新
+
+**Waves:** 1 (31-01) → 2 (31-02)
+
+### Phase 32: 创作项目与编辑器
+
+**Goal:** 用真实实现替换 fanfiction 501：创作项目模型、Markdown 编辑、版本历史、章节规划；`/writing` 从占位页升级为真实入口。  
+**Requirements:** REQ-CRE-03, REQ-CRE-04  
+**Depends on:** Phase 31  
+**Status:** PLANNED
+
+**Success Criteria:**
+1. 创作项目 CRUD（owner 隔离）、章节规划、Markdown 编辑与自动保存。
+2. 版本历史：每次保存可追溯、可 diff、可回滚。
+3. fanfiction API 501 移除。
+4. 权限/安全对齐既有标准（owner、上传边界、审计）。
+
+Plans:
+- [ ] 32-01 创作域数据模型 + API + 迁移
+- [ ] 32-02 编辑器 UI + 版本历史
+- [ ] 32-03 章节规划 + 浏览器验收
+
+**Waves:** 1 (32-01) → 2 (32-02 ∥ 32-03)
+
+### Phase 33: 理解约束的续写
+
+**Goal:** 续写生成注入原作理解约束（指定叙事位置的人物状态、世界状态、时间线因果、未回收伏笔、文风），使输出区别于普通文本生成，并可评测一致性。  
+**Requirements:** REQ-CRE-05, REQ-CRE-06  
+**Depends on:** Phase 32、v1.2 数据闭环（人物/世界状态来自 NM chapter_state/arc）  
+**Status:** PLANNED
+
+**Success Criteria:**
+1. 续写上下文包 = 用户设定 + 指定 cutoff 处的 NM 状态 + 相关证据引用；包内容可审计。
+2. 生成走既有预算/审计/成本链路（复用 timeline/reader_chat gateway 模式）。
+3. 一致性评测：人物行为/既定事实/时间线矛盾的自动检查 + 冻结样例集门禁。
+4. 用户可选择偏离原作（override 显式记录），偏离不回写原作空间。
+
+Plans:
+- [ ] 33-01 理解约束上下文包 + 生成链路
+- [ ] 33-02 一致性评测与门禁
+- [ ] 33-03 偏离管理 + UI 集成
+
+**Waves:** 1 (33-01) → 2 (33-02 ∥ 33-03)
+
+### Phase 34: 导出、部署与项目收口
+
+**Goal:** Markdown/EPUB 导出、生产部署基线、全项目最终审计——核心功能完成的正式退出。  
+**Requirements:** REQ-CRE-07, REQ-SHIP-01, REQ-SHIP-02  
+**Depends on:** Phase 32、33  
+**Status:** PLANNED
+
+**Success Criteria:**
+1. 创作作品与（可选）分析报告导出 Markdown/EPUB，内容与版本一致。
+2. 生产部署清单：TLS/密钥管理/备份/监控成本告警核对（沿用现有 deploy configs 收口）。
+3. 最终审计：三维度全绿；TARGET-GAP-ANALYSIS 的 Target C 达标条件逐项核销；Target D 差距重估。
+4. `docs/` 面向用户文档完整（GETTING-STARTED 到创作流程）。
+
+Plans:
+- [ ] 34-01 导出管线 + 格式验收
+- [ ] 34-02 部署基线核对 + 监控告警
+- [ ] 34-03 最终里程碑审计 + 文档收口
+
+**Waves:** 1 (34-01 ∥ 34-02) → 2 (34-03)
+
+## Cross-cutting Execution Rules (v1.1+)
+
+1. 所有 plan 遵循 GSD：`Steps / Must-Haves / Verification`，slice 以 `Test, Fix, and Confirm` 结束，完成状态必须有命令或代码证据。
+2. **红线（直至 Phase 30 立项获得显式授权前有效）**：禁止 NM promotion / active pointer 创建或移动 / Reader Chat cutover。
+3. 每个 phase 收口按 `implementation_readiness / sample_data_coverage / quality_qualification` 三维度分开报告，禁止合并为单一百分比。
+4. 任何新功能立项前先检查是否依赖尚未关闭的前置 phase。
+5. 建议节奏：Phase 21 与 22 立即并行启动；23 → 24 ∥ 25；随后进入 v1.2。
+
 ## Auto Start
 
 **v1.0 / Phase 20 COMPLETE（2026-07-16）** — plans 20-01..04 verified (P0).  
 **2026-07-17 ordered follow-on** — hierarchy green (91), timeline chapter range, rel transition UI, clue live re-judge (payoff residual), API UAT; NM build **partial** (see `20-ORDERED-EXEC-REPORT.md`).  
 **禁止** narrative-memory promotion / Reader Chat cutover 无新授权时执行。  
-Next: resume NM candidate build to arc/global; clue worker payoff/title fix; optional BE restart to serve chapter_range.
+**2026-07-26 全量规划落地** — Phase 21–34 已按标准 GSD 格式写入本文件（见上方 Phase 21..34 区块）；现状核查事实见 `AUDIT-STATUS-REFRESH-2026-07-26.md`。  
+Next: 启动 v1.1 — Phase 21（phase21 追认与文档一致性）∥ Phase 22（CI 恢复绿）；随后 23 → 24 ∥ 25。原 follow-on 项（NM build to arc/global、clue payoff 生产重跑）已并入 Phase 26/27。
 
 ## Backlog
 
