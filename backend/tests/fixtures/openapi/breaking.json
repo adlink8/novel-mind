@@ -29,6 +29,9 @@
             "description": "自定义 API 地址",
             "title": "Base Url"
           },
+          "contract_required_field": {
+            "type": "string"
+          },
           "extra_params": {
             "anyOf": [
               {
@@ -78,9 +81,6 @@
             "default": "balanced",
             "description": "层级: quality / balanced / budget",
             "title": "Tier",
-            "type": "string"
-          },
-          "contract_required_field": {
             "type": "string"
           }
         },
@@ -4530,6 +4530,40 @@
         "title": "RelationshipVersionSource",
         "type": "string"
       },
+      "RoutingPreferenceResponse": {
+        "description": "路由偏好响应",
+        "properties": {
+          "preference": {
+            "title": "Preference",
+            "type": "string"
+          }
+        },
+        "required": [
+          "preference"
+        ],
+        "title": "RoutingPreferenceResponse",
+        "type": "object"
+      },
+      "RoutingPreferenceUpdate": {
+        "description": "更新路由偏好请求（非法值返回 422）",
+        "properties": {
+          "preference": {
+            "description": "路由偏好: quality / balanced / budget",
+            "enum": [
+              "quality",
+              "balanced",
+              "budget"
+            ],
+            "title": "Preference",
+            "type": "string"
+          }
+        },
+        "required": [
+          "preference"
+        ],
+        "title": "RoutingPreferenceUpdate",
+        "type": "object"
+      },
       "SearchRequest": {
         "description": "混合搜索请求（BM25 + 向量）",
         "properties": {
@@ -5484,52 +5518,6 @@
         ]
       }
     },
-    "/api/analysis/{novel_id}/analyze/stream": {
-      "post": {
-        "description": "流式输出分析过程（SSE）— 后续迭代。",
-        "operationId": "analyze_novel_stream_api_analysis__novel_id__analyze_stream_post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "novel_id",
-            "required": true,
-            "schema": {
-              "title": "Novel Id",
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Analyze Novel Stream",
-        "tags": [
-          "剧情分析"
-        ]
-      }
-    },
     "/api/analysis/{novel_id}/chapters/{chapter_id}/analyze": {
       "post": {
         "description": "分析单个章节（基于该章下的 Phase07 场景）。",
@@ -5821,7 +5809,7 @@
     },
     "/api/characters/{novel_id}": {
       "get": {
-        "description": "获取小说人物列表",
+        "description": "已退役: 人物列表由关系图 envelope（nodes）提供。",
         "operationId": "get_characters_api_characters__novel_id__get",
         "parameters": [
           {
@@ -5867,7 +5855,7 @@
     },
     "/api/characters/{novel_id}/extract": {
       "post": {
-        "description": "AI 自动识别人物及关系（NER + LLM 混合抽取）",
+        "description": "已退役: 抽取由服务端 timeline/KG 管线完成，不再由客户端触发。",
         "operationId": "extract_characters_api_characters__novel_id__extract_post",
         "parameters": [
           {
@@ -5913,7 +5901,7 @@
     },
     "/api/characters/{novel_id}/relations": {
       "get": {
-        "description": "获取人物关系网络（用于 AntV G6 图谱可视化）",
+        "description": "已退役: 关系网络由 spoiler-safe 关系图 envelope（edges）提供。",
         "operationId": "get_relations_api_characters__novel_id__relations_get",
         "parameters": [
           {
@@ -7411,7 +7399,7 @@
     },
     "/api/fanfiction": {
       "post": {
-        "description": "创建同人文（指定原作、标题、续写提示）",
+        "description": "创建同人文（deferred，v1.4 Phase 31-33 实现）",
         "operationId": "create_fanfiction_api_fanfiction_post",
         "requestBody": {
           "content": {
@@ -7458,7 +7446,7 @@
     },
     "/api/fanfiction/{fanfiction_id}/continue": {
       "post": {
-        "description": "AI 续写（流式输出，基于 RAG 上下文注入）",
+        "description": "AI 续写（deferred，v1.4 Phase 31-33 实现）",
         "operationId": "continue_writing_api_fanfiction__fanfiction_id__continue_post",
         "parameters": [
           {
@@ -7516,7 +7504,7 @@
     },
     "/api/fanfiction/{novel_id}": {
       "get": {
-        "description": "获取小说的同人文列表",
+        "description": "获取小说的同人文列表（deferred，v1.4 Phase 31-33 实现）",
         "operationId": "list_fanfictions_api_fanfiction__novel_id__get",
         "parameters": [
           {
@@ -10825,6 +10813,78 @@
         ]
       }
     },
+    "/api/settings/routing": {
+      "get": {
+        "description": "获取当前 AI 路由全局偏好（未设置时返回默认 \"balanced\"）",
+        "operationId": "get_routing_api_settings_routing_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoutingPreferenceResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Routing",
+        "tags": [
+          "设置中心"
+        ]
+      },
+      "put": {
+        "description": "更新 AI 路由全局偏好（落库 + 同步内存中的路由器单例）",
+        "operationId": "update_routing_api_settings_routing_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoutingPreferenceUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoutingPreferenceResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update Routing",
+        "tags": [
+          "设置中心"
+        ]
+      }
+    },
     "/api/timeline/{novel_id}": {
       "get": {
         "operationId": "get_timeline_api_timeline__novel_id__get",
@@ -10920,16 +10980,6 @@
           }
         ],
         "responses": {
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          },
           "201": {
             "content": {
               "application/json": {
@@ -10939,6 +10989,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
         "security": [
@@ -11440,6 +11500,31 @@
         "summary": "Get Version",
         "tags": [
           "时间线"
+        ]
+      }
+    },
+    "/api/usage/summary": {
+      "get": {
+        "description": "用量汇总。\n\nReturns:\n    today_cost_usd: 当天 0 点（UTC）起的费用\n    week_cost_usd: 最近 7 天费用\n    month_cost_usd: 最近 30 天费用\n    total_tokens: 全部记录的 input + output token 总和",
+        "operationId": "usage_summary_api_usage_summary_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Usage Summary",
+        "tags": [
+          "用量统计"
         ]
       }
     }

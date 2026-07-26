@@ -61,7 +61,8 @@ async def test_timeline_missing_novel_returns_404(auth_client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_characters_not_implemented(auth_client: AsyncClient):
-    """测试人物抽取端点返回 501"""
+async def test_characters_extract_retired(auth_client: AsyncClient):
+    """人物抽取端点已退役：返回 410 并给出 successor 指引"""
     response = await auth_client.post("/api/characters/1/extract")
-    assert response.status_code == 501
+    assert response.status_code == 410
+    assert response.json()["detail"]["successor"] == "/api/relationships/1/graph"
