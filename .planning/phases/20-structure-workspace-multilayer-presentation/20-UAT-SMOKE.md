@@ -1,3 +1,5 @@
+> Layer numbering superseded by docs/adr/0001-layer-registry.md
+
 # Phase 20 UAT / Smoke — Structure Workspace
 
 **Date:** 2026-07-17  
