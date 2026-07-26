@@ -4,17 +4,23 @@ Embedding 索引管线服务
 将小说文本分块后生成 embedding 向量并存储到 ChromaDB，
 是 RAG 检索系统的核心编排层。
 
-完整流程:
-  1. 从数据库读取小说和章节
-  2. 更新 Novel.status = "chunking"
-  3. 调用 chunking_service.chunk_novel 分块
-  4. 将分块写入 text_chunks 表
-  5. 更新 Novel.status = "embedding"
-  6. 批量调用 ai_service.embedding 生成向量
-  7. 调用 vector_store.add_chunks 写入向量
-  8. 更新 text_chunks.embedding_status = "embedded"
-  9. 更新 Novel.status = "ready"
-  10. 返回统计信息
+完整流程（Phase 24-01：journal/幂等/fail-closed）:
+  1. 从数据库读取小说和章节，计算 source_signature（幂等键）
+  2. 基于 chunk_index_journal 判定：进行中 → 拒绝并发；
+     同内容已 completed 且零失败 → 跳过（force=True 显式重建）
+  3. 创建 journal（phase=started），更新 Novel.status = "chunking"
+  4. 调用 chunking_service.chunk_novel 分块
+  5. phase=deleting_old：**先删 Chroma collection，再删 text_chunks 行**；
+     Chroma 删除失败 fail-closed（journal 记 failed，抛错，不再 warning 继续）
+  6. 将分块写入 text_chunks 表（phase=chunks_persisted）
+  7. 更新 Novel.status = "embedding"（journal phase=embedding）
+  8. 批量调用 ai_service.embedding 生成向量 + vector_store.add_chunks 写入
+     （journal 计数随批次提交推进）
+  9. failed_count == 0 → Novel.status = "ready"，journal phase=completed
+     并写入 manifest_checksum（Phase 24-02 reconcile 绑定）；
+     failed_count > 0 → Novel.status = "partial"（fail-closed，检索侧可感知），
+     journal phase=failed + error 摘要
+  10. 返回统计信息（含 attempt_id）
 
 使用方式:
   from app.services.indexing_service import indexing_service
@@ -22,14 +28,21 @@ Embedding 索引管线服务
   results = await indexing_service.search_similar(db, novel_id=1, query="主角的性格")
 """
 
+import hashlib
 import logging
-from typing import Any, Callable, Awaitable
+import uuid
+from datetime import datetime, timezone
+from typing import Any, Awaitable, Callable
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.models.novel import Novel, Chapter
+from app.models.chunk_index_journal import (
+    INDEX_JOURNAL_IN_PROGRESS_PHASES,
+    ChunkIndexJournal,
+)
+from app.models.novel import Chapter, Novel
 from app.models.text_chunk import TextChunk
 from app.services.ai_service import ai_service
 from app.services.chunking_service import ChunkingService
@@ -39,6 +52,32 @@ logger = logging.getLogger(__name__)
 
 # 进度回调类型: (novel_id, current, total, status)
 ProgressCallback = Callable[[int, int, str], Awaitable[None]]
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _sha256_text(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def compute_source_signature(chapter_payload: list[dict[str, Any]]) -> str:
+    """章节内容幂等键：排序 `chapter_id:chapter_number:sha256(content)` 行的 sha256。"""
+    lines = sorted(
+        f"{item['id']}:{item['chapter_number']}:{_sha256_text(item['content'] or '')}"
+        for item in chapter_payload
+    )
+    return _sha256_text("\n".join(lines))
+
+
+def compute_chunk_manifest_checksum(pairs: list[tuple[Any, str]]) -> str:
+    """chunk 集 manifest：排序 `chunk_id:sha256(content)` 行的 sha256。
+
+    reconcile（Phase 24-02）从 DB text_chunks 复算同一公式与 journal 比对。
+    """
+    lines = sorted(f"{chunk_id}:{_sha256_text(content)}" for chunk_id, content in pairs)
+    return _sha256_text("\n".join(lines))
 
 
 class IndexingError(Exception):
@@ -62,14 +101,16 @@ class IndexingService:
         db: AsyncSession,
         novel_id: int,
         progress_callback: ProgressCallback | None = None,
+        force: bool = False,
     ) -> dict[str, Any]:
         """
-        完整的小说索引流程。
+        完整的小说索引流程（journal 贯穿、幂等、fail-closed）。
 
         Args:
             db: 数据库会话
             novel_id: 小说 ID
             progress_callback: 进度回调函数，签名为 (novel_id, current, total, status)
+            force: True 时跳过幂等检查并接管进行中的旧尝试（显式重建语义）
 
         Returns:
             统计信息字典，包含:
@@ -78,9 +119,12 @@ class IndexingService:
                 - embedded_chunks: 成功向量化的块数
                 - failed_chunks: 失败的块数
                 - status: 最终状态 ("ready" 或 "partial")
+                - attempt_id: 本次索引尝试的 journal 标识
+                - skipped: 幂等命中（同内容已完成）时为 True
 
         Raises:
-            IndexingError: 流程级错误（如小说不存在、章节为空）
+            IndexingError: 流程级错误（小说不存在、章节为空、并发索引、
+                旧向量清理失败等 fail-closed 场景）
         """
         # 1. 读取小说和章节
         novel = await db.get(Novel, novel_id)
@@ -110,14 +154,115 @@ class IndexingService:
             for ch in chapters
         ]
 
-        # 2. 更新状态为 chunking
+        # 2. 幂等键 + 并发判定（基于 journal）
+        source_signature = compute_source_signature(chapter_payload)
+        latest = await self._latest_journal(db, novel_id)
+        if latest is not None:
+            in_progress = (
+                latest.finished_at is None
+                and latest.phase in INDEX_JOURNAL_IN_PROGRESS_PHASES
+            )
+            if in_progress:
+                if not force:
+                    raise IndexingError(
+                        f"索引已在进行中 novel_id={novel_id} "
+                        f"attempt={latest.attempt_id} phase={latest.phase}；"
+                        "如需强制重建请使用 force=True"
+                    )
+                latest.phase = "failed"
+                latest.error_summary = "superseded by new forced attempt"
+                latest.finished_at = _utcnow()
+                await db.commit()
+            elif (
+                not force
+                and latest.phase == "completed"
+                and latest.source_signature == source_signature
+                and (latest.failed_chunks or 0) == 0
+            ):
+                logger.info(
+                    "索引幂等命中 novel_%d attempt=%s（同内容已完成，跳过）",
+                    novel_id,
+                    latest.attempt_id,
+                )
+                return {
+                    "novel_id": novel_id,
+                    "total_chunks": latest.total_chunks,
+                    "embedded_chunks": latest.embedded_chunks,
+                    "failed_chunks": latest.failed_chunks,
+                    "status": "ready",
+                    "attempt_id": latest.attempt_id,
+                    "skipped": True,
+                }
+
+        # 3. 创建 journal + 状态 chunking
+        journal = ChunkIndexJournal(
+            novel_id=novel_id,
+            attempt_id=uuid.uuid4().hex,
+            kind="index",
+            phase="started",
+            collection_name=f"novel_{novel_id}",
+            source_signature=source_signature,
+            started_at=_utcnow(),
+        )
+        db.add(journal)
         novel.status = "chunking"
         await db.commit()
+
+        try:
+            return await self._run_index(
+                db,
+                novel=novel,
+                journal=journal,
+                chapter_payload=chapter_payload,
+                progress_callback=progress_callback,
+            )
+        except Exception as e:
+            # fail-closed：任何流程级失败都落 journal，novel 不得停留在中间态
+            try:
+                journal.phase = "failed"
+                journal.error_summary = str(e)[:2000]
+                journal.finished_at = _utcnow()
+                novel.status = "failed"
+                await db.commit()
+            except Exception:
+                logger.exception(
+                    "索引失败后写 journal 失败 novel_%d attempt=%s",
+                    novel_id,
+                    journal.attempt_id,
+                )
+            raise
+
+    async def _latest_journal(
+        self, db: AsyncSession, novel_id: int
+    ) -> ChunkIndexJournal | None:
+        """取该小说最近一次 kind='index' 的 journal 记录。"""
+        result = await db.execute(
+            select(ChunkIndexJournal)
+            .where(
+                ChunkIndexJournal.novel_id == novel_id,
+                ChunkIndexJournal.kind == "index",
+            )
+            .order_by(ChunkIndexJournal.id.desc())
+            .limit(1)
+        )
+        return result.scalars().first()
+
+    async def _run_index(
+        self,
+        db: AsyncSession,
+        *,
+        novel: Novel,
+        journal: ChunkIndexJournal,
+        chapter_payload: list[dict[str, Any]],
+        progress_callback: ProgressCallback | None,
+    ) -> dict[str, Any]:
+        """journal 已创建后的主索引流程（异常由 index_novel 统一 fail-closed）。"""
+        novel_id = novel.id
 
         if progress_callback:
             await progress_callback(novel_id, 0, 0, "chunking")
 
-        # 3. 分块
+        # 4. 分块
         from app.services.chunking_service import Chapter as ChunkChapter
 
         chunk_chapters = [
@@ -134,6 +279,9 @@ class IndexingService:
 
         if not raw_chunks:
             novel.status = "ready"
+            journal.phase = "completed"
+            journal.manifest_checksum = compute_chunk_manifest_checksum([])
+            journal.finished_at = _utcnow()
             await db.commit()
             return {
                 "novel_id": novel_id,
@@ -141,21 +289,28 @@ class IndexingService:
                 "embedded_chunks": 0,
                 "failed_chunks": 0,
                 "status": "ready",
+                "attempt_id": journal.attempt_id,
             }
 
-        # 4. 清理旧分块与旧向量（维度/模型切换后必须重建，避免 768/512 混用）
+        # 5. 清理旧向量与旧分块（维度/模型切换后必须重建，避免 768/512 混用）。
+        #    顺序：先删 Chroma、后删 DB 行——失败时 fail-closed 抛错，
+        #    消除"DB 已删、旧向量残留"窗口（旧实现先删 DB、Chroma 失败仅 warning）。
+        journal.phase = "deleting_old"
+        await db.commit()
+
+        try:
+            await self.vector_store.delete_novel_chunks(novel_id)
+        except Exception as e:
+            raise IndexingError(
+                f"清理旧 Chroma collection 失败 novel_{novel_id}: {e}"
+            ) from e
+
         from sqlalchemy import delete as sa_delete
 
         await db.execute(sa_delete(TextChunk).where(TextChunk.novel_id == novel_id))
         await db.commit()
-        try:
-            await self.vector_store.delete_novel_chunks(novel_id)
-        except Exception as e:
-            logger.warning(
-                "清理旧 Chroma collection 失败 novel_%d: %s（将继续重建）", novel_id, e
-            )
 
-        # 5. 将分块写入 text_chunks 表
+        # 6. 将分块写入 text_chunks 表
         chunk_records = []
         for chunk in raw_chunks:
             metadata = chunk.get("metadata_json", {})
@@ -172,14 +327,17 @@ class IndexingService:
             db.add(record)
             chunk_records.append(record)
 
+        journal.phase = "chunks_persisted"
+        journal.total_chunks = len(chunk_records)
         await db.commit()
 
         # 刷新以获取自动生成的 id
         for record in chunk_records:
             await db.refresh(record)
 
-        # 6. 更新状态为 embedding
+        # 7. 更新状态为 embedding
         novel.status = "embedding"
+        journal.phase = "embedding"
         await db.commit()
 
         total = len(chunk_records)
@@ -222,6 +380,8 @@ class IndexingService:
                     record.embedding_status = "failed"
                     failed_count += 1
                     failed_chunk_ids.append(record.id)
+                journal.embedded_chunks = embedded_count
+                journal.failed_chunks = failed_count
                 await db.commit()
                 if progress_callback:
                     await progress_callback(
@@ -267,18 +427,32 @@ class IndexingService:
                     failed_count += 1
                     failed_chunk_ids.append(record.id)
 
+            journal.embedded_chunks = embedded_count
+            journal.failed_chunks = failed_count
             await db.commit()
 
             if progress_callback:
                 await progress_callback(novel_id, embedded_count, total, "embedding")
 
-        # 9. 更新最终状态
+        # 9. 更新最终状态（fail-closed：部分失败不得声明 ready）
+        journal.embedded_chunks = embedded_count
+        journal.failed_chunks = failed_count
+        journal.finished_at = _utcnow()
         if failed_count == 0:
             novel.status = "ready"
             final_status = "ready"
+            journal.phase = "completed"
+            # Phase 24-02 manifest 绑定：chunk 集 checksum，reconcile 可从 DB 复算
+            journal.manifest_checksum = compute_chunk_manifest_checksum(
+                [(record.id, record.content) for record in chunk_records]
+            )
         else:
-            novel.status = "ready"
+            novel.status = "partial"
             final_status = "partial"
+            journal.phase = "failed"
+            journal.error_summary = (
+                f"partial: {failed_count}/{total} chunks failed embedding"
+            )
 
         await db.commit()
 
@@ -299,11 +473,14 @@ class IndexingService:
             )
 
         logger.info(
-            "小说索引完成 novel_%d: total=%d, embedded=%d, failed=%d hierarchy=%s",
+            "小说索引完成 novel_%d: total=%d, embedded=%d, failed=%d "
+            "status=%s attempt=%s hierarchy=%s",
             novel_id,
             total,
             embedded_count,
             failed_count,
+            final_status,
+            journal.attempt_id,
             hierarchy_build_id,
         )
 
@@ -314,6 +491,7 @@ class IndexingService:
             "failed_chunks": failed_count,
             "failed_chunk_ids": failed_chunk_ids,
             "status": final_status,
+            "attempt_id": journal.attempt_id,
             "hierarchy_build_id": hierarchy_build_id,
         }
 

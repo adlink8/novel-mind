@@ -508,6 +508,8 @@ class TestErrorHandling:
         assert result["embedded_chunks"] == 100
         assert result["failed_chunks"] == 50
         assert result["status"] == "partial"
+        # Phase 24-01 fail-closed: partial 不得声明 ready
+        assert mock_novel.status == "partial"
 
     @pytest.mark.asyncio
     async def test_vector_store_failure_marks_failed(
@@ -535,6 +537,7 @@ class TestErrorHandling:
         assert result["failed_chunks"] == 3
         assert result["embedded_chunks"] == 0
         assert result["status"] == "partial"
+        assert mock_novel.status == "partial"
 
     @pytest.mark.asyncio
     async def test_all_embedding_failures(
@@ -559,6 +562,7 @@ class TestErrorHandling:
         assert result["embedded_chunks"] == 0
         assert result["failed_chunks"] == 3
         assert result["status"] == "partial"
+        assert mock_novel.status == "partial"
 
 
 # ── 进度回调测试 ──
@@ -711,8 +715,13 @@ class TestStatusUpdate:
 
             await indexing_service.index_novel(mock_db, novel_id=1)
 
-        # db.add 被调用了 3 次（每个 chunk 一次）
-        assert mock_db.add.call_count == 3
+        # 每个 chunk 一次 db.add（journal 记录另计一次）
+        from app.models.text_chunk import TextChunk
+
+        chunk_adds = [
+            c for c in mock_db.add.call_args_list if isinstance(c.args[0], TextChunk)
+        ]
+        assert len(chunk_adds) == 3
 
     @pytest.mark.asyncio
     async def test_chunk_embedding_status_updated(
@@ -742,8 +751,12 @@ class TestStatusUpdate:
 
             await indexing_service.index_novel(mock_db, novel_id=1)
 
-        # 所有记录最终应为 embedded
-        for record in added_records:
+        # 所有 TextChunk 记录最终应为 embedded（journal 记录不参与该断言）
+        from app.models.text_chunk import TextChunk
+
+        chunk_records = [r for r in added_records if isinstance(r, TextChunk)]
+        assert len(chunk_records) == 3
+        for record in chunk_records:
             assert record.embedding_status == "embedded"
 
     @pytest.mark.asyncio

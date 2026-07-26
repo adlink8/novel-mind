@@ -96,7 +96,8 @@ class HybridSearchService:
                 item = dict(item)
                 item["hierarchy_mode"] = "raw_fallback"
                 enriched.append(item)
-        return enriched
+        # 5. Phase 24-01 additive: partial 索引小说的结果带 index_status 标注
+        return await self._attach_index_status(db, enriched)
 
     async def search_novel(
         self,
@@ -135,7 +136,46 @@ class HybridSearchService:
         # 3. 融合排序
         merged = await self._hybrid_rerank(bm25_results, vector_results, top_k)
         # 4. Phase 07 hierarchy: evidence hit → scene expand (raw fallback)
-        return await self._enrich_with_hierarchy(db, novel_id, merged)
+        enriched = await self._enrich_with_hierarchy(db, novel_id, merged)
+        # 5. Phase 24-01 additive: partial 索引小说的结果带 index_status 标注
+        return await self._attach_index_status(db, enriched)
+
+    async def _attach_index_status(
+        self,
+        db: AsyncSession,
+        results: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        """Phase 24-01 fail-closed 感知（additive、best-effort）。
+
+        索引部分失败的小说 novel.status = "partial"（indexing_service 不再把
+        partial 声明为 ready）。检索照常执行，但结果元数据带
+        `index_status: "partial"`，让消费方（UI / RAG 编排）知道召回可能不完整。
+        任何查询失败都不影响搜索本身。
+        """
+        if not results:
+            return results
+        try:
+            novel_ids = {
+                item.get("novel_id")
+                for item in results
+                if isinstance(item, dict) and isinstance(item.get("novel_id"), int)
+            }
+            if not novel_ids:
+                return results
+            rows = (
+                await db.execute(
+                    select(Novel.id, Novel.status).where(Novel.id.in_(novel_ids))
+                )
+            ).all()
+            partial_ids = {row.id for row in rows if row.status == "partial"}
+            if not partial_ids:
+                return results
+            for item in results:
+                if isinstance(item, dict) and item.get("novel_id") in partial_ids:
+                    item["index_status"] = "partial"
+        except Exception as e:
+            logger.debug("index_status 标注跳过: %s", e)
+        return results
 
     async def _enrich_with_hierarchy(
         self,
