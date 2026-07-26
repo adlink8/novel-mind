@@ -193,9 +193,12 @@ jobs:
         working-directory: backend
         run: bandit -r app -lll -q
 
+      # PYSEC-2026-311 (chromadb 1.5.9, 即 CVE-2026-45829): 无可用修复版本，
+      # 且 docker-compose.ci.yml 按 digest 锁定同版本 server，客户端必须匹配。
+      # chromadb 发布修复版本后移除此豁免并同步升级镜像 digest。
       - name: pip-audit
         working-directory: backend
-        run: pip-audit
+        run: pip-audit --ignore-vuln PYSEC-2026-311
 
       - name: TypeScript
         working-directory: frontend
