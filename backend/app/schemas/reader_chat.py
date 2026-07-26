@@ -75,6 +75,31 @@ class SelectionCoordinate(StrictReaderChatModel):
         return self
 
 
+class ChapterRange(StrictReaderChatModel):
+    """Structure-anchored chapter interval (chapter-number semantics, inclusive).
+
+    Matches timeline API chapter_start/chapter_end semantics. Server narrows
+    chapter_end to the reading cutoff before any context assembly.
+    """
+
+    chapter_start: int = Field(ge=1)
+    chapter_end: int = Field(ge=1)
+
+    @model_validator(mode="after")
+    def validate_inclusive_order(self) -> ChapterRange:
+        if self.chapter_end < self.chapter_start:
+            raise ValueError("chapter_end must be >= chapter_start")
+        return self
+
+
+class ChapterRangeAnchor(StrictReaderChatModel):
+    """Echo of the effective (cutoff-narrowed) structure anchor on a message."""
+
+    kind: Literal["chapter_range"] = "chapter_range"
+    chapter_start: int = Field(ge=1)
+    chapter_end: int = Field(ge=1)
+
+
 class ConversationCreate(StrictReaderChatModel):
     title: str = Field(default="New chat", min_length=1, max_length=200)
 
@@ -115,11 +140,21 @@ class MessageCreate(StrictReaderChatModel):
     body: str = Field(min_length=1, max_length=8000)
     chapter_id: int | None = Field(default=None, gt=0)
     selection: SelectionCoordinate | None = None
+    chapter_range: ChapterRange | None = None
 
     @model_validator(mode="after")
     def require_chapter_context(self) -> MessageCreate:
+        if self.chapter_range is not None:
+            # Structure anchor is exclusive with selection/single-chapter anchors.
+            if self.selection is not None or self.chapter_id is not None:
+                raise ValueError(
+                    "chapter_range is mutually exclusive with selection and chapter_id"
+                )
+            return self
         if self.selection is None and self.chapter_id is None:
-            raise ValueError("chapter_id is required when selection is absent")
+            raise ValueError(
+                "chapter_id is required when selection and chapter_range are absent"
+            )
         if (
             self.selection is not None
             and self.chapter_id is not None
@@ -167,6 +202,7 @@ class MessageView(StrictReaderChatModel):
     client_message_id: str | None = None
     reply_to_message_id: int | None = None
     selection: SelectionSummary | None = None
+    anchor: ChapterRangeAnchor | None = None
     citations: list[CitationView] = Field(default_factory=list)
     generation_job: GenerationJobView | None = None
     created_at: datetime

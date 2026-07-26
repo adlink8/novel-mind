@@ -29,6 +29,11 @@ MAX_SELECTION_CODE_POINTS = 8000
 SELECTION_EVIDENCE_KEY = "selection:primary"
 CHAPTER_EVIDENCE_KEY = "chapter:primary"
 
+# Multi-chapter range context: total excerpt budget is a bounded multiple (2x)
+# of the single-chapter budget, split evenly across chapters in the range.
+MAX_RANGE_CONTEXT_CODE_POINTS = 2 * MAX_SELECTION_CODE_POINTS
+CHAPTER_RANGE_ANCHOR_KIND = "chapter_range"
+
 
 class SelectionValidationError(ValueError):
     """Stable selection rejection with machine-readable code."""
@@ -66,6 +71,80 @@ class ProgressSnapshot:
             "timeline_full_book": self.timeline_full_book,
             "full_book": self.full_book,
         }
+
+
+@dataclass(frozen=True)
+class ValidatedChapterSegment:
+    """One visible chapter's budgeted excerpt inside a validated range."""
+
+    chapter_id: int
+    chapter_number: int
+    excerpt: str
+    excerpt_hash: str
+    chapter_content_hash: str
+
+
+@dataclass(frozen=True)
+class ValidatedChapterRange:
+    """Cutoff-narrowed chapter interval with per-chapter budgeted excerpts."""
+
+    chapter_start: int
+    chapter_end: int  # effective end after cutoff narrowing
+    requested_chapter_end: int
+    segments: tuple[ValidatedChapterSegment, ...]
+    hierarchy_build_id: str
+    hierarchy_checksum: str
+    progress: ProgressSnapshot
+
+    def anchor_dict(self) -> dict[str, Any]:
+        return {
+            "kind": CHAPTER_RANGE_ANCHOR_KIND,
+            "chapter_start": self.chapter_start,
+            "chapter_end": self.chapter_end,
+        }
+
+
+def narrow_chapter_range(
+    chapter_start: int,
+    chapter_end: int,
+    *,
+    cutoff_chapter_number: int,
+    full_book: bool,
+) -> int:
+    """Intersect the requested range with the spoiler cutoff.
+
+    Returns the effective chapter_end. full_book skips truncation entirely;
+    a range starting beyond the cutoff is a stable 422 (chapter_beyond_cutoff).
+    """
+
+    if chapter_start < 1 or chapter_end < chapter_start:
+        raise SelectionValidationError(
+            "invalid_chapter_range",
+            "chapter_range requires 1 <= chapter_start <= chapter_end",
+        )
+    if full_book:
+        return chapter_end
+    if chapter_start > cutoff_chapter_number:
+        raise SelectionValidationError(
+            "chapter_beyond_cutoff",
+            "chapter range starts beyond the visible reading cutoff",
+        )
+    return min(chapter_end, cutoff_chapter_number)
+
+
+def chapter_range_budget(chapter_count: int) -> int:
+    """Per-chapter excerpt budget: even split of the bounded total.
+
+    Never exceeds the single-chapter budget per chapter and keeps the sum
+    within MAX_RANGE_CONTEXT_CODE_POINTS (no unbounded concatenation).
+    """
+
+    if chapter_count < 1:
+        raise SelectionValidationError(
+            "invalid_chapter_range", "chapter range must contain at least one chapter"
+        )
+    per_chapter = MAX_RANGE_CONTEXT_CODE_POINTS // chapter_count
+    return min(MAX_SELECTION_CODE_POINTS, max(per_chapter, 1))
 
 
 @dataclass(frozen=True)
@@ -348,6 +427,89 @@ async def validate_chapter_context(
     )
 
 
+async def validate_chapter_range_context(
+    session: AsyncSession,
+    *,
+    novel: Novel,
+    owner_id: int,
+    chapter_start: int,
+    chapter_end: int,
+    progress: ProgressSnapshot | None = None,
+) -> ValidatedChapterRange:
+    """Resolve an owned, cutoff-narrowed chapter interval into budgeted excerpts.
+
+    Chapter-number semantics (inclusive), matching the timeline API. The range
+    is intersected with the reading cutoff; full_book skips truncation.
+    """
+
+    if novel.owner_id != owner_id:
+        raise SelectionValidationError("not_found", "chapter not found for owner scope")
+
+    if progress is None:
+        progress = await resolve_progress_snapshot(session, novel)
+
+    effective_end = narrow_chapter_range(
+        chapter_start,
+        chapter_end,
+        cutoff_chapter_number=progress.cutoff_chapter_number,
+        full_book=progress.full_book,
+    )
+
+    chapters = list(
+        (
+            await session.scalars(
+                select(Chapter)
+                .where(
+                    Chapter.novel_id == novel.id,
+                    Chapter.chapter_number >= chapter_start,
+                    Chapter.chapter_number <= effective_end,
+                )
+                .order_by(Chapter.chapter_number.asc())
+                .options(undefer(Chapter.content))
+            )
+        ).all()
+    )
+    if not chapters:
+        raise SelectionValidationError(
+            "not_found", "no chapters found in range for owner scope"
+        )
+
+    budget = chapter_range_budget(len(chapters))
+    segments: list[ValidatedChapterSegment] = []
+    for chapter in chapters:
+        content = chapter.content or ""
+        if not content:
+            continue
+        excerpt = content[:budget]
+        segments.append(
+            ValidatedChapterSegment(
+                chapter_id=int(chapter.id),
+                chapter_number=int(chapter.chapter_number),
+                excerpt=excerpt,
+                excerpt_hash=content_sha256(excerpt),
+                chapter_content_hash=content_sha256(content),
+            )
+        )
+    if not segments:
+        raise SelectionValidationError(
+            "empty_chapter", "all chapters in range have empty content"
+        )
+
+    from app.services.reader_chat.retrieval import resolve_active_hierarchy
+
+    meta = await resolve_active_hierarchy(session, novel_id=novel.id)
+    build_id, build_checksum = meta or ("none", "0" * 64)
+    return ValidatedChapterRange(
+        chapter_start=int(chapter_start),
+        chapter_end=int(effective_end),
+        requested_chapter_end=int(chapter_end),
+        segments=tuple(segments),
+        hierarchy_build_id=build_id,
+        hierarchy_checksum=build_checksum,
+        progress=progress,
+    )
+
+
 def _dialogue_framing(
     prior_dialogue: list[dict[str, Any]] | None,
 ) -> dict[str, Any]:
@@ -480,6 +642,159 @@ async def assemble_context_manifest(
     source_status.setdefault(
         "selection" if selection_bound else "chapter", SourceStatus.OK
     )
+
+    draft = ContextManifest(
+        reading_progress_snapshot=progress.as_dict(),
+        full_book=full_book,
+        cutoff_chapter_number=progress.cutoff_chapter_number,
+        analysis_version_id=retrieval.analysis_version_id,
+        hierarchy_build_id=hierarchy_build_id,
+        hierarchy_checksum=hierarchy_checksum,
+        evidence=tuple(evidence_entries),
+        omitted_evidence_counts=dict(retrieval.omitted_counts),
+        prompt_inputs=prompt_inputs,
+        source_status=source_status,
+        manifest_checksum="",  # filled below
+    )
+    checksum = canonical_manifest_checksum(draft.canonical_payload())
+    return ContextManifest(
+        reading_progress_snapshot=draft.reading_progress_snapshot,
+        full_book=draft.full_book,
+        cutoff_chapter_number=draft.cutoff_chapter_number,
+        analysis_version_id=draft.analysis_version_id,
+        hierarchy_build_id=draft.hierarchy_build_id,
+        hierarchy_checksum=draft.hierarchy_checksum,
+        evidence=draft.evidence,
+        omitted_evidence_counts=draft.omitted_evidence_counts,
+        prompt_inputs=draft.prompt_inputs,
+        source_status=draft.source_status,
+        manifest_checksum=checksum,
+    )
+
+
+async def assemble_range_context_manifest(
+    session: AsyncSession,
+    *,
+    novel: Novel,
+    owner_id: int,
+    chapter_range: ValidatedChapterRange,
+    question: str = "",
+    prior_dialogue: list[dict[str, Any]] | None = None,
+    relationship_reader: RelationshipObservationReader | None = None,
+    client_evidence_keys: list[str] | None = None,
+    max_evidence: int = 24,
+) -> ContextManifest:
+    """Build one immutable context graph for a structure-anchored chapter range.
+
+    Per-chapter budgeted excerpts are the primary evidence; retrieval evidence
+    is aggregated strictly inside the (already cutoff-narrowed) interval.
+    """
+
+    if client_evidence_keys:
+        raise SelectionValidationError(
+            "forged_evidence_refs",
+            "client evidence refs are not authoritative and are rejected",
+        )
+
+    progress = chapter_range.progress
+    full_book = progress.full_book
+    segments = chapter_range.segments
+    if not segments:
+        raise SelectionValidationError(
+            "empty_chapter", "chapter range has no visible content"
+        )
+
+    # Defensive re-check: the frozen range must already respect the cutoff.
+    if not full_book and chapter_range.chapter_start > progress.cutoff_chapter_number:
+        raise SelectionValidationError(
+            "chapter_beyond_cutoff",
+            "chapter range starts beyond the visible reading cutoff",
+        )
+
+    pivot = segments[0]
+    retrieval = await retrieve_visible_evidence(
+        session,
+        novel=novel,
+        owner_id=owner_id,
+        selection_chapter_id=pivot.chapter_id,
+        selection_start=0,
+        selection_end=code_point_len(pivot.excerpt),
+        # Bound retrieval to the effective range end; the range is already
+        # intersected with the cutoff (or full_book allows the requested end).
+        cutoff_chapter=chapter_range.chapter_end,
+        full_book=False,
+        relationship_reader=relationship_reader,
+        max_evidence=max(0, max_evidence - len(segments)),
+    )
+
+    hierarchy_build_id = (
+        retrieval.hierarchy_build_id or chapter_range.hierarchy_build_id
+    )
+    hierarchy_checksum = (
+        retrieval.hierarchy_checksum or chapter_range.hierarchy_checksum
+    )
+
+    evidence_entries: list[ContextEvidenceEntry] = []
+    for sort_order, segment in enumerate(segments):
+        evidence_entries.append(
+            ContextEvidenceEntry(
+                evidence_key=f"chapter:{segment.chapter_id}",
+                source_type="hierarchy",
+                source_id=f"chapter:{segment.chapter_id}",
+                chapter_id=segment.chapter_id,
+                chapter_number=segment.chapter_number,
+                source_start=0,
+                source_end=code_point_len(segment.excerpt),
+                content_hash=segment.excerpt_hash,
+                excerpt=segment.excerpt,
+                sort_order=sort_order,
+                version_lineage={
+                    "hierarchy_build_id": hierarchy_build_id,
+                    "hierarchy_checksum": hierarchy_checksum,
+                    "chapter_content_hash": segment.chapter_content_hash,
+                },
+            )
+        )
+
+    primary_keys = {entry.evidence_key for entry in evidence_entries}
+    sort_order = len(evidence_entries)
+    for item in retrieval.items:
+        # Aggregate strictly inside the effective interval; never widen scope.
+        if item.chapter_number < chapter_range.chapter_start:
+            continue
+        if item.chapter_number > chapter_range.chapter_end:
+            continue
+        if not full_book and item.chapter_number > progress.cutoff_chapter_number:
+            continue
+        if item.evidence_key in primary_keys:
+            continue
+        evidence_entries.append(
+            ContextEvidenceEntry(
+                evidence_key=item.evidence_key,
+                source_type=item.source_type,
+                source_id=item.source_id,
+                chapter_id=item.chapter_id,
+                chapter_number=item.chapter_number,
+                source_start=item.source_start,
+                source_end=item.source_end,
+                content_hash=item.content_hash,
+                excerpt=item.excerpt,
+                sort_order=sort_order,
+                version_lineage=dict(item.version_lineage),
+            )
+        )
+        sort_order += 1
+
+    prompt_inputs: dict[str, Any] = {
+        "question_hash": content_sha256(question or ""),
+        "dialogue_framing": _dialogue_framing(prior_dialogue),
+        "allowed_evidence_ids": [e.evidence_key for e in evidence_entries],
+        "context_mode": CHAPTER_RANGE_ANCHOR_KIND,
+        "anchor": chapter_range.anchor_dict(),
+    }
+
+    source_status = dict(retrieval.source_status)
+    source_status.setdefault(CHAPTER_RANGE_ANCHOR_KIND, SourceStatus.OK)
 
     draft = ContextManifest(
         reading_progress_snapshot=progress.as_dict(),

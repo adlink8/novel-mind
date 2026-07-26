@@ -32,6 +32,8 @@ from app.models.reader_chat import (
     ReaderMessageSelection,
 )
 from app.schemas.reader_chat import (
+    ChapterRange,
+    ChapterRangeAnchor,
     ConversationCreate,
     ConversationDetail,
     ConversationListItem,
@@ -61,6 +63,23 @@ def _sha256_json(payload: dict[str, Any]) -> str:
         payload, sort_keys=True, ensure_ascii=False, separators=(",", ":")
     )
     return _sha256_text(canonical)
+
+
+def anchor_view_from_prompt_inputs(
+    prompt_inputs: dict[str, Any] | None,
+) -> ChapterRangeAnchor | None:
+    """Echo the persisted chapter_range anchor (narrowed values) if present."""
+
+    raw = (prompt_inputs or {}).get("anchor")
+    if not isinstance(raw, dict) or raw.get("kind") != "chapter_range":
+        return None
+    try:
+        return ChapterRangeAnchor(
+            chapter_start=int(raw["chapter_start"]),
+            chapter_end=int(raw["chapter_end"]),
+        )
+    except (KeyError, TypeError, ValueError):
+        return None
 
 
 @dataclass
@@ -114,6 +133,7 @@ class ContextBuilder(Protocol):
         selection: SelectionCoordinate | None,
         body: str,
         chapter_id: int | None = None,
+        chapter_range: ChapterRange | None = None,
     ) -> ContextGraph: ...
 
 
@@ -130,11 +150,14 @@ class ProductionContextBuilder:
         selection: SelectionCoordinate | None,
         body: str,
         chapter_id: int | None = None,
+        chapter_range: ChapterRange | None = None,
     ) -> ContextGraph:
         from app.services.reader_chat.context import (
             SelectionValidationError,
             assemble_context_manifest,
+            assemble_range_context_manifest,
             validate_chapter_context,
+            validate_chapter_range_context,
             validate_selection,
         )
         from app.services.reader_chat.retrieval import (
@@ -142,35 +165,55 @@ class ProductionContextBuilder:
         )
 
         try:
-            if selection is not None:
-                validated = await validate_selection(
+            if chapter_range is not None:
+                validated_range = await validate_chapter_range_context(
                     db,
                     novel=novel,
                     owner_id=owner_id,
-                    selection=selection,
+                    chapter_start=chapter_range.chapter_start,
+                    chapter_end=chapter_range.chapter_end,
+                )
+                manifest = await assemble_range_context_manifest(
+                    db,
+                    novel=novel,
+                    owner_id=owner_id,
+                    chapter_range=validated_range,
+                    question=body,
+                    relationship_reader=Phase09RelationshipObservationReader(),
                 )
             else:
-                if chapter_id is None:
-                    raise SelectionValidationError(
-                        "missing_chapter", "chapter_id is required"
+                if selection is not None:
+                    validated = await validate_selection(
+                        db,
+                        novel=novel,
+                        owner_id=owner_id,
+                        selection=selection,
                     )
-                validated = await validate_chapter_context(
+                else:
+                    if chapter_id is None:
+                        raise SelectionValidationError(
+                            "missing_chapter", "chapter_id is required"
+                        )
+                    validated = await validate_chapter_context(
+                        db,
+                        novel=novel,
+                        owner_id=owner_id,
+                        chapter_id=chapter_id,
+                    )
+                manifest = await assemble_context_manifest(
                     db,
                     novel=novel,
                     owner_id=owner_id,
-                    chapter_id=chapter_id,
+                    selection=validated,
+                    question=body,
+                    relationship_reader=Phase09RelationshipObservationReader(),
+                    selection_bound=selection is not None,
                 )
-            manifest = await assemble_context_manifest(
-                db,
-                novel=novel,
-                owner_id=owner_id,
-                selection=validated,
-                question=body,
-                relationship_reader=Phase09RelationshipObservationReader(),
-                selection_bound=selection is not None,
-            )
         except SelectionValidationError as exc:
-            raise HTTPException(status_code=422, detail=exc.message) from exc
+            raise HTTPException(
+                status_code=422,
+                detail={"code": exc.code, "message": exc.message},
+            ) from exc
 
         evidence_refs = [
             EvidenceRefDraft(
@@ -243,7 +286,13 @@ class DeterministicContextBuilder:
         selection: SelectionCoordinate | None,
         body: str,
         chapter_id: int | None = None,
+        chapter_range: ChapterRange | None = None,
     ) -> ContextGraph:
+        if chapter_range is not None:
+            raise HTTPException(
+                status_code=422,
+                detail="chapter_range messages require the production context builder",
+            )
         if selection is None:
             raise HTTPException(
                 status_code=422,
@@ -618,6 +667,8 @@ class ConversationService:
         }
         if data.selection is None:
             build_kwargs["chapter_id"] = data.chapter_id
+        if data.chapter_range is not None:
+            build_kwargs["chapter_range"] = data.chapter_range
         graph = await self._context_builder.build(db, **build_kwargs)
 
         sequence = int(conv.next_sequence)
@@ -983,6 +1034,7 @@ class ConversationService:
         self, db: AsyncSession, message: ReaderMessage
     ) -> MessageView:
         selection_summary: SelectionSummary | None = None
+        anchor: ChapterRangeAnchor | None = None
         if message.role == MessageRole.USER.value:
             sel = (
                 await db.execute(
@@ -999,6 +1051,20 @@ class ConversationService:
                     selection_text_hash=sel.selection_text_hash,
                     chapter_content_hash=sel.chapter_content_hash,
                 )
+            else:
+                # chapter_range anchors persist inside the frozen manifest's
+                # prompt_inputs (no new columns / migrations); echo them back.
+                manifest_row = (
+                    await db.execute(
+                        select(ReaderContextManifest).where(
+                            ReaderContextManifest.user_message_id == message.id
+                        )
+                    )
+                ).scalar_one_or_none()
+                if manifest_row is not None:
+                    anchor = anchor_view_from_prompt_inputs(
+                        dict(manifest_row.prompt_inputs or {})
+                    )
 
         job_view: GenerationJobView | None = None
         if message.role == MessageRole.USER.value:
@@ -1055,6 +1121,7 @@ class ConversationService:
             client_message_id=message.client_message_id,
             reply_to_message_id=message.reply_to_message_id,
             selection=selection_summary,
+            anchor=anchor,
             citations=citations,
             generation_job=job_view,
             created_at=message.created_at,
