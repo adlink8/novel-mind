@@ -303,6 +303,7 @@ class KnowledgeProjectionService:
             description=_projection_description(judgment),
             strength=max(1, min(10, round(judgment.confidence * 10))),
             chapter_first_seen=chapter_number,
+            intake_kind=_judgment_intake_kind(judgment),
         )
         db.add(relation)
         await db.flush()
@@ -402,6 +403,19 @@ class KnowledgeProjectionService:
 
 def _judgment_marker(judgment_id: int) -> str:
     return f"kg_judgment_id={judgment_id}"
+
+
+def _judgment_intake_kind(judgment: KnowledgeRelationJudgment) -> str:
+    """Provenance for projected rows: seed backfill vs real LLM judgment."""
+    if (judgment.model_name or "") == "timeline_cooccur_heuristic":
+        return "timeline_seed_backfill"
+    for payload in (judgment.structured_output, judgment.raw_output):
+        if (
+            isinstance(payload, dict)
+            and payload.get("source") == "timeline_kg_backfill"
+        ):
+            return "timeline_seed_backfill"
+    return "llm_judgment"
 
 
 def _projection_description(judgment: KnowledgeRelationJudgment) -> str:

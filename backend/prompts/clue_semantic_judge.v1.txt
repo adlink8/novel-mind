@@ -20,9 +20,13 @@ Authority rules:
 Output:
 Return JSON only matching schema_version clue-semantic-judgment.v1 with keys:
 schema_version, candidate_id, classification, cue_evidence_ids, later_evidence_ids,
-confidence, conflict_flags, rationale.
+confidence, conflict_flags, short_title, rationale.
 
 Echo candidate_id exactly from the package.
+short_title: a concise display title for the clue hypothesis, at most 40 characters,
+in the same language as the evidence. It must summarize the hypothesis (e.g.
+"银钥匙与密室封印"), never copy a full sentence of source text, and never contain
+evidence IDs, offsets, or lifecycle status words.
 conflict_flags may include: MOTIF_ONLY, ORDER_CONFLICT, ENTITY_CONFLICT,
 UNRESOLVED_REFERENCE, INSUFFICIENT_PAYOFF.
 If the later text only repeats a motif without resolving the cue, set classification=unrelated

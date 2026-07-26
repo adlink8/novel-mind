@@ -79,6 +79,16 @@ class RelationshipEdgeKind(StrEnum):
     PROVISIONAL_COOCCURRENCE = "provisional_cooccurrence"
 
 
+class RelationshipIntakeKind(StrEnum):
+    """Producer lineage for relationship data (Phase 25-02 provenance)."""
+
+    LLM_JUDGMENT = "llm_judgment"
+    TIMELINE_SEED_BACKFILL = "timeline_seed_backfill"
+    COOCCURRENCE_CANDIDATE = "cooccurrence_candidate"
+    MANUAL = "manual"
+    UNKNOWN = "unknown"
+
+
 class RelationshipGraphEdgeLabel(StrEnum):
     """
     Labels allowed on graph *projection* edges.
@@ -276,6 +286,9 @@ class RelationshipGraphEdge(StrictRelationshipModel):
     edge_kind: RelationshipEdgeKind = RelationshipEdgeKind.ACCEPTED_OBSERVATION
     # Heuristic fiction label for provisional co-occurrence only; never accepted fact.
     suggested_type: RelationshipEdgeType | None = None
+    # Producer lineage (Phase 25-02): rows persisted before the intake_kind
+    # column report 'unknown' honestly instead of a fabricated origin.
+    intake_kind: RelationshipIntakeKind = RelationshipIntakeKind.UNKNOWN
 
     @field_validator("relation_type", mode="before")
     @classmethod

@@ -28,6 +28,16 @@ from app.models.base import Base, TimestampMixin
 # signals (causes/precedes/same_entity) are never relationship graph edges.
 RELATIONSHIP_EDGE_TYPES = ("ally", "enemy", "family", "mentor", "romantic")
 RELATIONSHIP_TRANSITIONS = ("establish", "change", "end", "uncertain")
+# Intake provenance for accepted observations (Phase 25-02): which producer
+# path created the row. "cooccurrence_candidate" is reserved for provisional
+# co-occurrence projections; accepted rows normally use the first two kinds.
+RELATIONSHIP_INTAKE_KINDS = (
+    "llm_judgment",
+    "timeline_seed_backfill",
+    "cooccurrence_candidate",
+    "manual",
+    "unknown",
+)
 OBSERVATION_PIPELINE_STATUSES = (
     "candidate",
     "judged",
@@ -316,7 +326,13 @@ class RelationshipObservation(TimestampMixin, Base):
             "valid_to_narrative_index >= valid_from_narrative_index)))",
             name="ck_rel_observations_interval_order",
         ),
+        CheckConstraint(
+            "intake_kind IN ('llm_judgment','timeline_seed_backfill',"
+            "'cooccurrence_candidate','manual','unknown')",
+            name="ck_rel_observations_intake_kind",
+        ),
         UniqueConstraint("idempotency_key", name="uq_rel_observations_idempotency"),
+        Index("idx_rel_observations_intake_kind", "intake_kind"),
         Index(
             "idx_rel_observations_version_interval",
             "analysis_version_id",
@@ -379,6 +395,11 @@ class RelationshipObservation(TimestampMixin, Base):
     relation_type: Mapped[str] = mapped_column(String(32), nullable=False)
     transition: Mapped[str] = mapped_column(String(24), nullable=False)
     status: Mapped[str] = mapped_column(String(24), nullable=False, default="accepted")
+    # Producer lineage: llm_judgment / timeline_seed_backfill /
+    # cooccurrence_candidate / manual / unknown (Phase 25-02).
+    intake_kind: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="unknown", server_default="unknown"
+    )
     valid_from_chapter: Mapped[int] = mapped_column(Integer, nullable=False)
     valid_from_narrative_index: Mapped[int] = mapped_column(Integer, nullable=False)
     valid_to_chapter: Mapped[int | None] = mapped_column(Integer, nullable=True)

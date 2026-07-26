@@ -44,6 +44,7 @@ from app.schemas.relationship import (
     RelationshipGraphEdgeLabel,
     RelationshipGraphEnvelope,
     RelationshipGraphNode,
+    RelationshipIntakeKind,
     RelationshipVersionSource,
 )
 
@@ -78,6 +79,7 @@ class _FoldedEdge:
     evidence_count: int = 0
     edge_kind: RelationshipEdgeKind = RelationshipEdgeKind.ACCEPTED_OBSERVATION
     suggested_type: str | None = None
+    intake_kind: str = RelationshipIntakeKind.UNKNOWN.value
 
 
 def logical_relationship_key(
@@ -603,6 +605,11 @@ class RelationshipGraphQueryService:
                     if e.suggested_type in {t.value for t in RelationshipEdgeType}
                     else None
                 ),
+                intake_kind=(
+                    RelationshipIntakeKind(e.intake_kind)
+                    if e.intake_kind in {k.value for k in RelationshipIntakeKind}
+                    else RelationshipIntakeKind.UNKNOWN
+                ),
             )
             for e in folded
             if e.transition in ("establish", "change", "end")
@@ -821,6 +828,10 @@ class RelationshipGraphQueryService:
                     "source_character_id": row.source_character_id,
                     "target_character_id": row.target_character_id,
                     "relation_type": row.relation_type,
+                    "intake_kind": (
+                        getattr(row, "intake_kind", None)
+                        or RelationshipIntakeKind.UNKNOWN.value
+                    ),
                     "evidence": [
                         {
                             "evidence_id": e.evidence_id,
@@ -1233,6 +1244,7 @@ class RelationshipGraphQueryService:
                     evidence_count=int(st["count"]),
                     edge_kind=RelationshipEdgeKind.PROVISIONAL_COOCCURRENCE,
                     suggested_type=suggested_t,
+                    intake_kind=RelationshipIntakeKind.COOCCURRENCE_CANDIDATE.value,
                 )
             )
             used_quota[suggested_t] += 1
@@ -1293,6 +1305,10 @@ class RelationshipGraphQueryService:
                     valid_to_chapter=obs.valid_to_chapter,
                     logical_key=key,
                     provenance=ProvenanceKind.MACHINE,
+                    intake_kind=(
+                        getattr(obs, "intake_kind", None)
+                        or RelationshipIntakeKind.UNKNOWN.value
+                    ),
                 )
 
             if current is None:

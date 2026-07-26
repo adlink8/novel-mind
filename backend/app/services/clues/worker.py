@@ -64,6 +64,31 @@ DECODING_HASH = sha256_json(
 )
 
 
+COST_REASON_UNKNOWN_PRICING = "unknown_pricing"
+
+
+def compute_actual_cost_usd(
+    *,
+    input_tokens: int,
+    output_tokens: int,
+    input_price_per_million: Decimal | None,
+    output_price_per_million: Decimal | None,
+) -> tuple[Decimal, str | None]:
+    """Actual settlement cost from usage × deployment price snapshot.
+
+    Mirrors timeline/narrative-memory gateway settlement. When the price
+    snapshot is missing, the cost is explicitly 0 with a reason — never a
+    silent zero.
+    """
+    if input_price_per_million is None or output_price_per_million is None:
+        return Decimal("0"), COST_REASON_UNKNOWN_PRICING
+    cost = (
+        Decimal(int(input_tokens)) * input_price_per_million
+        + Decimal(int(output_tokens)) * output_price_per_million
+    ) / Decimal(1_000_000)
+    return cost, None
+
+
 class ClueWorkerError(RuntimeError):
     pass
 
@@ -590,24 +615,40 @@ async def _judge_and_persist(
                 result = await runtime.judge.judge_package(draft.package, repair=True)
                 latency_ms = int((time.perf_counter() - started) * 1000)
             if result.structured is None:
+                failed_input = result.audit.prompt_tokens or 0
+                failed_output = result.audit.completion_tokens or 0
+                failed_cost, failed_cost_reason = compute_actual_cost_usd(
+                    input_tokens=failed_input,
+                    output_tokens=failed_output,
+                    input_price_per_million=(
+                        runtime.deployment.input_price_per_million
+                    ),
+                    output_price_per_million=(
+                        runtime.deployment.output_price_per_million
+                    ),
+                )
+                result.audit.cost_usd = float(failed_cost)
+                failed_usage: dict[str, Any] = {
+                    "input_tokens": failed_input,
+                    "output_tokens": failed_output,
+                }
+                if failed_cost_reason is not None:
+                    failed_usage["cost_usd_reason"] = failed_cost_reason
                 await runtime.call_repo.complete_attempt(
                     handle,
                     status="failed",
                     response_hash=None,
                     provider_request_id=None,
-                    usage={
-                        "input_tokens": result.audit.prompt_tokens or 0,
-                        "output_tokens": result.audit.completion_tokens or 0,
-                    },
-                    cost_usd=None,
+                    usage=failed_usage,
+                    cost_usd=failed_cost,
                     latency_ms=latency_ms,
                     error_code="schema_or_judgment_failed",
                 )
                 budget.settle(
                     f"{stage_key}:primary",
-                    actual_input_tokens=result.audit.prompt_tokens or 0,
-                    actual_output_tokens=result.audit.completion_tokens or 0,
-                    actual_cost_usd=Decimal(0),
+                    actual_input_tokens=failed_input,
+                    actual_output_tokens=failed_output,
+                    actual_cost_usd=failed_cost,
                 )
                 await _mark_stage_completed(
                     runtime.sessions,
@@ -622,26 +663,38 @@ async def _judge_and_persist(
             judgment = result.structured
             validated = judgment.model_dump(mode="json")
             response_hash = sha256_json(validated)
+            actual_input = int(result.audit.prompt_tokens or 100)
+            actual_output = int(result.audit.completion_tokens or 50)
+            actual_cost, cost_reason = compute_actual_cost_usd(
+                input_tokens=actual_input,
+                output_tokens=actual_output,
+                input_price_per_million=runtime.deployment.input_price_per_million,
+                output_price_per_million=runtime.deployment.output_price_per_million,
+            )
+            # Real settlement value flows to audit + attempt + ledger together.
+            result.audit.cost_usd = float(actual_cost)
             usage = {
-                "input_tokens": result.audit.prompt_tokens or 100,
-                "output_tokens": result.audit.completion_tokens or 50,
+                "input_tokens": actual_input,
+                "output_tokens": actual_output,
                 "validated_output": validated,
             }
+            if cost_reason is not None:
+                usage["cost_usd_reason"] = cost_reason
             await runtime.call_repo.complete_attempt(
                 handle,
                 status="succeeded",
                 response_hash=response_hash,
                 provider_request_id=None,
                 usage=usage,
-                cost_usd=Decimal(str(result.audit.cost_usd or 0)),
+                cost_usd=actual_cost,
                 latency_ms=latency_ms,
                 error_code=None,
             )
             budget.settle(
                 f"{stage_key}:primary",
-                actual_input_tokens=int(usage["input_tokens"]),
-                actual_output_tokens=int(usage["output_tokens"]),
-                actual_cost_usd=Decimal(str(result.audit.cost_usd or 0)),
+                actual_input_tokens=actual_input,
+                actual_output_tokens=actual_output,
+                actual_cost_usd=actual_cost,
             )
         except Exception as exc:
             await runtime.call_repo.complete_attempt(
@@ -701,6 +754,50 @@ def _clean_title_stem(text: str, *, max_len: int = 24) -> str:
     if len(cleaned) <= max_len:
         return cleaned
     return cleaned[: max_len - 1].rstrip() + "…"
+
+
+MAX_SHORT_TITLE_LEN = 40
+
+TITLE_SOURCE_JUDGE_SHORT_TITLE = "judge_short_title"
+TITLE_SOURCE_RATIONALE_OR_STEM = "rationale_or_chapter_stem"
+
+
+def _clean_short_title(text: str | None, *, max_len: int = MAX_SHORT_TITLE_LEN) -> str:
+    """Collapse whitespace in a judge-provided display title and clip length."""
+    cleaned = " ".join((text or "").replace("\r", "\n").split())
+    if len(cleaned) <= max_len:
+        return cleaned
+    return cleaned[: max_len - 1].rstrip() + "…"
+
+
+def resolve_machine_clue_title(
+    *,
+    short_title: str | None,
+    rationale: str | None,
+    cue_text: str | None,
+    chapter: int | None,
+    candidate_id: str,
+    max_len: int = 32,
+) -> tuple[str, str]:
+    """Return ``(title, title_source)`` with judge short_title as first choice.
+
+    Falls back to the historical rationale/chapter-stem heuristic when the
+    judge did not provide a usable short title. ``title_source`` is recorded
+    honestly in the package snapshot.
+    """
+    cleaned = _clean_short_title(short_title)
+    if len(cleaned) >= 2:
+        return cleaned, TITLE_SOURCE_JUDGE_SHORT_TITLE
+    return (
+        build_machine_clue_title(
+            rationale=rationale,
+            cue_text=cue_text,
+            chapter=chapter,
+            candidate_id=candidate_id,
+            max_len=max_len,
+        ),
+        TITLE_SOURCE_RATIONALE_OR_STEM,
+    )
 
 
 def build_machine_clue_title(
@@ -798,7 +895,8 @@ async def _persist_decision(
 
         cue_unit = package.cue_units[0] if package.cue_units else None
         cue_text = (cue_unit.text or "") if cue_unit is not None else ""
-        title = build_machine_clue_title(
+        title, title_source = resolve_machine_clue_title(
+            short_title=judgment.short_title,
             rationale=judgment.rationale,
             cue_text=cue_text or None,
             chapter=(
@@ -808,12 +906,10 @@ async def _persist_decision(
         )
         snapshot = package.to_snapshot()
         # Keep raw cue excerpt for ops/debug; product title stays short hypothesis.
-        if isinstance(snapshot, dict) and cue_text:
-            snapshot = {
-                **snapshot,
-                "cue_excerpt": cue_text[:500],
-                "title_source": "rationale_or_chapter_stem",
-            }
+        if isinstance(snapshot, dict):
+            snapshot = {**snapshot, "title_source": title_source}
+            if cue_text:
+                snapshot["cue_excerpt"] = cue_text[:500]
         machine = MachineClue(
             owner_id=owner_id,
             novel_id=novel_id,
