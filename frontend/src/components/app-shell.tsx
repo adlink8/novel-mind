@@ -211,6 +211,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <nav
         aria-label="移动导航"
+        data-testid="app-shell-nav-mobile"
         className="fixed inset-x-3 bottom-[calc(0.75rem_+_env(safe-area-inset-bottom))] z-50 grid grid-cols-6 rounded-[22px] border border-border/70 bg-sidebar/95 p-1.5 shadow-[0_18px_50px_-22px_rgba(38,31,24,0.65)] backdrop-blur-xl md:hidden"
       >
         {navigation.map((item) => {

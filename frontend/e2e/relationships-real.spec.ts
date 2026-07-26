@@ -2,11 +2,10 @@ import { expect, test } from "@playwright/test";
 import { spawnSync } from "child_process";
 import path from "path";
 
-import { registerAndLogin, uniqueUser } from "./helpers";
+import { backendPythonBin, registerAndLogin, uniqueUser } from "./helpers";
 
 const backend = path.resolve(__dirname, "../../backend");
-const python =
-  process.platform === "win32" ? "venv\\Scripts\\python.exe" : "venv/bin/python";
+const python = backendPythonBin(backend);
 
 function qualificationCommand(args: string[]) {
   const result = spawnSync(python, ["scripts/run_relationship_qualification.py", ...args], {

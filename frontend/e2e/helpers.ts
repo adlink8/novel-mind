@@ -5,6 +5,25 @@ import os from "os";
 
 const BACKEND = process.env.BACKEND_URL || "http://127.0.0.1:8010";
 
+// Desktop rail is `hidden md:flex`; 390px renders the mobile bottom nav instead.
+// The authenticated-shell assertion must accept whichever variant the viewport shows.
+const SHELL_NAV_VISIBLE =
+  '[data-testid="app-shell-nav"]:visible, [data-testid="app-shell-nav-mobile"]:visible';
+
+export async function expectAuthenticatedShell(page: Page) {
+  await expect(page.locator(SHELL_NAV_VISIBLE).first()).toBeVisible({
+    timeout: 30_000,
+  });
+}
+
+/** Backend python for qualification helpers: venv locally, runner python in CI. */
+export function backendPythonBin(backendDir: string): string {
+  if (process.env.E2E_PYTHON) return process.env.E2E_PYTHON;
+  const venv =
+    process.platform === "win32" ? "venv\\Scripts\\python.exe" : "venv/bin/python";
+  return fs.existsSync(path.join(backendDir, venv)) ? venv : "python";
+}
+
 export function uniqueUser(prefix = "e2e") {
   const stamp = `${Date.now()}_${Math.floor(Math.random() * 1e6)}`;
   return {
@@ -53,10 +72,8 @@ export async function registerAndLogin(page: Page, user = uniqueUser()) {
   });
   await page.getByRole("button", { name: /注册并登录/ }).click();
 
-  // Authenticated shell: main nav is always rendered (desktop + 390px).
-  await expect(page.locator('[data-testid="app-shell-nav"]')).toBeVisible({
-    timeout: 30_000,
-  });
+  // Authenticated shell: desktop rail or mobile bottom nav, per viewport.
+  await expectAuthenticatedShell(page);
   // Prefer main content when present (desktop/home); skip if navigated elsewhere.
   const homeHeading = page
     .locator("#main-content")
@@ -75,9 +92,7 @@ export async function login(page: Page, username: string, password: string) {
   }
   await fillAuthForm(page, { username, password });
   await page.getByRole("button", { name: /^登录$/ }).click();
-  await expect(page.locator('[data-testid="app-shell-nav"]')).toBeVisible({
-    timeout: 30_000,
-  });
+  await expectAuthenticatedShell(page);
 }
 
 /** Create a small UTF-8 novel file for upload. */

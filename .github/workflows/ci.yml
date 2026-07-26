@@ -610,10 +610,24 @@ jobs:
       - name: Autobuild
         uses: github/codeql-action/autobuild@v3
 
+      # Private repo without GitHub Advanced Security: the code-scanning upload
+      # endpoint is unavailable ("Code scanning is not enabled"), so analysis
+      # runs locally and SARIF is kept as a build artifact instead.
       - name: Analyze
         uses: github/codeql-action/analyze@v3
         with:
           category: "/language:${{ matrix.language }}"
+          upload: never
+          output: codeql-results
+
+      - name: Upload CodeQL SARIF artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: codeql-sarif-${{ matrix.language }}
+          path: codeql-results/**
+          if-no-files-found: warn
+          retention-days: 14
 
   # ---------------------------------------------------------------------------
   # Live smoke — protected main / schedule / dispatch only (45m — D-16)

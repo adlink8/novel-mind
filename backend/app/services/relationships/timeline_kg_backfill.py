@@ -87,7 +87,7 @@ class BackfillResult:
 
 
 def _sha1_hex(text: str) -> str:
-    return hashlib.sha1(text.encode("utf-8")).hexdigest()
+    return hashlib.sha1(text.encode("utf-8"), usedforsecurity=False).hexdigest()
 
 
 class TimelineKgBackfillService:
