@@ -2,7 +2,12 @@ import { expect, test } from "@playwright/test";
 import { spawnSync } from "child_process";
 import path from "path";
 
-import { backendPythonBin, registerAndLogin, uniqueUser } from "./helpers";
+import {
+  backendPythonBin,
+  openAnalysisVisualization,
+  registerAndLogin,
+  uniqueUser,
+} from "./helpers";
 
 const backend = path.resolve(__dirname, "../../backend");
 const python = backendPythonBin(backend);
@@ -68,6 +73,7 @@ test("real API relationship workspace is spoiler-safe with filters evidence and 
 
   await page.goto("/analysis");
   await page.getByLabel("选择小说").selectOption(String(seeded.novel_id));
+  await openAnalysisVisualization(page);
   await page.getByRole("tab", { name: "人物关系" }).click();
   await expect(page.getByTestId("relationship-workspace")).toBeVisible();
 
@@ -151,6 +157,7 @@ test("filters_required over-cap graph shows guidance without cytoscape elements"
 
   await page.goto("/analysis");
   await page.getByLabel("选择小说").selectOption(String(seeded.novel_id));
+  await openAnalysisVisualization(page);
   await page.getByRole("tab", { name: "人物关系" }).click();
   await expect(page.getByTestId("relationship-workspace")).toBeVisible();
 
