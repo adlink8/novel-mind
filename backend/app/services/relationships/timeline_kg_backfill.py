@@ -226,6 +226,9 @@ class TimelineKgBackfillService:
                     novel_id=novel_id,
                     analysis_version_id=version.id,
                     deterministic_outputs=det,
+                    # Provenance honesty: rows from this ops seed path must
+                    # never masquerade as pipeline LLM observations.
+                    intake_kind="timeline_seed_backfill",
                 )
                 result.relationship_build_status = worker_result.status
                 result.relationship_accepted = worker_result.accepted_count

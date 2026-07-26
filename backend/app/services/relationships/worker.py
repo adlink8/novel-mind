@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.knowledge import KnowledgeRelationJudgment
 from app.core.database import async_session_factory
 from app.models.relationship import (
+    RELATIONSHIP_INTAKE_KINDS,
     RelationshipBuildRun,
     RelationshipEvidenceLink,
     RelationshipObservation,
@@ -92,11 +93,18 @@ class RelationshipObservationWorker:
         analysis_version_id: int,
         build_run_id: int | None = None,
         deterministic_outputs: dict[str, dict[str, Any]] | None = None,
+        intake_kind: str | None = None,
     ) -> WorkerRunResult:
         """Build candidates, judge, gate, and persist accepted observations.
 
         Network calls happen outside short persistence transactions (caller may
         share one session; we flush frequently and never write Neo4j).
+
+        ``intake_kind`` forces the provenance recorded on accepted observations
+        (e.g. the timeline seed backfill passes ``timeline_seed_backfill``).
+        When omitted, provenance is derived per candidate from the Phase 04
+        source judgment: seed-marked sources record ``timeline_seed_backfill``,
+        the normal pipeline records ``llm_judgment``.
         """
 
         build_run = await self._ensure_build_run(
@@ -152,8 +160,16 @@ class RelationshipObservationWorker:
             await db.flush()
 
             # Re-check source acceptance immediately before model call.
-            source_ok = await self._source_still_accepted(
-                db, source_judgment_id=draft.source_judgment_id
+            source_judgment = await db.get(
+                KnowledgeRelationJudgment, draft.source_judgment_id
+            )
+            source_ok = (
+                source_judgment is not None
+                and source_judgment.status == "accepted"
+                and source_judgment.gate_status == "accepted"
+            )
+            resolved_intake = self._resolve_intake_kind(
+                requested=intake_kind, source_judgment=source_judgment
             )
 
             det_output = det.get(draft.package.candidate_key) or det.get(
@@ -255,6 +271,7 @@ class RelationshipObservationWorker:
                         judge_result=judge_result,
                         interval=interval,
                         idempotency_key=idem_key,
+                        intake_kind=resolved_intake,
                     )
                 candidate_row.status = "accepted"
             elif decision.needs_review:
@@ -385,13 +402,36 @@ class RelationshipObservationWorker:
         )
         return result.scalar_one_or_none()
 
-    async def _source_still_accepted(
-        self, db: AsyncSession, *, source_judgment_id: int
-    ) -> bool:
-        judgment = await db.get(KnowledgeRelationJudgment, source_judgment_id)
-        if judgment is None:
+    @staticmethod
+    def _is_seed_source_judgment(source_judgment: Any) -> bool:
+        """True when the Phase 04 source row was seeded by the timeline backfill."""
+        if source_judgment is None:
             return False
-        return judgment.status == "accepted" and judgment.gate_status == "accepted"
+        if (
+            getattr(source_judgment, "model_name", "") or ""
+        ) == "timeline_cooccur_heuristic":
+            return True
+        for payload in (
+            getattr(source_judgment, "structured_output", None),
+            getattr(source_judgment, "raw_output", None),
+        ):
+            if (
+                isinstance(payload, dict)
+                and payload.get("source") == "timeline_kg_backfill"
+            ):
+                return True
+        return False
+
+    @classmethod
+    def _resolve_intake_kind(
+        cls, *, requested: str | None, source_judgment: Any
+    ) -> str:
+        """Caller-requested intake wins; otherwise derive from source lineage."""
+        if requested is not None:
+            return requested if requested in RELATIONSHIP_INTAKE_KINDS else "unknown"
+        if cls._is_seed_source_judgment(source_judgment):
+            return "timeline_seed_backfill"
+        return "llm_judgment"
 
     async def _persist_judgment_audit(
         self,
@@ -496,6 +536,7 @@ class RelationshipObservationWorker:
         judge_result: JudgmentCallResult,
         interval: dict[str, Any],
         idempotency_key: str,
+        intake_kind: str = "unknown",
     ) -> RelationshipObservation:
         structured = judge_result.structured
         assert structured is not None
@@ -543,6 +584,9 @@ class RelationshipObservationWorker:
             relation_type=rel_type,
             transition=transition,
             status="accepted",
+            intake_kind=(
+                intake_kind if intake_kind in RELATIONSHIP_INTAKE_KINDS else "unknown"
+            ),
             valid_from_chapter=interval["valid_from_chapter"],
             valid_from_narrative_index=interval["valid_from_narrative_index"],
             valid_to_chapter=interval["valid_to_chapter"],

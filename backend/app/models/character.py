@@ -112,3 +112,12 @@ class CharacterRelation(TimestampMixin, Base):
     chapter_first_seen: Mapped[int | None] = mapped_column(
         Integer
     )  # 该关系首次出现的章节号
+    # 数据来源（Phase 25-02）：llm_judgment / timeline_seed_backfill /
+    # cooccurrence_candidate / manual / unknown
+    intake_kind: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        default="unknown",
+        server_default="unknown",
+        index=True,
+    )
