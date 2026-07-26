@@ -254,12 +254,25 @@ class IndexStatusResponse(BaseModel):
 # ─────────── 混合搜索（BM25 + 向量）───────────
 
 
+SearchFallbackReason = Literal[
+    "units_index_unavailable",
+    "units_query_failed",
+    "units_requires_auth",
+]
+
+
 class SearchRequest(BaseModel):
     """混合搜索请求（BM25 + 向量）"""
 
     query: str = Field(..., min_length=1, max_length=500, description="搜索查询文本")
     top_k: int = Field(default=10, ge=1, le=50, description="返回结果数量上限")
-    mode: Literal["chunks", "units", "hybrid"] = Field(default="chunks")
+    mode: Literal["auto", "chunks", "units", "hybrid"] = Field(
+        default="auto",
+        description=(
+            "检索意图；实际执行层由服务端 router 决策："
+            "auto 优先 hybrid，units 索引不可用时自动降级 chunks"
+        ),
+    )
 
 
 class SearchResultItem(BaseModel):
@@ -287,3 +300,11 @@ class SearchResponse(BaseModel):
     results: list[SearchResultItem]
     total: int
     query: str
+    # 诚实元数据（additive，Phase 24-03）：服务端 router 实际执行的检索层，
+    # 以及发生降级时的原因；None 表示按请求意图执行、无降级。
+    resolved_mode: Literal["chunks", "units", "hybrid"] | None = Field(
+        default=None, description="服务端实际执行的检索层"
+    )
+    fallback_reason: SearchFallbackReason | None = Field(
+        default=None, description="降级原因；null 表示未发生降级"
+    )

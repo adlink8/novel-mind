@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 from typing import Any
 
 from sqlalchemy import select
@@ -21,9 +23,60 @@ from app.services.ai_service import ai_service
 from app.services.vector_store import vector_store
 
 
+logger = logging.getLogger(__name__)
+
 BuildSelector = Callable[
     [AsyncSession, int, int, str], Awaitable[NarrativeIndexBuild | None]
 ]
+
+# ── Retrieval layer registry (server-side router authority; NM-DATA-010) ──
+# "narrative_memory" is deliberately listed but DISABLED: NM is candidate-only
+# (no active pointer, no promotion journal) and MUST NOT enter production
+# retrieval before an explicit Phase 30 authorization. See ADR-0002
+# (docs/adr/0002-narrative-unit-vs-narrative-memory.md) §2/§4 — any router
+# change that enables this layer is an architecture violation until then.
+RETRIEVAL_LAYERS: dict[str, str] = {
+    "chunks": "enabled",
+    "units": "enabled",
+    "narrative_memory": "disabled",
+}
+
+# Fallback-reason enum surfaced verbatim in SearchResponse.fallback_reason.
+FALLBACK_UNITS_INDEX_UNAVAILABLE = "units_index_unavailable"
+FALLBACK_UNITS_QUERY_FAILED = "units_query_failed"
+
+
+class UnitsIndexUnavailableError(RuntimeError):
+    """The units layer has no usable index (no pointer/build or collection)."""
+
+
+@dataclass(frozen=True)
+class RetrievalOutcome:
+    """Honest retrieval result: rows plus the layer that actually executed."""
+
+    rows: list[dict[str, Any]]
+    resolved_mode: str
+    fallback_reason: str | None = None
+
+
+def _citation_backed(unit_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Enforce the citation contract on unit hits (ADR-0002 §2).
+
+    Search evidence/citations may only come from the raw chunk (leaf) layer:
+    a Narrative Unit hit is only presentable together with its evidence
+    back-links into that layer. Units without ``evidence_refs`` are dropped
+    fail-closed instead of being shown as uncited claims.
+    """
+    backed: list[dict[str, Any]] = []
+    for row in unit_rows:
+        if row.get("evidence_refs"):
+            backed.append(row)
+        else:
+            logger.warning(
+                "dropping unit hit without evidence back-links: unit_id=%s",
+                row.get("unit_id"),
+            )
+    return backed
 
 
 async def select_active_build(
@@ -74,15 +127,26 @@ class NarrativeSearchService:
             (await db.scalars(select(Novel.id).where(Novel.owner_id == owner_id))).all()
         )
         results: list[dict[str, Any]] = []
+        units_layer_available = False
         for novel_id in novel_ids:
-            results.extend(
-                await self.search_units(
+            try:
+                rows = await self.search_units(
                     db,
                     owner_id=owner_id,
                     novel_id=novel_id,
                     query=query,
                     top_k=top_k,
                 )
+            except UnitsIndexUnavailableError:
+                # Novels without an active units index don't poison the whole
+                # owner-scope query; only a fully index-less owner is treated
+                # as "units layer unavailable".
+                continue
+            units_layer_available = True
+            results.extend(rows)
+        if not units_layer_available:
+            raise UnitsIndexUnavailableError(
+                f"no eligible narrative index build for owner {owner_id}"
             )
         return sorted(results, key=lambda item: item["score"], reverse=True)[:top_k]
 
@@ -108,11 +172,18 @@ class NarrativeSearchService:
             or build.status not in {"candidate", "active"}
             or not build.collection_name
         ):
-            return []
+            raise UnitsIndexUnavailableError(
+                f"no eligible narrative index build for novel {novel_id}"
+            )
+        try:
+            collection = await asyncio.to_thread(
+                self.store.get_named_collection, build.collection_name
+            )
+        except Exception as exc:
+            raise UnitsIndexUnavailableError(
+                f"narrative index collection missing: {build.collection_name}"
+            ) from exc
         embedding = (await self.embeddings.embedding(texts=[query]))[0]
-        collection = await asyncio.to_thread(
-            self.store.get_named_collection, build.collection_name
-        )
         raw = await asyncio.to_thread(
             collection.query, query_embeddings=[embedding], n_results=top_k
         )
@@ -140,20 +211,25 @@ class NarrativeSearchService:
                     )
                 ).all()
             )
-            refs = (
-                list(
-                    (
-                        await db.scalars(
-                            select(KnowledgeEvidenceRef).where(
-                                KnowledgeEvidenceRef.id.in_(
-                                    [link.source_evidence_id for link in evidence]
-                                )
+            if not evidence:
+                # Citation contract (ADR-0002 §2): a unit may only surface with
+                # its evidence back-links into the raw chunk layer. An
+                # evidence-less unit is never shown as a search result.
+                logger.warning(
+                    "dropping unit %s: no evidence back-links to raw chunks",
+                    unit.id,
+                )
+                continue
+            refs = list(
+                (
+                    await db.scalars(
+                        select(KnowledgeEvidenceRef).where(
+                            KnowledgeEvidenceRef.id.in_(
+                                [link.source_evidence_id for link in evidence]
                             )
                         )
-                    ).all()
-                )
-                if evidence
-                else []
+                    )
+                ).all()
             )
             distance = (raw.get("distances") or [[]])[0][index]
             results.append(
@@ -207,11 +283,107 @@ narrative_search_service = NarrativeSearchService()
 
 
 class NarrativeRetrievalStrategy:
-    """Production chunks/units/hybrid policy shared by API and frozen eval."""
+    """Server-side retrieval router shared by API and frozen eval (NM-DATA-010).
+
+    The client ``mode`` is an *intent* only; this router decides which layer
+    actually executes and reports it honestly:
+
+    - ``auto`` prefers ``hybrid`` (units + chunks fusion);
+    - when the units index is unavailable (missing collection, no active
+      pointer) the router degrades to raw ``chunks`` with
+      ``fallback_reason=units_index_unavailable`` — including when ``units``
+      was requested explicitly (degrade, never error/empty);
+    - a failing units query degrades likewise with
+      ``fallback_reason=units_query_failed``;
+    - ``narrative_memory`` is registered in RETRIEVAL_LAYERS but disabled
+      (candidate-only until Phase 30, ADR-0002 §2/§4) and is not a valid mode.
+    """
 
     def __init__(self, *, chunks: Any, units: NarrativeSearchService):
         self.chunks = chunks
         self.units = units
+
+    async def _resolve(
+        self,
+        intent: str,
+        *,
+        top_k: int,
+        fetch_units: Callable[[], Awaitable[list[dict[str, Any]]]],
+        fetch_chunks: Callable[[], Awaitable[list[dict[str, Any]]]],
+    ) -> RetrievalOutcome:
+        if intent not in {"auto", "chunks", "units", "hybrid"}:
+            # Disabled layers (narrative_memory) intentionally land here:
+            # candidate-only layers cannot be routed to (ADR-0002 §4).
+            raise ValueError(f"unsupported retrieval mode: {intent}")
+        target = "hybrid" if intent == "auto" else intent
+        if target == "chunks":
+            return RetrievalOutcome(await fetch_chunks(), "chunks")
+        try:
+            unit_rows = _citation_backed(await fetch_units())
+        except UnitsIndexUnavailableError:
+            return RetrievalOutcome(
+                await fetch_chunks(), "chunks", FALLBACK_UNITS_INDEX_UNAVAILABLE
+            )
+        except Exception:
+            logger.exception("units retrieval failed; degrading to raw chunks")
+            return RetrievalOutcome(
+                await fetch_chunks(), "chunks", FALLBACK_UNITS_QUERY_FAILED
+            )
+        if target == "units":
+            return RetrievalOutcome(unit_rows, "units")
+        chunk_rows = await fetch_chunks()
+        return RetrievalOutcome(
+            fuse_results(chunk_rows, unit_rows, top_k=top_k), "hybrid"
+        )
+
+    async def resolve_global(
+        self,
+        db: AsyncSession,
+        *,
+        owner_id: int,
+        query: str,
+        mode: str,
+        top_k: int,
+    ) -> RetrievalOutcome:
+        return await self._resolve(
+            mode,
+            top_k=top_k,
+            fetch_units=lambda: self.units.search_global_units(
+                db, owner_id=owner_id, query=query, top_k=top_k
+            ),
+            fetch_chunks=lambda: self.chunks.search_global(
+                db, query=query, top_k=top_k, owner_id=owner_id
+            ),
+        )
+
+    async def resolve_novel(
+        self,
+        db: AsyncSession,
+        *,
+        owner_id: int,
+        novel_id: int,
+        domain_profile: str,
+        query: str,
+        mode: str,
+        top_k: int,
+        build_selector: BuildSelector = select_active_build,
+    ) -> RetrievalOutcome:
+        return await self._resolve(
+            mode,
+            top_k=top_k,
+            fetch_units=lambda: self.units.search_units(
+                db,
+                owner_id=owner_id,
+                novel_id=novel_id,
+                domain_profile=domain_profile,
+                query=query,
+                top_k=top_k,
+                build_selector=build_selector,
+            ),
+            fetch_chunks=lambda: self.chunks.search_novel(
+                db, novel_id=novel_id, query=query, top_k=top_k
+            ),
+        )
 
     async def search_global(
         self,
@@ -222,19 +394,10 @@ class NarrativeRetrievalStrategy:
         mode: str,
         top_k: int,
     ) -> list[dict[str, Any]]:
-        unit_rows: list[dict[str, Any]] = []
-        if mode in {"units", "hybrid"}:
-            unit_rows = await self.units.search_global_units(
-                db, owner_id=owner_id, query=query, top_k=top_k
-            )
-        if mode == "units":
-            return unit_rows
-        chunk_rows = await self.chunks.search_global(
-            db, query=query, top_k=top_k, owner_id=owner_id
+        outcome = await self.resolve_global(
+            db, owner_id=owner_id, query=query, mode=mode, top_k=top_k
         )
-        if mode == "chunks":
-            return chunk_rows
-        return fuse_results(chunk_rows, unit_rows, top_k=top_k)
+        return outcome.rows
 
     async def search_novel(
         self,
@@ -248,25 +411,17 @@ class NarrativeRetrievalStrategy:
         top_k: int,
         build_selector: BuildSelector = select_active_build,
     ) -> list[dict[str, Any]]:
-        unit_rows: list[dict[str, Any]] = []
-        if mode in {"units", "hybrid"}:
-            unit_rows = await self.units.search_units(
-                db,
-                owner_id=owner_id,
-                novel_id=novel_id,
-                domain_profile=domain_profile,
-                query=query,
-                top_k=top_k,
-                build_selector=build_selector,
-            )
-        if mode == "units":
-            return unit_rows
-        chunk_rows = await self.chunks.search_novel(
-            db, novel_id=novel_id, query=query, top_k=top_k
+        outcome = await self.resolve_novel(
+            db,
+            owner_id=owner_id,
+            novel_id=novel_id,
+            domain_profile=domain_profile,
+            query=query,
+            mode=mode,
+            top_k=top_k,
+            build_selector=build_selector,
         )
-        if mode == "chunks":
-            return chunk_rows
-        return fuse_results(chunk_rows, unit_rows, top_k=top_k)
+        return outcome.rows
 
 
 def production_retrieval_strategy() -> NarrativeRetrievalStrategy:

@@ -38,7 +38,7 @@ async def global_search(
     需要认证。
     """
     try:
-        results = await strategy.search_global(
+        outcome = await strategy.resolve_global(
             db,
             owner_id=current_user.id,
             query=request.query,
@@ -49,9 +49,11 @@ async def global_search(
         logger.exception("global hybrid search failed: %s", e)
         return SearchResponse(results=[], total=0, query=request.query)
     return SearchResponse(
-        results=[SearchResultItem(**r) for r in results],
-        total=len(results),
+        results=[SearchResultItem(**r) for r in outcome.rows],
+        total=len(outcome.rows),
         query=request.query,
+        resolved_mode=outcome.resolved_mode,
+        fallback_reason=outcome.fallback_reason,
     )
 
 
@@ -82,26 +84,36 @@ async def novel_search(
     ):
         raise HTTPException(status_code=403, detail="无权访问该小说")
 
-    try:
-        if request.mode != "chunks" and current_user is None:
+    # 服务端 router 意图解析：匿名访问只允许 raw chunks 层。
+    # auto 意图在服务端解析为 chunks（诚实标注原因）；
+    # 显式请求 units/hybrid 仍保持 401 契约。
+    mode = request.mode
+    auth_fallback = None
+    if current_user is None:
+        if mode in {"units", "hybrid"}:
             raise HTTPException(status_code=401, detail="知识单元检索需要认证")
-        results = await strategy.search_novel(
+        if mode == "auto":
+            mode = "chunks"
+            auth_fallback = "units_requires_auth"
+
+    try:
+        outcome = await strategy.resolve_novel(
             db,
             owner_id=current_user.id if current_user else novel.owner_id,
             novel_id=novel_id,
             domain_profile="fiction",
             query=request.query,
-            mode=request.mode,
+            mode=mode,
             top_k=request.top_k,
         )
-    except HTTPException:
-        raise
     except Exception as e:
         logger.exception("hybrid search failed for novel_%d: %s", novel_id, e)
         return SearchResponse(results=[], total=0, query=request.query)
 
     return SearchResponse(
-        results=[SearchResultItem(**r) for r in results],
-        total=len(results),
+        results=[SearchResultItem(**r) for r in outcome.rows],
+        total=len(outcome.rows),
         query=request.query,
+        resolved_mode=outcome.resolved_mode,
+        fallback_reason=auth_fallback or outcome.fallback_reason,
     )
