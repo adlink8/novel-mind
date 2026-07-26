@@ -589,6 +589,9 @@ jobs:
     permissions:
       contents: read
       security-events: write
+      # codeql-action/analyze 上传结果时需要读取 workflow run 元数据；
+      # 缺少该权限时报 "Resource not accessible by integration" 并判 configuration error。
+      actions: read
     strategy:
       fail-fast: false
       matrix:
@@ -961,7 +964,7 @@ jobs:
           def r(key: str) -> str:
               return (os.environ.get(key) or "missing").strip().lower()
 
-          run_nightly_raw = (os.environ.get("RUN_NIGHTLY") || "false").strip().lower()
+          run_nightly_raw = (os.environ.get("RUN_NIGHTLY") or "false").strip().lower()
           run_nightly = run_nightly_raw in ("true", "1", "yes")
           payload = {
               "event": os.environ.get("EVENT_NAME") or "",

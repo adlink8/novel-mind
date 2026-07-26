@@ -248,7 +248,18 @@ class TimelineReconciler:
             )
             for i in range(len(exact_sorted) - 1)
         ]
-        ranks, conflicts = _topological_ranks(groups, constraints)
+        narrative_key = {
+            root: min(
+                (
+                    by_id[item].narrative_chapter_number,
+                    by_id[item].narrative_index,
+                    item,
+                )
+                for item in members
+            )
+            for root, members in groups.items()
+        }
+        ranks, conflicts = _topological_ranks(groups, constraints, narrative_key)
 
         materialized = []
         evidence_by_root: dict[str, set[str]] = {}
@@ -307,7 +318,9 @@ class TimelineReconciler:
 
 
 def _topological_ranks(
-    nodes: dict[str, list[str]], constraints: list[tuple[str, str]]
+    nodes: dict[str, list[str]],
+    constraints: list[tuple[str, str]],
+    narrative_key: dict[str, tuple] | None = None,
 ) -> tuple[dict[str, int], list[str]]:
     graph = {node: set() for node in nodes}
     indegree = {node: 0 for node in nodes}
@@ -321,16 +334,24 @@ def _topological_ranks(
             continue
         graph[source].add(target)
         indegree[target] += 1
-    ready = sorted(node for node, degree in indegree.items() if degree == 0)
+
+    # Unconstrained ties must fall back to narrative order, never to candidate-id
+    # string order ("event-10" < "event-9" lexicographically).
+    def _tie_key(node: str) -> tuple:
+        return narrative_key[node] if narrative_key else (node,)
+
+    ready = sorted(
+        (node for node, degree in indegree.items() if degree == 0), key=_tie_key
+    )
     ordered: list[str] = []
     while ready:
         node = ready.pop(0)
         ordered.append(node)
-        for target in sorted(graph[node]):
+        for target in sorted(graph[node], key=_tie_key):
             indegree[target] -= 1
             if indegree[target] == 0:
                 ready.append(target)
-                ready.sort()
+                ready.sort(key=_tie_key)
     if len(ordered) != len(nodes):
         cyclic = sorted(node for node, degree in indegree.items() if degree > 0)
         return {}, [f"contradictory chronology cycle: {','.join(cyclic)}"]

@@ -149,3 +149,34 @@ async def test_cycles_and_contradictions_are_retained_without_fabricated_order()
     assert all(event.story_rank is None for event in result.events)
     assert result.conflicts
     assert result.edges == ()  # causal evidence must cover both endpoints
+
+
+@pytest.mark.asyncio
+async def test_unconstrained_story_ranks_follow_narrative_order_not_id_lexicography():
+    """Candidate ids crossing a digit boundary ("event-10" < "event-9" as strings)
+    must not reverse story order when no story-time constraints exist."""
+
+    async def transport(payload):
+        return ReconcileInput(
+            duplicate_groups=[], story_constraints=[], causal_edges=[]
+        )
+
+    reconciler = TimelineReconciler(
+        transport=transport,
+        deployment=ModelDeployment(
+            "openai", "quality", "r1", True, Decimal("1"), Decimal("1")
+        ),
+        budget=_budget(),
+    )
+    result = await reconciler.reconcile(
+        run_id=10,
+        events=[
+            _event("event-9", 2, 0, title="先"),
+            _event("event-10", 9, 0, title="后"),
+        ],
+    )
+    assert [event.logical_event_id for event in result.events] == [
+        "event-9",
+        "event-10",
+    ]
+    assert [event.story_rank for event in result.events] == [0, 1]
