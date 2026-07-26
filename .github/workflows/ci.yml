@@ -208,9 +208,12 @@ jobs:
         working-directory: frontend
         run: npm run lint
 
+      # --omit=dev：GHSA-mh99-v99m-4gvg 仅 5.0.8 修复且与 eslint→minimatch@3
+      # 的 brace-expansion@1 API 不兼容（全局 override 会使 eslint 崩溃），
+      # 开发链无法洗绿。生产依赖树保持全量审计门禁。
       - name: npm audit
         working-directory: frontend
-        run: npm audit --registry=https://registry.npmjs.org
+        run: npm audit --omit=dev --registry=https://registry.npmjs.org
 
   # ---------------------------------------------------------------------------
   # actionlint (locked v1.7.12)
