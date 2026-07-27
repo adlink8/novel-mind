@@ -31,6 +31,5 @@ sentence-transformers>=3.0
 
 # Security
 cryptography>=42.0
-passlib[bcrypt]>=1.7
 bcrypt>=4.0,<5.0
 pyjwt>=2.8
