@@ -64,6 +64,7 @@ from app.models.ai_model import AIModelConfig
 from app.models.ai_usage_log import AIUsageLog
 from app.models.app_setting import AppSetting
 from app.models.text_chunk import TextChunk
+from app.models.chunk_index_journal import ChunkIndexJournal
 from app.models.chunk_build import (
     ChunkActivePointer,
     ChunkBuild,
@@ -193,6 +194,7 @@ __all__ = [
     "AIUsageLog",
     "AppSetting",
     "TextChunk",
+    "ChunkIndexJournal",
     "ChunkBuild",
     "ChunkActivePointer",
     "ChunkHierarchyNode",

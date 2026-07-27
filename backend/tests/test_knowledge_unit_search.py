@@ -314,6 +314,7 @@ async def test_hybrid_api_fallback_is_owned_by_shared_strategy(auth_client):
             "unit_id": None,
             "evidence_refs": [],
             "lifecycle": None,
+            "index_status": None,
         }
     ]
 

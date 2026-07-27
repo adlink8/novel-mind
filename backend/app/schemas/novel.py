@@ -292,6 +292,8 @@ class SearchResultItem(BaseModel):
     unit_id: int | None = None
     evidence_refs: list[str] = Field(default_factory=list)
     lifecycle: str | None = None
+    # Phase 24-01 additive: 小说索引部分失败时为 "partial"（fail-closed 感知）
+    index_status: str | None = None
 
 
 class SearchResponse(BaseModel):

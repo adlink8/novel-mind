@@ -8,10 +8,10 @@ from datetime import datetime, timedelta, timezone
 import uuid
 from typing import Optional
 
+import bcrypt
 import jwt
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from passlib.context import CryptContext
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -19,8 +19,11 @@ from app.config import settings
 from app.core.database import get_db
 from app.models import User
 
-# bcrypt 密码哈希上下文
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Use the maintained bcrypt API directly. Passlib 1.7.x probes the removed
+# ``bcrypt.__about__`` attribute with current bcrypt releases, which produces
+# noisy warnings and makes the CI authentication path unnecessarily fragile.
+# Direct bcrypt calls still accept existing $2a/$2b/$2y hashes.
+BCRYPT_ROUNDS = 12
 
 # HTTP Bearer Token 认证方案
 security_scheme = HTTPBearer(auto_error=False)
@@ -32,12 +35,20 @@ UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """验证明文密码与哈希密码是否匹配"""
-    return pwd_context.verify(plain_password, hashed_password)
+    try:
+        return bcrypt.checkpw(
+            plain_password.encode("utf-8"), hashed_password.encode("ascii")
+        )
+    except (UnicodeEncodeError, ValueError):
+        # Malformed stored hashes fail closed instead of breaking login.
+        return False
 
 
 def hash_password(password: str) -> str:
     """对明文密码进行 bcrypt 哈希"""
-    return pwd_context.hash(password)
+    return bcrypt.hashpw(
+        password.encode("utf-8"), bcrypt.gensalt(rounds=BCRYPT_ROUNDS)
+    ).decode("ascii")
 
 
 def validate_password_length(password: str) -> str:

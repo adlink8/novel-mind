@@ -14,6 +14,7 @@ from pydantic import ValidationError
 
 from app.config import Settings
 from app.core.crypto import decrypt_text, encrypt_text
+from app.core.security import hash_password, verify_password
 from app.core.url_security import validate_ai_base_url
 from app.models import Novel, User
 from app.services.novel_service import novel_service
@@ -87,6 +88,15 @@ async def test_registration_rejects_password_over_bcrypt_byte_limit(
         },
     )
     assert response.status_code == 422
+
+
+def test_password_hash_round_trip_and_fail_closed() -> None:
+    hashed = hash_password("Password1!")
+
+    assert hashed.startswith("$2b$")
+    assert verify_password("Password1!", hashed)
+    assert not verify_password("wrong-password", hashed)
+    assert not verify_password("Password1!", "not-a-bcrypt-hash")
 
 
 @pytest.mark.asyncio

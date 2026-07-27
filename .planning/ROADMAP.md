@@ -56,7 +56,7 @@
 | Phase 18 前端动效与过渡系统 | 3/3 | **COMPLETE** — 18-01..03 done; dual-viewport motion qualified |
 | v0.9 / Phase 19 分析工作台呈现与数据诚实 | 4/4 | **COMPLETE** — 19-01..04 done (truth + presentation) |
 | v1.0 / Phase 20 结构工作台与多层呈现 | 4/4 | **COMPLETE** — P0 Structure Workspace + NM read-only |
-| v1.1 / Phase 21-25 + 25.1 工程与治理基线收口 | 4/16 | Phase 21 COMPLETE; 22 NEAR-COMPLETE (3-nightly watch); 23–25, 25.1 planned |
+| v1.1 / Phase 21-25 + 25.1 工程与治理基线收口 | 14/16 | Phase 21–23, 24-03, 25, 25.1 COMPLETE; 24-01/02 在途 (#23); 22 nightly watch day 1/3 |
 | v1.2 / Phase 26-29 单书垂直证明 | 0/11 | PLANNED |
 | v1.3 / Phase 30 生产切换 | 0/3 | PLANNED — 立项需新授权 |
 | v1.4 / Phase 31-34 创作域 | 0/11 | PLANNED |
