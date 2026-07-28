@@ -22,6 +22,7 @@
 | 测试 | `TESTING.md` | 测试和质量门槛 |
 | 配置 | `CONFIGURATION.md` | 配置与 secrets 规则 |
 | 接口 | `API.md` | API 能力和限制 |
+<<<<<<< HEAD
 | 部署 | `deployment.md` | 部署边界与指南 |
 | 常见问题 | `faq.md` | 导入/时间线/NM/关系/聊天 技术细节问答 |
 | 产品 | `需求文档.md` | 产品需求 |
@@ -40,5 +41,6 @@
 | 读者聊天 | `reader-chat.md` | 上下文组装、证据检索、剧透控制 |
 | 检索与评测 | `search-and-rag.md` | BM25/向量混合搜索、Eval 评测闭环 |
 | 前端架构 | `frontend.md` | 路由、组件、动效系统、主题 |
+
 
 `.planning/` 是 AI 工作目录，不作为维护者阅读文档的主入口。
