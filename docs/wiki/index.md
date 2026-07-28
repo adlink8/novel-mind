@@ -15,7 +15,7 @@
 | [读者聊天](reader-chat.md) | 证据检索、上下文组装、剧透控制 |
 | [检索与评测 (RAG)](search-and-rag.md) | 语义搜索、混合搜索、评测闭环 |
 | [前端架构](frontend.md) | 结构工作台、3D 翻页书、动效系统 |
-| [部署指南](deployment.md) | Docker、环境变量、启动脚本 |
+| [部署指南](../DEPLOYMENT.md) | Docker、环境变量、启动脚本 |
 
 ## 项目概览
 

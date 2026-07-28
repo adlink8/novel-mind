@@ -22,9 +22,9 @@
 | 测试 | `TESTING.md` | 测试和质量门槛 |
 | 配置 | `CONFIGURATION.md` | 配置与 secrets 规则 |
 | 接口 | `API.md` | API 能力和限制 |
-<<<<<<< HEAD
-| 部署 | `deployment.md` | 部署边界与指南 |
-| 常见问题 | `faq.md` | 导入/时间线/NM/关系/聊天 技术细节问答 |
+| 部署 | `DEPLOYMENT.md` | 部署边界与指南 |
+| Wiki | `wiki/index.md` | 功能深度介绍（导入/时间线/NM/关系/RAG/前端） |
+| 常见问题 | `wiki/faq.md` | 导入/时间线/NM/关系/聊天 技术细节问答 |
 | 产品 | `需求文档.md` | 产品需求 |
 | 产品 | `路线图.md` | 产品路线图 |
 | 产品 | `竞品调研报告.md` | 竞品分析 |
@@ -33,14 +33,14 @@
 
 | 主题 | 文档 | 内容 |
 |------|------|------|
-| 用户指南 | `user-guide.md` | 从注册到分析全流程操作说明 |
-| 导入管线 | `import-pipeline.md` | 编码检测、章节拆分、分块建索引 |
-| 时间线分析 | `timeline-analysis.md` | 逐章提取 → 跨章归并 → 因果边 |
-| 叙事记忆 | `narrative-memory.md` | NM 四层等级、6 种 Claims、Builder 流水线 |
-| 人物关系 | `relationships.md` | 候选包 → LLM 语义判决 → 门控接受 |
-| 读者聊天 | `reader-chat.md` | 上下文组装、证据检索、剧透控制 |
-| 检索与评测 | `search-and-rag.md` | BM25/向量混合搜索、Eval 评测闭环 |
-| 前端架构 | `frontend.md` | 路由、组件、动效系统、主题 |
+| 用户指南 | `wiki/user-guide.md` | 从注册到分析全流程操作说明 |
+| 导入管线 | `wiki/import-pipeline.md` | 编码检测、章节拆分、分块建索引 |
+| 时间线分析 | `wiki/timeline-analysis.md` | 逐章提取 → 跨章归并 → 因果边 |
+| 叙事记忆 | `wiki/narrative-memory.md` | NM 四层等级、6 种 Claims、Builder 流水线 |
+| 人物关系 | `wiki/relationships.md` | 候选包 → LLM 语义判决 → 门控接受 |
+| 读者聊天 | `wiki/reader-chat.md` | 上下文组装、证据检索、剧透控制 |
+| 检索与评测 | `wiki/search-and-rag.md` | BM25/向量混合搜索、Eval 评测闭环 |
+| 前端架构 | `wiki/frontend.md` | 路由、组件、动效系统、主题 |
 
 
 `.planning/` 是 AI 工作目录，不作为维护者阅读文档的主入口。
