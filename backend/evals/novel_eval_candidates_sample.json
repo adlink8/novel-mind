@@ -1,0 +1,57 @@
+[
+  {
+    "novel_id": 1,
+    "question": "路明非第一次在卡塞尔学院见到楚子航是在什么场合？",
+    "question_type": "original_text",
+    "difficulty": "easy",
+    "gold_chunks": [3, 5],
+    "expected_points": ["开学典礼", "楚子航作为学生会主席发言", "路明非在台下"],
+    "must_not_say": ["他们在宿舍第一次见面"],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 1,
+    "question": "楚子航和路明非的关系从开始到后来经历了怎样的变化？",
+    "question_type": "character_relation",
+    "difficulty": "medium",
+    "gold_chunks": [12, 25, 48],
+    "expected_points": ["起初楚子航冷淡疏远", "共同执行任务后逐渐信任", "成为战友"],
+    "must_not_say": ["他们一直很亲密"],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 1,
+    "question": "夔门计划失败的根本原因是什么？",
+    "question_type": "event_causality",
+    "difficulty": "hard",
+    "gold_chunks": [67, 68, 72],
+    "expected_points": ["对龙族实力预估不足", "情报不完整", "团队配合出现问题"],
+    "must_not_say": ["因为路明非一个人的失误"],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 1,
+    "question": "路明非收到卡塞尔学院录取通知书到进入学院的完整时间线是怎样的？",
+    "question_type": "timeline",
+    "difficulty": "medium",
+    "gold_chunks": [1, 2, 3, 4],
+    "expected_points": ["收到录取通知书", "诺诺来接他", "坐CC1000次列车", "到达学院参加入学测试"],
+    "must_not_say": ["他直接坐飞机去的"],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 1,
+    "question": "青铜与火之王在前期有哪些伏笔和暗示？",
+    "question_type": "foreshadowing",
+    "difficulty": "hard",
+    "gold_chunks": [8, 22, 45, 89],
+    "expected_points": ["楚子航的言灵·君焰", "关于四大君王的传说", "青铜城的壁画描述", "路明非的特殊体质暗示"],
+    "must_not_say": ["一开始就明确说明了青铜与火之王的身份"],
+    "status": "candidate",
+    "created_by": "auto"
+  }
+]

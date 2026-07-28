@@ -1,0 +1,5 @@
+# actionlint config — allow custom self-hosted labels for nightly dual-model runners
+self-hosted-runner:
+  labels:
+    - ollama
+    - linux

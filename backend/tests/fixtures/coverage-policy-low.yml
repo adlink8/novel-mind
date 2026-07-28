@@ -1,0 +1,40 @@
+# Valid structure but intentionally low thresholds used as a synthetic "measured" report
+# companion: tests assert evaluator fails when measured < policy.
+version: 1
+tools:
+  pytest_cov: "7.1.0"
+  pytest_timeout: "2.4.0"
+  vitest: "4.1.10"
+  vitest_coverage_v8: "4.1.10"
+coverage:
+  backend:
+    overall:
+      line: 10
+      branch: 5
+    critical:
+      line: 10
+      branch: 5
+      globs:
+        - "app/core/security.py"
+  frontend:
+    overall:
+      line: 10
+      branch: 5
+    critical:
+      line: 10
+      branch: 5
+      globs:
+        - "src/lib/api.ts"
+  diff_coverage:
+    minimum: 10
+timeouts:
+  unit: 5
+  contract: 15
+  integration: 30
+  browser: 60
+  live: 180
+flake:
+  pr_max: 0
+  external_infra:
+    max_retry: 1
+    save_first_failure_evidence: true

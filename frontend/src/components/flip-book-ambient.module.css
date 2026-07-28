@@ -1,0 +1,421 @@
+/**
+ * 翻页书环境动效（鸣潮菲比专武风格）：倾斜开卷姿态、桌面投影、纸纹颗粒、
+ * 书页厚度侧棱、纸张感翻页（页面弯折 + 移动阴影）、悬浮、金色光环、
+ * 光尘粒子、书脊辉光、翻页扫光、描金内框。组件作用域（CSS Module）。
+ *
+ * 所有「动画」仅在 prefers-reduced-motion: no-preference 时启用；
+ * 姿态/纸纹等静态装饰不受影响，reduced-motion 用户看到完整书本。
+ */
+
+.ambientScene {
+  position: relative;
+  isolation: isolate;
+}
+
+/* ── 倾斜开卷（2D 近似）：书本像放在桌面上一样斜放。
+   不能用 3D rotateX —— preserve-3d 祖变换会让 Chromium 命中测试失灵，
+   页内链接点击落空；2D rotate/scale 的命中测试是可靠的。 ── */
+.bookPose {
+  height: 100%;
+  width: 100%;
+  transform: rotate(-1.5deg) scaleY(0.97);
+}
+
+/* 桌面投影：书下的椭圆软影（不随书本悬浮） */
+.tableShadow {
+  position: absolute;
+  left: 6%;
+  right: 6%;
+  bottom: 40px;
+  height: 56px;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(
+    50% 50% at 50% 50%,
+    rgba(40, 28, 12, 0.28),
+    transparent 70%
+  );
+  filter: blur(14px);
+}
+
+/* 金色光环：书本背后的大面积柔光，缓慢呼吸 */
+.aura {
+  position: absolute;
+  inset: -14% -10%;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      46% 56% at 50% 42%,
+      rgba(255, 214, 120, 0.32),
+      rgba(255, 214, 120, 0) 70%
+    ),
+    radial-gradient(
+      32% 42% at 50% 62%,
+      rgba(255, 240, 200, 0.26),
+      rgba(255, 240, 200, 0) 75%
+    );
+  filter: blur(10px);
+}
+
+/* 悬浮容器（曾带 book-float 漂浮动画：移动可交互内容会让真实点击落空，已移除） */
+.floatWrap {
+  position: relative;
+}
+
+/* 纸纹颗粒：书页表面淡淡的纤维噪点（SVG 内联，自带低透明度） */
+.paperFace::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0.23 0 0 0 0 0.18 0 0 0 0 0.1 0 0 0 0.055 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* 书页厚度侧棱：切口处一页一页的层叠线（右=未翻页堆，左=已翻页堆） */
+.foreEdge {
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  width: 8px;
+  z-index: 30;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    90deg,
+    #d8cbaa 0 1px,
+    #f5eedb 1px 3px
+  );
+  box-shadow: inset 0 0 2px rgba(90, 70, 40, 0.35);
+}
+
+.foreEdgeRight {
+  right: -1px;
+  border-radius: 0 4px 4px 0;
+}
+
+.foreEdgeLeft {
+  left: -1px;
+  border-radius: 4px 0 0 4px;
+}
+
+/* 书脊辉光：中缝一道金色光束（展开模式居中，单页模式在左侧书脊） */
+.spineBeam {
+  position: absolute;
+  top: 4%;
+  bottom: 4%;
+  left: 50%;
+  width: 48px;
+  transform: translateX(-50%);
+  z-index: 30;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 226, 150, 0.5),
+    transparent
+  );
+  filter: blur(6px);
+}
+
+.spineBeamSingle {
+  left: 0;
+  width: 36px;
+  transform: none;
+}
+
+/* 光尘粒子：金色微粒自书底升起、漂移、淡出 */
+.particle {
+  position: absolute;
+  bottom: -3%;
+  z-index: 40;
+  border-radius: 9999px;
+  pointer-events: none;
+  background: radial-gradient(
+    circle,
+    rgba(255, 244, 214, 0.95),
+    rgba(255, 214, 120, 0.55) 55%,
+    transparent 75%
+  );
+  box-shadow: 0 0 8px 2px rgba(255, 214, 120, 0.35);
+  opacity: 0;
+}
+
+/* 翻页扫光：每次翻页在新页面上扫过一道亮光（key 变更重放） */
+.shimmer {
+  position: absolute;
+  inset: 0;
+  z-index: 25;
+  overflow: hidden;
+  border-radius: 8px;
+  pointer-events: none;
+}
+
+.shimmer::before {
+  content: "";
+  position: absolute;
+  inset: -20% -60%;
+  background: linear-gradient(
+    105deg,
+    transparent 42%,
+    rgba(255, 246, 220, 0.5) 50%,
+    transparent 58%
+  );
+  transform: translateX(-120%);
+}
+
+/* 纸张感翻页：翻动中的页面弯折（动画结束后类仍在，故不能改 transform-origin，
+   否则背面常驻的 rotateY(180deg) 会以左缘为轴甩出书外） */
+.paperFlexFront,
+.paperFlexBack {
+  backface-visibility: hidden;
+}
+
+/* 翻动中页面上移动的光影（正面渐暗扬起 / 背面落地压影） */
+.flipShade {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.shadeLiftFront {
+  background: linear-gradient(
+    100deg,
+    rgba(60, 40, 20, 0) 42%,
+    rgba(60, 40, 20, 0.15) 78%,
+    rgba(60, 40, 20, 0.22) 100%
+  );
+}
+
+.shadeLandBack {
+  background: linear-gradient(
+    260deg,
+    rgba(60, 40, 20, 0) 42%,
+    rgba(60, 40, 20, 0.13) 80%,
+    rgba(60, 40, 20, 0.2) 100%
+  );
+}
+
+/* 翻页时掠过整本书的柔和投影（书叶影子滑过页面） */
+.turnShadow {
+  position: absolute;
+  inset: 0;
+  z-index: 22;
+  overflow: hidden;
+  border-radius: 8px;
+  pointer-events: none;
+}
+
+.turnShadow::before {
+  content: "";
+  position: absolute;
+  top: -6%;
+  bottom: -6%;
+  left: 0;
+  width: 26%;
+  background: radial-gradient(
+    closest-side,
+    rgba(50, 35, 15, 0.13),
+    transparent 70%
+  );
+  transform: translateX(390%);
+  opacity: 0;
+}
+
+/* 描金内框：书页/封面内的金色细框（专武雕花感） */
+.goldFrame {
+  position: absolute;
+  inset: 10px;
+  z-index: 15;
+  border: 1px solid rgba(214, 171, 84, 0.35);
+  border-radius: 6px;
+  pointer-events: none;
+  box-shadow: inset 0 0 18px rgba(214, 171, 84, 0.08);
+}
+
+/* 书体金色边缘光 */
+.gilded {
+  box-shadow:
+    0 0 0 1px rgba(214, 171, 84, 0.28),
+    0 0 42px rgba(245, 197, 66, 0.22),
+    0 24px 50px -24px rgba(20, 14, 8, 0.6);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .aura {
+    animation: aura-breathe 5.5s ease-in-out infinite;
+  }
+
+  .spineBeam {
+    animation: spine-breathe 4s ease-in-out infinite;
+  }
+
+  .particle {
+    animation: particle-rise var(--rise-duration, 9s) linear infinite;
+    animation-delay: var(--rise-delay, 0s);
+  }
+
+  .shimmer::before {
+    animation: shimmer-sweep 1.4s ease-out 1;
+  }
+
+  .paperFlexFront {
+    animation: paper-flex-front 0.85s cubic-bezier(0.32, 0.72, 0.35, 1) 1;
+  }
+
+  .paperFlexBack {
+    animation: paper-flex-back 0.85s cubic-bezier(0.32, 0.72, 0.35, 1) 1;
+  }
+
+  .shadeLiftFront {
+    animation: shade-lift 0.85s cubic-bezier(0.32, 0.72, 0.35, 1) 1;
+  }
+
+  .shadeLandBack {
+    animation: shade-land 0.85s cubic-bezier(0.32, 0.72, 0.35, 1) 1;
+  }
+
+  .turnShadow::before {
+    animation: turn-sweep-fwd 0.85s cubic-bezier(0.32, 0.72, 0.35, 1) 1;
+  }
+
+  .turnShadowBack::before {
+    animation-name: turn-sweep-back;
+  }
+}
+
+@keyframes aura-breathe {
+  0%,
+  100% {
+    opacity: 0.72;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+}
+
+@keyframes spine-breathe {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
+
+@keyframes particle-rise {
+  0% {
+    transform: translate3d(0, 10%, 0) scale(0.6);
+    opacity: 0;
+  }
+  12% {
+    opacity: var(--peak-opacity, 0.9);
+  }
+  80% {
+    opacity: 0.45;
+  }
+  100% {
+    transform: translate3d(var(--drift, 12px), -70vh, 0) scale(1);
+    opacity: 0;
+  }
+}
+
+@keyframes shimmer-sweep {
+  to {
+    transform: translateX(120%);
+  }
+}
+
+/* 纸页弯折：翻起时页面轻微弓起、落下回弹 */
+@keyframes paper-flex-front {
+  0% {
+    transform: skewY(0deg) scaleX(1);
+  }
+  35% {
+    transform: skewY(-1.6deg) scaleX(0.99);
+  }
+  70% {
+    transform: skewY(0.8deg) scaleX(1.004);
+  }
+  100% {
+    transform: skewY(0deg) scaleX(1);
+  }
+}
+
+@keyframes paper-flex-back {
+  0% {
+    transform: rotateY(180deg) skewY(0deg) scaleX(1);
+  }
+  35% {
+    transform: rotateY(180deg) skewY(1.6deg) scaleX(0.99);
+  }
+  70% {
+    transform: rotateY(180deg) skewY(-0.8deg) scaleX(1.004);
+  }
+  100% {
+    transform: rotateY(180deg) skewY(0deg) scaleX(1);
+  }
+}
+
+@keyframes shade-lift {
+  0% {
+    opacity: 0;
+  }
+  35% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes shade-land {
+  0% {
+    opacity: 0;
+  }
+  55% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes turn-sweep-fwd {
+  0% {
+    transform: translateX(390%);
+    opacity: 0;
+  }
+  25% {
+    opacity: 1;
+  }
+  75% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(-140%);
+    opacity: 0;
+  }
+}
+
+@keyframes turn-sweep-back {
+  0% {
+    transform: translateX(-140%);
+    opacity: 0;
+  }
+  25% {
+    opacity: 1;
+  }
+  75% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(390%);
+    opacity: 0;
+  }
+}

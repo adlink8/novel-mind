@@ -1,0 +1,61 @@
+{
+  "dataset_version": "timeline-fiction.v1",
+  "domain": "fiction",
+  "source_snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "hierarchy_build_id": "fixture-hierarchy-v1",
+  "hierarchy_checksum": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "prompt_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "schema_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "model_lineage": {
+    "chapter": "controlled/balanced@fixture-v1",
+    "reconcile": "controlled/quality@fixture-v1"
+  },
+  "version_lineage": "timeline-candidate-fixture-v1",
+  "deferred_products_absent": ["relationship_graph", "reader_ai", "clue_tracker", "history_corpus"],
+  "cases": [
+    {"id":"c01","chapter":1,"shape":"forward","precision":"exact","evidence":["e01"],"participants":["阿宁"],"causal":true,"supported":true,"visible":true},
+    {"id":"c02","chapter":1,"shape":"forward","precision":"relative","evidence":["e02"],"participants":["阿宁","林舟"],"causal":true,"supported":true,"visible":true},
+    {"id":"c03","chapter":2,"shape":"flashback","precision":"fuzzy","evidence":["e03"],"participants":["林舟"],"causal":false,"supported":true,"visible":false},
+    {"id":"c04","chapter":2,"shape":"interlude","precision":"unknown","evidence":["e04"],"participants":[],"causal":false,"supported":true,"visible":false},
+    {"id":"c05","chapter":3,"shape":"prophecy","precision":"unknown","evidence":["e05"],"participants":["先知"],"causal":false,"supported":true,"visible":false},
+    {"id":"c06","chapter":3,"shape":"rumor","precision":"fuzzy","evidence":["e06"],"participants":["旅人"],"causal":false,"supported":true,"visible":false},
+    {"id":"c07","chapter":4,"shape":"recollection","precision":"relative","evidence":["e07"],"participants":["阿宁"],"causal":false,"supported":true,"visible":false},
+    {"id":"c08","chapter":4,"shape":"dream","precision":"unknown","evidence":["e08"],"participants":["阿宁"],"causal":false,"supported":true,"visible":false},
+    {"id":"c09","chapter":5,"shape":"forward","precision":"exact","evidence":["e09"],"participants":["林舟"],"causal":true,"supported":true,"visible":false},
+    {"id":"c10","chapter":5,"shape":"flashback","precision":"relative","evidence":["e10"],"participants":["林舟"],"causal":false,"supported":true,"visible":false},
+    {"id":"c11","chapter":6,"shape":"forward","precision":"fuzzy","evidence":["e11"],"participants":["阿宁","林舟"],"causal":true,"supported":true,"visible":false},
+    {"id":"c12","chapter":6,"shape":"interlude","precision":"unknown","evidence":["e12"],"participants":["守门人"],"causal":false,"supported":true,"visible":false},
+    {"id":"c13","chapter":7,"shape":"forward","precision":"relative","evidence":["e13"],"participants":["阿宁"],"causal":true,"supported":true,"visible":false},
+    {"id":"c14","chapter":7,"shape":"flashback","precision":"fuzzy","evidence":["e14"],"participants":["母亲"],"causal":false,"supported":true,"visible":false},
+    {"id":"c15","chapter":8,"shape":"forward","precision":"exact","evidence":["e15"],"participants":["林舟"],"causal":true,"supported":true,"visible":false},
+    {"id":"c16","chapter":8,"shape":"rumor","precision":"unknown","evidence":["e16"],"participants":["旅人"],"causal":false,"supported":true,"visible":false},
+    {"id":"c17","chapter":9,"shape":"forward","precision":"relative","evidence":["e17"],"participants":["阿宁"],"causal":true,"supported":true,"visible":false},
+    {"id":"c18","chapter":9,"shape":"recollection","precision":"fuzzy","evidence":["e18"],"participants":["阿宁"],"causal":false,"supported":true,"visible":false},
+    {"id":"c19","chapter":10,"shape":"forward","precision":"exact","evidence":["e19"],"participants":["阿宁","林舟"],"causal":true,"supported":true,"visible":false},
+    {"id":"c20","chapter":10,"shape":"dream","precision":"unknown","evidence":["e20"],"participants":["阿宁"],"causal":false,"supported":true,"visible":false}
+  ],
+  "cross_chapter_groups": [
+    {"id":"g01","members":["c01","c07"],"duplicate":true,"story_order":["c07","c01"]},
+    {"id":"g02","members":["c02","c03"],"duplicate":false,"story_order":["c03","c02"]},
+    {"id":"g03","members":["c04","c08"],"duplicate":false,"story_order":[]},
+    {"id":"g04","members":["c05","c16"],"duplicate":false,"story_order":[]},
+    {"id":"g05","members":["c06","c12"],"duplicate":false,"story_order":["c06","c12"]},
+    {"id":"g06","members":["c09","c15"],"duplicate":false,"story_order":["c09","c15"]},
+    {"id":"g07","members":["c10","c14"],"duplicate":true,"story_order":["c14","c10"]},
+    {"id":"g08","members":["c11","c13"],"duplicate":false,"story_order":["c11","c13"]},
+    {"id":"g09","members":["c17","c18"],"duplicate":false,"story_order":["c18","c17"]},
+    {"id":"g10","members":["c19","c20"],"duplicate":false,"story_order":["c20","c19"]}
+  ],
+  "operational_expectations": {
+    "restart_next_chapter": true,
+    "duplicate_completed_calls": 0,
+    "exact_cache_audit": true,
+    "override_relink": "stable_evidence_only",
+    "stale_cas_rejected": true,
+    "rollback_byte_identical": true,
+    "active_candidate_separate": true,
+    "visible_set_first": true,
+    "unknown_price_status": "paused_budget",
+    "calls_after_budget_pause": 0
+  }
+}

@@ -1,0 +1,15 @@
+# DEPRECATED (06-06): replaced by .github/workflows/ci.yml
+# No push/pull_request/schedule triggers — never runs unless explicitly workflow_call'd (unused).
+name: Full Stack CI (disabled)
+
+on:
+  workflow_call:
+
+jobs:
+  disabled:
+    name: Disabled stub
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - name: Point to unified CI
+        run: echo "full-ci.yml disabled — use .github/workflows/ci.yml"

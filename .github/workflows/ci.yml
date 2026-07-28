@@ -1,0 +1,1002 @@
+# NovelMind unified CI producer DAG + ci-gate aggregate (Phase 06-06 / 06-07)
+# Decisions: D-10, D-13, D-14, D-16, D-17, D-18, D-19
+# Producers emit results/artifacts; single required check context is `ci-gate`.
+#
+# Event matrix:
+#   pull_request  — secretless unit/contract + locked Postgres/Chroma + Chromium smoke
+#   push main     — full integration (+ optional live smoke); alert on protected main
+#   schedule      — nightly dual-model benchmark on approved runners
+#   workflow_dispatch — protected ref + approved environment + fixed benchmark commit only
+#
+# Fork safety: no pull_request_target; secret/self-hosted/write jobs never run on PR;
+# alert job never checks out untrusted PR code.
+
+name: CI
+
+on:
+  pull_request:
+    branches: [main, master]
+  push:
+    branches: [main, master]
+  schedule:
+    # Nightly UTC 02:00 — dual-model RAG qualification (D-14 / D-18)
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+    inputs:
+      benchmark_commit:
+        description: "Fixed benchmark commit SHA (40-char hex; required)"
+        required: true
+        type: string
+      run_nightly:
+        description: "Run nightly dual-model benchmark after unit/integration"
+        required: false
+        type: boolean
+        default: false
+
+# Default least privilege; jobs escalate only where required (D-18).
+permissions:
+  contents: read
+
+concurrency:
+  # Group by workflow + ref; PR cancel-in-progress; schedule keeps mid-run baseline (D-13)
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "20"
+  ACTIONLINT_VERSION: v1.7.12
+  OASDIFF_VERSION: v1.17.0
+  # service-lock URLs (host ports from docker-compose.ci.yml)
+  NOVELMIND_DATABASE_URL: postgresql+asyncpg://novelmind:novelmind@127.0.0.1:5433/novelmind_ci
+  NOVELMIND_CHROMA_URL: http://127.0.0.1:8002
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Guard: event/ref/dispatch invariants (fail closed)
+  # ---------------------------------------------------------------------------
+  guard:
+    name: Event guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      is_pr: ${{ steps.flags.outputs.is_pr }}
+      is_main: ${{ steps.flags.outputs.is_main }}
+      is_schedule: ${{ steps.flags.outputs.is_schedule }}
+      is_dispatch: ${{ steps.flags.outputs.is_dispatch }}
+      allow_secrets: ${{ steps.flags.outputs.allow_secrets }}
+      allow_nightly: ${{ steps.flags.outputs.allow_nightly }}
+      allow_alert: ${{ steps.flags.outputs.allow_alert }}
+      benchmark_sha: ${{ steps.flags.outputs.benchmark_sha }}
+    steps:
+      - name: Evaluate event matrix
+        id: flags
+        shell: bash
+        run: |
+          set -euo pipefail
+          EVENT="${{ github.event_name }}"
+          REF="${{ github.ref }}"
+          REPO="${{ github.repository }}"
+          IS_PR=false
+          IS_MAIN=false
+          IS_SCHEDULE=false
+          IS_DISPATCH=false
+          ALLOW_SECRETS=false
+          ALLOW_NIGHTLY=false
+          ALLOW_ALERT=false
+          BENCH_SHA=""
+
+          case "$EVENT" in
+            pull_request)
+              IS_PR=true
+              # Fork PRs never receive secrets / self-hosted / issues:write
+              HEAD_REPO="${{ github.event.pull_request.head.repo.full_name }}"
+              if [[ "$HEAD_REPO" != "$REPO" ]]; then
+                echo "Fork PR detected ($HEAD_REPO) — secretless only"
+              fi
+              ;;
+            push)
+              if [[ "$REF" == "refs/heads/main" || "$REF" == "refs/heads/master" ]]; then
+                IS_MAIN=true
+                ALLOW_SECRETS=true
+                ALLOW_ALERT=true
+              fi
+              ;;
+            schedule)
+              IS_SCHEDULE=true
+              ALLOW_SECRETS=true
+              ALLOW_NIGHTLY=true
+              ALLOW_ALERT=true
+              ;;
+            workflow_dispatch)
+              IS_DISPATCH=true
+              if [[ "$REF" != "refs/heads/main" && "$REF" != "refs/heads/master" ]]; then
+                echo "::error::workflow_dispatch requires protected ref main/master (got $REF)"
+                exit 1
+              fi
+              BENCH_SHA="${{ inputs.benchmark_commit }}"
+              if [[ ! "$BENCH_SHA" =~ ^[0-9a-fA-F]{40}$ ]]; then
+                echo "::error::benchmark_commit must be a 40-char hex SHA (got '$BENCH_SHA')"
+                exit 1
+              fi
+              ALLOW_SECRETS=true
+              if [[ "${{ inputs.run_nightly }}" == "true" ]]; then
+                ALLOW_NIGHTLY=true
+              fi
+              ALLOW_ALERT=true
+              IS_MAIN=true
+              ;;
+            *)
+              echo "::error::Unsupported event: $EVENT"
+              exit 1
+              ;;
+          esac
+
+          {
+            echo "is_pr=$IS_PR"
+            echo "is_main=$IS_MAIN"
+            echo "is_schedule=$IS_SCHEDULE"
+            echo "is_dispatch=$IS_DISPATCH"
+            echo "allow_secrets=$ALLOW_SECRETS"
+            echo "allow_nightly=$ALLOW_NIGHTLY"
+            echo "allow_alert=$ALLOW_ALERT"
+            echo "benchmark_sha=$BENCH_SHA"
+          } >> "$GITHUB_OUTPUT"
+
+  # ---------------------------------------------------------------------------
+  # Static analysis + dependency audits (job timeout 5m — D-16)
+  # ---------------------------------------------------------------------------
+  static:
+    name: Static & audits
+    needs: [guard]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.benchmark_commit || github.sha }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install backend tooling
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Install frontend deps
+        working-directory: frontend
+        run: npm ci
+
+      - name: Ruff check
+        working-directory: backend
+        run: ruff check app tests
+
+      - name: Ruff format
+        working-directory: backend
+        run: ruff format --check app tests
+
+      - name: Bandit
+        working-directory: backend
+        run: bandit -r app -lll -q
+
+      - name: pip-audit
+        working-directory: backend
+        run: pip-audit
+
+      - name: TypeScript
+        working-directory: frontend
+        run: npx tsc --noEmit
+
+      - name: ESLint
+        working-directory: frontend
+        run: npm run lint
+
+      - name: npm audit
+        working-directory: frontend
+        run: npm audit --registry=https://registry.npmjs.org
+
+  # ---------------------------------------------------------------------------
+  # actionlint (locked v1.7.12)
+  # ---------------------------------------------------------------------------
+  workflow-lint:
+    name: actionlint
+    needs: [guard]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache: false
+
+      - name: Install actionlint v1.7.12
+        env:
+          GOSUMDB: sum.golang.org
+        run: |
+          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Run actionlint
+        run: actionlint -color
+
+  # ---------------------------------------------------------------------------
+  # Unit + contract (job timeout 10m — D-16)
+  # ---------------------------------------------------------------------------
+  unit:
+    name: Unit & contract
+    needs: [guard]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.benchmark_commit || github.sha }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install backend
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Backend unit/contract + coverage + JUnit
+        working-directory: backend
+        run: |
+          mkdir -p artifacts
+          pytest -m "unit or contract" \
+            --cov=app --cov-branch \
+            --cov-report=xml:artifacts/backend-coverage.xml \
+            --junitxml=artifacts/backend-junit.xml \
+            --tb=short --color=yes
+
+      - name: Install frontend
+        working-directory: frontend
+        run: npm ci
+
+      - name: Frontend unit/coverage
+        working-directory: frontend
+        run: npm run test:coverage
+
+      - name: CI policy scripts (repo-root)
+        run: |
+          python -m pip install pyyaml
+          PYTHONPATH=. pytest tests/ci -q --tb=short
+
+      - name: Upload PR JUnit/coverage (14d)
+        if: always() && (github.event_name == 'pull_request' || github.event_name == 'push')
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-junit-coverage
+          path: |
+            backend/artifacts/backend-junit.xml
+            backend/artifacts/backend-coverage.xml
+            frontend/coverage/**
+          if-no-files-found: warn
+          retention-days: 14
+
+  # ---------------------------------------------------------------------------
+  # OpenAPI export + breaking check
+  # ---------------------------------------------------------------------------
+  openapi:
+    name: OpenAPI contract
+    needs: [guard]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.benchmark_commit || github.sha }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache: false
+
+      - name: Install backend
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Install oasdiff
+        env:
+          GOSUMDB: sum.golang.org
+        run: |
+          go install github.com/oasdiff/oasdiff@v1.17.0
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Export OpenAPI
+        working-directory: backend
+        run: |
+          mkdir -p artifacts
+          python scripts/export_openapi.py --output artifacts/openapi.json
+
+      - name: oasdiff breaking
+        working-directory: backend
+        run: |
+          oasdiff breaking openapi-baseline.json artifacts/openapi.json --fail-on ERR
+
+      - name: OpenAPI pytest contract
+        working-directory: backend
+        run: |
+          pytest tests/contract/test_openapi_contract.py -m contract \
+            --junitxml=artifacts/openapi-junit.xml
+
+      - name: Upload OpenAPI artifact (14d)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: openapi-export
+          path: |
+            backend/artifacts/openapi.json
+            backend/artifacts/openapi-junit.xml
+          if-no-files-found: warn
+          retention-days: 14
+
+  # ---------------------------------------------------------------------------
+  # Integration: locked Postgres 16 + Chroma (job timeout 15m — D-16)
+  # ---------------------------------------------------------------------------
+  integration:
+    name: Integration (Postgres/Chroma)
+    needs: [guard]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.benchmark_commit || github.sha }}
+
+      - name: Validate service lock present
+        run: |
+          test -f .github/ci/service-lock.json
+          test -f docker-compose.ci.yml
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          lock = json.loads(Path(".github/ci/service-lock.json").read_text(encoding="utf-8"))
+          assert lock.get("fail_closed") is True
+          for key in ("postgres", "chroma"):
+              svc = lock[key]
+              assert svc.get("digest"), f"{key} missing digest"
+              assert "sha256:" in svc["digest"]
+          print("service-lock ok")
+          PY
+
+      - name: Start locked CI services
+        run: docker compose -f docker-compose.ci.yml up -d --wait db chroma
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
+
+      - name: Install backend
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Alembic upgrade heads
+        working-directory: backend
+        env:
+          NOVELMIND_DATABASE_URL: ${{ env.NOVELMIND_DATABASE_URL }}
+        run: |
+          alembic upgrade heads
+          alembic current
+          alembic check
+
+      - name: Integration tests
+        working-directory: backend
+        env:
+          NOVELMIND_DATABASE_URL: ${{ env.NOVELMIND_DATABASE_URL }}
+        run: |
+          mkdir -p artifacts
+          pytest -m integration \
+            tests/integration/test_postgres_migrations.py \
+            tests/integration/test_postgres_semantics.py \
+            tests/integration/test_chroma_contract.py \
+            tests/integration/test_chroma_recovery.py \
+            tests/integration/timeline/test_real_qualification.py \
+            tests/integration/clues/test_real_qualification.py \
+            --junitxml=artifacts/integration-junit.xml \
+            --timeout=30
+
+      # Phase 09 relationship release authority (retains Phase 08 timeline gates above)
+      - name: Relationship qualification suite
+        working-directory: backend
+        env:
+          NOVELMIND_DATABASE_URL: ${{ env.NOVELMIND_DATABASE_URL }}
+        run: |
+          mkdir -p artifacts
+          pytest \
+            tests/integration/relationships/test_release_gate.py \
+            tests/integration/relationships/test_boundaries_pg.py \
+            tests/integration/relationships/test_performance.py \
+            tests/adversarial/test_relationship_boundaries.py \
+            --junitxml=artifacts/relationship-junit.xml \
+            --timeout=180
+          python scripts/run_relationship_qualification.py --scope-scan \
+            > artifacts/relationship-scope-scan.json
+
+      # Phase 11 clue qualification and release authority
+      - name: Clue qualification suite
+        working-directory: backend
+        env:
+          NOVELMIND_DATABASE_URL: ${{ env.NOVELMIND_DATABASE_URL }}
+        run: |
+          mkdir -p artifacts
+          pytest \
+            tests/integration/clues/test_real_qualification.py \
+            tests/adversarial/test_clue_false_positives.py \
+            tests/adversarial/test_clue_spoilers_and_versions.py \
+            tests/unit/clues/test_eval.py \
+            --junitxml=artifacts/clue-junit.xml \
+            --timeout=180
+          python scripts/run_clue_qualification.py --scope-scan \
+            > artifacts/clue-scope-scan.json
+          python scripts/run_clue_qualification.py --offline \
+            > artifacts/clue-offline-qualification.json
+
+      - name: Collect service logs
+        if: always() && (github.event_name == 'push' || github.event_name == 'schedule')
+        run: |
+          mkdir -p backend/artifacts/service-logs
+          docker compose -f docker-compose.ci.yml logs db > backend/artifacts/service-logs/db.log || true
+          docker compose -f docker-compose.ci.yml logs chroma > backend/artifacts/service-logs/chroma.log || true
+
+      - name: Upload integration artifacts (PR 14d / main 30d)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-results
+          path: |
+            backend/artifacts/integration-junit.xml
+            backend/artifacts/relationship-junit.xml
+            backend/artifacts/relationship-scope-scan.json
+            backend/artifacts/service-logs/**
+            backend/artifacts/chroma-failure-*.json
+          if-no-files-found: warn
+          retention-days: ${{ github.event_name == 'pull_request' && 14 || 30 }}
+
+      - name: Tear down services
+        if: always()
+        run: docker compose -f docker-compose.ci.yml down -v || true
+
+  # ---------------------------------------------------------------------------
+  # Browser: Playwright desktop + 390px (job timeout 15m — D-16)
+  # ---------------------------------------------------------------------------
+  browser:
+    name: Browser smoke
+    needs: [guard]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.benchmark_commit || github.sha }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Start locked CI services
+        run: docker compose -f docker-compose.ci.yml up -d --wait db chroma
+
+      - name: Install backend
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Alembic upgrade head
+        working-directory: backend
+        env:
+          NOVELMIND_DATABASE_URL: ${{ env.NOVELMIND_DATABASE_URL }}
+        run: alembic upgrade head
+
+      - name: Install frontend + Playwright Chromium
+        working-directory: frontend
+        run: |
+          npm ci
+          npx playwright install chromium --with-deps
+
+      - name: Playwright (desktop + 390px, retries=0)
+        working-directory: frontend
+        env:
+          CI: "true"
+          NOVELMIND_DATABASE_URL: ${{ env.NOVELMIND_DATABASE_URL }}
+        run: |
+          npx playwright test \
+            --project=chromium-desktop \
+            --project=chromium-mobile-390 \
+            --retries=0
+
+      - name: Upload Playwright failure artifacts (7d)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-failure
+          path: |
+            frontend/test-results/**
+            frontend/playwright-report/**
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # ---------------------------------------------------------------------------
+  # CodeQL — Python + JS/TS once (D-13)
+  # ---------------------------------------------------------------------------
+  codeql:
+    name: CodeQL
+    needs: [guard]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [python, javascript-typescript]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          config-file: .github/codeql/codeql-config.yml
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
+
+  # ---------------------------------------------------------------------------
+  # Live smoke — protected main / schedule / dispatch only (45m — D-16)
+  # Never on pull_request (fork-safe, no secrets)
+  # ---------------------------------------------------------------------------
+  live:
+    name: Live dependency smoke
+    needs: [guard, unit, integration]
+    if: needs.guard.outputs.allow_secrets == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: quality-live
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.benchmark_commit || github.sha }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
+
+      - name: Install backend
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Live dual-model path (blocked_dependency if Ollama down)
+        working-directory: backend
+        run: |
+          mkdir -p artifacts
+          pytest -m live tests/live/test_rag_quality_dual_model.py \
+            --junitxml=artifacts/live-junit.xml \
+            --timeout=180
+
+      - name: Upload live JUnit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-results
+          path: backend/artifacts/live-junit.xml
+          if-no-files-found: warn
+          retention-days: 30
+
+  # ---------------------------------------------------------------------------
+  # Nightly dual-model benchmark (60m — D-16)
+  # schedule or dispatch with run_nightly; never PR; self-hosted preferred
+  # ---------------------------------------------------------------------------
+  nightly:
+    name: Nightly RAG benchmark
+    needs: [guard, unit, integration, live]
+    if: needs.guard.outputs.allow_nightly == 'true'
+    runs-on: [self-hosted, linux, ollama]
+    timeout-minutes: 60
+    environment: quality-benchmark
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.benchmark_commit || github.sha }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install backend
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Start locked services (if not already)
+        run: docker compose -f docker-compose.ci.yml up -d --wait db chroma || true
+
+      - name: 3-repeat signed quality benchmark
+        working-directory: backend
+        env:
+          NOVELMIND_DATABASE_URL: ${{ env.NOVELMIND_DATABASE_URL }}
+          RAG_SIGNING_SECRET: ${{ secrets.RAG_SIGNING_SECRET }}
+        run: |
+          mkdir -p artifacts/nightly evals/results
+          python scripts/run_rag_quality.py \
+            --fixture evals/fixtures/rag-quality-benchmark.v1.json \
+            --live-health \
+            --durable \
+            --output artifacts/nightly/rag-quality-report.json
+          # Ensure report is present for promotion
+          test -f artifacts/nightly/rag-quality-report.json
+
+      - name: Upload signed nightly report (180d)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-rag-report
+          path: |
+            backend/artifacts/nightly/**
+            backend/evals/results/**
+          if-no-files-found: warn
+          retention-days: 180
+
+  # ---------------------------------------------------------------------------
+  # Baseline promotion — only passed/qualified signed reports
+  # ---------------------------------------------------------------------------
+  promote-baseline:
+    name: Promote baseline
+    needs: [guard, nightly]
+    if: |
+      always() &&
+      needs.guard.outputs.allow_nightly == 'true' &&
+      needs.nightly.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: quality-benchmark
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Download nightly report
+        uses: actions/download-artifact@v4
+        with:
+          name: nightly-rag-report
+          path: backend/artifacts/nightly-download
+
+      - name: Prepare + commit baseline (fail closed)
+        env:
+          RAG_SIGNING_SECRET: ${{ secrets.RAG_SIGNING_SECRET }}
+        run: |
+          python -m pip install pyyaml
+          REPORT=$(find backend/artifacts/nightly-download -name 'rag-quality-report.json' | head -n1)
+          test -n "$REPORT"
+          python scripts/ci/promote-baseline.py prepare \
+            --report "$REPORT" \
+            --policy .github/quality/baseline-policy.yml \
+            --out backend/artifacts/baseline-prepare.json
+          python scripts/ci/promote-baseline.py commit \
+            --prepared backend/artifacts/baseline-prepare.json \
+            --policy .github/quality/baseline-policy.yml \
+            --baseline-out backend/evals/results/baseline.json
+
+      - name: Upload committed baseline (180d)
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: promoted-baseline
+          path: |
+            backend/evals/results/baseline.json
+            backend/artifacts/baseline-prepare.json
+          if-no-files-found: error
+          retention-days: 180
+
+  # ---------------------------------------------------------------------------
+  # Isolated alert job (D-18)
+  # - schedule / protected main only
+  # - environment-approved
+  # - permissions: contents:read, issues:write only
+  # - does NOT checkout PR code
+  # - consumes only hash/schema validated reports
+  # - fork unreachable
+  # ---------------------------------------------------------------------------
+  alert:
+    name: Quality alert
+    needs: [guard, nightly, promote-baseline]
+    if: |
+      always() &&
+      needs.guard.outputs.allow_alert == 'true' &&
+      github.event_name != 'pull_request' &&
+      (needs.nightly.result == 'failure' ||
+       needs.promote-baseline.result == 'failure' ||
+       needs.nightly.result == 'cancelled')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: quality-alerts
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      # Intentionally no actions/checkout of PR head — only download validated artifacts
+      - name: Download validated nightly report (if any)
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: nightly-rag-report
+          path: /tmp/validated-report
+
+      - name: Open or update quality alert issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const crypto = require('crypto');
+            const event = context.eventName;
+            const ref = context.ref;
+            if (event === 'pull_request') {
+              core.setFailed('alert job must not run on pull_request');
+              return;
+            }
+            if (ref !== 'refs/heads/main' && ref !== 'refs/heads/master' && event !== 'schedule') {
+              core.setFailed(`alert forbidden on ref ${ref}`);
+              return;
+            }
+            let fingerprint = `nightly-fail:${context.runId}`;
+            let bodyExtra = 'No validated report artifact available.';
+            const root = '/tmp/validated-report';
+            function walk(dir, acc=[]) {
+              if (!fs.existsSync(dir)) return acc;
+              for (const ent of fs.readdirSync(dir, {withFileTypes: true})) {
+                const p = path.join(dir, ent.name);
+                if (ent.isDirectory()) walk(p, acc);
+                else acc.push(p);
+              }
+              return acc;
+            }
+            const files = walk(root).filter(f => f.endsWith('.json'));
+            for (const f of files) {
+              try {
+                const raw = fs.readFileSync(f, 'utf8');
+                const data = JSON.parse(raw);
+                // Reject obvious fulltext markers
+                if (raw.includes('NOVEL_FULLTEXT_BEGIN') || raw.includes('<<<NOVEL_BODY>>>')) {
+                  core.setFailed('Sensitive fulltext detected in report artifact');
+                  return;
+                }
+                if (data.report_signature || data.signature) {
+                  fingerprint = crypto.createHash('sha256')
+                    .update(JSON.stringify({status: data.status, policy_hash: data.policy_hash}))
+                    .digest('hex').slice(0, 16);
+                  bodyExtra = [
+                    `status: ${data.status}`,
+                    `policy_hash: ${data.policy_hash || 'n/a'}`,
+                    `schema_version: ${data.schema_version || 'n/a'}`,
+                    `quality_comparable: ${data.quality_comparable}`,
+                    `metrics: ${data.metrics == null ? 'null' : 'present'}`,
+                  ].join('\n');
+                  break;
+                }
+              } catch (e) { /* skip invalid */ }
+            }
+            const title = `[quality-alert] Nightly/benchmark failure (${fingerprint})`;
+            const body = [
+              '## Automated quality alert (D-18)',
+              '',
+              `- event: \`${event}\``,
+              `- ref: \`${ref}\``,
+              `- run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              `- fingerprint: \`${fingerprint}\``,
+              '',
+              '### Report summary (hash/schema validated only)',
+              '```',
+              bodyExtra,
+              '```',
+              '',
+              '_This job does not checkout untrusted PR code and has issues:write only._',
+            ].join('\n');
+            const labels = ['quality-alert', 'automated'];
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'quality-alert',
+              per_page: 50,
+            });
+            const match = existing.data.find(i => i.title.includes(fingerprint));
+            if (match) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: match.number,
+                body: `Recurrence on run ${context.runId}\n\n${body}`,
+              });
+              core.info(`Deduped alert on issue #${match.number}`);
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels,
+              });
+            }
+
+  # ---------------------------------------------------------------------------
+  # ci-gate — single stable required check (06-07 / D-13 / D-19)
+  # Aggregates producer needs.*.result only; does NOT re-run tests or re-score.
+  # Job id + name must remain exactly `ci-gate` for branch protection context.
+  # ---------------------------------------------------------------------------
+  ci-gate:
+    name: ci-gate
+    needs:
+      - guard
+      - static
+      - unit
+      - openapi
+      - integration
+      - browser
+      - codeql
+      - workflow-lint
+      - live
+      - nightly
+      - promote-baseline
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Write producer results envelope
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          RUN_NIGHTLY: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.run_nightly) }}
+          RESULT_GUARD: ${{ needs.guard.result }}
+          RESULT_STATIC: ${{ needs.static.result }}
+          RESULT_UNIT: ${{ needs.unit.result }}
+          RESULT_OPENAPI: ${{ needs.openapi.result }}
+          RESULT_INTEGRATION: ${{ needs.integration.result }}
+          RESULT_BROWSER: ${{ needs.browser.result }}
+          RESULT_CODEQL: ${{ needs.codeql.result }}
+          RESULT_WORKFLOW_LINT: ${{ needs.workflow-lint.result }}
+          RESULT_LIVE: ${{ needs.live.result }}
+          RESULT_NIGHTLY: ${{ needs.nightly.result }}
+          RESULT_PROMOTE: ${{ needs.promote-baseline.result }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/ci-gate
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+
+          def r(key: str) -> str:
+              return (os.environ.get(key) or "missing").strip().lower()
+
+          run_nightly_raw = (os.environ.get("RUN_NIGHTLY") || "false").strip().lower()
+          run_nightly = run_nightly_raw in ("true", "1", "yes")
+          payload = {
+              "event": os.environ.get("EVENT_NAME") or "",
+              "run_nightly": run_nightly,
+              "require_artifacts": False,
+              "producers": {
+                  "guard": {"result": r("RESULT_GUARD")},
+                  "static": {"result": r("RESULT_STATIC")},
+                  "unit": {"result": r("RESULT_UNIT")},
+                  "openapi": {"result": r("RESULT_OPENAPI")},
+                  "integration": {"result": r("RESULT_INTEGRATION")},
+                  "browser": {"result": r("RESULT_BROWSER")},
+                  "codeql": {"result": r("RESULT_CODEQL")},
+                  "workflow-lint": {"result": r("RESULT_WORKFLOW_LINT")},
+                  "live": {"result": r("RESULT_LIVE")},
+                  "nightly": {"result": r("RESULT_NIGHTLY")},
+                  "promote-baseline": {"result": r("RESULT_PROMOTE")},
+              },
+          }
+          out = Path("/tmp/ci-gate/producer-results.json")
+          out.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+          print(out.read_text(encoding="utf-8"))
+          PY
+
+      - name: Aggregate ci-gate (fail closed)
+        run: |
+          python scripts/ci/ci-gate.py \
+            --results-json /tmp/ci-gate/producer-results.json \
+            --out /tmp/ci-gate/verdict.json
+
+      - name: Upload ci-gate verdict
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-gate-verdict
+          path: /tmp/ci-gate/**
+          if-no-files-found: warn
+          retention-days: 14

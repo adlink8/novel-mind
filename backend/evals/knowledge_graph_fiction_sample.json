@@ -1,0 +1,509 @@
+{
+  "fixture_version": "knowledge-graph-eval-fixture.v1",
+  "name": "knowledge_graph_fiction_sample",
+  "domain_profile": "fiction",
+  "ontology_profile": "fiction.v1",
+  "description": "Ten labeled fiction relation examples for offline knowledge graph evaluation.",
+  "examples": [
+    {
+      "id": "fx-01",
+      "category": "character_relation",
+      "expected_decision": "accepted",
+      "expected_evidence_refs": ["ev-fx-0101", "ev-fx-0102"],
+      "candidate": {
+        "candidate_id": 1,
+        "relation_type": "ally",
+        "source": {"kind": "entity_candidate", "id": 101, "name": "Mira"},
+        "target": {"kind": "entity_candidate", "id": 102, "name": "Jon"},
+        "recall_signals": {
+          "adjacency": {"same_chapter": true, "chapter_distance": 0, "chunk_distance": 1},
+          "entity_overlap": {"shared": ["Mira", "Jon"], "source": "metadata_json"},
+          "retrieval": {"source": {"bm25": {"score": 2.4}}, "target": {"vector": {"score": 0.87}}}
+        },
+        "evidence_refs": ["ev-fx-0101", "ev-fx-0102"]
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev-fx-0101",
+          "source_type": "text_chunk",
+          "chunk_id": 10101,
+          "chapter_id": 11,
+          "chapter_title": "Ash Gate",
+          "chunk_index": 0,
+          "excerpt": "Mira opened the ash gate for Jon and hid his rebel sigil before the patrol arrived.",
+          "metadata": {"characters": ["Mira", "Jon"], "time_refs": ["nightfall"]}
+        },
+        {
+          "evidence_id": "ev-fx-0102",
+          "source_type": "text_chunk",
+          "chunk_id": 10102,
+          "chapter_id": 11,
+          "chapter_title": "Ash Gate",
+          "chunk_index": 1,
+          "excerpt": "Jon promised Mira that he would return with medicine for her brother after she saved him.",
+          "metadata": {"characters": ["Mira", "Jon"], "time_refs": ["nightfall"]}
+        }
+      ],
+      "judgment": {
+        "candidate_id": 1,
+        "relation_type": "ally",
+        "confidence": 0.91,
+        "evidence_refs": ["ev-fx-0101", "ev-fx-0102"],
+        "rationale": "Both cited passages show Mira protecting Jon and Jon offering reciprocal aid.",
+        "risk_flags": [],
+        "needs_human_review": false,
+        "rationale_supported_by_evidence": true
+      },
+      "llm_usage": {"prompt_tokens": 0, "completion_tokens": 0, "cost_usd": 0.0, "latency_ms": 0.0}
+    },
+    {
+      "id": "fx-02",
+      "category": "conflict",
+      "expected_decision": "accepted",
+      "expected_evidence_refs": ["ev-fx-0201", "ev-fx-0202"],
+      "candidate": {
+        "candidate_id": 2,
+        "relation_type": "enemy",
+        "source": {"kind": "entity_candidate", "id": 103, "name": "Lord Veyr"},
+        "target": {"kind": "entity_candidate", "id": 104, "name": "Captain Sela"},
+        "recall_signals": {
+          "adjacency": {"same_chapter": true, "chapter_distance": 0, "chunk_distance": 1},
+          "entity_overlap": {"shared": ["Lord Veyr", "Captain Sela"], "source": "metadata_json"}
+        },
+        "evidence_refs": ["ev-fx-0201", "ev-fx-0202"]
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev-fx-0201",
+          "source_type": "text_chunk",
+          "chunk_id": 10201,
+          "chapter_id": 12,
+          "chapter_title": "The Salt Court",
+          "chunk_index": 0,
+          "excerpt": "Lord Veyr named Captain Sela a traitor before the court and ordered her ships burned.",
+          "metadata": {"characters": ["Lord Veyr", "Captain Sela"]}
+        },
+        {
+          "evidence_id": "ev-fx-0202",
+          "source_type": "text_chunk",
+          "chunk_id": 10202,
+          "chapter_id": 12,
+          "chapter_title": "The Salt Court",
+          "chunk_index": 1,
+          "excerpt": "Sela swore she would break Veyr's blockade even if every harbor turned against her.",
+          "metadata": {"characters": ["Lord Veyr", "Captain Sela"]}
+        }
+      ],
+      "judgment": {
+        "candidate_id": 2,
+        "relation_type": "enemy",
+        "confidence": 0.94,
+        "evidence_refs": ["ev-fx-0201", "ev-fx-0202"],
+        "rationale": "The evidence directly shows accusation, coercive orders, and reciprocal opposition.",
+        "risk_flags": [],
+        "needs_human_review": false,
+        "rationale_supported_by_evidence": true
+      },
+      "llm_usage": {"prompt_tokens": 0, "completion_tokens": 0, "cost_usd": 0.0, "latency_ms": 0.0}
+    },
+    {
+      "id": "fx-03",
+      "category": "event_sequence",
+      "expected_decision": "accepted",
+      "expected_evidence_refs": ["ev-fx-0301", "ev-fx-0302"],
+      "candidate": {
+        "candidate_id": 3,
+        "relation_type": "precedes",
+        "source": {"kind": "event_candidate", "id": 201, "name": "Beacon lighting"},
+        "target": {"kind": "event_candidate", "id": 202, "name": "Northern march"},
+        "recall_signals": {
+          "adjacency": {"same_chapter": false, "chapter_distance": 1, "chunk_distance": 1},
+          "retrieval": {"source": {"bm25": {"score": 1.8}}, "target": {"bm25": {"score": 1.6}}}
+        },
+        "evidence_refs": ["ev-fx-0301", "ev-fx-0302"]
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev-fx-0301",
+          "source_type": "text_chunk",
+          "chunk_id": 10301,
+          "chapter_id": 13,
+          "chapter_title": "Signal Hill",
+          "chunk_index": 4,
+          "excerpt": "At dawn, the last watchman lit the ridge beacon.",
+          "metadata": {"characters": ["watchman"], "time_refs": ["dawn"]}
+        },
+        {
+          "evidence_id": "ev-fx-0302",
+          "source_type": "text_chunk",
+          "chunk_id": 10302,
+          "chapter_id": 14,
+          "chapter_title": "The March",
+          "chunk_index": 0,
+          "excerpt": "By noon, the northern companies saw the flame and began their march.",
+          "metadata": {"characters": ["northern companies"], "time_refs": ["noon"]}
+        }
+      ],
+      "judgment": {
+        "candidate_id": 3,
+        "relation_type": "precedes",
+        "confidence": 0.89,
+        "evidence_refs": ["ev-fx-0301", "ev-fx-0302"],
+        "rationale": "The beacon at dawn is followed by the march at noon.",
+        "risk_flags": [],
+        "needs_human_review": false,
+        "rationale_supported_by_evidence": true
+      },
+      "llm_usage": {"prompt_tokens": 0, "completion_tokens": 0, "cost_usd": 0.0, "latency_ms": 0.0}
+    },
+    {
+      "id": "fx-04",
+      "category": "foreshadowing",
+      "expected_decision": "accepted",
+      "expected_evidence_refs": ["ev-fx-0401", "ev-fx-0402"],
+      "candidate": {
+        "candidate_id": 4,
+        "relation_type": "causes",
+        "source": {"kind": "event_candidate", "id": 203, "name": "Bridge sabotage"},
+        "target": {"kind": "event_candidate", "id": 204, "name": "Army delay"},
+        "recall_signals": {
+          "adjacency": {"same_chapter": false, "chapter_distance": 1, "chunk_distance": 2},
+          "entity_overlap": {"shared": ["Iron Bridge"], "source": "metadata_json"}
+        },
+        "evidence_refs": ["ev-fx-0401", "ev-fx-0402"]
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev-fx-0401",
+          "source_type": "text_chunk",
+          "chunk_id": 10401,
+          "chapter_id": 15,
+          "chapter_title": "Iron Bridge",
+          "chunk_index": 2,
+          "excerpt": "The saboteurs cut the Iron Bridge chains before retreating into the reeds.",
+          "metadata": {"locations": ["Iron Bridge"]}
+        },
+        {
+          "evidence_id": "ev-fx-0402",
+          "source_type": "text_chunk",
+          "chunk_id": 10402,
+          "chapter_id": 16,
+          "chapter_title": "Late Arrival",
+          "chunk_index": 1,
+          "excerpt": "Because the Iron Bridge lay broken, the queen's army reached the pass two days late.",
+          "metadata": {"locations": ["Iron Bridge"], "time_refs": ["two days late"]}
+        }
+      ],
+      "judgment": {
+        "candidate_id": 4,
+        "relation_type": "causes",
+        "confidence": 0.92,
+        "evidence_refs": ["ev-fx-0401", "ev-fx-0402"],
+        "rationale": "The second passage explicitly says the broken bridge caused the army's delay.",
+        "risk_flags": [],
+        "needs_human_review": false,
+        "rationale_supported_by_evidence": true
+      },
+      "llm_usage": {"prompt_tokens": 0, "completion_tokens": 0, "cost_usd": 0.0, "latency_ms": 0.0}
+    },
+    {
+      "id": "fx-05",
+      "category": "alias_resolution",
+      "expected_decision": "accepted",
+      "expected_evidence_refs": ["ev-fx-0501", "ev-fx-0502"],
+      "candidate": {
+        "candidate_id": 5,
+        "relation_type": "same_entity",
+        "source": {"kind": "entity_candidate", "id": 105, "name": "The Glass Fox"},
+        "target": {"kind": "entity_candidate", "id": 106, "name": "Ilen"},
+        "recall_signals": {
+          "adjacency": {"same_chapter": true, "chapter_distance": 0, "chunk_distance": 1},
+          "entity_overlap": {"shared": ["Ilen"], "source": "metadata_json"}
+        },
+        "evidence_refs": ["ev-fx-0501", "ev-fx-0502"]
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev-fx-0501",
+          "source_type": "text_chunk",
+          "chunk_id": 10501,
+          "chapter_id": 17,
+          "chapter_title": "Masks",
+          "chunk_index": 3,
+          "excerpt": "Only Ilen knew the old thieves' sign used by the Glass Fox.",
+          "metadata": {"characters": ["Ilen", "The Glass Fox"]}
+        },
+        {
+          "evidence_id": "ev-fx-0502",
+          "source_type": "text_chunk",
+          "chunk_id": 10502,
+          "chapter_id": 17,
+          "chapter_title": "Masks",
+          "chunk_index": 4,
+          "excerpt": "When the mask fell, Ilen admitted she had been called the Glass Fox in the capital.",
+          "metadata": {"characters": ["Ilen", "The Glass Fox"]}
+        }
+      ],
+      "judgment": {
+        "candidate_id": 5,
+        "relation_type": "same_entity",
+        "confidence": 0.95,
+        "evidence_refs": ["ev-fx-0501", "ev-fx-0502"],
+        "rationale": "Ilen directly states that the Glass Fox was her alias.",
+        "risk_flags": [],
+        "needs_human_review": false,
+        "rationale_supported_by_evidence": true
+      },
+      "llm_usage": {"prompt_tokens": 0, "completion_tokens": 0, "cost_usd": 0.0, "latency_ms": 0.0}
+    },
+    {
+      "id": "fx-06",
+      "category": "unsupported_claim",
+      "expected_decision": "rejected",
+      "expected_evidence_refs": ["ev-fx-0601", "ev-fx-0602"],
+      "candidate": {
+        "candidate_id": 6,
+        "relation_type": "ally",
+        "source": {"kind": "entity_candidate", "id": 107, "name": "Nera"},
+        "target": {"kind": "entity_candidate", "id": 108, "name": "Orin"},
+        "recall_signals": {
+          "adjacency": {"same_chapter": true, "chapter_distance": 0, "chunk_distance": 1},
+          "retrieval": {"source": {"vector": {"score": 0.73}}, "target": {"vector": {"score": 0.71}}}
+        },
+        "evidence_refs": ["ev-fx-0601", "ev-fx-0602"]
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev-fx-0601",
+          "source_type": "text_chunk",
+          "chunk_id": 10601,
+          "chapter_id": 18,
+          "chapter_title": "Cold Market",
+          "chunk_index": 1,
+          "excerpt": "Nera passed Orin in the market without speaking.",
+          "metadata": {"characters": ["Nera", "Orin"]}
+        },
+        {
+          "evidence_id": "ev-fx-0602",
+          "source_type": "text_chunk",
+          "chunk_id": 10602,
+          "chapter_id": 18,
+          "chapter_title": "Cold Market",
+          "chunk_index": 2,
+          "excerpt": "Orin later asked a guard whether Nera had left the city.",
+          "metadata": {"characters": ["Nera", "Orin"]}
+        }
+      ],
+      "judgment": {
+        "candidate_id": 6,
+        "relation_type": "ally",
+        "confidence": 0.88,
+        "evidence_refs": ["ev-fx-9999"],
+        "rationale": "The claim cites evidence outside the package.",
+        "risk_flags": [],
+        "needs_human_review": false,
+        "rationale_supported_by_evidence": false
+      },
+      "llm_usage": {"prompt_tokens": 0, "completion_tokens": 0, "cost_usd": 0.0, "latency_ms": 0.0}
+    },
+    {
+      "id": "fx-07",
+      "category": "ambiguous_foreshadowing",
+      "expected_decision": "needs_human_review",
+      "expected_evidence_refs": ["ev-fx-0701", "ev-fx-0702"],
+      "candidate": {
+        "candidate_id": 7,
+        "relation_type": "causes",
+        "source": {"kind": "event_candidate", "id": 205, "name": "Dream of fire"},
+        "target": {"kind": "event_candidate", "id": 206, "name": "Tower burns"},
+        "recall_signals": {
+          "adjacency": {"same_chapter": false, "chapter_distance": 3, "chunk_distance": 5},
+          "retrieval": {"source": {"bm25": {"score": 1.1}}, "target": {"bm25": {"score": 1.0}}}
+        },
+        "evidence_refs": ["ev-fx-0701", "ev-fx-0702"]
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev-fx-0701",
+          "source_type": "text_chunk",
+          "chunk_id": 10701,
+          "chapter_id": 19,
+          "chapter_title": "Dream",
+          "chunk_index": 2,
+          "excerpt": "Mira dreamed of a red tower cracking in heat.",
+          "metadata": {"characters": ["Mira"], "symbols": ["red tower"]}
+        },
+        {
+          "evidence_id": "ev-fx-0702",
+          "source_type": "text_chunk",
+          "chunk_id": 10702,
+          "chapter_id": 22,
+          "chapter_title": "Burning Tower",
+          "chunk_index": 0,
+          "excerpt": "Three nights later, the watchtower burned after lightning struck the roof.",
+          "metadata": {"time_refs": ["three nights later"], "locations": ["watchtower"]}
+        }
+      ],
+      "judgment": {
+        "candidate_id": 7,
+        "relation_type": "causes",
+        "confidence": 0.62,
+        "evidence_refs": ["ev-fx-0701", "ev-fx-0702"],
+        "rationale": "The dream may foreshadow the tower fire but does not prove causality.",
+        "risk_flags": ["ambiguous_foreshadowing"],
+        "needs_human_review": true,
+        "rationale_supported_by_evidence": true
+      },
+      "llm_usage": {"prompt_tokens": 0, "completion_tokens": 0, "cost_usd": 0.0, "latency_ms": 0.0}
+    },
+    {
+      "id": "fx-08",
+      "category": "schema_violation",
+      "expected_decision": "rejected",
+      "expected_evidence_refs": ["ev-fx-0801", "ev-fx-0802"],
+      "candidate": {
+        "candidate_id": 8,
+        "relation_type": "enemy",
+        "source": {"kind": "entity_candidate", "id": 109, "name": "Rell"},
+        "target": {"kind": "entity_candidate", "id": 110, "name": "Voss"},
+        "recall_signals": {
+          "adjacency": {"same_chapter": true, "chapter_distance": 0, "chunk_distance": 1}
+        },
+        "evidence_refs": ["ev-fx-0801", "ev-fx-0802"]
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev-fx-0801",
+          "source_type": "text_chunk",
+          "chunk_id": 10801,
+          "chapter_id": 23,
+          "chapter_title": "The Duel",
+          "chunk_index": 0,
+          "excerpt": "Rell challenged Voss before the council.",
+          "metadata": {"characters": ["Rell", "Voss"]}
+        },
+        {
+          "evidence_id": "ev-fx-0802",
+          "source_type": "text_chunk",
+          "chunk_id": 10802,
+          "chapter_id": 23,
+          "chapter_title": "The Duel",
+          "chunk_index": 1,
+          "excerpt": "Voss refused to answer the challenge.",
+          "metadata": {"characters": ["Rell", "Voss"]}
+        }
+      ],
+      "judgment": {
+        "candidate_id": 8,
+        "relation_type": "betrays",
+        "confidence": 0.8,
+        "evidence_refs": ["ev-fx-0801", "ev-fx-0802"],
+        "rationale": "The relation type is not allowed in the fiction ontology.",
+        "risk_flags": [],
+        "needs_human_review": false,
+        "rationale_supported_by_evidence": false
+      },
+      "llm_usage": {"prompt_tokens": 0, "completion_tokens": 0, "cost_usd": 0.0, "latency_ms": 0.0}
+    },
+    {
+      "id": "fx-09",
+      "category": "entity_alias_conflict",
+      "expected_decision": "needs_human_review",
+      "expected_evidence_refs": ["ev-fx-0901", "ev-fx-0902"],
+      "candidate": {
+        "candidate_id": 9,
+        "relation_type": "same_entity",
+        "source": {"kind": "entity_candidate", "id": 111, "name": "Black Thorn"},
+        "target": {"kind": "entity_candidate", "id": 112, "name": "Thorn Captain"},
+        "recall_signals": {
+          "entity_overlap": {"shared": ["Thorn"], "source": "metadata_json"},
+          "retrieval": {"source": {"vector": {"score": 0.82}}, "target": {"vector": {"score": 0.8}}}
+        },
+        "evidence_refs": ["ev-fx-0901", "ev-fx-0902"]
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev-fx-0901",
+          "source_type": "text_chunk",
+          "chunk_id": 10901,
+          "chapter_id": 24,
+          "chapter_title": "Ranks",
+          "chunk_index": 2,
+          "excerpt": "The Black Thorn signed the warning with a thorn seal.",
+          "metadata": {"aliases": ["Black Thorn"]}
+        },
+        {
+          "evidence_id": "ev-fx-0902",
+          "source_type": "text_chunk",
+          "chunk_id": 10902,
+          "chapter_id": 24,
+          "chapter_title": "Ranks",
+          "chunk_index": 3,
+          "excerpt": "The Thorn Captain used the same seal, but Sela said several officers carried copies.",
+          "metadata": {"aliases": ["Thorn Captain"], "characters": ["Sela"]}
+        }
+      ],
+      "judgment": {
+        "candidate_id": 9,
+        "relation_type": "same_entity",
+        "confidence": 0.78,
+        "evidence_refs": ["ev-fx-0901", "ev-fx-0902"],
+        "rationale": "The shared seal suggests a link, but copied seals make the alias uncertain.",
+        "risk_flags": ["entity_alias_conflict"],
+        "needs_human_review": true,
+        "rationale_supported_by_evidence": true
+      },
+      "llm_usage": {"prompt_tokens": 0, "completion_tokens": 0, "cost_usd": 0.0, "latency_ms": 0.0}
+    },
+    {
+      "id": "fx-10",
+      "category": "family_relation",
+      "expected_decision": "accepted",
+      "expected_evidence_refs": ["ev-fx-1001", "ev-fx-1002"],
+      "candidate": {
+        "candidate_id": 10,
+        "relation_type": "family",
+        "source": {"kind": "entity_candidate", "id": 113, "name": "Tarin"},
+        "target": {"kind": "entity_candidate", "id": 114, "name": "Lysa"},
+        "recall_signals": {
+          "adjacency": {"same_chapter": true, "chapter_distance": 0, "chunk_distance": 1},
+          "entity_overlap": {"shared": ["Tarin", "Lysa"], "source": "metadata_json"}
+        },
+        "evidence_refs": ["ev-fx-1001", "ev-fx-1002"]
+      },
+      "evidence": [
+        {
+          "evidence_id": "ev-fx-1001",
+          "source_type": "text_chunk",
+          "chunk_id": 11001,
+          "chapter_id": 25,
+          "chapter_title": "Letters",
+          "chunk_index": 0,
+          "excerpt": "Tarin kept the letter from his sister Lysa folded under his coat.",
+          "metadata": {"characters": ["Tarin", "Lysa"]}
+        },
+        {
+          "evidence_id": "ev-fx-1002",
+          "source_type": "text_chunk",
+          "chunk_id": 11002,
+          "chapter_id": 25,
+          "chapter_title": "Letters",
+          "chunk_index": 1,
+          "excerpt": "Lysa called Tarin her only brother when she signed the reply.",
+          "metadata": {"characters": ["Tarin", "Lysa"]}
+        }
+      ],
+      "judgment": {
+        "candidate_id": 10,
+        "relation_type": "family",
+        "confidence": 0.97,
+        "evidence_refs": ["ev-fx-1001", "ev-fx-1002"],
+        "rationale": "Both passages explicitly identify Tarin and Lysa as siblings.",
+        "risk_flags": [],
+        "needs_human_review": false,
+        "rationale_supported_by_evidence": true
+      },
+      "llm_usage": {"prompt_tokens": 0, "completion_tokens": 0, "cost_usd": 0.0, "latency_ms": 0.0}
+    }
+  ]
+}

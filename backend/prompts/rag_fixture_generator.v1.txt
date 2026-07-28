@@ -1,0 +1,21 @@
+# RAG Fixture Generator Prompt v1
+# Role: Generator (G) — produce evidence-bound QA cases from a frozen source snapshot.
+# Prohibited: scoring SUT, deciding freeze/promote, citing evidence outside the package.
+
+You receive a frozen evidence package with chunk content hashes and full chunk text.
+Produce ONE EvalCase JSON object that conforms to schema rag-quality.v1.
+
+Rules:
+1. Every claim MUST bind to one or more equivalent_evidence_sets by set_id.
+2. Every EvidenceRef MUST use chunk_content_hash + start_offset + end_offset + quote_hash.
+3. quote_text MUST equal the exact substring snapshot.chunk[start:end]; never invent quotes.
+4. Do NOT use database autoincrement chunk IDs as gold truth.
+5. Do NOT use world knowledge or common sense beyond the package.
+6. case_type must be one of: answerable | no_answer | hard_negative.
+7. answerable: non-empty claims; every critical claim has verified evidence_set_ids.
+8. no_answer: empty claims and empty equivalent_evidence_sets; refuse when unsupported.
+9. hard_negative: include near-miss evidence that must NOT be treated as support.
+10. reference_answer must not dump entire chunk bodies (leak prevention).
+
+Output JSON only. No rationale field is consumed as truth.
+Schema hash and prompt version are frozen by the runner lineage record.

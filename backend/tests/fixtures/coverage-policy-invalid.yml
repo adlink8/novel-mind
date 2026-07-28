@@ -1,0 +1,11 @@
+# Missing required fields (coverage.frontend, flake, tools) — must fail schema
+version: 1
+coverage:
+  backend:
+    overall:
+      line: 80
+      branch: 70
+  diff_coverage:
+    minimum: 90
+timeouts:
+  unit: 5

@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://novel-mind.local/schemas/coverage-policy.schema.json",
+  "title": "NovelMind Coverage and Quality Policy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "coverage",
+    "timeouts",
+    "flake",
+    "tools"
+  ],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["backend", "frontend", "diff_coverage"],
+      "properties": {
+        "backend": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["overall", "critical"],
+          "properties": {
+            "overall": { "$ref": "#/$defs/lineBranchThreshold" },
+            "critical": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["line", "branch", "globs"],
+              "properties": {
+                "line": { "type": "number", "minimum": 0, "maximum": 100 },
+                "branch": { "type": "number", "minimum": 0, "maximum": 100 },
+                "globs": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": { "type": "string", "minLength": 1 }
+                }
+              }
+            }
+          }
+        },
+        "frontend": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["overall", "critical"],
+          "properties": {
+            "overall": { "$ref": "#/$defs/lineBranchThreshold" },
+            "critical": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["line", "branch", "globs"],
+              "properties": {
+                "line": { "type": "number", "minimum": 0, "maximum": 100 },
+                "branch": { "type": "number", "minimum": 0, "maximum": 100 },
+                "globs": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": { "type": "string", "minLength": 1 }
+                }
+              }
+            }
+          }
+        },
+        "diff_coverage": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["minimum"],
+          "properties": {
+            "minimum": { "type": "number", "minimum": 0, "maximum": 100 }
+          }
+        }
+      }
+    },
+    "timeouts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["unit", "contract", "integration", "browser", "live"],
+      "properties": {
+        "unit": { "type": "integer", "minimum": 1 },
+        "contract": { "type": "integer", "minimum": 1 },
+        "integration": { "type": "integer", "minimum": 1 },
+        "browser": { "type": "integer", "minimum": 1 },
+        "live": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "flake": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pr_max", "external_infra"],
+      "properties": {
+        "pr_max": { "type": "integer", "minimum": 0, "maximum": 0 },
+        "external_infra": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["max_retry", "save_first_failure_evidence"],
+          "properties": {
+            "max_retry": { "type": "integer", "minimum": 0, "maximum": 1 },
+            "save_first_failure_evidence": { "type": "boolean", "const": true }
+          }
+        }
+      }
+    },
+    "tools": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pytest_cov", "pytest_timeout", "vitest", "vitest_coverage_v8"],
+      "properties": {
+        "pytest_cov": { "type": "string", "const": "7.1.0" },
+        "pytest_timeout": { "type": "string", "const": "2.4.0" },
+        "vitest": { "type": "string", "const": "4.1.10" },
+        "vitest_coverage_v8": { "type": "string", "const": "4.1.10" }
+      }
+    }
+  },
+  "$defs": {
+    "lineBranchThreshold": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["line", "branch"],
+      "properties": {
+        "line": { "type": "number", "minimum": 0, "maximum": 100 },
+        "branch": { "type": "number", "minimum": 0, "maximum": 100 }
+      }
+    }
+  }
+}

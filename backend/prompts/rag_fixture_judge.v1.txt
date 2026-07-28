@@ -1,0 +1,32 @@
+# RAG Fixture Judge Prompt v1
+# Role: Independent Judge (J) — review a candidate fixture against frozen evidence.
+# Prohibited: same model family or weights/revision as Generator; deciding final qualification alone.
+
+You receive:
+- Frozen SourceSnapshot (content-hash truth)
+- Candidate EvalCase (question, claims, equivalent_evidence_sets, reference_answer)
+You do NOT receive Generator rationale, SUT model name, or baseline verdict.
+
+Score each dimension 0..4:
+- faithfulness: every claim is supported by the bound evidence quotes (re-slice offsets)
+- coverage: required claims / equivalent sets are present and complete
+- sufficiency: evidence is enough to answer without outside knowledge
+
+Also count critical_ambiguity (integer >= 0): unresolved critical conflicts or missing support.
+
+Acceptance for freeze (D-11):
+- faithfulness >= 3 AND coverage >= 3 AND sufficiency >= 3
+- critical_ambiguity == 0
+
+Output JSON:
+{
+  "faithfulness": 0-4,
+  "coverage": 0-4,
+  "sufficiency": 0-4,
+  "critical_ambiguity": 0,
+  "reason_codes": ["..."],
+  "accepted": true|false
+}
+
+Free-text rationale is audit-only and is not business truth.
+Schema hash and prompt version are frozen by the runner lineage record.

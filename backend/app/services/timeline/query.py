@@ -1,0 +1,330 @@
+"""Owner-scoped, visible-set-first timeline reads."""
+
+from __future__ import annotations
+
+from collections import Counter
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.analysis import AnalysisRun, AnalysisVersion
+from app.models.novel import Chapter, Novel
+from app.models.timeline import (
+    MachineTimelineEvent,
+    TimelineActivePointer,
+    TimelineCausalEdge,
+    TimelineEvidenceRef,
+    TimelineOverride,
+    TimelineParticipant,
+)
+from app.schemas.timeline import (
+    Participant,
+    TimelineCounts,
+    TimelineOrdering,
+    TimelineVersionSource,
+    TimelineVersionView,
+    TimelineVisibleEdge,
+    TimelineVisibleEvent,
+)
+
+
+async def resolve_version_id(
+    session: AsyncSession,
+    *,
+    owner_id: int,
+    novel_id: int,
+    source: TimelineVersionSource,
+) -> tuple[int, str, dict] | None:
+    if source == TimelineVersionSource.ACTIVE:
+        pointer = await session.scalar(
+            select(TimelineActivePointer).where(
+                TimelineActivePointer.owner_id == owner_id,
+                TimelineActivePointer.novel_id == novel_id,
+            )
+        )
+        if pointer is None:
+            return None
+        version = await session.get(AnalysisVersion, pointer.version_id)
+        return (pointer.version_id, version.status if version else "active", {})
+    run = await session.scalar(
+        select(AnalysisRun).where(
+            AnalysisRun.owner_id == owner_id,
+            AnalysisRun.novel_id == novel_id,
+            AnalysisRun.active_key == "active",
+            AnalysisRun.status != "completed",
+            AnalysisRun.version_id.is_not(None),
+        )
+    )
+    if run is None or run.version_id is None:
+        return None
+    return run.version_id, run.status, dict(run.progress or {})
+
+
+async def resolve_chapter_cutoff(session: AsyncSession, novel: Novel) -> int | None:
+    """Public reusable cutoff from persisted reading progress (D20 / Phase 10).
+
+    No usable progress returns the first chapter number, never the whole book.
+    """
+    progress = novel.reading_progress or {}
+    chapter_id = progress.get("chapter_id")
+    if chapter_id is not None:
+        chapter = await session.scalar(
+            select(Chapter).where(
+                Chapter.id == int(chapter_id),
+                Chapter.novel_id == novel.id,
+            )
+        )
+        if chapter is not None:
+            return chapter.chapter_number
+    # D20: no usable progress means first chapter, never the whole book.
+    return await session.scalar(
+        select(Chapter.chapter_number)
+        .where(
+            Chapter.novel_id == novel.id,
+        )
+        .order_by(Chapter.chapter_number)
+        .limit(1)
+    )
+
+
+# Backward-compatible private alias (scripts / historical imports).
+async def _chapter_cutoff(session: AsyncSession, novel: Novel) -> int | None:
+    return await resolve_chapter_cutoff(session, novel)
+
+
+def effective_narrative_bounds(
+    *,
+    spoiler_cutoff: int | None,
+    spoiler_open: bool,
+    chapter_start: int | None = None,
+    chapter_end: int | None = None,
+) -> tuple[bool, int | None, int | None]:
+    """Combine spoiler cutoff with optional structure chapter range.
+
+    Returns ``(hide_all, lower_inclusive, upper_inclusive)``.
+
+    - Spoiler remains authoritative: when not open and cutoff is missing, hide all.
+    - ``chapter_end`` narrows the upper bound via ``min(chapter_end, spoiler_upper)``.
+    - ``chapter_start`` is a lower inclusive floor (structure scope).
+    - Params are optional; callers without range keep prior spoiler-only behavior.
+    """
+    if not spoiler_open and spoiler_cutoff is None:
+        return True, None, None
+    upper: int | None = None if spoiler_open else int(spoiler_cutoff)  # type: ignore[arg-type]
+    if chapter_end is not None:
+        end = int(chapter_end)
+        upper = end if upper is None else min(end, upper)
+    lower = int(chapter_start) if chapter_start is not None else None
+    return False, lower, upper
+
+
+async def build_version_view(
+    session: AsyncSession,
+    *,
+    novel: Novel,
+    owner_id: int,
+    source: TimelineVersionSource,
+    ordering: TimelineOrdering,
+    person: str | None,
+    include_causal: bool,
+    request_full_book: bool,
+    chapter_start: int | None = None,
+    chapter_end: int | None = None,
+) -> TimelineVersionView | None:
+    resolved = await resolve_version_id(
+        session, owner_id=owner_id, novel_id=novel.id, source=source
+    )
+    if resolved is None:
+        return None
+    version_id, status, progress = resolved
+    persisted_full_book = bool(
+        (novel.reading_progress or {}).get("timeline_full_book", False)
+    )
+    # A running candidate represents the live analysis result, so it must expose
+    # every provisional event produced so far. The reading-progress spoiler gate
+    # applies only to the promoted active timeline.
+    candidate_view = source == TimelineVersionSource.RUNNING_CANDIDATE
+    spoiler_open = candidate_view or (request_full_book and persisted_full_book)
+    cutoff = None if spoiler_open else await resolve_chapter_cutoff(session, novel)
+
+    event_query = select(MachineTimelineEvent).where(
+        MachineTimelineEvent.owner_id == owner_id,
+        MachineTimelineEvent.novel_id == novel.id,
+        MachineTimelineEvent.version_id == version_id,
+    )
+    hide_all, lower, upper = effective_narrative_bounds(
+        spoiler_cutoff=cutoff,
+        spoiler_open=spoiler_open,
+        chapter_start=chapter_start,
+        chapter_end=chapter_end,
+    )
+    if hide_all:
+        event_query = event_query.where(False)
+    else:
+        if lower is not None:
+            event_query = event_query.where(
+                MachineTimelineEvent.narrative_chapter_number >= lower
+            )
+        if upper is not None:
+            event_query = event_query.where(
+                MachineTimelineEvent.narrative_chapter_number <= upper
+            )
+    visible_rows = list((await session.scalars(event_query)).all())
+    visible_ids = {row.id for row in visible_rows}
+
+    evidence_rows = (
+        list(
+            (
+                await session.scalars(
+                    select(TimelineEvidenceRef).where(
+                        TimelineEvidenceRef.event_id.in_(visible_ids),
+                    )
+                )
+            ).all()
+        )
+        if visible_ids
+        else []
+    )
+    source_start_by_event: dict[int, int] = {}
+    for evidence in evidence_rows:
+        source_start_by_event[evidence.event_id] = min(
+            source_start_by_event.get(evidence.event_id, evidence.source_start),
+            evidence.source_start,
+        )
+
+    participants = (
+        list(
+            (
+                await session.scalars(
+                    select(TimelineParticipant).where(
+                        TimelineParticipant.event_id.in_(visible_ids)
+                    )
+                )
+            ).all()
+        )
+        if visible_ids
+        else []
+    )
+    participants_by_event: dict[int, list[TimelineParticipant]] = {}
+    for row in participants:
+        participants_by_event.setdefault(row.event_id, []).append(row)
+
+    if person:
+        matched_ids = {
+            row.event_id
+            for row in participants
+            if row.mention.casefold() == person.casefold()
+        }
+        visible_rows = [row for row in visible_rows if row.id in matched_ids]
+        visible_ids = {row.id for row in visible_rows}
+
+    # Overrides are fetched only for already-visible logical IDs, preventing text leaks.
+    logical_ids = {row.logical_event_id for row in visible_rows}
+    overrides = (
+        list(
+            (
+                await session.scalars(
+                    select(TimelineOverride)
+                    .where(
+                        TimelineOverride.owner_id == owner_id,
+                        TimelineOverride.novel_id == novel.id,
+                        TimelineOverride.logical_event_id.in_(logical_ids),
+                        TimelineOverride.status == "active",
+                        TimelineOverride.needs_relink.is_(False),
+                    )
+                    .order_by(TimelineOverride.id)
+                )
+            ).all()
+        )
+        if logical_ids
+        else []
+    )
+    override_by_event: dict[str, dict[str, object]] = {}
+    for row in overrides:
+        override_by_event.setdefault(row.logical_event_id, {})[row.field_name] = (
+            row.value
+        )
+
+    def _source_start(row: MachineTimelineEvent) -> int:
+        return source_start_by_event.get(row.id, row.narrative_index)
+
+    if ordering == TimelineOrdering.STORY:
+
+        def _order_key(row: MachineTimelineEvent) -> tuple:
+            return (
+                row.story_rank is None,
+                row.story_rank,
+                row.narrative_chapter_number,
+                _source_start(row),
+                row.id,
+            )
+    else:
+
+        def _order_key(row: MachineTimelineEvent) -> tuple:
+            return (row.narrative_chapter_number, _source_start(row), row.id)
+
+    visible_rows.sort(key=_order_key)
+    events = []
+    participant_mentions: list[str] = []
+    for row in visible_rows:
+        patch = override_by_event.get(row.logical_event_id, {})
+        provenance = {field: "manual" for field in patch}
+        event_participants = participants_by_event.get(row.id, [])
+        participant_mentions.extend(item.mention for item in event_participants)
+        events.append(
+            TimelineVisibleEvent(
+                id=row.id,
+                logical_event_id=row.logical_event_id,
+                title=patch.get("title", row.title),
+                description=patch.get("description", row.description),
+                event_type=patch.get("event_type", row.event_type),
+                narrative_chapter_number=row.narrative_chapter_number,
+                source_start=_source_start(row),
+                narrative_index=row.narrative_index,
+                story_rank=row.story_rank,
+                time_precision=row.time_precision,
+                time_expression=patch.get("time_expression", row.time_expression),
+                confidence=row.confidence,
+                participants=[
+                    Participant(mention=item.mention, entity_id=item.entity_id)
+                    for item in event_participants
+                ],
+                provenance=provenance,
+            )
+        )
+    edges = []
+    if include_causal and visible_ids:
+        edge_rows = (
+            await session.scalars(
+                select(TimelineCausalEdge).where(
+                    TimelineCausalEdge.version_id == version_id,
+                    TimelineCausalEdge.source_event_id.in_(visible_ids),
+                    TimelineCausalEdge.target_event_id.in_(visible_ids),
+                )
+            )
+        ).all()
+        edges = [
+            TimelineVisibleEdge(
+                source_event_id=e.source_event_id,
+                target_event_id=e.target_event_id,
+                edge_type=e.edge_type,
+                confidence=e.confidence,
+            )
+            for e in edge_rows
+        ]
+    aggregates = dict(Counter(participant_mentions))
+    return TimelineVersionView(
+        source=source,
+        version_id=version_id,
+        status=status,
+        progress=progress,
+        events=events,
+        causal_edges=edges,
+        counts=TimelineCounts(
+            events=len(events),
+            participants=len(participant_mentions),
+            causal_edges=len(edges),
+        ),
+        aggregates=aggregates,
+        previews=[event.title for event in events[:5]],
+    )

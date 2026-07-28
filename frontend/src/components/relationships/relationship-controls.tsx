@@ -1,0 +1,166 @@
+"use client";
+
+import type {
+  RelationshipEdgeType,
+  RelationshipGraphEdgeLabel,
+  RelationshipGraphNode,
+} from "@/lib/api";
+
+const RELATION_LABELS: Record<string, string> = {
+  ally: "同盟",
+  enemy: "敌对",
+  family: "亲属",
+  mentor: "师徒",
+  romantic: "爱慕",
+  cooccur: "共现",
+};
+
+type Props = {
+  nodes: RelationshipGraphNode[];
+  availableRelationTypes: RelationshipGraphEdgeLabel[];
+  characterId: number | "";
+  relationType: RelationshipEdgeType | "";
+  throughChapter: number | "";
+  maxChapter?: number;
+  /** Opt-in layer of provisional co-occurrence edges (API include_provisional). */
+  includeProvisional?: boolean;
+  onIncludeProvisionalChange?: (value: boolean) => void;
+  onCharacterChange: (value: number | "") => void;
+  onRelationTypeChange: (value: RelationshipEdgeType | "") => void;
+  onThroughChapterChange: (value: number | "") => void;
+  onZoomIn?: () => void;
+  onZoomOut?: () => void;
+  onFit?: () => void;
+  degradationMode?: string;
+};
+
+export function RelationshipControls(props: Props) {
+  return (
+    <section
+      aria-label="人物关系控制"
+      className="flex flex-wrap items-end gap-x-4 gap-y-2"
+    >
+      <label className="grid min-w-40 gap-1 text-xs text-muted-foreground">
+        筛选人物
+        <select
+          aria-label="筛选人物"
+          value={props.characterId === "" ? "" : String(props.characterId)}
+          onChange={(event) => {
+            const raw = event.target.value;
+            props.onCharacterChange(raw === "" ? "" : Number(raw));
+          }}
+          className="h-9 rounded-lg border-0 bg-muted/50 px-2.5 text-sm text-foreground ring-1 ring-border/50 focus:outline-none focus:ring-foreground/20"
+        >
+          <option value="">全部人物</option>
+          {props.nodes.map((node) => (
+            <option key={node.character_id} value={node.character_id}>
+              {node.name}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label className="grid min-w-36 gap-1 text-xs text-muted-foreground">
+        关系类型
+        <select
+          aria-label="筛选关系类型"
+          value={props.relationType}
+          onChange={(event) =>
+            props.onRelationTypeChange(
+              (event.target.value || "") as RelationshipEdgeType | ""
+            )
+          }
+          className="h-9 rounded-lg border-0 bg-muted/50 px-2.5 text-sm text-foreground ring-1 ring-border/50 focus:outline-none focus:ring-foreground/20"
+        >
+          <option value="">全部类型</option>
+          {props.availableRelationTypes
+            .filter((type) => type !== "cooccur")
+            .map((type) => (
+              <option key={type} value={type}>
+                {RELATION_LABELS[type] ?? type}
+              </option>
+            ))}
+        </select>
+      </label>
+
+      <label className="grid min-w-28 gap-1 text-xs text-muted-foreground">
+        叙事位置（章）
+        <input
+          type="number"
+          min={1}
+          max={props.maxChapter}
+          aria-label="叙事位置章节"
+          value={props.throughChapter === "" ? "" : props.throughChapter}
+          onChange={(event) => {
+            const raw = event.target.value;
+            if (raw === "") {
+              props.onThroughChapterChange("");
+              return;
+            }
+            const n = Number(raw);
+            if (Number.isFinite(n) && n > 0) {
+              props.onThroughChapterChange(n);
+            }
+          }}
+          placeholder="跟随默认"
+          className="h-9 w-28 rounded-lg border-0 bg-muted/50 px-2.5 text-sm text-foreground ring-1 ring-border/50 focus:outline-none focus:ring-foreground/20"
+        />
+      </label>
+
+      <label className="flex h-9 min-w-[9.5rem] cursor-pointer items-center gap-2 text-sm text-muted-foreground">
+        <input
+          type="checkbox"
+          aria-label="显示临时共现"
+          data-testid="relationship-include-provisional"
+          checked={props.includeProvisional ?? false}
+          onChange={(event) =>
+            props.onIncludeProvisionalChange?.(event.target.checked)
+          }
+          className="size-4 rounded border-border accent-primary"
+        />
+        显示临时共现
+      </label>
+
+      <div
+        className="flex flex-wrap gap-1"
+        role="group"
+        aria-label="关系图缩放"
+      >
+        <button
+          type="button"
+          onClick={props.onZoomIn}
+          className="h-9 rounded-md px-2.5 text-sm text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+        >
+          放大
+        </button>
+        <button
+          type="button"
+          onClick={props.onZoomOut}
+          className="h-9 rounded-md px-2.5 text-sm text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+        >
+          缩小
+        </button>
+        <button
+          type="button"
+          onClick={props.onFit}
+          className="h-9 rounded-md px-2.5 text-sm text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+        >
+          适配
+        </button>
+      </div>
+
+      {props.degradationMode === "large" && (
+        <p className="w-full text-xs text-amber-800">
+          大图模式：画布以连接度最高人物为中心分层，悬停可聚焦邻接。
+        </p>
+      )}
+      {props.degradationMode === "filters_required" && (
+        <p className="w-full text-xs text-destructive" role="status">
+          可见关系超过上限，请先用人物/类型/章节筛选后再渲染图。
+        </p>
+      )}
+    </section>
+  );
+}
+
+export { RELATION_LABELS };

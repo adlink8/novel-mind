@@ -1,0 +1,160 @@
+# NovelMind baseline + CI producer policy (Phase 06-06)
+# Locked decisions: D-10, D-13, D-14, D-16, D-17, D-18
+# Fail closed: missing signature/schema/status, fork escalation, sensitive artifacts
+
+version: 1
+schema_version: baseline-policy.v1
+phase: "06-06"
+
+promotion:
+  # Only these terminal statuses may prepare/commit a baseline (D-08/D-18)
+  allowed_statuses:
+    - passed
+    - qualified
+  rejected_statuses:
+    - failed_policy
+    - quality_regression
+    - blocked_dependency
+    - invalid_fixture
+    - invalid_lineage
+    - quarantined
+    - cancelled
+  require_report_signature: true
+  require_schema_version: rag-quality.v1
+  prepare_then_commit: true
+  repeats_required: 3
+  # Baseline must not include novel fulltext or raw chunk bodies
+  forbid_fulltext_in_baseline: true
+
+artifacts:
+  retention_days:
+    pr_junit_coverage_openapi: 14
+    playwright_failure: 7
+    main_integration_logs: 30
+    nightly_signed_reports_baselines: 180
+  # Globs never uploaded as CI artifacts (D-17)
+  forbidden_globs:
+    - "uploads/**"
+    - "backend/uploads/**"
+    - "**/*fulltext*"
+    - "**/novel-content/**"
+    - "**/*.epub"
+    - "**/chapters/*.txt"
+  forbidden_content_markers:
+    - "NOVEL_FULLTEXT_BEGIN"
+    - "<<<NOVEL_BODY>>>"
+    - "raw_chapter_text"
+  allowed_artifact_kinds:
+    - junit
+    - coverage
+    - openapi
+    - playwright_failure
+    - integration_logs
+    - signed_rag_report
+    - baseline
+    - security_report
+
+alerts:
+  # Independent alert job only (D-18)
+  allowed_events:
+    - schedule
+    - push
+  allowed_refs:
+    - refs/heads/main
+    - refs/heads/master
+  environment: quality-alerts
+  permissions:
+    contents: read
+    issues: write
+  no_pr_checkout: true
+  fork_unreachable: true
+  consume_only_validated_reports: true
+  dedup_window_hours: 24
+  issue_labels:
+    - quality-alert
+    - automated
+
+flake:
+  pr_max: 0
+  # required checks 30-day failure rate < 0.1% (D-10)
+  required_check_30d_failure_rate_max: 0.001
+  external_infra:
+    max_retry: 1
+    save_first_failure_evidence: true
+
+job_timeouts_minutes:
+  static: 5
+  unit: 10
+  integration: 15
+  browser: 15
+  live: 45
+  nightly: 60
+
+security:
+  actionlint_version: v1.7.12
+  oasdiff_version: v1.17.0
+  no_pull_request_target: true
+  concurrency_by_workflow_ref: true
+  pr_cancel_in_progress: true
+  # Nightly baseline compare must not cancel mid-run
+  schedule_cancel_in_progress: false
+  secret_jobs_forbid_pull_request: true
+  self_hosted_forbid_pull_request: true
+  write_permissions_forbid_fork: true
+  codeql_languages:
+    - python
+    - javascript-typescript
+  audits:
+    - ruff
+    - bandit
+    - pip-audit
+    - npm-audit
+    - actionlint
+    - codeql
+
+events:
+  pull_request:
+    secretless: true
+    jobs:
+      - guard
+      - static
+      - unit
+      - openapi
+      - integration
+      - browser
+      - codeql
+      - workflow-lint
+  push_protected_main:
+    jobs:
+      - guard
+      - static
+      - unit
+      - openapi
+      - integration
+      - browser
+      - codeql
+      - workflow-lint
+      - live
+      - alert
+  schedule:
+    jobs:
+      - guard
+      - static
+      - unit
+      - openapi
+      - integration
+      - browser
+      - codeql
+      - workflow-lint
+      - live
+      - nightly
+      - promote-baseline
+      - alert
+  workflow_dispatch:
+    require_protected_ref: true
+    require_approved_environment: true
+    require_fixed_benchmark_commit: true
+    protected_refs:
+      - refs/heads/main
+      - refs/heads/master
+    environment: quality-benchmark

@@ -1,0 +1,28 @@
+{
+  "project": "novel-mind",
+  "active_milestone": "v1.0",
+  "last_completed_milestone": "v1.0",
+  "last_completed_phase": "20-structure-workspace-multilayer-presentation",
+  "active_phase": "20-structure-workspace-multilayer-presentation",
+  "active_plan": "20-04",
+  "status": "phase_complete",
+  "canonical_dir": ".planning",
+  "auto_start": ".planning/phases/20-structure-workspace-multilayer-presentation/20-VERIFICATION.md",
+  "documentation_ownership": {
+    "human": ["README.md", "IMPLEMENTATION-STATUS.md", "docs/"],
+    "ai": [".planning/"]
+  },
+  "rules": {
+    "task_plan_required_sections": ["Steps", "Must-Haves", "Verification"],
+    "implementation_slice_required_final_step": "Test, Fix, and Confirm",
+    "status_labels": ["VERIFIED", "PARTIAL", "MISSING"]
+  },
+  "workflow": {
+    "_auto_chain_active": false,
+    "use_worktrees": false
+  },
+  "notes": {
+    "phase_19": "Analysis workbench presentation & truth; complete",
+    "phase_20": "Structure Workspace P0 complete; 2026-07-17 ordered follow-on; NM partial candidate; no promotion"
+  }
+}

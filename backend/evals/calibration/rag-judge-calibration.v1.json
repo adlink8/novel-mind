@@ -1,0 +1,115 @@
+{
+  "schema_version": "rag-quality.v1",
+  "suite_id": "rag-judge-calibration.v1",
+  "domain": "calibration-synthetic",
+  "suite_type": "calibration",
+  "cases": [
+    {
+      "case_id": "cal-supported",
+      "category": "supported",
+      "question": "Who stood at the gate?",
+      "candidate_answer": "路明非站在卡塞尔学院的门前",
+      "evidence_refs": [
+        {
+          "chunk_content_hash": "03f19bf5117f3b8b97a7f1bb2ae453479e480580d25a04706a56d0df5c55df82",
+          "start_offset": 0,
+          "end_offset": 10,
+          "quote_hash": "514c725bd5259fb2f07dd543da4afcdf043f11c6c0b949de8a51b7528824cfde",
+          "quote_text": "路明非站在卡塞尔学院"
+        }
+      ],
+      "gold_verdict": "accept",
+      "critical": false
+    },
+    {
+      "case_id": "cal-partial",
+      "category": "partial",
+      "question": "What did he see?",
+      "candidate_answer": "他看见石碑和无关内容",
+      "evidence_refs": [
+        {
+          "chunk_content_hash": "03f19bf5117f3b8b97a7f1bb2ae453479e480580d25a04706a56d0df5c55df82",
+          "start_offset": 14,
+          "end_offset": 28,
+          "quote_hash": "d74c3394ea16aaf54b8012bb6d4515b1524a3a2edfef6a024d6402f146b47026",
+          "quote_text": "第一次看见青铜与火之王的传说"
+        }
+      ],
+      "gold_verdict": "partial",
+      "critical": false
+    },
+    {
+      "case_id": "cal-unsupported",
+      "category": "unsupported",
+      "question": "Bank balance?",
+      "candidate_answer": "他有一百万元",
+      "evidence_refs": [],
+      "gold_verdict": "reject",
+      "critical": true
+    },
+    {
+      "case_id": "cal-contradictory",
+      "category": "contradictory",
+      "question": "Where was he?",
+      "candidate_answer": "他在纽约街头",
+      "evidence_refs": [
+        {
+          "chunk_content_hash": "03f19bf5117f3b8b97a7f1bb2ae453479e480580d25a04706a56d0df5c55df82",
+          "start_offset": 0,
+          "end_offset": 8,
+          "quote_hash": "fd21f35225363507c5c2c068ae40d62612d7e4917cb31bfd711f003e88d8b1ce",
+          "quote_text": "路明非站在卡塞尔"
+        }
+      ],
+      "gold_verdict": "contradictory",
+      "critical": true
+    },
+    {
+      "case_id": "cal-no-answer",
+      "category": "no_answer",
+      "question": "Phone number?",
+      "candidate_answer": "unknown",
+      "evidence_refs": [],
+      "gold_verdict": "no_answer",
+      "critical": true
+    },
+    {
+      "case_id": "cal-hard-negative",
+      "category": "hard_negative",
+      "question": "Did rain prove the sword?",
+      "candidate_answer": "雨夜证明拔刀",
+      "evidence_refs": [
+        {
+          "chunk_content_hash": "617b809101fdf4cdb3e845eb92b56a1cdc6b009eee12325305b3152d86197ad1",
+          "start_offset": 7,
+          "end_offset": 13,
+          "quote_hash": "4da82e03355b624067f5202ad9e545faeeae2341b5c33defc7e6bdac532e9d28",
+          "quote_text": "今夜的雨很大"
+        }
+      ],
+      "gold_verdict": "hard_negative",
+      "critical": true
+    },
+    {
+      "case_id": "cal-equiv",
+      "category": "equivalent_evidence",
+      "question": "Legend location?",
+      "candidate_answer": "石碑上的传说",
+      "evidence_refs": [
+        {
+          "chunk_content_hash": "03f19bf5117f3b8b97a7f1bb2ae453479e480580d25a04706a56d0df5c55df82",
+          "start_offset": 14,
+          "end_offset": 28,
+          "quote_hash": "d74c3394ea16aaf54b8012bb6d4515b1524a3a2edfef6a024d6402f146b47026",
+          "quote_text": "第一次看见青铜与火之王的传说"
+        }
+      ],
+      "gold_verdict": "accept",
+      "critical": false
+    }
+  ],
+  "suite_hash": "5b97bf9dc72ec8f9fe1cbb361aad9cbffcc3a36b7fd1f17a835b3531cf28d6b6",
+  "signature": "8572b4346b30a7a3facce6e38e87430f447d0bc15a5fa16bd9be090a5fbe6202",
+  "prompt_hash": "ba14dccd65be387acff0020f6300c4d98397a21647a1c3c72ebfbcf8d239a47e",
+  "schema_hash": "abbbaed9fb1b458af7e7e8af8b45e8dc835ae862d5c312b18ddb6004c2bd622a"
+}

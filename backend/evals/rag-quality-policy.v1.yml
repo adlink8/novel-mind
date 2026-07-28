@@ -1,0 +1,59 @@
+# RAG quality policy v1 — locked D-08 thresholds (06-04)
+# Missing policy / p95 budgets / baseline / health / lineage => fail closed.
+version: rag-quality-policy.v1
+schema_version: rag-quality.v1
+
+thresholds:
+  # answer faithfulness bootstrap 95% lower bound
+  answer_faithfulness_95lb_min: 0.90
+  # critical unsupported claim rate must be exactly 0
+  critical_unsupported_claim_rate_max: 0.0
+  # context recall@5 regression vs baseline (percentage points)
+  context_recall_at_5_regression_pp_max: 2.0
+  # answer relevance regression vs baseline (percentage points)
+  answer_relevance_regression_pp_max: 3.0
+  # 3-repeat verdict consistency
+  verdict_consistency_min: 0.80
+  # cost <= baseline + 15%
+  cost_vs_baseline_max_ratio: 1.15
+
+p95_budgets:
+  latency_ms: 30000
+  tokens_total: 500000
+  cost_usd: 5.0
+
+run:
+  repeats: 3
+  top_k: 5
+  bootstrap_samples: 1000
+  bootstrap_alpha: 0.05
+  bootstrap_seed: 42
+
+comparable_terminal_statuses:
+  - passed
+  - qualified
+
+non_comparable_terminal_statuses:
+  - failed_policy
+  - quality_regression
+  - blocked_dependency
+  - invalid_fixture
+  - invalid_lineage
+  - quarantined
+  - cancelled
+
+fail_closed_on_missing:
+  - policy
+  - p95_budgets
+  - baseline
+  - health
+  - lineage
+
+deprecation:
+  legacy_eval_api: true
+  replacement_endpoints:
+    - POST /api/eval/quality/runs
+    - GET /api/eval/quality/runs/{job_id}
+    - POST /api/eval/quality/runs/{job_id}/resume
+    - POST /api/eval/quality/runs/{job_id}/cancel
+  migration_deadline: "until signed quality fixtures replace gold_chunks-only cases"

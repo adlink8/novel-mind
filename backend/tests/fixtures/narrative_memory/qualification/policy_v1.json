@@ -1,0 +1,121 @@
+{
+  "policy_version": "nm-qual-policy.v1",
+  "qualification_kind": "single_book_candidate",
+  "required_buckets": [
+    "local",
+    "cross_chapter_arc",
+    "whole_book_global",
+    "no_answer",
+    "spoiler"
+  ],
+  "min_cases_per_bucket": 1,
+  "generator": {
+    "role": "generator",
+    "deployment_id": "gen-qual-v1",
+    "model_revision": "gen-rev-1",
+    "prompt_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+    "schema_hash": "2222222222222222222222222222222222222222222222222222222222222222",
+    "decoding_hash": "3333333333333333333333333333333333333333333333333333333333333333",
+    "calibrated": false
+  },
+  "judge": {
+    "role": "judge",
+    "deployment_id": "judge-qual-v1",
+    "model_revision": "judge-rev-1",
+    "prompt_hash": "4444444444444444444444444444444444444444444444444444444444444444",
+    "schema_hash": "5555555555555555555555555555555555555555555555555555555555555555",
+    "decoding_hash": "6666666666666666666666666666666666666666666666666666666666666666",
+    "calibrated": true
+  },
+  "price": {
+    "input_per_million_usd": "0.50",
+    "output_per_million_usd": "1.50",
+    "currency": "USD"
+  },
+  "budget": {
+    "max_calls": 32,
+    "max_input_tokens": 50000,
+    "max_output_tokens": 20000,
+    "max_cost_usd": "1.00",
+    "timeout_ms": 60000,
+    "max_retries": 0,
+    "top_k": 8,
+    "max_leaves": 16,
+    "max_rerank": 16
+  },
+  "metric_version": "nm-qual-metrics.v1",
+  "thresholds": [
+    {
+      "metric_name": "spoiler_leakage",
+      "scope": "aggregate",
+      "bucket": null,
+      "strategy": null,
+      "minimum": null,
+      "maximum": 0.0,
+      "zero_tolerance": true,
+      "relative_to_baseline_min_delta": null
+    },
+    {
+      "metric_name": "invalid_citation_rate",
+      "scope": "aggregate",
+      "bucket": null,
+      "strategy": null,
+      "minimum": null,
+      "maximum": 0.0,
+      "zero_tolerance": true,
+      "relative_to_baseline_min_delta": null
+    },
+    {
+      "metric_name": "critical_unsupported",
+      "scope": "aggregate",
+      "bucket": null,
+      "strategy": null,
+      "minimum": null,
+      "maximum": 0.0,
+      "zero_tolerance": true,
+      "relative_to_baseline_min_delta": null
+    },
+    {
+      "metric_name": "leaf_recall_at_k",
+      "scope": "aggregate",
+      "bucket": null,
+      "strategy": "hierarchical_candidate",
+      "minimum": 0.5,
+      "maximum": null,
+      "zero_tolerance": false,
+      "relative_to_baseline_min_delta": -0.15
+    },
+    {
+      "metric_name": "no_answer_abstention",
+      "scope": "bucket",
+      "bucket": "no_answer",
+      "strategy": "hierarchical_candidate",
+      "minimum": 1.0,
+      "maximum": null,
+      "zero_tolerance": false,
+      "relative_to_baseline_min_delta": null
+    },
+    {
+      "metric_name": "faithfulness_mean",
+      "scope": "aggregate",
+      "bucket": null,
+      "strategy": "hierarchical_candidate",
+      "minimum": 0.6,
+      "maximum": null,
+      "zero_tolerance": false,
+      "relative_to_baseline_min_delta": -0.1
+    },
+    {
+      "metric_name": "end_to_end_latency_p95_ms",
+      "scope": "aggregate",
+      "bucket": null,
+      "strategy": "hierarchical_candidate",
+      "minimum": null,
+      "maximum": 30000.0,
+      "zero_tolerance": false,
+      "relative_to_baseline_min_delta": null
+    }
+  ],
+  "disclaimer": "Single-book candidate qualification only. Does not promote, activate, or cut over timeline/relationship/clue/Reader Chat consumers. Does not claim closure of v0.3 project-wide 100-confirmed, faithfulness, or cost gaps.",
+  "strategy_order": ["hierarchical_candidate", "leaf_raw_baseline"]
+}

@@ -1,0 +1,31 @@
+sequenceDiagram
+    participant U as User
+    participant F as Next.js Frontend
+    participant API as FastAPI
+    participant Auth as get_current_user
+    participant DB as PostgreSQL
+
+    Note over F,DB: === 注册 ===
+    U->>F: 填写用户名/邮箱/密码
+    F->>API: POST /api/auth/register
+    API->>API: 校验密码 <= 72 bytes
+    API->>DB: INSERT users (bcrypt hash)
+    API->>API: 签发 JWT
+    API-->>F: Set-Cookie + access_token
+    F->>F: 存储认证状态
+
+    Note over F,DB: === 登录 ===
+    U->>F: 输入凭据
+    F->>API: POST /api/auth/login
+    API->>DB: SELECT by username
+    API->>API: bcrypt.verify
+    API-->>F: Set-Cookie + access_token
+
+    Note over F,DB: === 认证中间件 ===
+    F->>API: 任何 API 请求
+    API->>Auth: Cookie / Bearer 提取 token
+    Auth->>Auth: JWT 验证（签名/iss/aud/exp）
+    Auth->>DB: 确认 user 存在 & is_active
+    Auth-->>API: current_user 注入
+    API->>API: Owner 权限校验
+    API-->>F: 响应（脱敏后）

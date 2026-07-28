@@ -1,0 +1,36 @@
+# NovelMind backend runtime dependencies
+
+# Web
+fastapi>=0.115
+uvicorn[standard]>=0.32
+
+# Database and migrations
+sqlalchemy>=2.0
+asyncpg>=0.30
+alembic>=1.14
+psycopg2-binary>=2.9
+
+# Validation and configuration
+pydantic>=2.13
+pydantic-settings>=2.8
+python-dotenv>=1.0
+
+# File processing
+python-multipart>=0.0.18
+chardet>=5.2
+
+# AI and vector integration
+litellm>=1.83.10
+pgvector>=0.3
+chromadb==1.5.9
+httpx>=0.28
+# 本地 embedding（与数据分析项目一致：bge-small-zh-v1.5）
+sentence-transformers>=3.0
+# torch 由 sentence-transformers 拉取；有 GPU 时可用官方 CUDA 轮子覆盖
+
+
+# Security
+cryptography>=42.0
+passlib[bcrypt]>=1.7
+bcrypt>=4.0,<5.0
+pyjwt>=2.8

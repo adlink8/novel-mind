@@ -1,0 +1,400 @@
+{
+  "fixture_version": "clue-fiction.v1",
+  "dataset_version": "clue-fiction.v1",
+  "domain": "fiction",
+  "partition": "frozen",
+  "source_snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "hierarchy_build_id": "clue-fixture-hierarchy-v1",
+  "hierarchy_checksum": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "prompt_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "schema_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "policy_hash": "fbc2e23c58a4753543572ba8b9396aabb50723c929df48f2b7c3c3f9377a0873",
+  "model_lineage": {
+    "judgment": "controlled/clue@fixture-v1"
+  },
+  "version_lineage": "clue-candidate-fixture-v1",
+  "deferred_products_absent": [
+    "history_corpus",
+    "writing_assistant",
+    "chat_as_clue_fact",
+    "relationship_product_write"
+  ],
+  "thresholds": {
+    "paid_off_precision_min": 0.9,
+    "active_reinforced_macro_f1_min": 0.85,
+    "critical_false_active": 0,
+    "critical_false_paid_off": 0,
+    "spoiler_leaks": 0,
+    "cross_scope_links": 0,
+    "override_overwrites": 0,
+    "api_p95_ms_max": 500,
+    "model_p95_ms_max": 60000
+  },
+  "cases": [
+    {
+      "id": "c01",
+      "category": "full_chain",
+      "partition": "frozen",
+      "title": "sealed letter",
+      "expected_state": "paid_off",
+      "expected_lifecycle": ["candidate", "active", "reinforced", "paid_off"],
+      "cue": {"evidence_id": "ev-c01-cue", "chapter": 1, "source_start": 0, "source_end": 28, "text": "A sealed letter waited on the pier."},
+      "reinforcements": [{"evidence_id": "ev-c01-re", "chapter": 3, "source_start": 0, "source_end": 30, "text": "The sealed letter still unopened."}],
+      "payoff": {"evidence_id": "ev-c01-pay", "chapter": 7, "source_start": 0, "source_end": 34, "text": "She broke the seal; the letter named the traitor."},
+      "ambiguity_ok": false
+    },
+    {
+      "id": "c02",
+      "category": "full_chain",
+      "partition": "frozen",
+      "title": "broken compass",
+      "expected_state": "paid_off",
+      "expected_lifecycle": ["candidate", "active", "reinforced", "paid_off"],
+      "cue": {"evidence_id": "ev-c02-cue", "chapter": 1, "source_start": 0, "source_end": 32, "text": "His compass always pointed inland."},
+      "reinforcements": [{"evidence_id": "ev-c02-re", "chapter": 4, "source_start": 0, "source_end": 28, "text": "The inland compass rattled again."}],
+      "payoff": {"evidence_id": "ev-c02-pay", "chapter": 8, "source_start": 0, "source_end": 40, "text": "The compass hid a map needle to the vault."},
+      "ambiguity_ok": false
+    },
+    {
+      "id": "c03",
+      "category": "full_chain",
+      "partition": "frozen",
+      "title": "twin scarves",
+      "expected_state": "paid_off",
+      "expected_lifecycle": ["candidate", "active", "reinforced", "paid_off"],
+      "cue": {"evidence_id": "ev-c03-cue", "chapter": 2, "source_start": 0, "source_end": 30, "text": "Two red scarves hung by the gate."},
+      "reinforcements": [{"evidence_id": "ev-c03-re", "chapter": 5, "source_start": 0, "source_end": 28, "text": "One red scarf was missing overnight."}],
+      "payoff": {"evidence_id": "ev-c03-pay", "chapter": 9, "source_start": 0, "source_end": 36, "text": "The missing scarf marked the spy's exit."},
+      "ambiguity_ok": false
+    },
+    {
+      "id": "c04",
+      "category": "full_chain",
+      "partition": "frozen",
+      "title": "silent bell",
+      "expected_state": "paid_off",
+      "expected_lifecycle": ["candidate", "active", "reinforced", "paid_off"],
+      "cue": {"evidence_id": "ev-c04-cue", "chapter": 1, "source_start": 0, "source_end": 26, "text": "The temple bell never rang."},
+      "reinforcements": [{"evidence_id": "ev-c04-re", "chapter": 3, "source_start": 0, "source_end": 24, "text": "Still the bell stayed mute."}],
+      "payoff": {"evidence_id": "ev-c04-pay", "chapter": 6, "source_start": 0, "source_end": 38, "text": "The clapper had been stolen to mute alarms."},
+      "ambiguity_ok": false
+    },
+    {
+      "id": "c05",
+      "category": "full_chain",
+      "partition": "frozen",
+      "title": "empty chair",
+      "expected_state": "paid_off",
+      "expected_lifecycle": ["candidate", "active", "reinforced", "paid_off"],
+      "cue": {"evidence_id": "ev-c05-cue", "chapter": 2, "source_start": 0, "source_end": 28, "text": "An empty chair faced the door."},
+      "reinforcements": [{"evidence_id": "ev-c05-re", "chapter": 4, "source_start": 0, "source_end": 30, "text": "The empty chair was still warm."}],
+      "payoff": {"evidence_id": "ev-c05-pay", "chapter": 8, "source_start": 0, "source_end": 42, "text": "The chair belonged to the hidden twin who fled."},
+      "ambiguity_ok": false
+    },
+    {
+      "id": "c06",
+      "category": "full_chain",
+      "partition": "frozen",
+      "title": "cipher flower",
+      "expected_state": "paid_off",
+      "expected_lifecycle": ["candidate", "active", "reinforced", "paid_off"],
+      "cue": {"evidence_id": "ev-c06-cue", "chapter": 1, "source_start": 0, "source_end": 32, "text": "She pressed a blue flower in every letter."},
+      "reinforcements": [{"evidence_id": "ev-c06-re", "chapter": 4, "source_start": 0, "source_end": 30, "text": "Another blue flower arrived unsigned."}],
+      "payoff": {"evidence_id": "ev-c06-pay", "chapter": 7, "source_start": 0, "source_end": 40, "text": "Blue petals encoded the rendezvous hour."},
+      "ambiguity_ok": false
+    },
+    {
+      "id": "c07",
+      "category": "full_chain",
+      "partition": "frozen",
+      "title": "left-hand glove",
+      "expected_state": "paid_off",
+      "expected_lifecycle": ["candidate", "active", "reinforced", "paid_off"],
+      "cue": {"evidence_id": "ev-c07-cue", "chapter": 2, "source_start": 0, "source_end": 30, "text": "Only a left-hand glove remained."},
+      "reinforcements": [{"evidence_id": "ev-c07-re", "chapter": 5, "source_start": 0, "source_end": 28, "text": "The left glove reappeared in court."}],
+      "payoff": {"evidence_id": "ev-c07-pay", "chapter": 9, "source_start": 0, "source_end": 38, "text": "The right glove was on the killer's hand."},
+      "ambiguity_ok": false
+    },
+    {
+      "id": "c08",
+      "category": "full_chain",
+      "partition": "frozen",
+      "title": "rain ledger",
+      "expected_state": "paid_off",
+      "expected_lifecycle": ["candidate", "active", "reinforced", "paid_off"],
+      "cue": {"evidence_id": "ev-c08-cue", "chapter": 1, "source_start": 0, "source_end": 34, "text": "The rain ledger listed one blank night."},
+      "reinforcements": [{"evidence_id": "ev-c08-re", "chapter": 3, "source_start": 0, "source_end": 30, "text": "That blank night was mentioned again."}],
+      "payoff": {"evidence_id": "ev-c08-pay", "chapter": 6, "source_start": 0, "source_end": 40, "text": "The blank night hid the warehouse raid."},
+      "ambiguity_ok": false
+    },
+    {
+      "id": "c09",
+      "category": "cue_only_active",
+      "partition": "frozen",
+      "title": "unnamed whistle",
+      "expected_state": "active",
+      "expected_lifecycle": ["candidate", "active"],
+      "cue": {"evidence_id": "ev-c09-cue", "chapter": 1, "source_start": 0, "source_end": 30, "text": "A three-note whistle echoed at dusk."},
+      "reinforcements": [],
+      "payoff": null,
+      "ambiguity_ok": false
+    },
+    {
+      "id": "c10",
+      "category": "cue_only_active",
+      "partition": "frozen",
+      "title": "burned map corner",
+      "expected_state": "active",
+      "expected_lifecycle": ["candidate", "active"],
+      "cue": {"evidence_id": "ev-c10-cue", "chapter": 2, "source_start": 0, "source_end": 32, "text": "Only the burned corner of a map survived."},
+      "reinforcements": [],
+      "payoff": null,
+      "ambiguity_ok": false
+    },
+    {
+      "id": "c11",
+      "category": "cue_only_active",
+      "partition": "frozen",
+      "title": "locked attic door",
+      "expected_state": "active",
+      "expected_lifecycle": ["candidate", "active"],
+      "cue": {"evidence_id": "ev-c11-cue", "chapter": 1, "source_start": 0, "source_end": 28, "text": "The attic door stayed locked always."},
+      "reinforcements": [],
+      "payoff": null,
+      "ambiguity_ok": false
+    },
+    {
+      "id": "c12",
+      "category": "cue_only_active",
+      "partition": "frozen",
+      "title": "mirror crack",
+      "expected_state": "active",
+      "expected_lifecycle": ["candidate", "active"],
+      "cue": {"evidence_id": "ev-c12-cue", "chapter": 3, "source_start": 0, "source_end": 30, "text": "A hairline crack crossed the mirror."},
+      "reinforcements": [],
+      "payoff": null,
+      "ambiguity_ok": false
+    },
+    {
+      "id": "c13",
+      "category": "reinforced_unresolved",
+      "partition": "frozen",
+      "title": "midnight footfalls",
+      "expected_state": "reinforced",
+      "expected_lifecycle": ["candidate", "active", "reinforced"],
+      "cue": {"evidence_id": "ev-c13-cue", "chapter": 1, "source_start": 0, "source_end": 30, "text": "Midnight footfalls crossed the hall."},
+      "reinforcements": [{"evidence_id": "ev-c13-re", "chapter": 4, "source_start": 0, "source_end": 32, "text": "The same midnight steps returned."}],
+      "payoff": null,
+      "ambiguity_ok": false
+    },
+    {
+      "id": "c14",
+      "category": "reinforced_unresolved",
+      "partition": "frozen",
+      "title": "borrowed key",
+      "expected_state": "reinforced",
+      "expected_lifecycle": ["candidate", "active", "reinforced"],
+      "cue": {"evidence_id": "ev-c14-cue", "chapter": 2, "source_start": 0, "source_end": 28, "text": "Someone borrowed the spare key."},
+      "reinforcements": [{"evidence_id": "ev-c14-re", "chapter": 5, "source_start": 0, "source_end": 30, "text": "The spare key was still missing."}],
+      "payoff": null,
+      "ambiguity_ok": false
+    },
+    {
+      "id": "c15",
+      "category": "reinforced_unresolved",
+      "partition": "frozen",
+      "title": "tide marks",
+      "expected_state": "reinforced",
+      "expected_lifecycle": ["candidate", "active", "reinforced"],
+      "cue": {"evidence_id": "ev-c15-cue", "chapter": 1, "source_start": 0, "source_end": 30, "text": "Odd tide marks climbed the cellar wall."},
+      "reinforcements": [{"evidence_id": "ev-c15-re", "chapter": 3, "source_start": 0, "source_end": 28, "text": "Higher tide marks appeared overnight."}],
+      "payoff": null,
+      "ambiguity_ok": false
+    },
+    {
+      "id": "c16",
+      "category": "reinforced_unresolved",
+      "partition": "frozen",
+      "title": "guest ledger gap",
+      "expected_state": "reinforced",
+      "expected_lifecycle": ["candidate", "active", "reinforced"],
+      "cue": {"evidence_id": "ev-c16-cue", "chapter": 2, "source_start": 0, "source_end": 30, "text": "The guest ledger skipped one night."},
+      "reinforcements": [{"evidence_id": "ev-c16-re", "chapter": 6, "source_start": 0, "source_end": 32, "text": "That skipped night was noted again."}],
+      "payoff": null,
+      "ambiguity_ok": false
+    },
+    {
+      "id": "hn01",
+      "category": "hard_negative_recurring_motif",
+      "partition": "frozen",
+      "title": "recurring rain motif",
+      "expected_state": "dismissed",
+      "expected_lifecycle": ["candidate", "dismissed"],
+      "cue": {"evidence_id": "ev-hn01-a", "chapter": 1, "source_start": 0, "source_end": 20, "text": "It rained on the pier."},
+      "reinforcements": [],
+      "payoff": {"evidence_id": "ev-hn01-b", "chapter": 5, "source_start": 0, "source_end": 20, "text": "It rained on the pier again."},
+      "hard_negative": "recurring_motif",
+      "must_not_accept": ["active", "reinforced", "paid_off"],
+      "ambiguity_ok": true
+    },
+    {
+      "id": "hn02",
+      "category": "hard_negative_repeated_object",
+      "partition": "frozen",
+      "title": "repeated teacup",
+      "expected_state": "dismissed",
+      "expected_lifecycle": ["candidate", "dismissed"],
+      "cue": {"evidence_id": "ev-hn02-a", "chapter": 1, "source_start": 0, "source_end": 22, "text": "A blue teacup sat alone."},
+      "reinforcements": [],
+      "payoff": {"evidence_id": "ev-hn02-b", "chapter": 4, "source_start": 0, "source_end": 24, "text": "A blue teacup sat alone still."},
+      "hard_negative": "repeated_object",
+      "must_not_accept": ["active", "reinforced", "paid_off"],
+      "ambiguity_ok": true
+    },
+    {
+      "id": "hn03",
+      "category": "hard_negative_similar_wording",
+      "partition": "frozen",
+      "title": "similar wording",
+      "expected_state": "dismissed",
+      "expected_lifecycle": ["candidate", "dismissed"],
+      "cue": {"evidence_id": "ev-hn03-a", "chapter": 2, "source_start": 0, "source_end": 28, "text": "Lin walked along the quiet road."},
+      "reinforcements": [],
+      "payoff": {"evidence_id": "ev-hn03-b", "chapter": 6, "source_start": 0, "source_end": 30, "text": "Lin walked along the quiet road later."},
+      "hard_negative": "similar_wording",
+      "must_not_accept": ["paid_off"],
+      "ambiguity_ok": true
+    },
+    {
+      "id": "hn04",
+      "category": "hard_negative_same_people_location",
+      "partition": "frozen",
+      "title": "same people location",
+      "expected_state": "dismissed",
+      "expected_lifecycle": ["candidate", "dismissed"],
+      "cue": {"evidence_id": "ev-hn04-a", "chapter": 1, "source_start": 0, "source_end": 34, "text": "Alice and Bob met at the pier at dusk."},
+      "reinforcements": [],
+      "payoff": {"evidence_id": "ev-hn04-b", "chapter": 5, "source_start": 0, "source_end": 36, "text": "Alice and Bob met at the pier at dusk again."},
+      "hard_negative": "same_people_location",
+      "must_not_accept": ["paid_off"],
+      "ambiguity_ok": true
+    },
+    {
+      "id": "hn05",
+      "category": "hard_negative_summary_paraphrase",
+      "partition": "frozen",
+      "title": "summary paraphrase",
+      "expected_state": "dismissed",
+      "expected_lifecycle": ["candidate", "dismissed"],
+      "cue": {"evidence_id": "ev-hn05-a", "chapter": 2, "source_start": 0, "source_end": 40, "text": "The narrator summarized that secrets would surface."},
+      "reinforcements": [],
+      "payoff": {"evidence_id": "ev-hn05-b", "chapter": 7, "source_start": 0, "source_end": 36, "text": "In short, the secrets eventually surfaced."},
+      "hard_negative": "summary_paraphrase",
+      "must_not_accept": ["active", "paid_off"],
+      "ambiguity_ok": true
+    },
+    {
+      "id": "hn06",
+      "category": "hard_negative_payoff_before_cue",
+      "partition": "frozen",
+      "title": "payoff before cue order",
+      "expected_state": "dismissed",
+      "expected_lifecycle": ["candidate", "dismissed"],
+      "cue": {"evidence_id": "ev-hn06-a", "chapter": 8, "source_start": 0, "source_end": 24, "text": "Late mention of a dagger."},
+      "reinforcements": [],
+      "payoff": {"evidence_id": "ev-hn06-b", "chapter": 2, "source_start": 0, "source_end": 28, "text": "Early reveal of the same dagger."},
+      "hard_negative": "payoff_before_cue",
+      "must_not_accept": ["paid_off"],
+      "ambiguity_ok": false
+    },
+    {
+      "id": "hn07",
+      "category": "hard_negative_author_intent",
+      "partition": "frozen",
+      "title": "unsupported author intent",
+      "expected_state": "dismissed",
+      "expected_lifecycle": ["candidate", "dismissed"],
+      "cue": {"evidence_id": "ev-hn07-a", "chapter": 1, "source_start": 0, "source_end": 40, "text": "The author surely meant this as a clue about fate."},
+      "reinforcements": [],
+      "payoff": null,
+      "hard_negative": "unsupported_author_intent",
+      "must_not_accept": ["active", "reinforced", "paid_off"],
+      "ambiguity_ok": true
+    },
+    {
+      "id": "hn08",
+      "category": "hard_negative_chat_only",
+      "partition": "frozen",
+      "title": "chat-only assertion",
+      "expected_state": "dismissed",
+      "expected_lifecycle": ["candidate", "dismissed"],
+      "cue": {"evidence_id": "ev-hn08-chat", "chapter": 1, "source_start": 0, "source_end": 40, "text": "READER_CHAT: this is definitely a paid-off foreshadow."},
+      "reinforcements": [],
+      "payoff": null,
+      "hard_negative": "chat_only_assertion",
+      "must_not_accept": ["active", "reinforced", "paid_off"],
+      "source_protocol": "chat_rejected",
+      "ambiguity_ok": false
+    }
+  ],
+  "adversarial_cases": [
+    {
+      "id": "a01",
+      "attack": "false_active_from_similarity",
+      "expected_critical": "false_active",
+      "must_count": 0
+    },
+    {
+      "id": "a02",
+      "attack": "false_paid_off_without_order",
+      "expected_critical": "false_paid_off",
+      "must_count": 0
+    },
+    {
+      "id": "a03",
+      "attack": "spoiler_paid_off_before_cutoff",
+      "expected_critical": "spoiler_leak",
+      "must_count": 0
+    },
+    {
+      "id": "a04",
+      "attack": "cross_owner_link",
+      "expected_critical": "cross_scope_link",
+      "must_count": 0
+    },
+    {
+      "id": "a05",
+      "attack": "override_overwrite_mutate",
+      "expected_critical": "override_overwrite",
+      "must_count": 0
+    },
+    {
+      "id": "a06",
+      "attack": "chat_as_lifecycle_evidence",
+      "expected_critical": "chat_fact_source",
+      "must_count": 0
+    },
+    {
+      "id": "a07",
+      "attack": "relationship_source_unavailable_as_zero",
+      "expected_critical": "source_unavailable_masked",
+      "must_count": 0
+    },
+    {
+      "id": "a08",
+      "attack": "cross_version_link",
+      "expected_critical": "cross_scope_link",
+      "must_count": 0
+    }
+  ],
+  "operational_expectations": {
+    "min_cases": 24,
+    "min_hard_negatives": 8,
+    "min_full_chains": 8,
+    "fiction_only": true,
+    "quality_comparable_requires_metrics": true,
+    "blocked_live_not_zero": true,
+    "chat_never_clue_fact_source": true,
+    "phase09_source_unavailable_explicit": true
+  }
+}
