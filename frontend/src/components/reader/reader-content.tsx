@@ -122,6 +122,16 @@ export function ReaderContent({
     }
   }, [highlightRange, chapter?.content, pages, pageIndex, isScrollMode]);
 
+  useEffect(() => {
+    if (!highlightRange || !chapter?.content || !isScrollMode) return;
+    const frame = requestAnimationFrame(() => {
+      document
+        .querySelector<HTMLElement>('[data-testid="reader-citation-highlight"]')
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [highlightRange, chapter?.content, isScrollMode]);
+
   // 换章：有存档则恢复章内位置，否则回顶从头开始
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- chapter boundary reset

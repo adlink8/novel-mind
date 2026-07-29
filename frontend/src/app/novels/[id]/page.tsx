@@ -8,6 +8,7 @@ import { ReaderContent } from "@/components/reader/reader-content";
 import { ReaderChatPanel } from "@/components/reader/reader-chat-panel";
 import { ProgressBar } from "@/components/reader/progress-bar";
 import { SearchPanel } from "@/components/reader/search-panel";
+import { ReaderBookmarks } from "@/components/reader/reader-bookmarks";
 import {
   loadReaderPreferences,
   ReaderPreferencesPanel,
@@ -17,6 +18,7 @@ import {
 import { cn } from "@/lib/utils";
 import {
   novelsApi,
+  type Bookmark,
   type Novel,
   type Chapter,
   type SelectionCoordinate,
@@ -36,6 +38,7 @@ import {
   MessageSquareText,
   PanelLeft,
   Search,
+  Bookmark as BookmarkIcon,
 } from "lucide-react";
 import { BookLoader } from "@/components/book-loader";
 
@@ -110,6 +113,7 @@ function NovelReaderInner() {
     return window.innerWidth >= 1280;
   });
   const [searchOpen, setSearchOpen] = useState(false);
+  const [bookmarksOpen, setBookmarksOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [chapterPercent, setChapterPercent] = useState(0);
@@ -429,6 +433,20 @@ function NovelReaderInner() {
     [novelId]
   );
 
+  const handleBookmarkNavigate = useCallback(
+    (bookmark: Bookmark) => {
+      setHighlightRange({
+        sourceStart: bookmark.source_start,
+        sourceEnd: bookmark.source_end,
+      });
+      if (bookmark.chapter_id !== currentChapterId) {
+        handleSelectChapter(bookmark.chapter_id);
+      }
+      window.setTimeout(() => setHighlightRange(null), 8000);
+    },
+    [currentChapterId, handleSelectChapter]
+  );
+
   /** 沉浸模式：点按正文切换控制层；选中文本或点击交互控件时不触发 */
   const handleImmersiveSurfaceTap = useCallback(
     (event: React.MouseEvent) => {
@@ -604,6 +622,13 @@ function NovelReaderInner() {
               onChange={handlePreferencesChange}
               open={preferencesOpen}
               onOpenChange={setPreferencesOpen}
+            />
+            <ReaderBookmarks
+              novelId={novelId}
+              chapters={chapters}
+              open={bookmarksOpen}
+              onOpenChange={setBookmarksOpen}
+              onNavigate={handleBookmarkNavigate}
             />
             <Button
               variant="ghost"
