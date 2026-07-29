@@ -38,6 +38,7 @@ from app.models.base import Base
 from app.models.user import User
 from app.models.novel import Novel, Chapter
 from app.models.import_job import ImportJob
+from app.models.bookmark import Bookmark
 from app.models.analysis import (
     AnalysisResult,
     AnalysisRun,
@@ -170,6 +171,7 @@ __all__ = [
     "Novel",
     "Chapter",
     "ImportJob",
+    "Bookmark",
     "AnalysisResult",
     "TimelineEvent",
     "AnalysisRun",

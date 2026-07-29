@@ -1,5 +1,7 @@
 """小说管理 API — 接入 novel_service + 数据库"""
 
+import hashlib
+
 from fastapi import (
     APIRouter,
     Depends,
@@ -9,12 +11,15 @@ from fastapi import (
     Query,
     BackgroundTasks,
 )
+from sqlalchemy import select
+from sqlalchemy.orm import undefer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.api.dependencies import require_owned_novel
 from app.core.security import require_user
-from app.models import Novel, User
+from app.models import Bookmark, Chapter, Novel, User
+from app.schemas.bookmark import BookmarkCreate, BookmarkResponse
 from app.schemas.novel import (
     NovelResponse,
     NovelListResponse,
@@ -259,6 +264,91 @@ async def get_chapter(
     if not chapter or chapter.novel_id != novel.id:
         raise HTTPException(status_code=404, detail="章节不存在")
     return ChapterResponse.model_validate(chapter)
+
+
+@router.get("/{novel_id}/bookmarks", response_model=list[BookmarkResponse])
+async def list_bookmarks(
+    novel: Novel = Depends(require_owned_novel),
+    db: AsyncSession = Depends(get_db),
+):
+    """返回当前用户在本书保存的选区书签。"""
+    result = await db.execute(
+        select(Bookmark)
+        .where(
+            Bookmark.owner_id == novel.owner_id,
+            Bookmark.novel_id == novel.id,
+        )
+        .order_by(Bookmark.created_at.desc(), Bookmark.id.desc())
+    )
+    return list(result.scalars().all())
+
+
+@router.post(
+    "/{novel_id}/bookmarks",
+    response_model=BookmarkResponse,
+    status_code=201,
+)
+async def create_bookmark(
+    data: BookmarkCreate,
+    novel: Novel = Depends(require_owned_novel),
+    db: AsyncSession = Depends(get_db),
+):
+    """保存经过服务端校验的章节选区，位置单位为 Unicode code point。"""
+    chapter_result = await db.execute(
+        select(Chapter)
+        .options(undefer(Chapter.content))
+        .where(Chapter.id == data.chapter_id, Chapter.novel_id == novel.id)
+    )
+    chapter = chapter_result.scalar_one_or_none()
+    if not chapter:
+        raise HTTPException(status_code=404, detail="章节不存在")
+
+    content = chapter.content or ""
+    if hashlib.sha256(content.encode("utf-8")).hexdigest() != data.chapter_content_hash:
+        raise HTTPException(status_code=409, detail="章节内容已变化，请重新选择文本")
+    if data.source_end <= data.source_start or data.source_end > len(content):
+        raise HTTPException(status_code=422, detail="书签选区位置无效")
+
+    expected_text = content[data.source_start : data.source_end]
+    if expected_text != data.selection_text:
+        raise HTTPException(status_code=409, detail="选中文本已变化，请重新选择文本")
+    if hashlib.sha256(expected_text.encode("utf-8")).hexdigest() != data.selection_text_hash:
+        raise HTTPException(status_code=422, detail="选中文本校验失败")
+
+    bookmark = Bookmark(
+        owner_id=novel.owner_id,
+        novel_id=novel.id,
+        chapter_id=chapter.id,
+        source_start=data.source_start,
+        source_end=data.source_end,
+        selected_text=expected_text,
+        selection_text_hash=data.selection_text_hash,
+        chapter_content_hash=data.chapter_content_hash,
+    )
+    db.add(bookmark)
+    await db.commit()
+    await db.refresh(bookmark)
+    return bookmark
+
+
+@router.delete("/{novel_id}/bookmarks/{bookmark_id}", status_code=204)
+async def delete_bookmark(
+    bookmark_id: int,
+    novel: Novel = Depends(require_owned_novel),
+    db: AsyncSession = Depends(get_db),
+):
+    """删除当前用户在本书保存的选区书签。"""
+    bookmark = await db.scalar(
+        select(Bookmark).where(
+            Bookmark.id == bookmark_id,
+            Bookmark.owner_id == novel.owner_id,
+            Bookmark.novel_id == novel.id,
+        )
+    )
+    if not bookmark:
+        raise HTTPException(status_code=404, detail="书签不存在")
+    await db.delete(bookmark)
+    await db.commit()
 
 
 @router.patch("/{novel_id}/progress", response_model=ReadingProgressResponse)

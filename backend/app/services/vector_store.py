@@ -117,7 +117,8 @@ class VectorStore:
             documents = [chunk["content"] for chunk in chunks]
             embeddings = [chunk["embedding"] for chunk in chunks]
             metadatas = [chunk.get("metadata", {}) for chunk in chunks]
-            collection.add(
+            # upsert 使网络超时后重试幂等：第一次请求可能已写入但客户端未收到响应。
+            collection.upsert(
                 ids=ids,
                 documents=documents,
                 embeddings=embeddings,

@@ -52,7 +52,7 @@ VALID_STATUS_TRANSITIONS = {
     "parsing": ["chunking", "saving", "failed", "cancelled"],
     "chunking": ["embedding", "saving", "failed", "cancelled"],
     "embedding": ["ready", "failed", "cancelled"],
-    "saving": ["ready", "failed", "cancelled"],
+    "saving": ["embedding", "ready", "failed", "cancelled"],
     "ready": [],  # 终态
     "failed": ["pending"],  # 只能重试回 pending
     "cancelled": [],  # 终态

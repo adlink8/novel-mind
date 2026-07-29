@@ -474,7 +474,7 @@ class ImportService:
             await self.update_job_status(
                 db,
                 job_id,
-                "ready",
+                "embedding",
                 90,
                 f"分章完成：{len(chapters)} 章，{sum(c['word_count'] for c in chapters)} 字；正在建立检索索引…",
             )
@@ -493,16 +493,25 @@ class ImportService:
                 )
             else:
                 try:
-                    await self.update_job_status(
-                        db,
-                        job_id,
-                        "embedding",
-                        92,
-                        "正在建立检索索引（分块+向量）…",
-                    )
                     from app.services.indexing_service import indexing_service
 
                     index_result = await indexing_service.index_novel(db, novel.id)
+                    failed_chunks = int(index_result.get("failed_chunks", 0) or 0)
+                    if failed_chunks:
+                        detail = (
+                            f"检索索引失败：{failed_chunks}/"
+                            f"{index_result.get('total_chunks', 0)} 个语块未完成嵌入"
+                        )
+                        await self.update_job_status(
+                            db,
+                            job_id,
+                            "failed",
+                            100,
+                            f"导入完成，但检索索引失败（已自动重试，{detail}）；请重新建立索引",
+                            error_detail=detail,
+                        )
+                        await db.commit()
+                        return
                     await self.update_job_status(
                         db,
                         job_id,

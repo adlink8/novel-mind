@@ -6,7 +6,7 @@
 上传 TXT (.txt)
     │
     ▼
-创建 ImportJob（状态机：pending → uploading → detecting → parsing → saving → embedding → ready）
+创建 ImportJob（状态机：pending → uploading → detecting → parsing → saving → embedding → ready / failed）
     │
     ├── 编码检测（_decode_with_fallback）
     │   ├─ BOM 检测：\xff\xfe → UTF-16, \xfe\xff → UTF-16 BE, \xef\xbb\xbf → UTF-8-SIG
@@ -45,7 +45,7 @@
 
 - **Lease 机制**：每 5 分钟租约续期，防止重复处理
 - **Content Hash**：SHA-256 文件内容哈希，同一文件重新上传只返回已有 job_id
-- **重试恢复**：`recover_stale_jobs()` 服务重启时自动恢复超时任务
+- **重试恢复**：embedding/Chroma 短暂失败自动有限重试；服务重启时 `recover_stale_jobs()` 自动恢复超时任务。最终索引失败会进入 `indexing_failed`，不能伪装为 `ready`。
 - **取消支持**：`cancel_job()` 终止运行中的导入
 
 ## 关键代码位置

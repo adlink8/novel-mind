@@ -66,7 +66,12 @@ async def search_novel(
 
     可选认证：有 token 则检查所有权，无 token 则允许访问。
     """
-    await _get_novel_for_search(novel_id, db, current_user)
+    novel = await _get_novel_for_search(novel_id, db, current_user)
+    if novel.status == "indexing_failed":
+        raise HTTPException(
+            status_code=409,
+            detail="检索索引未完成，当前不可搜索；请先重新建立索引",
+        )
 
     from app.services.indexing_service import indexing_service
 

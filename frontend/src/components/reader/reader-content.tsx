@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { Chapter } from "@/lib/api";
 import type { SelectionCoordinate } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, ChevronLeft, ChevronRight, MessageSquareText } from "lucide-react";
+import { AlertTriangle, BookmarkPlus, ChevronLeft, ChevronRight, MessageSquareText } from "lucide-react";
 import type { ReaderMode } from "@/components/reader/reader-preferences";
 import {
   buildSelectionPayload,
@@ -28,6 +28,8 @@ interface ReaderContentProps {
   hasPrevChapter?: boolean;
   /** Fired when user activates ask-AI on a captured selection. */
   onAskSelection?: (payload: SelectionCoordinate) => void;
+  /** Fired when user saves a captured selection as a persistent bookmark. */
+  onBookmarkSelection?: (payload: SelectionCoordinate) => void | Promise<void>;
   /** Highlight a code-point range within the current chapter (citation jump). */
   highlightRange?: { sourceStart: number; sourceEnd: number } | null;
   /** 分页阅读或整章长页阅读。 */
@@ -69,6 +71,7 @@ export function ReaderContent({
   hasNextChapter = false,
   hasPrevChapter = false,
   onAskSelection,
+  onBookmarkSelection,
   highlightRange = null,
   readingMode = "paged",
   initialProgress = 0,
@@ -86,6 +89,7 @@ export function ReaderContent({
     coords: ChapterSelectionCoords;
     anchor: { top: number; left: number };
   } | null>(null);
+  const [bookmarkState, setBookmarkState] = useState<"idle" | "saving" | "saved" | "error">("idle");
 
   const pages = useMemo(
     () => splitPagesWithBases(chapter?.content || "", PAGE_CHARS),
@@ -195,7 +199,11 @@ export function ReaderContent({
   }, []);
 
   const handleSelectionChange = useCallback(() => {
-    if (!chapter || !pageTextRef.current || !onAskSelection) return;
+    if (
+      !chapter ||
+      !pageTextRef.current ||
+      (!onAskSelection && !onBookmarkSelection)
+    ) return;
     const sel = window.getSelection();
     // Selection cleared / collapsed → hide floating 「问 AI」 immediately.
     if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
@@ -221,7 +229,10 @@ export function ReaderContent({
       return;
     }
 
-    const rect = range.getBoundingClientRect();
+    const rect =
+      typeof range.getBoundingClientRect === "function"
+        ? range.getBoundingClientRect()
+        : { bottom: 0, left: 0 };
     const host = contentRef.current?.getBoundingClientRect();
     const top = host ? rect.bottom - host.top + 8 : rect.bottom;
     const left = host
@@ -230,10 +241,10 @@ export function ReaderContent({
 
     // Capture immutable coords before native selection can collapse (mobile/menus).
     setCaptured({ coords, anchor: { top, left } });
-  }, [chapter, onAskSelection, pageIndex, displayPages]);
+  }, [chapter, onAskSelection, onBookmarkSelection, pageIndex, displayPages]);
 
   useEffect(() => {
-    if (!onAskSelection) return;
+    if (!onAskSelection && !onBookmarkSelection) return;
     document.addEventListener("selectionchange", handleSelectionChange);
     // mouseup/touchend catch selection finalization on some browsers
     document.addEventListener("mouseup", handleSelectionChange);
@@ -248,7 +259,7 @@ export function ReaderContent({
       document.removeEventListener("touchend", handleSelectionChange);
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [handleSelectionChange, onAskSelection, clearCaptured]);
+  }, [handleSelectionChange, onAskSelection, onBookmarkSelection, clearCaptured]);
 
   // Page flip / chapter change drops the floating action (stale anchors).
   useEffect(() => {
@@ -293,6 +304,25 @@ export function ReaderContent({
     onAskSelection(payload);
     setCaptured(null);
     window.getSelection()?.removeAllRanges();
+  };
+
+  const handleBookmark = async () => {
+    if (!chapter || !captured || !onBookmarkSelection) return;
+    setBookmarkState("saving");
+    try {
+      const payload = await buildSelectionPayload(
+        chapter.id,
+        chapter.content || "",
+        captured.coords
+      );
+      await onBookmarkSelection(payload);
+      setBookmarkState("saved");
+      setCaptured(null);
+      window.getSelection()?.removeAllRanges();
+      window.setTimeout(() => setBookmarkState("idle"), 1800);
+    } catch {
+      setBookmarkState("error");
+    }
   };
 
   const safeIndex = Math.min(pageIndex, Math.max(displayPages.length - 1, 0));
@@ -423,22 +453,45 @@ export function ReaderContent({
         {renderedPage}
       </div>
 
-      {captured && onAskSelection ? (
+      {captured && (onAskSelection || onBookmarkSelection) ? (
         <div
           data-testid="reader-selection-action"
           className="absolute z-30"
           style={{ top: captured.anchor.top, left: captured.anchor.left }}
         >
-          <Button
-            type="button"
-            size="sm"
-            className="shadow-md"
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => void handleAsk()}
-          >
-            <MessageSquareText className="size-3.5" />
-            问 AI
-          </Button>
+          <div className="flex items-center gap-1 rounded-lg bg-background/95 p-1 shadow-md ring-1 ring-border/70">
+            {onAskSelection ? (
+              <Button
+                type="button"
+                size="sm"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => void handleAsk()}
+              >
+                <MessageSquareText className="size-3.5" />
+                问 AI
+              </Button>
+            ) : null}
+            {onBookmarkSelection ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={bookmarkState === "saving"}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => void handleBookmark()}
+                aria-label="保存书签"
+              >
+                <BookmarkPlus className="size-3.5" />
+                {bookmarkState === "saving"
+                  ? "保存中"
+                  : bookmarkState === "saved"
+                    ? "已保存"
+                    : bookmarkState === "error"
+                      ? "保存失败"
+                      : "书签"}
+              </Button>
+            ) : null}
+          </div>
         </div>
       ) : null}
 

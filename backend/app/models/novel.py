@@ -6,7 +6,8 @@
   Chapter 是 Novel 的子实体，通过 novel_id 外键关联。
 
 状态机 (Novel.status):
-  importing → ready → analyzing → analyzed
+  importing → chunking → embedding → ready → analyzing → analyzed
+  embedding → indexing_failed（检索索引失败，可重建）
   - importing: 正在上传/解析
   - ready: 解析完成，可供阅读和分析
   - analyzing: AI 正在分析中
@@ -69,7 +70,7 @@ class Novel(TimestampMixin, Base):
     # 处理状态
     status: Mapped[str] = mapped_column(
         String(50), default="importing"
-    )  # 状态: importing / chunking / embedding / analyzing / analyzed / ready
+    )  # 状态: importing / chunking / embedding / indexing_failed / analyzing / analyzed / ready
 
     # 文件路径
     source_path: Mapped[str | None] = mapped_column(

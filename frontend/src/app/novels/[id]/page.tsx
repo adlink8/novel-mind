@@ -422,6 +422,13 @@ function NovelReaderInner() {
     setChatCollapsed(false);
   }, []);
 
+  const handleBookmarkSelection = useCallback(
+    async (payload: SelectionCoordinate) => {
+      await novelsApi.createBookmark(novelId, payload);
+    },
+    [novelId]
+  );
+
   /** 沉浸模式：点按正文切换控制层；选中文本或点击交互控件时不触发 */
   const handleImmersiveSurfaceTap = useCallback(
     (event: React.MouseEvent) => {
@@ -668,6 +675,7 @@ function NovelReaderInner() {
               }
               hasPrevChapter={currentIndex > 0}
               onAskSelection={handleAskSelection}
+              onBookmarkSelection={handleBookmarkSelection}
               highlightRange={highlightRange}
               readingMode={preferences.mode}
               initialProgress={restorePercent}

@@ -1,5 +1,5 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { Chapter } from "@/lib/api";
 import { ReaderContent } from "./reader-content";
@@ -59,5 +59,32 @@ describe("ReaderContent keyboard paging", () => {
     // 长页模式没有页码指示，只验证不渲染翻页控件
     expect(screen.getByText(/长页模式/)).toBeInTheDocument();
     expect(screen.queryByText(/第 \d+\/\d+ 页/)).not.toBeInTheDocument();
+  });
+
+  it("saves a selected paragraph through the bookmark callback", async () => {
+    const onBookmarkSelection = vi.fn().mockResolvedValue(undefined);
+    render(
+      <ReaderContent
+        chapter={makeChapter("这是需要保存的选中段落。")}
+        onBookmarkSelection={onBookmarkSelection}
+      />
+    );
+
+    const textNode = screen.getByTestId("reader-page-text").firstChild;
+    expect(textNode).not.toBeNull();
+    const range = document.createRange();
+    range.setStart(textNode!, 0);
+    range.setEnd(textNode!, 7);
+    const selection = window.getSelection()!;
+    selection.removeAllRanges();
+    selection.addRange(range);
+    fireEvent(document, new Event("selectionchange"));
+
+    const saveButton = await screen.findByRole("button", { name: "保存书签" });
+    fireEvent.click(saveButton);
+    await waitFor(() => expect(onBookmarkSelection).toHaveBeenCalledTimes(1));
+    expect(onBookmarkSelection.mock.calls[0][0].selection_text).toBe(
+      "这是需要保存的"
+    );
   });
 });

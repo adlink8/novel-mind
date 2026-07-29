@@ -152,7 +152,7 @@ class NovelUploadResponse(BaseModel):
     )
     title: str  # 小说标题（从文件名提取）
     status: str = Field(
-        ..., description="处理状态: pending / importing / ready / failed"
+        ..., description="处理状态: pending / importing / ready / indexing_failed / failed"
     )
     message: str = Field(default="文件已上传，正在处理中...")
     chapter_count: int = 0  # 解析出的章节数
