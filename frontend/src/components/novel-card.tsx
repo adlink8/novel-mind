@@ -63,6 +63,12 @@ function statusMeta(status: string): { label: string; className: string; hint: s
         className: "bg-blue-100 text-blue-800",
         hint: "正在建立检索索引，完成后才可语义搜索",
       };
+    case "indexing_failed":
+      return {
+        label: "索引失败",
+        className: "bg-red-100 text-red-800",
+        hint: "检索索引未完成，请重新建立索引后再使用搜索",
+      };
     case "analyzing":
       return {
         label: "时间线分析中",
@@ -112,6 +118,8 @@ function sealChar(status: string): string {
     case "chunking":
     case "embedding":
       return "索";
+    case "indexing_failed":
+      return "错";
     case "analyzing":
       return "析";
     case "analyzed":

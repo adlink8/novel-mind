@@ -559,6 +559,41 @@ class TestErrorHandling:
         assert result["embedded_chunks"] == 0
         assert result["failed_chunks"] == 3
         assert result["status"] == "partial"
+        assert mock_novel.status == "indexing_failed"
+
+    @pytest.mark.asyncio
+    async def test_transient_embedding_failure_is_retried(
+        self,
+        indexing_service,
+        mock_db,
+        mock_novel,
+        mock_chapters,
+        mock_vector_store,
+    ):
+        """短暂 embedding 故障恢复后，索引应成功而不是留下失败块。"""
+        mock_db.get.return_value = mock_novel
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = mock_chapters
+        mock_db.execute.return_value = mock_result
+
+        with (
+            patch("app.services.indexing_service.ai_service") as mock_ai,
+            patch("app.services.indexing_service.settings") as mock_settings,
+        ):
+            mock_settings.embedding_provider = "ollama"
+            mock_settings.embedding_batch_size = 100
+            mock_settings.embedding_max_retries = 1
+            mock_settings.embedding_retry_backoff_seconds = 0
+            mock_ai.embedding = AsyncMock(
+                side_effect=[RuntimeError("temporary outage"), [[0.1, 0.2, 0.3]] * 3]
+            )
+
+            result = await indexing_service.index_novel(mock_db, novel_id=1)
+
+        assert result["status"] == "ready"
+        assert result["failed_chunks"] == 0
+        assert mock_ai.embedding.await_count == 2
+        assert mock_novel.status == "ready"
 
 
 # ── 进度回调测试 ──

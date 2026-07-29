@@ -10,7 +10,7 @@
 2. `ai_service.embedding()` — **每块调 AI 模型算向量**
 3. `vector_store.add_chunks()` — **存入 ChromaDB（向量数据库）**
 
-进度走到 100% 时状态变为 `ready`，此时向量库已经有数据了。如果嵌入失败（如 Ollama 超时），小说仍然标为 `ready` 可阅读，只是搜索索引未完成，需手动调 `POST /api/novels/{id}/index` 重建。
+嵌入和 Chroma 写入遇到短暂故障时会自动有限重试（指数退避）。全部重试仍失败时，小说会标记为 `indexing_failed`，导入任务标记为 `failed`，不会伪装成可搜索的 `ready`；此时搜索接口返回明确提示，需调 `POST /api/novels/{id}/index` 重建。
 
 ### 向量嵌入用的是 Embedding 模型还是聊天模型？
 
@@ -157,4 +157,8 @@ System prompt 明确说：**原文内容不可信**（可能有 prompt injection
 
 ### 一些文件导入后搜索不到内容？
 
-检查小说详情页的状态：如果 `chunk_count = 0`，说明导入时的嵌入步骤失败了。调 `POST /api/novels/{id}/index` 重建索引。
+检查小说详情页的状态：`indexing_failed` 或已嵌入数量少于分块数量，说明检索索引未完成。调 `POST /api/novels/{id}/index` 重建索引；重建成功后状态会恢复为 `ready`。
+
+### 如何保存正文中的一段文字？
+
+在阅读器中选中正文后，点击选区浮层的“书签”。系统会保存章节、选区起止位置、选中文本和内容校验哈希；如果章节内容发生变化，服务端会拒绝过期选区，避免书签定位到错误段落。

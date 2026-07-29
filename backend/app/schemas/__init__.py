@@ -40,6 +40,7 @@ from app.schemas.novel import (
     NovelUpdate,
     NovelUploadResponse,
 )
+from app.schemas.bookmark import BookmarkCreate, BookmarkResponse
 
 # 分析
 from app.schemas.analysis import (
@@ -158,6 +159,8 @@ __all__ = [
     "NovelResponse",
     "NovelUpdate",
     "NovelUploadResponse",
+    "BookmarkCreate",
+    "BookmarkResponse",
     # 分析
     "AnalysisRequest",
     "AnalysisResponse",

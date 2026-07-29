@@ -88,6 +88,9 @@ class Settings(BaseSettings):
     embedding_dimensions: int = 512
     embedding_device: str = "cpu"  # cuda / cpu；无 CUDA torch 时自动回退 cpu
     embedding_batch_size: int = 64
+    # 外部 embedding / Chroma 短暂不可用时的有限重试。
+    embedding_max_retries: int = 2
+    embedding_retry_backoff_seconds: float = 0.5
 
     # ── 认证与敏感数据保护 ──
     secret_key: str = DEV_JWT_SECRET

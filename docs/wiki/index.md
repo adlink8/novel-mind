@@ -82,7 +82,7 @@ AI：       OpenAI / Anthropic / Google Vertex / Ollama（可配置模型路由�
 ```
 TXT 上传 → 导入任务 → 编码检测 → 章节拆分 → 分块 → 向量嵌入 → ChromaDB
                                                        ↓
-                                              ← ready（可阅读/搜索）
+                                              ← ready（可阅读/搜索；索引失败时为 indexing_failed）
 用户点「开始分析」→ 时间线 worker → 逐章事件提取 → 跨章归并 → 发布 active
                               → 关系 worker（时间线完成后自动触发）
                               → 线索 worker（并行）

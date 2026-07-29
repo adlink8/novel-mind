@@ -22,6 +22,7 @@ Embedding 索引管线服务
   results = await indexing_service.search_similar(db, novel_id=1, query="主角的性格")
 """
 
+import asyncio
 import logging
 from typing import Any, Callable, Awaitable
 
@@ -57,6 +58,42 @@ class IndexingService:
         self.chunking_service = ChunkingService()
         self.vector_store = VectorStore()
 
+    @staticmethod
+    def _retry_settings() -> tuple[int, float]:
+        """读取有限重试配置，并对非法环境值安全回退。"""
+        try:
+            retries = max(0, int(getattr(settings, "embedding_max_retries", 2)))
+        except (TypeError, ValueError):
+            retries = 2
+        try:
+            backoff = max(
+                0.0,
+                float(getattr(settings, "embedding_retry_backoff_seconds", 0.5)),
+            )
+        except (TypeError, ValueError):
+            backoff = 0.5
+        return retries, backoff
+
+    async def _with_retry(self, operation, *, operation_name: str):
+        """对 embedding 和向量写入执行有限指数退避重试。"""
+        max_retries, backoff = self._retry_settings()
+        for attempt in range(max_retries + 1):
+            try:
+                return await operation()
+            except Exception:
+                if attempt >= max_retries:
+                    raise
+                delay = backoff * (2**attempt)
+                logger.warning(
+                    "%s 失败，将在 %.2fs 后重试（%d/%d）",
+                    operation_name,
+                    delay,
+                    attempt + 1,
+                    max_retries,
+                )
+                if delay:
+                    await asyncio.sleep(delay)
+
     async def index_novel(
         self,
         db: AsyncSession,
@@ -77,7 +114,7 @@ class IndexingService:
                 - total_chunks: 总块数
                 - embedded_chunks: 成功向量化的块数
                 - failed_chunks: 失败的块数
-                - status: 最终状态 ("ready" 或 "partial")
+                - status: 最终状态 ("ready" 或 "partial")；失败时 Novel.status 为 "indexing_failed"
 
         Raises:
             IndexingError: 流程级错误（如小说不存在、章节为空）
@@ -250,8 +287,11 @@ class IndexingService:
 
             # 写入 ChromaDB
             try:
-                await self.vector_store.add_chunks(
-                    novel_id=novel_id, chunks=chunks_for_store
+                await self._with_retry(
+                    lambda: self.vector_store.add_chunks(
+                        novel_id=novel_id, chunks=chunks_for_store
+                    ),
+                    operation_name=f"Chroma 写入 batch {i // batch_size}",
                 )
             except Exception as e:
                 logger.error(
@@ -277,7 +317,8 @@ class IndexingService:
             novel.status = "ready"
             final_status = "ready"
         else:
-            novel.status = "ready"
+            # 不能把不可完整检索的小说报告为 ready；保留已成功的块，等待重建。
+            novel.status = "indexing_failed"
             final_status = "partial"
 
         await db.commit()
@@ -442,7 +483,14 @@ class IndexingService:
 
         for i in range(0, len(texts), batch_size):
             batch = texts[i : i + batch_size]
-            embeddings = await ai_service.embedding(texts=batch)
+            embeddings = await self._with_retry(
+                lambda: ai_service.embedding(texts=batch),
+                operation_name=f"embedding batch {i // batch_size}",
+            )
+            if len(embeddings) != len(batch):
+                raise IndexingError(
+                    f"embedding 返回数量不匹配: expected={len(batch)}, got={len(embeddings)}"
+                )
             all_embeddings.extend(embeddings)
 
         return all_embeddings

@@ -62,7 +62,7 @@ class TestAddChunks:
     async def test_add_chunks_calls_correctly(
         self, vector_store, mock_chroma_client, mock_collection
     ):
-        """验证 add_chunks 调用 collection.add 的参数格式"""
+        """验证 add_chunks 调用 collection.upsert 的参数格式"""
         mock_chroma_client.get_or_create_collection.return_value = mock_collection
 
         chunks = [
@@ -95,7 +95,7 @@ class TestAddChunks:
         mock_chroma_client.get_or_create_collection.assert_called_once_with(
             name="novel_1", metadata={"hnsw:space": "cosine"}
         )
-        mock_collection.add.assert_called_once_with(
+        mock_collection.upsert.assert_called_once_with(
             ids=["chunk_1", "chunk_2"],
             documents=["第一段文本", "第二段文本"],
             embeddings=[[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]],
@@ -127,7 +127,7 @@ class TestAddChunks:
     ):
         """写入失败时抛出 VectorStoreError"""
         mock_chroma_client.get_or_create_collection.return_value = mock_collection
-        mock_collection.add.side_effect = RuntimeError("connection refused")
+        mock_collection.upsert.side_effect = RuntimeError("connection refused")
 
         with pytest.raises(VectorStoreError, match="写入向量失败"):
             await vector_store.add_chunks(

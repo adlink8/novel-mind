@@ -15,6 +15,7 @@ RAG 检索 API 测试
 
 import io
 import sys
+from types import SimpleNamespace
 from unittest.mock import patch, AsyncMock, MagicMock
 
 import pytest
@@ -75,6 +76,27 @@ async def test_search_success(mock_service: AsyncMock, auth_client: AsyncClient)
     assert data["results"][0]["chunk_id"] == 1
     assert data["results"][0]["score"] == 0.95
     mock_service.search_similar.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+@patch("app.services.indexing_service.indexing_service")
+@patch("app.api.rag._get_novel_for_search", new_callable=AsyncMock)
+async def test_search_blocks_incomplete_index(
+    mock_get_novel: AsyncMock,
+    mock_service: AsyncMock,
+    auth_client: AsyncClient,
+):
+    """索引失败时不得继续调用搜索，避免返回误导性的空结果。"""
+    mock_get_novel.return_value = SimpleNamespace(status="indexing_failed")
+
+    resp = await auth_client.post(
+        "/api/novels/1/search",
+        json={"query": "主角", "top_k": 5},
+    )
+
+    assert resp.status_code == 409
+    assert "索引未完成" in resp.json()["detail"]
+    mock_service.search_similar.assert_not_called()
 
 
 @pytest.mark.asyncio

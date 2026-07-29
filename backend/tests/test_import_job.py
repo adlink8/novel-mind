@@ -17,6 +17,9 @@ import pytest
 
 pytestmark = pytest.mark.unit
 from datetime import datetime, timedelta, timezone
+from unittest.mock import AsyncMock, patch
+from io import BytesIO
+from starlette.datastructures import UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.import_job import ImportJob
@@ -214,6 +217,50 @@ async def test_import_service_create_job(db_session: AsyncSession):
     assert job.status == "pending"
     assert job.progress == 0
     assert job.message == "等待处理"
+
+
+@pytest.mark.asyncio
+async def test_import_marks_index_failure_as_failed(
+    db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+):
+    """自动索引未完成时，导入任务不能伪装成 ready。"""
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    user = await _create_test_user(db_session)
+    novel = await _create_test_novel(db_session, user)
+    service = ImportService()
+    job = await service.create_import_job(db_session)
+
+    async def failed_index(_db, _novel_id):
+        novel.status = "indexing_failed"
+        return {"total_chunks": 4, "embedded_chunks": 2, "failed_chunks": 2}
+
+    chapters = [{"title": "第一章", "content": "正文", "word_count": 2}]
+    upload = UploadFile(file=BytesIO(b"content"), filename="failure.txt")
+    with (
+        patch(
+            "app.services.import_service.novel_service.upload_novel",
+            new=AsyncMock(return_value=("upload.txt", b"content")),
+        ),
+        patch(
+            "app.services.import_service.novel_service.parse_novel",
+            return_value=chapters,
+        ),
+        patch(
+            "app.services.import_service.novel_service.create_novel_record",
+            new=AsyncMock(return_value=novel),
+        ),
+        patch(
+            "app.services.indexing_service.indexing_service.index_novel",
+            new=AsyncMock(side_effect=failed_index),
+        ),
+    ):
+        await service.process_import_file(db_session, job.id, upload, user.id)
+
+    await db_session.refresh(job)
+    assert job.status == "failed"
+    assert "检索索引失败" in job.message
+    assert job.error_detail is not None
+    assert novel.status == "indexing_failed"
 
 
 @pytest.mark.asyncio

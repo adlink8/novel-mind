@@ -137,6 +137,7 @@ export default function NovelsPage() {
     { value: "importing", label: "导入中" },
     { value: "chunking", label: "建索引中" },
     { value: "embedding", label: "向量化中" },
+    { value: "indexing_failed", label: "索引失败" },
     { value: "ready", label: "可阅读" },
     { value: "analyzing", label: "分析中" },
     { value: "analyzed", label: "已分析" },

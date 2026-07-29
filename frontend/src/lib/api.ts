@@ -129,6 +129,20 @@ export interface Chapter {
   updated_at: string;
 }
 
+export interface Bookmark {
+  id: number;
+  owner_id: number;
+  novel_id: number;
+  chapter_id: number;
+  source_start: number;
+  source_end: number;
+  selected_text: string;
+  selection_text_hash: string;
+  chapter_content_hash: string;
+  created_at: string;
+  updated_at: string;
+}
+
 /** 小说列表分页响应 */
 export interface NovelListResponse {
   items: Novel[];
@@ -159,7 +173,7 @@ export interface NovelBulkDeleteResponse {
 export interface ImportStatus {
   job_id?: number | null;
   novel_id?: number | null;
-  stage: string;       // uploading / detecting / parsing / saving / ready / failed / error
+  stage: string;       // uploading / detecting / parsing / saving / embedding / ready / failed / error
   percent: number;     // 0-100
   message: string;
 }
@@ -188,6 +202,12 @@ export const novelsApi = {
     api.get<Chapter>(`/novels/${novelId}/chapters/${chapterId}`),
   updateProgress: (novelId: string, chapterId: number, progressPercent: number) =>
     api.patch(`/novels/${novelId}/progress`, { chapter_id: chapterId, progress_percent: progressPercent }),
+  listBookmarks: (novelId: string | number) =>
+    api.get<Bookmark[]>(`/novels/${novelId}/bookmarks`),
+  createBookmark: (novelId: string | number, selection: SelectionCoordinate) =>
+    api.post<Bookmark>(`/novels/${novelId}/bookmarks`, selection),
+  deleteBookmark: (novelId: string | number, bookmarkId: number) =>
+    api.delete(`/novels/${novelId}/bookmarks/${bookmarkId}`),
   /** @deprecated 上传后应使用 getImportJobStatus(job_id) */
   getImportStatus: (novelId: string) => api.get<ImportStatus>(`/novels/${novelId}/import-status`),
   getImportJobStatus: (jobId: string | number) =>
