@@ -81,6 +81,7 @@ describe("ReaderContent keyboard paging", () => {
     fireEvent(document, new Event("selectionchange"));
 
     const saveButton = await screen.findByRole("button", { name: "保存书签" });
+    expect(screen.queryByText("书签")).not.toBeInTheDocument();
     fireEvent.click(saveButton);
     await waitFor(() => expect(onBookmarkSelection).toHaveBeenCalledTimes(1));
     expect(onBookmarkSelection.mock.calls[0][0].selection_text).toBe(

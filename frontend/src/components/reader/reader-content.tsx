@@ -474,21 +474,31 @@ export function ReaderContent({
             {onBookmarkSelection ? (
               <Button
                 type="button"
-                size="sm"
-                variant="outline"
+                size="icon-sm"
+                variant="ghost"
                 disabled={bookmarkState === "saving"}
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => void handleBookmark()}
-                aria-label="保存书签"
+                aria-label={
+                  bookmarkState === "saving"
+                    ? "保存书签中"
+                    : bookmarkState === "saved"
+                      ? "书签已保存"
+                      : bookmarkState === "error"
+                        ? "书签保存失败"
+                        : "保存书签"
+                }
+                title={
+                  bookmarkState === "saving"
+                    ? "保存书签中"
+                    : bookmarkState === "saved"
+                      ? "书签已保存"
+                      : bookmarkState === "error"
+                        ? "书签保存失败"
+                        : "保存书签"
+                }
               >
                 <BookmarkPlus className="size-3.5" />
-                {bookmarkState === "saving"
-                  ? "保存中"
-                  : bookmarkState === "saved"
-                    ? "已保存"
-                    : bookmarkState === "error"
-                      ? "保存失败"
-                      : "书签"}
               </Button>
             ) : null}
           </div>
