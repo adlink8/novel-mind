@@ -49,8 +49,18 @@ export function ReaderBookmarks({
       .then((response) => {
         if (active) setBookmarks(response.data);
       })
-      .catch(() => {
-        if (active) setError("书签加载失败，请确认数据库迁移已完成");
+      .catch((requestError: unknown) => {
+        if (!active) return;
+        const status = (
+          requestError as { response?: { status?: number } }
+        ).response?.status;
+        if (status === 401) {
+          setError("登录状态已失效，请重新登录");
+        } else if (status === 404) {
+          setError("后端书签接口未更新，请重启后端服务");
+        } else {
+          setError("书签加载失败，请确认数据库迁移已完成");
+        }
       })
       .finally(() => {
         if (active) setLoading(false);
