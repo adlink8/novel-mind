@@ -24,7 +24,7 @@ from pydantic import (
 from app.services.narrative_memory.contracts import (
     Hash64,
     Key,
-    PositiveInt,
+    NonNegativeInt,
     VersionLabel,
 )
 
@@ -145,8 +145,8 @@ class CompatibilityPolicy(RebuildFrozenModel):
 class GraphVertex(RebuildFrozenModel):
     asset_key: Key
     asset_kind: AssetKind
-    chapter_start: PositiveInt | None = None
-    chapter_end: PositiveInt | None = None
+    chapter_start: NonNegativeInt | None = None
+    chapter_end: NonNegativeInt | None = None
     content_checksum: Hash64 | None = None
     evidence_fingerprint: Hash64 | None = None
     optional_fingerprint: Hash64 | None = None
@@ -210,8 +210,8 @@ class ChangeRecord(RebuildFrozenModel):
     asset_kind: AssetKind
     change_kind: ChangeKind
     reasons: tuple[ReasonCode, ...]
-    chapter_start: PositiveInt | None = None
-    chapter_end: PositiveInt | None = None
+    chapter_start: NonNegativeInt | None = None
+    chapter_end: NonNegativeInt | None = None
     old_checksum: Hash64 | None = None
     new_checksum: Hash64 | None = None
     detail: dict[str, Any] = Field(default_factory=dict)
@@ -224,8 +224,8 @@ class RebuildItemDecision(RebuildFrozenModel):
     direct_reasons: tuple[ReasonCode, ...]
     propagated_reasons: tuple[ReasonCode, ...]
     predecessor_keys: tuple[Key, ...]
-    chapter_start: PositiveInt | None = None
-    chapter_end: PositiveInt | None = None
+    chapter_start: NonNegativeInt | None = None
+    chapter_end: NonNegativeInt | None = None
     old_content_checksum: Hash64 | None = None
     new_content_checksum: Hash64 | None = None
     dependency_checksum: Hash64 | None = None
@@ -283,9 +283,9 @@ class EvidenceFingerprint(RebuildFrozenModel):
     """Authoritative evidence identity independent of hierarchy node ids."""
 
     chapter_id: PositiveInt
-    chapter_number: PositiveInt
+    chapter_number: NonNegativeInt
     source_start: Annotated[StrictInt, Field(ge=0)]
-    source_end: PositiveInt
+    source_end: NonNegativeInt
     content_hash: Hash64
 
     def fingerprint(self) -> str:
@@ -296,9 +296,9 @@ class ChapterIdentity(RebuildFrozenModel):
     """Stable scoped chapter identity (DB chapter id under owner/novel)."""
 
     chapter_id: PositiveInt
-    chapter_number: PositiveInt
+    chapter_number: NonNegativeInt
     content_hash: Hash64 | None = None
-    narrative_order: PositiveInt | None = None
+    narrative_order: NonNegativeInt | None = None
 
     def semantic_key(self) -> str:
         return f"source_chapter:{self.chapter_id}"

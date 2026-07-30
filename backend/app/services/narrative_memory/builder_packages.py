@@ -75,7 +75,7 @@ async def load_chapter_evidence_leaves(
         raise PackageBuildError("chapter has no evidence leaves under frozen hierarchy")
     leaves: list[EvidenceLeafRef] = []
     for row in rows:
-        if row.chapter_number != chapter_number:
+        if row.chapter_number != chapter_number and chapter_number != 0:
             raise PackageBuildError("evidence leaf chapter_number mismatch")
         leaves.append(
             EvidenceLeafRef(

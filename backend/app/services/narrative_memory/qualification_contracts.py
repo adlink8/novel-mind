@@ -28,7 +28,7 @@ from pydantic import (
 from app.services.narrative_memory.contracts import (
     Hash64,
     Key,
-    PositiveInt,
+    NonNegativeInt,
     VersionLabel,
 )
 
@@ -144,7 +144,7 @@ class GoldLeafRef(QualificationFrozenModel):
     hierarchy_build_id: Key
     source_snapshot_hash: Hash64
     chapter_id: PositiveInt
-    chapter_number: PositiveInt
+    chapter_number: NonNegativeInt
     start_offset: StrictInt = Field(ge=0)
     end_offset: StrictInt = Field(gt=0)
     content_hash: Hash64
@@ -163,7 +163,7 @@ class SpoilerForbiddenRef(QualificationFrozenModel):
     """Identity-only forbidden set; no titles or text payloads."""
 
     leaf_id: Key | None = None
-    chapter_number: PositiveInt | None = None
+    chapter_number: NonNegativeInt | None = None
     metadata_key: Key | None = None
 
     @model_validator(mode="after")
@@ -184,7 +184,7 @@ class QuestionCase(QualificationFrozenModel):
         StrictStr,
         StringConstraints(strip_whitespace=True, min_length=1, max_length=2000),
     ]
-    through_chapter: PositiveInt
+    through_chapter: NonNegativeInt
     full_book_authorized: StrictBool = False
     expected_answerability: ExpectedAnswerability
     allowed_routes: tuple[Key, ...] = ()
@@ -448,7 +448,7 @@ class CommonCaseEnvelope(QualificationFrozenModel):
     hierarchy_build_id: Key
     hierarchy_checksum: Hash64
     candidate_manifest_checksum: Hash64
-    through_chapter: PositiveInt
+    through_chapter: NonNegativeInt
     full_book_authorized: StrictBool
     top_k: PositiveInt
     max_leaves: PositiveInt

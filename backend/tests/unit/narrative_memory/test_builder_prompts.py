@@ -4,14 +4,18 @@ from types import SimpleNamespace
 
 import pytest
 
+from app.services.narrative_memory.builder_repository import BuilderRepositoryError
 from app.services.narrative_memory.builder_worker import (
+    NarrativeMemoryBuilderWorker,
     _estimated_input_tokens,
+    _is_retryable_lease_error,
     _node_content,
 )
 from scripts.run_narrative_memory_build import (
     _ARC_PLAN_PROMPT,
     _PROMPT_TEXT,
     _build_messages,
+    _normalize_model_output,
     _response_schema_for_stage,
 )
 
@@ -41,6 +45,43 @@ def test_chapter_state_prompt_requires_substantive_structured_summary() -> None:
         "key_elements",
         "narrative_progress",
     }
+
+
+def test_chapter_state_normalizes_unknown_uncertainty_enum() -> None:
+    normalized = _normalize_model_output(
+        {
+            "summary": "主角离开城门。",
+            "key_elements": [],
+            "narrative_progress": "主角开始逃亡。",
+            "claims": [
+                {
+                    "claim_key": "chapter_state:3:claim:1",
+                    "uncertainty": "none",
+                    "payload": {
+                        "claim_kind": "event_fact",
+                        "event_kind": "action",
+                        "actor_keys": ["character:main"],
+                        "chapter_start": 3,
+                        "chapter_end": 3,
+                        "outcome": {"value_kind": "text", "value": "离开城门"},
+                    },
+                }
+            ],
+            "source_bindings": [
+                {
+                    "claim_key": "chapter_state:3:claim:1",
+                    "evidence_node_id": "leaf-3",
+                    "source_key": "source-3",
+                }
+            ],
+        },
+        payload={
+            "chapter_number": 3,
+            "evidence_leaves": [{"evidence_node_id": "leaf-3"}],
+        },
+        stage_key="chapter_state:3",
+    )
+    assert normalized["claims"][0]["uncertainty"] == "likely"
 
 
 def test_parent_aggregation_payload_contains_claim_content() -> None:
@@ -84,3 +125,38 @@ def test_arc_plan_prompt_uses_story_content_instead_of_fixed_windows() -> None:
 def test_aggregation_budget_estimate_scales_with_claim_content() -> None:
     payload = {"child_content": [{"claims": [{"content": "长文本" * 5_000}]}]}
     assert _estimated_input_tokens(payload) > 8_000
+
+
+def test_lease_errors_are_limited_to_transient_claim_failures() -> None:
+    assert _is_retryable_lease_error(BuilderRepositoryError("lease lost"))
+    assert _is_retryable_lease_error(
+        BuilderRepositoryError("run lease held by another worker")
+    )
+    assert not _is_retryable_lease_error(BuilderRepositoryError("run cancelled"))
+
+
+@pytest.mark.asyncio
+async def test_process_run_retries_lease_loss(monkeypatch: pytest.MonkeyPatch) -> None:
+    worker = object.__new__(NarrativeMemoryBuilderWorker)
+    calls = 0
+
+    async def fake_process_run_once(**_kwargs: object) -> str:
+        nonlocal calls
+        calls += 1
+        if calls < 3:
+            raise BuilderRepositoryError("lease lost")
+        return "resumed"
+
+    delays: list[int] = []
+
+    async def fake_sleep(seconds: int) -> None:
+        delays.append(seconds)
+
+    monkeypatch.setattr(worker, "_process_run_once", fake_process_run_once)
+    monkeypatch.setattr("app.services.narrative_memory.builder_worker.asyncio.sleep", fake_sleep)
+
+    result = await worker.process_run(owner_id=2, novel_id=216, version_id=17)
+
+    assert result == "resumed"
+    assert calls == 3
+    assert delays == [5, 15]

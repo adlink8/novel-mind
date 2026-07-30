@@ -23,6 +23,7 @@ engine = create_async_engine(
     settings.database_url,
     echo=settings.debug,  # 开发环境打印 SQL，生产环境关闭
     pool_pre_ping=True,  # 连接健康检查，防止使用已断开的连接
+    pool_reset_on_return="rollback",  # 归还连接前回滚事务，防止 InFailedSQLTransactionError 传染
 )
 
 # 异步会话工厂

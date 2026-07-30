@@ -18,6 +18,9 @@ from app.models.narrative_memory_builder import (
 from app.services.narrative_memory.builder_contracts import RunPolicy
 
 
+DEFAULT_LEASE_TTL_SECONDS = 120
+
+
 class BuilderRepositoryError(ValueError):
     pass
 
@@ -143,7 +146,7 @@ class BuilderRepository:
         self,
         run: NarrativeMemoryBuildRun,
         *,
-        lease_ttl_seconds: int = 120,
+        lease_ttl_seconds: int = DEFAULT_LEASE_TTL_SECONDS,
         lease_id: str | None = None,
     ) -> str:
         now = datetime.now(timezone.utc)
@@ -164,8 +167,7 @@ class BuilderRepository:
             locked.lease_id
             and locked.lease_expires_at is not None
             and locked.lease_expires_at > now
-            and lease_id is not None
-            and locked.lease_id != lease_id
+            and (lease_id is None or locked.lease_id != lease_id)
         )
         if active_lease:
             raise BuilderRepositoryError("run lease held by another worker")
@@ -179,7 +181,11 @@ class BuilderRepository:
         return claimed
 
     async def heartbeat(
-        self, run_id: int, lease_id: str, *, lease_ttl_seconds: int = 120
+        self,
+        run_id: int,
+        lease_id: str,
+        *,
+        lease_ttl_seconds: int = DEFAULT_LEASE_TTL_SECONDS,
     ) -> None:
         run = await self._session.get(
             NarrativeMemoryBuildRun, run_id, with_for_update=True

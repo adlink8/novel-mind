@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 import ast
+import asyncio
+import contextlib
 import json
+import logging
 from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import Path
 from typing import Any, Callable, Sequence
+from uuid import uuid4
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -49,6 +53,7 @@ from app.services.narrative_memory.builder_packages import (
 from app.services.narrative_memory.builder_repository import (
     BuilderRepository,
     BuilderRepositoryError,
+    DEFAULT_LEASE_TTL_SECONDS,
 )
 from app.services.narrative_memory.contracts import ModelLineage, NodeKind
 
@@ -65,6 +70,75 @@ FORBIDDEN_IMPORT_FRAGMENTS = (
     "current_version",
     "set_active_pointer",
 )
+LEASE_RETRY_BACKOFF_SECONDS = (5, 15, 30)
+logger = logging.getLogger(__name__)
+
+
+def _is_retryable_lease_error(exc: BuilderRepositoryError) -> bool:
+    return str(exc) in {
+        "lease lost",
+        "run lease held by another worker",
+    }
+
+
+class _LeaseHeartbeat:
+    """Keep a build lease alive while a model call is awaiting I/O."""
+
+    def __init__(
+        self,
+        sessions: async_sessionmaker[AsyncSession],
+        *,
+        run_id: int,
+        lease_id: str,
+        interval_seconds: int = 30,
+    ) -> None:
+        self._sessions = sessions
+        self._run_id = run_id
+        self._lease_id = lease_id
+        self._interval_seconds = interval_seconds
+        self._stop = asyncio.Event()
+        self._task: asyncio.Task[None] | None = None
+        self._error: BaseException | None = None
+
+    async def __aenter__(self) -> "_LeaseHeartbeat":
+        self._task = asyncio.create_task(self._run())
+        return self
+
+    async def __aexit__(self, *_exc_info: object) -> None:
+        self._stop.set()
+        if self._task is not None:
+            try:
+                await asyncio.wait_for(asyncio.shield(self._task), timeout=5)
+            except asyncio.TimeoutError:
+                self._task.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await self._task
+
+    async def _run(self) -> None:
+        while True:
+            try:
+                await asyncio.wait_for(
+                    self._stop.wait(), timeout=self._interval_seconds
+                )
+                return
+            except asyncio.TimeoutError:
+                pass
+            try:
+                async with self._sessions() as session:
+                    repo = BuilderRepository(session)
+                    await repo.heartbeat(
+                        self._run_id,
+                        self._lease_id,
+                        lease_ttl_seconds=DEFAULT_LEASE_TTL_SECONDS,
+                    )
+                    await session.commit()
+            except Exception as exc:  # noqa: BLE001 - surfaced by raise_if_failed
+                self._error = exc
+                return
+
+    def raise_if_failed(self) -> None:
+        if self._error is not None:
+            raise BuilderRepositoryError("lease lost") from self._error
 
 
 def _claim_content(claim: Any) -> dict[str, Any]:
@@ -136,6 +210,7 @@ class NarrativeMemoryBuilderWorker:
         self._deployment = deployment
         self._optional_source_loader = optional_source_loader
         self.transport_calls = 0
+        self._lease_ids: dict[int, str] = {}
 
     async def start_run(
         self,
@@ -179,6 +254,7 @@ class NarrativeMemoryBuilderWorker:
                     "chapter_id": chapter.id,
                 }
                 for chapter in chapters
+                if chapter.chapter_number > 0  # skip prologue / chapter 0
             ]
             # Placeholder parent/global stages filled after boundary plan.
             stage_specs.append(
@@ -212,6 +288,49 @@ class NarrativeMemoryBuilderWorker:
         lease_id: str | None = None,
         max_stages: int | None = None,
     ) -> WorkerResult:
+        """Process a checkpointed run and recover transient lease loss.
+
+        A lease can be lost while the provider is still processing a request
+        or while the heartbeat session is waiting on the database. Roll back
+        the abandoned worker transaction before retrying so the next attempt
+        starts from the last committed checkpoint.
+        """
+        for retry_number in range(len(LEASE_RETRY_BACKOFF_SECONDS) + 1):
+            try:
+                return await self._process_run_once(
+                    owner_id=owner_id,
+                    novel_id=novel_id,
+                    version_id=version_id,
+                    lease_id=lease_id,
+                    max_stages=max_stages,
+                )
+            except BuilderRepositoryError as exc:
+                if not _is_retryable_lease_error(exc) or retry_number == len(
+                    LEASE_RETRY_BACKOFF_SECONDS
+                ):
+                    raise
+                delay_seconds = LEASE_RETRY_BACKOFF_SECONDS[retry_number]
+                logger.warning(
+                    "NM builder lease retry %s/%s after %s seconds: %s",
+                    retry_number + 1,
+                    len(LEASE_RETRY_BACKOFF_SECONDS),
+                    delay_seconds,
+                    exc,
+                )
+                if delay_seconds:
+                    await asyncio.sleep(delay_seconds)
+
+        raise AssertionError("unreachable lease retry loop")
+
+    async def _process_run_once(
+        self,
+        *,
+        owner_id: int,
+        novel_id: int,
+        version_id: int,
+        lease_id: str | None = None,
+        max_stages: int | None = None,
+    ) -> WorkerResult:
         async with self._sessions() as session:
             repo = BuilderRepository(session)
             version = await repo.get_version(
@@ -226,91 +345,110 @@ class NarrativeMemoryBuilderWorker:
                 self._inventory_source, owner_id=owner_id, novel_id=novel_id
             )
             self._assert_eligibility_matches(version, report)
-            claimed_lease = await repo.claim_run_lease(run, lease_id=lease_id)
             run_id = int(run.id)
-            policy = RunPolicy.model_validate(run.run_policy)
-            gateway = BuilderModelGateway(
-                session,
-                transport=self._transport,
-                deployment=self._deployment,
-                max_schema_repairs=policy.max_schema_repairs,
+            effective_lease_id = lease_id or self._lease_ids.setdefault(
+                run_id, uuid4().hex
             )
-
-            if not provider_calls_allowed(report):
-                await repo.update_run_status(
-                    run_id,
-                    status="paused_dependency",
-                    reason="provider_calls_not_allowed",
-                )
-                await session.commit()
-                return await self._snapshot_result(
-                    session, run_id, gateway.transport_calls
-                )
-
-            processed = 0
-            # Phase A: chapter states
-            stages = await repo.list_stages(run_id)
-            chapter_stages = [
-                s for s in stages if s.stage_kind == StageKind.CHAPTER_STATE.value
-            ]
-            for stage in chapter_stages:
-                if max_stages is not None and processed >= max_stages:
-                    break
-                # Skip completed and hard-failed stages so batch resume can make
-                # forward progress; operators requeue failed→pending explicitly.
-                if stage.status in {"completed", "failed", "cancelled"}:
-                    continue
-                if await repo.is_cancelled(run_id):
-                    await repo.update_run_status(
-                        run_id, status="cancelled", reason="cancel_requested"
-                    )
-                    break
-                await self._run_chapter_stage(
-                    session,
-                    repo=repo,
-                    gateway=gateway,
-                    version=version,
-                    run_id=run_id,
-                    stage=stage,
-                    policy=policy,
-                )
-                processed += 1
-                await session.flush()
-                await repo.heartbeat(run_id, claimed_lease)
-
-            # Phase B: boundary plan + arc aggregates (if arc planner available)
-            stages = await repo.list_stages(run_id)
-            if all(
-                s.status == "completed"
-                for s in stages
-                if s.stage_kind == StageKind.CHAPTER_STATE.value
-            ):
-                await self._ensure_boundary_and_parents(
-                    session,
-                    repo=repo,
-                    gateway=gateway,
-                    version=version,
-                    run_id=run_id,
-                    policy=policy,
-                    max_stages=max_stages,
-                    processed=processed,
-                    lease_id=claimed_lease,
-                )
-
-            # Phase C: global + manifest if parents complete
-            await self._maybe_run_global_and_manifest(
-                session,
-                repo=repo,
-                gateway=gateway,
-                version=version,
-                run_id=run_id,
-                policy=policy,
+            claimed_lease = await repo.claim_run_lease(
+                run, lease_id=effective_lease_id
             )
-
-            self.transport_calls += gateway.transport_calls
-            result = await self._finalize_run_status(session, repo, run_id)
+            # Release the row lock acquired by claim_run_lease before model
+            # calls. The independent heartbeat session must be able to lock
+            # this row while the worker transaction is awaiting the provider.
             await session.commit()
-            return result
+            async with _LeaseHeartbeat(
+                self._sessions,
+                run_id=run_id,
+                lease_id=claimed_lease,
+            ) as lease_guard:
+                policy = RunPolicy.model_validate(run.run_policy)
+                gateway = BuilderModelGateway(
+                    session,
+                    transport=self._transport,
+                    deployment=self._deployment,
+                    max_schema_repairs=policy.max_schema_repairs,
+                )
+
+                if not provider_calls_allowed(report):
+                    lease_guard.raise_if_failed()
+                    await repo.update_run_status(
+                        run_id,
+                        status="paused_dependency",
+                        reason="provider_calls_not_allowed",
+                    )
+                    await session.commit()
+                    return await self._snapshot_result(
+                        session, run_id, gateway.transport_calls
+                    )
+
+                processed = 0
+                # Phase A: chapter states
+                stages = await repo.list_stages(run_id)
+                chapter_stages = [
+                    s
+                    for s in stages
+                    if s.stage_kind == StageKind.CHAPTER_STATE.value
+                ]
+                for stage in chapter_stages:
+                    if max_stages is not None and processed >= max_stages:
+                        break
+                    # Skip completed and hard-failed stages so batch resume can
+                    # forward progress; operators requeue failed→pending.
+                    if stage.status in {"completed", "failed", "cancelled"}:
+                        continue
+                    if await repo.is_cancelled(run_id):
+                        await repo.update_run_status(
+                            run_id, status="cancelled", reason="cancel_requested"
+                        )
+                        break
+                    await self._run_chapter_stage(
+                        session,
+                        repo=repo,
+                        gateway=gateway,
+                        version=version,
+                        run_id=run_id,
+                        stage=stage,
+                        policy=policy,
+                    )
+                    lease_guard.raise_if_failed()
+                    processed += 1
+                    await session.flush()
+                    await repo.heartbeat(run_id, claimed_lease)
+
+                # Phase B: boundary plan + arc aggregates (if arc planner available)
+                stages = await repo.list_stages(run_id)
+                if all(
+                    s.status == "completed"
+                    for s in stages
+                    if s.stage_kind == StageKind.CHAPTER_STATE.value
+                ):
+                    await self._ensure_boundary_and_parents(
+                        session,
+                        repo=repo,
+                        gateway=gateway,
+                        version=version,
+                        run_id=run_id,
+                        policy=policy,
+                        max_stages=max_stages,
+                        processed=processed,
+                        lease_id=claimed_lease,
+                    )
+
+                # Phase C: global + manifest if parents complete
+                await self._maybe_run_global_and_manifest(
+                    session,
+                    repo=repo,
+                    gateway=gateway,
+                    version=version,
+                    run_id=run_id,
+                    policy=policy,
+                )
+                lease_guard.raise_if_failed()
+
+                self.transport_calls += gateway.transport_calls
+                result = await self._finalize_run_status(session, repo, run_id)
+                await session.commit()
+                return result
 
     async def cancel(
         self, *, owner_id: int, novel_id: int, version_id: int
@@ -439,28 +577,32 @@ class NarrativeMemoryBuilderWorker:
                 },
             )
         except CancelledBeforePersist:
-            stage = await self._reload_stage(session, run_id, stage_key)
-            await repo.mark_stage(
-                stage, status="cancelled", reason="cancelled_before_persist"
-            )
+            await session.rollback()
             raise
         except (UnknownPricing, BudgetExceeded) as exc:
-            stage = await self._reload_stage(session, run_id, stage_key)
-            await repo.mark_stage(
-                stage, status="paused_budget", reason=type(exc).__name__
-            )
-            await repo.update_run_status(
-                run_id, status="paused_budget", reason=type(exc).__name__
+            await self._persist_stage_outcome(
+                session,
+                run_id=run_id,
+                stage_key=stage_key,
+                status="paused_budget",
+                reason=f"{type(exc).__name__}:{exc}"[:160],
+                run_status="paused_budget",
             )
         except (PackageBuildError, GatewayError, BuilderRepositoryError) as exc:
-            stage = await self._reload_stage(session, run_id, stage_key)
-            await repo.mark_stage(stage, status="failed", reason=str(exc)[:160])
+            await self._persist_stage_outcome(
+                session,
+                run_id=run_id,
+                stage_key=stage_key,
+                status="failed",
+                reason=f"{type(exc).__name__}:{exc}"[:160],
+            )
         except Exception as exc:  # noqa: BLE001 - durable failure isolation
-            if session.in_transaction() and session.is_active is False:
-                await session.rollback()
-            stage = await self._reload_stage(session, run_id, stage_key)
-            await repo.mark_stage(
-                stage, status="failed", reason=f"{type(exc).__name__}:{exc}"[:160]
+            await self._persist_stage_outcome(
+                session,
+                run_id=run_id,
+                stage_key=stage_key,
+                status="failed",
+                reason=f"{type(exc).__name__}:{exc}"[:160],
             )
 
     async def _run_arc_plan_stage(
@@ -549,22 +691,38 @@ class NarrativeMemoryBuilderWorker:
                 checkpoint={"boundary_plan_checksum": checksum},
             )
         except CancelledBeforePersist:
-            stage = await self._reload_stage(session, run_id, stage.stage_key)
-            await repo.mark_stage(stage, status="cancelled", reason="cancelled_before_persist")
+            await self._persist_stage_outcome(
+                session,
+                run_id=run_id,
+                stage_key=stage.stage_key,
+                status="cancelled",
+                reason="cancelled_before_persist",
+            )
             raise
         except (UnknownPricing, BudgetExceeded) as exc:
-            stage = await self._reload_stage(session, run_id, stage.stage_key)
-            await repo.mark_stage(stage, status="paused_budget", reason=type(exc).__name__)
-            await repo.update_run_status(
-                run_id, status="paused_budget", reason=type(exc).__name__
+            await self._persist_stage_outcome(
+                session,
+                run_id=run_id,
+                stage_key=stage.stage_key,
+                status="paused_budget",
+                reason=f"{type(exc).__name__}:{exc}"[:160],
+                run_status="paused_budget",
             )
         except (PackageBuildError, GatewayError, BuilderRepositoryError) as exc:
-            stage = await self._reload_stage(session, run_id, stage.stage_key)
-            await repo.mark_stage(stage, status="failed", reason=str(exc)[:160])
+            await self._persist_stage_outcome(
+                session,
+                run_id=run_id,
+                stage_key=stage.stage_key,
+                status="failed",
+                reason=f"{type(exc).__name__}:{exc}"[:160],
+            )
         except Exception as exc:  # noqa: BLE001 - durable failure isolation
-            stage = await self._reload_stage(session, run_id, stage.stage_key)
-            await repo.mark_stage(
-                stage, status="failed", reason=f"{type(exc).__name__}:{exc}"[:160]
+            await self._persist_stage_outcome(
+                session,
+                run_id=run_id,
+                stage_key=stage.stage_key,
+                status="failed",
+                reason=f"{type(exc).__name__}:{exc}"[:160],
             )
 
     async def _ensure_boundary_and_parents(
@@ -826,18 +984,30 @@ class NarrativeMemoryBuilderWorker:
                 checkpoint={"boundary_plan_checksum": boundary_checksum},
             )
         except CancelledBeforePersist:
-            stage = await self._reload_stage(session, run_id, stage.stage_key)
-            await repo.mark_stage(
-                stage, status="cancelled", reason="cancelled_before_persist"
+            await self._persist_stage_outcome(
+                session,
+                run_id=run_id,
+                stage_key=stage.stage_key,
+                status="cancelled",
+                reason="cancelled_before_persist",
             )
         except (UnknownPricing, BudgetExceeded) as exc:
-            stage = await self._reload_stage(session, run_id, stage.stage_key)
-            await repo.mark_stage(
-                stage, status="paused_budget", reason=type(exc).__name__
+            await self._persist_stage_outcome(
+                session,
+                run_id=run_id,
+                stage_key=stage.stage_key,
+                status="paused_budget",
+                reason=f"{type(exc).__name__}:{exc}"[:160],
+                run_status="paused_budget",
             )
         except Exception as exc:  # noqa: BLE001
-            stage = await self._reload_stage(session, run_id, stage.stage_key)
-            await repo.mark_stage(stage, status="failed", reason=str(exc)[:160])
+            await self._persist_stage_outcome(
+                session,
+                run_id=run_id,
+                stage_key=stage.stage_key,
+                status="failed",
+                reason=f"{type(exc).__name__}:{exc}"[:160],
+            )
 
     async def _maybe_run_global_and_manifest(
         self,
@@ -1045,13 +1215,21 @@ class NarrativeMemoryBuilderWorker:
                 checkpoint={},
             )
         except CancelledBeforePersist:
-            stage = await self._reload_stage(session, run_id, stage.stage_key)
-            await repo.mark_stage(
-                stage, status="cancelled", reason="cancelled_before_persist"
+            await self._persist_stage_outcome(
+                session,
+                run_id=run_id,
+                stage_key=stage.stage_key,
+                status="cancelled",
+                reason="cancelled_before_persist",
             )
         except Exception as exc:  # noqa: BLE001
-            stage = await self._reload_stage(session, run_id, stage.stage_key)
-            await repo.mark_stage(stage, status="failed", reason=str(exc)[:160])
+            await self._persist_stage_outcome(
+                session,
+                run_id=run_id,
+                stage_key=stage.stage_key,
+                status="failed",
+                reason=f"{type(exc).__name__}:{exc}"[:160],
+            )
 
     async def _run_manifest_stage(
         self,
@@ -1132,8 +1310,10 @@ class NarrativeMemoryBuilderWorker:
                 },
             )
         except Exception as exc:  # noqa: BLE001
-            await repo.mark_stage(
-                stage,
+            await self._persist_stage_outcome(
+                session,
+                run_id=run_id,
+                stage_key=stage.stage_key,
                 status="failed",
                 reason=f"{type(exc).__name__}:{str(exc)}"[:160],
             )
@@ -1150,6 +1330,39 @@ class NarrativeMemoryBuilderWorker:
         if row is None:
             raise BuilderRepositoryError(f"stage {stage_key} missing after error")
         return row
+
+    async def _persist_stage_outcome(
+        self,
+        session: AsyncSession,
+        *,
+        run_id: int,
+        stage_key: str,
+        status: str,
+        reason: str,
+        run_status: str | None = None,
+    ) -> None:
+        """Record a stage failure after abandoning the failed transaction.
+
+        PostgreSQL rejects every statement after one statement fails until the
+        transaction is rolled back.  The worker must therefore roll back the
+        stage session first, then use a fresh session and explicitly commit the
+        durable outcome.  Without both steps the following heartbeat masks the
+        original exception with InFailedSQLTransactionError.
+        """
+        await session.rollback()
+        async with self._sessions() as recovery_session:
+            recovery_repo = BuilderRepository(recovery_session)
+            recovered_stage = await self._reload_stage(
+                recovery_session, run_id, stage_key
+            )
+            await recovery_repo.mark_stage(
+                recovered_stage, status=status, reason=reason[:160]
+            )
+            if run_status is not None:
+                await recovery_repo.update_run_status(
+                    run_id, status=run_status, reason=reason[:160]
+                )
+            await recovery_session.commit()
 
     async def _load_optional_signals(
         self,

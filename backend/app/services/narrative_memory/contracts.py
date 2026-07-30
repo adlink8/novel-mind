@@ -37,6 +37,7 @@ VersionLabel = Annotated[
     StringConstraints(strip_whitespace=True, min_length=1, max_length=80),
 ]
 PositiveInt = Annotated[StrictInt, Field(gt=0)]
+NonNegativeInt = Annotated[StrictInt, Field(ge=0)]
 
 
 class StrictFrozenModel(BaseModel):
@@ -225,8 +226,8 @@ class CandidateVersionSpec(StrictFrozenModel):
 
 class MemoryNodeBase(StrictFrozenModel):
     node_key: Key
-    chapter_start: PositiveInt
-    chapter_end: PositiveInt
+    chapter_start: NonNegativeInt
+    chapter_end: NonNegativeInt
     schema_version: VersionLabel
     display_label: Annotated[StrictStr, StringConstraints(max_length=240)] | None = None
 
@@ -291,8 +292,8 @@ class EventFactClaim(StrictFrozenModel):
     event_kind: EventKind
     actor_keys: Annotated[tuple[Key, ...], Field(min_length=1)]
     object_keys: tuple[Key, ...] = ()
-    chapter_start: PositiveInt
-    chapter_end: PositiveInt
+    chapter_start: NonNegativeInt
+    chapter_end: NonNegativeInt
     outcome: TypedValue
 
     @field_validator("actor_keys", "object_keys")
@@ -377,7 +378,7 @@ class MemoryClaim(StrictFrozenModel):
     payload: ClaimPayload
     uncertainty: Uncertainty
     confidence: Annotated[StrictFloat, Field(ge=0.0, le=1.0)]
-    visible_from_chapter: PositiveInt
+    visible_from_chapter: NonNegativeInt
     source_keys: Annotated[tuple[Key, ...], Field(min_length=1)]
     non_authoritative_statement: (
         Annotated[StrictStr, StringConstraints(max_length=1000)] | None
@@ -421,9 +422,9 @@ class ExactSourceLink(StrictFrozenModel):
     hierarchy_build_id: Key
     evidence_node_id: Key
     chapter_id: PositiveInt
-    chapter_number: PositiveInt
+    chapter_number: NonNegativeInt
     source_start: Annotated[StrictInt, Field(ge=0)]
-    source_end: PositiveInt
+    source_end: NonNegativeInt
     content_hash: Hash64
     source_snapshot_hash: Hash64
     optional_domain_source_key: Key | None = None

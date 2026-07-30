@@ -14,6 +14,18 @@ from app.services.narrative_memory.builder_contracts import (
 )
 
 
+async def _execute_optional_query(
+    session: AsyncSession, statement, params: dict[str, Any]
+):
+    """Run an optional-source probe in a savepoint.
+
+    A missing or stale optional table must not abort the chapter transaction
+    or expire ORM objects that the caller still needs.
+    """
+    async with session.begin_nested():
+        return await session.execute(statement, params)
+
+
 async def load_optional_signals(
     session: AsyncSession,
     *,
@@ -88,7 +100,8 @@ async def _timeline_signal(
             lineage={"version_id": expected.get("version_id")},
         )
     try:
-        row = await session.execute(
+        row = await _execute_optional_query(
+            session,
             text(
                 """
                 SELECT id, source_snapshot_hash, hierarchy_build_id, hierarchy_checksum
@@ -124,7 +137,8 @@ async def _timeline_signal(
             reason_code="timeline_lineage_mismatch",
             lineage={"version_id": version_row["id"]},
         )
-    count_row = await session.execute(
+    count_row = await _execute_optional_query(
+        session,
         text(
             """
             SELECT count(*) AS n
@@ -164,7 +178,8 @@ async def _relationship_signal(
             reason_code="relationship_unavailable",
         )
     try:
-        count_row = await session.execute(
+        count_row = await _execute_optional_query(
+            session,
             text(
                 """
                 SELECT count(*) AS n
@@ -207,7 +222,8 @@ async def _clue_signal(
             reason_code="clue_unavailable",
         )
     try:
-        pointer = await session.execute(
+        pointer = await _execute_optional_query(
+            session,
             text(
                 """
                 SELECT p.version_id, v.status, v.source_snapshot_hash, v.hierarchy_build_id
@@ -248,7 +264,8 @@ async def _clue_signal(
             reason_code="clue_lineage_mismatch",
             lineage={"version_id": row["version_id"]},
         )
-    count_row = await session.execute(
+    count_row = await _execute_optional_query(
+        session,
         text("SELECT count(*) FROM machine_clues WHERE version_id = :version"),
         {"version": row["version_id"]},
     )

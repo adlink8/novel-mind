@@ -24,6 +24,7 @@ from app.services.narrative_memory.contracts import (
     Hash64,
     Key,
     ModelLineage,
+    NonNegativeInt,
     PositiveInt,
     VersionLabel,
 )
@@ -148,7 +149,7 @@ class EvidenceLeafRef(BuilderFrozenModel):
     hierarchy_build_id: Key
     evidence_node_id: Key
     chapter_id: PositiveInt
-    chapter_number: PositiveInt
+    chapter_number: NonNegativeInt
     source_start: Annotated[StrictInt, Field(ge=0)]
     source_end: PositiveInt
     content_hash: Hash64
@@ -169,7 +170,7 @@ class ChapterStateInputPackage(BuilderFrozenModel):
     novel_id: PositiveInt
     version_id: PositiveInt
     chapter_id: PositiveInt
-    chapter_number: PositiveInt
+    chapter_number: NonNegativeInt
     hierarchy_build_id: Key
     source_snapshot_hash: Hash64
     hierarchy_checksum: Hash64

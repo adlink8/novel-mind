@@ -26,7 +26,7 @@ from pydantic import (
 
 
 Hash64 = Annotated[StrictStr, StringConstraints(pattern=r"^[0-9a-f]{64}$")]
-PositiveInt = Annotated[StrictInt, Field(gt=0)]
+NonNegativeInt = Annotated[StrictInt, Field(gt=0)]
 NonNegInt = Annotated[StrictInt, Field(ge=0)]
 PolicyVersion = Annotated[
     StrictStr,
@@ -112,7 +112,7 @@ class RetrievalBudgets(StrictFrozenModel):
 class CutoffSnapshot(StrictFrozenModel):
     """Persisted reading-progress cutoff; never a transient client guess."""
 
-    through_chapter: PositiveInt
+    through_chapter: NonNegativeInt
     full_book_authorized: StrictBool = False
     snapshot_hash: Hash64
 
@@ -149,9 +149,9 @@ class RetrievalQuestion(StrictFrozenModel):
         StringConstraints(min_length=1, max_length=2000),
     ]
     query_hash: Hash64
-    selected_chapter: PositiveInt | None = None
+    selected_chapter: NonNegativeInt | None = None
     selected_start: NonNegInt | None = None
-    selected_end: PositiveInt | None = None
+    selected_end: NonNegativeInt | None = None
 
     @model_validator(mode="after")
     def _selection_bounds(self) -> RetrievalQuestion:
@@ -197,15 +197,15 @@ class VisibleCandidate(StrictFrozenModel):
     """Already-admitted visible identity only; no titles/summaries."""
 
     candidate_kind: Literal["node", "claim", "edge", "source_link"]
-    entity_id: PositiveInt
+    entity_id: NonNegativeInt
     stable_key: Annotated[
         StrictStr,
         StringConstraints(strip_whitespace=True, min_length=1, max_length=200),
     ]
     node_kind: StartLevel | None = None
-    chapter_start: PositiveInt | None = None
-    chapter_end: PositiveInt | None = None
-    parent_node_id: PositiveInt | None = None
+    chapter_start: NonNegativeInt | None = None
+    chapter_end: NonNegativeInt | None = None
+    parent_node_id: NonNegativeInt | None = None
     rank_key: Annotated[
         StrictStr,
         StringConstraints(min_length=1, max_length=240),
@@ -244,22 +244,22 @@ class LeafCitation(StrictFrozenModel):
     """Final evidence only after fresh Chapter re-slice and hash validation."""
 
     chapter_id: PositiveInt
-    chapter_number: PositiveInt
+    chapter_number: NonNegativeInt
     evidence_node_id: Annotated[
         StrictStr,
         StringConstraints(strip_whitespace=True, min_length=1, max_length=64),
     ]
     hierarchy_build_id: BuildId
     source_start: NonNegInt
-    source_end: PositiveInt
+    source_end: NonNegativeInt
     content_hash: Hash64
     excerpt: Annotated[
         StrictStr,
         StringConstraints(min_length=1, max_length=4000),
     ]
     source_snapshot_hash: Hash64
-    link_id: PositiveInt | None = None
-    claim_id: PositiveInt | None = None
+    link_id: NonNegativeInt | None = None
+    claim_id: NonNegativeInt | None = None
 
 
 class CacheEnvelope(StrictFrozenModel):
