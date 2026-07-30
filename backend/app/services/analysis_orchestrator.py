@@ -12,7 +12,7 @@ from sqlalchemy.exc import IntegrityError
 from app.core.database import async_session_factory
 from app.models.analysis import AnalysisRun
 from app.models.chunk_build import ChunkActivePointer
-from app.models.clue import ClueAnalysisRun
+from app.models.clue import ClueAnalysisRun, ClueAnalysisVersion
 from app.models.full_analysis import FullAnalysisRun
 from app.models.relationship import RelationshipBuildRun
 from app.models.text_chunk import TextChunk
@@ -428,7 +428,9 @@ async def _wait_relationship(
         await asyncio.sleep(0.8)
 
 
-async def _ensure_clue_run(owner_id: int, novel_id: int) -> tuple[int, str]:
+async def _ensure_clue_run(
+    owner_id: int, novel_id: int, timeline_version_id: int
+) -> tuple[int, str]:
     async with async_session_factory() as session:
         row = await session.scalar(
             select(ClueAnalysisRun)
@@ -439,6 +441,31 @@ async def _ensure_clue_run(owner_id: int, novel_id: int) -> tuple[int, str]:
             )
             .with_for_update()
         )
+        if row is not None and row.status == "completed":
+            clue_version = (
+                await session.get(ClueAnalysisVersion, row.version_id)
+                if row.version_id is not None
+                else None
+            )
+            if (
+                clue_version is not None
+                and clue_version.timeline_version_id == timeline_version_id
+            ):
+                await session.commit()
+                return int(row.id), row.status
+            row.active_key = None
+            row = None
+        elif row is not None and row.version_id is not None:
+            clue_version = await session.get(ClueAnalysisVersion, row.version_id)
+            if (
+                clue_version is not None
+                and clue_version.timeline_version_id not in {None, timeline_version_id}
+            ):
+                row.cancel_requested = True
+                row.status = "cancelled"
+                row.status_reason = "superseded by full analysis timeline"
+                row.active_key = None
+                row = None
         if row is None:
             row = ClueAnalysisRun(
                 owner_id=owner_id,
@@ -571,7 +598,9 @@ async def run_full_analysis(run_id: int) -> None:
             )
 
         await _check_cancelled(run_id)
-        clue_run_id, clue_status = await _ensure_clue_run(owner_id, novel_id)
+        clue_run_id, clue_status = await _ensure_clue_run(
+            owner_id, novel_id, int(timeline_version_id)
+        )
         if clue_status == "completed":
             await _update_progress(run_id, stage="clue_judgment", completed=1, total=1)
         else:
