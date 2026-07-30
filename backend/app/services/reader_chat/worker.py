@@ -662,6 +662,9 @@ def _build_messages(
         "timeline_summary_not_evidence": list(
             prompt_inputs.get("timeline_summary") or []
         ),
+        "narrative_context_not_evidence": dict(
+            prompt_inputs.get("narrative_context_not_evidence") or {}
+        ),
         "conversational_framing_not_evidence": context["dialogue"],
         "schema_version": SCHEMA_VERSION,
     }

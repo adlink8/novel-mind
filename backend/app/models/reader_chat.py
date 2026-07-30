@@ -49,12 +49,15 @@ READER_JOB_NONTERMINAL_STATUSES = (
     "paused_dependency",
 )
 # Fiction-only allowlist for persisted context evidence source types (D-12).
+# Clue evidence is source-bound and citeable; narrative-memory summaries remain
+# prompt-only context and are intentionally not listed here.
 READER_EVIDENCE_SOURCE_TYPES = (
     "selection",
     "hierarchy",
     "timeline",
     "knowledge",
     "relationship_observation",
+    "clue_evidence",
 )
 READER_BUDGET_SCOPE_TYPES = ("conversation", "novel")
 READER_RESERVATION_STATUSES = ("reserved", "settled", "released", "failed")
@@ -275,7 +278,7 @@ class ReaderContextEvidenceRef(Base):
     __table_args__ = (
         CheckConstraint(
             "source_type IN ('selection','hierarchy','timeline','knowledge',"
-            "'relationship_observation')",
+            "'relationship_observation','clue_evidence')",
             name="ck_reader_evidence_source_type",
         ),
         CheckConstraint(

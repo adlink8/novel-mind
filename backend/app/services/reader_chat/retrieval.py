@@ -1,9 +1,8 @@
 """Visible-set-first evidence retrieval and Phase 09 read-only consumer contract.
 
-Phase 10 never imports Phase 09 ORM models. Relationship observations arrive only
-through :class:`RelationshipObservationReader`, bound to the completed Phase 09
-public API (``load_filtered_relationship_graph``). Runtime outages are explicit
-source statuses; missing contracts are execution failures, not null adapters.
+Relationship observations arrive through :class:`RelationshipObservationReader`,
+while clue evidence is read through the owner/version-scoped clue projection.
+Narrative-memory data is loaded as non-citation prompt context only.
 """
 
 from __future__ import annotations
@@ -17,6 +16,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.analysis import AnalysisVersion
 from app.models.chunk_build import ChunkActivePointer, ChunkBuild, ChunkHierarchyNode
+from app.models.clue import (
+    ClueActivePointer,
+    ClueAnalysisVersion,
+    ClueEvidenceRef,
+    MachineClue,
+)
+from app.models.narrative_memory import (
+    NarrativeMemoryClaim,
+    NarrativeMemoryNode,
+    NarrativeMemoryVersion,
+)
 from app.models.novel import Chapter, Novel
 from app.models.timeline import (
     MachineTimelineEvent,
@@ -24,6 +34,7 @@ from app.models.timeline import (
     TimelineEvidenceRef,
 )
 from app.schemas.relationship import RelationshipVersionSource
+from app.services.narrative_memory.structure_query import claim_summary_text
 
 # Priority ranks used when packing the immutable context manifest (AI-SPEC §7).
 SOURCE_PRIORITY: dict[str, int] = {
@@ -31,7 +42,8 @@ SOURCE_PRIORITY: dict[str, int] = {
     "hierarchy": 1,
     "knowledge": 2,
     "timeline": 3,
-    "relationship_observation": 4,
+    "clue_evidence": 4,
+    "relationship_observation": 5,
 }
 
 DEFAULT_MAX_EVIDENCE = 24
@@ -39,6 +51,9 @@ DEFAULT_MAX_EXCERPT_CODE_POINTS = 700
 DEFAULT_MAX_PER_SOURCE = 8
 TIMELINE_SUMMARY_WINDOW = 5
 MAX_TIMELINE_SUMMARY_ITEMS = 16
+MAX_NARRATIVE_CONTEXT_CHAPTERS = 12
+MAX_NARRATIVE_CONTEXT_ARCS = 3
+NARRATIVE_CONTEXT_WINDOW = 5
 
 
 class SourceStatus(StrEnum):
@@ -162,6 +177,7 @@ class RetrievalResult:
     hierarchy_checksum: str
     analysis_version_id: int | None
     timeline_summary: list[dict[str, Any]] = field(default_factory=list)
+    narrative_context: dict[str, Any] = field(default_factory=dict)
 
 
 def bound_excerpt(
@@ -476,6 +492,267 @@ async def fetch_relationship_evidence(
     return candidates[:max_items], omitted, SourceStatus.OK
 
 
+async def fetch_clue_evidence(
+    session: AsyncSession,
+    *,
+    owner_id: int,
+    novel_id: int,
+    cutoff_chapter: int | None,
+    full_book: bool,
+    focus_chapter_number: int | None = None,
+    max_items: int = DEFAULT_MAX_PER_SOURCE,
+) -> tuple[list[RetrievedEvidence], int, str]:
+    """Load visible plant/reinforcement/payoff evidence for the active clue version."""
+
+    pointer = await session.scalar(
+        select(ClueActivePointer).where(
+            ClueActivePointer.owner_id == owner_id,
+            ClueActivePointer.novel_id == novel_id,
+        )
+    )
+    if pointer is None:
+        return [], 0, SourceStatus.ABSENT
+    version = await session.scalar(
+        select(ClueAnalysisVersion).where(
+            ClueAnalysisVersion.id == pointer.version_id,
+            ClueAnalysisVersion.owner_id == owner_id,
+            ClueAnalysisVersion.novel_id == novel_id,
+        )
+    )
+    if version is None:
+        return [], 0, SourceStatus.UNAVAILABLE
+
+    query = (
+        select(ClueEvidenceRef, MachineClue)
+        .join(MachineClue, MachineClue.id == ClueEvidenceRef.machine_clue_id)
+        .where(
+            ClueEvidenceRef.owner_id == owner_id,
+            ClueEvidenceRef.novel_id == novel_id,
+            ClueEvidenceRef.version_id == version.id,
+            MachineClue.owner_id == owner_id,
+            MachineClue.novel_id == novel_id,
+            MachineClue.version_id == version.id,
+        )
+    )
+    if not full_book and cutoff_chapter is not None:
+        query = query.where(
+            ClueEvidenceRef.narrative_chapter_number <= cutoff_chapter
+        )
+    rows = list((await session.execute(query)).all())
+    if not rows:
+        return [], 0, SourceStatus.OK
+
+    visible_roles: dict[str, set[str]] = {}
+    for ref, _clue in rows:
+        visible_roles.setdefault(str(ref.logical_clue_id), set()).add(str(ref.role))
+
+    candidates: list[RetrievedEvidence] = []
+    for ref, clue in rows:
+        chapter_number = int(ref.narrative_chapter_number)
+        roles = visible_roles.get(str(ref.logical_clue_id), set())
+        chain_label = "→".join(
+            role for role in ("cue", "reinforcement", "payoff") if role in roles
+        )
+        excerpt = str(ref.excerpt or "").strip()
+        title = str(clue.title or ref.logical_clue_id).strip()
+        prefix = f"线索《{title}》 [{chain_label or ref.role}]"
+        if excerpt:
+            excerpt = f"{prefix}：{excerpt}"
+        else:
+            excerpt = prefix
+        distance = (
+            abs(chapter_number - focus_chapter_number)
+            if focus_chapter_number is not None
+            else 0
+        )
+        candidates.append(
+            RetrievedEvidence(
+                evidence_key=f"clue_evidence:{ref.logical_clue_id}:{ref.id}",
+                source_type="clue_evidence",
+                source_id=str(ref.id),
+                chapter_id=int(ref.chapter_id),
+                chapter_number=chapter_number,
+                source_start=int(ref.source_start),
+                source_end=int(ref.source_end),
+                content_hash=str(ref.content_hash),
+                excerpt=bound_excerpt(excerpt),
+                version_lineage={
+                    "clue_version_id": int(version.id),
+                    "logical_clue_id": str(ref.logical_clue_id),
+                    "machine_clue_id": int(ref.machine_clue_id),
+                    "role": str(ref.role),
+                    "visible_chain_roles": sorted(roles),
+                },
+                priority=SOURCE_PRIORITY["clue_evidence"],
+                rank_key=(distance, chapter_number, int(ref.sort_order), int(ref.id)),
+            )
+        )
+
+    candidates.sort(key=lambda item: item.rank_key)
+    omitted = max(0, len(candidates) - max_items)
+    return candidates[:max_items], omitted, SourceStatus.OK
+
+
+def _context_text(value: Any, *, limit: int = 500) -> str:
+    if isinstance(value, str):
+        return value.strip()[:limit]
+    if isinstance(value, dict):
+        for key in ("value", "text", "summary", "description", "state"):
+            if value.get(key):
+                return _context_text(value[key], limit=limit)
+    if isinstance(value, list):
+        return "；".join(
+            _context_text(item, limit=160) for item in value[:6] if item
+        )[:limit]
+    return str(value or "").strip()[:limit]
+
+
+async def fetch_narrative_context(
+    session: AsyncSession,
+    *,
+    owner_id: int,
+    novel_id: int,
+    cutoff_chapter: int | None,
+    full_book: bool,
+    focus_chapter_number: int | None,
+) -> tuple[dict[str, Any], str]:
+    """Load spoiler-bounded NM preview summaries as non-evidence context."""
+
+    version = await session.scalar(
+        select(NarrativeMemoryVersion)
+        .where(
+            NarrativeMemoryVersion.owner_id == owner_id,
+            NarrativeMemoryVersion.novel_id == novel_id,
+        )
+        .order_by(NarrativeMemoryVersion.id.desc())
+        .limit(1)
+    )
+    if version is None:
+        return {}, SourceStatus.ABSENT
+
+    visible_max = None if full_book else int(cutoff_chapter or 1)
+    focus = int(focus_chapter_number or visible_max or 1)
+    low = max(1, focus - NARRATIVE_CONTEXT_WINDOW)
+    high = focus + NARRATIVE_CONTEXT_WINDOW
+
+    node_query = select(NarrativeMemoryNode).where(
+        NarrativeMemoryNode.owner_id == owner_id,
+        NarrativeMemoryNode.novel_id == novel_id,
+        NarrativeMemoryNode.version_id == version.id,
+    )
+    nodes = list((await session.scalars(node_query)).all())
+    visible_nodes = [
+        node
+        for node in nodes
+        if (visible_max is None or node.chapter_end <= visible_max)
+        and (
+            node.node_kind == "chapter_state"
+            and low <= node.chapter_start <= high
+            or node.node_kind in {"story_arc", "volume"}
+            and node.chapter_start <= focus <= node.chapter_end
+        )
+    ]
+    node_ids = [int(node.id) for node in visible_nodes]
+    claims = []
+    if node_ids:
+        claims = list(
+            (
+                await session.scalars(
+                    select(NarrativeMemoryClaim)
+                    .where(
+                        NarrativeMemoryClaim.owner_id == owner_id,
+                        NarrativeMemoryClaim.novel_id == novel_id,
+                        NarrativeMemoryClaim.version_id == version.id,
+                        NarrativeMemoryClaim.node_id.in_(node_ids),
+                        NarrativeMemoryClaim.visible_from_chapter
+                        <= (visible_max or 10**9),
+                    )
+                    .order_by(NarrativeMemoryClaim.visible_from_chapter, NarrativeMemoryClaim.id)
+                )
+            ).all()
+        )
+    claims_by_node: dict[int, list[NarrativeMemoryClaim]] = {}
+    for claim in claims:
+        claims_by_node.setdefault(int(claim.node_id), []).append(claim)
+
+    chapter_summaries: list[dict[str, Any]] = []
+    character_states: list[dict[str, Any]] = []
+    for node in sorted(
+        (n for n in visible_nodes if n.node_kind == "chapter_state"),
+        key=lambda item: (item.chapter_start, item.id),
+    )[:MAX_NARRATIVE_CONTEXT_CHAPTERS]:
+        node_claims = claims_by_node.get(int(node.id), [])
+        payloads = [dict(c.typed_payload or {}) for c in node_claims]
+        summary = str(node.display_label or "").strip()
+        if not summary:
+            summary = "；".join(
+                claim_summary_text(payload) for payload in payloads if claim_summary_text(payload)
+            )[:800]
+        progress = next(
+            (
+                _context_text(payload.get("narrative_progress"))
+                for payload in payloads
+                if payload.get("narrative_progress")
+            ),
+            "",
+        )
+        chapter_summaries.append(
+            {
+                "chapter_number": int(node.chapter_start),
+                "summary": summary[:800],
+                "narrative_progress": progress,
+            }
+        )
+        for payload in payloads:
+            if str(payload.get("claim_kind") or "") != "entity_state":
+                continue
+            name = _context_text(
+                payload.get("entity_name")
+                or payload.get("name")
+                or payload.get("character")
+                or payload.get("entity"),
+                limit=120,
+            )
+            state = _context_text(
+                payload.get("state")
+                or payload.get("description")
+                or payload.get("outcome")
+                or payload.get("summary"),
+                limit=300,
+            )
+            if name and state:
+                character_states.append(
+                    {
+                        "character": name,
+                        "state": state,
+                        "chapter_number": int(node.chapter_start),
+                    }
+                )
+
+    arcs = [
+        {
+            "label": str(node.display_label or node.node_key)[:200],
+            "chapter_start": int(node.chapter_start),
+            "chapter_end": int(node.chapter_end),
+            "node_kind": node.node_kind,
+        }
+        for node in sorted(
+            (n for n in visible_nodes if n.node_kind in {"story_arc", "volume"}),
+            key=lambda item: (item.chapter_start, item.chapter_end, item.id),
+        )[:MAX_NARRATIVE_CONTEXT_ARCS]
+    ]
+    current_arc = arcs[0] if arcs else None
+    return (
+        {
+            "version_id": int(version.id),
+            "current_arc": current_arc,
+            "chapter_summaries": chapter_summaries,
+            "character_states": character_states[:24],
+        },
+        SourceStatus.OK,
+    )
+
+
 class Phase09RelationshipObservationReader:
     """Binds completed Phase 09 public reader — no ORM imports from relationships models."""
 
@@ -593,12 +870,15 @@ async def retrieve_visible_evidence(
         "timeline": SourceStatus.ABSENT,
         "knowledge": SourceStatus.ABSENT,
         "relationship_observation": SourceStatus.ABSENT,
+        "clue_evidence": SourceStatus.ABSENT,
+        "narrative_memory": SourceStatus.ABSENT,
     }
     omitted: dict[str, int] = {
         "hierarchy": 0,
         "timeline": 0,
         "knowledge": 0,
         "relationship_observation": 0,
+        "clue_evidence": 0,
     }
 
     hierarchy_meta = await resolve_active_hierarchy(session, novel_id=novel.id)
@@ -700,6 +980,31 @@ async def retrieve_visible_evidence(
     knowledge_items: list[RetrievedEvidence] = []
 
     (
+        clue_items,
+        omitted["clue_evidence"],
+        source_status["clue_evidence"],
+    ) = await fetch_clue_evidence(
+        session,
+        owner_id=owner_id,
+        novel_id=novel.id,
+        cutoff_chapter=cutoff_chapter,
+        full_book=full_book,
+        focus_chapter_number=current_chapter_number,
+        max_items=max_per_source,
+    )
+
+    narrative_context, source_status["narrative_memory"] = (
+        await fetch_narrative_context(
+            session,
+            owner_id=owner_id,
+            novel_id=novel.id,
+            cutoff_chapter=cutoff_chapter,
+            full_book=full_book,
+            focus_chapter_number=current_chapter_number,
+        )
+    )
+
+    (
         rel_items,
         omitted["relationship_observation"],
         source_status["relationship_observation"],
@@ -715,7 +1020,13 @@ async def retrieve_visible_evidence(
         max_items=max_per_source,
     )
 
-    packed = hierarchy_items + knowledge_items + timeline_items + rel_items
+    packed = (
+        hierarchy_items
+        + knowledge_items
+        + timeline_items
+        + clue_items
+        + rel_items
+    )
     packed.sort(
         key=lambda item: (
             item.priority,
@@ -738,4 +1049,5 @@ async def retrieve_visible_evidence(
         hierarchy_checksum=hierarchy_checksum,
         analysis_version_id=version_id,
         timeline_summary=timeline_summary,
+        narrative_context=narrative_context,
     )

@@ -476,6 +476,8 @@ async def assemble_context_manifest(
         "context_mode": "selection" if selection_bound else "chapter",
         "timeline_summary": list(retrieval.timeline_summary),
         "timeline_summary_is_evidence": False,
+        "narrative_context_not_evidence": dict(retrieval.narrative_context),
+        "narrative_context_is_evidence": False,
     }
 
     source_status = dict(retrieval.source_status)
