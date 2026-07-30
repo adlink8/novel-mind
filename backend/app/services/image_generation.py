@@ -72,17 +72,47 @@ def _image_dimensions(data: bytes) -> tuple[int, int]:
     return 1024, 1024
 
 
+def _provider_error_detail(response: httpx.Response) -> str | None:
+    try:
+        payload = response.json()
+    except ValueError:
+        return None
+    if not isinstance(payload, dict):
+        return None
+    error = payload.get("error")
+    if isinstance(error, dict):
+        message = error.get("message")
+        if isinstance(message, str) and message.strip():
+            return message.strip()[:300]
+    message = payload.get("message")
+    if isinstance(message, str) and message.strip():
+        return message.strip()[:300]
+    return None
+
+
 async def _request_image(prompt: str) -> tuple[bytes, str]:
     endpoint = settings.image_generation_base_url.rstrip("/") + "/v1/images/generations"
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(120.0, connect=5.0)) as client:
             response = await client.post(
                 endpoint,
-                json={"prompt": prompt, "size": "1024x1024"},
+                json={"prompt": prompt, "size": "1024x1024", "response_format": "b64_json"},
             )
-            response.raise_for_status()
+            try:
+                response.raise_for_status()
+            except httpx.HTTPStatusError as exc:
+                provider_detail = _provider_error_detail(response)
+                detail = f"生图服务返回 HTTP {response.status_code}"
+                if provider_detail:
+                    detail += f"：{provider_detail}"
+                raise HTTPException(status_code=502, detail=detail) from exc
             payload = response.json()
-            item = (payload.get("data") or [])[0]
+            if not isinstance(payload, dict) or not isinstance(payload.get("data"), list):
+                raise HTTPException(status_code=502, detail="生图服务返回格式无效：缺少 data 图片字段")
+            items = payload["data"]
+            if not items or not isinstance(items[0], dict):
+                raise HTTPException(status_code=502, detail="生图服务返回格式无效：没有图片结果")
+            item = items[0]
             if item.get("b64_json"):
                 image_bytes = base64.b64decode(item["b64_json"], validate=True)
                 return image_bytes, "jpg" if image_bytes.startswith(b"\xff\xd8") else "png"
@@ -98,9 +128,17 @@ async def _request_image(prompt: str) -> tuple[bytes, str]:
                 image_response.raise_for_status()
                 image_bytes = image_response.content
                 return image_bytes, "jpg" if image_bytes.startswith(b"\xff\xd8") else "png"
-    except (httpx.HTTPError, ValueError, IndexError, KeyError, TypeError, binascii.Error) as exc:
-        raise HTTPException(status_code=500, detail="图片生成失败，请确认 ZCodeProxy 已启动") from exc
-    raise HTTPException(status_code=500, detail="图片生成失败：提供方未返回图片")
+    except httpx.ConnectError as exc:
+        raise HTTPException(status_code=503, detail="无法连接生图服务，请确认 ZCodeProxy 已启动（127.0.0.1:3001）") from exc
+    except httpx.TimeoutException as exc:
+        raise HTTPException(status_code=504, detail="生图服务响应超时，请检查 ZCodeProxy 和混元服务状态") from exc
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=502, detail=f"访问生图服务失败：{str(exc)[:300]}") from exc
+    except HTTPException:
+        raise
+    except (ValueError, IndexError, KeyError, TypeError, binascii.Error) as exc:
+        raise HTTPException(status_code=502, detail=f"生图服务返回图片数据无效：{str(exc)[:300]}") from exc
+    raise HTTPException(status_code=502, detail="生图服务未返回图片")
 
 
 async def _get_or_create_conversation(
