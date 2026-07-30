@@ -526,23 +526,27 @@ class ImportService:
                     )
                 except Exception as index_err:
                     logger.exception(
-                        "导入后索引失败 novel_%s: %s（小说仍可阅读）",
+                        "导入后索引失败 novel_%s: %s",
                         novel.id,
                         index_err,
                     )
                     novel = await db.get(Novel, novel.id)
                     if novel:
-                        novel.status = "ready"
+                        novel.status = "indexing_failed"
+                    detail = f"检索索引异常：{index_err}"
                     await self.update_job_status(
                         db,
                         job_id,
-                        "ready",
+                        "failed",
                         100,
                         (
-                            f"导入完成：{len(chapters)} 章（检索索引未完成，"
-                            f"请调用 POST /api/novels/{{id}}/index 重建）"
+                            f"导入完成，但检索索引异常：{detail}；"
+                            "请重新建立索引"
                         )[:500],
+                        error_detail=detail,
                     )
+                    await db.commit()
+                    return
             await db.commit()
 
             logger.info(

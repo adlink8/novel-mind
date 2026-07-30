@@ -184,6 +184,73 @@ class TestIndexNovel:
         # 验证向量写入
         mock_vector_store.add_chunks.assert_called_once()
 
+
+class TestPendingEmbeddingRecovery:
+    """测试服务重启后的 pending embedding 续跑。"""
+
+    @pytest.mark.asyncio
+    async def test_resume_pending_embeddings_without_rechunking(
+        self,
+        indexing_service,
+        mock_db,
+        mock_novel,
+        mock_text_chunks,
+        mock_chunking_service,
+        mock_vector_store,
+    ):
+        pending_result = MagicMock()
+        pending_result.scalars.return_value.all.return_value = mock_text_chunks
+        failed_result = MagicMock()
+        failed_result.scalar.return_value = 0
+        mock_db.get.return_value = mock_novel
+        mock_db.execute.side_effect = [pending_result, failed_result]
+
+        with patch("app.services.indexing_service.ai_service") as mock_ai:
+            mock_ai.embedding = AsyncMock(return_value=[[0.1, 0.2, 0.3]] * 3)
+
+            result = await indexing_service.resume_pending_embeddings(
+                mock_db, novel_id=1
+            )
+
+        assert result["total_chunks"] == 3
+        assert result["embedded_chunks"] == 3
+        assert result["failed_chunks"] == 0
+        assert result["status"] == "ready"
+        assert mock_novel.status == "ready"
+        assert all(chunk.embedding_status == "embedded" for chunk in mock_text_chunks)
+        mock_chunking_service.chunk_novel.assert_not_called()
+        mock_vector_store.add_chunks.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_resume_marks_batch_failure_and_keeps_failed_state(
+        self, indexing_service, mock_db, mock_novel, mock_text_chunks
+    ):
+        pending_result = MagicMock()
+        pending_result.scalars.return_value.all.return_value = mock_text_chunks
+        failed_result = MagicMock()
+        failed_result.scalar.return_value = 0
+        mock_db.get.return_value = mock_novel
+        mock_db.execute.side_effect = [pending_result, failed_result]
+
+        with (
+            patch("app.services.indexing_service.ai_service") as mock_ai,
+            patch("app.services.indexing_service.settings") as mock_settings,
+        ):
+            mock_settings.embedding_provider = "ollama"
+            mock_settings.embedding_max_retries = 0
+            mock_settings.embedding_retry_backoff_seconds = 0
+            mock_ai.embedding = AsyncMock(side_effect=RuntimeError("服务中断"))
+
+            result = await indexing_service.resume_pending_embeddings(
+                mock_db, novel_id=1
+            )
+
+        assert result["embedded_chunks"] == 0
+        assert result["failed_chunks"] == 3
+        assert result["status"] == "partial"
+        assert mock_novel.status == "indexing_failed"
+        assert all(chunk.embedding_status == "failed" for chunk in mock_text_chunks)
+
     @pytest.mark.asyncio
     async def test_novel_not_found(self, indexing_service, mock_db):
         """小说不存在时抛出 IndexingError"""

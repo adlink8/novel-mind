@@ -264,6 +264,46 @@ async def test_import_marks_index_failure_as_failed(
 
 
 @pytest.mark.asyncio
+async def test_import_marks_index_exception_as_failed(
+    db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+):
+    """索引阶段抛异常时，不能把导入任务伪装成 ready。"""
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    user = await _create_test_user(db_session)
+    novel = await _create_test_novel(db_session, user)
+    service = ImportService()
+    job = await service.create_import_job(db_session)
+
+    chapters = [{"title": "第一章", "content": "正文", "word_count": 2}]
+    upload = UploadFile(file=BytesIO(b"content"), filename="exception.txt")
+    with (
+        patch(
+            "app.services.import_service.novel_service.upload_novel",
+            new=AsyncMock(return_value=("upload.txt", b"content")),
+        ),
+        patch(
+            "app.services.import_service.novel_service.parse_novel",
+            return_value=chapters,
+        ),
+        patch(
+            "app.services.import_service.novel_service.create_novel_record",
+            new=AsyncMock(return_value=novel),
+        ),
+        patch(
+            "app.services.indexing_service.indexing_service.index_novel",
+            new=AsyncMock(side_effect=RuntimeError("分块服务中断")),
+        ),
+    ):
+        await service.process_import_file(db_session, job.id, upload, user.id)
+
+    await db_session.refresh(job)
+    assert job.status == "failed"
+    assert "检索索引异常" in job.message
+    assert "分块服务中断" in (job.error_detail or "")
+    assert novel.status == "indexing_failed"
+
+
+@pytest.mark.asyncio
 async def test_import_service_update_job_status(db_session: AsyncSession):
     """测试更新任务状态服务"""
     user = await _create_test_user(db_session)

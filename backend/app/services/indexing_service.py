@@ -26,7 +26,7 @@ import asyncio
 import logging
 from typing import Any, Callable, Awaitable
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -73,6 +73,18 @@ class IndexingService:
         except (TypeError, ValueError):
             backoff = 0.5
         return retries, backoff
+
+    @staticmethod
+    def _embedding_batch_size() -> int:
+        """按 provider 选择可恢复的 embedding 批大小。"""
+        if getattr(settings, "embedding_provider", "").lower() in (
+            "local_st",
+            "local",
+            "sentence_transformers",
+            "bge",
+        ):
+            return max(16, int(getattr(settings, "embedding_batch_size", 64) or 64))
+        return 100
 
     async def _with_retry(self, operation, *, operation_name: str):
         """对 embedding 和向量写入执行有限指数退避重试。"""
@@ -230,16 +242,7 @@ class IndexingService:
         failed_chunk_ids: list[int] = []
 
         # local_st 可用更大 batch；ollama 仍用较小批避免超时
-        batch_size = 100
-        if getattr(settings, "embedding_provider", "").lower() in (
-            "local_st",
-            "local",
-            "sentence_transformers",
-            "bge",
-        ):
-            batch_size = max(
-                16, int(getattr(settings, "embedding_batch_size", 64) or 64)
-            )
+        batch_size = self._embedding_batch_size()
 
         for i in range(0, total, batch_size):
             batch = chunk_records[i : i + batch_size]
@@ -356,6 +359,151 @@ class IndexingService:
             "failed_chunk_ids": failed_chunk_ids,
             "status": final_status,
             "hierarchy_build_id": hierarchy_build_id,
+        }
+
+    async def resume_pending_embeddings(
+        self,
+        db: AsyncSession,
+        novel_id: int,
+        progress_callback: ProgressCallback | None = None,
+    ) -> dict[str, Any]:
+        """只续跑数据库中尚未完成的 embedding，不重分块、不删除已有向量。
+
+        进程在某个 batch 内中断时，该 batch 的数据库事务不会提交，
+        因此块仍保持 ``pending``；重启后重新 upsert 到 Chroma 是幂等的。
+        """
+        novel = await db.get(Novel, novel_id)
+        if not novel:
+            raise IndexingError(f"小说不存在: novel_id={novel_id}")
+
+        pending_result = await db.execute(
+            select(TextChunk)
+            .where(
+                TextChunk.novel_id == novel_id,
+                TextChunk.embedding_status == "pending",
+            )
+            .order_by(TextChunk.id)
+        )
+        pending_chunks = list(pending_result.scalars().all())
+
+        failed_result = await db.execute(
+            select(func.count()).where(
+                TextChunk.novel_id == novel_id,
+                TextChunk.embedding_status == "failed",
+            )
+        )
+        existing_failed = int(failed_result.scalar() or 0)
+
+        if not pending_chunks:
+            if novel.status == "embedding":
+                novel.status = "indexing_failed" if existing_failed else "ready"
+                await db.commit()
+            return {
+                "novel_id": novel_id,
+                "total_chunks": 0,
+                "embedded_chunks": 0,
+                "failed_chunks": existing_failed,
+                "status": "partial" if existing_failed else "ready",
+            }
+
+        novel.status = "embedding"
+        await db.commit()
+
+        total = len(pending_chunks)
+        embedded_count = 0
+        failed_count = existing_failed
+        failed_chunk_ids: list[int] = []
+
+        if progress_callback:
+            await progress_callback(novel_id, 0, total, "embedding")
+
+        for i in range(0, total, self._embedding_batch_size()):
+            batch = pending_chunks[i : i + self._embedding_batch_size()]
+            batch_texts = [record.content for record in batch]
+
+            try:
+                embeddings = await self._batch_embed(batch_texts)
+            except Exception as exc:
+                logger.error(
+                    "续跑 embedding 失败 novel_%d batch_%d: %s",
+                    novel_id,
+                    i // self._embedding_batch_size(),
+                    exc,
+                )
+                for record in batch:
+                    record.embedding_status = "failed"
+                    failed_count += 1
+                    failed_chunk_ids.append(record.id)
+                await db.commit()
+                if progress_callback:
+                    await progress_callback(novel_id, embedded_count, total, "embedding")
+                continue
+
+            chunks_for_store = [
+                {
+                    "id": record.id,
+                    "content": record.content,
+                    "embedding": embeddings[j],
+                    "metadata": {
+                        "chapter_id": record.chapter_id,
+                        "chunk_index": record.chunk_index,
+                        "chunk_type": record.chunk_type,
+                        "word_count": record.word_count,
+                    },
+                }
+                for j, record in enumerate(batch)
+            ]
+
+            try:
+                await self._with_retry(
+                    lambda: self.vector_store.add_chunks(
+                        novel_id=novel_id, chunks=chunks_for_store
+                    ),
+                    operation_name=(
+                        f"续跑 Chroma 写入 batch {i // self._embedding_batch_size()}"
+                    ),
+                )
+            except Exception as exc:
+                logger.error(
+                    "续跑向量写入失败 novel_%d batch_%d: %s",
+                    novel_id,
+                    i // self._embedding_batch_size(),
+                    exc,
+                )
+                for record in batch:
+                    record.embedding_status = "failed"
+                    failed_count += 1
+                    failed_chunk_ids.append(record.id)
+            else:
+                for record in batch:
+                    record.embedding_status = "embedded"
+                embedded_count += len(batch)
+
+            await db.commit()
+            if progress_callback:
+                await progress_callback(novel_id, embedded_count, total, "embedding")
+
+        final_status = "partial" if failed_count else "ready"
+        novel.status = "indexing_failed" if failed_count else "ready"
+        await db.commit()
+
+        if progress_callback:
+            await progress_callback(novel_id, total, total, final_status)
+
+        logger.info(
+            "小说 embedding 续跑完成 novel_%d: pending=%d, embedded=%d, failed=%d",
+            novel_id,
+            total,
+            embedded_count,
+            failed_count,
+        )
+        return {
+            "novel_id": novel_id,
+            "total_chunks": total,
+            "embedded_chunks": embedded_count,
+            "failed_chunks": failed_count,
+            "failed_chunk_ids": failed_chunk_ids,
+            "status": final_status,
         }
 
     async def _persist_hierarchy_build(

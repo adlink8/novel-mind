@@ -15,9 +15,11 @@ NovelMind 后端 - FastAPI ASGI 应用入口
   TrailingSlash → RequestLogging → CORS → 路由处理
 """
 
+import asyncio
 import logging
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from sqlalchemy.engine import make_url
+from sqlalchemy import select
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -47,6 +49,89 @@ from app.config import settings
 from app.core.logging import RequestLoggingMiddleware, setup_logging
 
 logger = logging.getLogger("novelmind")
+
+
+async def _resume_pending_embeddings_on_startup() -> None:
+    """扫描 pending 文本块并在独立后台任务中续跑 embedding。"""
+    from app.core.database import async_session_factory
+    from app.models.import_job import ImportJob
+    from app.models.text_chunk import TextChunk
+    from app.services.indexing_service import indexing_service
+
+    try:
+        async with async_session_factory() as db:
+            result = await db.execute(
+                select(TextChunk.novel_id)
+                .where(TextChunk.embedding_status == "pending")
+                .distinct()
+            )
+            novel_ids = list(result.scalars().all())
+
+        if not novel_ids:
+            logger.info("启动恢复检查：没有待续跑的 embedding 块")
+            return
+
+        logger.info(
+            "启动恢复检查：发现 %d 本小说存在 pending embedding，将自动续跑",
+            len(novel_ids),
+        )
+        for novel_id in novel_ids:
+            async with async_session_factory() as db:
+                try:
+                    job_result = await db.execute(
+                        select(ImportJob)
+                        .where(ImportJob.novel_id == novel_id)
+                        .order_by(ImportJob.id.desc())
+                    )
+                    job = job_result.scalars().first()
+                    if job and job.status == "cancelled":
+                        logger.info(
+                            "跳过已取消任务的 embedding 恢复: novel_id=%s, job_id=%s",
+                            novel_id,
+                            job.id,
+                        )
+                        continue
+
+                    result = await indexing_service.resume_pending_embeddings(
+                        db, novel_id
+                    )
+                    if job:
+                        # 启动恢复是崩溃恢复路径，直接修正持久化状态，
+                        # 不受正常导入状态机的 ready -> embedding 限制影响。
+                        job.lease_id = None
+                        job.lease_expires_at = None
+                        if result["failed_chunks"]:
+                            detail = (
+                                f"自动恢复 embedding 失败：{result['failed_chunks']} 个块未完成"
+                            )
+                            job.status = "failed"
+                            job.progress = 100
+                            job.message = detail
+                            job.error_detail = detail
+                        else:
+                            job.status = "ready"
+                            job.progress = 100
+                            job.message = (
+                                f"服务重启后自动恢复索引完成："
+                                f"{result['embedded_chunks']} 个待嵌入块"
+                            )
+                            job.error_detail = None
+                    await db.commit()
+                    logger.info(
+                        "启动恢复完成 novel_id=%s: %s",
+                        novel_id,
+                        result,
+                    )
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    await db.rollback()
+                    logger.exception("启动恢复 embedding 失败 novel_id=%s", novel_id)
+    except asyncio.CancelledError:
+        raise
+    except Exception:
+        # 恢复失败不能阻断 API 启动；下次重启仍会再次扫描 pending。
+        logger.exception("启动扫描 pending embedding 失败")
 
 
 @asynccontextmanager
@@ -94,8 +179,18 @@ async def lifespan(app: FastAPI):
         logger.warning(f"恢复 AI 路由偏好失败，使用默认值: {e}")
 
     logger.info("服务就绪 ✓")
-    yield
-    logger.info("NovelMind API 已关闭")
+    recovery_task = asyncio.create_task(
+        _resume_pending_embeddings_on_startup(),
+        name="resume-pending-embeddings",
+    )
+    try:
+        yield
+    finally:
+        if not recovery_task.done():
+            recovery_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await recovery_task
+        logger.info("NovelMind API 已关闭")
 
 
 # 创建 FastAPI 应用实例
