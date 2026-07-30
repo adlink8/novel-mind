@@ -429,6 +429,7 @@ class ReaderBudgetLedger(TimestampMixin, Base):
             "conversation_id",
             unique=True,
             postgresql_where=text("scope_type = 'conversation'"),
+            sqlite_where=text("scope_type = 'conversation'"),
         ),
         Index(
             "uq_reader_budget_ledger_novel",
@@ -436,6 +437,7 @@ class ReaderBudgetLedger(TimestampMixin, Base):
             "novel_id",
             unique=True,
             postgresql_where=text("scope_type = 'novel'"),
+            sqlite_where=text("scope_type = 'novel'"),
         ),
         Index("idx_reader_budget_ledgers_novel", "owner_id", "novel_id"),
     )

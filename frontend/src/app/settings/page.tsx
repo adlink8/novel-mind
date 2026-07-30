@@ -7,6 +7,7 @@
 import { ChapterOrnament } from "@/components/chapter-ornament";
 import { PageContainer, PageHeader } from "@/components/page-header";
 import { AccountSection } from "@/components/settings/account-section";
+import { AIBudgetSection } from "@/components/settings/ai-budget-section";
 import { ModelsSection } from "@/components/settings/models-section";
 import { RoutingSection } from "@/components/settings/routing-section";
 import { UsageSection } from "@/components/settings/usage-section";
@@ -26,7 +27,9 @@ export default function SettingsPage() {
       <ChapterOrnament />
       <ModelsSection chapter="叁" />
       <ChapterOrnament />
-      <UsageSection chapter="肆" />
+      <AIBudgetSection chapter="肆" />
+      <ChapterOrnament />
+      <UsageSection chapter="伍" />
     </PageContainer>
   );
 }

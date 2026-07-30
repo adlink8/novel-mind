@@ -344,6 +344,52 @@ async def test_novel_full_lifecycle(auth_client: AsyncClient):
     assert len(chapters) == 2
     chapter_id = chapters[0]["id"]
 
+    batch_resp = await auth_client.get(
+        f"/api/novels/{novel_id}/chapters/content"
+    )
+    assert batch_resp.status_code == 200
+    batch_chapters = batch_resp.json()
+    assert [item["chapter_number"] for item in batch_chapters] == [1, 2]
+    assert "测试内容。" in batch_chapters[0]["content"]
+
+    # 小说级和会话级 AI 预算均可独立配置。
+    novel_budget_resp = await auth_client.put(
+        "/api/settings/ai-budget",
+        json={
+            "novel_id": novel_id,
+            "novel": {
+                "max_calls": 600,
+                "max_input_tokens": 5000000,
+                "max_output_tokens": 1000000,
+                "max_cost_usd": 60,
+            },
+            "arc_window_size": 2,
+        },
+    )
+    assert novel_budget_resp.status_code == 200
+    assert novel_budget_resp.json()["novel"]["max_calls"] == 600
+    assert novel_budget_resp.json()["arc_window_size"] == 2
+
+    conversation_resp = await auth_client.post(
+        f"/api/novels/{novel_id}/conversations", json={"title": "预算测试"}
+    )
+    assert conversation_resp.status_code == 201
+    conversation_id = conversation_resp.json()["id"]
+    conversation_budget_resp = await auth_client.put(
+        "/api/settings/ai-budget",
+        json={
+            "conversation_id": conversation_id,
+            "conversation": {
+                "max_calls": 80,
+                "max_input_tokens": 800000,
+                "max_output_tokens": 160000,
+                "max_cost_usd": 8,
+            },
+        },
+    )
+    assert conversation_budget_resp.status_code == 200
+    assert conversation_budget_resp.json()["conversation"]["max_calls"] == 80
+
     # 查询单个章节
     chapter_resp = await auth_client.get(
         f"/api/novels/{novel_id}/chapters/{chapter_id}"

@@ -617,16 +617,21 @@ class DualBudgetRepository:
         )
         if ledger is not None:
             return ledger
-        policy = self.novel_policy
+        # New ledgers take the user-configured defaults; existing ledgers keep
+        # their frozen per-novel/per-conversation ceilings until explicitly changed.
+        from app.services.settings_service import get_reader_budget_defaults
+
+        configured = await get_reader_budget_defaults(session, owner_id)
+        configured_policy = configured["novel"]
         ledger = ReaderBudgetLedger(
             scope_type="novel",
             owner_id=owner_id,
             novel_id=novel_id,
             conversation_id=None,
-            max_calls=policy.max_calls,
-            max_input_tokens=policy.max_input_tokens,
-            max_output_tokens=policy.max_output_tokens,
-            max_cost_usd=policy.max_cost_usd,
+            max_calls=int(configured_policy["max_calls"]),
+            max_input_tokens=int(configured_policy["max_input_tokens"]),
+            max_output_tokens=int(configured_policy["max_output_tokens"]),
+            max_cost_usd=configured_policy["max_cost_usd"],
         )
         session.add(ledger)
         await session.flush()
@@ -650,16 +655,19 @@ class DualBudgetRepository:
         )
         if ledger is not None:
             return ledger
-        policy = self.conversation_policy
+        from app.services.settings_service import get_reader_budget_defaults
+
+        configured = await get_reader_budget_defaults(session, owner_id)
+        configured_policy = configured["conversation"]
         ledger = ReaderBudgetLedger(
             scope_type="conversation",
             owner_id=owner_id,
             novel_id=novel_id,
             conversation_id=conversation_id,
-            max_calls=policy.max_calls,
-            max_input_tokens=policy.max_input_tokens,
-            max_output_tokens=policy.max_output_tokens,
-            max_cost_usd=policy.max_cost_usd,
+            max_calls=int(configured_policy["max_calls"]),
+            max_input_tokens=int(configured_policy["max_input_tokens"]),
+            max_output_tokens=int(configured_policy["max_output_tokens"]),
+            max_cost_usd=configured_policy["max_cost_usd"],
         )
         session.add(ledger)
         await session.flush()
