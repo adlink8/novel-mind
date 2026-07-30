@@ -190,7 +190,7 @@ export function RelationshipEvidencePanel(props: Props) {
             <ul className="mt-2 grid gap-2">
               {evidence.evidence.map((item) => (
                 <li
-                  key={item.evidence_id}
+                  key={`${item.evidence_id}-${item.chapter_id}-${item.source_start}`}
                   className="rounded-2xl border bg-card p-3 text-sm"
                 >
                   <p className="text-xs text-muted-foreground">

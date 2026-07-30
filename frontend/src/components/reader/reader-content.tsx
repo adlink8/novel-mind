@@ -108,6 +108,9 @@ export function ReaderContent({
   /** 防止回到顶部时重复触发同一章的自动换章。 */
   const autoRetreatChapterRef = useRef<number | null>(null);
   const previousScrollTopRef = useRef<number | null>(null);
+  /** 滚动上报节流：避免 setChapterPercent 每秒触发 60 次导致卡顿 */
+  const lastScrollReportRef = useRef(0);
+  const SCROLL_THROTTLE_MS = 150;
   const chapterId = activeChapterId ?? chapter?.id;
   const [captured, setCaptured] = useState<{
     coords: ChapterSelectionCoords;
@@ -275,7 +278,12 @@ export function ReaderContent({
         reportProgress(percent, activeChapter.id);
       };
 
-      const onScroll = () => reportMultiChapterScroll();
+      const onScroll = () => {
+        const now = Date.now();
+        if (now - lastScrollReportRef.current < SCROLL_THROTTLE_MS) return;
+        lastScrollReportRef.current = now;
+        reportMultiChapterScroll();
+      };
       el.addEventListener("scroll", onScroll, { passive: true });
       return () => {
         el.removeEventListener("scroll", onScroll);
