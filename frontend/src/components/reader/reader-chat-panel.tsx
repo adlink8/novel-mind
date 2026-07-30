@@ -36,6 +36,7 @@ import {
 } from "@/lib/reader-selection";
 import { useDismissableLayer } from "@/lib/use-dismissable-layer";
 import { cn } from "@/lib/utils";
+import axios from "axios";
 
 export type CitationNavigateTarget = {
   chapter_id: number;
@@ -61,6 +62,30 @@ type Props = {
   onModeChange?: (mode: "text" | "image") => void;
   className?: string;
 };
+
+function extractReaderChatError(err: unknown, fallback: string): string {
+  if (axios.isAxiosError(err)) {
+    const data = err.response?.data as { detail?: unknown } | undefined;
+    const detail = data?.detail;
+    if (typeof detail === "string" && detail.trim()) return detail;
+    if (Array.isArray(detail)) {
+      const messages = detail
+        .map((item) => {
+          if (item && typeof item === "object" && "msg" in item) {
+            return String((item as { msg: unknown }).msg);
+          }
+          return String(item);
+        })
+        .filter(Boolean);
+      if (messages.length) return messages.join("；");
+    }
+    if (err.response?.status === 401) return "登录状态已失效，请重新登录后再试";
+    if (err.response?.status === 403) return "没有权限执行此操作";
+    if (err.response?.status) return `${fallback}（服务端 HTTP ${err.response.status}）`;
+  }
+  if (err instanceof Error && err.message) return err.message;
+  return fallback;
+}
 
 function newClientMessageId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -451,16 +476,17 @@ export function ReaderChatPanel({
       onClearSelection();
       await refreshConversations();
     } catch (err: unknown) {
-      const status = (err as { response?: { status?: number; data?: { detail?: string } } })
-        ?.response?.status;
-      const detail = (err as { response?: { data?: { detail?: string } } })?.response
-        ?.data?.detail;
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      const detail = extractReaderChatError(
+        err,
+        mode === "image" ? "图片生成失败" : "发送失败"
+      );
       if (status === 409) {
-        setError(typeof detail === "string" ? detail : "会话冲突");
+        setError(detail || "会话冲突");
       } else if (status === 422) {
-        setError(typeof detail === "string" ? detail : "选区无效或已过期");
+        setError(detail || "选区无效或已过期");
       } else {
-        setError(mode === "image" ? "图片生成失败，请确认生图服务已启动" : "发送失败");
+        setError(detail);
       }
     } finally {
       setSending(false);
