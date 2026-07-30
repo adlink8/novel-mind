@@ -4,7 +4,7 @@ import {
   QualityStatusBadge,
   DeprecationBanner,
   QualityJobsPanel,
-} from "./page";
+} from "./eval-components";
 import type { DeprecationMeta, QualityJobPublic } from "@/lib/api";
 
 vi.mock("@/hooks/use-eval", () => ({

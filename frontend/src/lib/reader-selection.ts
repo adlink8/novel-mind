@@ -171,15 +171,13 @@ export function captureSelectionFromRange(
 /** SHA-256 hex of UTF-8 bytes (matches backend content_sha256). */
 export async function sha256Hex(text: string): Promise<string> {
   const data = new TextEncoder().encode(text);
-  if (typeof globalThis.crypto?.subtle?.digest === "function") {
-    const digest = await globalThis.crypto.subtle.digest("SHA-256", data);
-    return Array.from(new Uint8Array(digest))
-      .map((b) => b.toString(16).padStart(2, "0"))
-      .join("");
+  if (typeof globalThis.crypto?.subtle?.digest !== "function") {
+    throw new Error("当前环境不支持 Web Crypto，无法计算书签校验哈希");
   }
-  // Node / Vitest fallback without WebCrypto
-  const { createHash } = await import("node:crypto");
-  return createHash("sha256").update(text, "utf8").digest("hex");
+  const digest = await globalThis.crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 export async function buildSelectionPayload(
