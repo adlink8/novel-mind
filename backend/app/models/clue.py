@@ -238,7 +238,7 @@ class ClueEvidenceRef(TimestampMixin, Base):
             name="ck_clue_evidence_refs_offsets",
         ),
         CheckConstraint(
-            "narrative_chapter_number > 0",
+            "narrative_chapter_number >= 0",
             name="ck_clue_evidence_refs_chapter",
         ),
         # At least one parent attachment.

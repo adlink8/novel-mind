@@ -92,7 +92,7 @@ class NmSourceLinkItem(StrictNmProductModel):
     source_kind: str = Field(min_length=1, max_length=24)
     hierarchy_build_id: str = Field(min_length=1, max_length=64)
     evidence_node_id: str = Field(min_length=1, max_length=64)
-    chapter_number: int = Field(gt=0)
+    chapter_number: int = Field(ge=0)
     source_start: int = Field(ge=0)
     source_end: int = Field(gt=0)
     content_hash: str | None = None

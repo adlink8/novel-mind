@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import logging
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
@@ -24,6 +25,7 @@ from app.models.analysis import (
 )
 from app.models.chunk_build import ChunkActivePointer, ChunkBuild, ChunkHierarchyNode
 from app.models.novel import Chapter, Novel
+from app.models.character import Character
 from app.models.timeline import (
     MachineTimelineEvent,
     TimelineActivePointer,
@@ -51,6 +53,7 @@ from app.services.timeline.model_gateway import (
     ModelCallFailed,
     ModelDeployment,
     PostgresCallRepository,
+    StructuredOutputRejected,
     TimelineModelGateway,
 )
 from app.services.timeline.promotion import promote_version, snapshot_manifest
@@ -60,6 +63,9 @@ from app.services.timeline.reconcile import (
     TimelineReconciler,
     reconciliation_contract_hashes,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 class TimelineWorkerError(RuntimeError):
@@ -260,7 +266,19 @@ async def run_timeline_worker(run_id: int, *, runtime: TimelineWorkerRuntime) ->
         await _raise_if_cancel_requested(runtime.sessions, run_id)
         budget = BudgetGate(runtime.budget_policy)
         for completed, chapter in enumerate(chapters, start=1):
-            await _extract_and_persist(runtime, budget, run, version, build, chapter)
+            try:
+                await _extract_and_persist(runtime, budget, run, version, build, chapter)
+            except ModelCallFailed as exc:
+                logger.warning(
+                    "chapter %s extraction skipped: %s (%s/483)",
+                    chapter.id,
+                    type(exc).__name__,
+                    completed,
+                )
+                # mark chapter as skipped so it won't block pipeline
+                await _persist_skipped_stage(
+                    runtime.sessions, run, chapter, f"chapter_extract:{chapter.id}", str(exc)
+                )
             await _raise_if_cancel_requested(runtime.sessions, run_id)
             await _update_progress(
                 runtime.sessions, run.id, completed, len(chapters), "extracting"
@@ -550,6 +568,36 @@ async def _extract_and_persist(runtime, budget, run, version, build, chapter) ->
     await _persist_chapter(runtime.sessions, run, version, chapter, stage_key, output)
 
 
+async def _persist_skipped_stage(
+    sessions: async_sessionmaker[AsyncSession],
+    run: AnalysisRun,
+    chapter: Chapter,
+    stage_key: str,
+    reason: str,
+) -> None:
+    async with sessions.begin() as session:
+        existing = await session.scalar(
+            select(AnalysisChapterStage)
+            .where(
+                AnalysisChapterStage.run_id == run.id,
+                AnalysisChapterStage.stage_key == stage_key,
+            )
+            .with_for_update()
+        )
+        if existing is not None:
+            return
+        session.add(
+            AnalysisChapterStage(
+                run_id=run.id,
+                chapter_id=chapter.id,
+                stage_key=stage_key,
+                status="skipped",
+                artifact_checksum="skipped",
+                checkpoint={"skipped_reason": reason[:1000]},
+            )
+        )
+
+
 async def _persist_chapter(
     sessions, run, version, chapter, stage_key, extraction
 ) -> None:
@@ -566,6 +614,25 @@ async def _persist_chapter(
         )
         if existing is not None and existing.status == "completed":
             return
+        # batch-validate participant entity_ids against characters table
+        all_eids = {
+            item.entity_id
+            for candidate in extraction.events
+            for item in candidate.participants
+            if item.entity_id is not None
+        }
+        valid_eids: set[int] = set()
+        if all_eids:
+            rows = (
+                (
+                    await session.execute(
+                        select(Character.id).where(Character.id.in_(list(all_eids)))
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            valid_eids = set(rows)
         for candidate in extraction.events:
             logical_id = f"{chapter.id}:{candidate.candidate_id}"
             event = MachineTimelineEvent(
@@ -602,7 +669,7 @@ async def _persist_chapter(
                 [
                     TimelineParticipant(
                         event_id=event.id,
-                        entity_id=item.entity_id,
+                        entity_id=item.entity_id if item.entity_id in valid_eids else None,
                         mention=item.mention,
                     )
                     for item in candidate.participants

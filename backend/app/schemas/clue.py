@@ -172,7 +172,7 @@ class ClueEvidenceRef(StrictClueModel):
     evidence_id: str = Field(min_length=1, max_length=80)
     role: ClueEvidenceRole
     chapter_id: int = Field(gt=0)
-    narrative_chapter_number: int = Field(gt=0)
+    narrative_chapter_number: int = Field(ge=0)
     source_start: int = Field(ge=0)
     source_end: int = Field(gt=0)
     content_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
@@ -561,7 +561,7 @@ class ClueVisibleItem(StrictClueModel):
     logical_clue_id: str = Field(min_length=1, max_length=80)
     title: str = Field(min_length=1, max_length=200)
     derived_state: ClueLifecycleState
-    narrative_chapter_number: int = Field(gt=0)
+    narrative_chapter_number: int = Field(ge=0)
     source_start: int = Field(ge=0)
     confidence: float = Field(ge=0, le=1)
     evidence_count: int = Field(ge=0)

@@ -202,7 +202,7 @@ def make_clue_evidence_unit(
 ) -> ClueEvidenceUnit:
     body = text or ""
     end = source_end if source_end is not None else max(len(body), 1)
-    if chapter_id <= 0 or narrative_chapter_number <= 0:
+    if chapter_id < 0 or narrative_chapter_number < 0:
         raise ClueEvidenceScopeError("chapter identifiers must be positive")
     if end <= source_start or source_start < 0:
         raise ClueEvidenceScopeError(f"invalid evidence offsets for {evidence_id}")

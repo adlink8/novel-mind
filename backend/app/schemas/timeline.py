@@ -118,7 +118,7 @@ class EventCandidate(StrictTimelineModel):
     title: str = Field(min_length=1, max_length=200)
     description: str = Field(min_length=1)
     event_type: Literal["plot", "character", "world", "conflict"]
-    narrative_chapter_number: int = Field(gt=0)
+    narrative_chapter_number: int = Field(ge=0)
     narrative_index: int = Field(ge=0)
     participants: list[Participant] = Field(default_factory=list)
     story_time: StoryTime

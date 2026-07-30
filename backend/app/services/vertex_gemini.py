@@ -111,6 +111,17 @@ class GcloudTokenProvider:
             env["CLOUDSDK_ROOT_DIR"] = self._cloud_sdk_root
         env["CLOUDSDK_CORE_DISABLE_PROMPTS"] = "1"
 
+        # gcloud 使用 CLOUDSDK_CORE_PROXY 而非 HTTPS_PROXY；从设置或环境变量中读取
+        proxy = _resolve_https_proxy()
+        if proxy:
+            if "CLOUDSDK_CORE_PROXY" not in env:
+                env["CLOUDSDK_CORE_PROXY"] = proxy
+            # gcloud.py 内部使用 Python HTTP 库，只认 HTTPS_PROXY/HTTP_PROXY
+            if "HTTPS_PROXY" not in env:
+                env["HTTPS_PROXY"] = proxy
+            if "HTTP_PROXY" not in env:
+                env["HTTP_PROXY"] = proxy
+
         if self._sdk_py and os.path.exists(self._sdk_py):
             r = subprocess.run(
                 [sys.executable, self._sdk_py, "auth", "print-access-token"],
