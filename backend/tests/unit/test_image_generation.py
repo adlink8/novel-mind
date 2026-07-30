@@ -1,10 +1,17 @@
 import base64
+from types import SimpleNamespace
 
 import httpx
 import pytest
 
 from app.services import image_generation
-from app.services.image_generation import _image_dimensions, _prompt_parts, _provider_error_detail
+from app.services.image_generation import (
+    _build_enrichment_messages,
+    _enrich_prompt,
+    _image_dimensions,
+    _prompt_parts,
+    _provider_error_detail,
+)
 from app.schemas.reader_chat import ImageGenerationRequest
 
 
@@ -23,6 +30,79 @@ def test_image_prompt_combines_selection_and_refinement():
 def test_image_prompt_rejects_empty_input():
     with pytest.raises(Exception, match="选择文本或输入画面描述"):
         _prompt_parts(ImageGenerationRequest())
+
+
+def test_enrichment_messages_include_novel_character_and_history_context():
+    messages = _build_enrichment_messages(
+        base_prompt="魔王城决战",
+        context={
+            "novel_title": "转生史莱姆",
+            "genre": "东方玄幻",
+            "world_description": "魔法与魔王共存的世界",
+            "style_fingerprint": "浓郁色彩",
+            "chapter_title": "魔王城决战",
+            "characters": ["利姆路（主角）；外观/身份：蓝色长发"],
+            "history_prompts": ["日系轻小说插画，冷色魔法光效"],
+        },
+    )
+    assert "转生史莱姆" in messages[1]["content"]
+    assert "蓝色长发" in messages[1]["content"]
+    assert "日系轻小说插画" in messages[1]["content"]
+
+
+@pytest.mark.asyncio
+async def test_enrich_prompt_uses_llm_result(monkeypatch):
+    async def fake_chat(**_kwargs):
+        return SimpleNamespace(
+            choices=[
+                SimpleNamespace(
+                    message=SimpleNamespace(content="东方玄幻，蓝色长发主角在魔王城决战")
+                )
+            ]
+        )
+
+    monkeypatch.setattr(image_generation.ai_service, "chat", fake_chat)
+    async def fake_context(*_args, **_kwargs):
+        return {
+            "novel_title": "转生史莱姆",
+            "characters": [],
+            "history_prompts": [],
+        }
+
+    monkeypatch.setattr(image_generation, "_load_prompt_context", fake_context)
+
+    result = await _enrich_prompt(
+        None,
+        novel=SimpleNamespace(title="转生史莱姆", style_fingerprint=None),
+        owner_id=1,
+        chapter=None,
+        base_prompt="魔王城决战",
+    )
+
+    assert "蓝色长发" in result
+
+
+@pytest.mark.asyncio
+async def test_enrich_prompt_falls_back_when_llm_fails(monkeypatch):
+    async def failing_chat(**_kwargs):
+        raise RuntimeError("provider unavailable")
+
+    monkeypatch.setattr(image_generation.ai_service, "chat", failing_chat)
+    async def fake_context(*_args, **_kwargs):
+        return {"novel_title": "小说"}
+
+    monkeypatch.setattr(image_generation, "_load_prompt_context", fake_context)
+
+    assert (
+        await _enrich_prompt(
+            None,
+            novel=SimpleNamespace(title="小说", style_fingerprint=None),
+            owner_id=1,
+            chapter=None,
+            base_prompt="一座城堡",
+        )
+        == "一座城堡"
+    )
 
 
 def test_png_dimensions_are_read_without_pillow():

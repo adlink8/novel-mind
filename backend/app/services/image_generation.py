@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import base64
 import binascii
+import json
+import logging
 import secrets
 import struct
 from pathlib import Path
@@ -13,8 +15,10 @@ import httpx
 from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.config import settings
+from app.models.character import Character
 from app.models.novel import Chapter, Novel
 from app.models.reader_chat import GeneratedImage, ReaderConversation, ReaderMessage
 from app.schemas.reader_chat import (
@@ -22,6 +26,16 @@ from app.schemas.reader_chat import (
     ImageGenerationResponse,
     MessageType,
 )
+from app.services.ai_service import ai_service
+
+logger = logging.getLogger(__name__)
+
+PROMPT_PATH = (
+    Path(__file__).resolve().parents[2] / "prompts" / "image_prompt_enhancement.v1.txt"
+)
+MAX_CHARACTER_CONTEXT = 8
+MAX_HISTORY_PROMPTS = 3
+MAX_ENHANCED_PROMPT_LENGTH = 4000
 
 
 def _prompt_parts(data: ImageGenerationRequest) -> tuple[str, str]:
@@ -36,6 +50,180 @@ def _prompt_parts(data: ImageGenerationRequest) -> tuple[str, str]:
     # Hunyuan accepts Chinese prompts. Translation is intentionally optional in
     # the wiki contract, so the local provider receives the user's exact prompt.
     return prompt_cn, prompt_cn
+
+
+def _trim_context(value: object, limit: int) -> str:
+    return str(value or "").strip()[:limit]
+
+
+def _character_context(character: Character) -> str:
+    parts = [f"{character.name}（{character.role or '角色'}）"]
+    if character.description:
+        parts.append(f"外观/身份：{_trim_context(character.description, 500)}")
+    if character.personality:
+        parts.append(f"气质：{_trim_context(character.personality, 300)}")
+    if character.background:
+        parts.append(f"背景：{_trim_context(character.background, 300)}")
+    return "；".join(parts)
+
+
+def _style_fingerprint_context(novel: Novel) -> str:
+    fingerprint = novel.style_fingerprint or {}
+    if not fingerprint:
+        return ""
+    if isinstance(fingerprint, dict):
+        selected = {
+            key: fingerprint[key]
+            for key in (
+                "genre",
+                "world_setting",
+                "visual_style",
+                "art_style",
+                "tone",
+            )
+            if fingerprint.get(key)
+        }
+        if selected:
+            return _trim_context(
+                json.dumps(selected, ensure_ascii=False, sort_keys=True), 1200
+            )
+    return _trim_context(fingerprint, 1200)
+
+
+async def _load_prompt_context(
+    db: AsyncSession,
+    *,
+    novel: Novel,
+    owner_id: int,
+    chapter: Chapter | None,
+) -> dict[str, object]:
+    """Load bounded, owner-scoped context; optional analysis data never blocks drawing."""
+
+    characters: list[Character] = []
+    try:
+        characters = list(
+            (
+                await db.scalars(
+                    select(Character)
+                    .where(
+                        Character.novel_id == novel.id,
+                        Character.description.is_not(None),
+                    )
+                    .order_by(
+                        (Character.role == "protagonist").desc(),
+                        Character.first_appearance_chapter.asc().nullslast(),
+                        Character.id.asc(),
+                    )
+                    .limit(MAX_CHARACTER_CONTEXT)
+                )
+            ).all()
+        )
+    except SQLAlchemyError as exc:
+        logger.warning("读取生图人物上下文失败，继续使用基础 prompt: %s", type(exc).__name__)
+
+    history: list[GeneratedImage] = []
+    try:
+        history = list(
+            (
+                await db.scalars(
+                    select(GeneratedImage)
+                    .where(
+                        GeneratedImage.novel_id == novel.id,
+                        GeneratedImage.owner_id == owner_id,
+                    )
+                    .order_by(GeneratedImage.id.desc())
+                    .limit(MAX_HISTORY_PROMPTS)
+                )
+            ).all()
+        )
+    except SQLAlchemyError as exc:
+        logger.warning("读取历史生图 prompt 失败，继续使用基础 prompt: %s", type(exc).__name__)
+
+    return {
+        "novel_title": _trim_context(novel.title, 200),
+        "genre": _trim_context(novel.genre, 120),
+        "world_description": _trim_context(novel.description, 1200),
+        "style_fingerprint": _style_fingerprint_context(novel),
+        "chapter_title": _trim_context(chapter.title if chapter else "", 200),
+        "characters": [_character_context(item) for item in characters],
+        "history_prompts": [
+            _trim_context(item.prompt_cn or item.prompt_en, 700) for item in history
+        ],
+    }
+
+
+def _build_enrichment_messages(
+    *,
+    base_prompt: str,
+    context: dict[str, object],
+) -> list[dict[str, str]]:
+    payload = {
+        "base_prompt": _trim_context(base_prompt, 1600),
+        "novel": {
+            "title": context.get("novel_title", ""),
+            "genre": context.get("genre", ""),
+            "world_description": context.get("world_description", ""),
+            "style_fingerprint": context.get("style_fingerprint", ""),
+        },
+        "chapter_title": context.get("chapter_title", ""),
+        "character_references": context.get("characters", []),
+        "historical_image_prompts": context.get("history_prompts", []),
+    }
+    user_content = (
+        "IMAGE_CONTEXT_BEGIN\n"
+        + json.dumps(payload, ensure_ascii=False, sort_keys=True)
+        + "\nIMAGE_CONTEXT_END\n"
+        "只输出一条最终中文生图 prompt，不要解释过程。"
+    )
+    return [
+        {"role": "system", "content": PROMPT_PATH.read_text(encoding="utf-8")},
+        {"role": "user", "content": user_content},
+    ]
+
+
+def _response_text(response: object) -> str:
+    if isinstance(response, dict):
+        value = response.get("content")
+        return str(value or "").strip()
+    choices = getattr(response, "choices", None) or []
+    if choices:
+        return str(getattr(choices[0].message, "content", None) or "").strip()
+    return str(getattr(response, "content", None) or "").strip()
+
+
+async def _enrich_prompt(
+    db: AsyncSession,
+    *,
+    novel: Novel,
+    owner_id: int,
+    chapter: Chapter | None,
+    base_prompt: str,
+) -> str:
+    """Use the chat model to turn a bare scene description into a contextual prompt."""
+
+    context = await _load_prompt_context(
+        db, novel=novel, owner_id=owner_id, chapter=chapter
+    )
+    try:
+        response = await ai_service.chat(
+            messages=_build_enrichment_messages(
+                base_prompt=base_prompt, context=context
+            ),
+            temperature=0.2,
+            max_tokens=700,
+            stream=False,
+            task_type="image_prompt_enrichment",
+        )
+        enriched = _response_text(response)
+        if enriched.startswith("```"):
+            enriched = enriched.removeprefix("```json").removeprefix("```JSON")
+            enriched = enriched.removeprefix("```").strip()
+            enriched = enriched.removesuffix("```").strip()
+        if enriched:
+            return enriched[:MAX_ENHANCED_PROMPT_LENGTH]
+    except Exception as exc:
+        logger.warning("生图 prompt 增强失败，回退基础 prompt: %s", type(exc).__name__)
+    return base_prompt
 
 
 def _decode_data_url(value: str) -> bytes:
@@ -197,6 +385,7 @@ async def generate_image(
 ) -> ImageGenerationResponse:
     prompt_cn, prompt = _prompt_parts(data)
     chapter_id = data.chapter_id
+    chapter: Chapter | None = None
     if chapter_id is not None:
         chapter = (
             await db.execute(
@@ -215,6 +404,14 @@ async def generate_image(
     if conversation.status != "active":
         raise HTTPException(status_code=409, detail="归档会话不能生成图片")
 
+    prompt_cn = await _enrich_prompt(
+        db,
+        novel=novel,
+        owner_id=owner_id,
+        chapter=chapter,
+        base_prompt=prompt_cn,
+    )
+    prompt = prompt_cn
     image_bytes, extension = await _request_image(prompt)
     if not image_bytes or len(image_bytes) > max(settings.max_upload_size, 50 * 1024 * 1024):
         raise HTTPException(status_code=500, detail="图片生成失败：图片文件无效或过大")
