@@ -6,7 +6,27 @@ import io
 import pytest
 from httpx import AsyncClient
 
+from app.models.bookmark import Bookmark
+
 pytestmark = pytest.mark.unit
+
+
+def test_bookmark_model_matches_persisted_schema() -> None:
+    """ORM 必须映射现有 bookmarks 表，而不是不存在的 reader_bookmarks。"""
+    assert Bookmark.__tablename__ == "bookmarks"
+    assert set(Bookmark.__table__.columns.keys()) >= {
+        "id",
+        "owner_id",
+        "novel_id",
+        "chapter_id",
+        "source_start",
+        "source_end",
+        "selected_text",
+        "selection_text_hash",
+        "chapter_content_hash",
+        "created_at",
+        "updated_at",
+    }
 
 
 @pytest.mark.asyncio
