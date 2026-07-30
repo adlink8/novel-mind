@@ -216,6 +216,11 @@ class ChapterStateModelOutput(BuilderFrozenModel):
 
     node_key: Key
     display_label: Annotated[StrictStr, StringConstraints(max_length=240)] | None = None
+    summary: Annotated[StrictStr, StringConstraints(max_length=2_000)] | None = None
+    key_elements: tuple[dict[str, Any], ...] = ()
+    narrative_progress: (
+        Annotated[StrictStr, StringConstraints(max_length=2_000)] | None
+    ) = None
     claims: Annotated[tuple[dict[str, Any], ...], Field(min_length=1)]
     source_bindings: Annotated[tuple[dict[str, Any], ...], Field(min_length=1)]
 

@@ -170,6 +170,9 @@ def rebind_chapter_state_package(
             in {
                 "node_key",
                 "display_label",
+                "summary",
+                "key_elements",
+                "narrative_progress",
                 "claims",
                 "source_bindings",
             }
@@ -184,7 +187,7 @@ def rebind_chapter_state_package(
         chapter_start=input_package.chapter_number,
         chapter_end=input_package.chapter_number,
         schema_version="memory-node.v1",
-        display_label=model_output.display_label,
+        display_label=model_output.summary or model_output.display_label,
     )
 
     leaves_by_id = {

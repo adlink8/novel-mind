@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import json
 from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import Path
@@ -64,6 +65,44 @@ FORBIDDEN_IMPORT_FRAGMENTS = (
     "current_version",
     "set_active_pointer",
 )
+
+
+def _claim_content(claim: Any) -> dict[str, Any]:
+    """Serialize authoritative claim content for parent aggregation prompts."""
+    return {
+        "claim_key": claim.claim_key,
+        "claim_kind": claim.claim_kind,
+        "content": claim.typed_payload,
+        "uncertainty": claim.uncertainty,
+        "confidence": float(claim.confidence),
+        "visible_from_chapter": int(claim.visible_from_chapter),
+    }
+
+
+def _node_content(
+    nodes: Sequence[Any], claims: Sequence[Any]
+) -> list[dict[str, Any]]:
+    claims_by_node: dict[int, list[dict[str, Any]]] = {}
+    for claim in claims:
+        claims_by_node.setdefault(int(claim.node_id), []).append(_claim_content(claim))
+    return [
+        {
+            "node_key": node.node_key,
+            "chapter_start": int(node.chapter_start),
+            "chapter_end": int(node.chapter_end),
+            "label": node.display_label,
+            "claims": claims_by_node.get(int(node.id), []),
+        }
+        for node in nodes
+    ]
+
+
+def _estimated_input_tokens(payload: object) -> int:
+    """Reserve enough budget for aggregation payloads containing real claims."""
+    serialized = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+    # CJK text can approach one token per character; over-reserving is safer
+    # than allowing settlement to exceed the reservation for a large novel.
+    return max(8_000, len(serialized))
 
 
 @dataclass(frozen=True)
@@ -595,6 +634,7 @@ class NarrativeMemoryBuilderWorker:
                 "boundary_plan_checksum": boundary_checksum,
                 "child_node_keys": [n.node_key for n in nodes],
                 "child_claim_keys": [c.claim_key for c in claims],
+                "child_content": _node_content(nodes, claims),
                 "child_link_count": len(links),
                 "prompt_hash": policy.prompt_hash,
                 "schema_hash": policy.schema_hash,
@@ -648,7 +688,7 @@ class NarrativeMemoryBuilderWorker:
                 request_payload=request_payload,
                 validate_output=validate_output,
                 is_cancelled=is_cancelled,
-                estimated_input_tokens=8_000,
+                estimated_input_tokens=_estimated_input_tokens(request_payload),
                 estimated_output_tokens=4_096,
             )
             import json as _json
@@ -819,6 +859,7 @@ class NarrativeMemoryBuilderWorker:
             request_payload = {
                 "stage_key": stage.stage_key,
                 "parent_keys": [p.stage_key for p in parents],
+                "parent_content": _node_content(parent_nodes, parent_claims),
                 "prompt_hash": policy.prompt_hash,
                 "schema_hash": policy.schema_hash,
             }
@@ -866,7 +907,7 @@ class NarrativeMemoryBuilderWorker:
                 request_payload=request_payload,
                 validate_output=validate_output,
                 is_cancelled=is_cancelled,
-                estimated_input_tokens=8_000,
+                estimated_input_tokens=_estimated_input_tokens(request_payload),
                 estimated_output_tokens=4_096,
             )
             import json as _json
