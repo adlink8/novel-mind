@@ -46,6 +46,7 @@ interface ReaderContentProps {
 
 const PAGE_CHARS = 3500;
 const WARN_CHARS = 20_000;
+const SCROLL_ADVANCE_THRESHOLD_PX = 64;
 
 /** 强制滚到顶部；instant 避免 smooth 与换页内容切换打架 */
 function scrollToTop(
@@ -84,6 +85,8 @@ export function ReaderContent({
   const pageTextRef = useRef<HTMLDivElement>(null);
   /** 章内进度恢复进行中：屏蔽滚动上报与回顶，避免 0% 覆盖存档 */
   const restoreRef = useRef<{ percent: number } | null>(null);
+  /** 防止滚动到底部时重复触发同一章的自动换章。 */
+  const autoAdvanceChapterRef = useRef<number | null>(null);
   const chapterId = chapter?.id;
   const [captured, setCaptured] = useState<{
     coords: ChapterSelectionCoords;
@@ -136,6 +139,7 @@ export function ReaderContent({
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- chapter boundary reset
     setCaptured(null);
+    autoAdvanceChapterRef.current = null;
     const target = Math.min(100, Math.max(0, initialProgress || 0));
     // 长页（或单页短章）按滚动百分比恢复；多页翻页模式按页序恢复
     const restoreByScroll = target > 0 && (isScrollMode || pages.length <= 1);
@@ -186,17 +190,41 @@ export function ReaderContent({
     const el = scrollContainerRef?.current;
     if (!el) return;
 
-    const onScroll = () => {
+    const reportScroll = (allowAutoAdvance: boolean) => {
       // 恢复章内进度期间不上报，避免把存档冲掉
       if (restoreRef.current) return;
       const max = el.scrollHeight - el.clientHeight;
       const pct = max <= 0 ? 100 : (el.scrollTop / max) * 100;
       onChapterProgress?.(Math.min(100, Math.max(0, pct)));
+
+      if (
+        allowAutoAdvance &&
+        isScrollMode &&
+        hasNextChapter &&
+        onNextChapter &&
+        max > 0 &&
+        el.scrollTop + el.clientHeight >=
+          el.scrollHeight - SCROLL_ADVANCE_THRESHOLD_PX &&
+        autoAdvanceChapterRef.current !== chapterId
+      ) {
+        autoAdvanceChapterRef.current = chapterId;
+        onNextChapter();
+      }
     };
-    onScroll();
+    const onScroll = () => reportScroll(true);
+    // 初始检查只上报进度，不因恢复位置或切换模式时恰好在底部而自动换章。
+    reportScroll(false);
     el.addEventListener("scroll", onScroll, { passive: true });
     return () => el.removeEventListener("scroll", onScroll);
-  }, [chapterId, pages.length, scrollContainerRef, onChapterProgress, isScrollMode]);
+  }, [
+    chapterId,
+    pages.length,
+    scrollContainerRef,
+    onChapterProgress,
+    isScrollMode,
+    hasNextChapter,
+    onNextChapter,
+  ]);
 
   useEffect(() => {
     if (!chapterId || isScrollMode || pages.length <= 1) return;
@@ -515,7 +543,7 @@ export function ReaderContent({
         </div>
       ) : null}
 
-      {!isScrollMode && pages.length > 1 && (
+      {!isScrollMode && (
         <div className="relative mt-12 flex items-center justify-between gap-3 border-t border-border/50 pt-6">
           <Button
             type="button"

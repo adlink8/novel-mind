@@ -38,7 +38,6 @@ import {
   MessageSquareText,
   PanelLeft,
   Search,
-  Bookmark as BookmarkIcon,
 } from "lucide-react";
 import { BookLoader } from "@/components/book-loader";
 
@@ -653,24 +652,28 @@ function NovelReaderInner() {
             >
               <Search className="size-4" />
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handlePrevChapter}
-              disabled={currentIndex <= 0}
-            >
-              <ChevronLeft className="size-4" />
-              <span className="hidden sm:inline">上一章</span>
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleNextChapter}
-              disabled={currentIndex < 0 || currentIndex >= chapters.length - 1}
-            >
-              <span className="hidden sm:inline">下一章</span>
-              <ChevronRight className="size-4" />
-            </Button>
+            {preferences.mode !== "scroll" ? (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handlePrevChapter}
+                  disabled={currentIndex <= 0}
+                >
+                  <ChevronLeft className="size-4" />
+                  <span className="hidden sm:inline">上一章</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleNextChapter}
+                  disabled={currentIndex < 0 || currentIndex >= chapters.length - 1}
+                >
+                  <span className="hidden sm:inline">下一章</span>
+                  <ChevronRight className="size-4" />
+                </Button>
+              </>
+            ) : null}
           </div>
         </header>
         ) : null}
@@ -806,36 +809,40 @@ function NovelReaderInner() {
               {/* 底部控制层：翻章 / 进度 / AI 对话入口；点按正文任意处可隐藏 */}
               <div className="fixed inset-x-0 bottom-0 z-50 flex justify-center px-4 pb-[calc(0.75rem_+_env(safe-area-inset-bottom))]">
                 <div className="flex items-center gap-1 rounded-full border border-white/15 bg-black/65 px-2 py-1.5 text-white shadow-lg backdrop-blur">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={handlePrevChapter}
-                    disabled={currentIndex <= 0}
-                    className="text-white hover:bg-white/10 hover:text-white"
-                  >
-                    <ChevronLeft className="size-4" />
-                    上一章
-                  </Button>
+                  {preferences.mode !== "scroll" ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handlePrevChapter}
+                      disabled={currentIndex <= 0}
+                      className="text-white hover:bg-white/10 hover:text-white"
+                    >
+                      <ChevronLeft className="size-4" />
+                      上一章
+                    </Button>
+                  ) : null}
                   <span className="px-2 text-xs tabular-nums text-white/80">
                     {Math.round(chapterPercent)}%
                     {chapters.length > 0
                       ? ` · ${currentIndex + 1}/${chapters.length} 章`
                       : null}
                   </span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleNextChapter}
-                    disabled={
-                      currentIndex < 0 || currentIndex >= chapters.length - 1
-                    }
-                    className="text-white hover:bg-white/10 hover:text-white"
-                  >
-                    下一章
-                    <ChevronRight className="size-4" />
-                  </Button>
+                  {preferences.mode !== "scroll" ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleNextChapter}
+                      disabled={
+                        currentIndex < 0 || currentIndex >= chapters.length - 1
+                      }
+                      className="text-white hover:bg-white/10 hover:text-white"
+                    >
+                      下一章
+                      <ChevronRight className="size-4" />
+                    </Button>
+                  ) : null}
                   <div className="h-5 w-px bg-white/20" aria-hidden />
                   <Button
                     type="button"

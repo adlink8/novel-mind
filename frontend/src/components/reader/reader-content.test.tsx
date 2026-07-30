@@ -59,6 +59,55 @@ describe("ReaderContent keyboard paging", () => {
     // 长页模式没有页码指示，只验证不渲染翻页控件
     expect(screen.getByText(/长页模式/)).toBeInTheDocument();
     expect(screen.queryByText(/第 \d+\/\d+ 页/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /上一章|下一章|上一页|下一页/ })).not.toBeInTheDocument();
+  });
+
+  it("auto-advances to the next chapter at the end of scroll mode", () => {
+    const scrollContainer = document.createElement("div");
+    Object.defineProperties(scrollContainer, {
+      clientHeight: { configurable: true, value: 400 },
+      scrollHeight: { configurable: true, value: 1000 },
+    });
+    scrollContainer.scrollTo = vi.fn();
+    const scrollRef = { current: scrollContainer };
+    const onNextChapter = vi.fn();
+
+    render(
+      <ReaderContent
+        chapter={makeChapter("字".repeat(4000))}
+        readingMode="scroll"
+        scrollContainerRef={scrollRef}
+        hasNextChapter
+        onNextChapter={onNextChapter}
+      />
+    );
+
+    scrollContainer.scrollTop = 640;
+    fireEvent.scroll(scrollContainer);
+    fireEvent.scroll(scrollContainer);
+
+    expect(onNextChapter).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows chapter-boundary controls for a one-page chapter in paged mode", () => {
+    const onPrevChapter = vi.fn();
+    const onNextChapter = vi.fn();
+    render(
+      <ReaderContent
+        chapter={makeChapter("短章")}
+        readingMode="paged"
+        hasPrevChapter
+        hasNextChapter
+        onPrevChapter={onPrevChapter}
+        onNextChapter={onNextChapter}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "上一章" }));
+    fireEvent.click(screen.getByRole("button", { name: "下一章" }));
+
+    expect(onPrevChapter).toHaveBeenCalledTimes(1);
+    expect(onNextChapter).toHaveBeenCalledTimes(1);
   });
 
   it("saves a selected paragraph through the bookmark callback", async () => {
