@@ -28,6 +28,11 @@ class MessageRole(StrEnum):
     ASSISTANT = "assistant"
 
 
+class MessageType(StrEnum):
+    TEXT = "text"
+    IMAGE = "image"
+
+
 class GenerationJobStatus(StrEnum):
     QUEUED = "queued"
     RUNNING = "running"
@@ -158,18 +163,65 @@ class GenerationJobView(StrictReaderChatModel):
     updated_at: datetime
 
 
+class GeneratedImageView(StrictReaderChatModel):
+    id: int
+    message_id: int
+    image_url: str
+    prompt: str
+    prompt_cn: str
+    created_at: datetime
+    width: int
+    height: int
+    file_size: int
+
+
 class MessageView(StrictReaderChatModel):
     id: int
     conversation_id: int
     sequence: int
     role: MessageRole
+    message_type: MessageType = MessageType.TEXT
     body: str
     client_message_id: str | None = None
     reply_to_message_id: int | None = None
     selection: SelectionSummary | None = None
     citations: list[CitationView] = Field(default_factory=list)
     generation_job: GenerationJobView | None = None
+    image: GeneratedImageView | None = None
     created_at: datetime
+
+
+class ImageGenerationRequest(StrictReaderChatModel):
+    conversation_id: int | None = Field(default=None, gt=0)
+    chapter_id: int | None = Field(default=None, gt=0)
+    selected_text: str | None = Field(default=None, max_length=8000)
+    user_refine: str | None = Field(default=None, max_length=8000)
+    source_start: int | None = Field(default=None, ge=0)
+    source_end: int | None = Field(default=None, gt=0)
+
+    @model_validator(mode="after")
+    def validate_offsets(self) -> ImageGenerationRequest:
+        if (self.source_start is None) != (self.source_end is None):
+            raise ValueError("source_start and source_end must be provided together")
+        if (
+            self.source_start is not None
+            and self.source_end is not None
+            and self.source_end <= self.source_start
+        ):
+            raise ValueError("source_end must be greater than source_start")
+        return self
+
+
+class ImageGenerationResponse(StrictReaderChatModel):
+    id: int
+    message_id: int
+    image_url: str
+    prompt: str
+    prompt_cn: str
+    created_at: datetime
+    width: int
+    height: int
+    file_size: int
 
 
 class MessageAccepted(StrictReaderChatModel):

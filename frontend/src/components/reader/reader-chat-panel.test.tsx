@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => ({
   getJob: vi.fn(),
   cancelJob: vi.fn(),
   retryJob: vi.fn(),
+  generateImage: vi.fn(),
 }));
 
 vi.mock("@/lib/api", async () => {
@@ -54,6 +55,10 @@ vi.mock("@/lib/api", async () => {
     }),
   };
 });
+
+vi.mock("@/lib/image-api", () => ({
+  imageApi: { generate: mocks.generateImage },
+}));
 
 const selection: SelectionCoordinate = {
   chapter_id: 1,
@@ -133,6 +138,19 @@ beforeEach(() => {
         created_at: "2026-07-15T00:00:00Z",
         updated_at: "2026-07-15T00:00:00Z",
       },
+    },
+  });
+  mocks.generateImage.mockResolvedValue({
+    data: {
+      id: 88,
+      message_id: 108,
+      image_url: "/storage/images/11/test.png",
+      prompt: "阿宁走进\n\n画面补充：电影感",
+      prompt_cn: "阿宁走进\n\n画面补充：电影感",
+      created_at: "2026-07-15T00:00:00Z",
+      width: 1024,
+      height: 1024,
+      file_size: 100,
     },
   });
 });
@@ -288,6 +306,28 @@ describe("ReaderChatPanel", () => {
     const body = mocks.createMessage.mock.calls[0][2];
     expect(body.chapter_id).toBe(7);
     expect(body.selection).toBeUndefined();
+  });
+
+  it("generates an image from the selected text in image mode", async () => {
+    renderPanel({ mode: "image" });
+    await waitFor(() => expect(screen.getByTestId("reader-chat-mode-image")).toHaveAttribute("aria-selected", "true"));
+
+    expect(screen.getByTestId("reader-chat-input")).toHaveValue("阿宁走进");
+    fireEvent.change(screen.getByTestId("reader-chat-input"), {
+      target: { value: "阿宁走进，电影感" },
+    });
+    fireEvent.click(screen.getByTestId("reader-chat-send"));
+
+    await waitFor(() => expect(mocks.generateImage).toHaveBeenCalled());
+    expect(mocks.generateImage.mock.calls[0][0]).toBe("11");
+    expect(mocks.generateImage.mock.calls[0][1]).toMatchObject({
+      conversation_id: 1,
+      chapter_id: 1,
+      selected_text: "阿宁走进",
+      user_refine: "阿宁走进，电影感",
+      source_start: 0,
+      source_end: 4,
+    });
   });
 
   it("shows job loading, cancel and retry affordances", async () => {

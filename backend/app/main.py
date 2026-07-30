@@ -17,6 +17,7 @@ NovelMind 后端 - FastAPI ASGI 应用入口
 
 import asyncio
 import logging
+from pathlib import Path
 from contextlib import asynccontextmanager, suppress
 from sqlalchemy.engine import make_url
 from sqlalchemy import select
@@ -24,6 +25,7 @@ from sqlalchemy import select
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.api import (
     novels,
@@ -187,6 +189,14 @@ app = FastAPI(
     version="0.1.0",  # 版本号
     lifespan=lifespan,  # 生命周期管理
     redirect_slashes=False,  # 禁用自动斜杠重定向（由中间件处理）
+)
+
+_image_storage_path = Path(settings.image_storage_dir).resolve()
+_image_storage_path.mkdir(parents=True, exist_ok=True)
+app.mount(
+    "/storage/images",
+    StaticFiles(directory=str(_image_storage_path)),
+    name="reader-generated-images",
 )
 
 

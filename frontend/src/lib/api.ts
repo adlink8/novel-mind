@@ -657,13 +657,27 @@ export interface MessageView {
   conversation_id: number;
   sequence: number;
   role: MessageRole;
+  message_type: "text" | "image";
   body: string;
   client_message_id: string | null;
   reply_to_message_id: number | null;
   selection: SelectionSummary | null;
   citations: CitationView[];
   generation_job: GenerationJobView | null;
+  image: GeneratedImageView | null;
   created_at: string;
+}
+
+export interface GeneratedImageView {
+  id: number;
+  message_id: number;
+  image_url: string;
+  prompt: string;
+  prompt_cn: string;
+  created_at: string;
+  width: number;
+  height: number;
+  file_size: number;
 }
 
 export interface MessageAccepted {

@@ -71,6 +71,9 @@ class Settings(BaseSettings):
 
     # ── 文件存储 ──
     upload_dir: str = "./uploads"  # 小说上传文件存储目录
+    image_storage_dir: str = "./storage/images"  # 阅读器生图文件存储目录
+    image_generation_base_url: str = "http://127.0.0.1:3001"  # ZCodeProxy
+    image_generation_model: str = "hunyuan-image"  # 本地生图模型标识
     max_upload_size: int = 50 * 1024 * 1024  # 最大上传大小: 50MB
     streaming_threshold: int = (
         5 * 1024 * 1024

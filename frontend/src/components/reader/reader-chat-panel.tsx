@@ -6,7 +6,9 @@ import {
   ArchiveRestore,
   ChevronDown,
   ChevronUp,
+  ImagePlus,
   LoaderCircle,
+  Maximize2,
   MessageSquarePlus,
   Pencil,
   Send,
@@ -27,6 +29,7 @@ import {
   type MessageView,
   type SelectionCoordinate,
 } from "@/lib/api";
+import { imageApi } from "@/lib/image-api";
 import {
   loadReaderChatPresentation,
   saveReaderChatPresentation,
@@ -54,6 +57,8 @@ type Props = {
   pendingSelection: SelectionCoordinate | null;
   onClearSelection: () => void;
   onCitationNavigate: (target: CitationNavigateTarget) => void;
+  mode?: "text" | "image";
+  onModeChange?: (mode: "text" | "image") => void;
   className?: string;
 };
 
@@ -99,6 +104,8 @@ export function ReaderChatPanel({
   pendingSelection,
   onClearSelection,
   onCitationNavigate,
+  mode: requestedMode,
+  onModeChange,
   className,
 }: Props) {
   const [conversations, setConversations] = useState<ConversationListItem[]>([]);
@@ -111,10 +118,37 @@ export function ReaderChatPanel({
   const [activeJob, setActiveJob] = useState<GenerationJobView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState<string | null>(null);
+  const [localMode, setLocalMode] = useState<"text" | "image">("text");
+  const [lightboxImage, setLightboxImage] = useState<MessageView["image"]>(null);
+  const selectionPrefillRef = useRef<string | null>(null);
   const pollAbortRef = useRef<AbortController | null>(null);
   const listRequestRef = useRef(0);
   const msgRequestRef = useRef(0);
   const panelRef = useRef<HTMLDivElement>(null);
+  const mode = requestedMode ?? localMode;
+
+  const setMode = useCallback(
+    (next: "text" | "image") => {
+      setLocalMode(next);
+      onModeChange?.(next);
+    },
+    [onModeChange]
+  );
+
+  useEffect(() => {
+    if (mode !== "image") {
+      selectionPrefillRef.current = null;
+      return;
+    }
+    if (!pendingSelection) {
+      selectionPrefillRef.current = null;
+      return;
+    }
+    const key = pendingSelection.selection_text_hash;
+    if (selectionPrefillRef.current === key) return;
+    selectionPrefillRef.current = key;
+    setDraft(pendingSelection.selection_text);
+  }, [mode, pendingSelection]);
 
   // Expanded panel only — collapsed chip/rail is not a dismissable surface.
   // Close/collapse ONLY via explicit header buttons (not outside click / Escape).
@@ -349,8 +383,12 @@ export function ReaderChatPanel({
       setError("当前章节尚未加载");
       return;
     }
-    if (!draft.trim()) {
+    if (mode === "text" && !draft.trim()) {
       setError("请输入问题");
+      return;
+    }
+    if (mode === "image" && !draft.trim() && !pendingSelection?.selection_text.trim()) {
+      setError("请输入画面描述或先选择正文");
       return;
     }
     let conversationId = activeId;
@@ -365,6 +403,30 @@ export function ReaderChatPanel({
       if (activeConversation?.status === "archived") {
         setError("已归档会话不可发送");
         setSending(false);
+        return;
+      }
+      if (mode === "image") {
+        const selection = pendingSelection ? { ...pendingSelection } : undefined;
+        const selectedText = selection?.selection_text?.trim() || undefined;
+        const draftText = draft.trim();
+        const userRefine =
+          draftText && draftText !== selectedText ? draftText : undefined;
+        setDraft("");
+        await imageApi.generate(novelId, {
+          conversation_id: conversationId,
+          chapter_id: currentChapterId,
+          selected_text: selectedText,
+          user_refine: userRefine,
+          ...(selection
+            ? {
+                source_start: selection.source_start,
+                source_end: selection.source_end,
+              }
+            : {}),
+        });
+        onClearSelection();
+        await refreshMessages(conversationId);
+        await refreshConversations();
         return;
       }
       // Capture an optional selection immutably. Without one, the server derives
@@ -398,7 +460,7 @@ export function ReaderChatPanel({
       } else if (status === 422) {
         setError(typeof detail === "string" ? detail : "选区无效或已过期");
       } else {
-        setError("发送失败");
+        setError(mode === "image" ? "图片生成失败，请确认生图服务已启动" : "发送失败");
       }
     } finally {
       setSending(false);
@@ -557,6 +619,60 @@ export function ReaderChatPanel({
         </div>
       </header>
 
+      <div
+        role="tablist"
+        aria-label="阅读器 AI 模式"
+        className="flex shrink-0 gap-1 border-b border-border/50 px-2 py-1.5"
+      >
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mode === "text"}
+          data-testid="reader-chat-mode-text"
+          className={cn(
+            "flex-1 rounded-md px-3 py-1.5 text-xs transition-colors",
+            mode === "text"
+              ? "bg-primary text-primary-foreground"
+              : "text-muted-foreground hover:bg-muted"
+          )}
+          onClick={() => setMode("text")}
+        >
+          问 AI
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mode === "image"}
+          data-testid="reader-chat-mode-image"
+          className={cn(
+            "flex-1 rounded-md px-3 py-1.5 text-xs transition-colors",
+            mode === "image"
+              ? "bg-primary text-primary-foreground"
+              : "text-muted-foreground hover:bg-muted"
+          )}
+          onClick={() => setMode("image")}
+        >
+          <ImagePlus className="mr-1 inline-block size-3.5" />
+          画图
+        </button>
+      </div>
+
+      {lightboxImage ? (
+        <div
+          data-testid="reader-chat-image-lightbox"
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/75 p-4"
+          role="dialog"
+          aria-label="查看生成图片"
+          onClick={() => setLightboxImage(null)}
+        >
+          <img
+            src={lightboxImage.image_url}
+            alt={lightboxImage.prompt_cn}
+            className="max-h-[90vh] max-w-[90vw] rounded-lg object-contain shadow-2xl"
+          />
+        </div>
+      ) : null}
+
       <>
           <div className="flex shrink-0 items-center gap-1 overflow-x-auto border-b border-border/50 px-2 py-1.5">
             <Button
@@ -672,6 +788,11 @@ export function ReaderChatPanel({
                 key={m.id}
                 message={m}
                 onCitationNavigate={onCitationNavigate}
+                onImageOpen={setLightboxImage}
+                onReusePrompt={(prompt) => {
+                  setMode("image");
+                  setDraft(prompt);
+                }}
               />
             ))}
             {activeJob && jobStatusLabel(activeJob) ? (
@@ -727,7 +848,7 @@ export function ReaderChatPanel({
               data-testid="reader-chat-selection-preview"
               className="shrink-0 border-t border-border/50 bg-amber-50/80 px-3 py-1.5 text-xs text-amber-950"
             >
-              选区 [{pendingSelection.source_start}, {pendingSelection.source_end})：
+              {mode === "image" ? "画图选区" : "选区"} [{pendingSelection.source_start}, {pendingSelection.source_end})：
               <span className="ml-1 font-medium">
                 {pendingSelection.selection_text.slice(0, 48)}
                 {pendingSelection.selection_text.length > 48 ? "…" : ""}
@@ -735,7 +856,9 @@ export function ReaderChatPanel({
             </div>
           ) : (
             <div className="shrink-0 border-t border-border/50 px-3 py-1.5 text-xs text-muted-foreground">
-              当前章节提问模式 · 选中正文可绑定更精确的证据
+              {mode === "image"
+                ? "画图模式 · 可输入画面补充描述"
+                : "当前章节提问模式 · 选中正文可绑定更精确的证据"}
             </div>
           )}
 
@@ -756,7 +879,9 @@ export function ReaderChatPanel({
               placeholder={
                 activeConversation?.status === "archived"
                   ? "已归档，无法发送"
-                  : pendingSelection
+                  : mode === "image"
+                    ? "输入画面描述，可在选中文本基础上补充…"
+                    : pendingSelection
                     ? "针对选区提问…"
                     : "针对当前章节提问…"
               }
@@ -764,7 +889,7 @@ export function ReaderChatPanel({
               disabled={
                 sending ||
                 activeConversation?.status === "archived" ||
-                (!!activeJob && !isTerminalJobStatus(activeJob.status))
+                mode === "text" && !!activeJob && !isTerminalJobStatus(activeJob.status)
               }
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => {
@@ -781,7 +906,9 @@ export function ReaderChatPanel({
               data-testid="reader-chat-send"
               disabled={
                 sending ||
-                !draft.trim() ||
+                (mode === "text"
+                  ? !draft.trim()
+                  : !draft.trim() && !pendingSelection?.selection_text.trim()) ||
                 activeConversation?.status === "archived"
               }
               onClick={() => void handleSend()}
@@ -811,9 +938,13 @@ export function ReaderChatPanel({
 function MessageBubble({
   message,
   onCitationNavigate,
+  onImageOpen,
+  onReusePrompt,
 }: {
   message: MessageView;
   onCitationNavigate: (t: CitationNavigateTarget) => void;
+  onImageOpen: (image: NonNullable<MessageView["image"]>) => void;
+  onReusePrompt: (prompt: string) => void;
 }) {
   const isUser = message.role === "user";
   return (
@@ -825,7 +956,33 @@ function MessageBubble({
         isUser ? "ml-6 bg-primary/10" : "mr-4 border border-border/60 bg-background"
       )}
     >
-      <p className="whitespace-pre-wrap text-[13px] leading-relaxed">{message.body}</p>
+      {message.image ? (
+        <>
+          <button
+            type="button"
+            className="group relative block w-full overflow-hidden rounded-lg border border-border/60 bg-muted/30 text-left"
+            aria-label="放大生成图片"
+            onClick={() => onImageOpen(message.image!)}
+          >
+            <img
+              src={message.image.image_url}
+              alt={message.image.prompt_cn}
+              className="max-h-72 w-full object-contain"
+            />
+            <Maximize2 className="absolute bottom-2 right-2 size-4 rounded bg-black/55 p-0.5 text-white opacity-0 transition-opacity group-hover:opacity-100" />
+          </button>
+          <button
+            type="button"
+            className="mt-1 text-[11px] text-primary hover:underline"
+            onClick={() => onReusePrompt(message.image!.prompt_cn)}
+          >
+            复用提示词
+          </button>
+        </>
+      ) : null}
+      <p className="whitespace-pre-wrap text-[13px] leading-relaxed">
+        {message.body}
+      </p>
       {message.selection ? (
         <p className="mt-1 text-[10px] text-muted-foreground">
           选区 ch{message.selection.chapter_id} [{message.selection.source_start},

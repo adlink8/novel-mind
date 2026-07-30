@@ -4,7 +4,14 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { Chapter } from "@/lib/api";
 import type { SelectionCoordinate } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, BookmarkPlus, ChevronLeft, ChevronRight, MessageSquareText } from "lucide-react";
+import {
+  AlertTriangle,
+  BookmarkPlus,
+  ChevronLeft,
+  ChevronRight,
+  ImagePlus,
+  MessageSquareText,
+} from "lucide-react";
 import type { ReaderMode } from "@/components/reader/reader-preferences";
 import {
   buildSelectionPayload,
@@ -31,6 +38,8 @@ interface ReaderContentProps {
   hasPrevChapter?: boolean;
   /** Fired when user activates ask-AI on a captured selection. */
   onAskSelection?: (payload: SelectionCoordinate) => void;
+  /** Fired when user activates image generation on a captured selection. */
+  onImageSelection?: (payload: SelectionCoordinate) => void;
   /** Fired when user saves a captured selection as a persistent bookmark. */
   onBookmarkSelection?: (payload: SelectionCoordinate) => void | Promise<void>;
   /** Highlight a code-point range within the current chapter (citation jump). */
@@ -79,6 +88,7 @@ export function ReaderContent({
   hasNextChapter = false,
   hasPrevChapter = false,
   onAskSelection,
+  onImageSelection,
   onBookmarkSelection,
   highlightRange = null,
   highlightChapterId = null,
@@ -361,7 +371,7 @@ export function ReaderContent({
   }, []);
 
   const handleSelectionChange = useCallback(() => {
-    if (!onAskSelection && !onBookmarkSelection) return;
+    if (!onAskSelection && !onImageSelection && !onBookmarkSelection) return;
     const sel = window.getSelection();
     // Selection cleared / collapsed → hide floating 「问 AI」 immediately.
     if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
@@ -437,13 +447,14 @@ export function ReaderContent({
     displayPages,
     isMultiChapterScroll,
     onAskSelection,
+    onImageSelection,
     onBookmarkSelection,
     pageIndex,
     scrollChapters,
   ]);
 
   useEffect(() => {
-    if (!onAskSelection && !onBookmarkSelection) return;
+    if (!onAskSelection && !onImageSelection && !onBookmarkSelection) return;
     document.addEventListener("selectionchange", handleSelectionChange);
     // mouseup/touchend catch selection finalization on some browsers
     document.addEventListener("mouseup", handleSelectionChange);
@@ -458,7 +469,13 @@ export function ReaderContent({
       document.removeEventListener("touchend", handleSelectionChange);
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [handleSelectionChange, onAskSelection, onBookmarkSelection, clearCaptured]);
+  }, [
+    handleSelectionChange,
+    onAskSelection,
+    onImageSelection,
+    onBookmarkSelection,
+    clearCaptured,
+  ]);
 
   // Page flip / chapter change drops the floating action (stale anchors).
   useEffect(() => {
@@ -501,6 +518,18 @@ export function ReaderContent({
       captured.coords
     );
     onAskSelection(payload);
+    setCaptured(null);
+    window.getSelection()?.removeAllRanges();
+  };
+
+  const handleImage = async () => {
+    if (!captured || !onImageSelection) return;
+    const payload = await buildSelectionPayload(
+      captured.chapterId,
+      captured.chapterContent,
+      captured.coords
+    );
+    onImageSelection(payload);
     setCaptured(null);
     window.getSelection()?.removeAllRanges();
   };
@@ -628,7 +657,7 @@ export function ReaderContent({
           );
         })}
 
-        {captured && (onAskSelection || onBookmarkSelection) ? (
+        {captured && (onAskSelection || onImageSelection || onBookmarkSelection) ? (
           <div
             data-testid="reader-selection-action"
             className="absolute z-30"
@@ -644,6 +673,18 @@ export function ReaderContent({
                 >
                   <MessageSquareText className="size-3.5" />
                   问 AI
+                </Button>
+              ) : null}
+              {onImageSelection ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => void handleImage()}
+                >
+                  <ImagePlus className="size-3.5" />
+                  画图
                 </Button>
               ) : null}
               {onBookmarkSelection ? (
@@ -774,7 +815,7 @@ export function ReaderContent({
         {renderedPage}
       </div>
 
-      {captured && (onAskSelection || onBookmarkSelection) ? (
+      {captured && (onAskSelection || onImageSelection || onBookmarkSelection) ? (
         <div
           data-testid="reader-selection-action"
           className="absolute z-30"
@@ -790,6 +831,18 @@ export function ReaderContent({
               >
                 <MessageSquareText className="size-3.5" />
                 问 AI
+              </Button>
+            ) : null}
+            {onImageSelection ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => void handleImage()}
+              >
+                <ImagePlus className="size-3.5" />
+                画图
               </Button>
             ) : null}
             {onBookmarkSelection ? (

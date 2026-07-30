@@ -154,6 +154,7 @@ function NovelReaderInner() {
   const chatResizeRef = useRef<{ startX: number; startW: number } | null>(null);
   const [pendingSelection, setPendingSelection] =
     useState<SelectionCoordinate | null>(null);
+  const [chatMode, setChatMode] = useState<"text" | "image">("text");
   const [highlightRange, setHighlightRange] = useState<{
     sourceStart: number;
     sourceEnd: number;
@@ -476,6 +477,14 @@ function NovelReaderInner() {
 
   const handleAskSelection = useCallback((payload: SelectionCoordinate) => {
     setPendingSelection(payload);
+    setChatMode("text");
+    setChatOpen(true);
+    setChatCollapsed(false);
+  }, []);
+
+  const handleImageSelection = useCallback((payload: SelectionCoordinate) => {
+    setPendingSelection(payload);
+    setChatMode("image");
     setChatOpen(true);
     setChatCollapsed(false);
   }, []);
@@ -760,6 +769,7 @@ function NovelReaderInner() {
               }
               hasPrevChapter={currentIndex > 0}
               onAskSelection={handleAskSelection}
+              onImageSelection={handleImageSelection}
               onBookmarkSelection={handleBookmarkSelection}
               highlightRange={highlightRange}
               highlightChapterId={currentChapterId}
@@ -813,6 +823,8 @@ function NovelReaderInner() {
                 pendingSelection={pendingSelection}
                 onClearSelection={() => setPendingSelection(null)}
                 onCitationNavigate={handleCitationNavigate}
+                mode={chatMode}
+                onModeChange={setChatMode}
               />
             </div>
           ) : null}
@@ -938,6 +950,8 @@ function NovelReaderInner() {
           pendingSelection={pendingSelection}
           onClearSelection={() => setPendingSelection(null)}
           onCitationNavigate={handleCitationNavigate}
+          mode={chatMode}
+          onModeChange={setChatMode}
         />
       ) : null}
 

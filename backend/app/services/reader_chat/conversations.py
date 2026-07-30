@@ -26,6 +26,7 @@ from app.models.reader_chat import (
     ReaderContextEvidenceRef,
     ReaderContextManifest,
     ReaderConversation,
+    GeneratedImage,
     ReaderGenerationJob,
     ReaderMessage,
     ReaderMessageCitation,
@@ -39,6 +40,7 @@ from app.schemas.reader_chat import (
     ConversationStatus,
     GenerationJobStatus,
     GenerationJobView,
+    GeneratedImageView,
     MessageAccepted,
     MessageCreate,
     MessageRole,
@@ -1044,6 +1046,31 @@ class ConversationService:
                         source_start=ref.source_start,
                         source_end=ref.source_end,
                     )
+                    )
+
+        image_view: GeneratedImageView | None = None
+        if message.image_generation_id is not None:
+            image = (
+                await db.execute(
+                    select(GeneratedImage).where(
+                        GeneratedImage.id == message.image_generation_id,
+                        GeneratedImage.owner_id == message.owner_id,
+                        GeneratedImage.novel_id == message.novel_id,
+                        GeneratedImage.conversation_id == message.conversation_id,
+                    )
+                )
+            ).scalar_one_or_none()
+            if image is not None:
+                image_view = GeneratedImageView(
+                    id=image.id,
+                    message_id=message.id,
+                    image_url=f"/storage/{image.file_path}",
+                    prompt=image.prompt_en,
+                    prompt_cn=image.prompt_cn,
+                    created_at=image.created_at,
+                    width=image.width,
+                    height=image.height,
+                    file_size=image.file_size,
                 )
 
         return MessageView(
@@ -1051,12 +1078,14 @@ class ConversationService:
             conversation_id=message.conversation_id,
             sequence=message.sequence,
             role=MessageRole(message.role),
+            message_type=message.message_type,
             body=message.body,
             client_message_id=message.client_message_id,
             reply_to_message_id=message.reply_to_message_id,
             selection=selection_summary,
             citations=citations,
             generation_job=job_view,
+            image=image_view,
             created_at=message.created_at,
         )
 

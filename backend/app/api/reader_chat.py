@@ -20,14 +20,35 @@ from app.schemas.reader_chat import (
     ConversationListItem,
     ConversationPatch,
     GenerationJobView,
+    ImageGenerationRequest,
+    ImageGenerationResponse,
     MessageAccepted,
     MessageCreate,
     MessageView,
 )
 from app.services.reader_chat.conversations import conversation_service
 from app.services.reader_chat.worker import dispatch_reader_chat_job
+from app.services.image_generation import image_generation_service
 
 router = APIRouter(dependencies=[Depends(require_user)])
+
+
+@router.post(
+    "/{novel_id}/chat/generate-image",
+    response_model=ImageGenerationResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def generate_reader_image(
+    data: ImageGenerationRequest,
+    novel: Novel = Depends(require_owned_novel),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+) -> ImageGenerationResponse:
+    result = await image_generation_service.generate_image(
+        db, novel=novel, owner_id=current_user.id, data=data
+    )
+    await db.commit()
+    return result
 
 
 @router.get(

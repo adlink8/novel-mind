@@ -15,6 +15,10 @@ const nextConfig = {
         source: "/api/:path*",
         destination: `${process.env.BACKEND_URL || "http://127.0.0.1:8010"}/api/:path*`,
       },
+      {
+        source: "/storage/images/:path*",
+        destination: `${process.env.BACKEND_URL || "http://127.0.0.1:8010"}/storage/images/:path*`,
+      },
     ];
   },
 };

@@ -31,6 +31,7 @@ from app.models.base import Base, TimestampMixin
 
 READER_CONVERSATION_STATUSES = ("active", "archived")
 READER_MESSAGE_ROLES = ("user", "assistant")
+READER_MESSAGE_TYPES = ("text", "image")
 READER_JOB_STATUSES = (
     "queued",
     "running",
@@ -105,6 +106,10 @@ class ReaderMessage(TimestampMixin, Base):
             "role IN ('user','assistant')",
             name="ck_reader_messages_role",
         ),
+        CheckConstraint(
+            "message_type IN ('text','image')",
+            name="ck_reader_messages_type",
+        ),
         CheckConstraint("sequence >= 1", name="ck_reader_messages_sequence"),
         UniqueConstraint(
             "conversation_id",
@@ -134,12 +139,52 @@ class ReaderMessage(TimestampMixin, Base):
     )
     sequence: Mapped[int] = mapped_column(Integer, nullable=False)
     role: Mapped[str] = mapped_column(String(16), nullable=False)
+    message_type: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="text", server_default="text"
+    )
     body: Mapped[str] = mapped_column(Text, nullable=False)
     client_message_id: Mapped[str | None] = mapped_column(String(128))
     reply_to_message_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("reader_messages.id", ondelete="SET NULL")
     )
     content_hash: Mapped[str | None] = mapped_column(String(64))
+    image_generation_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("generated_images.id", ondelete="SET NULL")
+    )
+
+
+class GeneratedImage(TimestampMixin, Base):
+    """A generated reader image persisted in owner/novel/conversation scope."""
+
+    __tablename__ = "generated_images"
+    __table_args__ = (
+        Index("idx_generated_images_scope", "owner_id", "novel_id", "conversation_id"),
+        Index("idx_generated_images_chapter", "novel_id", "chapter_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    novel_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("novels.id", ondelete="CASCADE"), nullable=False
+    )
+    chapter_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("chapters.id", ondelete="SET NULL")
+    )
+    conversation_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("reader_conversations.id", ondelete="CASCADE"), nullable=False
+    )
+    owner_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    prompt_cn: Mapped[str] = mapped_column(Text, nullable=False)
+    prompt_en: Mapped[str] = mapped_column(Text, nullable=False)
+    source_start: Mapped[int | None] = mapped_column(Integer)
+    source_end: Mapped[int | None] = mapped_column(Integer)
+    selected_text: Mapped[str | None] = mapped_column(Text)
+    file_path: Mapped[str] = mapped_column(String(1000), nullable=False)
+    file_size: Mapped[int] = mapped_column(Integer, nullable=False)
+    width: Mapped[int] = mapped_column(Integer, nullable=False)
+    height: Mapped[int] = mapped_column(Integer, nullable=False)
+    model_used: Mapped[str] = mapped_column(String(120), nullable=False)
 
 
 class ReaderMessageSelection(TimestampMixin, Base):
