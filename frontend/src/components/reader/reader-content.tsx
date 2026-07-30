@@ -212,6 +212,21 @@ export function ReaderContent({
     if (!el) return;
 
     if (isMultiChapterScroll) {
+      let progressTimer: number | null = null;
+      let latestProgress: { percent: number; chapterId: number } | null = null;
+      const reportProgress = (percent: number, reportChapterId: number) => {
+        if (progressTimer === null) {
+          onChapterProgress?.(percent, reportChapterId);
+          progressTimer = window.setTimeout(() => {
+            progressTimer = null;
+            const latest = latestProgress;
+            latestProgress = null;
+            if (latest) onChapterProgress?.(latest.percent, latest.chapterId);
+          }, 200);
+        } else {
+          latestProgress = { percent, chapterId: reportChapterId };
+        }
+      };
       const reportMultiChapterScroll = () => {
         const containerTop = el.getBoundingClientRect().top;
         let activeChapter = scrollChapters[0];
@@ -247,16 +262,34 @@ export function ReaderContent({
         const localScroll = Math.max(0, el.scrollTop - chapterTop);
         const percent =
           chapterMax <= 0 ? 100 : Math.min(100, (localScroll / chapterMax) * 100);
-        onChapterProgress?.(percent, activeChapter.id);
+        reportProgress(percent, activeChapter.id);
       };
 
       const onScroll = () => reportMultiChapterScroll();
       el.addEventListener("scroll", onScroll, { passive: true });
-      return () => el.removeEventListener("scroll", onScroll);
+      return () => {
+        el.removeEventListener("scroll", onScroll);
+        if (progressTimer !== null) window.clearTimeout(progressTimer);
+      };
     }
 
     if (!chapterId || (!isScrollMode && pages.length > 1)) return;
 
+    let progressTimer: number | null = null;
+    let latestProgress: { percent: number; chapterId: number } | null = null;
+    const reportProgress = (percent: number, reportChapterId: number) => {
+      if (progressTimer === null) {
+        onChapterProgress?.(percent, reportChapterId);
+        progressTimer = window.setTimeout(() => {
+          progressTimer = null;
+          const latest = latestProgress;
+          latestProgress = null;
+          if (latest) onChapterProgress?.(latest.percent, latest.chapterId);
+        }, 200);
+      } else {
+        latestProgress = { percent, chapterId: reportChapterId };
+      }
+    };
     const reportScroll = (allowAutoAdvance: boolean) => {
       // 恢复章内进度期间不上报，避免把存档冲掉
       if (restoreRef.current) return;
@@ -266,7 +299,7 @@ export function ReaderContent({
       const scrollingUp =
         previousScrollTop !== null && el.scrollTop < previousScrollTop;
       previousScrollTopRef.current = el.scrollTop;
-      onChapterProgress?.(Math.min(100, Math.max(0, pct)), chapterId);
+      reportProgress(Math.min(100, Math.max(0, pct)), chapterId);
 
       const shouldRetreat =
         allowAutoAdvance &&
@@ -299,7 +332,10 @@ export function ReaderContent({
     // 初始检查只上报进度，不因恢复位置或切换模式时恰好在底部而自动换章。
     reportScroll(false);
     el.addEventListener("scroll", onScroll, { passive: true });
-    return () => el.removeEventListener("scroll", onScroll);
+    return () => {
+      el.removeEventListener("scroll", onScroll);
+      if (progressTimer !== null) window.clearTimeout(progressTimer);
+    };
   }, [
     chapterId,
     pages.length,
