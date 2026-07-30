@@ -271,31 +271,13 @@ function NovelReaderInner() {
       try {
         setLoading(true);
         setError(null);
-        const [res, chapterContentsRes] = await Promise.all([
+        const [res, chapterListRes] = await Promise.all([
           novelsApi.get(novelId),
-          novelsApi.getChapterContents(novelId),
+          novelsApi.getChapters(novelId),
         ]);
-        // 批量接口一次 SQL 返回所有正文；前端只在内存中拆出目录摘要。
-        const chapterResponses = chapterContentsRes.data.sort(
+        const chapterList = chapterListRes.data.sort(
           (a, b) => a.chapter_number - b.chapter_number || a.id - b.id
         );
-        const chapterList = chapterResponses.map(
-          ({ id, novel_id, chapter_number, title, word_count, summary, created_at, updated_at }) => ({
-            id,
-            novel_id,
-            chapter_number,
-            title,
-            word_count,
-            summary,
-            created_at,
-            updated_at,
-          })
-        );
-        if (!active) return;
-
-        setNovel(res.data);
-        setChapters(chapterList);
-        setChapterContents(chapterResponses);
 
         // A1: ?chapter= 且 from=timeline → 优先时间线定位，不覆盖真实阅读进度
         const fromQuery = resolveChapterFromQuery(chapterList, chapterQuery);
@@ -330,6 +312,27 @@ function NovelReaderInner() {
           }
           setProgressWritable(true);
         }
+
+        // 长页模式需要一次性正文；翻页模式只先取目录摘要，正文按当前章按需读取。
+        let initialContents: Chapter[] = [];
+        if (preferences.mode === "scroll") {
+          const chapterContentsRes = await novelsApi.getChapterContents(novelId);
+          initialContents = chapterContentsRes.data.sort(
+            (a, b) => a.chapter_number - b.chapter_number || a.id - b.id
+          );
+        } else if (initialChapterId) {
+          const chapterResponse = await novelsApi.getChapter(
+            novelId,
+            String(initialChapterId)
+          );
+          initialContents = [chapterResponse.data];
+        }
+        if (!active) return;
+
+        setNovel(res.data);
+        setChapters(chapterList);
+        setChapterContents(initialContents);
+
         pendingScrollChapterRef.current = initialChapterId;
         setChapterPercent(initialPercent);
         setRestorePercent(initialPercent);
@@ -344,7 +347,29 @@ function NovelReaderInner() {
     return () => {
       active = false;
     };
-  }, [novelId, chapterQuery, fromTimeline]);
+  }, [novelId, chapterQuery, fromTimeline, preferences.mode]);
+
+  // 翻页模式只保留当前章正文；切换目录时再按需请求目标章，避免一次性把整本书放进内存。
+  useEffect(() => {
+    if (loading || preferences.mode === "scroll" || !currentChapterId) return;
+    const currentContent = chapterContents.find(
+      (item) => item.id === currentChapterId && typeof item.content === "string"
+    );
+    if (currentContent) return;
+
+    let active = true;
+    void novelsApi
+      .getChapter(novelId, String(currentChapterId))
+      .then((response) => {
+        if (active) setChapterContents([response.data]);
+      })
+      .catch(() => {
+        if (active) setError("加载章节正文失败，请重试");
+      });
+    return () => {
+      active = false;
+    };
+  }, [chapterContents, currentChapterId, loading, novelId, preferences.mode]);
 
   // 滚动模式已一次性渲染全部章节；目录/书签跳转时只滚到目标章节，不重新请求正文。
   useEffect(() => {
