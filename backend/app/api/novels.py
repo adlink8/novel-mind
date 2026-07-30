@@ -253,6 +253,25 @@ async def list_chapters(
     return [ChapterSummaryResponse.model_validate(ch) for ch in chapters]
 
 
+@router.get(
+    "/{novel_id}/chapters/content",
+    response_model=list[ChapterResponse],
+)
+async def list_chapter_content(
+    novel: Novel = Depends(require_owned_novel),
+    db: AsyncSession = Depends(get_db),
+):
+    """一次查询返回整本小说的章节正文，供阅读器长页模式预取。"""
+    result = await db.execute(
+        select(Chapter)
+        .options(undefer(Chapter.content))
+        .where(Chapter.novel_id == novel.id)
+        .order_by(Chapter.chapter_number, Chapter.id)
+    )
+    chapters = result.scalars().all()
+    return [ChapterResponse.model_validate(ch) for ch in chapters]
+
+
 @router.get("/{novel_id}/chapters/{chapter_id}", response_model=ChapterResponse)
 async def get_chapter(
     chapter_id: int,

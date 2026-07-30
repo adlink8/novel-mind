@@ -202,6 +202,8 @@ export const novelsApi = {
       data: { novel_ids: ids },
     }),
   getChapters: (id: string) => api.get<ChapterSummary[]>(`/novels/${id}/chapters`),
+  getChapterContents: (id: string) =>
+    api.get<Chapter[]>(`/novels/${id}/chapters/content`),
   getChapter: (novelId: string, chapterId: string) =>
     api.get<Chapter>(`/novels/${novelId}/chapters/${chapterId}`),
   updateProgress: (novelId: string, chapterId: number, progressPercent: number) =>
@@ -906,10 +908,35 @@ export interface RoutingPreferenceResponse {
   preference: RoutingPreference;
 }
 
+export interface AIBudgetLimits {
+  max_calls: number;
+  max_input_tokens: number;
+  max_output_tokens: number;
+  max_cost_usd: number;
+}
+
+export interface AIBudgetResponse {
+  conversation: AIBudgetLimits;
+  novel: AIBudgetLimits;
+  arc_window_size: number;
+  scope: "defaults" | "novel" | "conversation";
+  novel_id: number | null;
+  conversation_id: number | null;
+}
+
 export const settingsApi = {
   getRouting: () => api.get<RoutingPreferenceResponse>("/settings/routing"),
   putRouting: (preference: RoutingPreference) =>
     api.put<RoutingPreferenceResponse>("/settings/routing", { preference }),
+  getAIBudget: (params?: { novel_id?: number; conversation_id?: number }) =>
+    api.get<AIBudgetResponse>("/settings/ai-budget", { params }),
+  putAIBudget: (data: {
+    novel_id?: number;
+    conversation_id?: number;
+    conversation?: AIBudgetLimits;
+    novel?: AIBudgetLimits;
+    arc_window_size?: number;
+  }) => api.put<AIBudgetResponse>("/settings/ai-budget", data),
 };
 
 // ==================== 用量统计 API ====================

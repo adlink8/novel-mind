@@ -271,29 +271,31 @@ function NovelReaderInner() {
       try {
         setLoading(true);
         setError(null);
-        const [res, chaptersRes] = await Promise.all([
+        const [res, chapterContentsRes] = await Promise.all([
           novelsApi.get(novelId),
-          novelsApi.getChapters(novelId),
+          novelsApi.getChapterContents(novelId),
         ]);
-        const chapterList = chaptersRes.data;
-        // 目录接口只返回摘要；正文在书籍打开时并行预取，滚动模式直接消费完整数组。
-        const chapterResponses = await Promise.all(
-          chapterList.map((summary) =>
-            novelsApi.getChapter(novelId, String(summary.id))
-          )
+        // 批量接口一次 SQL 返回所有正文；前端只在内存中拆出目录摘要。
+        const chapterResponses = chapterContentsRes.data.sort(
+          (a, b) => a.chapter_number - b.chapter_number || a.id - b.id
+        );
+        const chapterList = chapterResponses.map(
+          ({ id, novel_id, chapter_number, title, word_count, summary, created_at, updated_at }) => ({
+            id,
+            novel_id,
+            chapter_number,
+            title,
+            word_count,
+            summary,
+            created_at,
+            updated_at,
+          })
         );
         if (!active) return;
 
         setNovel(res.data);
         setChapters(chapterList);
-        setChapterContents(
-          chapterResponses
-            .map((response) => response.data)
-            .sort(
-              (a, b) =>
-                a.chapter_number - b.chapter_number || a.id - b.id
-            )
-        );
+        setChapterContents(chapterResponses);
 
         // A1: ?chapter= 且 from=timeline → 优先时间线定位，不覆盖真实阅读进度
         const fromQuery = resolveChapterFromQuery(chapterList, chapterQuery);
@@ -814,18 +816,20 @@ function NovelReaderInner() {
             onToggle={() => setImmersiveTocOpen((v) => !v)}
             forceDrawer
           />
+          {/* 目录入口与沉浸控制层解耦：控制栏隐藏时仍可打开目录。 */}
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={() => setImmersiveTocOpen(true)}
+            title="章节目录"
+            aria-label="章节目录"
+            className="fixed left-4 top-4 z-50 border-white/20 bg-black/65 text-white shadow-lg hover:bg-black/75 hover:text-white"
+          >
+            <BookOpenText className="size-4" />
+          </Button>
           {immersiveChrome ? (
             <>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setImmersiveTocOpen(true)}
-                title="章节目录"
-                className="fixed left-4 top-4 z-50 border-white/20 bg-black/65 text-white shadow-lg hover:bg-black/75 hover:text-white"
-              >
-                <BookOpenText className="size-4" />
-                目录
-              </Button>
               <ReaderPreferencesPanel
                 preferences={preferences}
                 onChange={handlePreferencesChange}
