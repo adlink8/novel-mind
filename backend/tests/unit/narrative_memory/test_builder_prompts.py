@@ -9,6 +9,7 @@ from app.services.narrative_memory.builder_worker import (
     _node_content,
 )
 from scripts.run_narrative_memory_build import (
+    _ARC_PLAN_PROMPT,
     _PROMPT_TEXT,
     _build_messages,
     _response_schema_for_stage,
@@ -61,6 +62,23 @@ def test_parent_aggregation_payload_contains_claim_content() -> None:
     )
     content = _node_content([node], [claim])
     assert content[0]["claims"][0]["content"]["outcome"] == "主角流亡"
+
+
+def test_arc_plan_prompt_uses_story_content_instead_of_fixed_windows() -> None:
+    assert "不要按固定的 3 章" in _ARC_PLAN_PROMPT
+    messages = _build_messages(
+        stage_key="arc_volume_plan:book",
+        payload={
+            "chapter_numbers": [1, 2, 3],
+            "chapter_content": [
+                {"chapter_number": 1, "claims": [{"content": {"summary": "故乡失守"}}]}
+            ],
+        },
+        repair=False,
+    )
+    assert "chapter_content" in messages[1]["content"]
+    schema = _response_schema_for_stage("arc_volume_plan:book")
+    assert "ranges" in schema["required"]
 
 
 def test_aggregation_budget_estimate_scales_with_claim_content() -> None:

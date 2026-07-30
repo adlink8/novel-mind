@@ -109,7 +109,9 @@ class RunPolicy(BuilderFrozenModel):
     stage_order: tuple[StageKind, ...]
     max_schema_repairs: Annotated[StrictInt, Field(ge=0, le=1)] = 1
     chapter_concurrency: PositiveInt = 1
-    arc_window_size: PositiveInt = 3
+    # Kept only so old persisted runs and integration fixtures can resume;
+    # new runs choose boundaries through the LLM arc-plan stage.
+    arc_window_size: PositiveInt | None = None
     budget: BudgetPolicy
     prompt_hash: Hash64
     schema_hash: Hash64

@@ -463,6 +463,110 @@ class NarrativeMemoryBuilderWorker:
                 stage, status="failed", reason=f"{type(exc).__name__}:{exc}"[:160]
             )
 
+    async def _run_arc_plan_stage(
+        self,
+        session: AsyncSession,
+        *,
+        repo: BuilderRepository,
+        gateway: BuilderModelGateway,
+        version: NarrativeMemoryVersion,
+        run_id: int,
+        stage: NarrativeMemoryBuildStage,
+        policy: RunPolicy,
+        chapter_numbers: Sequence[int],
+    ) -> None:
+        """Ask the model to choose story boundaries from chapter-state content."""
+        await repo.mark_stage(stage, status="running", increment_attempt=True)
+        try:
+            from app.services.narrative_memory.arc_planner import (
+                boundary_plan_checksum,
+                plan_arc_boundaries,
+            )
+
+            nodes, claims, _ = await load_child_chapter_authority(
+                session,
+                owner_id=version.owner_id,
+                novel_id=version.novel_id,
+                version_id=version.id,
+                chapter_numbers=chapter_numbers,
+            )
+            request_payload = {
+                "stage_key": stage.stage_key,
+                "chapter_numbers": list(chapter_numbers),
+                "chapter_content": _node_content(nodes, claims),
+                "prompt_hash": policy.prompt_hash,
+                "schema_hash": policy.schema_hash,
+                "policy_hash": policy.policy_hash,
+            }
+            package_cs = sha256(
+                json.dumps(request_payload, sort_keys=True, ensure_ascii=False).encode()
+            ).hexdigest()
+            cache_key = f"nmb:arc-plan:{package_cs[:100]}"
+
+            def validate_output(raw: Any) -> dict[str, Any]:
+                proposed_ranges = (
+                    list(raw.get("ranges") or []) if isinstance(raw, dict) else []
+                )
+                if not proposed_ranges:
+                    raise PackageBuildError("LLM arc plan returned no ranges")
+                plan = plan_arc_boundaries(
+                    chapter_numbers=chapter_numbers,
+                    policy_version=policy.policy_version,
+                    llm_ranges=proposed_ranges,
+                )
+                return {
+                    "boundary_plan": plan,
+                    "artifact_checksum": boundary_plan_checksum(plan),
+                }
+
+            async def is_cancelled() -> bool:
+                return await repo.is_cancelled(run_id)
+
+            result = await gateway.execute_structured(
+                run_id=run_id,
+                stage_key=stage.stage_key,
+                cache_key=cache_key,
+                request_payload=request_payload,
+                validate_output=validate_output,
+                is_cancelled=is_cancelled,
+                estimated_input_tokens=_estimated_input_tokens(request_payload),
+                estimated_output_tokens=4_096,
+            )
+            plan = result.output["boundary_plan"]
+            checksum = str(result.output["artifact_checksum"])
+            await repo.update_run_status(
+                run_id,
+                status="running",
+                boundary_plan=plan,
+                boundary_plan_checksum=checksum,
+            )
+            await repo.mark_stage(
+                stage,
+                status="completed",
+                package_checksum=package_cs,
+                cache_key=cache_key,
+                artifact_checksum=checksum,
+                checkpoint={"boundary_plan_checksum": checksum},
+            )
+        except CancelledBeforePersist:
+            stage = await self._reload_stage(session, run_id, stage.stage_key)
+            await repo.mark_stage(stage, status="cancelled", reason="cancelled_before_persist")
+            raise
+        except (UnknownPricing, BudgetExceeded) as exc:
+            stage = await self._reload_stage(session, run_id, stage.stage_key)
+            await repo.mark_stage(stage, status="paused_budget", reason=type(exc).__name__)
+            await repo.update_run_status(
+                run_id, status="paused_budget", reason=type(exc).__name__
+            )
+        except (PackageBuildError, GatewayError, BuilderRepositoryError) as exc:
+            stage = await self._reload_stage(session, run_id, stage.stage_key)
+            await repo.mark_stage(stage, status="failed", reason=str(exc)[:160])
+        except Exception as exc:  # noqa: BLE001 - durable failure isolation
+            stage = await self._reload_stage(session, run_id, stage.stage_key)
+            await repo.mark_stage(
+                stage, status="failed", reason=f"{type(exc).__name__}:{exc}"[:160]
+            )
+
     async def _ensure_boundary_and_parents(
         self,
         session: AsyncSession,
@@ -476,13 +580,7 @@ class NarrativeMemoryBuilderWorker:
         processed: int,
         lease_id: str,
     ) -> None:
-        try:
-            from app.services.narrative_memory.arc_planner import (
-                plan_arc_boundaries,
-                boundary_plan_checksum,
-            )
-        except ImportError:
-            return
+        from app.services.narrative_memory.arc_planner import boundary_plan_checksum
 
         run = await session.get(
             __import__(
@@ -496,19 +594,6 @@ class NarrativeMemoryBuilderWorker:
         chapter_numbers = list((run.progress or {}).get("chapter_numbers") or [])
         if not chapter_numbers:
             return
-        plan = plan_arc_boundaries(
-            chapter_numbers=chapter_numbers,
-            window_size=policy.arc_window_size,
-            policy_version=policy.policy_version,
-            explicit_volumes=None,
-        )
-        checksum = boundary_plan_checksum(plan)
-        await repo.update_run_status(
-            run_id,
-            status="running",
-            boundary_plan=plan,
-            boundary_plan_checksum=checksum,
-        )
         plan_stage = next(
             (
                 s
@@ -517,14 +602,38 @@ class NarrativeMemoryBuilderWorker:
             ),
             None,
         )
-        if plan_stage and plan_stage.status != "completed":
-            await repo.mark_stage(
-                plan_stage,
-                status="completed",
-                artifact_checksum=checksum,
-                package_checksum=checksum,
-                checkpoint={"boundary_plan_checksum": checksum},
+        if plan_stage is None:
+            return
+        if plan_stage.status != "completed" or not run.boundary_plan:
+            await self._run_arc_plan_stage(
+                session,
+                repo=repo,
+                gateway=gateway,
+                version=version,
+                run_id=run_id,
+                stage=plan_stage,
+                policy=policy,
+                chapter_numbers=chapter_numbers,
             )
+            run = await session.get(
+                __import__(
+                    "app.models.narrative_memory_builder",
+                    fromlist=["NarrativeMemoryBuildRun"],
+                ).NarrativeMemoryBuildRun,
+                run_id,
+            )
+            plan_stage = next(
+                (
+                    s
+                    for s in await repo.list_stages(run_id)
+                    if s.stage_kind == StageKind.ARC_VOLUME_PLAN.value
+                ),
+                None,
+            )
+            if run is None or plan_stage is None or plan_stage.status != "completed":
+                return
+        plan = dict(run.boundary_plan or {})
+        checksum = str(run.boundary_plan_checksum or boundary_plan_checksum(plan))
 
         parent_specs = []
         for item in plan["ranges"]:

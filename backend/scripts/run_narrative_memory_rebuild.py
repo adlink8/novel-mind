@@ -174,7 +174,6 @@ async def cmd_execute(args: argparse.Namespace) -> int:
             ),
             max_schema_repairs=1,
             chapter_concurrency=1,
-            arc_window_size=2,
             budget=BudgetPolicy(
                 max_calls=100,
                 max_input_tokens=1_000_000,

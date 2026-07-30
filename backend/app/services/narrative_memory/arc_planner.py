@@ -18,8 +18,13 @@ def plan_arc_boundaries(
     window_size: int = 3,
     policy_version: str = "arc-policy.v1",
     explicit_volumes: Sequence[dict[str, Any]] | None = None,
+    llm_ranges: Sequence[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    """Return a frozen full-cover continuous non-overlapping boundary plan."""
+    """Return a frozen full-cover continuous non-overlapping boundary plan.
+
+    ``llm_ranges`` is the production path used by the NM builder. The legacy
+    ``window_size`` fallback remains for deterministic tests and old callers.
+    """
 
     chapters = sorted({int(n) for n in chapter_numbers})
     if not chapters:
@@ -29,7 +34,12 @@ def plan_arc_boundaries(
     if window_size < 1:
         raise BoundaryPlanError("window_size must be positive")
 
-    if explicit_volumes:
+    if explicit_volumes and llm_ranges:
+        raise BoundaryPlanError("explicit_volumes and llm_ranges are mutually exclusive")
+    if llm_ranges:
+        ranges = _validate_llm_ranges(chapters, llm_ranges)
+        source_kind = "llm_story_arc"
+    elif explicit_volumes:
         ranges = _validate_explicit_volumes(chapters, explicit_volumes)
         source_kind = "explicit_volume"
     else:
@@ -114,6 +124,43 @@ def _validate_explicit_volumes(
         raise BoundaryPlanError("explicit volumes must exactly cover eligible chapters")
     ranges.sort(key=lambda item: (item["chapter_start"], item["chapter_end"]))
     # continuity already implied by exact cover of continuous chapters
+    return ranges
+
+
+def _validate_llm_ranges(
+    chapters: list[int], proposed_ranges: Sequence[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """Validate LLM-selected story ranges without trusting its labels/keys."""
+    ranges: list[dict[str, Any]] = []
+    covered: list[int] = []
+    for index, item in enumerate(proposed_ranges, start=1):
+        try:
+            start = int(item["chapter_start"])
+            end = int(item["chapter_end"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise BoundaryPlanError("LLM range must contain integer chapter_start/chapter_end") from exc
+        if start <= 0 or end < start:
+            raise BoundaryPlanError("LLM range has invalid chapter bounds")
+        span = list(range(start, end + 1))
+        if any(n not in chapters for n in span):
+            raise BoundaryPlanError("LLM range references a chapter outside the build")
+        if set(span) & set(covered):
+            raise BoundaryPlanError("LLM ranges overlap")
+        covered.extend(span)
+        ranges.append(
+            {
+                "stage_key": f"story_arc:{start}-{end}",
+                "node_kind": "story_arc",
+                "chapter_start": start,
+                "chapter_end": end,
+                "chapter_numbers": span,
+                "label": str(item.get("label") or f"story-arc-{index}")[:240],
+                "reason": str(item.get("reason") or "")[:500],
+            }
+        )
+    if sorted(covered) != chapters:
+        raise BoundaryPlanError("LLM ranges must exactly cover all eligible chapters")
+    ranges.sort(key=lambda item: (item["chapter_start"], item["chapter_end"]))
     return ranges
 
 
