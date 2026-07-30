@@ -89,6 +89,35 @@ describe("ReaderContent keyboard paging", () => {
     expect(onNextChapter).toHaveBeenCalledTimes(1);
   });
 
+  it("auto-advances to the previous chapter when scrolling to the top", () => {
+    const scrollContainer = document.createElement("div");
+    Object.defineProperties(scrollContainer, {
+      clientHeight: { configurable: true, value: 400 },
+      scrollHeight: { configurable: true, value: 1000 },
+    });
+    scrollContainer.scrollTo = vi.fn();
+    const scrollRef = { current: scrollContainer };
+    const onPrevChapter = vi.fn();
+
+    render(
+      <ReaderContent
+        chapter={makeChapter("字".repeat(4000))}
+        readingMode="scroll"
+        scrollContainerRef={scrollRef}
+        hasPrevChapter
+        onPrevChapter={onPrevChapter}
+      />
+    );
+
+    scrollContainer.scrollTop = 160;
+    fireEvent.scroll(scrollContainer);
+    scrollContainer.scrollTop = 0;
+    fireEvent.scroll(scrollContainer);
+    fireEvent.scroll(scrollContainer);
+
+    expect(onPrevChapter).toHaveBeenCalledTimes(1);
+  });
+
   it("shows chapter-boundary controls for a one-page chapter in paged mode", () => {
     const onPrevChapter = vi.fn();
     const onNextChapter = vi.fn();

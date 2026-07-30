@@ -87,6 +87,9 @@ export function ReaderContent({
   const restoreRef = useRef<{ percent: number } | null>(null);
   /** 防止滚动到底部时重复触发同一章的自动换章。 */
   const autoAdvanceChapterRef = useRef<number | null>(null);
+  /** 防止回到顶部时重复触发同一章的自动换章。 */
+  const autoRetreatChapterRef = useRef<number | null>(null);
+  const previousScrollTopRef = useRef<number | null>(null);
   const chapterId = chapter?.id;
   const [captured, setCaptured] = useState<{
     coords: ChapterSelectionCoords;
@@ -140,6 +143,8 @@ export function ReaderContent({
     // eslint-disable-next-line react-hooks/set-state-in-effect -- chapter boundary reset
     setCaptured(null);
     autoAdvanceChapterRef.current = null;
+    autoRetreatChapterRef.current = null;
+    previousScrollTopRef.current = null;
     const target = Math.min(100, Math.max(0, initialProgress || 0));
     // 长页（或单页短章）按滚动百分比恢复；多页翻页模式按页序恢复
     const restoreByScroll = target > 0 && (isScrollMode || pages.length <= 1);
@@ -153,13 +158,14 @@ export function ReaderContent({
         const max = el.scrollHeight - el.clientHeight;
         if (max > 0) el.scrollTop = (target / 100) * max;
       };
-      requestAnimationFrame(() => {
-        applyRestore();
         requestAnimationFrame(() => {
           applyRestore();
-          restoreRef.current = null;
-          onChapterProgress?.(target);
-        });
+          requestAnimationFrame(() => {
+            applyRestore();
+            previousScrollTopRef.current = scrollContainerRef?.current?.scrollTop ?? null;
+            restoreRef.current = null;
+            onChapterProgress?.(target);
+          });
       });
       return;
     }
@@ -195,18 +201,35 @@ export function ReaderContent({
       if (restoreRef.current) return;
       const max = el.scrollHeight - el.clientHeight;
       const pct = max <= 0 ? 100 : (el.scrollTop / max) * 100;
+      const previousScrollTop = previousScrollTopRef.current;
+      const scrollingUp =
+        previousScrollTop !== null && el.scrollTop < previousScrollTop;
+      previousScrollTopRef.current = el.scrollTop;
       onChapterProgress?.(Math.min(100, Math.max(0, pct)));
 
-      if (
+      const shouldRetreat =
         allowAutoAdvance &&
         isScrollMode &&
+        max > 0 &&
+        hasPrevChapter &&
+        onPrevChapter &&
+        scrollingUp &&
+        el.scrollTop <= SCROLL_ADVANCE_THRESHOLD_PX &&
+        autoRetreatChapterRef.current !== chapterId;
+      const shouldAdvance =
+        allowAutoAdvance &&
+        isScrollMode &&
+        max > 0 &&
         hasNextChapter &&
         onNextChapter &&
-        max > 0 &&
         el.scrollTop + el.clientHeight >=
           el.scrollHeight - SCROLL_ADVANCE_THRESHOLD_PX &&
-        autoAdvanceChapterRef.current !== chapterId
-      ) {
+        autoAdvanceChapterRef.current !== chapterId;
+
+      if (shouldRetreat) {
+          autoRetreatChapterRef.current = chapterId;
+          onPrevChapter();
+      } else if (shouldAdvance) {
         autoAdvanceChapterRef.current = chapterId;
         onNextChapter();
       }
@@ -224,6 +247,8 @@ export function ReaderContent({
     isScrollMode,
     hasNextChapter,
     onNextChapter,
+    hasPrevChapter,
+    onPrevChapter,
   ]);
 
   useEffect(() => {
