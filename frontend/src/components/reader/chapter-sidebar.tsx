@@ -2,11 +2,11 @@
 
 import React, { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
-import type { Chapter } from "@/lib/api";
+import type { ChapterSummary } from "@/lib/api";
 import { BookOpenText, ChevronLeft, ChevronRight, X } from "lucide-react";
 
 interface ChapterSidebarProps {
-  chapters: Chapter[];
+  chapters: ChapterSummary[];
   currentChapterId: number;
   onSelectChapter: (chapterId: number) => void;
   isOpen: boolean;

@@ -4,14 +4,14 @@ import { useEffect, useRef, useState } from "react";
 import { Bookmark as BookmarkIcon, LoaderCircle, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import type { Bookmark, Chapter } from "@/lib/api";
+import type { Bookmark, ChapterSummary } from "@/lib/api";
 import { novelsApi } from "@/lib/api";
 import { useDismissableLayer } from "@/lib/use-dismissable-layer";
 import { cn } from "@/lib/utils";
 
 interface ReaderBookmarksProps {
   novelId: string;
-  chapters: Chapter[];
+  chapters: ChapterSummary[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onNavigate: (bookmark: Bookmark) => void;

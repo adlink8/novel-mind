@@ -21,6 +21,7 @@ import {
   type Bookmark,
   type Novel,
   type Chapter,
+  type ChapterSummary,
   type SelectionCoordinate,
 } from "@/lib/api";
 import {
@@ -79,9 +80,9 @@ function saveProgress(
 }
 
 function resolveChapterFromQuery(
-  chapterList: Chapter[],
+  chapterList: ChapterSummary[],
   chapterParam: string | null
-): Chapter | null {
+): ChapterSummary | null {
   if (!chapterParam || !chapterList.length) return null;
   const n = Number(chapterParam);
   if (!Number.isFinite(n)) return null;
@@ -102,9 +103,9 @@ function NovelReaderInner() {
   const fromTimeline = searchParams.get("from") === "timeline";
 
   const [novel, setNovel] = useState<Novel | null>(null);
-  const [chapters, setChapters] = useState<Chapter[]>([]);
+  const [chapters, setChapters] = useState<ChapterSummary[]>([]);
+  const [chapterContents, setChapterContents] = useState<Chapter[]>([]);
   const [currentChapterId, setCurrentChapterId] = useState<number>(0);
-  const [chapterContent, setChapterContent] = useState<Chapter | null>(null);
   // 桌面（≥1280）默认展开目录，窄屏默认收起
   // 惰性初始，避免 effect 同步 setState
   const [sidebarOpen, setSidebarOpen] = useState(() => {
@@ -127,7 +128,9 @@ function NovelReaderInner() {
   const [immersiveTocOpen, setImmersiveTocOpen] = useState(false);
   /** 沉浸模式控制层显隐（点按正文切换） */
   const [immersiveChrome, setImmersiveChrome] = useState(true);
-  const chaptersRef = useRef<Chapter[]>([]);
+  const chaptersRef = useRef<ChapterSummary[]>([]);
+  const pendingScrollChapterRef = useRef<number | null>(null);
+  const syncedProgressChapterRef = useRef<string | null>(null);
   /** 时间线定位模式：不写入阅读进度，避免污染「上次读到」 */
   const [progressWritable, setProgressWritable] = useState(!fromTimeline);
   const jumpedChapterIdRef = useRef<number | null>(null);
@@ -159,6 +162,9 @@ function NovelReaderInner() {
     if (typeof window === "undefined") return true;
     return window.innerWidth >= 1280;
   });
+
+  const chapterContent =
+    chapterContents.find((item) => item.id === currentChapterId) ?? null;
 
   useEffect(() => {
     const onResize = () => setIsDesktop(window.innerWidth >= 1280);
@@ -223,7 +229,7 @@ function NovelReaderInner() {
     if (
       preferences.mode !== "scroll" ||
       !preferences.autoScroll ||
-      !chapterContent
+      chapterContents.length === 0
     ) {
       return;
     }
@@ -248,7 +254,7 @@ function NovelReaderInner() {
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
   }, [
-    chapterContent,
+    chapterContents.length,
     preferences.autoScroll,
     preferences.autoScrollSpeed,
     preferences.mode,
@@ -259,15 +265,35 @@ function NovelReaderInner() {
   }, [chapters]);
 
   useEffect(() => {
+    let active = true;
+
     async function loadNovel() {
       try {
         setLoading(true);
-        const res = await novelsApi.get(novelId);
-        setNovel(res.data);
-
-        const chaptersRes = await novelsApi.getChapters(novelId);
+        setError(null);
+        const [res, chaptersRes] = await Promise.all([
+          novelsApi.get(novelId),
+          novelsApi.getChapters(novelId),
+        ]);
         const chapterList = chaptersRes.data;
+        // 目录接口只返回摘要；正文在书籍打开时并行预取，滚动模式直接消费完整数组。
+        const chapterResponses = await Promise.all(
+          chapterList.map((summary) =>
+            novelsApi.getChapter(novelId, String(summary.id))
+          )
+        );
+        if (!active) return;
+
+        setNovel(res.data);
         setChapters(chapterList);
+        setChapterContents(
+          chapterResponses
+            .map((response) => response.data)
+            .sort(
+              (a, b) =>
+                a.chapter_number - b.chapter_number || a.id - b.id
+            )
+        );
 
         // A1: ?chapter= 且 from=timeline → 优先时间线定位，不覆盖真实阅读进度
         const fromQuery = resolveChapterFromQuery(chapterList, chapterQuery);
@@ -302,71 +328,63 @@ function NovelReaderInner() {
           }
           setProgressWritable(true);
         }
+        pendingScrollChapterRef.current = initialChapterId;
         setChapterPercent(initialPercent);
+        setRestorePercent(initialPercent);
         setCurrentChapterId(initialChapterId);
       } catch {
-        setError("加载小说失败，请重试");
+        if (active) setError("加载小说失败，请重试");
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     }
     loadNovel();
+    return () => {
+      active = false;
+    };
   }, [novelId, chapterQuery, fromTimeline]);
 
+  // 滚动模式已一次性渲染全部章节；目录/书签跳转时只滚到目标章节，不重新请求正文。
   useEffect(() => {
-    if (!currentChapterId) return;
-
-    async function loadChapter() {
-      try {
-        const res = await novelsApi.getChapter(novelId, String(currentChapterId));
-        setChapterContent(res.data);
-
-        // 同章且有存档 → 恢复章内位置；新章/时间线定位章 → 从头开始
-        const saved = loadProgress(novelId);
-        const sameChapter = saved?.chapterId === currentChapterId;
-        const pct = sameChapter ? (saved.chapterPercent ?? 0) : 0;
-        const shouldRestore =
-          sameChapter &&
-          pct > 0 &&
-          (progressWritable || jumpedChapterIdRef.current !== currentChapterId);
-        setChapterPercent(pct);
-        setRestorePercent(shouldRestore ? pct : 0);
-
-        // 不恢复时换章立刻顶到开头（instant）；布局后再顶一次，避免沿用上一章滚位
-        if (!shouldRestore) {
-          const el = scrollRef.current;
-          if (el) {
-            el.scrollTop = 0;
-            requestAnimationFrame(() => {
-              el.scrollTop = 0;
-            });
-          }
-        }
-
-        // 仅同章恢复才写回进度；新章由 ReaderContent 从顶部开始
-        if (sameChapter) {
-          saveProgress(novelId, currentChapterId, pct);
-        } else if (progressWritable) {
-          saveProgress(novelId, currentChapterId, 0);
-        }
-
-        // 同步到服务端（整书章节位置）
-        try {
-          await novelsApi.updateProgress(
-            novelId,
-            currentChapterId,
-            sameChapter ? pct : 0
-          );
-        } catch {
-          /* 后端进度失败不影响阅读 */
-        }
-      } catch {
-        setChapterContent(null);
-      }
+    if (
+      preferences.mode !== "scroll" ||
+      !currentChapterId ||
+      chapterContents.length === 0 ||
+      pendingScrollChapterRef.current !== currentChapterId
+    ) {
+      return;
     }
+    const frame = requestAnimationFrame(() => {
+      const container = scrollRef.current;
+      const target = container?.querySelector<HTMLElement>(
+        `[data-reader-chapter-id="${currentChapterId}"]`
+      );
+      if (!container || !target) return;
+      const chapterMax = Math.max(0, target.offsetHeight - container.clientHeight);
+      const percent = Math.min(100, Math.max(0, restorePercent || 0));
+      container.scrollTop = target.offsetTop + chapterMax * (percent / 100);
+      pendingScrollChapterRef.current = null;
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [
+    chapterContents.length,
+    currentChapterId,
+    preferences.mode,
+    restorePercent,
+  ]);
 
-    loadChapter();
-  }, [currentChapterId, novelId, progressWritable]);
+  // 全量预取后不再依赖“加载当前章”触发服务端进度同步，首次进入每章时补回同样的契约。
+  useEffect(() => {
+    if (!currentChapterId || chapterContents.length === 0) return;
+    const key = `${novelId}:${currentChapterId}`;
+    if (syncedProgressChapterRef.current === key) return;
+    syncedProgressChapterRef.current = key;
+    void novelsApi
+      .updateProgress(novelId, currentChapterId, chapterPercent)
+      .catch(() => {
+        /* 服务端进度失败不影响本地阅读 */
+      });
+  }, [chapterContents.length, chapterPercent, currentChapterId, novelId]);
 
   const persistProgress = useCallback(
     (chapterId: number, percent: number) => {
@@ -377,21 +395,28 @@ function NovelReaderInner() {
   );
 
   const handleChapterProgress = useCallback(
-    (percent: number) => {
+    (percent: number, progressChapterId = currentChapterId) => {
       setChapterPercent(percent);
+      if (
+        preferences.mode === "scroll" &&
+        progressChapterId &&
+        progressChapterId !== currentChapterId
+      ) {
+        setCurrentChapterId(progressChapterId);
+      }
       // 时间线定位：用户在本章滚动不写进度；翻章后才写
       if (
         progressWritable ||
         (jumpedChapterIdRef.current != null &&
-          currentChapterId !== jumpedChapterIdRef.current)
+          progressChapterId !== jumpedChapterIdRef.current)
       ) {
         if (!progressWritable) setProgressWritable(true);
-        if (currentChapterId) {
-          saveProgress(novelId, currentChapterId, percent);
+        if (progressChapterId) {
+          saveProgress(novelId, progressChapterId, percent);
         }
       }
     },
-    [currentChapterId, novelId, progressWritable]
+    [currentChapterId, novelId, preferences.mode, progressWritable]
   );
 
   const handleSelectChapter = useCallback((chapterId: number) => {
@@ -402,8 +427,7 @@ function NovelReaderInner() {
     ) {
       setProgressWritable(true);
     }
-    // 先卸载旧章正文和滚动监听，避免异步加载新章期间沿用旧章的底部位置。
-    setChapterContent(null);
+    pendingScrollChapterRef.current = chapterId;
     setChapterPercent(0);
     setRestorePercent(0);
     setCurrentChapterId(chapterId);
@@ -698,6 +722,8 @@ function NovelReaderInner() {
           >
             <ReaderContent
               chapter={chapterContent}
+              chapters={chapterContents}
+              activeChapterId={currentChapterId}
               onChapterProgress={handleChapterProgress}
               scrollContainerRef={scrollRef}
               onNextChapter={handleNextChapter}
@@ -709,6 +735,7 @@ function NovelReaderInner() {
               onAskSelection={handleAskSelection}
               onBookmarkSelection={handleBookmarkSelection}
               highlightRange={highlightRange}
+              highlightChapterId={currentChapterId}
               readingMode={preferences.mode}
               initialProgress={restorePercent}
               fontSize={preferences.fontSize}

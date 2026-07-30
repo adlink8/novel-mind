@@ -116,17 +116,21 @@ export interface Novel {
   updated_at: string;
 }
 
-/** 章节信息 */
-export interface Chapter {
+/** 章节目录摘要（章节列表接口不返回正文） */
+export interface ChapterSummary {
   id: number;
   novel_id: number;
   chapter_number: number;
   title: string;
-  content: string;       // 章节完整正文内容
-  summary?: string;
   word_count: number;
+  summary?: string;
   created_at: string;
   updated_at: string;
+}
+
+/** 章节详情（含完整正文） */
+export interface Chapter extends ChapterSummary {
+  content: string;
 }
 
 export interface Bookmark {
@@ -197,7 +201,7 @@ export const novelsApi = {
     api.delete<NovelBulkDeleteResponse>("/novels/bulk", {
       data: { novel_ids: ids },
     }),
-  getChapters: (id: string) => api.get<Chapter[]>(`/novels/${id}/chapters`),
+  getChapters: (id: string) => api.get<ChapterSummary[]>(`/novels/${id}/chapters`),
   getChapter: (novelId: string, chapterId: string) =>
     api.get<Chapter>(`/novels/${novelId}/chapters/${chapterId}`),
   updateProgress: (novelId: string, chapterId: number, progressPercent: number) =>
