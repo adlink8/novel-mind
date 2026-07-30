@@ -63,6 +63,27 @@ describe("ReaderContent keyboard paging", () => {
     expect(screen.queryByRole("button", { name: /上一章|下一章|上一页|下一页/ })).not.toBeInTheDocument();
   });
 
+  it("renders all prefetched chapters in order in scroll mode", () => {
+    const first = makeChapter("第一章正文", 1);
+    const second = makeChapter("第二章正文", 2);
+
+    render(
+      <ReaderContent
+        chapter={first}
+        chapters={[first, second]}
+        activeChapterId={first.id}
+        readingMode="scroll"
+      />
+    );
+
+    const content = screen.getByTestId("reader-multi-chapter-content");
+    expect(content.textContent?.indexOf("第一章正文")).toBeLessThan(
+      content.textContent?.indexOf("第二章正文") ?? -1
+    );
+    expect(screen.getByText("第1章 测试")).toBeInTheDocument();
+    expect(screen.getByText("第2章 测试")).toBeInTheDocument();
+  });
+
   it("auto-advances to the next chapter at the end of scroll mode", () => {
     const scrollContainer = document.createElement("div");
     Object.defineProperties(scrollContainer, {
@@ -203,5 +224,36 @@ describe("ReaderContent keyboard paging", () => {
     expect(onBookmarkSelection.mock.calls[0][0].selection_text).toBe(
       "这是需要保存的"
     );
+  });
+
+  it("keeps the selected chapter id when saving from multi-chapter scroll mode", async () => {
+    const onBookmarkSelection = vi.fn().mockResolvedValue(undefined);
+    const first = makeChapter("第一章正文", 1);
+    const second = makeChapter("第二章需要保存的正文", 2);
+    render(
+      <ReaderContent
+        chapter={first}
+        chapters={[first, second]}
+        activeChapterId={first.id}
+        readingMode="scroll"
+        onBookmarkSelection={onBookmarkSelection}
+      />
+    );
+
+    const textNode = screen
+      .getByText("第二章需要保存的正文")
+      .firstChild as Text;
+    const range = document.createRange();
+    range.setStart(textNode, 0);
+    range.setEnd(textNode, 6);
+    const selection = window.getSelection()!;
+    selection.removeAllRanges();
+    selection.addRange(range);
+    fireEvent(document, new Event("selectionchange"));
+
+    const saveButton = await screen.findByRole("button", { name: "保存书签" });
+    fireEvent.click(saveButton);
+    await waitFor(() => expect(onBookmarkSelection).toHaveBeenCalledTimes(1));
+    expect(onBookmarkSelection.mock.calls[0][0].chapter_id).toBe(2);
   });
 });

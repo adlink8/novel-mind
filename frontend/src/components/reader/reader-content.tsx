@@ -17,8 +17,11 @@ import {
 
 interface ReaderContentProps {
   chapter: Chapter | null;
+  /** 滚动模式的完整章节正文，按 chapter_number 顺序排列。 */
+  chapters?: Chapter[];
+  activeChapterId?: number;
   /** 本章滚动/翻页进度 0-100 */
-  onChapterProgress?: (percent: number) => void;
+  onChapterProgress?: (percent: number, chapterId?: number) => void;
   scrollContainerRef?: React.RefObject<HTMLElement | null>;
   /** 本章最后一页再点「下一页」时进入下一章 */
   onNextChapter?: () => void;
@@ -32,6 +35,7 @@ interface ReaderContentProps {
   onBookmarkSelection?: (payload: SelectionCoordinate) => void | Promise<void>;
   /** Highlight a code-point range within the current chapter (citation jump). */
   highlightRange?: { sourceStart: number; sourceEnd: number } | null;
+  highlightChapterId?: number | null;
   /** 分页阅读或整章长页阅读。 */
   readingMode?: ReaderMode;
   /** 进入本章时要恢复的章内进度 0-100（0 = 从头开始） */
@@ -47,6 +51,7 @@ interface ReaderContentProps {
 const PAGE_CHARS = 3500;
 const WARN_CHARS = 20_000;
 const SCROLL_ADVANCE_THRESHOLD_PX = 64;
+const EMPTY_CHAPTERS: Chapter[] = [];
 
 /** 强制滚到顶部；instant 避免 smooth 与换页内容切换打架 */
 function scrollToTop(
@@ -65,6 +70,8 @@ function scrollToTop(
 
 export function ReaderContent({
   chapter,
+  chapters = EMPTY_CHAPTERS,
+  activeChapterId,
   onChapterProgress,
   scrollContainerRef,
   onNextChapter,
@@ -74,6 +81,7 @@ export function ReaderContent({
   onAskSelection,
   onBookmarkSelection,
   highlightRange = null,
+  highlightChapterId = null,
   readingMode = "paged",
   initialProgress = 0,
   fontSize = 18,
@@ -90,10 +98,12 @@ export function ReaderContent({
   /** 防止回到顶部时重复触发同一章的自动换章。 */
   const autoRetreatChapterRef = useRef<number | null>(null);
   const previousScrollTopRef = useRef<number | null>(null);
-  const chapterId = chapter?.id;
+  const chapterId = activeChapterId ?? chapter?.id;
   const [captured, setCaptured] = useState<{
     coords: ChapterSelectionCoords;
     anchor: { top: number; left: number };
+    chapterId: number;
+    chapterContent: string;
   } | null>(null);
   const [bookmarkState, setBookmarkState] = useState<"idle" | "saving" | "saved" | "error">("idle");
 
@@ -102,6 +112,8 @@ export function ReaderContent({
     [chapter?.content]
   );
   const isScrollMode = readingMode === "scroll";
+  const scrollChapters = isScrollMode ? chapters : EMPTY_CHAPTERS;
+  const isMultiChapterScroll = scrollChapters.length > 0;
   const displayPages = useMemo(
     () =>
       isScrollMode
@@ -131,17 +143,21 @@ export function ReaderContent({
   useEffect(() => {
     if (!highlightRange || !chapter?.content || !isScrollMode) return;
     const frame = requestAnimationFrame(() => {
+      const selector = highlightChapterId
+        ? `[data-reader-chapter-id="${highlightChapterId}"] [data-testid="reader-citation-highlight"]`
+        : '[data-testid="reader-citation-highlight"]';
       document
-        .querySelector<HTMLElement>('[data-testid="reader-citation-highlight"]')
+        .querySelector<HTMLElement>(selector)
         ?.scrollIntoView({ behavior: "smooth", block: "center" });
     });
     return () => cancelAnimationFrame(frame);
-  }, [highlightRange, chapter?.content, isScrollMode]);
+  }, [highlightChapterId, highlightRange, chapter?.content, isScrollMode]);
 
   // 换章：有存档则恢复章内位置，否则回顶从头开始
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- chapter boundary reset
     setCaptured(null);
+    if (isMultiChapterScroll) return;
     autoAdvanceChapterRef.current = null;
     autoRetreatChapterRef.current = null;
     previousScrollTopRef.current = null;
@@ -183,18 +199,63 @@ export function ReaderContent({
     }
     scrollToTop(scrollContainerRef?.current, "auto");
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only on chapter change
-  }, [chapterId]);
+  }, [chapterId, isMultiChapterScroll]);
 
   useEffect(() => {
     // 恢复章内进度期间不回顶（恢复完成后再恢复正常行为）
-    if (restoreRef.current) return;
+    if (restoreRef.current || isMultiChapterScroll) return;
     scrollToTop(scrollContainerRef?.current, "auto");
-  }, [pageIndex, chapterId, scrollContainerRef, readingMode]);
+  }, [pageIndex, chapterId, isMultiChapterScroll, scrollContainerRef, readingMode]);
 
   useEffect(() => {
-    if (!chapterId || (!isScrollMode && pages.length > 1)) return;
     const el = scrollContainerRef?.current;
     if (!el) return;
+
+    if (isMultiChapterScroll) {
+      const reportMultiChapterScroll = () => {
+        const containerTop = el.getBoundingClientRect().top;
+        let activeChapter = scrollChapters[0];
+        let activeElement: HTMLElement | null = null;
+
+        for (const candidate of scrollChapters) {
+          const candidateElement = el.querySelector<HTMLElement>(
+            `[data-reader-chapter-id="${candidate.id}"]`
+          );
+          if (!candidateElement) continue;
+          const top = candidateElement.getBoundingClientRect().top - containerTop;
+          if (top <= 80) {
+            activeChapter = candidate;
+            activeElement = candidateElement;
+          } else {
+            break;
+          }
+        }
+
+        if (!activeElement) {
+          activeElement = el.querySelector<HTMLElement>(
+            `[data-reader-chapter-id="${activeChapter.id}"]`
+          );
+        }
+        if (!activeElement) return;
+
+        const chapterTop =
+          activeElement.getBoundingClientRect().top - containerTop + el.scrollTop;
+        const chapterMax = Math.max(
+          0,
+          activeElement.offsetHeight - el.clientHeight
+        );
+        const localScroll = Math.max(0, el.scrollTop - chapterTop);
+        const percent =
+          chapterMax <= 0 ? 100 : Math.min(100, (localScroll / chapterMax) * 100);
+        onChapterProgress?.(percent, activeChapter.id);
+      };
+
+      const onScroll = () => reportMultiChapterScroll();
+      el.addEventListener("scroll", onScroll, { passive: true });
+      return () => el.removeEventListener("scroll", onScroll);
+    }
+
+    if (!chapterId || (!isScrollMode && pages.length > 1)) return;
 
     const reportScroll = (allowAutoAdvance: boolean) => {
       // 恢复章内进度期间不上报，避免把存档冲掉
@@ -205,7 +266,7 @@ export function ReaderContent({
       const scrollingUp =
         previousScrollTop !== null && el.scrollTop < previousScrollTop;
       previousScrollTopRef.current = el.scrollTop;
-      onChapterProgress?.(Math.min(100, Math.max(0, pct)));
+      onChapterProgress?.(Math.min(100, Math.max(0, pct)), chapterId);
 
       const shouldRetreat =
         allowAutoAdvance &&
@@ -227,8 +288,8 @@ export function ReaderContent({
         autoAdvanceChapterRef.current !== chapterId;
 
       if (shouldRetreat) {
-          autoRetreatChapterRef.current = chapterId;
-          onPrevChapter();
+        autoRetreatChapterRef.current = chapterId;
+        onPrevChapter();
       } else if (shouldAdvance) {
         autoAdvanceChapterRef.current = chapterId;
         onNextChapter();
@@ -244,6 +305,8 @@ export function ReaderContent({
     pages.length,
     scrollContainerRef,
     onChapterProgress,
+    isMultiChapterScroll,
+    scrollChapters,
     isScrollMode,
     hasNextChapter,
     onNextChapter,
@@ -262,11 +325,7 @@ export function ReaderContent({
   }, []);
 
   const handleSelectionChange = useCallback(() => {
-    if (
-      !chapter ||
-      !pageTextRef.current ||
-      (!onAskSelection && !onBookmarkSelection)
-    ) return;
+    if (!onAskSelection && !onBookmarkSelection) return;
     const sel = window.getSelection();
     // Selection cleared / collapsed → hide floating 「问 AI」 immediately.
     if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
@@ -274,18 +333,46 @@ export function ReaderContent({
       return;
     }
     const range = sel.getRangeAt(0);
-    if (!pageTextRef.current.contains(range.commonAncestorContainer)) {
+
+    let selectionChapter = chapter;
+    let selectionRoot: HTMLElement | null = pageTextRef.current;
+    let base = 0;
+    if (isMultiChapterScroll) {
+      const commonAncestor =
+        range.commonAncestorContainer.nodeType === Node.ELEMENT_NODE
+          ? (range.commonAncestorContainer as Element)
+          : range.commonAncestorContainer.parentElement;
+      const chapterHost = commonAncestor?.closest<HTMLElement>(
+        "[data-reader-chapter-id]"
+      );
+      const selectedChapterId = Number(chapterHost?.dataset.readerChapterId);
+      selectionChapter = scrollChapters.find(
+        (item) => item.id === selectedChapterId
+      ) ?? null;
+      selectionRoot =
+        chapterHost?.querySelector<HTMLElement>(
+          '[data-testid="reader-page-text"]'
+        ) ?? null;
+    }
+
+    if (!selectionChapter || !selectionRoot) {
+      setCaptured(null);
+      return;
+    }
+    if (!selectionRoot.contains(range.commonAncestorContainer)) {
       setCaptured(null);
       return;
     }
 
-    const page = displayPages[Math.min(pageIndex, Math.max(displayPages.length - 1, 0))];
-    const base = page?.sourceStartUtf16 ?? 0;
+    if (!isMultiChapterScroll) {
+      const page = displayPages[Math.min(pageIndex, Math.max(displayPages.length - 1, 0))];
+      base = page?.sourceStartUtf16 ?? 0;
+    }
     const coords = captureSelectionFromRange(
-      pageTextRef.current,
+      selectionRoot,
       range,
       base,
-      chapter.content || ""
+      selectionChapter.content
     );
     if (!coords) {
       setCaptured(null);
@@ -303,8 +390,21 @@ export function ReaderContent({
       : rect.left;
 
     // Capture immutable coords before native selection can collapse (mobile/menus).
-    setCaptured({ coords, anchor: { top, left } });
-  }, [chapter, onAskSelection, onBookmarkSelection, pageIndex, displayPages]);
+    setCaptured({
+      coords,
+      anchor: { top, left },
+      chapterId: selectionChapter.id,
+      chapterContent: selectionChapter.content,
+    });
+  }, [
+    chapter,
+    displayPages,
+    isMultiChapterScroll,
+    onAskSelection,
+    onBookmarkSelection,
+    pageIndex,
+    scrollChapters,
+  ]);
 
   useEffect(() => {
     if (!onAskSelection && !onBookmarkSelection) return;
@@ -328,7 +428,7 @@ export function ReaderContent({
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- drop stale selection anchor
     clearCaptured();
-  }, [pageIndex, chapter?.id, clearCaptured]);
+  }, [pageIndex, chapter?.id, activeChapterId, clearCaptured]);
 
   // 键盘翻页：←/→（仅翻页模式；输入控件聚焦、有选区或调宽手柄聚焦时不劫持）
   useEffect(() => {
@@ -358,10 +458,10 @@ export function ReaderContent({
   });
 
   const handleAsk = async () => {
-    if (!chapter || !captured || !onAskSelection) return;
+    if (!captured || !onAskSelection) return;
     const payload = await buildSelectionPayload(
-      chapter.id,
-      chapter.content || "",
+      captured.chapterId,
+      captured.chapterContent,
       captured.coords
     );
     onAskSelection(payload);
@@ -370,12 +470,12 @@ export function ReaderContent({
   };
 
   const handleBookmark = async () => {
-    if (!chapter || !captured || !onBookmarkSelection) return;
+    if (!captured || !onBookmarkSelection) return;
     setBookmarkState("saving");
     try {
       const payload = await buildSelectionPayload(
-        chapter.id,
-        chapter.content || "",
+        captured.chapterId,
+        captured.chapterContent,
         captured.coords
       );
       await onBookmarkSelection(payload);
@@ -423,6 +523,128 @@ export function ReaderContent({
         </>
       );
     }
+  }
+
+  if (isMultiChapterScroll) {
+    return (
+      <div
+        ref={contentRef}
+        className="relative mx-auto w-full"
+        style={{ maxWidth: contentWidth }}
+        data-testid="reader-multi-chapter-content"
+      >
+        {scrollChapters.map((scrollChapter, index) => {
+          const isHighlightedChapter =
+            highlightRange && highlightChapterId === scrollChapter.id;
+          let renderedScrollContent: React.ReactNode = scrollChapter.content;
+          if (isHighlightedChapter) {
+            const chars = Array.from(scrollChapter.content);
+            const start = Math.max(0, highlightRange.sourceStart);
+            const end = Math.min(chars.length, highlightRange.sourceEnd);
+            if (end > start) {
+              renderedScrollContent = (
+                <>
+                  {chars.slice(0, start).join("")}
+                  <mark
+                    data-testid="reader-citation-highlight"
+                    data-source-start={highlightRange.sourceStart}
+                    className="rounded bg-amber-200/80 px-0.5 text-inherit"
+                  >
+                    {chars.slice(start, end).join("")}
+                  </mark>
+                  {chars.slice(end).join("")}
+                </>
+              );
+            }
+          }
+
+          return (
+            <article
+              key={scrollChapter.id}
+              data-reader-chapter-id={scrollChapter.id}
+              className="relative px-5 py-10 sm:px-8 sm:py-14"
+            >
+              <header className="relative mb-8 text-center sm:mb-10">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-primary">
+                  Chapter {index + 1}
+                </p>
+                <h1 className="mt-3 font-serif text-3xl font-semibold leading-tight tracking-tight text-foreground sm:text-4xl">
+                  {scrollChapter.title}
+                </h1>
+                <p className="mt-3 text-xs text-muted-foreground">
+                  {scrollChapter.content.length.toLocaleString()} 字 · 长页模式
+                </p>
+                <div aria-hidden className="mt-6 flex items-center justify-center gap-3">
+                  <span className="h-px w-16 bg-gradient-to-r from-transparent to-[#d6ab54]/50" />
+                  <span className="font-serif text-sm text-[#d6ab54]/80">❦</span>
+                  <span className="h-px w-16 bg-gradient-to-l from-transparent to-[#d6ab54]/50" />
+                </div>
+              </header>
+              <div
+                data-testid="reader-page-text"
+                data-source-start-utf16="0"
+                className="relative whitespace-pre-wrap font-reading tracking-[0.02em] text-foreground/90"
+                style={{ fontSize, lineHeight }}
+              >
+                {renderedScrollContent}
+              </div>
+            </article>
+          );
+        })}
+
+        {captured && (onAskSelection || onBookmarkSelection) ? (
+          <div
+            data-testid="reader-selection-action"
+            className="absolute z-30"
+            style={{ top: captured.anchor.top, left: captured.anchor.left }}
+          >
+            <div className="flex items-center gap-1 rounded-lg bg-background/95 p-1 shadow-md ring-1 ring-border/70">
+              {onAskSelection ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => void handleAsk()}
+                >
+                  <MessageSquareText className="size-3.5" />
+                  问 AI
+                </Button>
+              ) : null}
+              {onBookmarkSelection ? (
+                <Button
+                  type="button"
+                  size="icon-sm"
+                  variant="ghost"
+                  disabled={bookmarkState === "saving"}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => void handleBookmark()}
+                  aria-label={
+                    bookmarkState === "saving"
+                      ? "保存书签中"
+                      : bookmarkState === "saved"
+                        ? "书签已保存"
+                        : bookmarkState === "error"
+                          ? "书签保存失败"
+                          : "保存书签"
+                  }
+                  title={
+                    bookmarkState === "saving"
+                      ? "保存书签中"
+                      : bookmarkState === "saved"
+                        ? "书签已保存"
+                        : bookmarkState === "error"
+                          ? "书签保存失败"
+                          : "保存书签"
+                  }
+                >
+                  <BookmarkPlus className="size-3.5" />
+                </Button>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+      </div>
+    );
   }
 
   if (!chapter) {
