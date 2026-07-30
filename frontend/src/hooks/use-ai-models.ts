@@ -11,7 +11,6 @@
  * - getModelById(id)        - 按 ID 查找模型
  * - getModelsByProvider(p)  - 按提供商筛选
  * - getTestResult(id)       - 获取测试结果
- * - routingDescriptions     - 路由偏好的中文描述映射
  */
 
 "use client";
@@ -22,9 +21,9 @@ import type { AIModelConfig } from "@/lib/api";
 
 export function useAIModels() {
   const {
-    models, defaultModel, routingPreference, loading, error, testResults,
+    models, defaultModel, loading, error, testResults,
     fetchModels, addModel, removeModel, setDefaultModel, testConnection,
-    fetchRoutingPreference, setRoutingPreference, clearError,
+    clearError,
   } = useAIConfigStore();
 
   // 组件挂载时自动加载模型列表
@@ -47,17 +46,9 @@ export function useAIModels() {
     return testResults[id] || null;
   };
 
-  /** 路由偏好的中文描述（用于 UI 展示） */
-  const routingDescriptions: Record<string, string> = {
-    quality: "优先使用最强模型，适合深度分析和复杂创作",
-    balanced: "智能分配任务到合适的模型，兼顾质量和成本",
-    budget: "优先使用轻量模型，适合日常简单任务",
-  };
-
   return {
-    models, defaultModel, routingPreference, loading, error, testResults,
+    models, defaultModel, loading, error, testResults,
     fetchModels, addModel, removeModel, setDefaultModel, testConnection,
-    fetchRoutingPreference, setRoutingPreference, clearError,
-    getModelById, getModelsByProvider, getTestResult, routingDescriptions,
+    clearError, getModelById, getModelsByProvider, getTestResult,
   };
 }

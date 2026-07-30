@@ -1,29 +1,25 @@
 /**
  * AI 配置状态管理 Store (Zustand)
  *
- * 管理 AI 模型列表、默认模型、路由偏好和测试结果。
+ * 管理 AI 模型列表、默认模型和测试结果。
  * AI 设置页面通过 useAIConfigStore() 共享状态。
  *
  * 状态:
  * - models: AIModelConfig[]     - 已配置的 AI 模型列表
  * - defaultModel: AIModelConfig | null - 默认模型
- * - routingPreference - 路由偏好（quality/balanced/budget）
  * - testResults - 连接测试结果缓存
  */
 
 import { create } from "zustand";
 import {
   aiModelsApi,
-  settingsApi,
   type AIModelConfig,
   type AIModelConfigCreate,
-  type RoutingPreference,
 } from "@/lib/api";
 
 interface AIConfigState {
   models: AIModelConfig[];
   defaultModel: AIModelConfig | null;
-  routingPreference: RoutingPreference;
   loading: boolean;
   error: string | null;
   testResults: Record<string, { success: boolean; message: string }>;
@@ -33,15 +29,12 @@ interface AIConfigState {
   removeModel: (id: number) => Promise<void>;
   setDefaultModel: (id: number) => Promise<void>;
   testConnection: (id: number) => Promise<void>;
-  fetchRoutingPreference: () => Promise<void>;
-  setRoutingPreference: (pref: RoutingPreference) => Promise<void>;
   clearError: () => void;
 }
 
 export const useAIConfigStore = create<AIConfigState>((set, get) => ({
   models: [],
   defaultModel: null,
-  routingPreference: "balanced",
   loading: false,
   error: null,
   testResults: {},
@@ -125,26 +118,5 @@ export const useAIConfigStore = create<AIConfigState>((set, get) => ({
     }
   },
 
-  /** 拉取服务端持久化的路由偏好；失败时保留当前值（默认 balanced），不阻塞页面 */
-  fetchRoutingPreference: async () => {
-    try {
-      const res = await settingsApi.getRouting();
-      set({ routingPreference: res.data.preference });
-    } catch {
-      // 后端未就绪或网络失败时保持现状
-    }
-  },
-
-  /** 切换路由偏好：先 PUT 持久化，成功后更新本地状态 */
-  setRoutingPreference: async (pref: RoutingPreference) => {
-    try {
-      const res = await settingsApi.putRouting(pref);
-      set({ routingPreference: res.data.preference, error: null });
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Failed to save routing preference";
-      set({ error: message });
-    }
-  },
   clearError: () => set({ error: null }),
 }));

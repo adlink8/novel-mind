@@ -13,7 +13,7 @@ Pydantic v2 请求/响应模型，定义 API 的输入输出形状。FastAPI 路
 | `timeline.py` | `TimelineEventCreate`、`TimelineEventResponse`、`TimelineEventUpdate` | 时间线事件 |
 | `fanfiction.py` | `FanFictionCreate`、`FanFictionResponse`、`FanFictionChapterResponse` | 同人文 |
 | `ai_model.py` | `AIModelConfigCreate`、`AIModelConfigResponse`、`AIModelConfigUpdate`、`AIModelTestRequest`、`AIModelTestResponse` | AI 模型配置 |
-| `settings.py` | `RoutingPreferenceUpdate`、`RoutingPreferenceResponse` | 设置中心（路由偏好） |
+| `settings.py` | `AIBudgetUpdate`、`AIBudgetResponse`、`AIBudgetLimits` | 设置中心（AI 预算） |
 
 ## 约定
 

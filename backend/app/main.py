@@ -165,19 +165,6 @@ async def lifespan(app: FastAPI):
             logger.info(f"恢复 {len(recovered)} 个过期导入任务")
         await db.commit()
 
-    # 从库中恢复 AI 路由全局偏好（未设置时保持默认 "balanced"）
-    try:
-        from app.services.ai_router import ai_router
-        from app.services.settings_service import get_routing_preference
-
-        async with async_session_factory() as db:
-            preference = await get_routing_preference(db)
-        ai_router.update_preference(preference)
-        logger.info(f"AI 路由偏好: {preference}")
-    except Exception as e:
-        # 表不存在（迁移未执行）等情况不阻断启动
-        logger.warning(f"恢复 AI 路由偏好失败，使用默认值: {e}")
-
     logger.info("服务就绪 ✓")
     recovery_task = asyncio.create_task(
         _resume_pending_embeddings_on_startup(),

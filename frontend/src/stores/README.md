@@ -6,7 +6,7 @@
 
 | Store | 文件 | 职责 |
 |---|---|---|
-| `aiConfigStore` | `aiConfigStore.ts` (4.3KB) | AI 模型配置全局状态 — 模型列表、默认模型、加载状态、CRUD 操作；路由偏好经 `settingsApi`（GET/PUT `/api/settings/routing`）持久化 |
+| `aiConfigStore` | `aiConfigStore.ts` (4.3KB) | AI 模型配置全局状态 — 模型列表、默认模型、加载状态与 CRUD 操作 |
 | `novelStore` | `novelStore.ts` (1.9KB) | 小说列表全局状态 — 小说集合、当前选中、加载状态 |
 
 ## 使用示例

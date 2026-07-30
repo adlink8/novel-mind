@@ -43,8 +43,8 @@ React 组件，按功能域分目录组织。
 |---|---|---|
 | `SettingsSection` | `settings/settings-section.tsx` | 章回体小节骨架 — 朱砂章节字 + 衬线标题 + 操作插槽 |
 | `AccountSection` | `settings/account-section.tsx` | 账户区 — 当前用户展示、退出登录 |
-| `RoutingSection` | `settings/routing-section.tsx` | 路由策略迷你书架 — 三本书选出策略，API 持久化 |
 | `ModelsSection` | `settings/models-section.tsx` | AI 模型管理 — 列表、添加 Dialog、测试连接、设默认、删除 |
+| `AIBudgetSection` | `settings/ai-budget-section.tsx` | AI 调用预算 — 默认、小说和会话作用域的上限读写 |
 | `UsageSection` | `settings/usage-section.tsx` | 用量概览 — `GET /api/usage/summary`，失败显示「暂无数据」 |
 
 富文本编辑器仍未创建。同人文/创作可视化不在本目录。

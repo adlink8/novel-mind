@@ -901,13 +901,6 @@ export const aiModelsApi = {
 
 // ==================== 用户设置 API ====================
 
-/** 智能路由策略偏好 */
-export type RoutingPreference = "quality" | "balanced" | "budget";
-
-export interface RoutingPreferenceResponse {
-  preference: RoutingPreference;
-}
-
 export interface AIBudgetLimits {
   max_calls: number;
   max_input_tokens: number;
@@ -918,16 +911,12 @@ export interface AIBudgetLimits {
 export interface AIBudgetResponse {
   conversation: AIBudgetLimits;
   novel: AIBudgetLimits;
-  arc_window_size: number;
   scope: "defaults" | "novel" | "conversation";
   novel_id: number | null;
   conversation_id: number | null;
 }
 
 export const settingsApi = {
-  getRouting: () => api.get<RoutingPreferenceResponse>("/settings/routing"),
-  putRouting: (preference: RoutingPreference) =>
-    api.put<RoutingPreferenceResponse>("/settings/routing", { preference }),
   getAIBudget: (params?: { novel_id?: number; conversation_id?: number }) =>
     api.get<AIBudgetResponse>("/settings/ai-budget", { params }),
   putAIBudget: (data: {
@@ -935,7 +924,6 @@ export const settingsApi = {
     conversation_id?: number;
     conversation?: AIBudgetLimits;
     novel?: AIBudgetLimits;
-    arc_window_size?: number;
   }) => api.put<AIBudgetResponse>("/settings/ai-budget", data),
 };
 

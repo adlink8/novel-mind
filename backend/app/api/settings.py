@@ -1,13 +1,7 @@
 """
 设置中心 API 路由
 
-端点列表:
-  GET /api/settings/routing - 获取 AI 路由全局偏好
-  PUT /api/settings/routing - 更新 AI 路由全局偏好（同步更新内存中的 ai_router）
-
-说明:
-  - 偏好持久化在 app_settings 键值表（key = routing_preference）
-  - 应用启动时从库中读取并恢复（见 app/main.py lifespan）
+设置中心 API：预算读写。
 """
 
 from decimal import Decimal
@@ -24,39 +18,14 @@ from app.schemas.settings import (
     AIBudgetLimits,
     AIBudgetResponse,
     AIBudgetUpdate,
-    RoutingPreferenceResponse,
-    RoutingPreferenceUpdate,
 )
-from app.services.ai_router import ai_router
 from app.services.settings_service import (
     budget_policy_payload,
-    get_arc_window_size,
     get_reader_budget_defaults,
-    get_routing_preference,
-    set_arc_window_size,
     set_reader_budget_defaults,
-    set_routing_preference,
 )
 
 router = APIRouter(dependencies=[Depends(require_user)])
-
-
-@router.get("/routing", response_model=RoutingPreferenceResponse)
-async def get_routing(db: AsyncSession = Depends(get_db)):
-    """获取当前 AI 路由全局偏好（未设置时返回默认 "balanced"）"""
-    preference = await get_routing_preference(db)
-    return RoutingPreferenceResponse(preference=preference)
-
-
-@router.put("/routing", response_model=RoutingPreferenceResponse)
-async def update_routing(
-    data: RoutingPreferenceUpdate,
-    db: AsyncSession = Depends(get_db),
-):
-    """更新 AI 路由全局偏好（落库 + 同步内存中的路由器单例）"""
-    preference = await set_routing_preference(db, data.preference)
-    ai_router.update_preference(preference)
-    return RoutingPreferenceResponse(preference=preference)
 
 
 async def _owned_novel(
@@ -135,9 +104,6 @@ async def get_ai_budget(
     return AIBudgetResponse(
         conversation=conversation_limits,
         novel=novel_limits,
-        arc_window_size=await get_arc_window_size(
-            db, current_user.id, selected_novel_id
-        ),
         scope=scope,
         novel_id=selected_novel_id,
         conversation_id=conversation_id,
@@ -194,8 +160,6 @@ async def update_ai_budget(
             ledger.max_input_tokens = int(policy["max_input_tokens"])
             ledger.max_output_tokens = int(policy["max_output_tokens"])
             ledger.max_cost_usd = policy["max_cost_usd"]
-        if data.arc_window_size is not None:
-            await set_arc_window_size(db, current_user.id, data.arc_window_size)
     elif data.conversation_id is not None:
         conversation = await db.scalar(
             select(ReaderConversation).where(ReaderConversation.id == data.conversation_id)
@@ -258,10 +222,6 @@ async def update_ai_budget(
                 ledger.max_input_tokens = policy.max_input_tokens
                 ledger.max_output_tokens = policy.max_output_tokens
                 ledger.max_cost_usd = policy.max_cost_usd
-        if data.arc_window_size is not None:
-            await set_arc_window_size(
-                db, current_user.id, data.arc_window_size, novel_id=novel.id
-            )
 
     await db.flush()
     return await get_ai_budget(

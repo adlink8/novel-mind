@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 /**
  * 设置中心章节包装 — 章回体小节标题（朱砂章节字 + 衬线标题）。
- * 各设置区块（账户/路由/模型/用量）共用的节骨架。
+ * 各设置区块共用的节骨架。
  */
 export function SettingsSection({
   chapter,

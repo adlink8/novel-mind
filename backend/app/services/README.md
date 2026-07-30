@@ -12,8 +12,8 @@
 | `vector_store.py` | 9.1 KB | ChromaDB 向量存储封装 — 文档写入、语义搜索、集合删除 |
 | `indexing_service.py` | 11.6 KB | 索引管线 — 协调分块 + embedding 生成 + 向量存储写入，进度报告 |
 | `ai_service.py` | 4.9 KB | LiteLLM 统一封装 — chat / embedding / stream_chat，多提供商统一接口；调用后写 ai_usage_logs 用量日志（失败不影响主调用） |
-| `ai_router.py` | 8.0 KB | AI 智能路由器 — 按任务类型和路由层级选择最优模型；全局偏好由 settings API 持久化、启动时恢复 |
-| `settings_service.py` | — | app_settings 键值表读写（当前：routing_preference） |
+| `ai_router.py` | 8.0 KB | AI 任务路由器 — 按任务类型和路由层级选择最优模型 |
+| `settings_service.py` | — | app_settings 键值表读写（当前：阅读器 AI 预算默认值） |
 | `hybrid_search.py` | — | PostgreSQL tsvector + Chroma 向量结果融合，返回章节/chunk/evidence |
 | `eval_service.py` | — | bm25/baseline_vector/hybrid_search 评测，Recall/Precision/MRR/NDCG 与错误案例 |
 | `analysis_service.py` | — | 通用剧情/人物/主题等分析读写与 hierarchy 状态 |

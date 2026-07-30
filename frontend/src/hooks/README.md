@@ -7,7 +7,7 @@ React 自定义 Hook，封装数据获取和副作用逻辑，供页面组件使
 | Hook | 文件 | 职责 |
 |---|---|---|
 | `useNovels` | `use-novels.ts` (2.6KB) | 小说数据获取 — 列表加载、刷新、分页 |
-| `useAiModels` | `use-ai-models.ts` (2.1KB) | AI 模型数据获取 — 配置列表、CRUD、测试连接、路由偏好读写 |
+| `useAiModels` | `use-ai-models.ts` (2.1KB) | AI 模型数据获取 — 配置列表、CRUD、测试连接 |
 
 ## 使用示例
 

@@ -363,12 +363,10 @@ async def test_novel_full_lifecycle(auth_client: AsyncClient):
                 "max_output_tokens": 1000000,
                 "max_cost_usd": 60,
             },
-            "arc_window_size": 2,
         },
     )
     assert novel_budget_resp.status_code == 200
     assert novel_budget_resp.json()["novel"]["max_calls"] == 600
-    assert novel_budget_resp.json()["arc_window_size"] == 2
 
     conversation_resp = await auth_client.post(
         f"/api/novels/{novel_id}/conversations", json={"title": "预算测试"}

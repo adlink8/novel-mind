@@ -1,8 +1,8 @@
 """
-AI 智能路由器 - 根据任务类型与层级自动选择最优模型
+AI 任务路由器 - 根据任务类型与层级自动选择最优模型
 
-路由策略:
-  用户设置全局偏好（quality / balanced / budget）后，路由器会:
+任务路由策略:
+  路由器会:
   1. 根据任务类型查表确定目标层级（如 deep_analysis → quality）
   2. 从目标层级的模型池中选取第一个可用模型
   3. 若目标层级无可用模型，自动降级到其他层级
@@ -44,7 +44,7 @@ class ModelTier:
 
 @dataclass
 class RoutingConfig:
-    """路由偏好配置：三个层级的模型池"""
+    """三个层级的模型池配置"""
 
     quality_models: List[ModelTier] = field(default_factory=list)  # 质量优先模型池
     balanced_models: List[ModelTier] = field(default_factory=list)  # 均衡模型池
@@ -110,20 +110,14 @@ _TASK_TIER_MAP: Dict[str, str] = {
 
 class AIRouter:
     """
-    AI 智能路由器。
+    AI 任务路由器。
 
-    根据任务类型和用户偏好，从模型池中选择最优模型。
+    根据任务类型，从模型池中选择最优模型。
     支持降级机制：目标层级无可用模型时自动切换到其他层级。
     """
 
-    def __init__(self, routing_preference: str = "balanced"):
-        """
-        初始化路由器。
-
-        Args:
-            routing_preference: 全局偏好 - "quality" / "balanced" / "budget"
-        """
-        self.routing_preference = routing_preference
+    def __init__(self):
+        """初始化固定任务路由器。未知任务默认走 balanced。"""
         self.config = _DEFAULT_ROUTING
         self._available_models: Dict[str, ModelTier] = {}  # 运行时可用模型缓存
         self._load_defaults()
@@ -163,7 +157,7 @@ class AIRouter:
         if override_tier:
             tier = override_tier
         else:
-            tier = _TASK_TIER_MAP.get(task_type, self.routing_preference)
+            tier = _TASK_TIER_MAP.get(task_type, "balanced")
 
         # 从目标层级中选取第一个可用模型
         tier_models = self._get_tier_models(tier)
@@ -213,16 +207,5 @@ class AIRouter:
             "budget": self.config.budget_models,
         }
 
-    def update_preference(self, preference: str):
-        """更新全局路由偏好"""
-        if preference in ("quality", "balanced", "budget"):
-            self.routing_preference = preference
-            logger.info(f"[AIRouter] 全局偏好已更新: {preference}")
-        else:
-            raise ValueError(
-                f"无效的偏好值: {preference}，可选: quality / balanced / budget"
-            )
-
-
-# 全局单例（默认 balanced 偏好）
-ai_router = AIRouter(routing_preference="balanced")
+# 全局单例；任务类型映射固定，未知任务默认 balanced。
+ai_router = AIRouter()

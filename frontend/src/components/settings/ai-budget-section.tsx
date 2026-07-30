@@ -88,7 +88,6 @@ export function AIBudgetSection({ chapter }: { chapter: string }) {
   const [conversationLimits, setConversationLimits] =
     useState<AIBudgetLimits>(EMPTY_LIMITS);
   const [novelLimits, setNovelLimits] = useState<AIBudgetLimits>(EMPTY_LIMITS);
-  const [arcWindowSize, setArcWindowSize] = useState(3);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -157,7 +156,6 @@ export function AIBudgetSection({ chapter }: { chapter: string }) {
         setConfig(next);
         setConversationLimits(cloneLimits(next.conversation));
         setNovelLimits(cloneLimits(next.novel));
-        setArcWindowSize(next.arc_window_size);
         setMessage(null);
       })
       .catch(() => {
@@ -182,13 +180,11 @@ export function AIBudgetSection({ chapter }: { chapter: string }) {
           ? {
               conversation: conversationLimits,
               novel: novelLimits,
-              arc_window_size: arcWindowSize,
             }
           : scope === "novel"
-            ? {
+              ? {
                 novel_id: novelId ?? undefined,
                 novel: novelLimits,
-                arc_window_size: arcWindowSize,
               }
             : {
                 conversation_id: conversationId ?? undefined,
@@ -199,7 +195,6 @@ export function AIBudgetSection({ chapter }: { chapter: string }) {
       setConfig(next);
       setConversationLimits(cloneLimits(next.conversation));
       setNovelLimits(cloneLimits(next.novel));
-      setArcWindowSize(next.arc_window_size);
       setMessage("已保存，新的 AI 调用会立即使用此上限");
     } catch {
       setMessage("保存 AI 预算失败，请检查输入值");
@@ -296,24 +291,6 @@ export function AIBudgetSection({ chapter }: { chapter: string }) {
             onChange={setNovelLimits}
           />
         </div>
-
-        <label className="grid max-w-sm gap-1.5 text-sm">
-          <span className="text-muted-foreground">
-            叙事记忆聚合窗口（章）
-          </span>
-          <input
-            type="number"
-            min="1"
-            max="5"
-            value={arcWindowSize}
-            disabled={scope === "conversation" || loading || saving}
-            onChange={(event) => setArcWindowSize(Number(event.target.value) || 0)}
-            className="h-9 rounded-lg border border-border bg-background px-3 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
-          />
-          <span className="text-xs leading-5 text-muted-foreground">
-            可设 1–5 章；默认 3。短篇建议 1–2，长篇建议 3–5。
-          </span>
-        </label>
 
         <div className="flex items-center gap-3">
           <button
