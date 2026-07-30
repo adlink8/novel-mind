@@ -120,6 +120,63 @@ async def test_structured_call_disables_hidden_retry_stream_and_remote_thread():
 
 
 @pytest.mark.asyncio
+async def test_tool_call_is_executed_before_structured_answer():
+    transport = FakeTransport(
+        [
+            {
+                "content": "",
+                "tool_calls": [
+                    {
+                        "id": "call-1",
+                        "type": "function",
+                        "function": {
+                            "name": "search_novel_text",
+                            "arguments": {"query": "第十章伏笔", "top_k": 3},
+                        },
+                    }
+                ],
+                "usage": {"input_tokens": 20, "output_tokens": 5},
+            },
+            {
+                "content": _valid_answer(),
+                "usage": {"input_tokens": 40, "output_tokens": 8},
+            },
+        ]
+    )
+    tool_calls: list[tuple[str, dict]] = []
+
+    async def execute(name: str, arguments: dict) -> dict:
+        tool_calls.append((name, arguments))
+        return {"results": [{"chapter_number": 10, "text": "原文段落"}]}
+
+    result = await ReaderChatGateway(transport).generate(
+        deployment=deployment(),
+        messages=[{"role": "user", "content": "问伏笔"}],
+        allowed_evidence_ids=ALLOWED,
+        budget=budget(),
+        job_id=10,
+        max_input_tokens=100,
+        max_output_tokens=50,
+        tools=[{"type": "function", "function": {"name": "search_novel_text"}}],
+        tool_executor=execute,
+    )
+
+    assert result.output.answer_blocks[0].block_id == "b1"
+    assert tool_calls == [("search_novel_text", {"query": "第十章伏笔", "top_k": 3})]
+    assert [attempt.status for attempt in result.attempts] == [
+        "tool_call",
+        "succeeded",
+    ]
+    assert "tools" in transport.calls[0]
+    assert "response_format" not in transport.calls[0]
+    # Keep tools available for a second search; the model may decide that one
+    # passage is insufficient. Structured validation still gates the response.
+    assert "tools" in transport.calls[1]
+    assert transport.calls[1]["messages"][-2]["role"] == "assistant"
+    assert transport.calls[1]["messages"][-1]["role"] == "tool"
+
+
+@pytest.mark.asyncio
 async def test_capability_failure_pauses_before_network_or_budget():
     transport = FakeTransport([{"content": _valid_answer()}])
     gate = budget()

@@ -37,6 +37,8 @@ SOURCE_PRIORITY: dict[str, int] = {
 DEFAULT_MAX_EVIDENCE = 24
 DEFAULT_MAX_EXCERPT_CODE_POINTS = 700
 DEFAULT_MAX_PER_SOURCE = 8
+TIMELINE_SUMMARY_WINDOW = 5
+MAX_TIMELINE_SUMMARY_ITEMS = 16
 
 
 class SourceStatus(StrEnum):
@@ -159,6 +161,7 @@ class RetrievalResult:
     hierarchy_build_id: str
     hierarchy_checksum: str
     analysis_version_id: int | None
+    timeline_summary: list[dict[str, Any]] = field(default_factory=list)
 
 
 def bound_excerpt(
@@ -303,6 +306,7 @@ async def fetch_timeline_evidence(
     full_book: bool,
     chapters_by_id: dict[int, Chapter],
     max_items: int = DEFAULT_MAX_PER_SOURCE,
+    focus_chapter_number: int | None = None,
 ) -> tuple[list[RetrievedEvidence], int, str]:
     if version_id is None:
         return [], 0, SourceStatus.ABSENT
@@ -377,7 +381,15 @@ async def fetch_timeline_evidence(
                 )
             )
 
-    candidates.sort(key=lambda item: item.rank_key)
+    if focus_chapter_number is None:
+        candidates.sort(key=lambda item: item.rank_key)
+    else:
+        candidates.sort(
+            key=lambda item: (
+                abs(item.chapter_number - focus_chapter_number),
+                item.rank_key,
+            )
+        )
     omitted = max(0, len(candidates) - max_items)
     return candidates[:max_items], omitted, SourceStatus.OK
 
@@ -621,9 +633,17 @@ async def retrieve_visible_evidence(
     )
     chapters_by_id = {c.id: c for c in chapters}
     chapters_by_number = {c.chapter_number: c for c in chapters}
+    current_chapter_number = next(
+        (
+            chapter.chapter_number
+            for chapter in chapters
+            if chapter.id == selection_chapter_id
+        ),
+        None,
+    )
 
     (
-        timeline_items,
+        timeline_candidates,
         omitted["timeline"],
         source_status["timeline"],
     ) = await fetch_timeline_evidence(
@@ -634,8 +654,46 @@ async def retrieve_visible_evidence(
         cutoff_chapter=cutoff_chapter,
         full_book=full_book,
         chapters_by_id=chapters_by_id,
-        max_items=max_per_source,
+        # Keep the evidence manifest bounded, while retaining enough nearby
+        # events to build the non-citation timeline orientation below.
+        max_items=max(max_per_source, 48),
+        focus_chapter_number=current_chapter_number,
     )
+    timeline_items = timeline_candidates[:max_per_source]
+    omitted["timeline"] += max(0, len(timeline_candidates) - len(timeline_items))
+
+    nearby_timeline = [
+        item
+        for item in timeline_candidates
+        if current_chapter_number is None
+        or abs(item.chapter_number - current_chapter_number)
+        <= TIMELINE_SUMMARY_WINDOW
+    ]
+    if not nearby_timeline:
+        nearby_timeline = sorted(
+            timeline_candidates,
+            key=lambda item: (
+                abs(item.chapter_number - current_chapter_number)
+                if current_chapter_number is not None
+                else 0,
+                item.rank_key,
+            ),
+        )
+    timeline_summary: list[dict[str, Any]] = []
+    seen_summary: set[tuple[int, str]] = set()
+    for item in nearby_timeline:
+        summary_key = (item.chapter_number, item.excerpt)
+        if summary_key in seen_summary:
+            continue
+        seen_summary.add(summary_key)
+        timeline_summary.append(
+            {
+                "chapter_number": item.chapter_number,
+                "summary": item.excerpt,
+            }
+        )
+        if len(timeline_summary) >= MAX_TIMELINE_SUMMARY_ITEMS:
+            break
 
     # Knowledge units are optional; absence is explicit and never invented.
     source_status["knowledge"] = SourceStatus.ABSENT
@@ -679,4 +737,5 @@ async def retrieve_visible_evidence(
         hierarchy_build_id=hierarchy_build_id,
         hierarchy_checksum=hierarchy_checksum,
         analysis_version_id=version_id,
+        timeline_summary=timeline_summary,
     )

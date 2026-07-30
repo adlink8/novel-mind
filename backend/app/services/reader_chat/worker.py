@@ -3,7 +3,7 @@
 Authority boundaries:
 - Reads frozen context manifests only (never rebuilds on retry).
 - Writes only reader_* chat tables (messages, citations, jobs, attempts, budgets).
-- No timeline / relationship / clue domain mutation imports or tool calls.
+- Reader-chat tools are read-only and stay inside the frozen owner/novel visibility boundary.
 """
 
 from __future__ import annotations
@@ -49,6 +49,10 @@ from app.services.reader_chat.gateway import (
     business_validate_answer,
     canonical_hash,
 )
+from app.services.reader_chat.tools import (
+    READER_CHAT_TOOLS,
+    search_novel_text,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +65,7 @@ PROMPT_PATH = (
 SCHEMA_VERSION = "reader-answer.v1"
 MAX_INPUT_TOKENS = 8_000
 MAX_OUTPUT_TOKENS = 2_000
+MAX_TOOL_ROUNDS = 3
 LEASE_MINUTES = 5
 DECODING = {"temperature": 0.1, "max_tokens": MAX_OUTPUT_TOKENS}
 
@@ -95,6 +100,8 @@ class _LiteLLMTransport:
         messages = list(kwargs.get("messages") or [])
         timeout = float(kwargs.get("timeout") or 60)
         max_tokens = int(kwargs.get("max_tokens") or MAX_OUTPUT_TOKENS)
+        tools = kwargs.get("tools")
+        response_format = kwargs.get("response_format")
         # Explicit: no remote conversation/thread id, no retries, no stream.
         # Do not pass provider-specific kwargs (timeout/thread ids); keep one frozen call surface.
         _ = timeout
@@ -104,6 +111,8 @@ class _LiteLLMTransport:
             temperature=float(DECODING["temperature"]),
             max_tokens=max_tokens,
             stream=False,
+            tools=tools,
+            response_format=response_format,
         )
         usage_obj = getattr(response, "usage", None)
         if isinstance(response, dict):
@@ -131,14 +140,44 @@ class _LiteLLMTransport:
                 "total_tokens": int(getattr(usage_obj, "total_tokens", 0) or 0),
             }
         content = ""
+        tool_calls: list[dict[str, Any]] = []
+        message: Any = None
         if hasattr(response, "choices") and response.choices:
-            content = response.choices[0].message.content or ""
+            message = response.choices[0].message
+            content = getattr(message, "content", None) or ""
+            raw_tool_calls = getattr(message, "tool_calls", None) or []
+            for index, call in enumerate(raw_tool_calls):
+                function = getattr(call, "function", None)
+                name = getattr(function, "name", None) or getattr(call, "name", None)
+                arguments = getattr(function, "arguments", None) or getattr(
+                    call, "arguments", {}
+                )
+                if isinstance(arguments, str):
+                    try:
+                        arguments = json.loads(arguments)
+                    except json.JSONDecodeError:
+                        arguments = {}
+                if name:
+                    tool_calls.append(
+                        {
+                            "id": str(
+                                getattr(call, "id", None) or f"tool-call-{index}"
+                            ),
+                            "type": "function",
+                            "function": {
+                                "name": str(name),
+                                "arguments": arguments,
+                            },
+                        }
+                    )
         elif isinstance(response, dict):
             content = str(response.get("content") or "")
+            tool_calls = list(response.get("tool_calls") or [])
         return {
             "id": getattr(response, "id", None),
             "content": content,
             "usage": usage,
+            "tool_calls": tool_calls,
         }
 
 
@@ -349,6 +388,31 @@ async def run_reader_chat_worker(
             conversation_policy=runtime.conversation_policy,
             novel_policy=runtime.novel_policy,
         )
+
+        async def execute_reader_tool(
+            name: str, arguments: dict[str, Any]
+        ) -> dict[str, Any]:
+            if name != "search_novel_text":
+                return {"results": [], "error": "unknown_tool"}
+            async with runtime.sessions() as search_session:
+                return await search_novel_text(
+                    search_session,
+                    owner_id=int(context["owner_id"]),
+                    novel_id=int(context["novel_id"]),
+                    cutoff_chapter_number=int(
+                        context["prompt_inputs"].get(
+                            "cutoff_chapter_number", context.get("cutoff_chapter_number", 1)
+                        )
+                    ),
+                    full_book=bool(
+                        context["prompt_inputs"].get(
+                            "full_book", context.get("full_book", False)
+                        )
+                    ),
+                    query=arguments.get("query"),
+                    top_k=arguments.get("top_k", 5),
+                )
+
         try:
             result = await runtime.gateway.generate(
                 deployment=runtime.deployment,
@@ -359,6 +423,9 @@ async def run_reader_chat_worker(
                 max_input_tokens=runtime.max_input_tokens,
                 max_output_tokens=runtime.max_output_tokens,
                 cache_key=f"reader_chat:{job_id}:{prompt_hash[:16]}",
+                tools=READER_CHAT_TOOLS,
+                tool_executor=execute_reader_tool,
+                max_tool_rounds=MAX_TOOL_ROUNDS,
             )
         except UnknownPricing as exc:
             await _finish_job(
@@ -578,17 +645,23 @@ async def _load_frozen_context(
             "evidence_key_to_ref_id": {r.evidence_key: r.id for r in refs},
             "dialogue": dialogue,
             "prompt_inputs": prompt_inputs,
+            "cutoff_chapter_number": int(manifest.cutoff_chapter_number),
+            "full_book": bool(manifest.full_book),
         }
 
 
 def _build_messages(
     runtime: ReaderChatWorkerRuntime, context: dict[str, Any]
-) -> tuple[list[dict[str, str]], str, str, str, str]:
+) -> tuple[list[dict[str, Any]], str, str, str, str]:
     evidence_payload = list(context["evidence"])
+    prompt_inputs = dict(context.get("prompt_inputs") or {})
     user_payload = {
         "question": context["user_body"],
         "allowed_evidence_ids": context["allowed_evidence_ids"],
         "evidence": evidence_payload,
+        "timeline_summary_not_evidence": list(
+            prompt_inputs.get("timeline_summary") or []
+        ),
         "conversational_framing_not_evidence": context["dialogue"],
         "schema_version": SCHEMA_VERSION,
     }

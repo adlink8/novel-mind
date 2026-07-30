@@ -7,7 +7,7 @@ import json
 import time
 from dataclasses import dataclass, field
 from decimal import Decimal
-from typing import Any, Callable, Protocol
+from typing import Any, Awaitable, Callable, Protocol
 
 from pydantic import ValidationError
 
@@ -131,6 +131,46 @@ def _response_content(response: Any) -> str:
     return text
 
 
+def _response_tool_calls(response: Any) -> list[dict[str, Any]]:
+    raw_calls = (
+        response.get("tool_calls", [])
+        if isinstance(response, dict)
+        else getattr(response, "tool_calls", [])
+    ) or []
+    normalized: list[dict[str, Any]] = []
+    for index, call in enumerate(raw_calls):
+        if isinstance(call, dict):
+            function = call.get("function") or {}
+            name = function.get("name") or call.get("name")
+            arguments = function.get("arguments", call.get("arguments", {}))
+            call_id = call.get("id") or f"tool-call-{index}"
+        else:
+            function = getattr(call, "function", None)
+            name = getattr(function, "name", None) or getattr(call, "name", None)
+            arguments = getattr(function, "arguments", None) or getattr(
+                call, "arguments", {}
+            )
+            call_id = getattr(call, "id", None) or f"tool-call-{index}"
+        if not name:
+            continue
+        if isinstance(arguments, str):
+            try:
+                arguments = json.loads(arguments)
+            except json.JSONDecodeError:
+                arguments = {}
+        normalized.append(
+            {
+                "id": str(call_id),
+                "type": "function",
+                "function": {
+                    "name": str(name),
+                    "arguments": arguments if isinstance(arguments, dict) else {},
+                },
+            }
+        )
+    return normalized
+
+
 def _response_usage(response: Any) -> dict[str, int]:
     raw = (
         response.get("usage", {})
@@ -205,7 +245,7 @@ class ReaderChatGateway:
         self,
         *,
         deployment: ModelDeployment,
-        messages: list[dict[str, str]],
+        messages: list[dict[str, Any]],
         allowed_evidence_ids: set[str],
         budget: DualBudgetGate,
         job_id: int,
@@ -214,6 +254,10 @@ class ReaderChatGateway:
         timeout: float = 60,
         cache_key: str | None = None,
         business_validator: Callable[[ReaderAnswerEnvelope], None] | None = None,
+        tools: list[dict[str, Any]] | None = None,
+        tool_executor: Callable[[str, dict[str, Any]], Awaitable[dict[str, Any]]]
+        | None = None,
+        max_tool_rounds: int = 3,
     ) -> GatewayResult:
         if not deployment.supports_structured_output:
             raise DependencyPaused(
@@ -222,21 +266,28 @@ class ReaderChatGateway:
 
         attempts: list[GatewayAttempt] = []
         current_messages = list(messages)
+        bounded_tool_rounds = max(0, min(6, int(max_tool_rounds)))
 
-        for repair_index in (1, 2):
-            reservation_key = f"job:{job_id}:repair:{repair_index}"
+        async def invoke(
+            call_messages: list[dict[str, Any]],
+            *,
+            repair_index: int,
+            call_index: int,
+            enable_tools: bool,
+        ) -> dict[str, Any]:
+            reservation_key = f"job:{job_id}:repair:{repair_index}:call:{call_index}"
             request_hash = canonical_hash(
                 {
                     "deployment": deployment.lineage,
-                    "messages": current_messages,
+                    "messages": call_messages,
                     "schema": ReaderAnswerEnvelope.model_json_schema(),
                     "timeout": timeout,
                     "allowed_evidence_ids": sorted(allowed_evidence_ids),
+                    "tools": tools if enable_tools else None,
                 }
             )
             persistent: PersistentDualAttempt | None = None
             durable_attempt_number = repair_index
-
             if self.persistence is not None:
                 persistent = await self.persistence.reserve_and_start(
                     job_id=job_id,
@@ -259,17 +310,22 @@ class ReaderChatGateway:
                     output_price_per_million=deployment.output_price_per_million,
                 )
 
+            request: dict[str, Any] = {
+                "model": deployment.resolved_name,
+                "messages": call_messages,
+                "timeout": timeout,
+                "num_retries": 0,
+                "stream": False,
+                "max_tokens": max_output_tokens,
+            }
+            if enable_tools and tools and tool_executor is not None:
+                request["tools"] = tools
+            else:
+                request["response_format"] = ReaderAnswerEnvelope
+
             started = time.perf_counter()
             try:
-                response = await self.transport.complete(
-                    model=deployment.resolved_name,
-                    messages=current_messages,
-                    response_format=ReaderAnswerEnvelope,
-                    timeout=timeout,
-                    num_retries=0,
-                    stream=False,
-                    max_tokens=max_output_tokens,
-                )
+                response = await self.transport.complete(**request)
             except Exception as exc:
                 latency_ms = int((time.perf_counter() - started) * 1000)
                 if persistent is not None:
@@ -292,8 +348,7 @@ class ReaderChatGateway:
                 )
                 detail = f"{type(exc).__name__}: {str(exc)[:180]}".replace("\n", " ")
                 raise ModelCallFailed(
-                    f"provider call outcome is unknown ({detail})",
-                    attempts,
+                    f"provider call outcome is unknown ({detail})", attempts
                 ) from exc
 
             usage = _response_usage(response)
@@ -303,103 +358,158 @@ class ReaderChatGateway:
                 Decimal(usage["input_tokens"]) * in_price
                 + Decimal(usage["output_tokens"]) * out_price
             ) / Decimal(1_000_000)
-            response_hash = canonical_hash(response)
-            latency_ms = int((time.perf_counter() - started) * 1000)
+            return {
+                "response": response,
+                "usage": usage,
+                "actual_cost": actual_cost,
+                "response_hash": canonical_hash(response),
+                "latency_ms": int((time.perf_counter() - started) * 1000),
+                "persistent": persistent,
+                "reservation_key": reservation_key,
+                "request_hash": request_hash,
+                "attempt_number": durable_attempt_number,
+            }
 
-            try:
-                content = _response_content(response)
-                output = ReaderAnswerEnvelope.model_validate_json(content, strict=True)
-                business_validate_answer(
-                    output, allowed_evidence_ids=allowed_evidence_ids
-                )
-                if business_validator is not None:
-                    business_validator(output)
-            except (ValidationError, ValueError) as exc:
-                if persistent is not None:
-                    await self.persistence.complete_attempt(
-                        persistent,
-                        status="failed",
-                        response_hash=response_hash,
-                        provider_request_id=_response_request_id(response),
-                        usage=usage,
-                        cost_usd=actual_cost,
-                        latency_ms=latency_ms,
-                        error_code=type(exc).__name__,
-                    )
-                else:
-                    budget.settle(
-                        reservation_key,
-                        actual_input_tokens=usage["input_tokens"],
-                        actual_output_tokens=usage["output_tokens"],
-                        actual_cost_usd=actual_cost,
-                    )
-                attempts.append(
-                    GatewayAttempt(
-                        durable_attempt_number,
-                        "failed",
-                        reservation_key,
-                        request_hash,
-                        response_hash,
-                        usage,
-                        actual_cost,
-                        type(exc).__name__,
-                        latency_ms,
-                    )
-                )
-                if repair_index == 2:
-                    detail = str(exc)[:240].replace("\n", " ")
-                    raise StructuredOutputRejected(
-                        f"structured output failed local validation ({detail})",
-                        attempts,
-                    ) from exc
-                err_hint = str(exc)[:500].replace("\n", " ")
-                current_messages = current_messages + [
-                    {
-                        "role": "user",
-                        "content": (
-                            "Local validation error. Return one corrected JSON object "
-                            "matching reader-answer.v1; cite only allowed_evidence_ids; "
-                            "do not add fields. Error: "
-                            f"{err_hint}"
-                        ),
-                    }
-                ]
-                continue
-
-            envelope_dict = output.model_dump(mode="json")
+        async def settle(
+            state: dict[str, Any],
+            *,
+            status: str,
+            error_code: str | None,
+            envelope: dict[str, Any] | None = None,
+        ) -> None:
+            persistent = state["persistent"]
+            persisted_status = "succeeded" if status == "tool_call" else status
             if persistent is not None:
                 await self.persistence.complete_attempt(
                     persistent,
-                    status="succeeded",
-                    response_hash=response_hash,
-                    provider_request_id=_response_request_id(response),
-                    usage=usage,
-                    cost_usd=actual_cost,
-                    latency_ms=latency_ms,
-                    error_code=None,
-                    envelope=envelope_dict,
+                    status=persisted_status,
+                    response_hash=state["response_hash"],
+                    provider_request_id=_response_request_id(state["response"]),
+                    usage=state["usage"],
+                    cost_usd=state["actual_cost"],
+                    latency_ms=state["latency_ms"],
+                    error_code=error_code,
+                    envelope=envelope,
                 )
             else:
                 budget.settle(
-                    reservation_key,
-                    actual_input_tokens=usage["input_tokens"],
-                    actual_output_tokens=usage["output_tokens"],
-                    actual_cost_usd=actual_cost,
+                    state["reservation_key"],
+                    actual_input_tokens=state["usage"]["input_tokens"],
+                    actual_output_tokens=state["usage"]["output_tokens"],
+                    actual_cost_usd=state["actual_cost"],
                 )
             attempts.append(
                 GatewayAttempt(
-                    durable_attempt_number,
-                    "succeeded",
-                    reservation_key,
-                    request_hash,
-                    response_hash,
-                    usage,
-                    actual_cost,
-                    latency_ms=latency_ms,
-                    envelope=envelope_dict,
+                    state["attempt_number"],
+                    status,
+                    state["reservation_key"],
+                    state["request_hash"],
+                    state["response_hash"],
+                    state["usage"],
+                    state["actual_cost"],
+                    error_code,
+                    state["latency_ms"],
+                    envelope,
                 )
             )
-            return GatewayResult(output, attempts, deployment, response_hash)
+
+        for repair_index in (1, 2):
+            working_messages = list(current_messages)
+            tool_round = 0
+            call_index = 0
+            while True:
+                enable_tools = bool(
+                    tools and tool_executor is not None and tool_round < bounded_tool_rounds
+                )
+                state = await invoke(
+                    working_messages,
+                    repair_index=repair_index,
+                    call_index=call_index,
+                    enable_tools=enable_tools,
+                )
+                call_index += 1
+                response = state["response"]
+                tool_calls = _response_tool_calls(response)
+                if tool_calls and tool_executor is not None and enable_tools:
+                    tool_round += 1
+                    assistant_call_message = {
+                        "role": "assistant",
+                        "content": _response_content(response)
+                        if (isinstance(response, dict) and response.get("content"))
+                        else "",
+                        "tool_calls": tool_calls,
+                    }
+                    working_messages.append(assistant_call_message)
+                    for call in tool_calls:
+                        function = call["function"]
+                        try:
+                            tool_result = await tool_executor(
+                                function["name"], function["arguments"]
+                            )
+                        except Exception:
+                            tool_result = {"results": [], "error": "tool_failed"}
+                        if not isinstance(tool_result, dict):
+                            tool_result = {"result": tool_result}
+                        working_messages.append(
+                            {
+                                "role": "tool",
+                                "tool_call_id": call["id"],
+                                "name": function["name"],
+                                "content": json.dumps(
+                                    tool_result, ensure_ascii=False, sort_keys=True
+                                ),
+                            }
+                        )
+                    await settle(state, status="tool_call", error_code=None)
+                    continue
+
+                try:
+                    content = _response_content(response)
+                    output = ReaderAnswerEnvelope.model_validate_json(
+                        content, strict=True
+                    )
+                    business_validate_answer(
+                        output, allowed_evidence_ids=allowed_evidence_ids
+                    )
+                    if business_validator is not None:
+                        business_validator(output)
+                except (ValidationError, ValueError) as exc:
+                    await settle(
+                        state, status="failed", error_code=type(exc).__name__
+                    )
+                    if repair_index == 2:
+                        detail = str(exc)[:240].replace("\n", " ")
+                        raise StructuredOutputRejected(
+                            f"structured output failed local validation ({detail})",
+                            attempts,
+                        ) from exc
+                    err_hint = str(exc)[:500].replace("\n", " ")
+                    current_messages = working_messages + [
+                        {
+                            "role": "user",
+                            "content": (
+                                "Local validation error. Return one corrected JSON object "
+                                "matching reader-answer.v1; cite only allowed_evidence_ids; "
+                                "do not add fields. Error: "
+                                f"{err_hint}"
+                            ),
+                        }
+                    ]
+                    break
+
+                envelope_dict = output.model_dump(mode="json")
+                await settle(
+                    state,
+                    status="succeeded",
+                    error_code=None,
+                    envelope=envelope_dict,
+                )
+                return GatewayResult(
+                    output,
+                    attempts,
+                    deployment,
+                    state["response_hash"],
+                )
 
         raise StructuredOutputRejected(
             "structured output failed after primary and repair attempts",

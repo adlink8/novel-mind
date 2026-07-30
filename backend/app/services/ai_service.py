@@ -168,6 +168,9 @@ class AIService:
 
         Returns:
             类 OpenAI/LiteLLM 响应：response.choices[0].message.content
+
+        ``tools`` and ``response_format`` are passed through for callers that
+        need an agentic, still-structured interaction such as reader chat.
         """
         _sync_provider_env_keys()
         model = model or self.default_model
@@ -178,11 +181,19 @@ class AIService:
         start = time.perf_counter()
         try:
             if is_vertex_model(model) and not stream:
+                response_format = _extra.get("response_format")
+                response_json_schema = None
+                if hasattr(response_format, "model_json_schema"):
+                    response_json_schema = response_format.model_json_schema()
+                elif isinstance(response_format, dict):
+                    response_json_schema = response_format
                 response = await vertex_acomplete(
                     messages,
                     model=model,
                     temperature=temperature,
                     max_tokens=max_tokens,
+                    tools=_extra.get("tools"),
+                    response_json_schema=response_json_schema,
                 )
             else:
                 kwargs: dict = {
@@ -197,6 +208,9 @@ class AIService:
                     kwargs["api_key"] = resolved_key
                 if api_base:
                     kwargs["api_base"] = api_base
+                for passthrough in ("tools", "tool_choice", "response_format"):
+                    if _extra.get(passthrough) is not None:
+                        kwargs[passthrough] = _extra[passthrough]
 
                 response = await litellm.acompletion(**kwargs)
         except Exception:

@@ -194,6 +194,48 @@ def _messages_to_vertex_contents(
         if role == "system":
             system_parts.append(str(content))
             continue
+        if role == "assistant" and msg.get("tool_calls"):
+            parts: list[dict[str, Any]] = []
+            for call in msg.get("tool_calls") or []:
+                function = call.get("function", {}) if isinstance(call, dict) else {}
+                name = function.get("name") or call.get("name")
+                arguments = function.get("arguments", {})
+                if isinstance(arguments, str):
+                    try:
+                        arguments = json.loads(arguments)
+                    except json.JSONDecodeError:
+                        arguments = {}
+                if name:
+                    parts.append(
+                        {"functionCall": {"name": str(name), "args": arguments}}
+                    )
+            if parts:
+                contents.append({"role": "model", "parts": parts})
+            continue
+        if role == "tool":
+            tool_name = str(msg.get("name") or "search_novel_text")
+            response_payload: Any = content
+            if isinstance(content, str):
+                try:
+                    response_payload = json.loads(content)
+                except json.JSONDecodeError:
+                    response_payload = {"text": content}
+            contents.append(
+                {
+                    "role": "user",
+                    "parts": [
+                        {
+                            "functionResponse": {
+                                "name": tool_name,
+                                "response": response_payload
+                                if isinstance(response_payload, dict)
+                                else {"result": response_payload},
+                            }
+                        }
+                    ],
+                }
+            )
+            continue
         vrole = "model" if role == "assistant" else "user"
         contents.append({"role": vrole, "parts": [{"text": str(content)}]})
     system = "\n\n".join(system_parts) if system_parts else None
@@ -216,7 +258,37 @@ def _extract_text(candidate: dict) -> str:
     return c if isinstance(c, str) else ""
 
 
-def _to_openai_like_response(text: str, usage: dict[str, Any], model: str) -> Any:
+def _extract_tool_calls(candidate: dict) -> list[dict[str, Any]]:
+    parts = candidate.get("content", {}).get("parts", []) or []
+    calls: list[dict[str, Any]] = []
+    for index, part in enumerate(parts):
+        if not isinstance(part, dict) or not isinstance(part.get("functionCall"), dict):
+            continue
+        function_call = part["functionCall"]
+        name = function_call.get("name")
+        if not name:
+            continue
+        calls.append(
+            {
+                "id": str(function_call.get("id") or f"vertex-call-{index}"),
+                "type": "function",
+                "function": {
+                    "name": str(name),
+                    "arguments": json.dumps(
+                        function_call.get("args") or {}, ensure_ascii=False
+                    ),
+                },
+            }
+        )
+    return calls
+
+
+def _to_openai_like_response(
+    text: str,
+    usage: dict[str, Any],
+    model: str,
+    tool_calls: list[dict[str, Any]] | None = None,
+) -> Any:
     """构造与 LiteLLM 兼容的响应对象（choices/message/usage）。"""
     prompt_tokens = usage.get("promptTokenCount") or usage.get("prompt_tokens")
     completion_tokens = usage.get("candidatesTokenCount") or usage.get(
@@ -226,7 +298,9 @@ def _to_openai_like_response(text: str, usage: dict[str, Any], model: str) -> An
     return SimpleNamespace(
         choices=[
             SimpleNamespace(
-                message=SimpleNamespace(content=text or "", role="assistant"),
+                message=SimpleNamespace(
+                    content=text or "", role="assistant", tool_calls=tool_calls or None
+                ),
                 finish_reason="stop",
             )
         ],
@@ -238,6 +312,27 @@ def _to_openai_like_response(text: str, usage: dict[str, Any], model: str) -> An
         model=model,
         _vertex=True,
     )
+
+
+def _vertex_tools(tools: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
+    """Convert OpenAI function tools to Vertex functionDeclarations."""
+
+    declarations: list[dict[str, Any]] = []
+    for tool in tools or []:
+        if not isinstance(tool, dict):
+            continue
+        function = tool.get("function") or {}
+        name = function.get("name")
+        if not name:
+            continue
+        declaration: dict[str, Any] = {"name": str(name)}
+        if function.get("description"):
+            declaration["description"] = str(function["description"])
+        parameters = function.get("parameters")
+        if isinstance(parameters, dict):
+            declaration["parameters"] = _vertex_json_schema(parameters)
+        declarations.append(declaration)
+    return [{"functionDeclarations": declarations}] if declarations else []
 
 
 def _vertex_json_schema(schema: dict[str, Any] | None) -> dict[str, Any] | None:
@@ -368,6 +463,7 @@ async def acomplete(
     location: str | None = None,
     timeout: float = 120.0,
     response_json_schema: dict[str, Any] | None = None,
+    tools: list[dict[str, Any]] | None = None,
 ) -> Any:
     """异步调用 Vertex generateContent，返回 OpenAI-like 响应。
 
@@ -411,6 +507,9 @@ async def acomplete(
     }
     if system:
         body["systemInstruction"] = {"parts": [{"text": system}]}
+    vertex_tools = _vertex_tools(tools)
+    if vertex_tools:
+        body["tools"] = vertex_tools
 
     last_err: Exception | None = None
     for attempt in range(3):
@@ -438,8 +537,9 @@ async def acomplete(
             if not candidates:
                 raise VertexAPIError(f"Vertex 无 candidates: {str(data)[:300]}")
             text = _extract_text(candidates[0])
+            tool_calls = _extract_tool_calls(candidates[0])
             usage = data.get("usageMetadata") or {}
-            return _to_openai_like_response(text, usage, model_id)
+            return _to_openai_like_response(text, usage, model_id, tool_calls)
         except VertexAPIError as e:
             last_err = e
             if e.status_code in (429, 500, 502, 503) and attempt < 2:

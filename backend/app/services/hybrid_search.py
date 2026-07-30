@@ -284,6 +284,7 @@ class HybridSearchService:
                 "chapter_title": row.chapter_title or "",
                 "chunk_id": row.chunk_id,
                 "chunk_index": row.chunk_index,
+                "content": row.content or "",
                 "content_snippet": row.headline
                 or (row.content[:100] if row.content else ""),
                 "score": float(row.rank),
@@ -366,6 +367,8 @@ class HybridSearchService:
                         "score": item.get("score", 0.0),
                         "chapter_id": metadata.get("chapter_id"),
                         "chunk_index": metadata.get("chunk_index"),
+                        "source_start": metadata.get("source_start"),
+                        "source_end": metadata.get("source_end"),
                     }
                 )
 
@@ -417,7 +420,10 @@ class HybridSearchService:
                     "chapter_title": r.get("chapter_title", ""),
                     "chunk_id": chunk_id,
                     "chunk_index": r.get("chunk_index", 0),
+                    "content": r.get("content", ""),
                     "content_snippet": r.get("content_snippet", r.get("content", "")),
+                    "source_start": r.get("source_start"),
+                    "source_end": r.get("source_end"),
                     "bm25_score": norm_score,
                     "vector_score": 0.0,
                     "score": 0.0,
@@ -431,6 +437,12 @@ class HybridSearchService:
                     merged[chunk_id].get("content_snippet", "")
                 ):
                     merged[chunk_id]["content_snippet"] = r["content_snippet"]
+                if r.get("content") and not merged[chunk_id].get("content"):
+                    merged[chunk_id]["content"] = r["content"]
+                if r.get("source_start") is not None:
+                    merged[chunk_id]["source_start"] = r["source_start"]
+                if r.get("source_end") is not None:
+                    merged[chunk_id]["source_end"] = r["source_end"]
 
         # 处理向量结果
         max_vector = max((r["score"] for r in vector_results), default=1.0)
@@ -448,7 +460,10 @@ class HybridSearchService:
                     "chapter_title": "",
                     "chunk_id": chunk_id,
                     "chunk_index": r.get("chunk_index", 0),
+                    "content": r.get("content", ""),
                     "content_snippet": r.get("content", "")[:200],
+                    "source_start": r.get("source_start"),
+                    "source_end": r.get("source_end"),
                     "bm25_score": 0.0,
                     "vector_score": norm_score,
                     "score": 0.0,
@@ -457,6 +472,8 @@ class HybridSearchService:
                 merged[chunk_id]["vector_score"] = max(
                     merged[chunk_id]["vector_score"], norm_score
                 )
+                if r.get("content") and not merged[chunk_id].get("content"):
+                    merged[chunk_id]["content"] = r["content"]
 
         # 计算最终分数
         for info in merged.values():

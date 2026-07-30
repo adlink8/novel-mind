@@ -474,6 +474,8 @@ async def assemble_context_manifest(
         "dialogue_framing": _dialogue_framing(prior_dialogue),
         "allowed_evidence_ids": [e.evidence_key for e in evidence_entries],
         "context_mode": "selection" if selection_bound else "chapter",
+        "timeline_summary": list(retrieval.timeline_summary),
+        "timeline_summary_is_evidence": False,
     }
 
     source_status = dict(retrieval.source_status)
