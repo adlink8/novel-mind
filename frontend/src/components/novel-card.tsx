@@ -1,7 +1,7 @@
 /**
  * 小说卡片组件 — 书架列表
  *
- * Phase 08 编排：卡片「分析」入口导向全局时间线工作台（/analysis），
+ * Phase 08 编排：卡片「全部分析」入口导向全局分析工作台（/analysis），
  * 不再把 plot_summary 当成主产品。层级准备由后端 start-or-resume 负责。
  */
 
@@ -47,7 +47,7 @@ interface NovelCardProps {
   onSelectedChange?: (id: number, selected: boolean) => void;
 }
 
-/** 状态展示：导入 / 索引 / 分析（分析 = 时间线任务） */
+/** 状态展示：导入 / 索引 / 分析 */
 function statusMeta(status: string): { label: string; className: string; hint: string } {
   switch (status) {
     case "importing":
@@ -158,7 +158,7 @@ export function NovelCard({
   const handleOpenTimeline = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    // Phase 08 主入口：全局分析工作台；层级与 start-or-resume 在分析页完成
+    // 全部分析入口：全流程任务在分析工作台中启动并显示阶段进度
     router.push(`/analysis?novel=${novel.id}`);
   };
 
@@ -352,7 +352,7 @@ export function NovelCard({
               </DialogContent>
             </Dialog>
           )}
-          <Button type="button" variant="outline" size="sm" onClick={handleOpenTimeline} className="rounded-xl" title="打开时间线分析">时间线</Button>
+          <Button type="button" variant="outline" size="sm" onClick={handleOpenTimeline} className="rounded-xl" title="打开全部分析">全部分析</Button>
           {onDelete && !selectionMode && <Button type="button" variant="outline" size="icon" disabled={deleting} onClick={handleDelete} className="rounded-xl text-destructive hover:bg-destructive/10 hover:text-destructive" title="删除本书" aria-label={`删除《${novel.title}》`}>{deleting ? <LoaderCircle className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}</Button>}
         </div>
       </Card>

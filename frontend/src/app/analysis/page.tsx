@@ -10,6 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, Suspense } from "rea
 import { useSearchParams } from "next/navigation";
 import { BookOpen, RefreshCw } from "lucide-react";
 import { NovelPickerStrip } from "@/components/bookshelf/novel-picker-strip";
+import { FullAnalysisStatus } from "@/components/analysis/full-analysis-status";
 
 import { ClueWorkspace } from "@/components/clues/clue-workspace";
 import { clueApi } from "@/lib/clue-api";
@@ -36,8 +37,10 @@ import { TimelineControls } from "@/components/timeline/timeline-controls";
 import { TimelineStatus } from "@/components/timeline/timeline-status";
 import {
   novelsApi,
+  analysisApi,
   timelineApi,
   type Novel,
+  type FullAnalysisRun,
   type TimelineEnvelope,
   type TimelineEvent,
   type TimelineOrdering,
@@ -153,6 +156,8 @@ function AnalysisWorkspace() {
     running_candidate: null,
   });
   const [run, setRun] = useState<TimelineRun | null>(null);
+  const [fullRun, setFullRun] = useState<FullAnalysisRun | null>(null);
+  const [fullLoading, setFullLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const envelopeSigRef = useRef("");
@@ -354,6 +359,34 @@ function AnalysisWorkspace() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [novelId, run?.status]);
 
+  const fullStatus = fullRun?.status;
+
+  useEffect(() => {
+    if (!novelId) {
+      return;
+    }
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const response = await analysisApi.fullStatus(novelId);
+        if (!cancelled) setFullRun(response.data);
+      } catch {
+        // 404 means this novel has never started the aggregate pipeline.
+      }
+    };
+    void load();
+    if (!fullStatus || !["pending", "running"].includes(fullStatus)) {
+      return () => {
+        cancelled = true;
+      };
+    }
+    const timer = window.setInterval(() => void load(), 1500);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [novelId, fullStatus]);
+
   async function loadTimeline(
     id = novelId,
     next: {
@@ -443,6 +476,7 @@ function AnalysisWorkspace() {
     if (!id) {
       setEnvelope({ active: null, running_candidate: null });
       setRun(null);
+      setFullRun(null);
       setFullBook(false);
       setStructureForest([]);
       chapterTitlesRef.current = {};
@@ -451,6 +485,7 @@ function AnalysisWorkspace() {
       setStructureSource("chapters");
       return;
     }
+    setFullRun(null);
     // 同步服务端全书偏好，避免选书后还要再勾一次才看见数据
     const novelMeta = novels.find((n) => String(n.id) === String(id));
     const preferFullBook = Boolean(
@@ -567,6 +602,33 @@ function AnalysisWorkspace() {
       setError(typeof detail === "string" ? detail : "启动分析失败，请稍后重试。");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function startFullAnalysis() {
+    if (!novelId) return;
+    setFullLoading(true);
+    setError("");
+    try {
+      const response = await analysisApi.fullStart(novelId);
+      setFullRun(response.data);
+    } catch {
+      setError("启动全部分析失败，请稍后重试。");
+    } finally {
+      setFullLoading(false);
+    }
+  }
+
+  async function cancelFullAnalysis() {
+    if (!novelId) return;
+    setFullLoading(true);
+    try {
+      const response = await analysisApi.fullCancel(novelId);
+      setFullRun(response.data);
+    } catch {
+      setError("停止全部分析失败，请稍后重试。");
+    } finally {
+      setFullLoading(false);
     }
   }
 
@@ -931,6 +993,12 @@ function AnalysisWorkspace() {
           novelId={novelId}
         >
           <div className="grid gap-4">
+            <FullAnalysisStatus
+              run={fullRun}
+              busy={fullLoading}
+              onStart={() => void startFullAnalysis()}
+              onCancel={() => void cancelFullAnalysis()}
+            />
             {/* Facet tabs — 分段控件（画布切换），保持 tab 语义 */}
             <div className="flex justify-center">
               <div

@@ -258,6 +258,20 @@ export interface HierarchyStatus {
   }>;
 }
 
+export interface FullAnalysisRun {
+  id: number;
+  novel_id: number;
+  status: string;
+  stage: string;
+  progress: string;
+  stage_index: number;
+  stage_total: number;
+  detail?: string | null;
+  status_reason?: string | null;
+  cancel_requested: boolean;
+  updated_at?: string | null;
+}
+
 export const analysisApi = {
   analyze: (
     novelId: string,
@@ -294,6 +308,14 @@ export const analysisApi = {
     api.post<HierarchyStatus & { build_id?: string }>(
       `/analysis/${novelId}/hierarchy/rebuild`
     ),
+  fullStart: (novelId: string) =>
+    api.post<FullAnalysisRun>(`/novels/${novelId}/analyze-full`, null, {
+      timeout: 30_000,
+    }),
+  fullStatus: (novelId: string) =>
+    api.get<FullAnalysisRun>(`/novels/${novelId}/analyze-full/status`),
+  fullCancel: (novelId: string) =>
+    api.post<FullAnalysisRun>(`/novels/${novelId}/analyze-full/cancel`),
 };
 
 // ==================== 时间线 API ====================

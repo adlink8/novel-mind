@@ -39,6 +39,7 @@ from app.api import (
     search,
 )
 from app.api.clues import router as clues_router
+from app.api.analysis import full_analysis_router
 from app.api.asset_audit import router as asset_audit_router
 from app.api.eval import router as eval_router
 from app.api.knowledge import router as knowledge_router
@@ -277,6 +278,11 @@ async def value_error_handler(request: Request, exc: ValueError):
 # 每个路由模块负责一个业务领域，prefix 定义 URL 前缀，tags 用于 Swagger 分组
 app.include_router(auth.router, prefix="/api/auth", tags=["认证"])
 app.include_router(novels.router, prefix="/api/novels", tags=["小说管理"])
+app.include_router(
+    full_analysis_router,
+    prefix="/api/novels",
+    tags=["全部分析"],
+)
 app.include_router(analysis.router, prefix="/api/analysis", tags=["剧情分析"])
 app.include_router(timeline.router, prefix="/api/timeline", tags=["时间线"])
 app.include_router(clues_router, prefix="/api/clues", tags=["线索与伏笔"])

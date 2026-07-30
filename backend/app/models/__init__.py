@@ -48,6 +48,7 @@ from app.models.analysis import (
     AnalysisBudgetLedger,
     AnalysisBudgetReservation,
 )
+from app.models.full_analysis import FullAnalysisRun
 from app.models.timeline import (
     TimelineEvent,
     MachineTimelineEvent,
@@ -181,6 +182,7 @@ __all__ = [
     "ModelCallAttempt",
     "AnalysisBudgetLedger",
     "AnalysisBudgetReservation",
+    "FullAnalysisRun",
     "MachineTimelineEvent",
     "TimelineParticipant",
     "TimelineEvidenceRef",

@@ -15,13 +15,15 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.security import require_user
+from app.api.dependencies import require_owned_novel
+from app.models.full_analysis import FullAnalysisRun
 from app.models.novel import Novel
 from app.models.user import User
 from app.services.analysis_service import (
@@ -33,6 +35,7 @@ from app.services.analysis_service import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter(dependencies=[Depends(require_user)])
+full_analysis_router = APIRouter(dependencies=[Depends(require_user)])
 
 
 class AnalyzeBody(BaseModel):
@@ -190,3 +193,131 @@ async def analyze_novel_stream(novel_id: int):
     raise HTTPException(
         status_code=501, detail="流式剧情分析尚未实现，请使用 POST /analyze"
     )
+
+
+def _full_analysis_response(row: FullAnalysisRun) -> dict[str, Any]:
+    payload = dict(row.progress or {})
+    return {
+        "id": row.id,
+        "novel_id": row.novel_id,
+        "status": row.status,
+        "stage": payload.get("stage") or row.current_stage,
+        "progress": payload.get("progress") or "0/0",
+        "stage_index": payload.get("stage_index", 0),
+        "stage_total": payload.get("stage_total", 0),
+        "detail": payload.get("detail"),
+        "status_reason": row.status_reason,
+        "cancel_requested": row.cancel_requested,
+        "updated_at": row.updated_at.isoformat() if row.updated_at else None,
+    }
+
+
+async def _latest_full_analysis_run(
+    db: AsyncSession, owner_id: int, novel_id: int
+) -> FullAnalysisRun | None:
+    row = await db.scalar(
+        select(FullAnalysisRun)
+        .where(
+            FullAnalysisRun.owner_id == owner_id,
+            FullAnalysisRun.novel_id == novel_id,
+            FullAnalysisRun.active_key == "active",
+        )
+        .order_by(FullAnalysisRun.id.desc())
+        .limit(1)
+    )
+    if row is not None:
+        return row
+    return await db.scalar(
+        select(FullAnalysisRun)
+        .where(
+            FullAnalysisRun.owner_id == owner_id,
+            FullAnalysisRun.novel_id == novel_id,
+        )
+        .order_by(FullAnalysisRun.id.desc())
+        .limit(1)
+    )
+
+
+@full_analysis_router.post("/{novel_id}/analyze-full", status_code=202)
+async def analyze_full(
+    background_tasks: BackgroundTasks,
+    novel: Novel = Depends(require_owned_novel),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """按依赖顺序启动分块、时间线、关系、线索和 NM 全流程分析。"""
+
+    from app.services.analysis_orchestrator import run_full_analysis
+
+    row = await db.scalar(
+        select(FullAnalysisRun)
+        .where(
+            FullAnalysisRun.owner_id == current_user.id,
+            FullAnalysisRun.novel_id == novel.id,
+            FullAnalysisRun.active_key == "active",
+        )
+        .with_for_update()
+    )
+    if row is not None and row.status in {"pending", "running"}:
+        return _full_analysis_response(row)
+    if row is not None:
+        row.active_key = None
+
+    row = FullAnalysisRun(
+        owner_id=current_user.id,
+        novel_id=novel.id,
+        active_key="active",
+        status="pending",
+        current_stage="queued",
+        checkpoint={},
+        progress={
+            "stage": "queued",
+            "progress": "0/0",
+            "status": "pending",
+            "stage_index": 0,
+            "stage_total": 8,
+        },
+    )
+    db.add(row)
+    await db.commit()
+    await db.refresh(row)
+    background_tasks.add_task(run_full_analysis, row.id)
+    return _full_analysis_response(row)
+
+
+@full_analysis_router.get("/{novel_id}/analyze-full/status")
+async def full_analysis_status(
+    novel: Novel = Depends(require_owned_novel),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    row = await _latest_full_analysis_run(db, current_user.id, novel.id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="full analysis run not found")
+    return _full_analysis_response(row)
+
+
+@full_analysis_router.post("/{novel_id}/analyze-full/cancel")
+async def cancel_full_analysis(
+    novel: Novel = Depends(require_owned_novel),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    row = await db.scalar(
+        select(FullAnalysisRun)
+        .where(
+            FullAnalysisRun.owner_id == current_user.id,
+            FullAnalysisRun.novel_id == novel.id,
+            FullAnalysisRun.active_key == "active",
+        )
+        .with_for_update()
+    )
+    if row is None:
+        raise HTTPException(status_code=404, detail="full analysis run not found")
+    row.cancel_requested = True
+    row.status = "cancelled"
+    row.status_reason = "user requested cancellation"
+    row.active_key = None
+    await db.commit()
+    await db.refresh(row)
+    return _full_analysis_response(row)

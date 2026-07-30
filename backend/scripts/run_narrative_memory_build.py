@@ -887,6 +887,53 @@ def _run_policy(deployment_lineage):
 
 
 async def _create_version(args, sessions, deployment) -> int:
+    version_id = await create_candidate_version(
+        owner_id=args.owner_id,
+        novel_id=args.novel_id,
+        sessions=sessions,
+        deployment=deployment,
+        version_key=args.version_key,
+    )
+    if version_id is None:
+        print(
+            json.dumps(
+                {
+                    "error": "EligibilityRejectedError",
+                    "message": "provider_calls_allowed=false",
+                },
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+        )
+        return 2
+    print(
+        json.dumps(
+            {
+                "version_id": version_id,
+                "provider_calls_allowed": True,
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+    )
+    return 0
+
+
+async def create_candidate_version(
+    *,
+    owner_id: int,
+    novel_id: int,
+    sessions,
+    deployment,
+    version_key: str | None = None,
+) -> int | None:
+    """Create an explicit candidate version without invoking CLI parsing.
+
+    This is intentionally candidate-only. The builder has no promotion path,
+    so callers can safely use it from the full-analysis orchestrator.
+    """
     from datetime import datetime, timezone
 
     from app.services.narrative_memory.audit import audit_assets
@@ -894,31 +941,18 @@ async def _create_version(args, sessions, deployment) -> int:
     from app.services.narrative_memory.authority import CandidateAuthority
     from app.services.narrative_memory.contracts import CandidateVersionSpec, ModelLineage
 
-    version_key = args.version_key
     if not version_key:
         ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-        version_key = f"nm-candidate-{args.novel_id}-{ts}"
+        version_key = f"nm-candidate-{novel_id}-{ts}"
 
     async with sessions() as session:
         report = await audit_assets(
             PostgresAuditSource(session),
-            owner_id=args.owner_id,
-            novel_id=args.novel_id,
+            owner_id=owner_id,
+            novel_id=novel_id,
         )
         if not report.provider_calls_allowed:
-            print(
-                json.dumps(
-                    {
-                        "error": "EligibilityRejectedError",
-                        "message": "provider_calls_allowed=false",
-                        "report": report.model_dump(mode="json"),
-                    },
-                    ensure_ascii=False,
-                    sort_keys=True,
-                    separators=(",", ":"),
-                )
-            )
-            return 2
+            return None
 
         lineage = ModelLineage(
             provider=deployment.provider,
@@ -937,26 +971,101 @@ async def _create_version(args, sessions, deployment) -> int:
         )
         authority = CandidateAuthority(session)
         version = await authority.create_version(
-            owner_id=args.owner_id,
-            novel_id=args.novel_id,
+            owner_id=owner_id,
+            novel_id=novel_id,
             spec=spec,
             eligibility_report=report,
         )
         await session.commit()
-        print(
-            json.dumps(
-                {
-                    "version_id": version.id,
-                    "version_key": version.version_key,
-                    "hierarchy_build_id": version.hierarchy_build_id,
-                    "provider_calls_allowed": True,
-                },
-                ensure_ascii=False,
-                sort_keys=True,
-                separators=(",", ":"),
-            )
+        return int(version.id)
+
+
+async def run_narrative_memory_build(
+    *,
+    owner_id: int,
+    novel_id: int,
+    progress_callback=None,
+    sessions=None,
+) -> dict[str, Any]:
+    """Run all NM candidate stages from application code.
+
+    The former CLI remains available, but the orchestration API can now reuse
+    the same worker and durable checkpoints. ``progress_callback`` receives
+    ``(stage, completed, total, status)`` and must be awaitable when supplied.
+    No active NarrativeMemory pointer is changed here.
+    """
+    from app.core.database import async_session_factory
+    from app.services.narrative_memory.builder_repository import BuilderRepository
+    from app.services.narrative_memory.builder_worker import NarrativeMemoryBuilderWorker
+
+    sessions = sessions or async_session_factory
+    transport, deployment = _production_transport_and_deployment(
+        sessions, noop=False
+    )
+    inventory = _SessionInventorySource(sessions)
+    worker = NarrativeMemoryBuilderWorker(
+        sessions,
+        inventory_source=inventory,
+        transport=transport,
+        deployment=deployment,
+    )
+    version_id = await create_candidate_version(
+        owner_id=owner_id,
+        novel_id=novel_id,
+        sessions=sessions,
+        deployment=deployment,
+    )
+    if version_id is None:
+        raise RuntimeError("叙事记忆资格检查未通过，禁止调用模型")
+
+    policy = _run_policy(deployment)
+    run_id = await worker.start_run(
+        owner_id=owner_id,
+        novel_id=novel_id,
+        version_id=version_id,
+        run_policy=policy,
+    )
+
+    terminal = {"completed", "partial", "failed", "paused_budget", "paused_dependency", "cancelled"}
+    while True:
+        result = await worker.process_run(
+            owner_id=owner_id,
+            novel_id=novel_id,
+            version_id=version_id,
+            max_stages=1,
         )
-        return 0
+        async with sessions() as session:
+            repo = BuilderRepository(session)
+            stages = await repo.list_stages(run_id)
+        completed = sum(stage.status == "completed" for stage in stages)
+        total = len(stages)
+        active = next(
+            (
+                stage
+                for stage in stages
+                if stage.status in {"running", "pending", "paused_budget", "blocked_dependency"}
+            ),
+            None,
+        )
+        kind = active.stage_kind if active is not None else "manifest_validation"
+        stage_name = {
+            "chapter_state": "nm_chapter_state",
+            "arc_volume_plan": "nm_arc_plan",
+            "arc_volume_aggregate": "nm_aggregate",
+            "global_aggregate": "nm_aggregate",
+            "manifest_validation": "nm_aggregate",
+        }.get(kind, "nm_aggregate")
+        if progress_callback is not None:
+            await progress_callback(stage_name, completed, total, result.status)
+        if result.status in terminal:
+            return {
+                "version_id": version_id,
+                "run_id": run_id,
+                "status": result.status,
+                "status_reason": result.status_reason,
+                "completed_stages": completed,
+                "total_stages": total,
+            }
 
 
 async def _main_async(args: argparse.Namespace) -> int:

@@ -916,6 +916,12 @@ async def _dispatch_dependent_analysis(sessions, run, version_id: int) -> None:
     Product contract: 开始分析 → 时间线主链路；完成后并行关系与线索。
     Clue may have been started earlier in parallel (FE); re-queue failed/paused runs.
     """
+    # The one-click full-analysis orchestrator owns dependency ordering and
+    # deliberately starts relationship/clue stages only after it has observed
+    # timeline completion. Avoid launching those workers behind its back.
+    if (run.checkpoint or {}).get("orchestrator_managed"):
+        return
+
     from app.models.clue import ClueAnalysisRun
     from app.services.clues.worker import dispatch_clue_run
     from app.services.relationships.worker import dispatch_relationship_build
