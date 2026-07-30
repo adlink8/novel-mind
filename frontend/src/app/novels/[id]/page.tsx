@@ -402,6 +402,10 @@ function NovelReaderInner() {
     ) {
       setProgressWritable(true);
     }
+    // 先卸载旧章正文和滚动监听，避免异步加载新章期间沿用旧章的底部位置。
+    setChapterContent(null);
+    setChapterPercent(0);
+    setRestorePercent(0);
     setCurrentChapterId(chapterId);
   }, []);
 

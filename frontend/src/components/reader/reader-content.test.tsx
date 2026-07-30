@@ -1,15 +1,16 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { useState } from "react";
 
 import type { Chapter } from "@/lib/api";
 import { ReaderContent } from "./reader-content";
 
-function makeChapter(content: string): Chapter {
+function makeChapter(content: string, id = 1): Chapter {
   return {
-    id: 1,
+    id,
     novel_id: 11,
-    chapter_number: 1,
-    title: "第一章 测试",
+    chapter_number: id,
+    title: `第${id}章 测试`,
     content,
     word_count: content.length,
     created_at: "2026-01-01T00:00:00Z",
@@ -86,6 +87,43 @@ describe("ReaderContent keyboard paging", () => {
     fireEvent.scroll(scrollContainer);
     fireEvent.scroll(scrollContainer);
 
+    expect(onNextChapter).toHaveBeenCalledTimes(1);
+  });
+
+  it("resets the scroll position before the next chapter can auto-advance again", async () => {
+    const scrollContainer = document.createElement("div");
+    Object.defineProperties(scrollContainer, {
+      clientHeight: { configurable: true, value: 400 },
+      scrollHeight: { configurable: true, value: 1000 },
+    });
+    scrollContainer.scrollTo = vi.fn();
+    const scrollRef = { current: scrollContainer };
+    const onNextChapter = vi.fn();
+
+    function Harness() {
+      const [chapter, setChapter] = useState(() => makeChapter("字".repeat(4000)));
+      return (
+        <ReaderContent
+          chapter={chapter}
+          readingMode="scroll"
+          scrollContainerRef={scrollRef}
+          hasNextChapter={chapter.id < 3}
+          onNextChapter={() => {
+            onNextChapter();
+            setChapter(makeChapter("字".repeat(4000), chapter.id + 1));
+          }}
+        />
+      );
+    }
+
+    render(<Harness />);
+
+    scrollContainer.scrollTop = 640;
+    fireEvent.scroll(scrollContainer);
+    await waitFor(() => expect(screen.getByText("第2章 测试")).toBeInTheDocument());
+    await waitFor(() => expect(scrollContainer.scrollTop).toBe(0));
+
+    fireEvent.scroll(scrollContainer);
     expect(onNextChapter).toHaveBeenCalledTimes(1);
   });
 
