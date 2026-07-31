@@ -797,7 +797,7 @@ jobs:
           retention-days: 180
 
   # ---------------------------------------------------------------------------
-  # Isolated alert job (D-18)
+  # Isolated alert reconciliation job (D-18 / Phase 22-G3)
   # - schedule / protected main only
   # - environment-approved
   # - permissions: contents:read, issues:write only
@@ -806,21 +806,22 @@ jobs:
   # - fork unreachable
   # ---------------------------------------------------------------------------
   alert:
-    name: Quality alert
+    name: Quality alert reconciliation
     needs: [guard, nightly, promote-baseline]
     if: |
       always() &&
       needs.guard.outputs.allow_alert == 'true' &&
       github.event_name != 'pull_request' &&
-      (needs.nightly.result == 'failure' ||
-       needs.promote-baseline.result == 'failure' ||
-       needs.nightly.result == 'cancelled')
+      needs.guard.outputs.allow_nightly == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     environment: quality-alerts
     permissions:
       contents: read
       issues: write
+    env:
+      NIGHTLY_RESULT: ${{ needs.nightly.result }}
+      PROMOTE_RESULT: ${{ needs.promote-baseline.result }}
     steps:
       # Intentionally no actions/checkout of PR head — only download validated artifacts
       - name: Download validated nightly report (if any)
@@ -847,7 +848,18 @@ jobs:
               core.setFailed(`alert forbidden on ref ${ref}`);
               return;
             }
-            let fingerprint = `nightly-fail:${context.runId}`;
+            const nightlyResult = (process.env.NIGHTLY_RESULT || 'missing').toLowerCase();
+            const promoteResult = (process.env.PROMOTE_RESULT || 'missing').toLowerCase();
+            const isGreen = nightlyResult === 'success' && promoteResult === 'success';
+            const rootClass =
+              nightlyResult === 'cancelled' ? 'runner-or-environment-unavailable' :
+              nightlyResult === 'skipped' ? 'upstream-required-job-failed' :
+              nightlyResult === 'failure' ? 'nightly-benchmark-failed' :
+              promoteResult === 'failure' ? 'baseline-promotion-failed' :
+              `nightly-${nightlyResult}-promotion-${promoteResult}`;
+            let fingerprint = crypto.createHash('sha256')
+              .update(rootClass)
+              .digest('hex').slice(0, 16);
             let bodyExtra = 'No validated report artifact available.';
             const root = '/tmp/validated-report';
             function walk(dir, acc=[]) {
@@ -892,6 +904,9 @@ jobs:
               `- ref: \`${ref}\``,
               `- run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
               `- fingerprint: \`${fingerprint}\``,
+              `- root_class: \`${rootClass}\``,
+              `- nightly_result: \`${nightlyResult}\``,
+              `- promote_result: \`${promoteResult}\``,
               '',
               '### Report summary (hash/schema validated only)',
               '```',
@@ -908,6 +923,25 @@ jobs:
               labels: 'quality-alert',
               per_page: 50,
             });
+            if (isGreen) {
+              for (const issue of existing.data) {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  body: `Resolved by scheduled run ${context.runId}: nightly and baseline promotion both succeeded.`,
+                });
+                await github.rest.issues.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  state: 'closed',
+                  state_reason: 'completed',
+                });
+              }
+              core.info(`Closed ${existing.data.length} resolved quality alert issue(s)`);
+              return;
+            }
             const match = existing.data.find(i => i.title.includes(fingerprint));
             if (match) {
               await github.rest.issues.createComment({

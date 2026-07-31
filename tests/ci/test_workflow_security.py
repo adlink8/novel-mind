@@ -93,6 +93,19 @@ def test_alert_isolation_d18(workflow: dict, policy: dict) -> None:
         assert not str(step.get("uses") or "").startswith("actions/checkout")
 
 
+def test_alert_lifecycle_uses_stable_root_fingerprint(workflow: dict) -> None:
+    alert = workflow["jobs"]["alert"]
+    blob = yaml.dump(alert, sort_keys=False)
+    assert "NIGHTLY_RESULT" in alert["env"]
+    assert "PROMOTE_RESULT" in alert["env"]
+    assert "rootClass" in blob
+    assert "runner-or-environment-unavailable" in blob
+    assert "upstream-required-job-failed" in blob
+    assert "state_reason" in blob
+    assert "completed" in blob
+    assert "nightly-fail:${context.runId}" not in blob
+
+
 def test_dispatch_requires_fixed_commit(workflow: dict) -> None:
     vw.assert_dispatch_guard(workflow)
     on = workflow.get("on") or workflow.get(True)

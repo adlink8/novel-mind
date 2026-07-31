@@ -1,28 +1,27 @@
 {
-  "project": "novel-mind",
-  "active_milestone": "v1.0",
-  "last_completed_milestone": "v1.0",
-  "last_completed_phase": "20-structure-workspace-multilayer-presentation",
-  "active_phase": "20-structure-workspace-multilayer-presentation",
-  "active_plan": "20-04",
-  "status": "phase_complete",
-  "canonical_dir": ".planning",
-  "auto_start": ".planning/phases/20-structure-workspace-multilayer-presentation/20-VERIFICATION.md",
-  "documentation_ownership": {
-    "human": ["README.md", "IMPLEMENTATION-STATUS.md", "docs/"],
-    "ai": [".planning/"]
-  },
-  "rules": {
-    "task_plan_required_sections": ["Steps", "Must-Haves", "Verification"],
-    "implementation_slice_required_final_step": "Test, Fix, and Confirm",
-    "status_labels": ["VERIFIED", "PARTIAL", "MISSING"]
-  },
-  "workflow": {
-    "_auto_chain_active": false,
-    "use_worktrees": false
-  },
-  "notes": {
-    "phase_19": "Analysis workbench presentation & truth; complete",
-    "phase_20": "Structure Workspace P0 complete; 2026-07-17 ordered follow-on; NM partial candidate; no promotion"
+  "project": "NovelMind",
+  "baseline_branch": "master",
+  "baseline_commit": "01503c29209b4b6a1b4caa5284fc04d4e38debe5",
+  "active_milestone": "v1.1",
+  "active_phase": "22-ci-nightly-gap-closure",
+  "active_plan": "22-G2",
+  "status": "active",
+  "auto_start": ".planning/phases/22-ci-nightly-gap-closure/22-G2-PLAN.md",
+  "commit_docs": true,
+  "reporting_dimensions": [
+    "implementation_readiness",
+    "sample_data_coverage",
+    "quality_qualification"
+  ],
+  "status_labels": [
+    "VERIFIED",
+    "PARTIAL",
+    "BLOCKED",
+    "PLANNED"
+  ],
+  "promotion_policy": {
+    "narrative_memory": "candidate_only",
+    "active_pointer_cutover": "explicit_authorization_required",
+    "backlog": "999.x"
   }
 }

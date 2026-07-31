@@ -1,4 +1,66 @@
-# Requirements: 安全与架构修复
+# Requirements: NovelMind
+
+> Current authority snapshot: `master@01503c2`, 2026-07-31.
+> The current-status tables below supersede stale `PLANNED` labels in the legacy registry
+> later in this file. Legacy IDs remain for traceability and are not deleted.
+
+## Current Baseline Requirements
+
+| ID | Requirement | Owner | Status |
+|---|---|---|---|
+| REQ-BASELINE-01 | `master` is the sole GSD execution baseline; old branches are evidence only | Phase 21 | VERIFIED |
+| REQ-BASELINE-02 | Branch delta is classified as equivalent/missing/obsolete/reimplement with an explicit decision | Phase 21 | VERIFIED |
+| REQ-NIGHTLY-01 | Scheduled failures have stable root classes and reproducible entry points | 22-G1 | IN_PROGRESS |
+| REQ-NIGHTLY-02 | Nightly always produces an authority-safe artifact or an explicit dependency classification | 22-G2 | PLANNED |
+| REQ-NIGHTLY-03 | Alerts deduplicate/resolve by root cause and Phase 22 requires 3 consecutive scheduled green runs | 22-G3 | BLOCKED |
+| REQ-STATUS-01 | Report implementation, sample-data coverage and quality qualification independently | all | VERIFIED_CONTRACT |
+
+## v1.2 Trusted Understanding
+
+| ID | Requirement | Owner | Status |
+|---|---|---|---|
+| REQ-QP-01 | Typed QueryPlan captures intent, dimensions, scope, cutoff, fallback and answer constraints | 26-01 | PLANNED |
+| REQ-QP-02 | Retrieval covers raw, event/causal, character state/goal/motivation/knowledge, relations, timeline, clues, world entities/rules and NM chapter/arc/global | 26-02 | PLANNED |
+| REQ-QP-03 | All factual citations materialize to hash/offset-verified leaf/raw EvidenceRef | 26-03 | PLANNED |
+| REQ-QP-04 | Reader and Analysis Chat share retrieval/citation authority with distinct anchors | 26-04 | PLANNED |
+| REQ-WM-01 | Event facts and causal edges are typed, versioned and evidence-gated | 27-01 | PLANNED |
+| REQ-WM-02 | Character state, goal, motivation and knowledge evolve by cutoff/POV | 27-02 | PLANNED |
+| REQ-WM-03 | World entity, rule, faction, place and item projections retain exceptions and lineage | 27-03 | PLANNED |
+| REQ-WM-04 | Canon Fact, Probable Inference, Literary Interpretation and User Interpretation never silently collapse | 27-04 | PLANNED |
+| REQ-NM-01 | Every chapter reaches `completed|isolated|blocked`; no silent pending | 28-01..02 | PLANNED |
+| REQ-NM-02 | Semantic Arc/Volume/Global candidates continuously cover the source snapshot | 28-03 | PLANNED |
+| REQ-NM-03 | Timeline/relation/clue/character/world closure and one-click analysis expose dimension-specific progress | 28-04 | PLANNED |
+| REQ-NM-04 | NM remains candidate-only; no active pointer or consumer cutover | Phase 28 | LOCKED |
+| REQ-QA-01 | Frozen reading QA spans local/cross-chapter/global/causal/knowledge/world/no-answer/spoiler buckets | 29-01 | PLANNED |
+| REQ-QA-02 | Retrieval, citation, faithfulness, relevance, abstention, latency and cost are evaluated by bucket | 29-02 | PLANNED |
+| REQ-QA-03 | Real browser UAT verifies citations, partial states and spoiler-safe Reader/Analysis Chat | 29-03 | PLANNED |
+
+## v1.3 Visual Narrative
+
+| ID | Requirement | Owner | Status |
+|---|---|---|---|
+| REQ-VIS-01 | Versioned Visual Bible links characters/places/items/style to evidence and interpretation labels | Phase 30 | PLANNED |
+| REQ-VIS-02 | Key-scene selection records range, cast, place, time, POV, salience and diversity reasons | Phase 31 | PLANNED |
+| REQ-VIS-03 | Provider-neutral Scene Spec compiles to versioned prompts without unsupported canon details | Phase 32 | PLANNED |
+| REQ-VIS-04 | Illustration jobs are idempotent, budgeted, traceable and human-approved | Phase 33 | PLANNED |
+| REQ-VIS-05 | Approved images use hash-verified text anchors and survive responsive reading/export | Phase 34 | PLANNED |
+
+## v1.4 Canon Fork Derivatives
+
+| ID | Requirement | Owner | Status |
+|---|---|---|---|
+| REQ-FORK-01 | Original Canon, User Interpretation and Fanfiction Canon have isolated authority/index/version rules | Phase 35 | PLANNED |
+| REQ-FORK-02 | Derivative projects support owner-scoped planning, Markdown editing, autosave, history, diff and rollback | Phase 36 | PLANNED |
+| REQ-FORK-03 | Generation consumes an auditable cutoff state package and runs contradiction/character/timeline/clue checks | Phase 37 | PLANNED |
+| REQ-FORK-04 | Derivative Visual Bible/assets cannot mutate original visual authority | Phase 38 | PLANNED |
+| REQ-FORK-05 | Export preserves content/assets/citations/version parity and passes end-to-end UAT/audit | Phase 39 | PLANNED |
+
+## Explicit Backlog
+
+| ID | Requirement | Status |
+|---|---|---|
+| REQ-999-PROMOTION | NM active pointer, production A/B, promotion and rollback | DEFERRED — explicit authorization required |
+| REQ-999-READER | Branch-only bookmarks/navigation/performance not needed by Phase 26–39 | BACKLOG — selective reimplementation only |
 
 ## Requirements Status
 
