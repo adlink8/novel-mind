@@ -9,6 +9,7 @@ from app.services.narrative_memory.builder_worker import (
     NarrativeMemoryBuilderWorker,
     _estimated_input_tokens,
     _is_retryable_lease_error,
+    _is_retryable_provider_reason,
     _node_content,
 )
 from scripts.run_narrative_memory_build import (
@@ -133,6 +134,14 @@ def test_lease_errors_are_limited_to_transient_claim_failures() -> None:
         BuilderRepositoryError("run lease held by another worker")
     )
     assert not _is_retryable_lease_error(BuilderRepositoryError("run cancelled"))
+
+
+def test_provider_quota_failures_pause_for_later_resume() -> None:
+    assert _is_retryable_provider_reason(
+        "VertexAPIError:Vertex HTTP 429: Resource exhausted"
+    )
+    assert _is_retryable_provider_reason("temporarily unavailable")
+    assert not _is_retryable_provider_reason("PackageBuildError: invalid output")
 
 
 @pytest.mark.asyncio

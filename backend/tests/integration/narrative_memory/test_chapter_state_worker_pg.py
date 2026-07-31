@@ -40,6 +40,7 @@ class ControlledTransport:
     def __init__(self) -> None:
         self.calls: list[dict] = []
         self.fail_chapters: set[int] = set()
+        self.stale_claim_key_chapters: set[int] = set()
         self.cancel_after: int | None = None
 
     async def complete(self, **kwargs):
@@ -50,12 +51,17 @@ class ControlledTransport:
         if chapter_number in self.fail_chapters:
             raise RuntimeError("injected_chapter_failure")
         leaf = kwargs["payload"]["evidence_leaves"][0]
+        claim_chapter = (
+            chapter_number - 1
+            if chapter_number in self.stale_claim_key_chapters
+            else chapter_number
+        )
         return {
             "node_key": f"chapter_state:{chapter_number}",
             "display_label": f"Chapter {chapter_number}",
             "claims": [
                 {
-                    "claim_key": f"chapter_state:{chapter_number}:claim:1",
+                    "claim_key": f"chapter_state:{claim_chapter}:claim:1",
                     "payload": {
                         "claim_kind": "entity_state",
                         "entity_kind": "character",
@@ -75,13 +81,39 @@ class ControlledTransport:
             ],
             "source_bindings": [
                 {
-                    "claim_key": f"chapter_state:{chapter_number}:claim:1",
+                    "claim_key": f"chapter_state:{claim_chapter}:claim:1",
                     "evidence_node_id": leaf["evidence_node_id"],
                     "source_key": f"src:{chapter_number}",
                 }
             ],
             "usage": {"input_tokens": 10, "output_tokens": 20},
         }
+
+
+class FullChainTransport(ControlledTransport):
+    """Deterministic provider stub for the complete builder dependency chain."""
+
+    async def complete(self, **kwargs):
+        payload = kwargs["payload"]
+        stage_key = str(payload.get("stage_key", ""))
+        if stage_key == "arc_volume_plan:book":
+            self.calls.append(kwargs)
+            return {
+                "ranges": [
+                    {
+                        "chapter_start": 1,
+                        "chapter_end": 3,
+                        "label": "全书测试故事弧",
+                        "reason": "测试书三章属于同一事件链",
+                    }
+                ],
+                "usage": {"input_tokens": 10, "output_tokens": 20},
+            }
+        if stage_key.startswith("story_arc:") or stage_key == "global_story:book":
+            self.calls.append(kwargs)
+            return {"claims": [], "usage": {"input_tokens": 10, "output_tokens": 20}
+            }
+        return await super().complete(**kwargs)
 
 
 def _policy(**budget_overrides) -> RunPolicy:
@@ -108,6 +140,12 @@ def _policy(**budget_overrides) -> RunPolicy:
         config_hash=HEX_A,
         policy_hash=HEX_A,
     )
+
+
+def _full_policy(**budget_overrides) -> RunPolicy:
+    policy = _policy(**budget_overrides).model_dump(mode="json")
+    policy["stage_order"] = [stage.value for stage in StageKind]
+    return RunPolicy.model_validate(policy)
 
 
 def _deployment(*, unknown_price: bool = False) -> ModelDeploymentSnapshot:
@@ -289,6 +327,71 @@ async def test_chapter_states_complete_with_budget_and_cache(builder_env) -> Non
 
 
 @pytest.mark.asyncio
+async def test_full_test_book_completes_chapter_arc_global_manifest_chain(builder_env) -> None:
+    transport = FullChainTransport()
+    transport.stale_claim_key_chapters = {2}
+    worker = NarrativeMemoryBuilderWorker(
+        builder_env["factory"],
+        inventory_source=PostgresAuditSource,
+        transport=transport,
+        deployment=_deployment(),
+    )
+
+    class _Src:
+        def __init__(self, sessions):
+            self._sessions = sessions
+
+        async def inventory(self, *, owner_id: int, novel_id: int):
+            async with self._sessions() as session:
+                return await PostgresAuditSource(session).inventory(
+                    owner_id=owner_id, novel_id=novel_id
+                )
+
+    worker = NarrativeMemoryBuilderWorker(
+        builder_env["factory"],
+        inventory_source=_Src(builder_env["factory"]),
+        transport=transport,
+        deployment=_deployment(),
+    )
+    run_id = await worker.start_run(
+        owner_id=builder_env["owner_id"],
+        novel_id=builder_env["novel_id"],
+        version_id=builder_env["version_id"],
+        run_policy=_full_policy(),
+    )
+    result = await worker.process_run(
+        owner_id=builder_env["owner_id"],
+        novel_id=builder_env["novel_id"],
+        version_id=builder_env["version_id"],
+    )
+
+    async with builder_env["factory"]() as session:
+        stages = (
+            await session.scalars(
+                select(NarrativeMemoryBuildStage).where(
+                    NarrativeMemoryBuildStage.run_id == run_id
+                )
+            )
+        ).all()
+        by_kind = {stage.stage_kind: stage.status for stage in stages}
+        assert by_kind[StageKind.CHAPTER_STATE.value] == "completed"
+        assert by_kind[StageKind.ARC_VOLUME_PLAN.value] == "completed"
+        assert by_kind[StageKind.ARC_VOLUME_AGGREGATE.value] == "completed"
+        assert by_kind[StageKind.GLOBAL_AGGREGATE.value] == "completed"
+        assert by_kind[StageKind.MANIFEST_VALIDATION.value] == "completed"
+        assert result.status == "completed"
+        assert result.failed_stages == ()
+        assert result.blocked_stages == ()
+        manifest_stage = next(
+            stage
+            for stage in stages
+            if stage.stage_kind == StageKind.MANIFEST_VALIDATION.value
+        )
+        assert manifest_stage.artifact_checksum
+        assert len(transport.calls) == 6  # 3 chapter + plan + arc + global
+
+
+@pytest.mark.asyncio
 async def test_unknown_price_zero_transport(builder_env) -> None:
     transport = ControlledTransport()
 
@@ -320,6 +423,53 @@ async def test_unknown_price_zero_transport(builder_env) -> None:
         version_id=builder_env["version_id"],
     )
     assert transport.calls == []
+
+
+@pytest.mark.asyncio
+async def test_stale_model_claim_key_is_scoped_to_current_chapter(builder_env) -> None:
+    transport = ControlledTransport()
+    transport.stale_claim_key_chapters = {2}
+
+    class _Src:
+        def __init__(self, sessions):
+            self._sessions = sessions
+
+        async def inventory(self, *, owner_id: int, novel_id: int):
+            async with self._sessions() as session:
+                return await PostgresAuditSource(session).inventory(
+                    owner_id=owner_id, novel_id=novel_id
+                )
+
+    worker = NarrativeMemoryBuilderWorker(
+        builder_env["factory"],
+        inventory_source=_Src(builder_env["factory"]),
+        transport=transport,
+        deployment=_deployment(),
+    )
+    await worker.start_run(
+        owner_id=builder_env["owner_id"],
+        novel_id=builder_env["novel_id"],
+        version_id=builder_env["version_id"],
+        run_policy=_policy(),
+    )
+    result = await worker.process_run(
+        owner_id=builder_env["owner_id"],
+        novel_id=builder_env["novel_id"],
+        version_id=builder_env["version_id"],
+    )
+
+    assert result.failed_stages == ()
+    async with builder_env["factory"]() as session:
+        claims = (
+            await session.scalars(
+                select(NarrativeMemoryClaim).where(
+                    NarrativeMemoryClaim.version_id == builder_env["version_id"]
+                )
+            )
+        ).all()
+        assert {
+            claim.claim_key for claim in claims if claim.visible_from_chapter == 2
+        } == {"chapter_state:2:claim:1"}
 
 
 @pytest.mark.asyncio

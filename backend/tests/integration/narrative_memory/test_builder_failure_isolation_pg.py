@@ -114,3 +114,44 @@ async def test_resume_preserves_completed_sibling_artifacts(builder_env) -> None
         for key, checksum in node_checksums.items():
             row = next(n for n in nodes_after if n.node_key == key)
             assert row.content_checksum == checksum
+
+
+@pytest.mark.asyncio
+async def test_provider_rate_limit_pauses_with_exact_stage_reason(builder_env) -> None:
+    class RateLimitedTransport(ControlledTransport):
+        async def complete(self, **kwargs):
+            self.calls.append(kwargs)
+            raise RuntimeError("Vertex HTTP 429: Resource exhausted")
+
+    transport = RateLimitedTransport()
+    worker = NarrativeMemoryBuilderWorker(
+        builder_env["factory"],
+        inventory_source=_Src(builder_env["factory"]),
+        transport=transport,
+        deployment=_deployment(),
+    )
+    run_id = await worker.start_run(
+        owner_id=builder_env["owner_id"],
+        novel_id=builder_env["novel_id"],
+        version_id=builder_env["version_id"],
+        run_policy=_policy(),
+    )
+
+    result = await worker.process_run(
+        owner_id=builder_env["owner_id"],
+        novel_id=builder_env["novel_id"],
+        version_id=builder_env["version_id"],
+    )
+
+    assert result.status == "paused_dependency"
+    assert len(transport.calls) == 1
+    async with builder_env["factory"]() as session:
+        stage = await session.scalar(
+            select(NarrativeMemoryBuildStage).where(
+                NarrativeMemoryBuildStage.run_id == run_id,
+                NarrativeMemoryBuildStage.stage_key == "chapter_state:1",
+            )
+        )
+        assert stage is not None
+        assert stage.status == "paused_dependency"
+        assert "Vertex HTTP 429" in (stage.status_reason or "")
