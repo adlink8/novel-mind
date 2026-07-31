@@ -5,7 +5,7 @@
 | Gap | Status | Evidence |
 |---|---|---|
 | 22-G1 | VERIFIED_LOCAL | stable workflow classifications; CI policy 116 passed; relationship helper decoupled from unrelated timeline status; full frontend coverage 3/3 repeated (248 each) |
-| 22-G2 | IMPLEMENTED_LOCAL / BLOCKED_REMOTE_SETUP | hosted preflight and signed terminal finalizer committed; Runner/token setup and scheduled artifact inspection pending |
+| 22-G2 | VERIFIED_CONTROL_PLANE / BLOCKED_OPERATOR_SETUP | run 30623438107 emitted signed blocked terminal artifacts without scheduling a provider Runner; token/Runner setup and real schedule observation pending |
 | 22-G3 | IMPLEMENTED_LOCAL / BLOCKED_OBSERVATION | stable fingerprint, recurrence update and green auto-close covered by policy tests; 0/3 scheduled green |
 
 ## Consecutive Scheduled Green Runs
@@ -32,6 +32,17 @@
 - Production commit `495b29a`: optional provider Runner is preflight-gated; every terminal
   path produces a signed canonical report; only explicit `promotable=true` can reach
   baseline promotion.
+- PR #31 merged to master as `912ca6b`; merge push CI passed.
+- Workflow-dispatch run `30623438107`: all ordinary producers and Live smoke passed;
+  preflight completed on GitHub-hosted capacity; provider benchmark skipped; finalizer passed;
+  promotion skipped; `ci-gate` failed closed as designed for an incomparable Nightly.
+- Downloaded `nightly-control-report`: `nightly-authority.v1`,
+  `provider_ready=false`, `reason=runner_registry_unavailable`, runner count `0`.
+- Downloaded `nightly-rag-report`: `rag-quality.v1`, `blocked_dependency`,
+  `quality_comparable=false`, `metrics=null`, `promotable=false`, 64-character signature,
+  lineage bound to run `30623438107` and commit `912ca6b`.
+- Alert issue #32 classified the root cause as `runner-or-environment-unavailable` and
+  exposed the non-comparable report summary without full text.
 - GitHub run `30607067442`: 1 frontend test failed; Nightly skipped.
 - GitHub runs `30330904855`, `30424693088`, `30515165945`: Nightly runner
   unavailable until cancellation.
