@@ -526,7 +526,9 @@ async def _wait_clues(full_run_id: int, run_id: int) -> None:
         await asyncio.sleep(0.8)
 
 
-async def _run_nm(full_run_id: int, owner_id: int, novel_id: int) -> None:
+async def _run_nm(
+    full_run_id: int, owner_id: int, novel_id: int
+) -> dict[str, Any]:
     from scripts.run_narrative_memory_build import run_narrative_memory_build
 
     async def callback(stage: str, completed: int, total: int, status: str) -> None:
@@ -545,13 +547,7 @@ async def _run_nm(full_run_id: int, owner_id: int, novel_id: int) -> None:
         novel_id=novel_id,
         progress_callback=callback,
     )
-    if result.get("status") != "completed":
-        raise FullAnalysisError(
-            result.get("status_reason") or f"叙事记忆任务{result.get('status')}"
-        )
-    await _update_progress(
-        full_run_id, stage="nm_aggregate", completed=1, total=1, detail="candidate_ready"
-    )
+    return result
 
 
 async def run_full_analysis(run_id: int) -> None:
@@ -608,7 +604,24 @@ async def run_full_analysis(run_id: int) -> None:
 
         await _check_cancelled(run_id)
         await _update_progress(run_id, stage="nm_chapter_state", completed=0, total=1)
-        await _run_nm(run_id, owner_id, novel_id)
+        nm_result = await _run_nm(run_id, owner_id, novel_id)
+        nm_status = str(nm_result.get("status") or "failed")
+        if nm_status != "completed":
+            reason = str(
+                nm_result.get("status_reason")
+                or f"叙事记忆任务{nm_status}"
+            )
+            if nm_status in {"paused_dependency", "paused_budget", "cancelled"}:
+                await _set_run_status(run_id, nm_status, reason=reason)
+                return
+            raise FullAnalysisError(reason)
+        await _update_progress(
+            run_id,
+            stage="nm_aggregate",
+            completed=1,
+            total=1,
+            detail="candidate_ready",
+        )
         await _set_run_status(run_id, "completed")
     except FullAnalysisCancelled as exc:
         await _set_run_status(run_id, "cancelled", reason=str(exc))

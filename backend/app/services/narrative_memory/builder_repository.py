@@ -296,3 +296,28 @@ class BuilderRepository:
             run.boundary_plan = boundary_plan
             run.boundary_plan_checksum = boundary_plan_checksum
         await self._session.flush()
+
+    async def prepare_run_for_resume(self, run_id: int) -> None:
+        """Requeue unfinished stages without discarding completed artifacts."""
+
+        run = await self._session.get(
+            NarrativeMemoryBuildRun, run_id, with_for_update=True
+        )
+        if run is None:
+            raise BuilderRepositoryError("run not found")
+
+        run.cancel_requested = False
+        run.status = "pending"
+        run.status_reason = None
+        # A previous process may have died while holding a lease or while a
+        # stage was marked running. The next worker must be able to reclaim it.
+        run.lease_id = None
+        run.lease_expires_at = None
+        run.heartbeat_at = None
+
+        stages = await self.list_stages(run_id)
+        for stage in stages:
+            if stage.status in {"running", "failed", "blocked_dependency", "cancelled"}:
+                stage.status = "pending"
+                stage.status_reason = None
+        await self._session.flush()
