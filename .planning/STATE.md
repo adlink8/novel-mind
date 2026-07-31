@@ -2,7 +2,7 @@
 gsd_state_version: 2
 updated_at: 2026-07-31
 baseline_branch: master
-baseline_commit: 01503c29209b4b6a1b4caa5284fc04d4e38debe5
+baseline_commit: 5304619f4436043249abda744efab4769f0049f0
 active_milestone: v1.1
 active_phase: 22-ci-nightly-gap-closure
 active_plan: 22-G2
@@ -38,7 +38,8 @@ No single aggregate completion percentage is authoritative.
 ## Active Work
 
 1. `22-G1`: verified locally — stable failure classification and reproducible entry points.
-2. `22-G2`: active — Nightly artifact/environment/provider authority.
+2. `22-G2`: implementation committed — hosted preflight/finalizer complete; remote Runner
+   setup and scheduled artifact inspection pending.
 3. `22-G3`: lifecycle logic verified locally; three scheduled green observations remain.
 
 ## Latest Evidence
@@ -48,7 +49,10 @@ No single aggregate completion percentage is authoritative.
 - Runs `30330904855`, `30424693088`, `30515165945`: self-hosted Nightly runner unavailable,
   then cancelled.
 - Open automated alert issues: #24, #25, #27, #28.
-- Local frontend coverage run: 29 files / 248 tests passed once; repeat evidence pending.
+- PR #30 merged as `5304619`; this is the current master execution baseline.
+- G2 local contracts: 126 CI tests passed; actionlint and Ruff passed.
+- GitHub Runner inventory remains empty; operator setup is recorded in
+  `22-G2-USER-SETUP.md`.
 
 ## Execution Cursor
 
