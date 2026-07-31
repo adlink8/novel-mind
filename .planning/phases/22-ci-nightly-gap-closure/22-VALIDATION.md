@@ -4,7 +4,7 @@
 
 | Gap | Status | Evidence |
 |---|---|---|
-| 22-G1 | VERIFIED_LOCAL | stable workflow classifications; CI policy 116 passed; relationship test 5/5 repeated; full frontend 248 passed |
+| 22-G1 | VERIFIED_LOCAL | stable workflow classifications; CI policy 116 passed; relationship helper decoupled from unrelated timeline status; full frontend coverage 3/3 repeated (248 each) |
 | 22-G2 | PLANNED | self-hosted runner starvation and artifact gap confirmed |
 | 22-G3 | IMPLEMENTED_LOCAL / BLOCKED_OBSERVATION | stable fingerprint, recurrence update and green auto-close covered by policy tests; 0/3 scheduled green |
 
@@ -21,6 +21,9 @@
 - `npm run test:coverage`: 29 files passed, 248 tests passed (2026-07-31).
 - `npx vitest run src/app/analysis/relationships.test.tsx --coverage.enabled=false`:
   5 consecutive local runs passed, 18 tests each.
+- `npm run test:coverage`: 3 additional consecutive full-suite runs passed after the
+  helper was changed to wait for the user-visible relationship tab rather than the
+  unrelated timeline status request.
 - `PYTHONPATH=. pytest tests/ci -q`: 116 passed.
 - `actionlint v1.7.12`: passed.
 - GitHub run `30607067442`: 1 frontend test failed; Nightly skipped.

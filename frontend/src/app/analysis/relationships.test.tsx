@@ -304,8 +304,9 @@ async function selectNovelAndOpenRelationships() {
   fireEvent.change(await screen.findByLabelText("选择小说"), {
     target: { value: "11" },
   });
-  await waitFor(() => expect(mocks.status).toHaveBeenCalled(), { timeout: 3000 });
-  fireEvent.click(screen.getByRole("tab", { name: "人物关系" }));
+  fireEvent.click(
+    await screen.findByRole("tab", { name: "人物关系" }, { timeout: 3000 })
+  );
   await waitFor(() => expect(mocks.getGraph).toHaveBeenCalled(), { timeout: 3000 });
 }
 
