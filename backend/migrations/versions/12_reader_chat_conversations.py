@@ -15,6 +15,10 @@ depends_on = None
 
 READER_CHAT_TABLES = [
     "reader_conversations",
+    # ReaderMessage carries a nullable FK to generated_images in the current
+    # ORM.  Create the referenced table before creating reader_messages so a
+    # clean database can upgrade through this historical migration.
+    "generated_images",
     "reader_messages",
     "reader_message_selections",
     "reader_context_manifests",

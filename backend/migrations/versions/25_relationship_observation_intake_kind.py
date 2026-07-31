@@ -56,7 +56,7 @@ def downgrade() -> None:
     op.drop_constraint(
         "ck_rel_observations_intake_kind",
         "relationship_observations",
-        type="check",
+        type_="check",
     )
     op.drop_index(
         "idx_rel_observations_intake_kind",
