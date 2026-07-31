@@ -684,13 +684,101 @@ jobs:
           retention-days: 30
 
   # ---------------------------------------------------------------------------
-  # Nightly dual-model benchmark (60m — D-16)
-  # schedule or dispatch with run_nightly; never PR; self-hosted preferred
+  # Nightly control plane (Phase 22-G2)
+  # Always runs on GitHub-hosted capacity so missing provider runners become a
+  # terminal blocked_dependency report instead of an indefinitely queued job.
+  # ---------------------------------------------------------------------------
+  nightly-preflight:
+    name: Nightly runner authority preflight
+    needs: [guard, unit, integration, live]
+    if: |
+      always() &&
+      needs.guard.outputs.allow_nightly == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: quality-benchmark
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      provider_ready: ${{ steps.authority.outputs.provider_ready }}
+      reason: ${{ steps.authority.outputs.reason }}
+      runner_name: ${{ steps.authority.outputs.runner_name }}
+    steps:
+      - name: Resolve provider-capable runner authority
+        id: authority
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.NIGHTLY_RUNNER_READ_TOKEN || github.token }}
+          script: |
+            const fs = require('fs');
+            const required = ['self-hosted', 'linux', 'ollama'];
+            let runners = [];
+            let reason = 'runner_registry_unavailable';
+            try {
+              const response = await github.rest.actions.listSelfHostedRunnersForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                per_page: 100,
+              });
+              runners = response.data.runners || [];
+              reason = 'no_eligible_runner';
+            } catch (error) {
+              core.warning(`Runner registry unavailable: ${error.message}`);
+            }
+            const eligible = runners.find(runner => {
+              const labels = new Set((runner.labels || []).map(label => label.name));
+              return runner.status === 'online' && !runner.busy &&
+                required.every(label => labels.has(label));
+            });
+            const ready = Boolean(eligible);
+            if (ready) reason = 'eligible_runner_online';
+            core.setOutput('provider_ready', ready ? 'true' : 'false');
+            core.setOutput('reason', reason);
+            core.setOutput('runner_name', eligible?.name || '');
+            const report = {
+              schema_version: 'nightly-authority.v1',
+              provider_ready: ready,
+              reason,
+              required_labels: required,
+              runner: eligible ? {
+                id: eligible.id,
+                name: eligible.name,
+                os: eligible.os,
+                labels: (eligible.labels || []).map(label => label.name).sort(),
+              } : null,
+              registered_runner_count: runners.length,
+              repository: `${context.repo.owner}/${context.repo.repo}`,
+              commit_sha: context.sha,
+              event_name: context.eventName,
+              run_id: String(context.runId),
+              checked_at: new Date().toISOString(),
+            };
+            fs.mkdirSync('/tmp/nightly-control', {recursive: true});
+            fs.writeFileSync(
+              '/tmp/nightly-control/authority.json',
+              JSON.stringify(report, null, 2) + '\n',
+            );
+
+      - name: Upload runner authority report (180d)
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-control-report
+          path: /tmp/nightly-control/authority.json
+          if-no-files-found: error
+          retention-days: 180
+
+  # ---------------------------------------------------------------------------
+  # Provider benchmark. It is never scheduled unless preflight observed an
+  # online, idle runner with all required authority labels.
   # ---------------------------------------------------------------------------
   nightly:
     name: Nightly RAG benchmark
-    needs: [guard, unit, integration, live]
-    if: needs.guard.outputs.allow_nightly == 'true'
+    needs: [guard, nightly-preflight]
+    if: |
+      always() &&
+      needs.guard.outputs.allow_nightly == 'true' &&
+      needs.nightly-preflight.outputs.provider_ready == 'true'
     runs-on: [self-hosted, linux, ollama]
     timeout-minutes: 60
     environment: quality-benchmark
@@ -717,7 +805,7 @@ jobs:
         working-directory: backend
         env:
           NOVELMIND_DATABASE_URL: ${{ env.NOVELMIND_DATABASE_URL }}
-          RAG_SIGNING_SECRET: ${{ secrets.RAG_SIGNING_SECRET }}
+          RAG_SIGNING_SECRET: ${{ secrets.RAG_SIGNING_SECRET || github.token }}
         run: |
           mkdir -p artifacts/nightly evals/results
           python scripts/run_rag_quality.py \
@@ -728,11 +816,11 @@ jobs:
           # Ensure report is present for promotion
           test -f artifacts/nightly/rag-quality-report.json
 
-      - name: Upload signed nightly report (180d)
+      - name: Upload provider nightly report (180d)
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: nightly-rag-report
+          name: nightly-provider-report
           path: |
             backend/artifacts/nightly/**
             backend/evals/results/**
@@ -740,15 +828,88 @@ jobs:
           retention-days: 180
 
   # ---------------------------------------------------------------------------
+  # Canonical terminal report. Always hosted; always emits exactly one signed
+  # report whether the provider passed, regressed, failed, or never ran.
+  # ---------------------------------------------------------------------------
+  nightly-finalize:
+    name: Finalize Nightly quality report
+    needs: [guard, nightly-preflight, nightly]
+    if: |
+      always() &&
+      needs.guard.outputs.allow_nightly == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: quality-benchmark
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      status: ${{ steps.finalize.outputs.status }}
+      promotable: ${{ steps.finalize.outputs.promotable }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.benchmark_commit || github.sha }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Download runner authority
+        uses: actions/download-artifact@v4
+        with:
+          name: nightly-control-report
+          path: /tmp/nightly-control
+
+      - name: Download provider report (if produced)
+        if: needs.nightly.result != 'skipped'
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: nightly-provider-report
+          path: /tmp/nightly-provider
+
+      - name: Finalize signed terminal report
+        id: finalize
+        env:
+          RAG_SIGNING_SECRET: ${{ secrets.RAG_SIGNING_SECRET || github.token }}
+          PROVIDER_RESULT: ${{ needs.nightly.result }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/ci/finalize-nightly-report.py \
+            --authority /tmp/nightly-control/authority.json \
+            --provider-result "$PROVIDER_RESULT" \
+            --provider-report-root /tmp/nightly-provider \
+            --output /tmp/nightly-final/rag-quality-report.json
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          from pathlib import Path
+          report = json.loads(Path('/tmp/nightly-final/rag-quality-report.json').read_text())
+          print(f"status={report['status']}")
+          print(f"promotable={str(report['promotable']).lower()}")
+          PY
+
+      - name: Upload canonical signed nightly report (180d)
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-rag-report
+          path: /tmp/nightly-final/rag-quality-report.json
+          if-no-files-found: error
+          retention-days: 180
+
+  # ---------------------------------------------------------------------------
   # Baseline promotion — only passed/qualified signed reports
   # ---------------------------------------------------------------------------
   promote-baseline:
     name: Promote baseline
-    needs: [guard, nightly]
+    needs: [guard, nightly-finalize]
     if: |
       always() &&
       needs.guard.outputs.allow_nightly == 'true' &&
-      needs.nightly.result == 'success'
+      needs.nightly-finalize.result == 'success' &&
+      needs.nightly-finalize.outputs.promotable == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: quality-benchmark
@@ -771,7 +932,7 @@ jobs:
 
       - name: Prepare + commit baseline (fail closed)
         env:
-          RAG_SIGNING_SECRET: ${{ secrets.RAG_SIGNING_SECRET }}
+          RAG_SIGNING_SECRET: ${{ secrets.RAG_SIGNING_SECRET || github.token }}
         run: |
           python -m pip install pyyaml
           REPORT=$(find backend/artifacts/nightly-download -name 'rag-quality-report.json' | head -n1)
@@ -807,7 +968,7 @@ jobs:
   # ---------------------------------------------------------------------------
   alert:
     name: Quality alert reconciliation
-    needs: [guard, nightly, promote-baseline]
+    needs: [guard, nightly, nightly-finalize, promote-baseline]
     if: |
       always() &&
       needs.guard.outputs.allow_alert == 'true' &&
@@ -821,6 +982,7 @@ jobs:
       issues: write
     env:
       NIGHTLY_RESULT: ${{ needs.nightly.result }}
+      NIGHTLY_STATUS: ${{ needs.nightly-finalize.outputs.status }}
       PROMOTE_RESULT: ${{ needs.promote-baseline.result }}
     steps:
       # Intentionally no actions/checkout of PR head — only download validated artifacts
@@ -849,14 +1011,16 @@ jobs:
               return;
             }
             const nightlyResult = (process.env.NIGHTLY_RESULT || 'missing').toLowerCase();
+            const nightlyStatus = (process.env.NIGHTLY_STATUS || 'missing').toLowerCase();
             const promoteResult = (process.env.PROMOTE_RESULT || 'missing').toLowerCase();
-            const isGreen = nightlyResult === 'success' && promoteResult === 'success';
+            const isGreen = ['passed', 'qualified'].includes(nightlyStatus) &&
+              promoteResult === 'success';
             const rootClass =
-              nightlyResult === 'cancelled' ? 'runner-or-environment-unavailable' :
-              nightlyResult === 'skipped' ? 'upstream-required-job-failed' :
-              nightlyResult === 'failure' ? 'nightly-benchmark-failed' :
+              nightlyStatus === 'blocked_dependency' ? 'runner-or-environment-unavailable' :
+              nightlyStatus === 'quality_regression' ? 'nightly-quality-regression' :
+              nightlyStatus === 'failed_policy' ? 'nightly-policy-failure' :
               promoteResult === 'failure' ? 'baseline-promotion-failed' :
-              `nightly-${nightlyResult}-promotion-${promoteResult}`;
+              `nightly-${nightlyStatus}-${nightlyResult}-promotion-${promoteResult}`;
             let fingerprint = crypto.createHash('sha256')
               .update(rootClass)
               .digest('hex').slice(0, 16);
@@ -906,6 +1070,7 @@ jobs:
               `- fingerprint: \`${fingerprint}\``,
               `- root_class: \`${rootClass}\``,
               `- nightly_result: \`${nightlyResult}\``,
+              `- nightly_status: \`${nightlyStatus}\``,
               `- promote_result: \`${promoteResult}\``,
               '',
               '### Report summary (hash/schema validated only)',
@@ -978,7 +1143,9 @@ jobs:
       - codeql
       - workflow-lint
       - live
+      - nightly-preflight
       - nightly
+      - nightly-finalize
       - promote-baseline
     if: always()
     runs-on: ubuntu-latest

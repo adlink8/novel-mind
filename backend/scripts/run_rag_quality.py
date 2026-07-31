@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -68,6 +69,7 @@ def main() -> int:
         help="Use durable worker (lease/checkpoint)",
     )
     args = parser.parse_args()
+    signing_secret = os.getenv("RAG_SIGNING_SECRET", DEFAULT_SIGNING_SECRET)
 
     data = load_json(args.fixture)
     snap = SourceSnapshot.model_validate(data["snapshot"])
@@ -81,7 +83,10 @@ def main() -> int:
     else:
         # Synthetic passed calibration bound to case judge lineage for offline CLI
         if j is None:
-            print("[ERR] no judge lineage in fixtures and no --calibration", file=sys.stderr)
+            print(
+                "[ERR] no judge lineage in fixtures and no --calibration",
+                file=sys.stderr,
+            )
             return 2
         cal = CalibrationReport(
             suite_hash="a" * 64,
@@ -119,7 +124,7 @@ def main() -> int:
                 "cost_usd_total": 999.0,
             },
             health=health,
-            secret=DEFAULT_SIGNING_SECRET,
+            secret=signing_secret,
         )
         if not establish.get("metrics"):
             print(
@@ -129,7 +134,10 @@ def main() -> int:
             )
             out = Path(args.output)
             out.parent.mkdir(parents=True, exist_ok=True)
-            out.write_text(json.dumps(establish, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+            out.write_text(
+                json.dumps(establish, ensure_ascii=False, indent=2, default=str),
+                encoding="utf-8",
+            )
             return 1
         baseline = make_baseline_from_metrics(establish["metrics"])
 
@@ -140,7 +148,10 @@ def main() -> int:
         chunker_config=chunker_cfg,
         chunker_config_hash=recompute_chunker_config_hash(chunker_cfg),
         chunk_manifest_hash=stable_hash(
-            {"chunks": [c.content_hash for c in snap.chunks], "chunker": "baseline-fixed"}
+            {
+                "chunks": [c.content_hash for c in snap.chunks],
+                "chunker": "baseline-fixed",
+            }
         ),
         source_snapshot_hash=snap.manifest_hash,
     )
@@ -148,9 +159,7 @@ def main() -> int:
     if args.durable:
 
         async def _durable() -> dict:
-            worker = RagQualityWorker(
-                store=QualityJobStore(), secret=DEFAULT_SIGNING_SECRET
-            )
+            worker = RagQualityWorker(store=QualityJobStore(), secret=signing_secret)
             job = await worker.create_job(
                 owner_id=args.owner_id,
                 snapshot=snap,
@@ -178,7 +187,7 @@ def main() -> int:
             calibration_report=cal,
             baseline=baseline,
             health=health,
-            secret=DEFAULT_SIGNING_SECRET,
+            secret=signing_secret,
             chunker_lineage=chunker,
         )
 

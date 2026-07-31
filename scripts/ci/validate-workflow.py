@@ -34,7 +34,9 @@ LOCKED_JOB_TIMEOUTS = {
     "integration": 15,
     "browser": 15,
     "live": 45,
+    "nightly-preflight": 5,
     "nightly": 60,
+    "nightly-finalize": 5,
 }
 
 LOCKED_RETENTION = {
@@ -44,7 +46,7 @@ LOCKED_RETENTION = {
     "nightly_signed_reports_baselines": 180,
 }
 
-SECRET_JOBS = ("live", "nightly", "promote-baseline", "alert")
+SECRET_JOBS = ("live", "nightly", "nightly-finalize", "promote-baseline", "alert")
 SELF_HOSTED_JOBS = ("nightly",)
 WRITE_ISSUE_JOBS = ("alert",)
 

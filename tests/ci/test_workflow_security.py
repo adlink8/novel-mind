@@ -63,7 +63,9 @@ def test_job_timeouts_locked(workflow: dict, policy: dict) -> None:
     assert jobs["integration"]["timeout-minutes"] == 15
     assert jobs["browser"]["timeout-minutes"] == 15
     assert jobs["live"]["timeout-minutes"] == 45
+    assert jobs["nightly-preflight"]["timeout-minutes"] == 5
     assert jobs["nightly"]["timeout-minutes"] == 60
+    assert jobs["nightly-finalize"]["timeout-minutes"] == 5
 
 
 def test_concurrency_pr_cancel_only(workflow: dict, policy: dict) -> None:
@@ -74,7 +76,7 @@ def test_concurrency_pr_cancel_only(workflow: dict, policy: dict) -> None:
 
 def test_secret_jobs_gated(workflow: dict) -> None:
     vw.assert_secret_jobs_not_on_pr(workflow)
-    for name in ("live", "nightly", "promote-baseline", "alert"):
+    for name in ("live", "nightly", "nightly-finalize", "promote-baseline", "alert"):
         assert "if" in workflow["jobs"][name]
 
 
@@ -82,6 +84,25 @@ def test_self_hosted_nightly_only(workflow: dict) -> None:
     vw.assert_self_hosted_isolation(workflow)
     runs = workflow["jobs"]["nightly"]["runs-on"]
     assert "self-hosted" in str(runs)
+
+
+def test_nightly_control_plane_is_always_hosted_and_emits_terminal_artifact(workflow: dict) -> None:
+    jobs = workflow["jobs"]
+    preflight = jobs["nightly-preflight"]
+    finalize = jobs["nightly-finalize"]
+    assert preflight["runs-on"] == "ubuntu-latest"
+    assert finalize["runs-on"] == "ubuntu-latest"
+    assert preflight["environment"] == "quality-benchmark"
+    assert "provider_ready" in preflight["outputs"]
+    assert "nightly-preflight.outputs.provider_ready == 'true'" in jobs["nightly"]["if"]
+    assert "promotable" in finalize["outputs"]
+    assert "nightly-finalize.outputs.promotable == 'true'" in jobs["promote-baseline"]["if"]
+    finalize_blob = yaml.dump(finalize, sort_keys=False)
+    preflight_blob = yaml.dump(preflight, sort_keys=False)
+    assert "NIGHTLY_RUNNER_READ_TOKEN" in preflight_blob
+    assert "finalize-nightly-report.py" in finalize_blob
+    assert "nightly-rag-report" in finalize_blob
+    assert "if-no-files-found: error" in finalize_blob
 
 
 def test_alert_isolation_d18(workflow: dict, policy: dict) -> None:
@@ -97,10 +118,12 @@ def test_alert_lifecycle_uses_stable_root_fingerprint(workflow: dict) -> None:
     alert = workflow["jobs"]["alert"]
     blob = yaml.dump(alert, sort_keys=False)
     assert "NIGHTLY_RESULT" in alert["env"]
+    assert "NIGHTLY_STATUS" in alert["env"]
     assert "PROMOTE_RESULT" in alert["env"]
     assert "rootClass" in blob
     assert "runner-or-environment-unavailable" in blob
-    assert "upstream-required-job-failed" in blob
+    assert "nightly-quality-regression" in blob
+    assert "nightly-policy-failure" in blob
     assert "state_reason" in blob
     assert "completed" in blob
     assert "nightly-fail:${context.runId}" not in blob
