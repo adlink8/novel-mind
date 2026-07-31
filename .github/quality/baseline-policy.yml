@@ -88,7 +88,9 @@ job_timeouts_minutes:
   integration: 15
   browser: 15
   live: 45
+  nightly-preflight: 5
   nightly: 60
+  nightly-finalize: 5
 
 security:
   actionlint_version: v1.7.12
@@ -147,7 +149,9 @@ events:
       - codeql
       - workflow-lint
       - live
+      - nightly-preflight
       - nightly
+      - nightly-finalize
       - promote-baseline
       - alert
   workflow_dispatch:

@@ -1,7 +1,7 @@
 {
   "project": "NovelMind",
   "baseline_branch": "master",
-  "baseline_commit": "01503c29209b4b6a1b4caa5284fc04d4e38debe5",
+  "baseline_commit": "5304619f4436043249abda744efab4769f0049f0",
   "active_milestone": "v1.1",
   "active_phase": "22-ci-nightly-gap-closure",
   "active_plan": "22-G2",
@@ -23,5 +23,8 @@
     "narrative_memory": "candidate_only",
     "active_pointer_cutover": "explicit_authorization_required",
     "backlog": "999.x"
+  },
+  "workflow": {
+    "_auto_chain_active": false
   }
 }
