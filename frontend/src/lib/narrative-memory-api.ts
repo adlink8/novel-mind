@@ -171,7 +171,16 @@ export function pickLatestPreviewVersion(
   versions: NmVersionListItem[]
 ): NmVersionListItem | null {
   if (!versions.length) return null;
-  return [...versions].sort((a, b) => b.version_id - a.version_id)[0] ?? null;
+  return (
+    [...versions].sort((a, b) => {
+      // A retry can leave a newer candidate with fewer persisted chapter
+      // states. Prefer the most useful preview, then use version id as the
+      // deterministic tie-breaker.
+      const aChapters = a.node_counts?.chapter_state ?? -1;
+      const bChapters = b.node_counts?.chapter_state ?? -1;
+      return bChapters - aChapters || b.version_id - a.version_id;
+    })[0] ?? null
+  );
 }
 
 export const NM_PREVIEW_BADGE_LABEL = "叙事记忆候选 · 预览未发布";

@@ -17,10 +17,21 @@ const mocks = vi.hoisted(() => ({
   nmGetTree: vi.fn(),
   nmGetClaims: vi.fn(),
   nmGetSourceLinks: vi.fn(),
+  fullStatus: vi.fn(),
+  fullStart: vi.fn(),
+  fullCancel: vi.fn(),
 }));
 
 vi.mock("@/lib/api", () => ({
-  novelsApi: { list: mocks.list },
+  novelsApi: {
+    list: mocks.list,
+    getChapters: vi.fn().mockResolvedValue({ data: [] }),
+  },
+  analysisApi: {
+    fullStatus: mocks.fullStatus,
+    fullStart: mocks.fullStart,
+    fullCancel: mocks.fullCancel,
+  },
   timelineApi: {
     startOrResume: mocks.startOrResume,
     getTimeline: mocks.getTimeline,
@@ -279,6 +290,7 @@ describe("global analysis timeline workspace", () => {
         claims: [],
       },
     });
+    mocks.fullStatus.mockRejectedValue(new Error("not started"));
   });
 
   it("does not auto-start; live run prefers candidate events for chart/list", async () => {
@@ -489,6 +501,75 @@ describe("global analysis timeline workspace", () => {
     await waitFor(() =>
       expect(mocks.setFullBookPreference).toHaveBeenCalledWith("11", true)
     );
+  });
+
+  it("refreshes the NM candidate tree as full analysis progresses", async () => {
+    const running = (completed: number, updatedAt: string) => ({
+      data: {
+        id: 9,
+        novel_id: 11,
+        status: "running",
+        stage: "nm_chapter_state",
+        progress: `${completed}/483`,
+        stage_index: 6,
+        stage_total: 6,
+        cancel_requested: false,
+        updated_at: updatedAt,
+      },
+    });
+    mocks.fullStatus
+      .mockResolvedValueOnce(running(25, "2026-07-31T00:00:25Z"))
+      .mockResolvedValueOnce(running(37, "2026-07-31T00:00:37Z"))
+      .mockResolvedValue(running(37, "2026-07-31T00:00:37Z"));
+    mocks.nmListVersions.mockResolvedValue({
+      data: {
+        novel_id: 11,
+        versions: [
+          {
+            version_id: 20,
+            version_key: "candidate-20",
+            readiness: "incomplete",
+            badge: "candidate_preview",
+            has_manifest: false,
+          },
+        ],
+        publication_status: "candidate_preview",
+      },
+    });
+    let treeCalls = 0;
+    mocks.nmGetTree.mockImplementation(async () => {
+      treeCalls += 1;
+      const count = treeCalls === 1 ? 25 : 37;
+      return {
+        data: {
+          novel_id: 11,
+          version_id: 20,
+          through_chapter: 483,
+          publication_status: "candidate_preview",
+          readiness: "incomplete",
+          nodes: Array.from({ length: count }, (_, index) => ({
+            id: index + 1,
+            node_key: `chapter_state:${index + 1}`,
+            node_kind: "chapter_state",
+            display_label: null,
+            chapter_start: index + 1,
+            chapter_end: index + 1,
+            child_ids: [],
+          })),
+        },
+      };
+    });
+
+    render(<AnalysisPage />);
+    fireEvent.change(await screen.findByLabelText("选择小说"), {
+      target: { value: "11" },
+    });
+
+    expect(
+      await screen.findByRole("button", { name: /第 37 章/ })
+    ).toBeInTheDocument();
+    expect(mocks.fullStatus).toHaveBeenCalledTimes(2);
+    expect(mocks.nmGetTree.mock.calls.length).toBeGreaterThan(1);
   });
 
   it.each([

@@ -162,10 +162,13 @@ function AnalysisWorkspace() {
   const [error, setError] = useState("");
   const envelopeSigRef = useRef("");
   const progressSigRef = useRef("");
+  const fullProgressSigRef = useRef("");
   const sourceRef = useRef(source);
   const runStatusRef = useRef<string | null>(null);
   /** Last through_chapter used for NM tree fetch (re-fetch on spoiler change). */
   const nmTreeThroughRef = useRef<number | null>(null);
+  /** Ignore stale tree responses when progress polling overlaps a refresh. */
+  const structureLoadSeqRef = useRef(0);
   const selectedNodeRef = useRef<StructureNodeSelection | null>(null);
   /** 选中作品的章节真实标题（chapters 表），结构树标签统一用它补全章节名。 */
   const chapterTitlesRef = useRef<Record<number, string>>({});
@@ -245,6 +248,10 @@ function AnalysisWorkspace() {
       throughOverride?: number | "",
       opts?: { preserveSelection?: boolean }
     ) => {
+      const requestSeq = ++structureLoadSeqRef.current;
+      const preserveExistingTree = Boolean(opts?.preserveSelection);
+      const isCurrentRequest = () =>
+        requestSeq === structureLoadSeqRef.current;
       const chapterCount = novelMeta?.chapter_count ?? 1;
       try {
         // 章节标题与 NM 版本并行取；标题只用于树标签，失败不阻断主流程
@@ -262,9 +269,10 @@ function AnalysisWorkspace() {
           }
           chapterTitlesRef.current = map;
         }
+        if (!isCurrentRequest()) return;
         const latest = pickLatestPreviewVersion(versionsRes.data.versions ?? []);
         if (!latest) {
-          applyChapterForest(chapterCount);
+          if (!preserveExistingTree) applyChapterForest(chapterCount);
           return;
         }
         const effectiveThrough =
@@ -276,11 +284,12 @@ function AnalysisWorkspace() {
         const treeRes = await narrativeMemoryApi.getTree(id, latest.version_id, {
           through_chapter: through,
         });
+        if (!isCurrentRequest()) return;
         const forest = buildNmStructureTree(treeRes.data.nodes ?? [], {
           chapterTitles: chapterTitlesRef.current,
         });
         if (!forest.length) {
-          applyChapterForest(chapterCount);
+          if (!preserveExistingTree) applyChapterForest(chapterCount);
           return;
         }
         const resolvedThrough =
@@ -289,8 +298,11 @@ function AnalysisWorkspace() {
           preserveSelection: opts?.preserveSelection,
         });
       } catch {
-        // Honest fallback: no NM or API error → chapter structure only
-        applyChapterForest(chapterCount);
+        // Initial load falls back to chapters. During a live refresh, keep the
+        // last known NM tree instead of flashing to a transient fallback.
+        if (isCurrentRequest() && !preserveExistingTree) {
+          applyChapterForest(chapterCount);
+        }
       }
     },
     [applyChapterForest, applyNmForest, throughChapter]
@@ -369,7 +381,29 @@ function AnalysisWorkspace() {
     const load = async () => {
       try {
         const response = await analysisApi.fullStatus(novelId);
-        if (!cancelled) setFullRun(response.data);
+        if (cancelled) return;
+        const next = response.data;
+        setFullRun(next);
+
+        // NM chapter nodes are persisted incrementally. Refresh the candidate
+        // tree when the aggregate cursor changes; otherwise the preview stays
+        // at the chapter count that existed when the novel was first opened.
+        const progressKey = [
+          next.status,
+          JSON.stringify(next.progress ?? null),
+          next.updated_at ?? "",
+        ].join(":");
+        if (progressKey !== fullProgressSigRef.current) {
+          fullProgressSigRef.current = progressKey;
+          const novelMeta = novels.find(
+            (novel) => String(novel.id) === String(novelId)
+          );
+          if (novelMeta) {
+            void loadStructure(novelId, novelMeta, undefined, {
+              preserveSelection: true,
+            });
+          }
+        }
       } catch {
         // 404 means this novel has never started the aggregate pipeline.
       }
@@ -385,7 +419,7 @@ function AnalysisWorkspace() {
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [novelId, fullStatus]);
+  }, [loadStructure, novelId, fullStatus, novels]);
 
   async function loadTimeline(
     id = novelId,
@@ -456,6 +490,8 @@ function AnalysisWorkspace() {
 
   /** 仅选书 + 加载已有结果，不启动 worker；有数据则直接展示 */
   async function selectNovel(id: string) {
+    // Invalidate any in-flight tree request from the previously selected novel.
+    structureLoadSeqRef.current += 1;
     setNovelId(id);
     setPerson("");
     setSource("active");
@@ -465,6 +501,7 @@ function AnalysisWorkspace() {
     setError("");
     envelopeSigRef.current = "";
     progressSigRef.current = "";
+    fullProgressSigRef.current = "";
     runStatusRef.current = null;
     setNmClaims([]);
     setNmClaimsError(null);

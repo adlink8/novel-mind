@@ -22,6 +22,23 @@ function labelFor(stage: string): string {
   return STAGES.find(([key]) => key === stage)?.[1] || stage || "准备中";
 }
 
+function statusLabel(status: string): string {
+  switch (status) {
+    case "completed":
+      return "已完成";
+    case "failed":
+      return "失败";
+    case "paused_dependency":
+      return "等待依赖恢复";
+    case "paused_budget":
+      return "预算已暂停";
+    case "cancelled":
+      return "已停止";
+    default:
+      return "进行中";
+  }
+}
+
 export function FullAnalysisStatus({
   run,
   busy,
@@ -58,7 +75,7 @@ export function FullAnalysisStatus({
           <p className="text-sm font-semibold">全部分析</p>
           <p className="text-xs text-muted-foreground">
             {run
-              ? `${labelFor(run.stage)} · ${run.status === "completed" ? "已完成" : run.status === "failed" ? "失败" : "进行中"}`
+              ? `${labelFor(run.stage)} · ${statusLabel(run.status)}`
               : "按依赖顺序运行所有分析管线"}
           </p>
         </div>
@@ -125,4 +142,3 @@ export function FullAnalysisStatus({
     </div>
   );
 }
-
