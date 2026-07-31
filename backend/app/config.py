@@ -64,7 +64,7 @@ class Settings(BaseSettings):
     gcp_location: str = "us-central1"
     gcp_sdk_root: str = r"C:\Users\li\google-cloud-sdk"
     gcp_sdk_py: str = r"C:\Users\li\google-cloud-sdk\lib\gcloud.py"
-    vertex_model: str = "gemini-3.5-flash-lite"
+    vertex_model: str = "gemini-3.5-flash"
     # 访问 Vertex/Google API 的出站代理（国内环境常需；留空则读 HTTPS_PROXY 环境变量）
     https_proxy: str = ""
     ollama_base_url: str = "http://localhost:11434"  # 本地 Ollama 服务地址

@@ -48,6 +48,7 @@ from app.services.narrative_memory.builder_packages import (
     default_optional_signal,
     load_chapter_evidence_leaves,
     load_child_chapter_authority,
+    rebind_cached_chapter_state_package,
     rebind_chapter_state_package,
 )
 from app.services.narrative_memory.builder_repository import (
@@ -72,6 +73,24 @@ FORBIDDEN_IMPORT_FRAGMENTS = (
 )
 LEASE_RETRY_BACKOFF_SECONDS = (5, 15, 30)
 logger = logging.getLogger(__name__)
+
+
+def _is_retryable_provider_reason(reason: str) -> bool:
+    """Return whether a provider failure should pause instead of poison a run."""
+
+    text = reason.lower()
+    return any(
+        marker in text
+        for marker in (
+            "vertex http 429",
+            "vertex http 500",
+            "vertex http 502",
+            "vertex http 503",
+            "resource exhausted",
+            "rate limit",
+            "temporarily unavailable",
+        )
+    )
 
 
 def _is_retryable_lease_error(exc: BuilderRepositoryError) -> bool:
@@ -256,16 +275,19 @@ class NarrativeMemoryBuilderWorker:
                 for chapter in chapters
                 if chapter.chapter_number > 0  # skip prologue / chapter 0
             ]
-            # Placeholder parent/global stages filled after boundary plan.
-            stage_specs.append(
-                {
-                    "stage_key": "arc_volume_plan:book",
-                    "stage_kind": StageKind.ARC_VOLUME_PLAN.value,
-                    "dependency_keys": [
-                        f"chapter_state:{chapter.id}" for chapter in chapters
-                    ],
-                }
-            )
+            # Parent/global stages are only part of a full build policy. A
+            # chapter-only policy is used by focused tests and repair jobs and
+            # must not accidentally invoke an arc transport.
+            if StageKind.ARC_VOLUME_PLAN in run_policy.stage_order:
+                stage_specs.append(
+                    {
+                        "stage_key": "arc_volume_plan:book",
+                        "stage_kind": StageKind.ARC_VOLUME_PLAN.value,
+                        "dependency_keys": [
+                            f"chapter_state:{chapter.id}" for chapter in chapters
+                        ],
+                    }
+                )
             await repo.ensure_stages(run, stage_specs)
             # Stash chapter id map on run progress for deterministic resume.
             progress = dict(run.progress or {})
@@ -389,7 +411,15 @@ class NarrativeMemoryBuilderWorker:
                     for s in stages
                     if s.stage_kind == StageKind.CHAPTER_STATE.value
                 ]
-                for stage in chapter_stages:
+                chapter_stage_keys = [stage.stage_key for stage in chapter_stages]
+                for stage_key in chapter_stage_keys:
+                    # A failed stage is persisted through a rollback and a
+                    # fresh recovery session. Refresh the ORM row before
+                    # reading it so the async worker never triggers an
+                    # implicit IO on an expired object.
+                    stage = await self._reload_stage(
+                        session, run_id, stage_key
+                    )
                     if max_stages is not None and processed >= max_stages:
                         break
                     # Skip completed and hard-failed stages so batch resume can
@@ -401,23 +431,40 @@ class NarrativeMemoryBuilderWorker:
                             run_id, status="cancelled", reason="cancel_requested"
                         )
                         break
+                    current_version = await repo.get_version(
+                        owner_id=owner_id,
+                        novel_id=novel_id,
+                        version_id=version_id,
+                    )
+                    if current_version is None:
+                        raise BuilderRepositoryError("version not found")
                     await self._run_chapter_stage(
                         session,
                         repo=repo,
                         gateway=gateway,
-                        version=version,
+                        version=current_version,
                         run_id=run_id,
                         stage=stage,
                         policy=policy,
                     )
                     lease_guard.raise_if_failed()
                     processed += 1
-                    await session.flush()
+                    # Each chapter is an independent durable checkpoint. A
+                    # later chapter failure rolls back its transaction; commit
+                    # the completed sibling before moving on so recovery never
+                    # erases already persisted chapter artifacts.
+                    await session.commit()
+                    stage = await self._reload_stage(session, run_id, stage_key)
+                    if stage.status in {"paused_dependency", "paused_budget"}:
+                        # Do not hammer a provider that has explicitly asked
+                        # us to back off. The persisted stage is resumable by
+                        # a later operator-triggered run.
+                        break
                     await repo.heartbeat(run_id, claimed_lease)
 
                 # Phase B: boundary plan + arc aggregates (if arc planner available)
                 stages = await repo.list_stages(run_id)
-                if all(
+                if StageKind.ARC_VOLUME_PLAN in policy.stage_order and all(
                     s.status == "completed"
                     for s in stages
                     if s.stage_kind == StageKind.CHAPTER_STATE.value
@@ -435,14 +482,15 @@ class NarrativeMemoryBuilderWorker:
                     )
 
                 # Phase C: global + manifest if parents complete
-                await self._maybe_run_global_and_manifest(
-                    session,
-                    repo=repo,
-                    gateway=gateway,
-                    version=version,
-                    run_id=run_id,
-                    policy=policy,
-                )
+                if StageKind.GLOBAL_AGGREGATE in policy.stage_order:
+                    await self._maybe_run_global_and_manifest(
+                        session,
+                        repo=repo,
+                        gateway=gateway,
+                        version=version,
+                        run_id=run_id,
+                        policy=policy,
+                    )
                 lease_guard.raise_if_failed()
 
                 self.transport_calls += gateway.transport_calls
@@ -519,10 +567,20 @@ class NarrativeMemoryBuilderWorker:
                         CandidatePackage,
                     )
 
-                    package = CandidatePackage.model_validate(raw["candidate_package"])
+                    cached_package = CandidatePackage.model_validate_json(
+                        json.dumps(
+                            raw["candidate_package"],
+                            ensure_ascii=False,
+                            separators=(",", ":"),
+                        )
+                    )
+                    package = rebind_cached_chapter_state_package(
+                        input_package=input_package,
+                        cached_package=cached_package,
+                    )
                     return {
                         "candidate_package": package.model_dump(mode="json"),
-                        "artifact_checksum": str(raw["artifact_checksum"]),
+                        "artifact_checksum": artifact_checksum_for_package(package),
                     }
                 package = rebind_chapter_state_package(
                     input_package=input_package,
@@ -773,6 +831,7 @@ class NarrativeMemoryBuilderWorker:
                 policy=policy,
                 chapter_numbers=chapter_numbers,
             )
+            await session.commit()
             run = await session.get(
                 __import__(
                     "app.models.narrative_memory_builder",
@@ -854,17 +913,25 @@ class NarrativeMemoryBuilderWorker:
                 continue
             if not deps or any(d.status != "completed" for d in deps):
                 continue
+            current_version = await repo.get_version(
+                owner_id=version.owner_id,
+                novel_id=version.novel_id,
+                version_id=version.id,
+            )
+            if current_version is None:
+                raise BuilderRepositoryError("version not found")
             await self._run_arc_stage(
                 session,
                 repo=repo,
                 gateway=gateway,
-                version=version,
+                version=current_version,
                 run_id=run_id,
                 stage=stage,
                 policy=policy,
                 boundary_checksum=checksum,
             )
             local_processed += 1
+            await session.commit()
             await repo.heartbeat(run_id, lease_id)
 
     async def _run_arc_stage(
@@ -1054,6 +1121,7 @@ class NarrativeMemoryBuilderWorker:
                 policy=policy,
                 parents=parents,
             )
+            await session.commit()
         stages = await repo.list_stages(run_id)
         global_stage = next(
             s for s in stages if s.stage_kind == StageKind.GLOBAL_AGGREGATE.value
@@ -1074,6 +1142,7 @@ class NarrativeMemoryBuilderWorker:
             stage=manifest_stage,
             worker_artifact=global_stage.artifact_checksum,
         )
+        await session.commit()
 
     async def _run_global_stage(
         self,
@@ -1349,6 +1418,10 @@ class NarrativeMemoryBuilderWorker:
         durable outcome.  Without both steps the following heartbeat masks the
         original exception with InFailedSQLTransactionError.
         """
+        if status == "failed" and _is_retryable_provider_reason(reason):
+            status = "paused_dependency"
+            run_status = "paused_dependency"
+
         await session.rollback()
         async with self._sessions() as recovery_session:
             recovery_repo = BuilderRepository(recovery_session)
@@ -1520,6 +1593,9 @@ class NarrativeMemoryBuilderWorker:
         stages = await repo.list_stages(run_id)
         completed = tuple(s.stage_key for s in stages if s.status == "completed")
         failed = tuple(s.stage_key for s in stages if s.status == "failed")
+        paused = tuple(
+            s for s in stages if s.status in {"paused_dependency", "paused_budget"}
+        )
         blocked = tuple(s.stage_key for s in stages if s.status == "blocked_dependency")
         run = await session.get(NarrativeMemoryBuildRun, run_id)
         assert run is not None
@@ -1529,12 +1605,32 @@ class NarrativeMemoryBuilderWorker:
         elif run.status == "paused_budget":
             status = "paused_budget"
             reason = run.status_reason
+        elif paused:
+            status = "paused_dependency"
+            first = paused[0]
+            reason = f"{first.stage_key}: {first.status_reason or 'dependency unavailable'}"
         elif failed and completed:
             status = "partial"
-            reason = "chapter_or_parent_failed"
+            first_failed = next(
+                (s for s in stages if s.status == "failed"),
+                None,
+            )
+            reason = (
+                f"{first_failed.stage_key}: {first_failed.status_reason}"
+                if first_failed is not None and first_failed.status_reason
+                else "chapter_or_parent_failed"
+            )
         elif failed and not completed:
             status = "failed"
-            reason = "all_failed"
+            first_failed = next(
+                (s for s in stages if s.status == "failed"),
+                None,
+            )
+            reason = (
+                f"{first_failed.stage_key}: {first_failed.status_reason}"
+                if first_failed is not None and first_failed.status_reason
+                else "all_failed"
+            )
         elif stages and all(
             s.status == "completed"
             for s in stages

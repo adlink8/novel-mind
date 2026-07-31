@@ -27,6 +27,7 @@ from pydantic import (
 
 Hash64 = Annotated[StrictStr, StringConstraints(pattern=r"^[0-9a-f]{64}$")]
 NonNegativeInt = Annotated[StrictInt, Field(gt=0)]
+PositiveInt = Annotated[StrictInt, Field(gt=0)]
 NonNegInt = Annotated[StrictInt, Field(ge=0)]
 PolicyVersion = Annotated[
     StrictStr,

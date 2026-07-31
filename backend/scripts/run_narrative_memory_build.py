@@ -1015,6 +1015,80 @@ async def create_candidate_version(
         return int(version.id)
 
 
+async def _select_resumable_candidate(
+    *, owner_id: int, novel_id: int, sessions
+) -> int | None:
+    """Pick the most progressed unfinished candidate and retire duplicates."""
+
+    from datetime import datetime, timezone
+
+    from sqlalchemy import select
+
+    from app.models.narrative_memory_builder import (
+        NarrativeMemoryBuildRun,
+        NarrativeMemoryBuildStage,
+    )
+
+    terminal = {"completed"}
+    now = datetime.now(timezone.utc)
+    async with sessions() as session:
+        runs = list(
+            (
+                await session.scalars(
+                    select(NarrativeMemoryBuildRun)
+                    .where(
+                        NarrativeMemoryBuildRun.owner_id == owner_id,
+                        NarrativeMemoryBuildRun.novel_id == novel_id,
+                    )
+                    .order_by(NarrativeMemoryBuildRun.id.desc())
+                )
+            ).all()
+        )
+        candidates: list[tuple[NarrativeMemoryBuildRun, int]] = []
+        for run in runs:
+            if run.status in terminal:
+                continue
+            stages = list(
+                (
+                    await session.scalars(
+                        select(NarrativeMemoryBuildStage).where(
+                            NarrativeMemoryBuildStage.run_id == run.id
+                        )
+                    )
+                ).all()
+            )
+            completed_chapters = sum(
+                stage.stage_kind == "chapter_state" and stage.status == "completed"
+                for stage in stages
+            )
+            candidates.append((run, completed_chapters))
+
+        if not candidates:
+            return None
+
+        # Prefer the checkpoint with the most completed chapter work. This is
+        # important after an old retry created a newer, mostly-empty version.
+        selected, _ = max(candidates, key=lambda item: (item[1], item[0].id))
+        if (
+            selected.status == "running"
+            and not selected.cancel_requested
+            and selected.lease_expires_at is not None
+            and selected.lease_expires_at > now
+        ):
+            raise RuntimeError(
+                "叙事记忆已有构建任务正在运行，请等待当前任务结束后再重试"
+            )
+
+        for run, _ in candidates:
+            if run.id == selected.id or run.status in terminal:
+                continue
+            run.cancel_requested = True
+            run.status = "cancelled"
+            run.status_reason = "superseded by the most progressed candidate"
+        await session.commit()
+        return int(selected.version_id)
+
+
 async def run_narrative_memory_build(
     *,
     owner_id: int,
@@ -1044,14 +1118,19 @@ async def run_narrative_memory_build(
         transport=transport,
         deployment=deployment,
     )
-    version_id = await create_candidate_version(
-        owner_id=owner_id,
-        novel_id=novel_id,
-        sessions=sessions,
-        deployment=deployment,
+    version_id = await _select_resumable_candidate(
+        owner_id=owner_id, novel_id=novel_id, sessions=sessions
     )
+    resumed = version_id is not None
     if version_id is None:
-        raise RuntimeError("叙事记忆资格检查未通过，禁止调用模型")
+        version_id = await create_candidate_version(
+            owner_id=owner_id,
+            novel_id=novel_id,
+            sessions=sessions,
+            deployment=deployment,
+        )
+        if version_id is None:
+            raise RuntimeError("叙事记忆资格检查未通过，禁止调用模型")
 
     policy = _run_policy(deployment)
     run_id = await worker.start_run(
@@ -1060,6 +1139,11 @@ async def run_narrative_memory_build(
         version_id=version_id,
         run_policy=policy,
     )
+    if resumed:
+        async with sessions() as session:
+            repo = BuilderRepository(session)
+            await repo.prepare_run_for_resume(run_id)
+            await session.commit()
 
     terminal = {"completed", "partial", "failed", "paused_budget", "paused_dependency", "cancelled"}
     # Keep ownership stable across checkpointed process_run calls. A new

@@ -29,6 +29,7 @@ from app.services.narrative_memory.contracts import (
     Hash64,
     Key,
     NonNegativeInt,
+    PositiveInt,
     VersionLabel,
 )
 

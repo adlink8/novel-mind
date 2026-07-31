@@ -197,11 +197,23 @@ def rebind_chapter_state_package(
     claims: list[MemoryClaim] = []
 
     for index, raw_claim in enumerate(model_output.claims, start=1):
-        claim_key = str(raw_claim.get("claim_key") or f"{node_key}:claim:{index}")
+        # Claim keys are candidate-authority identities, not model-authored
+        # content.  A model can accidentally copy the previous chapter's key
+        # (for example, ``chapter_state:301:claim:1`` while processing chapter
+        # 302).  Keeping that key would make an otherwise valid retry collide
+        # with an immutable claim already stored for the previous chapter.
+        # Use the current chapter and deterministic claim position as the
+        # authority key, while still accepting the model key below for source
+        # binding compatibility.
+        model_claim_key = str(raw_claim.get("claim_key") or "")
+        claim_key = f"{node_key}:claim:{index}"
+        binding_claim_keys = {claim_key}
+        if model_claim_key:
+            binding_claim_keys.add(model_claim_key)
         bindings = [
             item
             for item in model_output.source_bindings
-            if str(item.get("claim_key", "")) == claim_key
+            if str(item.get("claim_key", "")) in binding_claim_keys
             or (
                 index == 1 and "claim_key" not in item and len(model_output.claims) == 1
             )
@@ -225,9 +237,9 @@ def rebind_chapter_state_package(
                 raise PackageBuildError(
                     f"model referenced unknown evidence leaf {evidence_node_id}"
                 )
-            source_key = str(
-                binding.get("source_key") or f"{claim_key}:src:{bind_index}"
-            )
+            # Source keys are package-local as well.  Re-key them so a stale
+            # model key cannot leak into the persisted provenance identity.
+            source_key = f"{claim_key}:src:{bind_index}"
             claim_source_keys.append(source_key)
             source_links.append(
                 ExactSourceLink(
@@ -289,6 +301,60 @@ def rebind_chapter_state_package(
     )
     assert_no_forbidden_keys(package.model_dump(mode="json"))
     return package
+
+
+def rebind_cached_chapter_state_package(
+    *,
+    input_package: ChapterStateInputPackage,
+    cached_package: CandidatePackage,
+) -> CandidatePackage:
+    """Rebind a cached chapter package through the current chapter identity.
+
+    Older builder attempts may have cached a validated package before the
+    authority transaction rejected it.  Reconstructing the model-shaped
+    envelope here makes those cache entries safe to resume instead of
+    replaying stale model-owned claim/source keys.
+    """
+    claims: list[dict[str, Any]] = []
+    source_bindings: list[dict[str, str]] = []
+    links_by_claim: dict[str, list[ExactSourceLink]] = {}
+    for link in cached_package.source_links:
+        links_by_claim.setdefault(link.claim_key, []).append(link)
+    for claim in cached_package.claims:
+        claims.append(
+            {
+                "claim_key": claim.claim_key,
+                "payload": claim.payload.model_dump(mode="json"),
+                "uncertainty": claim.uncertainty.value,
+                "confidence": float(claim.confidence),
+                "visible_from_chapter": claim.visible_from_chapter,
+            }
+        )
+        for link in links_by_claim.get(claim.claim_key, []):
+            source_bindings.append(
+                {
+                    "claim_key": claim.claim_key,
+                    "evidence_node_id": link.evidence_node_id,
+                    "source_key": link.source_key,
+                }
+            )
+    cached_node = next(
+        (
+            node
+            for node in cached_package.nodes
+            if node.node_key == f"chapter_state:{input_package.chapter_number}"
+        ),
+        None,
+    )
+    return rebind_chapter_state_package(
+        input_package=input_package,
+        model_output={
+            "node_key": f"chapter_state:{input_package.chapter_number}",
+            "display_label": cached_node.display_label if cached_node else None,
+            "claims": claims,
+            "source_bindings": source_bindings,
+        },
+    )
 
 
 async def load_child_chapter_authority(
