@@ -8,7 +8,7 @@
 ## Execution Baseline
 
 - authority branch: `master`
-- evidence snapshot: `01503c2` on 2026-07-31
+- evidence snapshot: `912ca6b` on 2026-08-01
 - single cursor: `.planning/STATE.md`
 - old feature branches: evidence only unless a new delta decision explicitly selects code
 
@@ -20,6 +20,11 @@ three consecutive green observations.
 
 ## Product Direction
 
+0. **Agent runtime foundation (Phase 25.2–25.3):** embedded Novel Agent Runtime with
+   controlled domain tools, versioned Skills, lineage-bound Artifacts and Web Approval;
+   Pi package governance with allowlist/lock, collision gates and external-evidence
+   isolation. The agent orchestrates; deterministic services keep facts, permissions,
+   versions and publication authority.
 1. **v1.2 trusted novel understanding (Phase 26–29):** question-driven QueryPlan,
    multi-dimensional retrieval, source citations, epistemic world model, whole-book NM and
    reading QA.
@@ -58,4 +63,4 @@ These dimensions may disagree. A green build does not imply data coverage or mod
 - `IMPLEMENTATION-STATUS.md`: human-facing implementation facts, updated only after verified
   implementation changes.
 
-*Last updated: 2026-07-31.*
+*Last updated: 2026-08-01.*

@@ -1,6 +1,6 @@
 # NovelMind GSD Roadmap
 
-> Execution authority: `master`. Snapshot: `01503c2`, 2026-07-31.
+> Execution authority: `master`. Snapshot: `912ca6b`, 2026-08-01.
 > Progress is reported in three independent dimensions:
 > `implementation_readiness`, `sample_data_coverage`, `quality_qualification`.
 
@@ -23,6 +23,7 @@
 | Milestone | Phases | implementation_readiness | sample_data_coverage | quality_qualification |
 |---|---|---|---|---|
 | v1.1 execution baseline | 21–25.1 | partial | partial | blocked by Phase 22 |
+| agent runtime foundation | 25.2–25.3 | planned | planned | planned |
 | v1.2 trusted novel understanding | 26–29 | planned | planned | planned |
 | v1.3 visual narrative | 30–34 | planned | planned | planned |
 | v1.4 Canon Fork derivatives | 35–39 | planned | planned | planned |
@@ -38,8 +39,173 @@
 | 25 facet/API/provenance/cost honesty | IMPLEMENTED | master contracts and tests |
 | 25.1 Analysis Chat workspace/range anchor | IMPLEMENTED | default chat view and chapter-range wiring |
 
-Phase 22 is the active cursor. Phases 26+ cannot be reported `ACTIVE` until its three-run
+Phase 22 is the active cursor. Phases 25.2+ cannot be reported `ACTIVE` until its three-run
 gate closes.
+
+---
+
+# Agent Runtime Foundation — Phase 25.2–25.3
+
+> Source: Issue #29 architecture appendix (2026-08-01). The product direction shifts from
+> "software + isolated AI buttons" to an agent-driven workspace: a Novel Agent Runtime
+> orchestrates Skills and controlled domain tools over the trusted world model, while
+> deterministic code keeps facts, permissions, memory, versions and publication authority.
+> The agent is an orchestrator — never a fact source or a database administrator.
+
+## Phase 25.2 — Embedded Novel Agent Runtime
+
+**Goal:** prove an embeddable agent runtime (Pi SDK or equivalent) and establish the
+NovelMind Tool / Skill / Artifact / Approval foundation; first stage allows read-only
+analysis and candidate Artifacts only — no Canon mutation, no illustration publication, no
+derivative text writes.
+
+**Depends on:** Phase 22, Phase 25.1.
+
+### Plans
+
+- **25.2-01 Agent Runtime Spike**
+  - Steps: embed the Pi SDK in a standalone Node agent-service; custom system prompt with
+    default coding tools (bash, file editing, arbitrary execution) disabled; call FastAPI
+    tool APIs; stream SSE/WebSocket events; verify session create/resume/cancel/retry,
+    model-routing compatibility with the existing AI configuration, and tool
+    timeout/error/cancellation propagation.
+  - Must-Haves: `.planning/spikes/embedded-novel-agent/` with `CONTEXT.md`,
+    `EXPERIMENTS.md`, `FINDINGS.md`, `DECISION.md`; no default coding tools enabled; no
+    write path exercised.
+  - Verification: one recorded experiment per required capability; explicit go/no-go
+    decision.
+  - Test, Fix, and Confirm: replay session scenarios, fix propagation gaps, freeze the
+    decision.
+- **25.2-02 Domain Tool Contract**
+  - Steps: implement the first read-only tools — `get_novel`, `get_chapter`,
+    `search_novel_text`, `get_timeline`, `get_relationships`, `get_clues`,
+    `get_narrative_memory` — with owner check, reading cutoff/spoiler boundary, query
+    budget, timeout, output size limit, evidence lineage and stable error codes enforced
+    server-side by FastAPI.
+  - Must-Haves: enforcement is server-side, never prompt-side; every tool has a typed
+    schema and an error-code table.
+  - Verification: per-tool contract tests for owner/spoiler/budget/timeout/lineage.
+  - Test, Fix, and Confirm: adversarial calls (cross-owner, beyond-cutoff, over-budget)
+    fail closed.
+- **25.2-03 Skill Runtime and Artifact Contract**
+  - Steps: `SkillRegistry` / `SkillVersion` / `SkillRun`; allowed-tools allowlist; input /
+    output JSON schemas; budget and approval policies; `Artifact` / `ArtifactRevision`
+    persistence carrying type, schema version, owner/novel/branch, producing skill and
+    version, agent runtime and model lineage, source versions, input hash, evidence refs,
+    status (`candidate` / `validated` / `approved` / `published` / `rejected`) and parent
+    revision; first skill `answer-reading-question`:
+    Question → QueryPlan → Tool calls → EvidenceRef materialization → Frozen Manifest →
+    Cited Answer Artifact.
+  - Must-Haves: an agent session is never a long-term fact source; artifacts are replayable
+    and version-traceable; `skill.yaml` declares `allowed_tools`, `read_permissions`,
+    `write_permissions`, `forbidden_spaces`, `budget` and `approval_required_for`.
+  - Verification: artifact schema, lineage and replay tests; a cancelled run writes no
+    artifact.
+  - Test, Fix, and Confirm: run the first skill end-to-end on fixtures and repair schema
+    gaps.
+- **25.2-04 Agent Workspace**
+  - Steps: `/analysis` agent streaming answers, current-phase and tool-call summaries,
+    artifact preview, citation jump-to-source, cancel/retry, user approve/reject of
+    candidate results, session restore.
+  - Must-Haves: approval state round-trips to the artifact store; no candidate is
+    published without explicit approval.
+  - Verification: desktop + 390px browser tests for streaming, approval and restore flows.
+  - Test, Fix, and Confirm: run real question flows and fix citation jumps/state loss.
+
+**Non-goals:** no shell / file-editing / arbitrary-command tools; no Original Canon
+mutation; no multi-agent; no automatic illustration publication; no derivative text
+publication; does not replace the stable Reader Chat chain — it reuses its evidence,
+budget, citation and session foundation.
+
+**Phase Verification:** the agent answers a real novel question inside `/analysis` using
+only NovelMind tools; every citation resolves to a legal leaf EvidenceRef; tool calls
+respect owner/spoiler/budget; a cancelled agent writes no artifact; identical input
+replays with traceable skill, model and data versions; the runtime is not a new fact
+source.
+
+## Phase 25.3 — Pi Package Compatibility and Governance
+
+**Goal:** establish a controlled reuse mechanism for Pi ecosystem packages and prove that
+third-party extensions cannot bypass NovelMind's permission, evidence, Canon and Artifact
+boundaries.
+
+**Depends on:** Phase 25.2.
+
+### Plans
+
+- **25.3-01 Package lock, source audit and lifecycle scanning**
+  - Steps: pin exact npm versions or Git SHAs; vendor or internal-registry after code
+    review; CI consumes a lockfile; `npm ci --ignore-scripts`; scan license, dependency
+    tree and lifecycle scripts; record an `adopt` / `fork` / `pattern-only` / `reject`
+    verdict per package.
+  - Must-Haves: no dynamic `pi install` / `pi update` inside the formal agent service;
+    every loaded package has a recorded verdict.
+  - Verification: governance policy tests; lockfile reproducibility check.
+  - Test, Fix, and Confirm: attempt unpinned/lifecycle-script packages and confirm blocks.
+- **25.3-02 Tool Registry Manifest and collision gate**
+  - Steps: startup `ToolRegistryManifest` with `tool_name`, `provider_package`,
+    `schema_hash`, `permission`, `domain`, `enabled`; same-name tools fail closed at
+    startup instead of silently overriding by load order.
+  - Must-Haves: collisions block startup; extensions with undeclared permissions cannot
+    start.
+  - Verification: collision and shadowing adversarial startup tests.
+  - Test, Fix, and Confirm: inject duplicate tool names and repair detection gaps.
+- **25.3-03 pi-mcp-adapter external-tool isolation spike**
+  - Steps: allowlisted external MCP servers only (web research, external documents, image
+    generation services); lazy discovery through the proxy tool; no ambient user-machine
+    MCP configuration; external results materialize as `external_evidence` artifacts and
+    are never mixed with `original_text_evidence`.
+  - Must-Haves: MCP never touches NovelMind PostgreSQL, Original Canon writes, evidence
+    validation or core Reader Chat retrieval.
+  - Verification: isolation negative tests; external-evidence labeling tests.
+  - Test, Fix, and Confirm: run one allowlisted server and confirm boundary enforcement.
+- **25.3-04 Permission policy core and Web Approval adapter**
+  - Steps: adopt or fork the permission-system policy core into `allow` / `ask` / `deny`
+    over domain actions (not file paths); `ask` creates a Web `ApprovalRequest`; `deny`
+    blocks deterministically (`modify_original_canon`, `move_active_pointer`).
+  - Must-Haves: rule precedence, fail-closed defaults, tool-visibility filtering and
+    session-scoped approval; approval UX lives in the web app, not a TUI.
+  - Verification: policy-decision matrix and approval round-trip tests.
+  - Test, Fix, and Confirm: exercise the allow/ask/deny matrix and fix precedence bugs.
+- **25.3-05 pi-web-ui Artifact/Tool renderer feasibility**
+  - Steps: evaluate borrowing the Artifact / Tool renderer designs (or wrapping selected
+    web components) inside the existing Analysis Chat without adopting its ChatPanel,
+    IndexedDB session authority or browser-held provider keys.
+  - Must-Haves: NovelMind Next.js and PostgreSQL remain session and rendering authority.
+  - Verification: feasibility note plus a prototype render of one artifact type.
+  - Test, Fix, and Confirm: render a cited-answer artifact and fix integration gaps.
+
+**Non-goals:** no arbitrary package installation; no multi-agent; no third-party memory
+replacing Narrative Memory; no extension receives shell, host-filesystem or direct
+database permissions; no third-party tool may modify Original Canon.
+
+**Phase Verification:** all loaded resources come from a fixed allowlist and lock
+manifest; same-name tools/skills block at startup; undeclared-permission extensions
+cannot start; MCP external results are labeled external evidence; confirmation-required
+actions create Web ApprovalRequests; removing any community package keeps core reading QA
+functional; every package has a recorded adoption verdict.
+
+### Agent Consumption Map — Phase 26–39
+
+The existing roadmap is not replaced; phases are delivered through Skills and controlled
+tools over the same world model:
+
+| Phase | Agent consumption |
+|---|---|
+| 26 question-driven retrieval | `answer-reading-question` Skill |
+| 27 world model | agent produces candidates; Validator/Gate publishes facts |
+| 28 whole-book narrative memory | `analyze-chapter` / `build-story-arc` Skills |
+| 29 QA quality | frozen evaluation over Skill Runs and Artifacts |
+| 30 Visual Bible | `build-visual-bible` Skill |
+| 31 key scenes | `detect-key-scenes` Skill |
+| 32 Scene Spec | `compile-scene-spec` Skill |
+| 33 illustrations | `illustrate-scene` Skill |
+| 34 in-text anchors | agent proposes; user approves; deterministic service publishes |
+| 35 Canon Fork | `create-canon-fork` Skill |
+| 36 derivative editor | agent as in-editor collaborator |
+| 37 constrained generation | `continue-derivative-story` Skill |
+| 38 derivative visual | branch-aware visual Skills |
+| 39 export/closeout | `prepare-export` Skill + deterministic exporter |
 
 ---
 
@@ -50,7 +216,7 @@ gate closes.
 **Goal:** turn a reader/analyst question into a typed retrieval plan, fuse the required
 dimensions and materialize source-verified citations.
 
-**Depends on:** Phase 22, Phase 24, Phase 25.1.
+**Depends on:** Phase 22, Phase 24, Phase 25.1, Phase 25.2.
 
 ### Plans
 
@@ -343,4 +509,5 @@ audit; **Test, Fix, and Confirm** every failed end-to-end checkpoint.
 ## Next
 
 Execute Phase 22 G1–G3. After three consecutive scheduled green observations, begin
-Phase 26 planning artifacts from the contracts above.
+Phase 25.2 (Embedded Novel Agent Runtime) spike and contracts, then Phase 26 planning
+artifacts from the contracts above.

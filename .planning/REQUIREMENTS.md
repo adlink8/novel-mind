@@ -1,6 +1,6 @@
 # Requirements: NovelMind
 
-> Current authority snapshot: `master@01503c2`, 2026-07-31.
+> Current authority snapshot: `master@912ca6b`, 2026-08-01.
 > The current-status tables below supersede stale `PLANNED` labels in the legacy registry
 > later in this file. Legacy IDs remain for traceability and are not deleted.
 
@@ -14,6 +14,18 @@
 | REQ-NIGHTLY-02 | Nightly always produces an authority-safe artifact or an explicit dependency classification | 22-G2 | PLANNED |
 | REQ-NIGHTLY-03 | Alerts deduplicate/resolve by root cause and Phase 22 requires 3 consecutive scheduled green runs | 22-G3 | BLOCKED |
 | REQ-STATUS-01 | Report implementation, sample-data coverage and quality qualification independently | all | VERIFIED_CONTRACT |
+
+## Agent Runtime Foundation
+
+| ID | Requirement | Owner | Status |
+|---|---|---|---|
+| REQ-AGENT-01 | Agent runtime executes only registered NovelMind domain tools; default coding tools (shell/file/arbitrary execution) are disabled | 25.2-01 | PLANNED |
+| REQ-AGENT-02 | Domain tools enforce owner, spoiler cutoff, budget, timeout, output limits, evidence lineage and stable error codes server-side | 25.2-02 | PLANNED |
+| REQ-AGENT-03 | Skills are versioned with allowed-tools/budget/approval contracts; every output persists as a lineage-bound Artifact; agent sessions are never fact sources | 25.2-03 | PLANNED |
+| REQ-AGENT-04 | Agent workspace streams answers, previews artifacts and requires explicit user approval before any candidate publication | 25.2-04 | PLANNED |
+| REQ-AGENT-05 | Third-party packages load only from a pinned allowlist and lock manifest with declared permissions; tool-name collisions fail closed at startup | 25.3-01/02 | PLANNED |
+| REQ-AGENT-06 | External MCP results are labeled `external_evidence` and never enter Canon, evidence validation or core retrieval authority | 25.3-03 | PLANNED |
+| REQ-AGENT-07 | High-impact actions route through allow/ask/deny policy with Web Approval; Canon mutation and active-pointer moves are deny | 25.3-04 | PLANNED |
 
 ## v1.2 Trusted Understanding
 
