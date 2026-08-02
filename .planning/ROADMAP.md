@@ -131,12 +131,12 @@ Alembic chain continues `26agentrun01 → 27approval01`.
 | Range | CONTEXT / RESEARCH / PATTERNS / VALIDATION | PLAN files | Implementation status |
 |---|---:|---:|---|
 | Phase 25.2–25.3 | 8/8 | 15 | **VERIFIED 2026-08-02** |
-| Phase 26–29 | 16/16 + shared Agent contract | 21 | PLANNED |
+| Phase 26–29 | 16/16 + shared Agent contract | 22 | PLANNED |
 | Phase 30–34 | 20/20 + shared Agent contract | 24 | PLANNED |
 | Phase 35–39 | 20/20 + shared Agent contract | 25 | PLANNED |
 
-The corrected portfolio contains 85 plans: 10 reused Kimi foundation plans, five corrective
-foundation slices, 56 deterministic/domain-gate plans and 14 Agent-integration plans.
+The corrected portfolio contains 86 plans: 10 reused Kimi foundation plans, five corrective
+foundation slices, 57 deterministic/domain/shared-integrity plans and 14 Agent-integration plans.
 Phase 25.2–25.3 are implemented and verified; Phases 26–39 remain planning verdicts only.
 
 ## Baseline Reconciliation — Phase 21–25.1
@@ -163,8 +163,8 @@ Phase 25.3 passed verification artifacts (now both exist).
 
 ### Phase 26: Question-Driven Retrieval and Evidence
 
-**Status:** PLANNED / EXECUTION BLOCKED — Phase 22 Nightly qualification remains 0/3 and
-Phase 25.2 and Phase 25.3 have no passed verification artifacts.
+**Status:** PLANNED / EXECUTION BLOCKED — Phase 25.2 and Phase 25.3 have passed verification
+artifacts; Phase 22 Nightly qualification remains 0/3 and is still the execution blocker.
 
 **Goal:** turn a reader/analyst question into a typed retrieval plan, fuse the required
 dimensions and materialize source-verified citations.
@@ -203,6 +203,9 @@ fallback; answer quality is reported separately, not inferred from implementatio
 
 - **26-05 Agent integration:** extend `answer-reading-question` over the validated QueryPlan,
   ToolRegistryManifest, Frozen Manifest and CitedAnswerArtifact contracts.
+- **26-06 Structured output integrity:** normalize only declared aliases/enums/container shapes,
+  strictly revalidate, preserve raw/repaired hashes and warnings, and block any repair that would
+  invent evidence, ownership, cutoff, authority, branch, fork or approval state.
 
 ## Phase 27 — World Model and Epistemic Layers
 
@@ -275,7 +278,9 @@ interpretive quality are measured independently.
 cross-dimension manifests agree, and candidate-only invariants hold.
 
 - **28-05 Agent integration:** register `analyze-chapter` and `build-story-arc`; persist
-  ChapterAnalysisArtifact/StoryArcArtifact with candidate-only terminal-state validation.
+  ChapterAnalysisArtifact/StoryArcArtifact with bounded context, continuity notes, non-indexed
+  digests and candidate-only terminal-state validation. Outline/mainline outputs remain
+  uncertainty-bearing candidates; progress reuses Agent SSE/Job notification over DB checkpoints.
 
 ## Phase 29 — Quality Qualification and v1.2 Closure
 
@@ -340,7 +345,8 @@ similarity.
 **Plans:** 31-01 scene boundary/candidate contract; 31-02 narrative salience and diversity
 ranking; 31-03 human review and frozen key-scene set.
 
-**Must-Haves:** evidence range, cast/place/time/POV, spoiler cutoff, diversity and reasons.
+**Must-Haves:** evidence range, cast/place/time/POV, spoiler cutoff, diversity and reasons;
+speaker/dialogue heuristics expose offsets/confidence/warnings only as candidate signals.
 
 **Verification:** precision/diversity/coverage review; **Test, Fix, and Confirm** against
 high-action, quiet-emotional and visually ambiguous scenes.
@@ -450,7 +456,8 @@ no silent write-back to original canon.
 with intentional canon violations and allowed divergences.
 
 - **37-05 Agent integration:** register `continue-derivative-story`; separate ordinary draft
-  approval, divergence approval and deterministic derivative revision publication.
+  approval, disabled-by-default BranchSuggestion, divergence approval and deterministic
+  derivative revision publication; suggestions never auto-fork or reuse an approval.
 
 ## Phase 38 — Derivative Visual Consistency
 

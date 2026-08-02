@@ -26,6 +26,7 @@
 | REQ-AGENT-05 | Third-party packages load only from a pinned allowlist and lock manifest with declared permissions; tool-name/schema collisions fail closed at startup | 25.3-01/02 | PLANNED |
 | REQ-AGENT-06 | External MCP results are labeled `external_evidence` and never enter Canon, original-text evidence validation or core retrieval authority | 25.3-03 | PLANNED |
 | REQ-AGENT-07 | High-impact actions route through allow/ask/deny policy with Web Approval; Original Canon mutation and active-pointer moves are deterministic deny operations | 25.3-04 | PLANNED |
+| REQ-AGENT-08 | Model-produced structured outputs permit only conservative normalization, must pass strict post-repair validation, record repair lineage/warnings and never synthesize evidence or authority fields | 26-06 | PLANNED |
 
 ## v1.2 Trusted Understanding
 
@@ -35,6 +36,7 @@
 | REQ-QP-02 | Retrieval covers raw, event/causal, character state/goal/motivation/knowledge, relations, timeline, clues, world entities/rules and NM chapter/arc/global | 26-02 | PLANNED |
 | REQ-QP-03 | All factual citations materialize to hash/offset-verified leaf/raw EvidenceRef | 26-03 | PLANNED |
 | REQ-QP-04 | Reader and Analysis Chat share retrieval/citation authority with distinct anchors | 26-04 | PLANNED |
+| REQ-QP-05 | Missing domain readers follow an explicit deterministic fallback chain; heuristic extraction remains candidate-only and unresolved dimensions terminate as stable partial/unavailable reasons | 26-02 | PLANNED |
 | REQ-WM-01 | Event facts and causal edges are typed, versioned and evidence-gated | 27-01 | PLANNED |
 | REQ-WM-02 | Character state, goal, motivation and knowledge evolve by cutoff/POV | 27-02 | PLANNED |
 | REQ-WM-03 | World entity, rule, faction, place and item projections retain exceptions and lineage | 27-03 | PLANNED |
@@ -43,6 +45,8 @@
 | REQ-NM-02 | Semantic Arc/Volume/Global candidates continuously cover the source snapshot | 28-03 | PLANNED |
 | REQ-NM-03 | Timeline/relation/clue/character/world closure and one-click analysis expose dimension-specific progress | 28-04 | PLANNED |
 | REQ-NM-04 | NM remains candidate-only; no active pointer or consumer cutover | Phase 28 | LOCKED |
+| REQ-NM-05 | Chapter memory carries bounded previous context, non-authoritative next hints, continuity notes and non-indexed digests with source hash, cutoff and spoiler lineage | 28-02/05 | PLANNED |
+| REQ-NM-06 | Outline and mainline summaries are uncertainty-bearing candidate Artifacts with source lineage and never become Canon by generation alone | 28-03 | PLANNED |
 | REQ-QA-01 | Frozen reading QA spans local/cross-chapter/global/causal/knowledge/world/no-answer/spoiler buckets | 29-01 | PLANNED |
 | REQ-QA-02 | Retrieval, citation, faithfulness, relevance, abstention, latency and cost are evaluated by bucket | 29-02 | PLANNED |
 | REQ-QA-03 | Real browser UAT verifies citations, partial states and spoiler-safe Reader/Analysis Chat | 29-03 | PLANNED |
@@ -56,6 +60,7 @@
 | REQ-VIS-03 | Provider-neutral Scene Spec compiles to versioned prompts without unsupported canon details | Phase 32 | PLANNED |
 | REQ-VIS-04 | Illustration jobs are idempotent, budgeted, traceable and human-approved | Phase 33 | PLANNED |
 | REQ-VIS-05 | Approved images use hash-verified text anchors and survive responsive reading/export | Phase 34 | PLANNED |
+| REQ-VIS-06 | Speaker/dialogue textual heuristics expose offsets, confidence and warnings solely as scene-candidate recall/ranking signals, never as Canon or citation authority | 31-01/02 | PLANNED |
 
 ## v1.4 Canon Fork Derivatives
 
@@ -66,6 +71,7 @@
 | REQ-FORK-03 | Generation consumes an auditable cutoff state package and runs contradiction/character/timeline/clue checks | Phase 37 | PLANNED |
 | REQ-FORK-04 | Derivative Visual Bible/assets cannot mutate original visual authority | Phase 38 | PLANNED |
 | REQ-FORK-05 | Export preserves content/assets/citations/version parity and passes end-to-end UAT/audit | Phase 39 | PLANNED |
+| REQ-FORK-06 | Branch suggestions are disabled-by-default candidate outputs bound to conflict, Canon delta and evidence; they cannot auto-fork or reuse divergence/publication approval | 37-03/05 | PLANNED |
 
 ## Explicit Backlog
 
@@ -73,6 +79,7 @@
 |---|---|---|
 | REQ-999-PROMOTION | NM active pointer, production A/B, promotion and rollback | DEFERRED — explicit authorization required |
 | REQ-999-READER | Branch-only bookmarks/navigation/performance not needed by Phase 26–39 | BACKLOG — selective reimplementation only |
+| REQ-999-EMOTIONAL-MEMORY | Long-term emotional-memory projection inspired by AgentVN | DEFERRED — requires a separate epistemic schema, evaluation set and phase authorization |
 
 ## Requirements Status
 

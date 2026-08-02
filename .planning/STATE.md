@@ -54,12 +54,13 @@ No single aggregate completion percentage is authoritative.
 |---|---|---|---:|
 | Phase 25.2 | VERIFIED | 8 | ✅ 2026-08-02 (user execution override) |
 | Phase 25.3 | VERIFIED | 7 | ✅ 2026-08-02 |
-| Phase 26–29 | PLANNED | 21 | BLOCKED by Phase 22 3/3 |
+| Phase 26–29 | PLANNED | 22 | BLOCKED by Phase 22 3/3 |
 | Phase 30–34 | PLANNED | 24 | BLOCKED by upstream execution dependencies |
 | Phase 35–39 | PLANNED | 25 | BLOCKED by upstream execution dependencies |
 
 The earlier 55-plan structural verdict did not prove Issue #29 Agent-consumption coverage.
-The corrected portfolio must cover REQ-AGENT-01..07 and the per-phase Skill/Artifact map in
+The corrected 86-plan portfolio must cover REQ-AGENT-01..08, AgentVN-derived candidate-only
+heuristics/context/branch-suggestion contracts, and the per-phase Skill/Artifact map in
 `.planning/AGENT-RUNTIME-CONTRACT.md`. No future SUMMARY or VERIFICATION placeholder is
 created.
 
@@ -106,7 +107,8 @@ Phase 22 execution is paused. Its recovery entry remains:
 
 `.planning/phases/22-ci-nightly-gap-closure/22-G2-PLAN.md`
 
-Phase 26–39 planning is complete. Phase 25.2 and Phase 25.3 are implemented and verified
+Phase 26–39 planning is complete, including the AgentVN planning integration recorded on
+2026-08-02. Phase 25.2 and Phase 25.3 are implemented and verified
 under the 2026-08-02 execution override. Do not execute Phase 26 until
 `scripts/check_phase_execution_gate.py` exists from 26-01 bootstrap and verifies both
 Phase 22 3/3 real scheduled green evidence and passed Phase 25.2 plus Phase 25.3 verification artifacts.
