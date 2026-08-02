@@ -27,6 +27,7 @@ from app.schemas.reader_chat import (
 )
 from app.services.agent_runtime import artifacts as artifact_service
 from app.services.agent_runtime.registry import canonical_input_hash
+from app.services.agent_runtime.structured_output_integrity import evaluate_integrity
 from app.services.reader_chat.budget import BudgetPolicy
 
 # agent_end 的取消 stop reason 集合 → cancelled 分支（0 写）。
@@ -165,6 +166,22 @@ async def finalize_skill_run(
             return FinalizeOutcome(
                 status="failed",
                 error_code=ERROR_CODE_BUDGET_EXCEEDED,
+                status_reason=run.status_reason,
+            )
+
+        # Structured Output Integrity 门禁（26-06 / REQ-AGENT-08 / D-16）：
+        # 唯一 finalizer 在任何写入之前执行严格 schema/lineage/trail 校验；
+        # blocked → run failed、零写入（不补默认值、不触发 approval/promotion）。
+        decision = evaluate_integrity(envelope=envelope, run=run)
+        if not decision.ok:
+            reason = decision.blocked_reason or "structured output integrity blocked"
+            run.status = "failed"
+            run.stop_reason = stop_reason
+            run.status_reason = reason[:160]
+            run.error_code = ERROR_CODE_FAILED_VALIDATION
+            return FinalizeOutcome(
+                status="failed",
+                error_code=ERROR_CODE_FAILED_VALIDATION,
                 status_reason=run.status_reason,
             )
 

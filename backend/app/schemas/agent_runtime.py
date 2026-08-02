@@ -186,11 +186,40 @@ class ArtifactRevisionView(StrictAgentRuntimeModel):
 # ────────────────────────── Cited Answer Artifact 信封（D-10） ──────────────────────────
 
 
+class NormalizationTrail(StrictAgentRuntimeModel):
+    """结构化输出修复血缘（26-06 / REQ-AGENT-08 / D-16）。
+
+    repaired_hash 是对**不含本 trail 的** repaired payload 的 canonical SHA-256
+    （与 agent-service normalizer 的 canonicalHash 口径一致）；raw_hash 是原始模型
+    输出的 canonical SHA-256（raw 本体保留在 agent-service 侧作为 immutable audit
+    evidence）。normalization_actions 每项至少含 path/action/after。
+    """
+
+    raw_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    repaired_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    normalization_actions: list[dict[str, Any]] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+
+    @field_validator("normalization_actions")
+    @classmethod
+    def _actions_shape(cls, value: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        for item in value:
+            if not isinstance(item, dict):
+                raise ValueError("each normalization action must be an object")
+            if not item.get("path") or not item.get("action"):
+                raise ValueError("each normalization action requires path and action")
+            if "after" not in item:
+                raise ValueError("each normalization action requires after")
+        return value
+
+
 class CitedAnswerArtifact(StrictAgentRuntimeModel):
     """智能体产物的 Cited Answer 信封（D-10/D-14）。
 
     finalize 写入 artifact_revisions.content 的完整载荷；所有证据引用必须属于
     run 冻结 manifest 白名单（validate_answer_against_manifest 服务端校验）。
+    normalization 是必须的修复血缘 trail：normalizer 的输出进入审计/Artifact
+    lineage，服务端 adapter 在任何写入前重放校验（26-06 / REQ-AGENT-08）。
     """
 
     type: Literal["cited_answer"] = "cited_answer"
@@ -208,6 +237,7 @@ class CitedAnswerArtifact(StrictAgentRuntimeModel):
     answer: dict[str, Any]
     status: Literal["candidate", "validated", "approved", "published", "rejected"]
     parent_revision: str | None = None
+    normalization: NormalizationTrail
 
 
 # ────────────────────────── External Evidence Artifact 信封（D-09） ──────────────────────────

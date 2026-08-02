@@ -51,6 +51,7 @@ from app.services.agent_runtime.registry import (
     register_skill_version,
     validate_skill_contract,
 )
+from app.services.agent_runtime.structured_output_integrity import canonical_content_hash
 from app.services.agent_tools.facade import ToolFacade
 from tests.integration.conftest import reset_public_schema, run_alembic
 
@@ -263,20 +264,20 @@ async def stub_agent_loop(
         "novel": "v1",
         "chapters": {"1": HEX64},
     }
-    envelope = CitedAnswerArtifact(
-        type="cited_answer",
-        schema_version="cited-answer.v1",
-        owner_id=owner_id,
-        novel_id=novel_id,
-        branch=None,
-        producing_skill=DEFAULT_SKILL,
-        producing_skill_version="1.0.0",
-        skill_version_id=skill_version_id,
-        model_lineage=model_lineage,
-        source_versions=source_versions,
-        input_hash=input_hash,
-        evidence_refs=[evidence_key],
-        answer={
+    envelope_dict = {
+        "type": "cited_answer",
+        "schema_version": "cited-answer.v1",
+        "owner_id": owner_id,
+        "novel_id": novel_id,
+        "branch": None,
+        "producing_skill": DEFAULT_SKILL,
+        "producing_skill_version": "1.0.0",
+        "skill_version_id": skill_version_id,
+        "model_lineage": model_lineage,
+        "source_versions": source_versions,
+        "input_hash": input_hash,
+        "evidence_refs": [evidence_key],
+        "answer": {
             "answer_blocks": [
                 {
                     "block_id": "b1",
@@ -288,9 +289,18 @@ async def stub_agent_loop(
             "uncertainty": None,
             "suggestion_candidates": [],
         },
-        status="candidate",
-        parent_revision=None,
-    )
+        "status": "candidate",
+        "parent_revision": None,
+    }
+    # 26-06：完整性 trail（noop 修复：raw == repaired，零 action）。
+    repaired_hash = canonical_content_hash(envelope_dict)
+    envelope_dict["normalization"] = {
+        "raw_hash": repaired_hash,
+        "repaired_hash": repaired_hash,
+        "normalization_actions": [],
+        "warnings": [],
+    }
+    envelope = CitedAnswerArtifact.model_validate(envelope_dict)
     usage = {"calls": 1, "input_tokens": 120, "output_tokens": 48, "cost_usd": "0.0002"}
     return {
         "envelope": envelope.model_dump(mode="json"),
