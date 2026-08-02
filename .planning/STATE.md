@@ -124,6 +124,19 @@ created.
 - Upstream verification artifacts still required: passed 25.1/25.2/25.3 (all exist) and
   each Phase 26 plan's own SUMMARY/VERIFICATION when complete.
 
+## Execution Override — Phase 27 (2026-08-03, user authorized)
+
+- User authorized skipping the Phase 22 3/3 gate for Phase 27 implementation (2026-08-03,
+  interactive confirmation "授权跳过门禁"). Scope: Phase 27-01..05 (shared event fact and
+  causal edge, character state/goal/motivation/knowledge, world entity/rule/faction/place/
+  item, POV/disclosure/epistemic authority, Agent integration) proceed without Phase 22
+  real scheduled green evidence.
+- `scripts/check_phase_execution_gate.py` (26-00) remains the fail-closed default; its
+  current-repo blocked (Phase 22 0/3) non-zero behavior is preserved.
+- Phase 22 verdict is NOT changed: remains blocked at 0/3 and must not be marked complete.
+- Phase 28+ still require a passed Phase 27 verification artifact per ROADMAP contracts;
+  this override does not waive those.
+
 ## Execution Cursor
 
 Phase 22 execution is paused. Its recovery entry remains:
