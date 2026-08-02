@@ -124,6 +124,32 @@
 
 ---
 
+## Agent Service 模块（Phase 25.2/25.3）
+
+### agent-service（独立 Node 服务）
+
+| 属性 | 内容 |
+|---|---|
+| **职责** | Novel Agent Runtime：Pi SDK 会话编排、域工具代理、Skill 指令注入、MCP 外部工具隔离、审批策略引擎；通过 `/api/gateway` 服务到服务调用 FastAPI |
+| **主要文件** | `agent-service/src/`（`config.ts`、`server.ts`、`agent/`、`tools/`、`skills/`、`governance/`、`policy/`、`mcp/`、`transport/`） |
+| **状态** | VERIFIED（223 vitest passed，tsc clean，2026-08-02） |
+| **上游** | FastAPI `/api/gateway`（Bearer 令牌，fail-closed 401） |
+| **下游** | `/api/agent`（skill-runs/artifacts/approval-requests）、`/api/agent-tools`（7 域工具） |
+| **文档** | `agent-service/qualification/` + `.planning/AGENT-RUNTIME-CONTRACT.md` |
+
+### 后端 Agent Runtime 模块
+
+| 属性 | 内容 |
+|---|---|
+| **职责** | SkillRegistry/SkillVersion/SkillRun/Artifact/ArtifactRevision/NovelAgentProfile/ApprovalRequest 持久化与权限权威；external_evidence 物化（`prohibited_from_canon=true`，不可发布）；最终 validator 拒绝 mcp:// 引用 |
+| **主要文件** | `backend/app/services/agent_runtime/`、`backend/app/api/agent.py`、`agent_tools.py`、`gateway.py`、`backend/app/models/agent_runtime.py` |
+| **状态** | VERIFIED（集成 24 + adversarial 56 + CI 37 passed，2026-08-02） |
+| **上游** | agent-service（经 gateway） |
+| **下游** | PostgreSQL（Alembic `27approval01` head） |
+| **文档** | `backend/app/services/agent_runtime/` + `.planning/AGENT-RUNTIME-CONTRACT.md` |
+
+---
+
 ## 前端模块
 
 ### 页面层（App Router）

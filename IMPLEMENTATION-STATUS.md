@@ -140,3 +140,26 @@ Key metrics:
 | 已声明豁免 | pip-audit：chromadb PYSEC-2026-311（无修复版）；npm audit `--omit=dev`（brace-expansion 5.0.8 与 eslint 链不兼容）——解除条件见 ci.yml 注释 | `.github/workflows/ci.yml` |
 | 依赖升级 | echarts 5→6.1；sharp/postcss/hono overrides；生产依赖 npm audit 0 | PR #13 |
 | Vertex/Gemini | 实验态（无测试/无文档），仅 Timeline/Clue live 调用使用 | `vertex_gemini.py` |
+
+---
+
+## 2026-08-02 快照（Phase 25.2/25.3 实现并验证；snapshot: master @ 2f20a40）
+
+以下事实覆盖上文旧节中的对应记录（25.2/25.3 = Novel Agent Runtime 基础）：
+
+| 项 | 当前值 | 证据 |
+|---|---|---|
+| 25.2 Embedded Novel Agent Runtime | **VERIFIED 2026-08-02** | `25.2-VERIFICATION.md` passed（source_commit `6988ceb`） |
+| 25.3 Pi Package Compatibility & Governance | **VERIFIED 2026-08-02** | `25.3-VERIFICATION.md` passed（source_commit `e4b1c95`） |
+| 后端测试 | **195 passed**（CI 37 + agent_runtime 集成 24 + adversarial 56 + contract 83） | 2026-08-02 本机全量；unit 452 passed |
+| agent-service（Node） | **223 passed / 10 files**；tsc clean | `cd agent-service && npx vitest run` |
+| 前端测试 | **281 passed / 36 files** | `cd frontend && npm run test -q` |
+| 执行门禁 | `scripts/check_agent_runtime_execution_gate.py` PASS | gate 9/9 CI 测试 |
+| Agent 域工具 | 7 个类型化只读工具（get_novel/get_chapter/search/timeline/relationships/clues/narrative_memory），禁默认编码工具 | `backend/app/api/agent_tools.py` |
+| Agent API | `/api/agent`（skill-runs/artifacts/approval-requests）+ `/api/agent-tools` + `/api/gateway` 已挂载 | `backend/app/main.py` |
+| Skill/Artifact 持久化 | SkillRegistry/SkillVersion/SkillRun/Artifact/ArtifactRevision/NovelAgentProfile/ApprovalRequest；Alembic `27approval01` head | `backend/app/models/agent_runtime.py` + `backend/migrations/versions/` |
+| MCP 隔离 | `pi-mcp-adapter@2.17.0` **ADOPT（external-tools-only）**；结果仅 `external_evidence`（`prohibited_from_canon=true`），禁止入 Canon | `agent-service/src/mcp/` + `backend/app/schemas/agent_runtime.py` |
+| Web renderer 可行性 | CitedAnswerArtifact 渲染器 + external_evidence 显示纪律；**零 `@earendil-works/pi-web-ui` 依赖**（pattern-only） | `frontend/src/components/analysis/cited-answer-artifact.tsx` + `25.3-05-FEASIBILITY.md` |
+| Web 审批 | SSE `approval_request` 帧 + approve/reject UX；FastAPI 保持唯一决策权威 | `agent-service/src/transport/sse.ts` + `frontend/src/components/analysis/approval-request-dialog.tsx` |
+| 已知环境限制 | `test_openapi_contract.py` 在 pytest 下挂起（subprocess→litellm/tiktoken 下载）；Next 16 canary dev server 编译失败（e2e 受限）；前端遗留 29 个 typecheck 错误（`creative-project-editor.tsx`/`reader-chat-budget-section.tsx`，`FanFictionChapter` 类型缺失，与 25.2/25.3 无关） | 2026-08-02 本机 |
+| 仍阻塞 | Phase 22 Nightly 3/3 未达成（0/3）；Phase 26 执行需 Phase 22 3/3 + 26-01 bootstrap gate | `.planning/STATE.md` |
