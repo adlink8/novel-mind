@@ -210,5 +210,45 @@ class CitedAnswerArtifact(StrictAgentRuntimeModel):
     parent_revision: str | None = None
 
 
+# ────────────────────────── External Evidence Artifact 信封（D-09） ──────────────────────────
+
+
+class ExternalEvidenceSource(StrictAgentRuntimeModel):
+    """外部（MCP）来源条目：retrieved_from 恒为 "mcp"（D-09）。"""
+
+    server: str = Field(min_length=1, max_length=120)
+    tool: str = Field(min_length=1, max_length=120)
+    uri: str = Field(min_length=1, max_length=2048)
+    title: str = Field(min_length=1, max_length=512)
+    retrieved_from: Literal["mcp"] = "mcp"
+
+
+class ExternalEvidenceClaim(StrictAgentRuntimeModel):
+    """外部主张条目：text + 在来源结果中的下标（D-09）。"""
+
+    text: str = Field(min_length=1, max_length=4000)
+    source_index: int = Field(ge=0)
+
+
+class ExternalEvidenceArtifact(StrictAgentRuntimeModel):
+    """外部（MCP）结果的 D-09 信封——仅以 external_evidence 类型物化。
+
+    prohibited_from_canon 是**服务端常量** Literal[True]：wire 形状本身无法断言
+    其他值（T-25.3-03-02，Pitfall 6）。与 25.2-03 CitedAnswerArtifact 信封纪律
+    一致（type / schema_version / lineage 字段），但携带 D-09 字段，且永不进入
+    CitedAnswerArtifact 的 evidence_refs——finalizer 的
+    validate_answer_against_manifest 只认识 original_text_evidence 引用。
+    """
+
+    type: Literal["external_evidence"] = "external_evidence"
+    schema_version: Literal[1] = 1
+    sources: list[ExternalEvidenceSource] = Field(min_length=1)
+    retrieval_time: datetime  # ISO-8601
+    claims: list[ExternalEvidenceClaim] = Field(default_factory=list)
+    confidence: Literal["low", "medium", "high"] = "low"
+    prohibited_from_canon: Literal[True] = True
+    release_status: Literal["external"] = "external"
+
+
 # 供 OpenAPI 引用，避免未使用告警。
 _ = (StrictReaderChatModel,)

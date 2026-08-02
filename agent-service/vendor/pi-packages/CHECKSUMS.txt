@@ -6,6 +6,7 @@
 
 ```
 4631ce4180008f24b0e98c475fd734cce9b86d0176c1adff1cb8275b798a0c28  earendil-works-pi-agent-core-0.83.0.tgz
+cab72beceb5fe32f8606b3bcf6986a8bb24c90199cb6f3440c0e79b23f1c8bef  pi-mcp-adapter-2.17.0.tgz
 ```
 
 ## 说明

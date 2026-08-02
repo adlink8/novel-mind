@@ -6,6 +6,9 @@ Phase 25.3 包治理工作（25.3-01..05）在写入任何 package/lockfile/runt
 front-matter 的 phase/slug/status/source_commit 与期望一致、且必填 validation 段落齐全。
 
 - 缺失 / 过期 / 畸形 / status 非 passed / phase id 不匹配 → exit 1，并在 stderr 点名原因。
+- source_commit 校验：显式 --expected-commit 时严格匹配；默认要求 source_commit 是
+  当前 git HEAD 的祖先（已验证并并入当前历史的提交）。伪造或未合并的旧提交被拒绝，
+  但验证之后的 docs/后续 plan 提交推进 HEAD 不会误判为过期。
 - planning override（.planning/STATE.md）与任何 SUMMARY 都不能替代 VERIFICATION：
   本脚本只读取 VERIFICATION 工件，其余文档一概不作为证据。
 - Phase 22 门禁已由用户授权执行跳过（STATE.md "Execution Override (2026-08-02)"），
@@ -83,14 +86,21 @@ def git_head(repo_root: Path) -> tuple[str, str] | None:
         return None
 
 
-def resolve_expected_commit(repo_root: Path, expected_commit: str | None) -> str | None:
-    """期望提交来源优先级：--expected-commit > git HEAD > None（无法核对）。"""
-    if expected_commit:
-        return expected_commit
-    head = git_head(repo_root)
-    if head is None:
-        return None
-    return head[1]  # 短哈希即可比较（VERIFICATION 记录的是短哈希）
+def commit_is_ancestor(repo_root: Path, source_commit: str) -> bool:
+    """source_commit 是否已是 HEAD 的祖先（已并入当前历史）。
+
+    语义：验证证据必须来自当前仓库历史中可审计的提交。相比"严格等于 HEAD"，
+    祖先检查允许验证后的 docs/后续 plan 提交推进 HEAD，而不会把合法证据
+    误判为过期；伪造/未合并分支上的旧提交仍被拒绝。
+    """
+    try:
+        proc = subprocess.run(
+            ["git", "-C", str(repo_root), "merge-base", "--is-ancestor", source_commit, "HEAD"],
+            capture_output=True, text=True, timeout=10,
+        )
+        return proc.returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        return False
 
 
 def check_verification(
@@ -135,12 +145,22 @@ def check_verification(
     if not source_commit or not COMMIT_RE.match(source_commit):
         errors.append(f"source_commit 缺失或畸形: {source_commit!r}")
     else:
-        expected = resolve_expected_commit(repo_root, expected_commit)
-        if expected is not None and source_commit != expected:
-            errors.append(
-                f"source_commit 过期/不匹配: VERIFICATION={source_commit}，"
-                f"期望={expected}"
-            )
+        if expected_commit:
+            # 显式期望：严格匹配（用于 fixture 与审计）
+            if source_commit != expected_commit:
+                errors.append(
+                    f"source_commit 过期/不匹配: VERIFICATION={source_commit}，"
+                    f"期望={expected_commit}"
+                )
+        elif repo_root.is_dir() and (repo_root / ".git").exists():
+            # 默认（无 --expected-commit）：必须是当前仓库 HEAD 的祖先——
+            # 验证证据来自已并入历史、可审计的提交。伪造/未合并提交被拒绝。
+            if not commit_is_ancestor(repo_root, source_commit):
+                head = git_head(repo_root)
+                errors.append(
+                    f"source_commit 不在当前历史: VERIFICATION={source_commit}，"
+                    f"HEAD={head[1] if head else '<无>'}"
+                )
 
     # 必填 validation 段落齐全
     body = text

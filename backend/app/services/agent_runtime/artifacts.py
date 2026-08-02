@@ -28,6 +28,12 @@ _ARTIFACT_TRANSITIONS: dict[str, frozenset[str]] = {
     "rejected": frozenset(),
 }
 
+# external_evidence（D-09，RESEARCH open question 3 决议 / T-25.3-03-02）：
+# 只以 candidate 进入，永不允许向 published（含 validated/approved 台阶）迁移；
+# 仅 rejected 分支可用。服务级门禁，与 schema 层 Literal[True] 一起构成双层防线。
+EXTERNAL_EVIDENCE_ARTIFACT_TYPE = "external_evidence"
+_EXTERNAL_EVIDENCE_ALLOWED_TRANSITIONS: frozenset[str] = frozenset({"rejected"})
+
 
 class ArtifactStateError(RuntimeError):
     """非法状态迁移 / 非 owner 操作被拒绝。"""
@@ -109,6 +115,17 @@ async def transition_artifact_status(
     )
     if artifact is None:
         raise ArtifactStateError("artifact not found or not owned by caller")
+    if artifact.type == EXTERNAL_EVIDENCE_ARTIFACT_TYPE:
+        # D-09：external_evidence 永不发布——向 validated/approved/published 的任何
+        # 迁移都被服务门禁拒绝（T-25.3-03-02）。
+        if to_status not in _EXTERNAL_EVIDENCE_ALLOWED_TRANSITIONS:
+            raise ArtifactStateError(
+                f"illegal artifact status transition {artifact.status!r} -> {to_status!r}: "
+                "external_evidence 仅以 candidate 存在且永不发布（仅 rejected 分支可用）"
+            )
+        artifact.status = to_status
+        await db.flush()
+        return artifact
     allowed = _ARTIFACT_TRANSITIONS.get(artifact.status, frozenset())
     if to_status not in allowed:
         raise ArtifactStateError(
