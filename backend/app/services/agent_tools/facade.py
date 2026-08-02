@@ -32,11 +32,14 @@ from typing import Any
 from app.models import Novel
 from app.schemas.novel import ChapterResponse, NovelResponse
 from app.schemas.relationship import RelationshipVersionSource
-from app.schemas.timeline import TimelineEnvelope, TimelineOrdering, TimelineVersionSource
+from app.schemas.timeline import (
+    TimelineEnvelope,
+    TimelineOrdering,
+    TimelineVersionSource,
+)
 from app.services.agent_tools.errors import (
     AgentToolError,
     BeyondCutoffError,
-    BudgetExceededError,
     InvalidInputError,
     NotFoundError,
     OutputTooLargeError,
@@ -318,9 +321,7 @@ class ToolFacade:
         if hasattr(raw, "model_dump"):
             return raw.model_dump(mode="json")
         if isinstance(raw, dict):
-            return {
-                key: ToolFacade._to_json_safe(value) for key, value in raw.items()
-            }
+            return {key: ToolFacade._to_json_safe(value) for key, value in raw.items()}
         if isinstance(raw, (list, tuple)):
             return [ToolFacade._to_json_safe(item) for item in raw]
         return raw
@@ -350,7 +351,9 @@ class ToolFacade:
             )
         return ChapterResponse.model_validate(chapter)
 
-    async def _search_novel_text(self, *, db, novel: Novel, owner_id: int, params: dict):
+    async def _search_novel_text(
+        self, *, db, novel: Novel, owner_id: int, params: dict
+    ):
         svc = self._svc("search_novel_text", _default_search_novel_text)
         return await svc(
             db,
@@ -363,11 +366,7 @@ class ToolFacade:
 
     async def _get_timeline(self, *, db, novel: Novel, owner_id: int, params: dict):
         persisted_full_book = _persisted_full_book(novel)
-        cutoff = (
-            None
-            if persisted_full_book
-            else await self.cutoff_resolver(db, novel)
-        )
+        cutoff = None if persisted_full_book else await self.cutoff_resolver(db, novel)
         chapter_start = params.get("chapter_start")
         chapter_end = params.get("chapter_end")
         if not persisted_full_book and cutoff is not None:
@@ -393,21 +392,15 @@ class ToolFacade:
             chapter_start=chapter_start,
             chapter_end=chapter_end,
         )
-        active = await svc(
-            source=TimelineVersionSource.ACTIVE, **common
-        )
-        running = await svc(
-            source=TimelineVersionSource.RUNNING_CANDIDATE, **common
-        )
+        active = await svc(source=TimelineVersionSource.ACTIVE, **common)
+        running = await svc(source=TimelineVersionSource.RUNNING_CANDIDATE, **common)
         return TimelineEnvelope(active=active, running_candidate=running)
 
-    async def _get_relationships(self, *, db, novel: Novel, owner_id: int, params: dict):
+    async def _get_relationships(
+        self, *, db, novel: Novel, owner_id: int, params: dict
+    ):
         persisted_full_book = _persisted_full_book(novel)
-        cutoff = (
-            None
-            if persisted_full_book
-            else await self.cutoff_resolver(db, novel)
-        )
+        cutoff = None if persisted_full_book else await self.cutoff_resolver(db, novel)
         through_chapter = params.get("through_chapter")
         if not persisted_full_book and cutoff is not None:
             if through_chapter is not None and int(through_chapter) > int(cutoff):
@@ -447,13 +440,11 @@ class ToolFacade:
             status_filter=params.get("status"),
         )
 
-    async def _get_narrative_memory(self, *, db, novel: Novel, owner_id: int, params: dict):
+    async def _get_narrative_memory(
+        self, *, db, novel: Novel, owner_id: int, params: dict
+    ):
         persisted_full_book = _persisted_full_book(novel)
-        cutoff = (
-            None
-            if persisted_full_book
-            else await self.cutoff_resolver(db, novel)
-        )
+        cutoff = None if persisted_full_book else await self.cutoff_resolver(db, novel)
         through_chapter = params.get("through_chapter")
         if not persisted_full_book and cutoff is not None:
             if through_chapter is not None and int(through_chapter) > int(cutoff):

@@ -17,14 +17,14 @@ from __future__ import annotations
 
 # 唯一事实源：冻结的错误码元组。顺序即文档顺序，请勿重排。
 AGENT_TOOL_ERROR_CODES: tuple[str, ...] = (
-    "forbidden",        # 客户端无权限访问目标资源（当前走 404-hide 约定，通常不直接出现）
-    "not_found",        # 资源不存在（章节不属于该小说等）
-    "beyond_cutoff",    # 请求的章节/范围超出当前阅读进度截止点（防剧透）
+    "forbidden",  # 客户端无权限访问目标资源（当前走 404-hide 约定，通常不直接出现）
+    "not_found",  # 资源不存在（章节不属于该小说等）
+    "beyond_cutoff",  # 请求的章节/范围超出当前阅读进度截止点（防剧透）
     "budget_exceeded",  # 预算策略拒绝本次调用（fail closed，调用前拦截）
-    "timeout",          # 上游服务执行超过 per-tool 超时
-    "output_too_large", # 序列化后的响应超过 per-tool 字节上限
-    "invalid_input",    # 请求参数校验失败（422）
-    "upstream_error",   # 未预期/未分类的上游错误
+    "timeout",  # 上游服务执行超过 per-tool 超时
+    "output_too_large",  # 序列化后的响应超过 per-tool 字节上限
+    "invalid_input",  # 请求参数校验失败（422）
+    "upstream_error",  # 未预期/未分类的上游错误
 )
 
 # 冻结集合，供校验与测试使用。

@@ -21,7 +21,10 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.models.agent_runtime import SkillRun, SkillVersion
-from app.schemas.reader_chat import ReaderAnswerEnvelope, validate_answer_against_manifest
+from app.schemas.reader_chat import (
+    ReaderAnswerEnvelope,
+    validate_answer_against_manifest,
+)
 from app.services.agent_runtime import artifacts as artifact_service
 from app.services.agent_runtime.registry import canonical_input_hash
 from app.services.reader_chat.budget import BudgetPolicy
@@ -117,7 +120,9 @@ async def finalize_skill_run(
             run.status_reason = "cancel_without_write"
             run.error_code = "user_cancel"
             return FinalizeOutcome(
-                status="cancelled", error_code="user_cancel", status_reason="cancel_without_write"
+                status="cancelled",
+                error_code="user_cancel",
+                status_reason="cancel_without_write",
             )
 
         # 只有 stop 才会写；其它 stop reason 视为运行异常。

@@ -103,7 +103,9 @@ async def transition_artifact_status(
     不允许的迁移或非 owner → ArtifactStateError。
     """
     artifact = await db.scalar(
-        select(Artifact).where(Artifact.id == artifact_id, Artifact.owner_id == owner_id)
+        select(Artifact).where(
+            Artifact.id == artifact_id, Artifact.owner_id == owner_id
+        )
     )
     if artifact is None:
         raise ArtifactStateError("artifact not found or not owned by caller")

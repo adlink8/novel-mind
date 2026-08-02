@@ -49,7 +49,9 @@ class ApprovalRequestCreate(StrictAgentRuntimeModel):
     # 规范化载荷摘要（SSE 帧携带给浏览器渲染；绝不承载原始工具 I/O）。
     payload_summary: dict[str, Any] = Field(default_factory=dict)
     # D-15 重放追溯哈希（String(64)，可空）。
-    payload_hash: str | None = Field(default=None, max_length=64, pattern=r"^[0-9a-f]{0,64}$")
+    payload_hash: str | None = Field(
+        default=None, max_length=64, pattern=r"^[0-9a-f]{0,64}$"
+    )
     expires_at: datetime | None = None
 
 

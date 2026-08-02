@@ -14,7 +14,13 @@ USER_INTERPRETATION = "user_interpretation"
 FANFICTION_CANON = "fanfiction_canon"
 
 ORIGINAL_PIPELINES = frozenset(
-    {"original_analysis", "original_retrieval", "facet", "evaluation", "candidate_builder"}
+    {
+        "original_analysis",
+        "original_retrieval",
+        "facet",
+        "evaluation",
+        "candidate_builder",
+    }
 )
 
 _SPACE_RULES: dict[str, tuple[str, str]] = {
@@ -46,7 +52,9 @@ class CanonSpaceRef:
 
 def validate_space(space: str) -> str:
     if space not in CANON_SPACES:
-        raise CanonSpacePolicyError("unknown_space", f"unsupported knowledge space: {space}")
+        raise CanonSpacePolicyError(
+            "unknown_space", f"unsupported knowledge space: {space}"
+        )
     return space
 
 
@@ -58,21 +66,37 @@ def expected_rule(space: str) -> tuple[str, str]:
 def validate_ref(ref: CanonSpaceRef) -> CanonSpaceRef:
     expected_authority, expected_citation = expected_rule(ref.space)
     if ref.owner_id < 1 or ref.novel_id < 1:
-        raise CanonSpacePolicyError("invalid_scope", "owner_id and novel_id must be positive")
+        raise CanonSpacePolicyError(
+            "invalid_scope", "owner_id and novel_id must be positive"
+        )
     if not ref.namespace or not ref.version_key:
-        raise CanonSpacePolicyError("missing_lineage", "namespace and version_key are required")
+        raise CanonSpacePolicyError(
+            "missing_lineage", "namespace and version_key are required"
+        )
     if ref.authority not in CANON_AUTHORITIES or ref.authority != expected_authority:
-        raise CanonSpacePolicyError("authority_mismatch", "authority does not match the knowledge space")
-    if ref.citation_policy not in CANON_CITATION_POLICIES or ref.citation_policy != expected_citation:
-        raise CanonSpacePolicyError("citation_policy_mismatch", "citation policy does not match the knowledge space")
+        raise CanonSpacePolicyError(
+            "authority_mismatch", "authority does not match the knowledge space"
+        )
+    if (
+        ref.citation_policy not in CANON_CITATION_POLICIES
+        or ref.citation_policy != expected_citation
+    ):
+        raise CanonSpacePolicyError(
+            "citation_policy_mismatch",
+            "citation policy does not match the knowledge space",
+        )
     return ref
 
 
 def assert_scope(ref: Any, *, owner_id: int, novel_id: int) -> None:
     if getattr(ref, "owner_id", None) != owner_id:
-        raise CanonSpacePolicyError("owner_scope", "artifact owner is outside the requested scope")
+        raise CanonSpacePolicyError(
+            "owner_scope", "artifact owner is outside the requested scope"
+        )
     if getattr(ref, "novel_id", None) != novel_id:
-        raise CanonSpacePolicyError("novel_scope", "artifact novel is outside the requested scope")
+        raise CanonSpacePolicyError(
+            "novel_scope", "artifact novel is outside the requested scope"
+        )
 
 
 def assert_pipeline_input(space: str, pipeline: str) -> None:

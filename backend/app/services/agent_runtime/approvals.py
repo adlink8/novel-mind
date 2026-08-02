@@ -30,7 +30,11 @@ def _utcnow() -> datetime:
 
 
 def _is_past_due(req: ApprovalRequest) -> bool:
-    return req.status == "pending" and req.expires_at is not None and _utcnow() > req.expires_at
+    return (
+        req.status == "pending"
+        and req.expires_at is not None
+        and _utcnow() > req.expires_at
+    )
 
 
 async def create(
@@ -88,7 +92,9 @@ async def confirm(
         raise ApprovalStateError(
             f"approval request {request_id} is {request.status!r} (terminal, no re-decision)"
         )
-    request.status = "approved" if mode == "once" else "approved_for_session"  # confirm 决策
+    request.status = (
+        "approved" if mode == "once" else "approved_for_session"
+    )  # confirm 决策
     request.decided_at = _utcnow()
     request.decision_actor_id = owner_id
     await db.flush()

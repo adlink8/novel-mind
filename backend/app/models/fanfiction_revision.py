@@ -16,10 +16,16 @@ class FanFictionRevision(TimestampMixin, Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     fanfiction_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("fan_fictions.id", ondelete="CASCADE"), nullable=False, index=True
+        Integer,
+        ForeignKey("fan_fictions.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
     chapter_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("fanfiction_chapters.id", ondelete="SET NULL"), nullable=True, index=True
+        Integer,
+        ForeignKey("fanfiction_chapters.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
     )
     revision_number: Mapped[int] = mapped_column(Integer, nullable=False)
     title: Mapped[str] = mapped_column(String(200), nullable=False, default="")

@@ -64,7 +64,10 @@ def evaluate_consistency(
         else:
             cited_claims += 1
 
-        if claim.chapter_number is not None and claim.chapter_number > package.cutoff_chapter_number:
+        if (
+            claim.chapter_number is not None
+            and claim.chapter_number > package.cutoff_chapter_number
+        ):
             findings.append(
                 CreativeConsistencyFinding(
                     claim_key=claim.claim_key,

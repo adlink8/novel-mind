@@ -45,7 +45,9 @@ class SkillVersionRegister(StrictAgentRuntimeModel):
     input_schema: dict[str, Any] = Field(default_factory=dict)
     output_schema: dict[str, Any] = Field(default_factory=dict)
 
-    @field_validator("allowed_tools", "read_permissions", "write_permissions", "forbidden_spaces")
+    @field_validator(
+        "allowed_tools", "read_permissions", "write_permissions", "forbidden_spaces"
+    )
     @classmethod
     def _list_of_nonempty(cls, value: list[str]) -> list[str]:
         for item in value:
@@ -133,7 +135,9 @@ class SkillRunAccepted(StrictAgentRuntimeModel):
 class SkillRunFinalize(StrictAgentRuntimeModel):
     """agent-service 在 agent_end 时触发的确定性 finalize 请求（25.2-05）。"""
 
-    stop_reason: Literal["stop", "aborted", "cancelled", "error", "max_tokens", "other"] = "stop"
+    stop_reason: Literal[
+        "stop", "aborted", "cancelled", "error", "max_tokens", "other"
+    ] = "stop"
     envelope: dict[str, Any] = Field(default_factory=dict)
     model_lineage: dict[str, Any] = Field(default_factory=dict)
     source_versions: dict[str, Any] = Field(default_factory=dict)

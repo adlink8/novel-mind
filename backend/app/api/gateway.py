@@ -65,9 +65,7 @@ def _usage_dict(usage: Any) -> dict[str, int]:
         return {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
     if isinstance(usage, dict):
         prompt = usage.get("prompt_tokens") or usage.get("input_tokens") or 0
-        completion = (
-            usage.get("completion_tokens") or usage.get("output_tokens") or 0
-        )
+        completion = usage.get("completion_tokens") or usage.get("output_tokens") or 0
     else:
         prompt = getattr(usage, "prompt_tokens", None) or 0
         completion = getattr(usage, "completion_tokens", None) or 0
@@ -79,7 +77,11 @@ def _usage_dict(usage: Any) -> dict[str, int]:
 
 
 def _response_id(response: Any) -> str:
-    rid = getattr(response, "id", None) if not isinstance(response, dict) else response.get("id")
+    rid = (
+        getattr(response, "id", None)
+        if not isinstance(response, dict)
+        else response.get("id")
+    )
     return rid or f"chatcmpl-{uuid.uuid4().hex[:24]}"
 
 

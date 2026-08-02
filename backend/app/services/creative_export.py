@@ -46,7 +46,9 @@ def _xhtml_body(content: str) -> str:
     return f'<pre class="markdown-source">{escape(_normalized_content(content))}</pre>'
 
 
-def _zip_entry(name: str, content: bytes, *, stored: bool = False) -> tuple[ZipInfo, bytes]:
+def _zip_entry(
+    name: str, content: bytes, *, stored: bool = False
+) -> tuple[ZipInfo, bytes]:
     info = ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
     info.compress_type = ZIP_STORED if stored else ZIP_DEFLATED
     info.external_attr = 0o644 << 16
@@ -60,11 +62,11 @@ def build_epub(*, project: FanFiction, revision: FanFictionRevision) -> bytes:
     title = escape(revision.title)
     content_xhtml = (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
-        '<!DOCTYPE html>\n'
+        "<!DOCTYPE html>\n"
         '<html xmlns="http://www.w3.org/1999/xhtml" lang="zh-CN">\n'
         "<head><title>"
         f"{title}"
-        "</title><meta charset=\"utf-8\"/><style>"
+        '</title><meta charset="utf-8"/><style>'
         ".markdown-source{white-space:pre-wrap;font-family:serif;line-height:1.6;}"
         "</style></head><body><h1>"
         f"{title}"
@@ -82,11 +84,11 @@ def build_epub(*, project: FanFiction, revision: FanFictionRevision) -> bytes:
         '<?xml version="1.0" encoding="UTF-8"?>\n'
         '<package xmlns="http://www.idpf.org/2007/opf" version="3.0" '
         f'unique-identifier="book-id"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/">'
-        f"<dc:identifier id=\"book-id\">{escape(identifier)}</dc:identifier>"
+        f'<dc:identifier id="book-id">{escape(identifier)}</dc:identifier>'
         f"<dc:title>{title}</dc:title><dc:language>zh-CN</dc:language>"
-        "</metadata><manifest><item id=\"chapter\" href=\"chapter.xhtml\" "
-        "media-type=\"application/xhtml+xml\"/></manifest>"
-        "<spine><itemref idref=\"chapter\"/></spine></package>\n"
+        '</metadata><manifest><item id="chapter" href="chapter.xhtml" '
+        'media-type="application/xhtml+xml"/></manifest>'
+        '<spine><itemref idref="chapter"/></spine></package>\n'
     ).encode("utf-8")
 
     entries = [
@@ -109,12 +111,23 @@ def build_export(
     *, project: FanFiction, revision: FanFictionRevision, format: str
 ) -> ExportArtifact:
     if format == "markdown":
-        return ExportArtifact(build_markdown(project=project, revision=revision), "text/markdown", "md")
+        return ExportArtifact(
+            build_markdown(project=project, revision=revision), "text/markdown", "md"
+        )
     if format == "epub":
-        return ExportArtifact(build_epub(project=project, revision=revision), "application/epub+zip", "epub")
+        return ExportArtifact(
+            build_epub(project=project, revision=revision),
+            "application/epub+zip",
+            "epub",
+        )
     raise ValueError("unsupported export format")
 
 
-def export_filename(*, project: FanFiction, revision: FanFictionRevision, extension: str) -> str:
-    stem = re.sub(r"[^\w\-]+", "-", revision.title, flags=re.UNICODE).strip("-") or "creative-project"
+def export_filename(
+    *, project: FanFiction, revision: FanFictionRevision, extension: str
+) -> str:
+    stem = (
+        re.sub(r"[^\w\-]+", "-", revision.title, flags=re.UNICODE).strip("-")
+        or "creative-project"
+    )
     return f"{stem}-v{revision.revision_number}.{extension}"

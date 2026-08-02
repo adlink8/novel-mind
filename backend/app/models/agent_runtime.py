@@ -336,7 +336,8 @@ class Artifact(TimestampMixin, Base):
     # 当前修订指针（与 artifact_revisions 互相引用；迁移中用 ALTER TABLE 补外键）。
     # use_alter=True：SQLite drop_all 无法排序循环外键，标记为已知循环。
     current_revision_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("artifact_revisions.id", ondelete="SET NULL", use_alter=True)
+        Integer,
+        ForeignKey("artifact_revisions.id", ondelete="SET NULL", use_alter=True),
     )
 
 

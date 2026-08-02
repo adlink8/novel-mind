@@ -44,7 +44,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter(dependencies=[Depends(require_user)])
 
 
-async def _run_tool(tool_name: str, *, db: AsyncSession, novel: Novel, owner_id: int, params: dict):
+async def _run_tool(
+    tool_name: str, *, db: AsyncSession, novel: Novel, owner_id: int, params: dict
+):
     """统一工具执行入口：任何未归类异常都映射为冻结错误码。"""
     try:
         return await tool_facade.execute(
@@ -84,7 +86,11 @@ async def tool_get_chapter(
 ):
     """获取章节全文（受 spoiler cutoff 与 64 KiB 字节上限约束）。"""
     return await _run_tool(
-        "get_chapter", db=db, novel=novel, owner_id=current_user.id, params=_params(body)
+        "get_chapter",
+        db=db,
+        novel=novel,
+        owner_id=current_user.id,
+        params=_params(body),
     )
 
 
@@ -114,7 +120,11 @@ async def tool_get_timeline(
 ):
     """时间线事件信封（spoiler cutoff 服务端强制）。"""
     return await _run_tool(
-        "get_timeline", db=db, novel=novel, owner_id=current_user.id, params=_params(body)
+        "get_timeline",
+        db=db,
+        novel=novel,
+        owner_id=current_user.id,
+        params=_params(body),
     )
 
 

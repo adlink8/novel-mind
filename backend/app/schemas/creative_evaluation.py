@@ -36,6 +36,8 @@ class CreativeConsistencyReport(StrictCreativeModel):
     checked_claims: int = Field(ge=0)
     citation_coverage: float = Field(ge=0, le=1)
     status: Literal["passed", "passed_with_warnings", "failed"]
-    findings: list[CreativeConsistencyFinding] = Field(default_factory=list, max_length=256)
+    findings: list[CreativeConsistencyFinding] = Field(
+        default_factory=list, max_length=256
+    )
     candidate_only: Literal[True] = True
     report_hash: str = Field(pattern=r"^[0-9a-f]{64}$")

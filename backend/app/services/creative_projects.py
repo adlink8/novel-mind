@@ -28,7 +28,9 @@ def _hash(content: str) -> str:
     return hashlib.sha256(content.encode("utf-8")).hexdigest()
 
 
-async def owned_novel(db: AsyncSession, *, novel_id: int, owner_id: int, is_superuser: bool) -> Novel:
+async def owned_novel(
+    db: AsyncSession, *, novel_id: int, owner_id: int, is_superuser: bool
+) -> Novel:
     novel = await db.get(Novel, novel_id)
     if novel is None or (not is_superuser and novel.owner_id != owner_id):
         raise CreativeProjectNotFound("novel not found")
@@ -83,7 +85,9 @@ async def create_project(db: AsyncSession, *, data: FanFictionCreate) -> FanFict
             raise ValueError("parent_chapter_id 不属于该小说")
     db.add(project)
     await db.flush()
-    await _write_revision(db, project=project, chapter=None, title=project.title, content="")
+    await _write_revision(
+        db, project=project, chapter=None, title=project.title, content=""
+    )
     await db.commit()
     await db.refresh(project)
     return project
@@ -98,13 +102,21 @@ async def update_project(
     for key, value in values.items():
         setattr(project, key, value)
     if "content" in values or "title" in values:
-        await _write_revision(db, project=project, chapter=None, title=project.title, content=project.content or "")
+        await _write_revision(
+            db,
+            project=project,
+            chapter=None,
+            title=project.title,
+            content=project.content or "",
+        )
     await db.commit()
     await db.refresh(project)
     return project
 
 
-async def list_chapters(db: AsyncSession, *, project: FanFiction) -> list[FanFictionChapter]:
+async def list_chapters(
+    db: AsyncSession, *, project: FanFiction
+) -> list[FanFictionChapter]:
     return list(
         (
             await db.scalars(
@@ -129,14 +141,24 @@ async def create_chapter(
     )
     db.add(chapter)
     await db.flush()
-    await _write_revision(db, project=project, chapter=chapter, title=chapter.title, content=chapter.content or "")
+    await _write_revision(
+        db,
+        project=project,
+        chapter=chapter,
+        title=chapter.title,
+        content=chapter.content or "",
+    )
     await db.commit()
     await db.refresh(chapter)
     return chapter
 
 
 async def update_chapter(
-    db: AsyncSession, *, chapter: FanFictionChapter, data: FanFictionChapterUpdate, project: FanFiction
+    db: AsyncSession,
+    *,
+    chapter: FanFictionChapter,
+    data: FanFictionChapterUpdate,
+    project: FanFiction,
 ) -> FanFictionChapter:
     values = data.model_dump(exclude_unset=True)
     for key, value in values.items():
@@ -144,13 +166,21 @@ async def update_chapter(
     if "content" in values:
         chapter.word_count = len(chapter.content or "")
     if values:
-        await _write_revision(db, project=project, chapter=chapter, title=chapter.title, content=chapter.content or "")
+        await _write_revision(
+            db,
+            project=project,
+            chapter=chapter,
+            title=chapter.title,
+            content=chapter.content or "",
+        )
     await db.commit()
     await db.refresh(chapter)
     return chapter
 
 
-async def get_chapter(db: AsyncSession, *, project: FanFiction, chapter_id: int) -> FanFictionChapter:
+async def get_chapter(
+    db: AsyncSession, *, project: FanFiction, chapter_id: int
+) -> FanFictionChapter:
     chapter = await db.scalar(
         select(FanFictionChapter).where(
             FanFictionChapter.id == chapter_id,
@@ -162,7 +192,9 @@ async def get_chapter(db: AsyncSession, *, project: FanFiction, chapter_id: int)
     return chapter
 
 
-async def list_revisions(db: AsyncSession, *, project: FanFiction) -> list[FanFictionRevision]:
+async def list_revisions(
+    db: AsyncSession, *, project: FanFiction
+) -> list[FanFictionRevision]:
     return list(
         (
             await db.scalars(
@@ -174,13 +206,17 @@ async def list_revisions(db: AsyncSession, *, project: FanFiction) -> list[FanFi
     )
 
 
-async def list_overrides(db: AsyncSession, *, project: FanFiction) -> list[FanFictionOverride]:
+async def list_overrides(
+    db: AsyncSession, *, project: FanFiction
+) -> list[FanFictionOverride]:
     return list(
         (
             await db.scalars(
                 select(FanFictionOverride)
                 .where(FanFictionOverride.fanfiction_id == project.id)
-                .order_by(FanFictionOverride.created_at.desc(), FanFictionOverride.id.desc())
+                .order_by(
+                    FanFictionOverride.created_at.desc(), FanFictionOverride.id.desc()
+                )
             )
         ).all()
     )

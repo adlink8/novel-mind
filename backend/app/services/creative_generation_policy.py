@@ -72,14 +72,20 @@ def validate_context_package(
     """Validate caller scope, lineage hash, and non-promoting output policy."""
 
     if package.owner_id != owner_id:
-        raise CreativeContextPolicyError("owner_scope", "context package is outside the owner scope")
+        raise CreativeContextPolicyError(
+            "owner_scope", "context package is outside the owner scope"
+        )
     if package.novel_id != novel_id:
-        raise CreativeContextPolicyError("novel_scope", "context package is outside the novel scope")
+        raise CreativeContextPolicyError(
+            "novel_scope", "context package is outside the novel scope"
+        )
     if package.output_space != "fanfiction_canon" or package.candidate_only is not True:
         raise CreativeContextPolicyError(
             "candidate_only_required",
             "creative generation preparation must remain Fanfiction Canon candidate-only",
         )
     if context_hash(package) != package.context_hash:
-        raise CreativeContextPolicyError("context_hash", "context package hash does not match its content")
+        raise CreativeContextPolicyError(
+            "context_hash", "context package hash does not match its content"
+        )
     return package

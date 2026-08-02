@@ -147,7 +147,9 @@ async def list_skills(
 ) -> tuple[list[SkillRegistry], int]:
     """列出当前用户可用的技能目录（元数据行）。"""
     where = (SkillRegistry.owner_id == owner_id,)
-    total = await db.scalar(select(func.count()).select_from(SkillRegistry).where(*where))
+    total = await db.scalar(
+        select(func.count()).select_from(SkillRegistry).where(*where)
+    )
     rows = list(
         (
             await db.scalars(
@@ -176,13 +178,17 @@ async def list_skill_versions(
         SkillRegistry.name == skill_name,
         SkillVersion.registry_id == SkillRegistry.id,
     )
-    total = await db.scalar(select(func.count()).select_from(SkillVersion).where(*where))
+    total = await db.scalar(
+        select(func.count()).select_from(SkillVersion).where(*where)
+    )
     rows = list(
         (
             await db.scalars(
                 select(SkillVersion)
                 .join(SkillRegistry, SkillVersion.registry_id == SkillRegistry.id)
-                .where(SkillRegistry.owner_id == owner_id, SkillRegistry.name == skill_name)
+                .where(
+                    SkillRegistry.owner_id == owner_id, SkillRegistry.name == skill_name
+                )
                 .order_by(SkillVersion.id)
                 .offset(skip)
                 .limit(limit)

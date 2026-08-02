@@ -69,8 +69,12 @@ class CreativeContextPackage(StrictCreativeModel):
     cutoff_chapter_number: int = Field(ge=1)
     output_space: Literal["fanfiction_canon"] = FANFICTION_CANON
     user_settings: dict[str, Any] = Field(default_factory=dict)
-    original_evidence: list[OriginalEvidenceRef] = Field(default_factory=list, max_length=64)
-    understanding_states: list[UnderstandingStateRef] = Field(default_factory=list, max_length=32)
+    original_evidence: list[OriginalEvidenceRef] = Field(
+        default_factory=list, max_length=64
+    )
+    understanding_states: list[UnderstandingStateRef] = Field(
+        default_factory=list, max_length=32
+    )
     override: CreativeOverride | None = None
     candidate_only: Literal[True] = True
     context_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
@@ -80,7 +84,9 @@ class CreativeContextPackage(StrictCreativeModel):
         if any(ref.novel_id != self.novel_id for ref in self.original_evidence):
             raise ValueError("all original evidence must belong to the package novel")
         if any(ref.novel_id != self.novel_id for ref in self.understanding_states):
-            raise ValueError("all understanding states must belong to the package novel")
+            raise ValueError(
+                "all understanding states must belong to the package novel"
+            )
         for ref in self.understanding_states:
             if ref.state_kind == "chapter_state" and ref.chapter_number is None:
                 raise ValueError("chapter_state requires chapter_number")

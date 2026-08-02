@@ -119,7 +119,9 @@ async def register_skill(
     未知域工具 → 注册拒绝（400），不产生任何 active 行（T-25.2-03-01）。
     """
     novel = await db.scalar(select(Novel).where(Novel.id == data.novel_id))
-    if novel is None or (novel.owner_id != current_user.id and not current_user.is_superuser):
+    if novel is None or (
+        novel.owner_id != current_user.id and not current_user.is_superuser
+    ):
         raise HTTPException(status_code=404, detail="小说不存在")
     try:
         _, version = await registry_service.register_skill_version(
@@ -181,7 +183,10 @@ async def accept_skill_run(
     # 输入规范化：novel_id 以路径为准，不能被请求体伪造到其它小说。
     input_payload = dict(data.input)
     input_payload["novel_id"] = novel.id
-    if not isinstance(input_payload.get("question"), str) or not input_payload["question"].strip():
+    if (
+        not isinstance(input_payload.get("question"), str)
+        or not input_payload["question"].strip()
+    ):
         raise HTTPException(status_code=422, detail="input.question 必须为非空字符串")
 
     input_hash = canonical_input_hash(input_payload)
@@ -205,7 +210,9 @@ async def accept_skill_run(
     # commit-before-dispatch：run 立即可见（worker / agent-service 新会话可读到）。
     await db.commit()
     await db.refresh(run)
-    return SkillRunAccepted(run=SkillRunView.model_validate(run), internal_token=internal_token)
+    return SkillRunAccepted(
+        run=SkillRunView.model_validate(run), internal_token=internal_token
+    )
 
 
 @router.get("/novels/{novel_id}/skill-runs", response_model=dict)
@@ -223,7 +230,11 @@ async def list_skill_runs(
     rows = list(
         (
             await db.scalars(
-                select(SkillRun).where(*where).order_by(SkillRun.id.desc()).offset(skip).limit(limit)
+                select(SkillRun)
+                .where(*where)
+                .order_by(SkillRun.id.desc())
+                .offset(skip)
+                .limit(limit)
             )
         ).all()
     )

@@ -77,10 +77,10 @@ class GetRelationshipsRequest(StrictAgentToolModel):
         default=None, gt=0, description="截止章节；超过服务端截止点将被拒绝"
     )
     character_id: int | None = Field(default=None, gt=0, description="人物过滤")
-    relation_type: str | None = Field(default=None, max_length=32, description="关系类型过滤")
-    include_provisional: bool = Field(
-        default=False, description="是否包含临时共现边"
+    relation_type: str | None = Field(
+        default=None, max_length=32, description="关系类型过滤"
     )
+    include_provisional: bool = Field(default=False, description="是否包含临时共现边")
 
 
 class GetCluesRequest(StrictAgentToolModel):
