@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 from typing import Any, Protocol
 
 from fastapi import HTTPException
+from pydantic import ValidationError
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -45,6 +46,7 @@ from app.schemas.reader_chat import (
     MessageCreate,
     MessageRole,
     MessageView,
+    QueryPlanTraceView,
     SelectionCoordinate,
     SelectionSummary,
 )
@@ -1030,6 +1032,27 @@ class ConversationService:
             updated_at=job.updated_at,
         )
 
+    async def _queryplan_view(
+        self, db: AsyncSession, user_message_id: int
+    ) -> QueryPlanTraceView | None:
+        """Rehydrate the shared QueryPlan trace from the frozen manifest (26-04)."""
+        manifest_row = (
+            await db.execute(
+                select(ReaderContextManifest).where(
+                    ReaderContextManifest.user_message_id == user_message_id
+                )
+            )
+        ).scalar_one_or_none()
+        if manifest_row is None:
+            return None
+        raw = (manifest_row.prompt_inputs or {}).get("queryplan")
+        if not isinstance(raw, dict):
+            return None
+        try:
+            return QueryPlanTraceView.model_validate(raw)
+        except ValidationError:
+            return None
+
     async def _to_message_view(
         self, db: AsyncSession, message: ReaderMessage
     ) -> MessageView:
@@ -1080,6 +1103,11 @@ class ConversationService:
                 job_view = self._to_job_view(job)
 
         citations: list = []
+        queryplan: QueryPlanTraceView | None = None
+        if message.role == MessageRole.USER.value:
+            queryplan = await self._queryplan_view(db, message.id)
+        elif message.reply_to_message_id is not None:
+            queryplan = await self._queryplan_view(db, message.reply_to_message_id)
         if message.role == MessageRole.ASSISTANT.value:
             # Citations loaded for replay; citation rows join evidence for keys.
             cite_rows = (
@@ -1124,6 +1152,7 @@ class ConversationService:
             anchor=anchor,
             citations=citations,
             generation_job=job_view,
+            queryplan=queryplan,
             created_at=message.created_at,
         )
 

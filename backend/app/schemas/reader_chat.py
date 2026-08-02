@@ -205,7 +205,32 @@ class MessageView(StrictReaderChatModel):
     anchor: ChapterRangeAnchor | None = None
     citations: list[CitationView] = Field(default_factory=list)
     generation_job: GenerationJobView | None = None
+    queryplan: QueryPlanTraceView | None = None
     created_at: datetime
+
+
+class QueryPlanTraceView(StrictReaderChatModel):
+    """Trace/citation-level exposure shared by Reader and Analysis Chat (26-04).
+
+    Mirrors the QueryPlan consumer view (trace id, availability, fallback and
+    leaf citation-jump targets). Only leaf/raw evidence appears in
+    ``citation_jump``; summaries, scores, routing metadata and chat text never
+    do (D-08).
+    """
+
+    trace_id: str = Field(min_length=32, max_length=64)
+    plan_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    intent: Literal["reader", "analysis"]
+    anchor_kind: Literal["selection", "chapter_range"] | None = None
+    cutoff_mode: str = Field(min_length=1, max_length=32)
+    through_chapter: int = Field(gt=0)
+    full_book_authorized: bool = False
+    availability: list[dict[str, str]] = Field(default_factory=list)
+    fallback: dict[str, Any] = Field(default_factory=dict)
+    manifest_checksum: str = Field(pattern=r"^[0-9a-f]{64}$")
+    allowed_evidence_ids: list[str] = Field(default_factory=list)
+    citation_jump: list[dict[str, Any]] = Field(default_factory=list)
+    abstained: bool = False
 
 
 class MessageAccepted(StrictReaderChatModel):

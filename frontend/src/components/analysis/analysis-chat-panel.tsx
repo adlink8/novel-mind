@@ -526,6 +526,30 @@ export function AnalysisChatPanel({
               message={m}
               onCitationNavigate={handleCitationNavigate}
             />
+            {m.queryplan ? (
+              <p
+                data-testid={`analysis-chat-queryplan-${m.id}`}
+                className="px-1 text-[10px] leading-snug text-muted-foreground/70"
+              >
+                QueryPlan · {m.queryplan.intent === "reader" ? "读者" : "分析"}
+                {m.queryplan.anchor_kind === "selection"
+                  ? " · 选区锚点"
+                  : m.queryplan.anchor_kind === "chapter_range"
+                    ? " · 结构区间锚点"
+                    : " · 无锚点"}
+                {m.queryplan.full_book_authorized
+                  ? " · 全书模式"
+                  : ` · 已读至第 ${m.queryplan.through_chapter} 章`}
+                {m.queryplan.abstained
+                  ? " · 已弃权（证据不足）"
+                  : ` · 引用 ${m.queryplan.allowed_evidence_ids.length}`}
+                {m.queryplan.availability.some(
+                  (a) => a.status === "unavailable" || a.status === "partial"
+                )
+                  ? " · 部分维度不可用"
+                  : ""}
+              </p>
+            ) : null}
           </div>
         ))}
         {activeJob && jobStatusLabel(activeJob) ? (

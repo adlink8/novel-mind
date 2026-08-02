@@ -18,9 +18,18 @@ from sqlalchemy.orm import undefer
 
 from app.models.novel import Chapter, Novel
 from app.schemas.reader_chat import SelectionCoordinate
+from app.services.queryplan.schemas import QueryPlanIntent, SelectionAnchor
+from app.services.queryplan.service import (
+    ConsumerManifestResult,
+    ConsumerPlanBlocked,
+    ConsumerQueryPlanView,
+    QueryPlanService,
+)
 from app.services.reader_chat.retrieval import (
     RelationshipObservationReader,
     SourceStatus,
+    build_source_snapshot,
+    chat_retrieval_dimension_results,
     retrieve_visible_evidence,
 )
 from app.services.timeline.query import resolve_chapter_cutoff
@@ -285,6 +294,130 @@ async def resolve_progress_snapshot(
     )
 
 
+# ---------------------------------------------------------------------------
+# Shared QueryPlan consumer seam (Phase 26-04 / REQ-QP-04, D-10, D-12)
+# ---------------------------------------------------------------------------
+
+_CONSUMER_BLOCKED_CODES: dict[str, str] = {
+    "unknown_intent": "unknown_intent",
+    "ambiguous_intent": "ambiguous_intent",
+    "scope_escape": "scope_escape",
+    "future_probing": "future_probing",
+    "contradictory_constraints": "contradictory_constraints",
+    "whole_book_unauthorized": "whole_book_unauthorized",
+    "invalid_input": "invalid_input",
+}
+
+
+def _consumer_blocked_code(reason_code: str) -> str:
+    return _CONSUMER_BLOCKED_CODES.get(reason_code, "queryplan_blocked")
+
+
+def build_reader_consumer_request(
+    *,
+    owner_id: int,
+    novel_id: int,
+    version_id: int,
+    question_text: str,
+    through_chapter: int,
+    snapshot_hash: str,
+    full_book_authorized: bool = False,
+    whole_book: bool = False,
+    selection: ValidatedSelection,
+    source: str = "reader_chat",
+) -> dict[str, Any]:
+    """Reader-consumer plan payload (selection anchor; D-10).
+
+    The anchor's ``chapter_id`` carries the *chapter ordinal* the reader
+    anchored on: the QueryPlan parser's scope check compares the anchor chapter
+    against the reading cutoff (chapter-number semantics), while leaf evidence
+    is always re-sliced from the frozen snapshot via evidence refs — never from
+    the anchor itself (D-07). Whole-book still requires the per-novel switch
+    (D-12), enforced by the parser.
+    """
+    return QueryPlanService.build_consumer_request(
+        intent=QueryPlanIntent.READER,
+        owner_id=owner_id,
+        novel_id=novel_id,
+        version_id=version_id,
+        question_text=question_text,
+        through_chapter=through_chapter,
+        snapshot_hash=snapshot_hash,
+        full_book_authorized=full_book_authorized,
+        whole_book=whole_book,
+        selection=SelectionAnchor(
+            kind="selection",
+            chapter_id=int(selection.chapter_number),
+            source_start=int(selection.source_start),
+            source_end=int(selection.source_end),
+            chapter_content_hash=selection.chapter_content_hash,
+        ),
+        source=source,
+    )
+
+
+async def run_reader_queryplan(
+    session: AsyncSession,
+    *,
+    novel: Novel,
+    owner_id: int,
+    version_id: int,
+    question: str,
+    selection: ValidatedSelection,
+    relationship_reader: RelationshipObservationReader | None = None,
+    whole_book: bool = False,
+) -> tuple[ConsumerManifestResult, ConsumerQueryPlanView]:
+    """Reader consumer seam: shared QueryPlan core with a selection anchor.
+
+    Server re-validates owner / cutoff / spoiler / evidence against the frozen
+    snapshot and returns the consumer view (trace / availability / fallback /
+    citation jump). A blocked plan raises ``SelectionValidationError`` with the
+    stable reason code (D-02/D-03/D-12) and never produces an answer or trace.
+    """
+    progress = await resolve_progress_snapshot(session, novel)
+    snapshot = await build_source_snapshot(
+        session,
+        novel=novel,
+        owner_id=owner_id,
+        version_id=version_id,
+        full_book_authorized=progress.full_book,
+    )
+    payload = build_reader_consumer_request(
+        owner_id=owner_id,
+        novel_id=novel.id,
+        version_id=version_id,
+        question_text=question,
+        through_chapter=progress.cutoff_chapter_number,
+        snapshot_hash=snapshot.snapshot_hash,
+        full_book_authorized=progress.full_book,
+        whole_book=whole_book,
+        selection=selection,
+    )
+    cutoff = None if progress.full_book else progress.cutoff_chapter_number
+    retrieval = await retrieve_visible_evidence(
+        session,
+        novel=novel,
+        owner_id=owner_id,
+        selection_chapter_id=selection.chapter_id,
+        selection_start=selection.source_start,
+        selection_end=selection.source_end,
+        cutoff_chapter=cutoff,
+        full_book=progress.full_book,
+        relationship_reader=relationship_reader,
+        max_evidence=24,
+    )
+    dimension_results = chat_retrieval_dimension_results(retrieval, snapshot)
+    try:
+        return await QueryPlanService().execute_consumer_manifest(
+            payload, source=snapshot, dimension_results=dimension_results
+        )
+    except ConsumerPlanBlocked as exc:
+        raise SelectionValidationError(
+            _consumer_blocked_code(exc.reason_code),
+            exc.result.message,
+        ) from exc
+
+
 async def validate_selection(
     session: AsyncSession,
     *,
@@ -543,11 +676,16 @@ async def assemble_context_manifest(
     client_evidence_keys: list[str] | None = None,
     max_evidence: int = 24,
     selection_bound: bool = True,
+    queryplan_view: ConsumerQueryPlanView | None = None,
 ) -> ContextManifest:
     """Build one immutable, deterministic context graph for atomic persistence.
 
     Client-supplied evidence IDs are ignored (never trusted). Optional sources may
     be unavailable without inventing content or widening the spoiler scope.
+
+    ``queryplan_view`` (Phase 26-04) embeds the shared QueryPlan trace /
+    availability / fallback / citation-jump record into ``prompt_inputs`` so the
+    consumer can expose trace-level detail; it is never used as evidence.
     """
 
     if client_evidence_keys:
@@ -637,6 +775,8 @@ async def assemble_context_manifest(
         "allowed_evidence_ids": [e.evidence_key for e in evidence_entries],
         "context_mode": "selection" if selection_bound else "chapter",
     }
+    if queryplan_view is not None:
+        prompt_inputs["queryplan"] = queryplan_view.canonical_dict()
 
     source_status = dict(retrieval.source_status)
     source_status.setdefault(
@@ -683,11 +823,14 @@ async def assemble_range_context_manifest(
     relationship_reader: RelationshipObservationReader | None = None,
     client_evidence_keys: list[str] | None = None,
     max_evidence: int = 24,
+    queryplan_view: ConsumerQueryPlanView | None = None,
 ) -> ContextManifest:
     """Build one immutable context graph for a structure-anchored chapter range.
 
     Per-chapter budgeted excerpts are the primary evidence; retrieval evidence
     is aggregated strictly inside the (already cutoff-narrowed) interval.
+    ``queryplan_view`` (Phase 26-04) embeds the shared QueryPlan trace record
+    into ``prompt_inputs`` for trace-level exposure; never evidence.
     """
 
     if client_evidence_keys:
@@ -792,6 +935,8 @@ async def assemble_range_context_manifest(
         "context_mode": CHAPTER_RANGE_ANCHOR_KIND,
         "anchor": chapter_range.anchor_dict(),
     }
+    if queryplan_view is not None:
+        prompt_inputs["queryplan"] = queryplan_view.canonical_dict()
 
     source_status = dict(retrieval.source_status)
     source_status.setdefault(CHAPTER_RANGE_ANCHOR_KIND, SourceStatus.OK)

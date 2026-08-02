@@ -633,6 +633,30 @@ export interface ChapterRangeAnchor {
   chapter_end: number;
 }
 
+/** 26-04：共享 QueryPlan trace/citation 暴露（Reader/Analysis Chat 同一核心）。 */
+export interface QueryPlanTraceView {
+  trace_id: string;
+  plan_hash: string;
+  intent: "reader" | "analysis";
+  anchor_kind: "selection" | "chapter_range" | null;
+  cutoff_mode: string;
+  through_chapter: number;
+  full_book_authorized: boolean;
+  availability: Array<Record<string, string>>;
+  fallback: Record<string, unknown>;
+  manifest_checksum: string;
+  allowed_evidence_ids: string[];
+  citation_jump: Array<{
+    evidence_key: string;
+    chapter_id: number;
+    chapter_number: number;
+    source_start: number;
+    source_end: number;
+    excerpt: string;
+  }>;
+  abstained: boolean;
+}
+
 export interface MessageView {
   id: number;
   conversation_id: number;
@@ -645,6 +669,7 @@ export interface MessageView {
   anchor?: ChapterRangeAnchor | null;
   citations: CitationView[];
   generation_job: GenerationJobView | null;
+  queryplan?: QueryPlanTraceView | null;
   created_at: string;
 }
 

@@ -8,6 +8,8 @@ source statuses; missing contracts are execution failures, not null adapters.
 
 from __future__ import annotations
 
+import hashlib
+import json
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any, Protocol, runtime_checkable
@@ -24,6 +26,18 @@ from app.models.timeline import (
     TimelineEvidenceRef,
 )
 from app.schemas.relationship import RelationshipVersionSource
+from app.services.queryplan.adapters import (
+    ChapterRecord,
+    DimensionResult,
+    SourceSnapshot,
+    chapter_content_hash,
+)
+from app.services.queryplan.schemas import (
+    AvailabilityStatus,
+    EvidenceRef,
+    FallbackStage,
+    QueryDimension,
+)
 
 # Priority ranks used when packing the immutable context manifest (AI-SPEC §7).
 SOURCE_PRIORITY: dict[str, int] = {
@@ -679,4 +693,130 @@ async def retrieve_visible_evidence(
         hierarchy_build_id=hierarchy_build_id,
         hierarchy_checksum=hierarchy_checksum,
         analysis_version_id=version_id,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Shared QueryPlan consumer seam (Phase 26-04 / D-07, D-10, D-15)
+# ---------------------------------------------------------------------------
+
+
+def _snapshot_hash(novel_id: int, version_id: int, records: tuple[ChapterRecord, ...]) -> str:
+    """Deterministic content address of the frozen chapter snapshot.
+
+    Covers the owner/novel/version lineage (via novel+version) and every
+    chapter's content hash so both chat consumers share the same leaf/raw
+    evidence authority. Never includes client- or model-supplied text.
+    """
+    body = {
+        "novel_id": int(novel_id),
+        "version_id": int(version_id),
+        "chapters": [
+            {
+                "chapter_id": rec.chapter_id,
+                "chapter_number": rec.chapter_number,
+                "content_hash": rec.content_hash,
+            }
+            for rec in records
+        ],
+    }
+    canonical = json.dumps(
+        body, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode("utf-8")
+    return hashlib.sha256(canonical).hexdigest()
+
+
+async def build_source_snapshot(
+    session: AsyncSession,
+    *,
+    novel: Novel,
+    owner_id: int,
+    version_id: int,
+    full_book_authorized: bool = False,
+) -> SourceSnapshot:
+    """Freeze the novel's chapters into a QueryPlan SourceSnapshot (D-07).
+
+    Both Reader and Analysis Chat build their QueryPlan source from this one
+    frozen snapshot, so evidence refs always re-slice the same leaf/raw text.
+    """
+    rows = list(
+        (
+            await session.scalars(
+                select(Chapter)
+                .where(Chapter.novel_id == novel.id)
+                .order_by(Chapter.chapter_number.asc())
+            )
+        ).all()
+    )
+    records = tuple(
+        ChapterRecord(
+            chapter_id=int(ch.id),
+            chapter_number=int(ch.chapter_number),
+            content=ch.content or "",
+            content_hash=chapter_content_hash(ch.content or ""),
+        )
+        for ch in rows
+    )
+    return SourceSnapshot(
+        owner_id=owner_id,
+        novel_id=int(novel.id),
+        version_id=version_id,
+        snapshot_hash=_snapshot_hash(novel.id, version_id, records),
+        chapters=records,
+        full_book_authorized=full_book_authorized,
+    )
+
+
+def chat_retrieval_dimension_results(
+    retrieval: RetrievalResult,
+    snapshot: SourceSnapshot,
+) -> tuple[DimensionResult, ...]:
+    """Adapt the chat retrieval stack into the QueryPlan raw_text dimension.
+
+    The retrieval selects candidate spans (shared recall); every EvidenceRef is
+    then re-sliced from the frozen snapshot chapter so the content hash is the
+    exact leaf slice (D-07). Candidates that cannot re-slice to a leaf (out of
+    bounds / empty / stale) never become evidence (D-15).
+    """
+    chapters_by_id = {rec.chapter_id: rec for rec in snapshot.chapters}
+    refs: list[EvidenceRef] = []
+    for item in retrieval.items:
+        chapter = chapters_by_id.get(item.chapter_id)
+        if chapter is None:
+            continue
+        start, end = item.source_start, item.source_end
+        if start < 0 or end <= start or end > len(chapter.content):
+            continue
+        excerpt = chapter.content[start:end]
+        if not excerpt:
+            continue
+        refs.append(
+            EvidenceRef(
+                chapter_id=chapter.chapter_id,
+                chapter_number=chapter.chapter_number,
+                source_start=start,
+                source_end=end,
+                content_hash=chapter_content_hash(excerpt),
+                source_snapshot_hash=snapshot.snapshot_hash,
+            )
+        )
+    if refs:
+        return (
+            DimensionResult(
+                dimension=QueryDimension.RAW_TEXT,
+                status=AvailabilityStatus.AVAILABLE,
+                reason="reader_ok",
+                provenance="reader_chat_retrieval_v1",
+                stage=FallbackStage.EXACT_READER,
+                refs=tuple(refs),
+            ),
+        )
+    return (
+        DimensionResult(
+            dimension=QueryDimension.RAW_TEXT,
+            status=AvailabilityStatus.UNAVAILABLE,
+            reason="reader_zero_hits_in_scope",
+            provenance="reader_chat_retrieval_v1",
+            stage=FallbackStage.STABLE_UNAVAILABLE,
+        ),
     )
