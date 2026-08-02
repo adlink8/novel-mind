@@ -163,3 +163,24 @@ Key metrics:
 | Web 审批 | SSE `approval_request` 帧 + approve/reject UX；FastAPI 保持唯一决策权威 | `agent-service/src/transport/sse.ts` + `frontend/src/components/analysis/approval-request-dialog.tsx` |
 | 已知环境限制 | `test_openapi_contract.py` 在 pytest 下挂起（subprocess→litellm/tiktoken 下载）；Next 16 canary dev server 编译失败（e2e 受限）；前端遗留 29 个 typecheck 错误（`creative-project-editor.tsx`/`reader-chat-budget-section.tsx`，`FanFictionChapter` 类型缺失，与 25.2/25.3 无关） | 2026-08-02 本机 |
 | 仍阻塞 | Phase 22 Nightly 3/3 未达成（0/3）；Phase 26 执行需 Phase 22 3/3 + 26-01 bootstrap gate | `.planning/STATE.md` |
+
+---
+
+## 2026-08-02/03 快照（Phase 26 实现并验证；snapshot: master @ cb071bc）
+
+以下事实覆盖上文旧节中的对应记录（Phase 26 = Question-Driven Retrieval and Evidence）：
+
+| 项 | 当前值 | 证据 |
+|---|---|---|
+| Phase 26 | **VERIFIED 2026-08-02/03** | `26-VERIFICATION.md` passed（source_commit `cb071bc`） |
+| 后端测试 | **920 passed**（unit 548 + integration/queryplan 68 + adversarial 129 + agent_runtime 60 + ci 37 + contract 78） | 独立测试子代理 2026-08-02/03 |
+| agent-service | **282 passed / 11 files**；tsc 0 errors | `cd agent-service && npx vitest run` |
+| QueryPlan | 严格契约 + 确定性 fail-closed parser + durable QueryPlanTrace（幂等重放） | `backend/app/services/queryplan/` + migration `20260801_2601` |
+| 检索适配器/融合 | 8 维度显式 availability、exact→heuristic→stable-reason 回退链、确定性 fusion | `queryplan/adapters.py` + `fusion.py` |
+| 证据物化 | leaf EvidenceRef（Unicode offset+hash）、immutable content-addressed Frozen Manifest、陈旧 hash 拒绝 | `queryplan/evidence.py` + `service.py` |
+| 共享消费者 | Reader/Analysis Chat 共享 QueryPlan 核心，保留 selection vs chapter_range anchor，暴露 trace/citation | `analysis_chat/query_adapter.py` + `test_chat_consumers.py` |
+| Agent 集成 | 版本化 answer-reading-question Skill（6 只读工具 allowlist），CitedAnswerArtifact 唯一官方输出，无 Approval/Publisher | `agent-service/src/skills/answer-reading-question/` + `test_phase_26_skill.py` |
+| 结构化输出完整性 | 保守 normalizer + 严格 post-repair 校验，零受保护字段合成，normalization trail/raw_hash/repaired_hash | `agent-service/src/structured-output/` + `structured_output_integrity.py` |
+| Alembic | 单 head `20260801_2601`；upgrade/downgrade 可逆；alembic check 零 drift | `alembic heads` |
+| 已知环境限制 | 同前：openapi subprocess 挂起、Next dev server 编译失败（e2e 受限）、live provider UAT 需 key、前端遗留 29 typecheck 错误（FanFictionChapter，与 Phase 26 无关） | 2026-08-02/03 本机 |
+| 仍阻塞 | Phase 22 Nightly 3/3 未达成（0/3）；Phase 27 执行需 Phase 22 3/3 + 26-VERIFICATION（已存在）或进一步 override | `.planning/STATE.md` |

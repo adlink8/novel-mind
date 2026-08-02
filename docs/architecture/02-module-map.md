@@ -145,8 +145,19 @@
 | **主要文件** | `backend/app/services/agent_runtime/`、`backend/app/api/agent.py`、`agent_tools.py`、`gateway.py`、`backend/app/models/agent_runtime.py` |
 | **状态** | VERIFIED（集成 24 + adversarial 56 + CI 37 passed，2026-08-02） |
 | **上游** | agent-service（经 gateway） |
-| **下游** | PostgreSQL（Alembic `27approval01` head） |
+| **下游** | PostgreSQL（Alembic `20260801_2601` head） |
 | **文档** | `backend/app/services/agent_runtime/` + `.planning/AGENT-RUNTIME-CONTRACT.md` |
+
+### QueryPlan 检索与证据模块（Phase 26）
+
+| 属性 | 内容 |
+|---|---|
+| **职责** | 把读者/分析师问题解析为类型化检索计划（QueryPlan）；8 维度适配器带显式 availability 与 exact→heuristic→stable-reason 回退；确定性 fusion；leaf EvidenceRef 物化与不可变 Frozen Manifest；Reader/Analysis Chat 共享核心，保留不同 anchor |
+| **主要文件** | `backend/app/services/queryplan/`（schemas/parser/repository/adapters/fusion/evidence/service）、`backend/app/services/analysis_chat/query_adapter.py` |
+| **状态** | VERIFIED（queryplan unit 96 + integration 68 + adversarial，2026-08-02/03） |
+| **上游** | Reader Chat / Analysis Chat 消费者 |
+| **下游** | reader_chat gateway `business_validate_answer` + `validate_answer_against_manifest`（leaf-only） |
+| **文档** | `backend/app/services/queryplan/` + `.planning/phases/26-question-driven-retrieval-and-evidence/` |
 
 ---
 
