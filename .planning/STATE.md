@@ -101,6 +101,20 @@ created.
   "blocked repo exits non-zero" behavior is preserved, with this override recorded as the
   authorized execution bypass.
 
+## Execution Override — Phase 26 (2026-08-02, user authorized)
+
+- User authorized skipping the Phase 22 3/3 gate for Phase 26 implementation (2026-08-02,
+  interactive confirmation "授权跳过 gate"). Scope: Phase 26-01..06 (QueryPlan contract,
+  retrieval adapters, EvidenceRef materialization, consumers, Agent integration,
+  structured-output integrity) proceed without Phase 22 real scheduled green evidence.
+- `scripts/check_phase_execution_gate.py` (26-00) is built and tested; its current-repo
+  blocked (Phase 22 0/3) non-zero behavior is preserved as the fail-closed default.
+- Phase 22 verdict is NOT changed: remains blocked at 0/3 and must not be marked complete.
+- Phase 27+ still require passed Phase 26 verification artifacts per ROADMAP contracts;
+  this override does not waive those.
+- Upstream verification artifacts still required: passed 25.1/25.2/25.3 (all exist) and
+  each Phase 26 plan's own SUMMARY/VERIFICATION when complete.
+
 ## Execution Cursor
 
 Phase 22 execution is paused. Its recovery entry remains:
@@ -109,9 +123,11 @@ Phase 22 execution is paused. Its recovery entry remains:
 
 Phase 26–39 planning is complete, including the AgentVN planning integration recorded on
 2026-08-02. Phase 25.2 and Phase 25.3 are implemented and verified
-under the 2026-08-02 execution override. Do not execute Phase 26 until
-`scripts/check_phase_execution_gate.py` exists from 26-01 bootstrap and verifies both
-Phase 22 3/3 real scheduled green evidence and passed Phase 25.2 plus Phase 25.3 verification artifacts.
+under the 2026-08-02 execution override. Phase 26-00 gate (`scripts/check_phase_execution_gate.py`)
+is built and tested; Phase 26-01..06 execution is authorized by the 2026-08-02 Phase 26
+override despite Phase 22 remaining 0/3. Do not execute Phase 27 until Phase 26 has a passed
+VERIFICATION artifact and the Phase 22 real scheduled green evidence exists (or a further
+explicit override).
 If Phase 22 is resumed, use `$gsd-resume-work`; do not mark it complete early.
 
 ## Roadmap
