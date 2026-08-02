@@ -13,16 +13,16 @@ status: blocked
 
 ## Current Position
 
-Phase 22 is blocked and deferred at G2. The user authorized Phase 25.2–39 planning while
-that gate is open; this override is planning-only. Phase 25.2+ implementation remains
-fail-closed until Phase 22 has 3/3 real scheduled green evidence. Phase 26 additionally
-requires passed Phase 25.2 and Phase 25.3 `VERIFICATION.md` artifacts. Phase 22 remains unverified at 0/3.
+Phase 22 is blocked and deferred at G2. The user authorized the Phase 25.2 execution
+override (2026-08-02). Phase 25.2 and Phase 25.3 are now **implemented and verified**
+(2026-08-02). Phase 26+ implementation remains fail-closed until Phase 22 has 3/3 real
+scheduled green evidence. Phase 22 remains unverified at 0/3.
 
 ## Truth Snapshot
 
 | Dimension | State | Evidence |
 |---|---|---|
-| implementation_readiness | PARTIAL | Phase 21, 23–25.1 implemented/reconciled; Phase 22 gaps active |
+| implementation_readiness | **HIGH for 25.2–25.3** | Phase 21, 23–25.1 implemented; 25.2/25.3 verified; Phase 22 gaps active |
 | sample_data_coverage | PARTIAL | existing product fixtures; Phase 26–29 gold sets not built |
 | quality_qualification | BLOCKED | latest scheduled run failed; Nightly benchmark 0/3 green |
 
@@ -43,19 +43,18 @@ No single aggregate completion percentage is authoritative.
 2. `22-G2`: deferred — remote control-plane path is verified, but operator-owned
    Runner/token setup and a real scheduled observation remain blocked.
 3. `22-G3`: lifecycle logic verified locally; three scheduled green observations remain.
-4. `25.2–25.3`: Kimi planning artifacts restored and corrected with machine preflight,
-   package qualification, Skill packaging and Web Approval ownership slices; planning
-   completion does not unlock implementation.
-5. `26–39`: Agent-consumption correction complete; deterministic service plans are bound to
-   versioned Skills, SkillRuns, Artifacts, Validators and explicit approval/publisher boundaries.
+4. `25.2`: **IMPLEMENTED & VERIFIED (2026-08-02)** — Pi SDK spike, 7 domain tools,
+   Skill/Artifact runtime, Agent Workspace, production agent service, DECISION.md GO.
+5. `25.3`: **IMPLEMENTED & VERIFIED (2026-08-02)** — package lock/governance, registry
+   collision gate, MCP isolation (ADOPT), approval policy/UX, renderer feasibility.
 
 ## Planning Portfolio
 
 | Range | Planning status | Plans | Execution status |
-|---|---|---:|---|
-| Phase 25.2 | PLANNED | 8 | BLOCKED by Phase 22 3/3 |
-| Phase 25.3 | PLANNED | 7 | BLOCKED by Phase 25.2 |
-| Phase 26–29 | PLANNED | 21 | BLOCKED by Phase 22 3/3 + Phase 25.2/25.3 verification |
+|---|---|---|---:|
+| Phase 25.2 | VERIFIED | 8 | ✅ 2026-08-02 (user execution override) |
+| Phase 25.3 | VERIFIED | 7 | ✅ 2026-08-02 |
+| Phase 26–29 | PLANNED | 21 | BLOCKED by Phase 22 3/3 |
 | Phase 30–34 | PLANNED | 24 | BLOCKED by upstream execution dependencies |
 | Phase 35–39 | PLANNED | 25 | BLOCKED by upstream execution dependencies |
 
@@ -79,6 +78,14 @@ created.
   `nightly-rag-report`; provider job and promotion were correctly skipped.
 - Canonical report: `blocked_dependency`, `quality_comparable=false`, `metrics=null`,
   `promotable=false`; alert issue #32 used root class `runner-or-environment-unavailable`.
+- **2026-08-02 recovery**: master restored (PR #35 → `a904d64`, restore commit `2c4b4bb`).
+- **2026-08-02 25.2 verification**: main.py mounts/gate script/models exports restored
+  (`6988ceb`); `25.2-VERIFICATION.md` passed; agent_runtime integration 24p, CI gate 9p,
+  contract 83p, adversarial 47p, unit 452p, agent-service 201p.
+- **2026-08-02 25.3 verification**: 25.3-03 MCP isolation + 25.3-05 renderer delivered;
+  `25.3-VERIFICATION.md` passed; backend 195p, agent-service 223p, frontend 281p, CI 37p.
+- Known environment limitations: `test_openapi_contract.py` hangs under pytest (subprocess →
+  litellm/tiktoken download); Next canary dev server fails to compile pages (e2e env-limited).
 
 ## Execution Override (2026-08-02, user authorized)
 
@@ -99,8 +106,8 @@ Phase 22 execution is paused. Its recovery entry remains:
 
 `.planning/phases/22-ci-nightly-gap-closure/22-G2-PLAN.md`
 
-Phase 26–39 planning is complete. Phase 25.2-01 is authorized to execute under the
-2026-08-02 execution override. Do not execute Phase 26 until
+Phase 26–39 planning is complete. Phase 25.2 and Phase 25.3 are implemented and verified
+under the 2026-08-02 execution override. Do not execute Phase 26 until
 `scripts/check_phase_execution_gate.py` exists from 26-01 bootstrap and verifies both
 Phase 22 3/3 real scheduled green evidence and passed Phase 25.2 plus Phase 25.3 verification artifacts.
 If Phase 22 is resumed, use `$gsd-resume-work`; do not mark it complete early.

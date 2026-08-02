@@ -26,7 +26,7 @@
 | Milestone | Phases | implementation_readiness | sample_data_coverage | quality_qualification |
 |---|---|---|---|---|
 | v1.1 execution baseline | 21–25.1 | partial | partial | blocked by Phase 22 |
-| agent runtime foundation | 25.2–25.3 | planned | planned | planned |
+| agent runtime foundation | 25.2–25.3 | **IMPLEMENTED & VERIFIED (2026-08-02)** | partial | blocked by Phase 22 3/3 |
 | v1.2 trusted novel understanding | 26–29 | planned | planned | planned |
 | v1.3 visual narrative | 30–34 | planned | planned | planned |
 | v1.4 Canon Fork derivatives | 35–39 | planned | planned | planned |
@@ -37,6 +37,8 @@
 > authorized while Phase 22 is blocked; execution remains fail-closed.
 
 ## Phase 25.2 — Embedded Novel Agent Runtime
+
+**Status:** IMPLEMENTED & VERIFIED (2026-08-02, `25.2-VERIFICATION.md` passed at `6988ceb`)
 
 **Goal:** qualify the pinned Pi SDK in a standalone Node Agent Service and establish controlled
 Domain Tools, versioned Skills/SkillRuns, lineage-bound Artifacts and the Agent Workspace.
@@ -73,6 +75,8 @@ and responsive Agent Workspace behavior. Alembic chain:
 `24idxjournal1 → 26agentrun01`.
 
 ## Phase 25.3 — Pi Package Compatibility and Governance
+
+**Status:** IMPLEMENTED & VERIFIED (2026-08-02, `25.3-VERIFICATION.md` passed at `e4b1c95`)
 
 **Goal:** qualify controlled Pi ecosystem reuse without allowing packages, MCP or renderers to
 bypass NovelMind permissions, evidence, Canon, Artifact or approval boundaries.
@@ -124,16 +128,16 @@ Alembic chain continues `26agentrun01 → 27approval01`.
 
 ### Phase 25.2–39 Planning Artifact Status (2026-08-02)
 
-| Range | CONTEXT / RESEARCH / PATTERNS / VALIDATION | PLAN files | Planning verdict |
+| Range | CONTEXT / RESEARCH / PATTERNS / VALIDATION | PLAN files | Implementation status |
 |---|---:|---:|---|
-| Phase 25.2–25.3 | 8/8 | 15 | PLANNED |
+| Phase 25.2–25.3 | 8/8 | 15 | **VERIFIED 2026-08-02** |
 | Phase 26–29 | 16/16 + shared Agent contract | 21 | PLANNED |
 | Phase 30–34 | 20/20 + shared Agent contract | 24 | PLANNED |
 | Phase 35–39 | 20/20 + shared Agent contract | 25 | PLANNED |
 
 The corrected portfolio contains 85 plans: 10 reused Kimi foundation plans, five corrective
-foundation slices, 56 deterministic/domain-gate plans and 14 Agent-integration plans. This
-remains a planning verdict only.
+foundation slices, 56 deterministic/domain-gate plans and 14 Agent-integration plans.
+Phase 25.2–25.3 are implemented and verified; Phases 26–39 remain planning verdicts only.
 
 ## Baseline Reconciliation — Phase 21–25.1
 
@@ -145,10 +149,13 @@ remains a planning verdict only.
 | 24 indexing journal, reconcile, retrieval router | IMPLEMENTED | merged on master; operational qualification remains Phase 29 |
 | 25 facet/API/provenance/cost honesty | IMPLEMENTED | master contracts and tests |
 | 25.1 Analysis Chat workspace/range anchor | IMPLEMENTED | default chat view and chapter-range wiring |
+| 25.2 Embedded Novel Agent Runtime | **VERIFIED 2026-08-02** | `25.2-VERIFICATION.md` passed; agent-service 223p, backend 195p |
+| 25.3 Pi Package Compatibility & Governance | **VERIFIED 2026-08-02** | `25.3-VERIFICATION.md` passed; MCP isolation, approval, renderer |
 
-Phase 22 remains blocked and unverified. The user explicitly allowed Phase 26–39 planning;
-implementation is not unlocked. Phase 25.2 requires Phase 22 qualification; Phase 25.3
-requires Phase 25.2; Phase 26+ requires all dependencies declared by its Agent integration.
+Phase 22 remains blocked and unverified. The user authorized the Phase 25.2 execution
+override (2026-08-02); Phase 25.3 proceeded on the passed Phase 25.2 verification artifact.
+Phase 26+ still requires Phase 22 3/3 real scheduled green evidence plus Phase 25.2 and
+Phase 25.3 passed verification artifacts (now both exist).
 
 ---
 
@@ -496,6 +503,8 @@ audit; **Test, Fix, and Confirm** every failed end-to-end checkpoint.
 
 ## Next
 
-Resume Phase 22 G2/G3 and complete Phase 25.2 plus Phase 25.3 verification before executing Phase 26.
-Phase 26–39 planning artifacts are complete and must remain reviewable without being
-misreported as implementation or quality qualification.
+Phase 22 (CI/Nightly authority) remains the last unverified gate — 0/3 scheduled green.
+Phase 25.2 and Phase 25.3 are verified (2026-08-02). Phase 26 execution requires Phase 22
+3/3 real scheduled green evidence; until then, Phase 26-01 bootstrap (which creates
+`scripts/check_phase_execution_gate.py` verifying Phase 22 3/3 + passed 25.2/25.3
+verification artifacts) can be planned but not executed.
