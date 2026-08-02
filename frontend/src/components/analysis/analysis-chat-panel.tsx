@@ -45,6 +45,13 @@ import {
 } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
+/**
+ * 25.3-05：Analysis workspace 共享 artifact 预览入口——经类型键渲染器注册表
+ * （ARTIFACT_RENDERERS / resolveArtifactRenderer，pi-web-ui 模式借用，零 import）
+ * 解析产物正文；实现见 cited-answer-artifact.tsx。
+ */
+export { ArtifactPreview } from "./cited-answer-artifact";
+
 export type AnalysisChapterRef = {
   id: number;
   chapter_number: number;

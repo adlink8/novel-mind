@@ -38,7 +38,10 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import type { AnalysisChapterRef } from "@/components/analysis/analysis-chat-panel";
+import {
+  ArtifactPreview,
+  type AnalysisChapterRef,
+} from "@/components/analysis/analysis-chat-panel";
 import {
   CitationChip,
   MessageBubble,
@@ -53,7 +56,6 @@ import {
   agentApi,
   type ArtifactStatus,
   type ArtifactView,
-  type CitationView,
   type MessageView,
   type SkillRunStatus,
 } from "@/lib/api";
@@ -101,25 +103,6 @@ const ARTIFACT_STATUS_LABELS: Record<ArtifactStatus, string> = {
   rejected: "已拒绝",
 };
 
-/** 从产物正文（含引证）抽出 CitationView 列表，供引证芯片渲染。 */
-function extractCitations(artifact: ArtifactView | null): CitationView[] {
-  const blocks = artifact?.content?.answer?.answer_blocks ?? [];
-  const out: CitationView[] = [];
-  for (const block of blocks) {
-    for (const c of block.citations ?? []) {
-      out.push({
-        block_id: c.block_id ?? `artifact-${artifact?.id}`,
-        evidence_key: c.evidence_key,
-        context_evidence_ref_id: c.context_evidence_ref_id ?? 0,
-        chapter_id: c.chapter_id,
-        source_start: c.source_start,
-        source_end: c.source_end,
-      });
-    }
-  }
-  return out;
-}
-
 /** 产物正文答案文本（session restore 时回填回答；无则空串）。 */
 function extractAnswerText(artifact: ArtifactView | null): string {
   const blocks = artifact?.content?.answer?.answer_blocks ?? [];
@@ -141,7 +124,6 @@ export function AgentWorkspacePanel({
   const [question, setQuestion] = useState("");
   const [lastQuestion, setLastQuestion] = useState<string | null>(null);
   const [answer, setAnswer] = useState("");
-  const [answerCitations, setAnswerCitations] = useState<CitationView[]>([]);
   const [toolCalls, setToolCalls] = useState<ToolCallState[]>([]);
   const [runId, setRunId] = useState<number | null>(null);
   const [runStatus, setRunStatus] = useState<SkillRunStatus | null>(null);
@@ -167,7 +149,6 @@ export function AgentWorkspacePanel({
     setQuestion("");
     setLastQuestion(null);
     setAnswer("");
-    setAnswerCitations([]);
     setToolCalls([]);
     setRunId(null);
     runIdRef.current = null;
@@ -189,14 +170,13 @@ export function AgentWorkspacePanel({
       const art = await agentApi.getLatestArtifact(novelId);
       if (!art) return;
       setArtifact(art);
-      setAnswerCitations(extractCitations(art));
-      // 恢复场景没有流式 delta：用产物正文回填回答（引证芯片才有渲染载体）。
+      // 恢复场景没有流式 delta：用产物正文回填回答（引证芯片由 ArtifactPreview 渲染）。
       const text = extractAnswerText(art);
       if (text) setAnswer((prev) => prev || text);
       // 元数据视图不带正文：尽力读最新修订正文（引证芯片数据源）。
       if (!art.content) {
         const content = await agentApi.getArtifactContent(novelId, art.id);
-        setAnswerCitations(extractCitations({ ...art, content: content ?? undefined }));
+        setArtifact({ ...art, content: content ?? undefined });
         const fullText = extractAnswerText({ ...art, content: content ?? undefined });
         if (fullText) setAnswer((prev) => prev || fullText);
       }
@@ -237,14 +217,12 @@ export function AgentWorkspacePanel({
       try {
         if (maybe && typeof maybe.id === "number") {
           setArtifact(maybe as unknown as ArtifactView);
-          setAnswerCitations(extractCitations(maybe as unknown as ArtifactView));
         } else if (maybe && typeof maybe.artifact_id === "number") {
           const art = await agentApi.getArtifact(
             novelId,
             maybe.artifact_id as number
           );
           setArtifact(art);
-          setAnswerCitations(extractCitations(art));
         } else {
           await refreshLatestArtifact();
         }
@@ -324,7 +302,6 @@ export function AgentWorkspacePanel({
     setQuestion("");
     setLastQuestion(q);
     setAnswer("");
-    setAnswerCitations([]);
     setToolCalls([]);
     setArtifact(null);
     runIdRef.current = null;
@@ -394,7 +371,6 @@ export function AgentWorkspacePanel({
     try {
       const updated = await agentApi.approveArtifact(artifact.id);
       setArtifact(updated);
-      setAnswerCitations(extractCitations(updated));
     } catch {
       setError("批准失败，请重试");
     } finally {
@@ -409,7 +385,6 @@ export function AgentWorkspacePanel({
     try {
       const updated = await agentApi.rejectArtifact(artifact.id);
       setArtifact(updated);
-      setAnswerCitations(extractCitations(updated));
     } catch {
       setError("拒绝失败，请重试");
     } finally {
@@ -463,11 +438,11 @@ export function AgentWorkspacePanel({
       client_message_id: null,
       reply_to_message_id: null,
       selection: null,
-      citations: answerCitations,
+      citations: [],
       generation_job: null,
       created_at: "",
     };
-  }, [answer, answerCitations]);
+  }, [answer]);
 
   const showApproval =
     artifact !== null &&
@@ -710,6 +685,15 @@ export function AgentWorkspacePanel({
                   </Dialog>
                 </div>
               ) : null}
+            </div>
+
+            {/* 25.3-05：产物正文经类型键渲染器注册表解析（pi-web-ui 模式借用，零 import）。 */}
+            <div className="mt-2 border-t border-primary/10 pt-2">
+              <ArtifactPreview
+                artifact={artifact}
+                novelId={novelId}
+                onCitationNavigate={handleCitationNavigate}
+              />
             </div>
           </div>
         ) : null}
