@@ -858,7 +858,7 @@ export function MessageBubble({
   );
 }
 
-function CitationChip({
+export function CitationChip({
   citation,
   onNavigate,
 }: {

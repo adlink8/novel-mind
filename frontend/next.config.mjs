@@ -15,6 +15,12 @@ const nextConfig = {
         source: "/api/:path*",
         destination: `${process.env.BACKEND_URL || "http://127.0.0.1:8010"}/api/:path*`,
       },
+      // 25.2-04：SSE 运行端点直达 agent-service（长连接流绕过 FastAPI 跳转；
+      // FastAPI 自有 /api/agent/* 仍走上面的后端 rewrite）。
+      {
+        source: "/agent/:path*",
+        destination: `${process.env.AGENT_SERVICE_URL || "http://127.0.0.1:3100"}/agent/:path*`,
+      },
     ];
   },
 };

@@ -15,6 +15,7 @@ import {
   AnalysisChatPanel,
   type AnalysisChapterRef,
 } from "@/components/analysis/analysis-chat-panel";
+import { AgentWorkspacePanel } from "@/components/analysis/agent-workspace-panel";
 import { ClueWorkspace } from "@/components/clues/clue-workspace";
 import { clueApi } from "@/lib/clue-api";
 import { RelationshipWorkspace } from "@/components/relationships/relationship-workspace";
@@ -61,8 +62,8 @@ const MULTI_CHAPTER_TIMELINE_CAP = 120;
 
 type AnalysisWorkspaceMode = "timeline" | "relationships" | "clues";
 
-/** Phase 25.1-02：页面顶层视图 —— 对话（默认）| 分析可视化 */
-type AnalysisPageView = "chat" | "analysis";
+/** Phase 25.1-02：页面顶层视图 —— 对话（默认）| 分析可视化；25.2-04 新增 agent */
+type AnalysisPageView = "chat" | "analysis" | "agent";
 
 function eventsSignature(
   envelope: TimelineEnvelope,
@@ -973,6 +974,7 @@ function AnalysisWorkspace() {
                   [
                     ["chat", "对话"],
                     ["analysis", "分析"],
+                    ["agent", "智能体"],
                   ] as const
                 ).map(([id, label]) => (
                   <button
@@ -997,6 +999,18 @@ function AnalysisWorkspace() {
             {/* 对话视图（默认）：与阅读器聊天共享同一会话底座 */}
             <AnalysisChatPanel
               className={cn("min-h-0 flex-1", pageView !== "chat" && "hidden")}
+              novelId={novelId}
+              chapters={chapterList}
+              fullBook={fullBook}
+              progressChapterId={
+                selectedNovel?.reading_progress?.chapter_id ?? null
+              }
+              selection={selectedNode}
+            />
+
+            {/* Agent Workspace（25.2-04）：SSE 流式技能运行；CSS-hide 保住流与产物状态 */}
+            <AgentWorkspacePanel
+              className={cn("min-h-0 flex-1", pageView !== "agent" && "hidden")}
               novelId={novelId}
               chapters={chapterList}
               fullBook={fullBook}
