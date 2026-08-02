@@ -203,3 +203,51 @@ async def require_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
     return current_user
+
+
+def _constant_time_equal(left: str, right: str) -> bool:
+    """常量时间比较，避免时序侧信道泄露令牌内容。"""
+    import secrets
+
+    return secrets.compare_digest(left.encode("utf-8"), right.encode("utf-8"))
+
+
+async def require_gateway_token(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_scheme),
+) -> None:
+    """
+    智能体网关的服务到服务认证（25.2-02 Open Question 2 决策落地）。
+
+    认证方式：agent-service 在请求头携带 ``Authorization: Bearer <token>``，
+    与 ``settings.novelmind_gateway_token`` 做常量时间比较。
+
+    安全属性（fail closed）:
+      - 环境变量未配置 → 401（网关不可用，绝不降级放行）；
+      - 缺失 / 非 Bearer / 不匹配 → 401，带 ``WWW-Authenticate: Bearer``；
+      - 令牌内容绝不写日志、绝不下发浏览器（V6 / T-25.2-02-04）。
+
+    备注（25.2-02 决策记录）:
+      - 工具门面（/api/agent-tools）走端用户 JWT（现有 require_user），
+        本依赖只用于网关；
+      - 长时运行超过 JWT 过期的 per-run 短命内部令牌，由 25.2-03 的
+        skill runtime 铸造，属 handoff 项，不在本阶段实现。
+    """
+    configured = settings.novelmind_gateway_token
+    if not configured:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="网关令牌未配置",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    if not credentials or credentials.scheme.lower() != "bearer":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="缺少网关令牌",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    if not _constant_time_equal(credentials.credentials, configured):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="无效的网关令牌",
+            headers={"WWW-Authenticate": "Bearer"},
+        )

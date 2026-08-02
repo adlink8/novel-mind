@@ -164,6 +164,21 @@ from app.models.narrative_memory_qualification import (
     NarrativeMemoryQualificationReport,
     NarrativeMemoryQualificationRun,
 )
+from app.models.agent_runtime import (
+    ApprovalRequest,
+    Artifact,
+    ArtifactRevision,
+    NovelAgentProfile,
+    SkillRegistry,
+    SkillRun,
+    SkillVersion,
+)
+# 31-34 迁移在链上但模型未注册：补齐注册使 ORM metadata 与迁移链一致
+# （否则 alembic check 把四张既有表判为待删除的 drift）。
+from app.models.canon_space import CanonSpaceArtifact
+from app.models.fanfiction_revision import FanFictionRevision
+from app.models.fanfiction_override import FanFictionOverride
+from app.models.reader_bookmark import ReaderBookmark
 
 __all__ = [
     "Base",
@@ -272,4 +287,15 @@ __all__ = [
     "NarrativeMemoryQualificationRun",
     "NarrativeMemoryQualificationCaseResult",
     "NarrativeMemoryQualificationReport",
+    "SkillRegistry",
+    "SkillVersion",
+    "SkillRun",
+    "Artifact",
+    "ArtifactRevision",
+    "NovelAgentProfile",
+    "ApprovalRequest",
+    "CanonSpaceArtifact",
+    "FanFictionRevision",
+    "FanFictionOverride",
+    "ReaderBookmark",
 ]

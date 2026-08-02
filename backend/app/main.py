@@ -20,6 +20,7 @@ from contextlib import asynccontextmanager
 from sqlalchemy.engine import make_url
 
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -34,9 +35,12 @@ from app.api import (
     rag,
     search,
 )
+from app.api.agent_tools import router as agent_tools_router
+from app.api.agent import router as agent_router
 from app.api.clues import router as clues_router
 from app.api.asset_audit import router as asset_audit_router
 from app.api.eval import router as eval_router
+from app.api.gateway import router as gateway_router
 from app.api.knowledge import router as knowledge_router
 from app.api.narrative_memory import router as narrative_memory_router
 from app.api.reader_chat import router as reader_chat_router
@@ -45,6 +49,7 @@ from app.api.settings import router as settings_router
 from app.api.usage import router as usage_router
 from app.config import settings
 from app.core.logging import RequestLoggingMiddleware, setup_logging
+from app.services.agent_tools.errors import AgentToolError
 
 logger = logging.getLogger("novelmind")
 
@@ -181,6 +186,32 @@ async def value_error_handler(request: Request, exc: ValueError):
     )
 
 
+# 智能体工具错误 → 冻结错误码信封 {error: {code, message}}（25.2-02 / D-07）。
+# 该错误类型只由 agent-tools 门面抛出，因此不影响其他 API 的错误形状。
+@app.exception_handler(AgentToolError)
+async def agent_tool_error_handler(request: Request, exc: AgentToolError):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"error": {"code": exc.code, "message": exc.message}},
+    )
+
+
+# 请求校验失败（FastAPI 422）: agent-tools / gateway 路径包装为冻结的
+# invalid_input 错误码；其余路径保持 FastAPI 默认 422 形状，避免回归。
+@app.exception_handler(RequestValidationError)
+async def request_validation_error_handler(request: Request, exc: RequestValidationError):
+    if request.url.path.startswith("/api/agent-tools") or request.url.path.startswith(
+        "/api/gateway"
+    ):
+        return JSONResponse(
+            status_code=422,
+            content={"error": {"code": "invalid_input", "message": "参数校验失败"}},
+        )
+    from fastapi.encoders import jsonable_encoder
+
+    return JSONResponse(status_code=422, content={"detail": jsonable_encoder(exc.errors())})
+
+
 # ── 注册 API 路由 ──
 # 每个路由模块负责一个业务领域，prefix 定义 URL 前缀，tags 用于 Swagger 分组
 app.include_router(auth.router, prefix="/api/auth", tags=["认证"])
@@ -212,6 +243,21 @@ app.include_router(
     reader_chat_router,
     prefix="/api/novels",
     tags=["阅读器对话"],
+)
+app.include_router(
+    agent_tools_router,
+    prefix="/api/agent-tools",
+    tags=["智能体工具"],
+)
+app.include_router(
+    gateway_router,
+    prefix="/api/gateway",
+    tags=["模型网关"],
+)
+app.include_router(
+    agent_router,
+    prefix="/api/agent",
+    tags=["智能体运行时"],
 )
 
 

@@ -105,6 +105,12 @@ class Settings(BaseSettings):
     # Never enables a production Reader Chat consumer or active pointer path.
     narrative_memory_retrieval_experiment_enabled: bool = False
 
+    # ── 智能体网关（25.2-02 / D-15）──
+    # 服务到服务共享令牌：agent-service 调 POST /api/gateway/v1/chat/completions
+    # 时须携带 `Authorization: Bearer <NOVELMIND_GATEWAY_TOKEN>`。为空时网关
+    # fail-closed（401）。令牌绝不写日志、绝不下发浏览器（V6/T-25.2-02-04）。
+    novelmind_gateway_token: str = ""
+
     # pydantic-settings 配置：从 .env 文件加载，环境变量前缀为 NOVELMIND_
     model_config = {"env_file": ".env", "env_prefix": "NOVELMIND_"}
 
