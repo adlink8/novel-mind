@@ -1,0 +1,434 @@
+{
+  "status": "qualified",
+  "metrics": {
+    "answer_faithfulness_mean": 1.0,
+    "answer_faithfulness_95lb": 1.0,
+    "answer_relevance_mean": 0.6666666666666666,
+    "context_precision_mean": 0.6666666666666666,
+    "context_recall_at_5_mean": 1.0,
+    "critical_unsupported_claim_rate": 0.0,
+    "verdict_consistency": 1.0,
+    "cost_usd_total": 0.009000000000000001,
+    "cost_usd_mean": 0.001,
+    "latency_ms_p95": 0.0004999747034162283,
+    "tokens_total": 1350,
+    "tokens_p95": 150.0,
+    "n_artifacts": 9,
+    "n_scored": 9,
+    "per_case_verdicts": {
+      "bench-answerable-001": [
+        "pass",
+        "pass",
+        "pass"
+      ],
+      "bench-noanswer-001": [
+        "pass",
+        "pass",
+        "pass"
+      ],
+      "bench-hardneg-001": [
+        "fail",
+        "fail",
+        "fail"
+      ]
+    }
+  },
+  "quality_comparable": true,
+  "reason": "all policy gates passed",
+  "detail": {
+    "answer_faithfulness_95lb": 1.0,
+    "verdict_consistency": 1.0,
+    "context_recall_regression_pp": 0.0,
+    "relevance_regression_pp": 0.0
+  },
+  "usable_for_baseline": true,
+  "policy_version": "rag-quality-policy.v1",
+  "policy_hash": "771dacf6332c77f587365cb57dc188b0b61e931812b67a4ba537c9e73f023ea0",
+  "schema_version": "rag-quality.v1",
+  "n_cases": 3,
+  "repeats": 3,
+  "input_hash": "d8f379945f3cd2b003c64592a8cdc8e0302ecb7a52343face35577c974c2f21a",
+  "chunker_lineage": {
+    "chunker_name": "baseline-fixed",
+    "chunker_version": "1.0.0",
+    "chunker_config_hash": "77f68ab55b800d79e468111354faf3bc611c062263d69c89d4d0b0d0ea418f5e",
+    "chunk_manifest_hash": "888b8ae16953b6961fb44888e04ada592565a20099dde60332bf011b2f044126",
+    "source_snapshot_hash": "3e8afd1575fc2ff21995f32deb97fc3a078032887a9174f44941dc8b4ddcf87f"
+  },
+  "artifacts": [
+    {
+      "case_id": "bench-answerable-001",
+      "repetition": 0,
+      "status": "scored",
+      "call_id": "bench-answerable-001:r0:72b3edae9e246971",
+      "cost_usd": 0.001,
+      "latency_ms": 0.0004999747034162283,
+      "deterministic_metrics": {
+        "context_precision": 1.0,
+        "context_recall_at_5": 1.0,
+        "faithfulness_proxy": 0.0,
+        "critical_unsupported_claim_rate": 1.0,
+        "critical_unsupported_count": 1,
+        "claim_verdicts": [
+          {
+            "claim_id": "c1",
+            "claim_text": "路明非在卡塞尔学院门前石碑上第一次看见传说",
+            "supported": false,
+            "critical": true
+          }
+        ],
+        "refused": false
+      },
+      "judge_scores": {
+        "faithfulness": 1.0,
+        "relevance": 1.0,
+        "claim_verdicts": [
+          {
+            "claim_id": "c1",
+            "claim_text": "路明非在卡塞尔学院门前石碑上第一次看见传说",
+            "supported": false,
+            "critical": true
+          }
+        ],
+        "critical_unsupported_count": 0,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "stub_answer_judge"
+        ]
+      },
+      "answer": "在卡塞尔学院门前的石碑上",
+      "retrieved_hashes": [
+        "03f19bf5117f3b8b97a7f1bb2ae453479e480580d25a04706a56d0df5c55df82"
+      ]
+    },
+    {
+      "case_id": "bench-answerable-001",
+      "repetition": 1,
+      "status": "scored",
+      "call_id": "bench-answerable-001:r1:af5ba3ce5ca0ef40",
+      "cost_usd": 0.001,
+      "latency_ms": 0.000100000761449337,
+      "deterministic_metrics": {
+        "context_precision": 1.0,
+        "context_recall_at_5": 1.0,
+        "faithfulness_proxy": 0.0,
+        "critical_unsupported_claim_rate": 1.0,
+        "critical_unsupported_count": 1,
+        "claim_verdicts": [
+          {
+            "claim_id": "c1",
+            "claim_text": "路明非在卡塞尔学院门前石碑上第一次看见传说",
+            "supported": false,
+            "critical": true
+          }
+        ],
+        "refused": false
+      },
+      "judge_scores": {
+        "faithfulness": 1.0,
+        "relevance": 1.0,
+        "claim_verdicts": [
+          {
+            "claim_id": "c1",
+            "claim_text": "路明非在卡塞尔学院门前石碑上第一次看见传说",
+            "supported": false,
+            "critical": true
+          }
+        ],
+        "critical_unsupported_count": 0,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "stub_answer_judge"
+        ]
+      },
+      "answer": "在卡塞尔学院门前的石碑上",
+      "retrieved_hashes": [
+        "03f19bf5117f3b8b97a7f1bb2ae453479e480580d25a04706a56d0df5c55df82"
+      ]
+    },
+    {
+      "case_id": "bench-answerable-001",
+      "repetition": 2,
+      "status": "scored",
+      "call_id": "bench-answerable-001:r2:071ea26a22d082c2",
+      "cost_usd": 0.001,
+      "latency_ms": 0.00019997241906821728,
+      "deterministic_metrics": {
+        "context_precision": 1.0,
+        "context_recall_at_5": 1.0,
+        "faithfulness_proxy": 0.0,
+        "critical_unsupported_claim_rate": 1.0,
+        "critical_unsupported_count": 1,
+        "claim_verdicts": [
+          {
+            "claim_id": "c1",
+            "claim_text": "路明非在卡塞尔学院门前石碑上第一次看见传说",
+            "supported": false,
+            "critical": true
+          }
+        ],
+        "refused": false
+      },
+      "judge_scores": {
+        "faithfulness": 1.0,
+        "relevance": 1.0,
+        "claim_verdicts": [
+          {
+            "claim_id": "c1",
+            "claim_text": "路明非在卡塞尔学院门前石碑上第一次看见传说",
+            "supported": false,
+            "critical": true
+          }
+        ],
+        "critical_unsupported_count": 0,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "stub_answer_judge"
+        ]
+      },
+      "answer": "在卡塞尔学院门前的石碑上",
+      "retrieved_hashes": [
+        "03f19bf5117f3b8b97a7f1bb2ae453479e480580d25a04706a56d0df5c55df82"
+      ]
+    },
+    {
+      "case_id": "bench-noanswer-001",
+      "repetition": 0,
+      "status": "scored",
+      "call_id": "bench-noanswer-001:r0:0d153fe491b52fa9",
+      "cost_usd": 0.001,
+      "latency_ms": 0.000100000761449337,
+      "deterministic_metrics": {
+        "context_precision": 0.0,
+        "context_recall_at_5": 1.0,
+        "faithfulness_proxy": 1.0,
+        "critical_unsupported_claim_rate": 0.0,
+        "critical_unsupported_count": 0,
+        "claim_verdicts": [],
+        "refused": true
+      },
+      "judge_scores": {
+        "faithfulness": 1.0,
+        "relevance": 1.0,
+        "claim_verdicts": [],
+        "critical_unsupported_count": 0,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "stub_answer_judge"
+        ]
+      },
+      "answer": "insufficient evidence",
+      "retrieved_hashes": [
+        "03f19bf5117f3b8b97a7f1bb2ae453479e480580d25a04706a56d0df5c55df82",
+        "e3233ef756b61f21fc09f1f9e311f1845c7858f058195b7bfa72bfd37a3c1bea",
+        "617b809101fdf4cdb3e845eb92b56a1cdc6b009eee12325305b3152d86197ad1"
+      ]
+    },
+    {
+      "case_id": "bench-noanswer-001",
+      "repetition": 1,
+      "status": "scored",
+      "call_id": "bench-noanswer-001:r1:a81de40f6c91badf",
+      "cost_usd": 0.001,
+      "latency_ms": 0.000100000761449337,
+      "deterministic_metrics": {
+        "context_precision": 0.0,
+        "context_recall_at_5": 1.0,
+        "faithfulness_proxy": 1.0,
+        "critical_unsupported_claim_rate": 0.0,
+        "critical_unsupported_count": 0,
+        "claim_verdicts": [],
+        "refused": true
+      },
+      "judge_scores": {
+        "faithfulness": 1.0,
+        "relevance": 1.0,
+        "claim_verdicts": [],
+        "critical_unsupported_count": 0,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "stub_answer_judge"
+        ]
+      },
+      "answer": "insufficient evidence",
+      "retrieved_hashes": [
+        "03f19bf5117f3b8b97a7f1bb2ae453479e480580d25a04706a56d0df5c55df82",
+        "e3233ef756b61f21fc09f1f9e311f1845c7858f058195b7bfa72bfd37a3c1bea",
+        "617b809101fdf4cdb3e845eb92b56a1cdc6b009eee12325305b3152d86197ad1"
+      ]
+    },
+    {
+      "case_id": "bench-noanswer-001",
+      "repetition": 2,
+      "status": "scored",
+      "call_id": "bench-noanswer-001:r2:5e4c88cc4656edac",
+      "cost_usd": 0.001,
+      "latency_ms": 0.000100000761449337,
+      "deterministic_metrics": {
+        "context_precision": 0.0,
+        "context_recall_at_5": 1.0,
+        "faithfulness_proxy": 1.0,
+        "critical_unsupported_claim_rate": 0.0,
+        "critical_unsupported_count": 0,
+        "claim_verdicts": [],
+        "refused": true
+      },
+      "judge_scores": {
+        "faithfulness": 1.0,
+        "relevance": 1.0,
+        "claim_verdicts": [],
+        "critical_unsupported_count": 0,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "stub_answer_judge"
+        ]
+      },
+      "answer": "insufficient evidence",
+      "retrieved_hashes": [
+        "03f19bf5117f3b8b97a7f1bb2ae453479e480580d25a04706a56d0df5c55df82",
+        "e3233ef756b61f21fc09f1f9e311f1845c7858f058195b7bfa72bfd37a3c1bea",
+        "617b809101fdf4cdb3e845eb92b56a1cdc6b009eee12325305b3152d86197ad1"
+      ]
+    },
+    {
+      "case_id": "bench-hardneg-001",
+      "repetition": 0,
+      "status": "scored",
+      "call_id": "bench-hardneg-001:r0:bf3fbd39b95cecab",
+      "cost_usd": 0.001,
+      "latency_ms": 0.000200001522898674,
+      "deterministic_metrics": {
+        "context_precision": 1.0,
+        "context_recall_at_5": 1.0,
+        "faithfulness_proxy": 0.0,
+        "critical_unsupported_claim_rate": 0.0,
+        "critical_unsupported_count": 0,
+        "claim_verdicts": [
+          {
+            "claim_id": "hn1",
+            "claim_text": "雨夜描述证明恺撒拔刀",
+            "supported": false,
+            "critical": false
+          }
+        ],
+        "refused": false
+      },
+      "judge_scores": {
+        "faithfulness": 1.0,
+        "relevance": 0.0,
+        "claim_verdicts": [
+          {
+            "claim_id": "hn1",
+            "claim_text": "雨夜描述证明恺撒拔刀",
+            "supported": false,
+            "critical": false
+          }
+        ],
+        "critical_unsupported_count": 0,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "stub_answer_judge"
+        ]
+      },
+      "answer": "insufficient equivalent evidence",
+      "retrieved_hashes": [
+        "617b809101fdf4cdb3e845eb92b56a1cdc6b009eee12325305b3152d86197ad1"
+      ]
+    },
+    {
+      "case_id": "bench-hardneg-001",
+      "repetition": 1,
+      "status": "scored",
+      "call_id": "bench-hardneg-001:r1:ee901eb4643d488e",
+      "cost_usd": 0.001,
+      "latency_ms": 0.000100000761449337,
+      "deterministic_metrics": {
+        "context_precision": 1.0,
+        "context_recall_at_5": 1.0,
+        "faithfulness_proxy": 0.0,
+        "critical_unsupported_claim_rate": 0.0,
+        "critical_unsupported_count": 0,
+        "claim_verdicts": [
+          {
+            "claim_id": "hn1",
+            "claim_text": "雨夜描述证明恺撒拔刀",
+            "supported": false,
+            "critical": false
+          }
+        ],
+        "refused": false
+      },
+      "judge_scores": {
+        "faithfulness": 1.0,
+        "relevance": 0.0,
+        "claim_verdicts": [
+          {
+            "claim_id": "hn1",
+            "claim_text": "雨夜描述证明恺撒拔刀",
+            "supported": false,
+            "critical": false
+          }
+        ],
+        "critical_unsupported_count": 0,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "stub_answer_judge"
+        ]
+      },
+      "answer": "insufficient equivalent evidence",
+      "retrieved_hashes": [
+        "617b809101fdf4cdb3e845eb92b56a1cdc6b009eee12325305b3152d86197ad1"
+      ]
+    },
+    {
+      "case_id": "bench-hardneg-001",
+      "repetition": 2,
+      "status": "scored",
+      "call_id": "bench-hardneg-001:r2:16692799098c8d1c",
+      "cost_usd": 0.001,
+      "latency_ms": 0.000100000761449337,
+      "deterministic_metrics": {
+        "context_precision": 1.0,
+        "context_recall_at_5": 1.0,
+        "faithfulness_proxy": 0.0,
+        "critical_unsupported_claim_rate": 0.0,
+        "critical_unsupported_count": 0,
+        "claim_verdicts": [
+          {
+            "claim_id": "hn1",
+            "claim_text": "雨夜描述证明恺撒拔刀",
+            "supported": false,
+            "critical": false
+          }
+        ],
+        "refused": false
+      },
+      "judge_scores": {
+        "faithfulness": 1.0,
+        "relevance": 0.0,
+        "claim_verdicts": [
+          {
+            "claim_id": "hn1",
+            "claim_text": "雨夜描述证明恺撒拔刀",
+            "supported": false,
+            "critical": false
+          }
+        ],
+        "critical_unsupported_count": 0,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "stub_answer_judge"
+        ]
+      },
+      "answer": "insufficient equivalent evidence",
+      "retrieved_hashes": [
+        "617b809101fdf4cdb3e845eb92b56a1cdc6b009eee12325305b3152d86197ad1"
+      ]
+    }
+  ],
+  "sut_family_disclosure": {
+    "note": "SUT may share family with G or J; disclosed for audit only"
+  },
+  "report_signature": "3f64f57d39abb08dfb9db73c2468b30a232ab4336be0c54fc03fe216bd871fc9",
+  "output_hash": "71e87d13f662203d6fff46cdfa54a77555e84225574a79c46820f6a97ed9529f"
+}

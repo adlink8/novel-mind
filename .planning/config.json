@@ -1,13 +1,40 @@
 {
   "project": "NovelMind",
   "baseline_branch": "master",
-  "baseline_commit": "5304619f4436043249abda744efab4769f0049f0",
+  "baseline_commit": "912ca6b423d6c2309bc2972cbfc083c4eaa280e1",
   "active_milestone": "v1.1",
   "active_phase": "22-ci-nightly-gap-closure",
   "active_plan": "22-G2",
-  "status": "active",
+  "status": "blocked",
   "auto_start": ".planning/phases/22-ci-nightly-gap-closure/22-G2-PLAN.md",
+  "gate_overrides": {
+    "phase_22_to_26": {
+      "authorized": true,
+      "authorized_at": "2026-07-31T11:20:40.992Z",
+      "scope": "planning_only_phase_25.2_to_39",
+      "reason": "User explicitly authorized correction of Phase 25.2-39 planning while preserving execution qualification gates.",
+      "preserve_phase_22_verdict": true
+    },
+    "phase_25.2_execution": {
+      "authorized": true,
+      "authorized_at": "2026-08-02",
+      "scope": "execution_phase_25.2-01_spike",
+      "reason": "User explicitly authorized skipping the Phase 22 3/3 gate to start the Phase 25.2-01 Pi SDK spike (interactive confirmation, AskUserQuestion).",
+      "preserve_phase_22_verdict": true,
+      "upstream_verification_still_required": true
+    }
+  },
   "commit_docs": true,
+  "model_overrides": {
+    "gsd-phase-researcher": "gpt-5.6-luna",
+    "gsd-pattern-mapper": "gpt-5.6-luna",
+    "gsd-planner": "gpt-5.6-luna",
+    "gsd-plan-checker": "gpt-5.6-luna",
+    "gsd-executor": "gpt-5.6-luna",
+    "gsd-verifier": "gpt-5.6-luna",
+    "gsd-integration-checker": "gpt-5.6-luna",
+    "gsd-nyquist-auditor": "gpt-5.6-luna"
+  },
   "reporting_dimensions": [
     "implementation_readiness",
     "sample_data_coverage",

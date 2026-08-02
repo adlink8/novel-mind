@@ -1,0 +1,14 @@
+{
+  "schema_version": "ai-pricing-snapshot.v1",
+  "provider": "vertex_google",
+  "model": "gemini-3.5-flash-lite",
+  "mode": "standard_online",
+  "region_class": "non_global",
+  "currency": "USD",
+  "input_usd_per_1m_tokens": 0.33,
+  "output_usd_per_1m_tokens": 2.75,
+  "effective_date": "2026-07-01",
+  "retrieved_at": "2026-07-28",
+  "source_url": "https://cloud.google.com/gemini-enterprise-agent-platform/generative-ai/pricing",
+  "source_note": "Google Cloud Agent Platform pricing page lists Gemini 3.5 Flash-Lite standard non-global input at $0.33/M tokens and output at $2.75/M tokens. The project uses Vertex us-central1, treated as non-global after the published effective date."
+}

@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AnswerReadingQuestionInput",
+  "description": "answer-reading-question 运行输入：question + novel_id（必填），chapter_range 可选。",
+  "type": "object",
+  "required": ["question", "novel_id"],
+  "properties": {
+    "question": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000,
+      "description": "要回答的问题（非空字符串）"
+    },
+    "novel_id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "目标小说 ID（必须与运行路径中的 novel_id 一致）"
+    },
+    "chapter_range": {
+      "type": "object",
+      "description": "可选的章节范围锚定（含端点，章节号语义）",
+      "required": ["chapter_start", "chapter_end"],
+      "properties": {
+        "chapter_start": { "type": "integer", "minimum": 1 },
+        "chapter_end": { "type": "integer", "minimum": 1 }
+      }
+    }
+  },
+  "additionalProperties": false
+}

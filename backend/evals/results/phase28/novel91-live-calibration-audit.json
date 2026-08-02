@@ -1,0 +1,225 @@
+{
+  "schema_version": "rag-quality-live-calibration-audit.v1",
+  "status": "passed",
+  "suite": "evals\\calibration\\novel91-live-calibration-20260728-v1.json",
+  "suite_hash": "df234514ec1c4348e6a6d7b6eee32ac20c457c86accaa99de26ec63a9b794a86",
+  "report": "evals\\results\\phase28\\novel91-live-calibration-report.json",
+  "judge_lineage": {
+    "provider": "vertex_google",
+    "model_family": "vertex_gemini_live_judge",
+    "model_id": "vertex_google/gemini-3.5-flash-lite",
+    "weights/revision": "vertex-gemini-3.5-flash-lite-2026-07-28",
+    "endpoint_class": "live_external_review",
+    "prompt_hash": "3bd4cef0d9a74e3930b9ed5e1e47fd59da76f5277e9cfd80eea0e1c11545b992",
+    "prompt_version": "novel91.live.semantic-review.v2",
+    "schema_hash": "abbbaed9fb1b458af7e7e8af8b45e8dc835ae862d5c312b18ddb6004c2bd622a",
+    "decoding": {
+      "temperature": null,
+      "top_p": null,
+      "max_tokens": null,
+      "seed": null
+    },
+    "runtime": "vertex_live",
+    "started_at": "2026-07-28T05:00:46.207360Z"
+  },
+  "counts": {
+    "cases": 7,
+    "repeats": 3,
+    "calls": 21
+  },
+  "usage": {
+    "input_tokens": 6681,
+    "output_tokens": 215
+  },
+  "results": [
+    {
+      "case_id": "live-supported",
+      "repeat": 1,
+      "status": "reviewed",
+      "classification": "accept",
+      "response_hash": "86572f139b5c4768fe0ab6b10f33ebfb979ac4eeff665d8a3a8f9057c9e95282",
+      "input_tokens": 322,
+      "output_tokens": 10
+    },
+    {
+      "case_id": "live-supported",
+      "repeat": 2,
+      "status": "reviewed",
+      "classification": "accept",
+      "response_hash": "86572f139b5c4768fe0ab6b10f33ebfb979ac4eeff665d8a3a8f9057c9e95282",
+      "input_tokens": 322,
+      "output_tokens": 10
+    },
+    {
+      "case_id": "live-supported",
+      "repeat": 3,
+      "status": "reviewed",
+      "classification": "accept",
+      "response_hash": "578e54526745489ea1e992bf90ce7717c55d588748aaadc9890d084d52b85099",
+      "input_tokens": 322,
+      "output_tokens": 5
+    },
+    {
+      "case_id": "live-partial",
+      "repeat": 1,
+      "status": "reviewed",
+      "classification": "partial",
+      "response_hash": "bc2a20776521f1b6b56121dd1a2260b09c8d5de62fd8615a41a428caf31b91f9",
+      "input_tokens": 330,
+      "output_tokens": 6
+    },
+    {
+      "case_id": "live-partial",
+      "repeat": 2,
+      "status": "reviewed",
+      "classification": "partial",
+      "response_hash": "6926c885c5a7ad53b8483bc0f6443cc3af2a2de12651ecbc0e91e6f52d19f420",
+      "input_tokens": 330,
+      "output_tokens": 11
+    },
+    {
+      "case_id": "live-partial",
+      "repeat": 3,
+      "status": "reviewed",
+      "classification": "partial",
+      "response_hash": "6926c885c5a7ad53b8483bc0f6443cc3af2a2de12651ecbc0e91e6f52d19f420",
+      "input_tokens": 330,
+      "output_tokens": 11
+    },
+    {
+      "case_id": "live-unsupported",
+      "repeat": 1,
+      "status": "reviewed",
+      "classification": "reject",
+      "response_hash": "48372083078e340dc739c4b226d5d76dce4e2e5d59fa5d936521c5d70211dcb6",
+      "input_tokens": 314,
+      "output_tokens": 10
+    },
+    {
+      "case_id": "live-unsupported",
+      "repeat": 2,
+      "status": "reviewed",
+      "classification": "reject",
+      "response_hash": "e462b901e5909f7ebd5d8744a1cfefc223348016bd4e4d753e821325bea75b59",
+      "input_tokens": 314,
+      "output_tokens": 11
+    },
+    {
+      "case_id": "live-unsupported",
+      "repeat": 3,
+      "status": "reviewed",
+      "classification": "reject",
+      "response_hash": "ad7496e163d4a6484d06a93144768aec1f0fb5413daca490564c1bc8a497b0bf",
+      "input_tokens": 314,
+      "output_tokens": 5
+    },
+    {
+      "case_id": "live-contradictory",
+      "repeat": 1,
+      "status": "reviewed",
+      "classification": "contradictory",
+      "response_hash": "78e5644f9fd2b6b3d0c2dd1c061bdb907ff55dc784eaf377cc5de5be7bad27d8",
+      "input_tokens": 314,
+      "output_tokens": 12
+    },
+    {
+      "case_id": "live-contradictory",
+      "repeat": 2,
+      "status": "reviewed",
+      "classification": "contradictory",
+      "response_hash": "78e5644f9fd2b6b3d0c2dd1c061bdb907ff55dc784eaf377cc5de5be7bad27d8",
+      "input_tokens": 314,
+      "output_tokens": 12
+    },
+    {
+      "case_id": "live-contradictory",
+      "repeat": 3,
+      "status": "reviewed",
+      "classification": "contradictory",
+      "response_hash": "c44acd9b21f213a11c7ce5348cfbe09469a9f1644c7cc44b5bc3cbc0b14bcaca",
+      "input_tokens": 314,
+      "output_tokens": 13
+    },
+    {
+      "case_id": "live-no-answer",
+      "repeat": 1,
+      "status": "reviewed",
+      "classification": "no_answer",
+      "response_hash": "e4b8e3d65eb74bc5239cc175af0b51762e42b0b04e0f5d0e8a3485c439623a49",
+      "input_tokens": 311,
+      "output_tokens": 12
+    },
+    {
+      "case_id": "live-no-answer",
+      "repeat": 2,
+      "status": "reviewed",
+      "classification": "no_answer",
+      "response_hash": "e4b8e3d65eb74bc5239cc175af0b51762e42b0b04e0f5d0e8a3485c439623a49",
+      "input_tokens": 311,
+      "output_tokens": 12
+    },
+    {
+      "case_id": "live-no-answer",
+      "repeat": 3,
+      "status": "reviewed",
+      "classification": "no_answer",
+      "response_hash": "e4b8e3d65eb74bc5239cc175af0b51762e42b0b04e0f5d0e8a3485c439623a49",
+      "input_tokens": 311,
+      "output_tokens": 12
+    },
+    {
+      "case_id": "live-hard-negative",
+      "repeat": 1,
+      "status": "reviewed",
+      "classification": "reject",
+      "response_hash": "e462b901e5909f7ebd5d8744a1cfefc223348016bd4e4d753e821325bea75b59",
+      "input_tokens": 319,
+      "output_tokens": 11
+    },
+    {
+      "case_id": "live-hard-negative",
+      "repeat": 2,
+      "status": "reviewed",
+      "classification": "reject",
+      "response_hash": "e462b901e5909f7ebd5d8744a1cfefc223348016bd4e4d753e821325bea75b59",
+      "input_tokens": 319,
+      "output_tokens": 11
+    },
+    {
+      "case_id": "live-hard-negative",
+      "repeat": 3,
+      "status": "reviewed",
+      "classification": "reject",
+      "response_hash": "e462b901e5909f7ebd5d8744a1cfefc223348016bd4e4d753e821325bea75b59",
+      "input_tokens": 319,
+      "output_tokens": 11
+    },
+    {
+      "case_id": "live-equivalent",
+      "repeat": 1,
+      "status": "reviewed",
+      "classification": "accept",
+      "response_hash": "86572f139b5c4768fe0ab6b10f33ebfb979ac4eeff665d8a3a8f9057c9e95282",
+      "input_tokens": 317,
+      "output_tokens": 10
+    },
+    {
+      "case_id": "live-equivalent",
+      "repeat": 2,
+      "status": "reviewed",
+      "classification": "accept",
+      "response_hash": "86572f139b5c4768fe0ab6b10f33ebfb979ac4eeff665d8a3a8f9057c9e95282",
+      "input_tokens": 317,
+      "output_tokens": 10
+    },
+    {
+      "case_id": "live-equivalent",
+      "repeat": 3,
+      "status": "reviewed",
+      "classification": "accept",
+      "response_hash": "86572f139b5c4768fe0ab6b10f33ebfb979ac4eeff665d8a3a8f9057c9e95282",
+      "input_tokens": 317,
+      "output_tokens": 10
+    }
+  ]
+}

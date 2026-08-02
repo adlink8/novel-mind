@@ -1,0 +1,57 @@
+{
+  "suite_hash": "df234514ec1c4348e6a6d7b6eee32ac20c457c86accaa99de26ec63a9b794a86",
+  "suite_signature": "27934f2e474b61ff16e8377b6cf10f967cac9a51ab152c7dd92870f0b356a017",
+  "prompt_hash": "3bd4cef0d9a74e3930b9ed5e1e47fd59da76f5277e9cfd80eea0e1c11545b992",
+  "schema_hash": "abbbaed9fb1b458af7e7e8af8b45e8dc835ae862d5c312b18ddb6004c2bd622a",
+  "judge_lineage": {
+    "provider": "vertex_google",
+    "model_family": "vertex_gemini_live_judge",
+    "model_id": "vertex_google/gemini-3.5-flash-lite",
+    "weights/revision": "vertex-gemini-3.5-flash-lite-2026-07-28",
+    "endpoint_class": "live_external_review",
+    "prompt_hash": "3bd4cef0d9a74e3930b9ed5e1e47fd59da76f5277e9cfd80eea0e1c11545b992",
+    "prompt_version": "novel91.live.semantic-review.v2",
+    "schema_hash": "abbbaed9fb1b458af7e7e8af8b45e8dc835ae862d5c312b18ddb6004c2bd622a",
+    "decoding": {
+      "temperature": null,
+      "top_p": null,
+      "max_tokens": null,
+      "seed": null
+    },
+    "runtime": "vertex_live",
+    "started_at": "2026-07-28T05:00:46.207360Z"
+  },
+  "domain": "calibration-novel91-live",
+  "repeats": 3,
+  "confusion_matrix": {
+    "accept": {
+      "accept": 6
+    },
+    "partial": {
+      "partial": 3
+    },
+    "reject": {
+      "reject": 3
+    },
+    "contradictory": {
+      "contradictory": 3
+    },
+    "no_answer": {
+      "no_answer": 3
+    },
+    "hard_negative": {
+      "reject": 3
+    }
+  },
+  "critical_false_accept": 0,
+  "consistency": 1.0,
+  "status": "passed",
+  "metrics": {
+    "consistency": 1.0,
+    "critical_false_accept": 0,
+    "n_cases": 7,
+    "repeats": 3
+  },
+  "quality_comparable": false,
+  "signature": "7a7e406cc372e6cc87e37f543ffb83bb257c072d21c9b3eb2e93d02b627b8e79"
+}

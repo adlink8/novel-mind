@@ -8,7 +8,7 @@
 ## Execution Baseline
 
 - authority branch: `master`
-- evidence snapshot: `01503c2` on 2026-07-31
+- evidence snapshot: `912ca6b` on 2026-08-01
 - single cursor: `.planning/STATE.md`
 - old feature branches: evidence only unless a new delta decision explicitly selects code
 
@@ -20,6 +20,10 @@ three consecutive green observations.
 
 ## Product Direction
 
+0. **Agent runtime foundation (Phase 25.2–25.3):** embedded Novel Agent Runtime using
+   pinned Pi SDK packages, controlled domain tools, versioned Skills, lineage-bound Artifacts
+   and Web Approval. The agent orchestrates; deterministic services retain facts,
+   permissions, versions and publication authority.
 1. **v1.2 trusted novel understanding (Phase 26–29):** question-driven QueryPlan,
    multi-dimensional retrieval, source citations, epistemic world model, whole-book NM and
    reading QA.
@@ -30,6 +34,10 @@ three consecutive green observations.
 
 ## Authority Boundaries
 
+- Pi/Novel Agent sessions are execution context, never a factual or persistence authority.
+- Only allowlisted NovelMind Domain Tools may reach FastAPI; default coding tools stay disabled.
+- Every official Agent result is a versioned Artifact produced by a versioned SkillRun.
+- High-impact writes require server-authoritative ApprovalRequest transitions.
 - Raw source evidence is the final factual authority.
 - NM/world models route and organize; they do not replace leaf/raw citation.
 - `canon_fact`, `probable_inference`, `literary_interpretation` and
@@ -55,7 +63,10 @@ These dimensions may disagree. A green build does not imply data coverage or mod
 - `.planning/REQUIREMENTS.md`: requirement ownership and status.
 - `.planning/spikes/phase21-branch-delta/`: branch-delta evidence and decision.
 - `.planning/phases/22-ci-nightly-gap-closure/`: active gap plans and validation ledger.
+- `.planning/phases/25.2-embedded-novel-agent-runtime/`: Pi runtime, Tool, Skill, Artifact and workspace plans.
+- `.planning/phases/25.3-pi-package-compatibility-governance/`: package, registry, MCP and approval governance plans.
+- `.planning/AGENT-RUNTIME-CONTRACT.md`: Phase 26–39 Agent consumption and authority contract.
 - `IMPLEMENTATION-STATUS.md`: human-facing implementation facts, updated only after verified
   implementation changes.
 
-*Last updated: 2026-07-31.*
+*Last updated: 2026-08-02.*
