@@ -1,0 +1,233 @@
+{
+  "fixture_version": "queryplan-fixture.v1",
+  "dataset_lineage": "queryplan-questions-v1",
+  "defaults": {
+    "owner_id": 1,
+    "novel_id": 1,
+    "version_id": 1,
+    "through_chapter": 3,
+    "snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "full_book_authorized": false,
+    "source": "fixture"
+  },
+  "disclaimer": "Frozen representative reader/analysis questions for REQ-QP-01. Covers local, cross-chapter/causal, character, world, whole-book, unsupported (unknown intent), scope-escape, future-probing, contradictory-constraint, and spoiler-boundary cases. Does not promote, activate, or cut over any Narrative Memory consumer (D-14).",
+  "cases": [
+    {
+      "case_key": "reader_local_01",
+      "intent": "reader",
+      "question": "林安在第一章走进哪里？",
+      "selection": {
+        "kind": "selection",
+        "chapter_id": 1,
+        "source_start": 4,
+        "source_end": 12,
+        "chapter_content_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "expected": "plan",
+      "expected_intent": "reader",
+      "expected_cutoff_mode": "reading_progress"
+    },
+    {
+      "case_key": "reader_local_02",
+      "intent": "reader",
+      "question": "主角现在身在何处？",
+      "expected": "plan",
+      "expected_intent": "reader",
+      "expected_cutoff_mode": "reading_progress"
+    },
+    {
+      "case_key": "reader_spoiler_boundary_01",
+      "intent": "reader",
+      "question": "第三章结尾发生了什么？",
+      "expected": "plan",
+      "expected_intent": "reader",
+      "expected_cutoff_mode": "reading_progress"
+    },
+    {
+      "case_key": "analysis_range_01",
+      "intent": "analysis",
+      "question": "前两章里主角的性格如何变化？",
+      "chapter_range": {
+        "kind": "chapter_range",
+        "chapter_start": 1,
+        "chapter_end": 2
+      },
+      "expected": "plan",
+      "expected_intent": "analysis",
+      "expected_cutoff_mode": "reading_progress",
+      "expected_availability": {
+        "character_state": "unavailable"
+      }
+    },
+    {
+      "case_key": "analysis_causal_01",
+      "intent": "analysis",
+      "question": "第一到三章之间，是什么原因推动了主线转折？",
+      "chapter_range": {
+        "kind": "chapter_range",
+        "chapter_start": 1,
+        "chapter_end": 3
+      },
+      "expected": "plan",
+      "expected_intent": "analysis",
+      "expected_cutoff_mode": "reading_progress"
+    },
+    {
+      "case_key": "analysis_world_01",
+      "intent": "analysis",
+      "question": "这个世界观有哪些已知规则和势力？",
+      "chapter_range": {
+        "kind": "chapter_range",
+        "chapter_start": 1,
+        "chapter_end": 3
+      },
+      "expected": "plan",
+      "expected_intent": "analysis",
+      "expected_availability": {
+        "world_rules": "unavailable"
+      }
+    },
+    {
+      "case_key": "whole_book_authorized_01",
+      "intent": "analysis",
+      "question": "全书的主线主题是什么？",
+      "chapter_range": {
+        "kind": "chapter_range",
+        "chapter_start": 1,
+        "chapter_end": 3
+      },
+      "whole_book": true,
+      "full_book_authorized": true,
+      "expected": "plan",
+      "expected_intent": "analysis",
+      "expected_cutoff_mode": "whole_book"
+    },
+    {
+      "case_key": "future_probe_01",
+      "intent": "reader",
+      "question": "第十章发生了什么？",
+      "expected": "blocked",
+      "expected_reason": "future_probing"
+    },
+    {
+      "case_key": "scope_escape_range_01",
+      "intent": "analysis",
+      "question": "第五到八章的角色关系如何变化？",
+      "chapter_range": {
+        "kind": "chapter_range",
+        "chapter_start": 5,
+        "chapter_end": 8
+      },
+      "expected": "blocked",
+      "expected_reason": "scope_escape"
+    },
+    {
+      "case_key": "scope_escape_selection_01",
+      "intent": "reader",
+      "question": "这里提到了什么线索？",
+      "selection": {
+        "kind": "selection",
+        "chapter_id": 9,
+        "source_start": 0,
+        "source_end": 10,
+        "chapter_content_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "expected": "blocked",
+      "expected_reason": "scope_escape"
+    },
+    {
+      "case_key": "whole_book_unauthorized_01",
+      "intent": "analysis",
+      "question": "全书的主线是什么？",
+      "chapter_range": {
+        "kind": "chapter_range",
+        "chapter_start": 1,
+        "chapter_end": 3
+      },
+      "expected": "blocked",
+      "expected_reason": "whole_book_unauthorized"
+    },
+    {
+      "case_key": "whole_book_contradiction_01",
+      "intent": "analysis",
+      "question": "整本书的主题是什么？",
+      "chapter_range": {
+        "kind": "chapter_range",
+        "chapter_start": 1,
+        "chapter_end": 3
+      },
+      "whole_book": true,
+      "expected": "blocked",
+      "expected_reason": "contradictory_constraints"
+    },
+    {
+      "case_key": "ambiguous_anchor_01",
+      "intent": "reader",
+      "question": "他在做什么？",
+      "chapter_range": {
+        "kind": "chapter_range",
+        "chapter_start": 1,
+        "chapter_end": 2
+      },
+      "expected": "blocked",
+      "expected_reason": "ambiguous_intent"
+    },
+    {
+      "case_key": "ambiguous_both_anchors_01",
+      "intent": "reader",
+      "question": "这里的线索是什么？",
+      "selection": {
+        "kind": "selection",
+        "chapter_id": 1,
+        "source_start": 0,
+        "source_end": 10,
+        "chapter_content_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "chapter_range": {
+        "kind": "chapter_range",
+        "chapter_start": 1,
+        "chapter_end": 2
+      },
+      "expected": "blocked",
+      "expected_reason": "ambiguous_intent"
+    },
+    {
+      "case_key": "unknown_intent_01",
+      "intent": "historian",
+      "question": "这段背景设定是什么？",
+      "expected": "blocked",
+      "expected_reason": "unknown_intent"
+    },
+    {
+      "case_key": "contradictory_constraints_01",
+      "intent": "reader",
+      "question": "主角的动机是什么？",
+      "answer_constraints": {
+        "must_cite_every_fact": false,
+        "abstain_without_evidence": false
+      },
+      "expected": "blocked",
+      "expected_reason": "contradictory_constraints"
+    },
+    {
+      "case_key": "explicit_dimensions_01",
+      "intent": "analysis",
+      "question": "角色之间的信任关系在前三章如何建立？",
+      "chapter_range": {
+        "kind": "chapter_range",
+        "chapter_start": 1,
+        "chapter_end": 3
+      },
+      "dimensions": ["relations", "events_causality", "character_state"],
+      "expected": "plan",
+      "expected_intent": "analysis",
+      "expected_cutoff_mode": "reading_progress",
+      "expected_dimensions": ["relations", "events_causality", "character_state"],
+      "expected_availability": {
+        "character_state": "unavailable",
+        "relations": "available",
+        "events_causality": "available"
+      }
+    }
+  ]
+}

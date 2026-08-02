@@ -47,7 +47,7 @@ def test_migration_from_phase09_head_creates_reader_chat_tables(
     run_alembic("upgrade", "head", database_url=empty_postgres)
     current = run_alembic("current", database_url=empty_postgres)
     out = current.stdout + current.stderr
-    assert "27approval01" in out
+    assert "20260801_2601" in out
 
     engine = create_engine(empty_postgres)
     with engine.connect() as conn:
@@ -94,7 +94,7 @@ def test_alembic_single_head_after_reader_chat(
     # Exactly one head revision token
     revision_tokens = [line.split()[0] for line in head_lines if line]
     assert len(revision_tokens) == 1
-    assert revision_tokens[0] == "27approval01"
+    assert revision_tokens[0] == "20260801_2601"
 
 
 def test_selection_offset_check_and_role_constraints(

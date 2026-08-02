@@ -1,9 +1,9 @@
 """25.2-03/25.3-04 skill_runtime 七表迁移、约束与级联权威测试。
 
 覆盖:
-  - 空库 upgrade heads → current 显示 27approval01
+  - 空库 upgrade heads → current 显示 20260801_2601
   - schema smoke：七张表 + 关键约束（ck_* / uq_* / idx_* / 循环外键）
-  - downgrade 回 34readerbookmark → 再 re-upgrade 回 27approval01
+  - downgrade 回 34readerbookmark → 再 re-upgrade 回 20260801_2601
   - 幂等：重复 upgrade 不报错（inspector 守卫）
 """
 
@@ -31,7 +31,7 @@ AGENT_TABLES = {
 
 
 def test_heads_show_agent_runtime(empty_postgres: str, require_postgres: None):
-    """upgrade to head 后 alembic heads 只显示一个 head 27approval01。"""
+    """upgrade to head 后 alembic heads 只显示一个 head 20260801_2601。"""
     run_alembic("upgrade", "head", database_url=empty_postgres)
     heads = run_alembic("heads", database_url=empty_postgres)
     head_lines = [
@@ -41,7 +41,7 @@ def test_heads_show_agent_runtime(empty_postgres: str, require_postgres: None):
     ]
     revision_tokens = [line.split()[0] for line in head_lines if line]
     assert len(revision_tokens) == 1
-    assert revision_tokens[0] == "27approval01"
+    assert revision_tokens[0] == "20260801_2601"
 
 
 def test_six_tables_and_key_constraints(empty_postgres: str, require_postgres: None):
@@ -105,7 +105,7 @@ def test_downgrade_then_reupgrade_cycle(empty_postgres: str, require_postgres: N
 
     run_alembic("upgrade", "head", database_url=empty_postgres)
     current = run_alembic("current", database_url=empty_postgres)
-    assert "27approval01" in current.stdout + current.stderr
+    assert "20260801_2601" in current.stdout + current.stderr
     engine = create_engine(empty_postgres)
     with engine.connect() as conn:
         assert AGENT_TABLES <= set(inspect(conn).get_table_names())

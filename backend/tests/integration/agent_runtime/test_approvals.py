@@ -140,7 +140,7 @@ def _seed_owner_novel(sync_url: str, *, suffix: str) -> dict[str, Any]:
 
 @pytest.fixture(scope="module")
 def migrated_postgres(pg_sync_url: str, require_postgres: None) -> str:
-    """模块级迁移：reset 一次 + upgrade head（含 27approval01）。"""
+    """模块级迁移：reset 一次 + upgrade head（含 20260801_2601）。"""
     reset_public_schema(pg_sync_url)
     run_alembic("upgrade", "head", database_url=pg_sync_url)
     return pg_sync_url
