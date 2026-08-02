@@ -27,7 +27,7 @@
 |---|---|---|---|---|
 | v1.1 execution baseline | 21–25.1 | partial | partial | blocked by Phase 22 |
 | agent runtime foundation | 25.2–25.3 | **IMPLEMENTED & VERIFIED (2026-08-02)** | partial | blocked by Phase 22 3/3 |
-| v1.2 trusted novel understanding | 26–29 | planned | planned | planned |
+| v1.2 trusted novel understanding | 26–29 | **26 VERIFIED (2026-08-02)** | planned | blocked by Phase 22 3/3 |
 | v1.3 visual narrative | 30–34 | planned | planned | planned |
 | v1.4 Canon Fork derivatives | 35–39 | planned | planned | planned |
 
@@ -131,7 +131,8 @@ Alembic chain continues `26agentrun01 → 27approval01`.
 | Range | CONTEXT / RESEARCH / PATTERNS / VALIDATION | PLAN files | Implementation status |
 |---|---:|---:|---|
 | Phase 25.2–25.3 | 8/8 | 15 | **VERIFIED 2026-08-02** |
-| Phase 26–29 | 16/16 + shared Agent contract | 22 | PLANNED |
+| Phase 26 | 7/7 + shared Agent contract | 7 | **VERIFIED 2026-08-02/03** |
+| Phase 27–29 | 12/12 + shared Agent contract | 15 | PLANNED |
 | Phase 30–34 | 20/20 + shared Agent contract | 24 | PLANNED |
 | Phase 35–39 | 20/20 + shared Agent contract | 25 | PLANNED |
 
@@ -151,11 +152,12 @@ Phase 25.2–25.3 are implemented and verified; Phases 26–39 remain planning v
 | 25.1 Analysis Chat workspace/range anchor | IMPLEMENTED | default chat view and chapter-range wiring |
 | 25.2 Embedded Novel Agent Runtime | **VERIFIED 2026-08-02** | `25.2-VERIFICATION.md` passed; agent-service 223p, backend 195p |
 | 25.3 Pi Package Compatibility & Governance | **VERIFIED 2026-08-02** | `25.3-VERIFICATION.md` passed; MCP isolation, approval, renderer |
+| 26 Question-Driven Retrieval & Evidence | **VERIFIED 2026-08-02/03** | `26-VERIFICATION.md` passed; QueryPlan, adapters/fusion, evidence manifest, consumers, skill integration, structured-output integrity |
 
-Phase 22 remains blocked and unverified. The user authorized the Phase 25.2 execution
-override (2026-08-02); Phase 25.3 proceeded on the passed Phase 25.2 verification artifact.
-Phase 26+ still requires Phase 22 3/3 real scheduled green evidence plus Phase 25.2 and
-Phase 25.3 passed verification artifacts (now both exist).
+Phase 22 remains blocked and unverified. The user authorized the Phase 25.2 and Phase 26
+execution overrides (2026-08-02); Phase 25.3 proceeded on the passed Phase 25.2 artifact,
+Phase 26 on the passed 25.3 artifact. Phase 27+ still requires Phase 22 3/3 real scheduled
+green evidence plus a passed Phase 26 verification artifact (exists).
 
 ---
 
@@ -163,8 +165,7 @@ Phase 25.3 passed verification artifacts (now both exist).
 
 ### Phase 26: Question-Driven Retrieval and Evidence
 
-**Status:** PLANNED / EXECUTION BLOCKED — Phase 25.2 and Phase 25.3 have passed verification
-artifacts; Phase 22 Nightly qualification remains 0/3 and is still the execution blocker.
+**Status:** IMPLEMENTED & VERIFIED (2026-08-02/03, `26-VERIFICATION.md` passed at `cb071bc`)
 
 **Goal:** turn a reader/analyst question into a typed retrieval plan, fuse the required
 dimensions and materialize source-verified citations.
@@ -511,7 +512,7 @@ audit; **Test, Fix, and Confirm** every failed end-to-end checkpoint.
 ## Next
 
 Phase 22 (CI/Nightly authority) remains the last unverified gate — 0/3 scheduled green.
-Phase 25.2 and Phase 25.3 are verified (2026-08-02). Phase 26 execution requires Phase 22
-3/3 real scheduled green evidence; until then, Phase 26-01 bootstrap (which creates
-`scripts/check_phase_execution_gate.py` verifying Phase 22 3/3 + passed 25.2/25.3
-verification artifacts) can be planned but not executed.
+Phase 25.2, 25.3 and 26 are verified (2026-08-02/03). Phase 27 execution requires Phase 22
+3/3 real scheduled green evidence plus a passed Phase 26 verification artifact (exists);
+until then, Phase 27-01 (Event Fact and Causal Edge contracts) can be planned but not
+executed without a further explicit override.

@@ -47,6 +47,9 @@ No single aggregate completion percentage is authoritative.
    Skill/Artifact runtime, Agent Workspace, production agent service, DECISION.md GO.
 5. `25.3`: **IMPLEMENTED & VERIFIED (2026-08-02)** — package lock/governance, registry
    collision gate, MCP isolation (ADOPT), approval policy/UX, renderer feasibility.
+6. `26`: **IMPLEMENTED & VERIFIED (2026-08-02/03)** — QueryPlan contract + durable trace,
+   dimension adapters/fusion, leaf EvidenceRef + frozen manifest, shared consumers,
+   answer-reading-question skill integration, structured-output integrity.
 
 ## Planning Portfolio
 
@@ -54,7 +57,8 @@ No single aggregate completion percentage is authoritative.
 |---|---|---|---:|
 | Phase 25.2 | VERIFIED | 8 | ✅ 2026-08-02 (user execution override) |
 | Phase 25.3 | VERIFIED | 7 | ✅ 2026-08-02 |
-| Phase 26–29 | PLANNED | 22 | BLOCKED by Phase 22 3/3 |
+| Phase 26 | VERIFIED | 7 | ✅ 2026-08-02/03 (user execution override) |
+| Phase 27–29 | PLANNED | 15 | BLOCKED by Phase 22 3/3 |
 | Phase 30–34 | PLANNED | 24 | BLOCKED by upstream execution dependencies |
 | Phase 35–39 | PLANNED | 25 | BLOCKED by upstream execution dependencies |
 
@@ -87,6 +91,11 @@ created.
   `25.3-VERIFICATION.md` passed; backend 195p, agent-service 223p, frontend 281p, CI 37p.
 - Known environment limitations: `test_openapi_contract.py` hangs under pytest (subprocess →
   litellm/tiktoken download); Next canary dev server fails to compile pages (e2e env-limited).
+- **2026-08-02/03 Phase 26 verification**: 26-00 gate + 26-01..26-06 delivered;
+  `26-VERIFICATION.md` passed (source_commit `cb071bc`); independent test sub-agent:
+  backend 920p (unit 548 + integration/queryplan 68 + adversarial 129 + agent_runtime 60
+  + ci 37 + contract 78), agent-service vitest 282p, tsc 0, alembic single head
+  `20260801_2601`.
 
 ## Execution Override (2026-08-02, user authorized)
 
@@ -122,12 +131,11 @@ Phase 22 execution is paused. Its recovery entry remains:
 `.planning/phases/22-ci-nightly-gap-closure/22-G2-PLAN.md`
 
 Phase 26–39 planning is complete, including the AgentVN planning integration recorded on
-2026-08-02. Phase 25.2 and Phase 25.3 are implemented and verified
-under the 2026-08-02 execution override. Phase 26-00 gate (`scripts/check_phase_execution_gate.py`)
-is built and tested; Phase 26-01..06 execution is authorized by the 2026-08-02 Phase 26
-override despite Phase 22 remaining 0/3. Do not execute Phase 27 until Phase 26 has a passed
-VERIFICATION artifact and the Phase 22 real scheduled green evidence exists (or a further
-explicit override).
+2026-08-02. Phase 25.2, Phase 25.3 and Phase 26 are implemented and verified
+under the 2026-08-02 execution overrides (26-VERIFICATION passed at `cb071bc`).
+Phase 27+ execution requires a passed upstream Phase 26 VERIFICATION (exists) plus
+Phase 22 real scheduled green evidence (0/3, not satisfied) or a further explicit override.
+If Phase 22 is resumed, use `$gsd-resume-work`; do not mark it complete early.
 If Phase 22 is resumed, use `$gsd-resume-work`; do not mark it complete early.
 
 ## Roadmap
