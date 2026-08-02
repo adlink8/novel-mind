@@ -1,13 +1,28 @@
-# answer-reading-question skill 契约（D-09 / D-14）
+# answer-reading-question skill 契约（D-09 / D-11 / D-14 / Phase 26）
 # 字段镜像 backend 注册入口（app.schemas.agent_runtime.SkillVersionRegister）。
-# allowed_tools 只含 25.2-02 注册的 7 个域工具中的 6 个只读工具：按 25.2-RESEARCH
-# Open Question 4，首版技能白名单排除叙事记忆结构工具（保持 D-01 干净，直到
-# Validator 故事落地；25.2-02 Handoff 第 4 项）。
+#
+# Phase 26 版本化只读 Skill manifest：
+#   - 本技能是 Phase 26 确定性能力的 Agent 消费边界（D-11）；允许的工具
+#     allowlist 只含 25.2-02 注册的 6 个只读域工具，编排绝不越出该 allowlist。
+#   - write_permissions 与 approval_required_for 恒为空：本技能不发起
+#     ApprovalRequest、不调用 Publisher、不执行 promotion / active-pointer /
+#     任何域写入（approval_required_for 空数组即"无任何审批动作"声明）。
+#   - 版本由 `version` 钉住（当前 1.0.0）；每次 run 经 skill_version_id
+#     绑定 SkillVersion 血缘（must-have：run 绑定 owner/novel/branch、
+#     SkillVersion、SkillRun、input hash、source snapshot、model/runtime
+#     lineage、output Artifact revision）。
+#   - 模型结构化输出走共享 26-06 normalizer + 严格 post-repair validator
+#     （本技能不引入本地修复路径）；normalization_actions / raw_hash /
+#     repaired_hash / warnings 保留在官方 CitedAnswerArtifact 上。
 name: answer-reading-question
 version: 1.0.0
 description: >-
-  给定问题与小说，通过只读域工具收集证据，物化 evidence_refs，冻结 manifest，
-  产出血缘绑定的 Cited Answer Artifact（D-14 首技能）。
+  Phase 26 版本化只读技能：给定问题与小说（Reader/Analysis anchor + source
+  snapshot 可选），通过 6 个只读域工具收集证据，物化 evidence_refs，冻结
+  Frozen Manifest，经共享 26-06 normalizer 与严格 validator 后，由后端
+  确定性 finalizer 持久化血缘绑定的 CitedAnswerArtifact（D-01/D-07/D-08/
+  D-11/D-14）。无审批、无发布、无域写入；未知工具/权限/血缘/schema drift
+  fail closed。
 allowed_tools:
   - get_novel
   - get_chapter

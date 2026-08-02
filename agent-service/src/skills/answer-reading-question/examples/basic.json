@@ -44,6 +44,12 @@
       "suggestion_candidates": []
     },
     "status": "candidate",
-    "parent_revision": null
+    "parent_revision": null,
+    "normalization": {
+      "raw_hash": "d95bbafbcab5503ba7415620745c9996c525d938b6b88c169e77c25d7a981cf5",
+      "repaired_hash": "d95bbafbcab5503ba7415620745c9996c525d938b6b88c169e77c25d7a981cf5",
+      "normalization_actions": [],
+      "warnings": []
+    }
   }
 }

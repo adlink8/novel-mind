@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "AnswerReadingQuestionInput",
-  "description": "answer-reading-question 运行输入：question + novel_id（必填），chapter_range 可选。",
+  "description": "answer-reading-question Phase 26 运行输入：question + novel_id（必填）；branch、chapter_range（Analysis 锚）、selection（Reader 锚）与 source_snapshot（D-07 冻结快照血缘）可选。锚定字段仅声明意图范围，最终 scope/cutoff 由服务端强制（D-12）。",
   "type": "object",
   "required": ["question", "novel_id"],
   "properties": {
@@ -16,13 +16,50 @@
       "minimum": 1,
       "description": "目标小说 ID（必须与运行路径中的 novel_id 一致）"
     },
+    "branch": {
+      "type": ["string", "null"],
+      "maxLength": 80,
+      "description": "衍生分支；原始主线为 null（owner/novel/branch 血缘绑定）"
+    },
     "chapter_range": {
       "type": "object",
-      "description": "可选的章节范围锚定（含端点，章节号语义）",
+      "description": "Analysis 结构锚（含端点，章节号语义）",
       "required": ["chapter_start", "chapter_end"],
       "properties": {
         "chapter_start": { "type": "integer", "minimum": 1 },
         "chapter_end": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "selection": {
+      "type": "object",
+      "description": "Reader 选区锚（D-10）：只携带引用定位，不携带原始选区文本",
+      "required": ["chapter_id", "source_start", "source_end", "chapter_content_hash"],
+      "properties": {
+        "kind": { "const": "selection" },
+        "chapter_id": { "type": "integer", "minimum": 1 },
+        "source_start": { "type": "integer", "minimum": 0 },
+        "source_end": { "type": "integer", "minimum": 1 },
+        "chapter_content_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "选区所在章节正文内容的 SHA-256（D-07 冻结快照）"
+        }
+      }
+    },
+    "source_snapshot": {
+      "type": "object",
+      "description": "D-07 冻结 source snapshot 血缘（可选；缺失时以 run 的 source_versions / frozen manifest 为准）",
+      "required": ["snapshot_hash"],
+      "properties": {
+        "snapshot_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "dataset_lineage": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
       }
     }
   },
