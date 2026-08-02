@@ -1,0 +1,115 @@
+{
+  "schema_version": "rag-quality.v1",
+  "suite_id": "novel91-live-judge-calibration-20260728-v2",
+  "domain": "calibration-novel91-live",
+  "suite_type": "calibration",
+  "cases": [
+    {
+      "case_id": "live-supported",
+      "category": "supported",
+      "question": "谁站在学院门前？",
+      "candidate_answer": "路明非站在学院门前。",
+      "evidence_refs": [
+        {
+          "chunk_content_hash": "e4475a959dfb31e0b397942c0005b037a876c833f5d68605ee3e790ec69af555",
+          "start_offset": 0,
+          "end_offset": 10,
+          "quote_hash": "e4475a959dfb31e0b397942c0005b037a876c833f5d68605ee3e790ec69af555",
+          "quote_text": "路明非站在学院门前。"
+        }
+      ],
+      "gold_verdict": "accept",
+      "critical": false
+    },
+    {
+      "case_id": "live-partial",
+      "category": "partial",
+      "question": "谁站在学院门前并拿着雨伞？",
+      "candidate_answer": "路明非站在学院门前并拿着雨伞。",
+      "evidence_refs": [
+        {
+          "chunk_content_hash": "e4475a959dfb31e0b397942c0005b037a876c833f5d68605ee3e790ec69af555",
+          "start_offset": 0,
+          "end_offset": 10,
+          "quote_hash": "e4475a959dfb31e0b397942c0005b037a876c833f5d68605ee3e790ec69af555",
+          "quote_text": "路明非站在学院门前。"
+        }
+      ],
+      "gold_verdict": "partial",
+      "critical": false
+    },
+    {
+      "case_id": "live-unsupported",
+      "category": "unsupported",
+      "question": "他的银行余额是多少？",
+      "candidate_answer": "他有一百万元。",
+      "evidence_refs": [],
+      "gold_verdict": "reject",
+      "critical": true
+    },
+    {
+      "case_id": "live-contradictory",
+      "category": "contradictory",
+      "question": "他在哪里？",
+      "candidate_answer": "他在纽约街头。",
+      "evidence_refs": [
+        {
+          "chunk_content_hash": "9f4f3b900a15c6a83f7adbf468d6e2d72b2175c960de36bd9bdac85b8e4d151b",
+          "start_offset": 0,
+          "end_offset": 8,
+          "quote_hash": "9f4f3b900a15c6a83f7adbf468d6e2d72b2175c960de36bd9bdac85b8e4d151b",
+          "quote_text": "他站在学院门前。"
+        }
+      ],
+      "gold_verdict": "contradictory",
+      "critical": true
+    },
+    {
+      "case_id": "live-no-answer",
+      "category": "no_answer",
+      "question": "他的电话号码是多少？",
+      "candidate_answer": "不知道。",
+      "evidence_refs": [],
+      "gold_verdict": "no_answer",
+      "critical": true
+    },
+    {
+      "case_id": "live-hard-negative",
+      "category": "hard_negative",
+      "question": "雨是否证明他拔刀？",
+      "candidate_answer": "雨证明他拔刀。",
+      "evidence_refs": [
+        {
+          "chunk_content_hash": "f4bcfd8175d25d1bdca97c38a94630a5adba4620e4b3fb9209786617dcb8a3a8",
+          "start_offset": 0,
+          "end_offset": 7,
+          "quote_hash": "f4bcfd8175d25d1bdca97c38a94630a5adba4620e4b3fb9209786617dcb8a3a8",
+          "quote_text": "今夜的雨很大。"
+        }
+      ],
+      "gold_verdict": "hard_negative",
+      "critical": true
+    },
+    {
+      "case_id": "live-equivalent",
+      "category": "equivalent_evidence",
+      "question": "学院门前是谁？",
+      "candidate_answer": "路明非。",
+      "evidence_refs": [
+        {
+          "chunk_content_hash": "e4475a959dfb31e0b397942c0005b037a876c833f5d68605ee3e790ec69af555",
+          "start_offset": 0,
+          "end_offset": 10,
+          "quote_hash": "e4475a959dfb31e0b397942c0005b037a876c833f5d68605ee3e790ec69af555",
+          "quote_text": "路明非站在学院门前。"
+        }
+      ],
+      "gold_verdict": "accept",
+      "critical": false
+    }
+  ],
+  "suite_hash": "df234514ec1c4348e6a6d7b6eee32ac20c457c86accaa99de26ec63a9b794a86",
+  "signature": "27934f2e474b61ff16e8377b6cf10f967cac9a51ab152c7dd92870f0b356a017",
+  "prompt_hash": "3bd4cef0d9a74e3930b9ed5e1e47fd59da76f5277e9cfd80eea0e1c11545b992",
+  "schema_hash": "abbbaed9fb1b458af7e7e8af8b45e8dc835ae862d5c312b18ddb6004c2bd622a"
+}

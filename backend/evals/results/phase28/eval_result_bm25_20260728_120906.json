@@ -1,0 +1,27 @@
+{
+  "run_id": 11,
+  "total_questions": 100,
+  "recall_at_k": 0.74,
+  "precision_at_k": 0.7095,
+  "mrr": 0.727,
+  "ndcg_at_k": 0.7302,
+  "latency_ms": 9721.0,
+  "job_id": null,
+  "status": "completed",
+  "quality_comparable": false,
+  "metrics": null,
+  "deprecation": {
+    "deprecated": true,
+    "legacy_eval_api": true,
+    "replacement": {
+      "create": "POST /api/eval/quality/runs",
+      "status": "GET /api/eval/quality/runs/{job_id}",
+      "report": "GET /api/eval/quality/runs/{job_id}",
+      "resume": "POST /api/eval/quality/runs/{job_id}/resume",
+      "cancel": "POST /api/eval/quality/runs/{job_id}/cancel"
+    },
+    "migration": "Migrate gold_chunks DB IDs to content-hash EvidenceRef fixtures (scripts/migrate_legacy_eval.py). Qualification rejects DB-id-only truth.",
+    "quality_comparable_default": false
+  },
+  "item_errors": []
+}

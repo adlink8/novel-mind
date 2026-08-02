@@ -1,0 +1,1602 @@
+[
+  {
+    "novel_id": 91,
+    "question": "文中提到「只是出于必要才持」时，原文明确表达了什么信息？",
+    "question_type": "original_text",
+    "difficulty": "medium",
+    "gold_chunks": [
+      26141
+    ],
+    "reference_answer": "只是出于必要才持续投身战场，并没有把战斗视为人生意义。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「借由在死亡瞬间查」时，原文明确表达了什么信息？",
+    "question_type": "original_text",
+    "difficulty": "medium",
+    "gold_chunks": [
+      26642
+    ],
+    "reference_answer": "借由在死亡瞬间查探自身状态的方式，迪诺发现菲德维的权能紧紧地束缚住他的「灵魂」。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「事到如今才要我还」时，原文明确表达了什么信息？",
+    "question_type": "original_text",
+    "difficulty": "medium",
+    "gold_chunks": [
+      21006
+    ],
+    "reference_answer": "事到如今才要我还给他们，我是不会答应的。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「因为您是连利姆路」时，原文明确表达了什么信息？",
+    "question_type": "original_text",
+    "difficulty": "medium",
+    "gold_chunks": [
+      21602
+    ],
+    "reference_answer": "因为您是连利姆路大人都认可的『勇者』啊！",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「更何况九魔罗已经」时，原文明确表达了什么信息？",
+    "question_type": "original_text",
+    "difficulty": "medium",
+    "gold_chunks": [
+      26578
+    ],
+    "reference_answer": "更何况九魔罗已经带着神性成为了神狐，实力当然不容小觑。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「在那张面具之下，」时，原文明确表达了什么信息？",
+    "question_type": "original_text",
+    "difficulty": "medium",
+    "gold_chunks": [
+      20889
+    ],
+    "reference_answer": "在那张面具之下，他正出现罕见的神情变化吧。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「菈米莉丝被迪亚布」时，原文明确表达了什么信息？",
+    "question_type": "original_text",
+    "difficulty": "medium",
+    "gold_chunks": [
+      19974
+    ],
+    "reference_answer": "菈米莉丝被迪亚布罗捉住还抬头挺胸，摆出得意洋洋的践脸。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「魔王守护巨像的胸」时，原文明确表达了什么信息？",
+    "question_type": "original_text",
+    "difficulty": "medium",
+    "gold_chunks": [
+      24055
+    ],
+    "reference_answer": "魔王守护巨像的胸部开启，隔著一层透明的膜可以看见盖多拉的身影。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「平常则可作为体育」时，原文明确表达了什么信息？",
+    "question_type": "original_text",
+    "difficulty": "medium",
+    "gold_chunks": [
+      25286
+    ],
+    "reference_answer": "平常则可作为体育馆或讲堂使用，有各种用途。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「气斩只砍掉数层「」时，原文明确表达了什么信息？",
+    "question_type": "original_text",
+    "difficulty": "medium",
+    "gold_chunks": [
+      19570
+    ],
+    "reference_answer": "气斩只砍掉数层「多重结界」，无法伤害本体。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「不管是多么残忍的」时，原文明确表达了什么信息？",
+    "question_type": "original_text",
+    "difficulty": "medium",
+    "gold_chunks": [
+      23686
+    ],
+    "reference_answer": "不管是多么残忍的计划，对她而言都无所谓。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「面对这过于不利的」时，原文明确表达了什么信息？",
+    "question_type": "original_text",
+    "difficulty": "medium",
+    "gold_chunks": [
+      22825
+    ],
+    "reference_answer": "面对这过于不利的状况，盖斯特总算做出判断要大家撤退。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「达姆拉德重金聘请」时，原文明确表达了什么信息？",
+    "question_type": "original_text",
+    "difficulty": "medium",
+    "gold_chunks": [
+      20598
+    ],
+    "reference_answer": "达姆拉德重金聘请他们，从母国找来这些人。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「因为这里有谍报机」时，原文明确表达了什么信息？",
+    "question_type": "original_text",
+    "difficulty": "medium",
+    "gold_chunks": [
+      21659
+    ],
+    "reference_answer": "因为这里有谍报机关的秘密据点，那是西方诸国最厉害的谍报机关。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「就算我夸口实力在」时，原文明确表达了什么信息？",
+    "question_type": "original_text",
+    "difficulty": "medium",
+    "gold_chunks": [
+      19586
+    ],
+    "reference_answer": "就算我夸口实力在你之上也没用，结果代表一切。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「雷昂原以为她会抱」时，原文明确表达了什么信息？",
+    "question_type": "original_text",
+    "difficulty": "medium",
+    "gold_chunks": [
+      25394
+    ],
+    "reference_answer": "雷昂原以为她会抱怨更多，见她这样反而困惑起来。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「哥布一正确解读我」时，原文明确表达了什么信息？",
+    "question_type": "original_text",
+    "difficulty": "medium",
+    "gold_chunks": [
+      21082
+    ],
+    "reference_answer": "哥布一正确解读我的意图，他可能会拥有属于自己的店，这份野心似乎令他满心雀跃。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「既然做得能够让巨」时，原文明确表达了什么信息？",
+    "question_type": "original_text",
+    "difficulty": "medium",
+    "gold_chunks": [
+      26937
+    ],
+    "reference_answer": "既然做得能够让巨人族轻松进出，可见每个开口的大小绝对有一定的规模。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「就因为他们平常很」时，原文明确表达了什么信息？",
+    "question_type": "original_text",
+    "difficulty": "medium",
+    "gold_chunks": [
+      22086
+    ],
+    "reference_answer": "就因为他们平常很要好，所以更容易受蒂亚的话影响。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「首领原本还在脑中」时，原文明确表达了什么信息？",
+    "question_type": "original_text",
+    "difficulty": "medium",
+    "gold_chunks": [
+      18385
+    ],
+    "reference_answer": "首领原本还在脑中勾勒哥布林们目睹战术遭人粉碎、六神无主的模样，眨眼间却发出惊呼。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「枪口硝烟窜升，主」时，原文明确表达了什么信息？",
+    "question_type": "character_relation",
+    "difficulty": "medium",
+    "gold_chunks": [
+      23692
+    ],
+    "reference_answer": "枪口硝烟窜升，主张自己就是射穿米夏太阳穴的凶器。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「话说智慧之王拉斐」时，原文明确表达了什么信息？",
+    "question_type": "character_relation",
+    "difficulty": "medium",
+    "gold_chunks": [
+      20716
+    ],
+    "reference_answer": "话说智慧之王拉斐尔大师的语气，听起来好像在生气。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「因为毕竟是优秀的」时，原文明确表达了什么信息？",
+    "question_type": "character_relation",
+    "difficulty": "medium",
+    "gold_chunks": [
+      24697
+    ],
+    "reference_answer": "因为毕竟是优秀的智慧之王，所以吾想在吾复活的时候就会对吾的残渣进行『解析鉴定』吧。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「又听说尽管比起这」时，原文明确表达了什么信息？",
+    "question_type": "character_relation",
+    "difficulty": "medium",
+    "gold_chunks": [
+      25928
+    ],
+    "reference_answer": "又听说尽管比起这些强大的超级觉醒者差了一截，他那里另有一群被认为相当于魔王种的战士。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「在这场游戏开始之」时，原文明确表达了什么信息？",
+    "question_type": "character_relation",
+    "difficulty": "medium",
+    "gold_chunks": [
+      26412
+    ],
+    "reference_answer": "在这场游戏开始之前，蕾茵挑战了那时候势力正在迅速扩张的泰斯塔罗莎。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「仿佛将阿毕特裹在」时，原文明确表达了什么信息？",
+    "question_type": "character_relation",
+    "difficulty": "medium",
+    "gold_chunks": [
+      26587
+    ],
+    "reference_answer": "仿佛将阿毕特裹在其中，空中张开了虹彩薄膜。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「那就是「圣净化结」时，原文明确表达了什么信息？",
+    "question_type": "character_relation",
+    "difficulty": "medium",
+    "gold_chunks": [
+      21852
+    ],
+    "reference_answer": "那就是「圣净化结界」──可说是对抗魔物的王牌招术，最强的「封杀结界」。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「还没来得及感到意」时，原文明确表达了什么信息？",
+    "question_type": "character_relation",
+    "difficulty": "medium",
+    "gold_chunks": [
+      26261
+    ],
+    "reference_answer": "还没来得及感到意外,塞拉斯又收到了国王的话。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「既然这样，就只能」时，原文明确表达了什么信息？",
+    "question_type": "character_relation",
+    "difficulty": "medium",
+    "gold_chunks": [
+      23949
+    ],
+    "reference_answer": "既然这样，就只能消耗掉维尔德拉的体力，去依赖鲁德拉的王权发动Regalia Dominion了。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「魔王种」收割大量」时，原文明确表达了什么信息？",
+    "question_type": "character_relation",
+    "difficulty": "medium",
+    "gold_chunks": [
+      19856
+    ],
+    "reference_answer": "「魔王种」收割大量资源，才会觉醒成「真魔王」。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「我们从矮人王国那」时，原文明确表达了什么信息？",
+    "question_type": "character_relation",
+    "difficulty": "medium",
+    "gold_chunks": [
+      19289
+    ],
+    "reference_answer": "我们从矮人王国那边反铺回来，前行之路已全数完成！",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「更重要的是，魔王」时，原文明确表达了什么信息？",
+    "question_type": "character_relation",
+    "difficulty": "medium",
+    "gold_chunks": [
+      19144
+    ],
+    "reference_answer": "更重要的是，魔王蜜莉姆害我丢脸，伤口痊愈也没用。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「魔王利姆路，我们」时，原文明确表达了什么信息？",
+    "question_type": "character_relation",
+    "difficulty": "medium",
+    "gold_chunks": [
+      20679
+    ],
+    "reference_answer": "魔王利姆路，我们追随的不是神鲁米纳斯，本骑士团只追随日向大人一人。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「如今觉得优树可疑」时，原文明确表达了什么信息？",
+    "question_type": "character_relation",
+    "difficulty": "medium",
+    "gold_chunks": [
+      21520
+    ],
+    "reference_answer": "如今觉得优树可疑，孩子们还是别安置在英格拉西亚王国比较妥当。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「恶德之王安哥拉·」时，原文明确表达了什么信息？",
+    "question_type": "character_relation",
+    "difficulty": "medium",
+    "gold_chunks": [
+      26851
+    ],
+    "reference_answer": "「恶德之王安哥拉·曼纽」引以为傲的「永劫回归」会将效果范围内的所有存在捕捉至拟似地狱，使其未来永久陷入恶梦之中直到世界毁灭，效果令人发指。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「除了要在英格拉西」时，原文明确表达了什么信息？",
+    "question_type": "character_relation",
+    "difficulty": "medium",
+    "gold_chunks": [
+      21706
+    ],
+    "reference_answer": "除了要在英格拉西亚王国享用睽违已久的午餐，关于明天召开的会议，日向会为我们做详细说明。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「另一人坐在他对面」时，原文明确表达了什么信息？",
+    "question_type": "character_relation",
+    "difficulty": "medium",
+    "gold_chunks": [
+      19223
+    ],
+    "reference_answer": "另一人坐在他对面，用忧郁的目光眺望窗外风景，是称号「天空女王」的魔王芙蕾。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「卡利翁的兽王战士」时，原文明确表达了什么信息？",
+    "question_type": "character_relation",
+    "difficulty": "medium",
+    "gold_chunks": [
+      24062
+    ],
+    "reference_answer": "卡利翁的兽王战士团虽然不到百人，但都能够一骑当千。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「没多久，王都就一」时，原文明确表达了什么信息？",
+    "question_type": "character_relation",
+    "difficulty": "medium",
+    "gold_chunks": [
+      25755
+    ],
+    "reference_answer": "没多久，王都就一如往常地被巨大的欢呼声包围。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「跟日向的战斗过程」时，原文明确表达了什么信息？",
+    "question_type": "character_relation",
+    "difficulty": "medium",
+    "gold_chunks": [
+      20684
+    ],
+    "reference_answer": "跟日向的战斗过程被智慧之王拉斐尔大师料得太准，害我不禁有那种想法。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「剩下的问题就是会」时，原文明确表达了什么信息？",
+    "question_type": "event_causality",
+    "difficulty": "medium",
+    "gold_chunks": [
+      24625
+    ],
+    "reference_answer": "剩下的问题就是会不会出现意想不到的背叛者。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「如此一来就能够打」时，原文明确表达了什么信息？",
+    "question_type": "event_causality",
+    "difficulty": "medium",
+    "gold_chunks": [
+      23744
+    ],
+    "reference_answer": "如此一来就能够打造出足以贯通对手结界的凶恶攻击。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「冷静分析状况后发」时，原文明确表达了什么信息？",
+    "question_type": "event_causality",
+    "difficulty": "medium",
+    "gold_chunks": [
+      24827
+    ],
+    "reference_answer": "冷静分析状况后发现，他的结论依然没有任何问题。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「此外，对擅长赤手」时，原文明确表达了什么信息？",
+    "question_type": "event_causality",
+    "difficulty": "medium",
+    "gold_chunks": [
+      19750
+    ],
+    "reference_answer": "此外，对擅长赤手空拳战斗的省吾来说，有这技能简直是如虎添翼。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「柯洛努跟著激动起」时，原文明确表达了什么信息？",
+    "question_type": "event_causality",
+    "difficulty": "medium",
+    "gold_chunks": [
+      24366
+    ],
+    "reference_answer": "柯洛努跟著激动起来，但并没有因此失去冷静。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「担任代表人当之无」时，原文明确表达了什么信息？",
+    "question_type": "event_causality",
+    "difficulty": "medium",
+    "gold_chunks": [
+      19933
+    ],
+    "reference_answer": "担任代表人当之无愧，应该听得到宝贵的意见。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「连北枪南枪、东华」时，原文明确表达了什么信息？",
+    "question_type": "event_causality",
+    "difficulty": "medium",
+    "gold_chunks": [
+      21052
+    ],
+    "reference_answer": "连北枪南枪、东华西华他们都有所成长，照这样看来，还是需要找到跟自己水准差不多的人当良性竞争对手吧，以上是本人的拙见。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「尽管失去大部分的」时，原文明确表达了什么信息？",
+    "question_type": "event_causality",
+    "difficulty": "medium",
+    "gold_chunks": [
+      25299
+    ],
+    "reference_answer": "尽管失去大部分的战斗能力，她仍有一颗灵光的脑袋。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「回应这道命令，直」时，原文明确表达了什么信息？",
+    "question_type": "event_causality",
+    "difficulty": "medium",
+    "gold_chunks": [
+      26630
+    ],
+    "reference_answer": "回应这道命令，直径约一公尺的四枚圆环出现并静止于空中。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「哥布达与兰加即使」时，原文明确表达了什么信息？",
+    "question_type": "event_causality",
+    "difficulty": "medium",
+    "gold_chunks": [
+      25831
+    ],
+    "reference_answer": "哥布达与兰加即使「同化」，战斗能力也不会暴增多少。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「发布撤退命令后，」时，原文明确表达了什么信息？",
+    "question_type": "event_causality",
+    "difficulty": "medium",
+    "gold_chunks": [
+      18751
+    ],
+    "reference_answer": "发布撤退命令后，哥布林肯定会争先恐后地逃跑，将洞窟入口塞住。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「因为哥布达想偷偷」时，原文明确表达了什么信息？",
+    "question_type": "event_causality",
+    "difficulty": "medium",
+    "gold_chunks": [
+      21330
+    ],
+    "reference_answer": "因为哥布达想偷偷跑到场外，凯却到处追，不让他逃跑。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「按照邦尼他们的攻」时，原文明确表达了什么信息？",
+    "question_type": "event_causality",
+    "difficulty": "medium",
+    "gold_chunks": [
+      23608
+    ],
+    "reference_answer": "按照邦尼他们的攻击来看，就算把正幸杀死也不在意。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「这是因为她只要一」时，原文明确表达了什么信息？",
+    "question_type": "event_causality",
+    "difficulty": "medium",
+    "gold_chunks": [
+      25889
+    ],
+    "reference_answer": "这是因为她只要一超过极限就会丧失理智，直接进入暴走状态。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「为了避免这种事情」时，原文明确表达了什么信息？",
+    "question_type": "event_causality",
+    "difficulty": "medium",
+    "gold_chunks": [
+      22484
+    ],
+    "reference_answer": "为了避免这种事情发生，准备新工作就是领导人──雇主的职责。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「这个魔法是核击魔」时，原文明确表达了什么信息？",
+    "question_type": "event_causality",
+    "difficulty": "medium",
+    "gold_chunks": [
+      24118
+    ],
+    "reference_answer": "这个魔法是核击魔法「死亡祝福Death Streak」。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「那是二十多岁，还」时，原文明确表达了什么信息？",
+    "question_type": "event_causality",
+    "difficulty": "medium",
+    "gold_chunks": [
+      25611
+    ],
+    "reference_answer": "那是二十多岁，还在负责现场监工时发生的事。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「相较于对维尔德拉」时，原文明确表达了什么信息？",
+    "question_type": "event_causality",
+    "difficulty": "medium",
+    "gold_chunks": [
+      23959
+    ],
+    "reference_answer": "相较于对维尔德拉放出的攻击，这个根本不算什么。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「好像没受伤嘛……」时，原文明确表达了什么信息？",
+    "question_type": "event_causality",
+    "difficulty": "medium",
+    "gold_chunks": [
+      18319
+    ],
+    "reference_answer": "好像没受伤嘛……还是说我受伤了，只是不觉得痛？",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「看到人类出现这种」时，原文明确表达了什么信息？",
+    "question_type": "event_causality",
+    "difficulty": "medium",
+    "gold_chunks": [
+      26975
+    ],
+    "reference_answer": "看到人类出现这种变化，戴丝特萝莎的心腹席恩开始放声大笑。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「其实我刚准备妥当」时，原文明确表达了什么信息？",
+    "question_type": "timeline",
+    "difficulty": "medium",
+    "gold_chunks": [
+      19354
+    ],
+    "reference_answer": "其实我刚准备妥当，晚上卡巴尔三人组就准时抵达。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「晚上出发太危险了」时，原文明确表达了什么信息？",
+    "question_type": "timeline",
+    "difficulty": "medium",
+    "gold_chunks": [
+      18575
+    ],
+    "reference_answer": "晚上出发太危险了，所以他跑到大门附近的公园露宿。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「隔天早上，我一大」时，原文明确表达了什么信息？",
+    "question_type": "timeline",
+    "difficulty": "medium",
+    "gold_chunks": [
+      20362
+    ],
+    "reference_answer": "隔天早上，我一大早就把干部找来，聚在一起开会。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「那天晚上我们喝通」时，原文明确表达了什么信息？",
+    "question_type": "timeline",
+    "difficulty": "medium",
+    "gold_chunks": [
+      20362
+    ],
+    "reference_answer": "那天晚上我们喝通宵，听盖德诉说烦恼，让他吐苦水。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「第二天之后，帝国」时，原文明确表达了什么信息？",
+    "question_type": "timeline",
+    "difficulty": "medium",
+    "gold_chunks": [
+      22932
+    ],
+    "reference_answer": "第二天之后，帝国军有好几次都想试著冲进七十层。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「晚上要开宴会，必」时，原文明确表达了什么信息？",
+    "question_type": "timeline",
+    "difficulty": "medium",
+    "gold_chunks": [
+      21063
+    ],
+    "reference_answer": "晚上要开宴会，必须趁白天这段时间将睡床准备好。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「我们谈话谈得有点」时，原文明确表达了什么信息？",
+    "question_type": "timeline",
+    "difficulty": "medium",
+    "gold_chunks": [
+      19049
+    ],
+    "reference_answer": "我们谈话谈得有点久，时间离中午已有一小段距离。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「就算经过一个晚上」时，原文明确表达了什么信息？",
+    "question_type": "timeline",
+    "difficulty": "medium",
+    "gold_chunks": [
+      23586
+    ],
+    "reference_answer": "就算经过一个晚上，紫苑身上还是没出现变化。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「一面为此担忧，住」时，原文明确表达了什么信息？",
+    "question_type": "timeline",
+    "difficulty": "medium",
+    "gold_chunks": [
+      22075
+    ],
+    "reference_answer": "一面为此担忧，住在鲁贝利欧斯的第二天就此揭开序幕。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「我跟著利格鲁德，」时，原文明确表达了什么信息？",
+    "question_type": "timeline",
+    "difficulty": "medium",
+    "gold_chunks": [
+      21269
+    ],
+    "reference_answer": "我跟著利格鲁德，带领那些早上的兴奋心情尚未平息的来宾们。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「来到才花一个晚上」时，原文明确表达了什么信息？",
+    "question_type": "timeline",
+    "difficulty": "medium",
+    "gold_chunks": [
+      24856
+    ],
+    "reference_answer": "来到才花一个晚上就变了个样的第二会议室，维尔格琳满意地点点头。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「就算他早就预见事」时，原文明确表达了什么信息？",
+    "question_type": "timeline",
+    "difficulty": "medium",
+    "gold_chunks": [
+      22681
+    ],
+    "reference_answer": "就算他早就预见事情会变成这样，从几十年前开始就著手安排，那也没什么好奇怪。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「跟早上的谈话内容」时，原文明确表达了什么信息？",
+    "question_type": "timeline",
+    "difficulty": "medium",
+    "gold_chunks": [
+      24608
+    ],
+    "reference_answer": "跟早上的谈话内容不同，下午的谈话内容十分活泼。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「因为是晚上,普雷」时，原文明确表达了什么信息？",
+    "question_type": "timeline",
+    "difficulty": "medium",
+    "gold_chunks": [
+      26335
+    ],
+    "reference_answer": "因为是晚上,普雷利克斯也可以参加,但是他好像不想让参加者害怕,所以没来。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「大叔他好歹是警备」时，原文明确表达了什么信息？",
+    "question_type": "timeline",
+    "difficulty": "medium",
+    "gold_chunks": [
+      18451
+    ],
+    "reference_answer": "大叔他好歹是警备队队长，居然从中午开始翘班，好大的胆子。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「早上都很空，傍晚」时，原文明确表达了什么信息？",
+    "question_type": "timeline",
+    "difficulty": "medium",
+    "gold_chunks": [
+      19373
+    ],
+    "reference_answer": "早上都很空，傍晚则会挤满从外头回来的人。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「第一天在讨论中度」时，原文明确表达了什么信息？",
+    "question_type": "timeline",
+    "difficulty": "medium",
+    "gold_chunks": [
+      18464
+    ],
+    "reference_answer": "第一天在讨论中度过，时间来到第二天夜晚。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「按摩迈尔的说明听」时，原文明确表达了什么信息？",
+    "question_type": "timeline",
+    "difficulty": "medium",
+    "gold_chunks": [
+      21265
+    ],
+    "reference_answer": "按摩迈尔的说明听来，上午跟下午各会举办一小时的公演。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「约莫三百五十年前」时，原文明确表达了什么信息？",
+    "question_type": "timeline",
+    "difficulty": "medium",
+    "gold_chunks": [
+      22430
+    ],
+    "reference_answer": "约莫三百五十年前，他们想要让「暴风龙」维尔德拉听从自己的命令却失败了，其中一个都市被灭掉。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「今天晚上镇民提供」时，原文明确表达了什么信息？",
+    "question_type": "timeline",
+    "difficulty": "medium",
+    "gold_chunks": [
+      21236
+    ],
+    "reference_answer": "今天晚上镇民提供的料理也让他们大饱口福。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「他发现那里有微弱」时，原文明确表达了什么信息？",
+    "question_type": "foreshadowing",
+    "difficulty": "hard",
+    "gold_chunks": [
+      19887
+    ],
+    "reference_answer": "他发现那里有微弱的魔力流动，能对精神造成影响。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「的确，哥布林光要」时，原文明确表达了什么信息？",
+    "question_type": "foreshadowing",
+    "difficulty": "hard",
+    "gold_chunks": [
+      18631
+    ],
+    "reference_answer": "的确，哥布林光要活下来都很吃力了，用来增添风味的调味料更是连想都不用想。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「以目前的势力来看」时，原文明确表达了什么信息？",
+    "question_type": "foreshadowing",
+    "difficulty": "hard",
+    "gold_chunks": [
+      19887
+    ],
+    "reference_answer": "以目前的势力来看，西方圣教会远胜神圣法皇国。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「我在两人催促下狂」时，原文明确表达了什么信息？",
+    "question_type": "foreshadowing",
+    "difficulty": "hard",
+    "gold_chunks": [
+      18631
+    ],
+    "reference_answer": "我在两人催促下狂吃肉，好久没这样吃了，真开心。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「长耳族都靠森林资」时，原文明确表达了什么信息？",
+    "question_type": "foreshadowing",
+    "difficulty": "hard",
+    "gold_chunks": [
+      20967
+    ],
+    "reference_answer": "长耳族都靠森林资源过活，对他们来说战争地带扩大，可是攸关性命的问题。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「日向被圈套暗算差」时，原文明确表达了什么信息？",
+    "question_type": "foreshadowing",
+    "difficulty": "hard",
+    "gold_chunks": [
+      23165
+    ],
+    "reference_answer": "日向被圈套暗算差点死掉，若是就这样放着不管会出大事。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「此外，我还给她们」时，原文明确表达了什么信息？",
+    "question_type": "foreshadowing",
+    "difficulty": "hard",
+    "gold_chunks": [
+      18631
+    ],
+    "reference_answer": "此外，我还给她们之前弄到的盐巴，两人高兴得都快飞上天了。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「还来不及为此哀叹」时，原文明确表达了什么信息？",
+    "question_type": "foreshadowing",
+    "difficulty": "hard",
+    "gold_chunks": [
+      23165
+    ],
+    "reference_answer": "还来不及为此哀叹，日向就过去找利姆路和解。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「拉普拉斯进入圣神」时，原文明确表达了什么信息？",
+    "question_type": "foreshadowing",
+    "difficulty": "hard",
+    "gold_chunks": [
+      19887
+    ],
+    "reference_answer": "拉普拉斯进入圣神殿，在那首次发现不对劲的地方。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「负责管理食材库存」时，原文明确表达了什么信息？",
+    "question_type": "foreshadowing",
+    "difficulty": "hard",
+    "gold_chunks": [
+      18631
+    ],
+    "reference_answer": "负责管理食材库存的哥布林君主莉莉娜、掌厨人哈露娜对我做出如上说明。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「始作俑者就是妾身」时，原文明确表达了什么信息？",
+    "question_type": "foreshadowing",
+    "difficulty": "hard",
+    "gold_chunks": [
+      23165
+    ],
+    "reference_answer": "始作俑者就是妾身放任不管的「七曜大师」们。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「就连妾身看了都感」时，原文明确表达了什么信息？",
+    "question_type": "foreshadowing",
+    "difficulty": "hard",
+    "gold_chunks": [
+      23165
+    ],
+    "reference_answer": "就连妾身看了都感到佩服，但同时也捏了一把冷汗，不晓得事情最后会如何定局。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「一般情况下，这种」时，原文明确表达了什么信息？",
+    "question_type": "foreshadowing",
+    "difficulty": "hard",
+    "gold_chunks": [
+      20967
+    ],
+    "reference_answer": "一般情况下，这种时候会先问候，再对我宣誓效忠。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「听他道谢还觉得莫」时，原文明确表达了什么信息？",
+    "question_type": "foreshadowing",
+    "difficulty": "hard",
+    "gold_chunks": [
+      20967
+    ],
+    "reference_answer": "听他道谢还觉得莫名其妙，就叫利格鲁德询问对方。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「至于一开始就加入」时，原文明确表达了什么信息？",
+    "question_type": "foreshadowing",
+    "difficulty": "hard",
+    "gold_chunks": [
+      20967
+    ],
+    "reference_answer": "至于一开始就加入联邦的人，部分人士会因我出力确保他们的生活安全、舒适，特地向我道谢。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「派遣骑士前往西方」时，原文明确表达了什么信息？",
+    "question_type": "foreshadowing",
+    "difficulty": "hard",
+    "gold_chunks": [
+      19887
+    ],
+    "reference_answer": "派遣骑士前往西方诸国的教会分部，以很有效率的集团形式活动，借此保护弱者——西方圣教会能蜕变成如此精良的组织，老实说全归功于坂口日向。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「这两个种族已兴战」时，原文明确表达了什么信息？",
+    "question_type": "foreshadowing",
+    "difficulty": "hard",
+    "gold_chunks": [
+      20967
+    ],
+    "reference_answer": "这两个种族已兴战超过百年，据说最大的牺牲者就是长耳族。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「就算面对其他魔王」时，原文明确表达了什么信息？",
+    "question_type": "foreshadowing",
+    "difficulty": "hard",
+    "gold_chunks": [
+      23165
+    ],
+    "reference_answer": "就算面对其他魔王也不害怕，大大方方阐述自己的意见。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「她们靠著吸收知识」时，原文明确表达了什么信息？",
+    "question_type": "foreshadowing",
+    "difficulty": "hard",
+    "gold_chunks": [
+      18631
+    ],
+    "reference_answer": "她们靠著吸收知识得知有这种东西，但盐太高级了，弄不到只好死心。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  },
+  {
+    "novel_id": 91,
+    "question": "文中提到「拉普拉斯的独有技」时，原文明确表达了什么信息？",
+    "question_type": "foreshadowing",
+    "difficulty": "hard",
+    "gold_chunks": [
+      19887
+    ],
+    "reference_answer": "拉普拉斯的独有技「诈欺师」启动自动防卫机制，才知道有如此巧妙的魔力存在。",
+    "expected_points": [
+      "见对应文本块"
+    ],
+    "must_not_say": [],
+    "status": "candidate",
+    "created_by": "auto"
+  }
+]

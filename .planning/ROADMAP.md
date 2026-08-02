@@ -1,6 +1,6 @@
 # NovelMind GSD Roadmap
 
-> Execution authority: `master`. Snapshot: `01503c2`, 2026-07-31.
+> Execution authority: `master`. Snapshot: `912ca6b`, 2026-08-01.
 > Progress is reported in three independent dimensions:
 > `implementation_readiness`, `sample_data_coverage`, `quality_qualification`.
 
@@ -17,40 +17,152 @@
    models route retrieval but do not replace source authority.
 6. NM remains candidate-only. Promotion, active-pointer cutover and production A/B are in
    `999.x` backlog and require explicit authorization.
+7. Phase 25.2+ uses the Novel Agent Runtime contract in
+   `.planning/AGENT-RUNTIME-CONTRACT.md`: Pi orchestrates allowlisted Skills/Tools, while
+   FastAPI and deterministic validators retain fact, permission, version and publication authority.
 
 ## Milestones
 
 | Milestone | Phases | implementation_readiness | sample_data_coverage | quality_qualification |
 |---|---|---|---|---|
 | v1.1 execution baseline | 21–25.1 | partial | partial | blocked by Phase 22 |
+| agent runtime foundation | 25.2–25.3 | planned | planned | planned |
 | v1.2 trusted novel understanding | 26–29 | planned | planned | planned |
 | v1.3 visual narrative | 30–34 | planned | planned | planned |
 | v1.4 Canon Fork derivatives | 35–39 | planned | planned | planned |
+
+# Agent Runtime Foundation — Phase 25.2–25.3
+
+> Source: Issue #29 architecture additions and reused Kimi planning artifacts. Planning is
+> authorized while Phase 22 is blocked; execution remains fail-closed.
+
+## Phase 25.2 — Embedded Novel Agent Runtime
+
+**Goal:** qualify the pinned Pi SDK in a standalone Node Agent Service and establish controlled
+Domain Tools, versioned Skills/SkillRuns, lineage-bound Artifacts and the Agent Workspace.
+
+**Depends on:** Phase 22 and Phase 25.1.
+
+### Plans
+
+- **25.2-00 Execution Preflight:** fail closed until Phase 22 has 3/3 scheduled green
+  evidence and Phase 25.1 qualification remains valid.
+- **25.2-01 Agent Runtime Spike:** pin and exercise Pi session, streaming, cancellation,
+  retry, model routing and ResourceLoader allowlist with all default coding tools disabled.
+- **25.2-02 Domain Tool Contract:** expose only typed NovelMind read tools with server-side
+  owner, cutoff, spoiler, budget, evidence, timeout, output-cap and stable-error enforcement.
+- **25.2-03 Skill Runtime and Artifact Contract:** persist SkillVersion, SkillRun, ToolRun,
+  Artifact/Revision and NovelAgentProfile; first Skill is `answer-reading-question`.
+- **25.2-04 Agent Workspace:** stream run/tool state, Artifact previews, citations,
+  cancel/retry/resume and server-authoritative approval status in `/analysis`.
+- **25.2-05 Production Agent Service:** wire PostgreSQL session storage, registry loading,
+  FastAPI Tool RPC and the production Next.js/FastAPI transport boundary.
+- **25.2-06 Spike Decision Record:** consolidate experiment evidence into the authoritative
+  go/no-go and storage-seam decision consumed by production plans.
+- **25.2-07 First Skill Package:** own the `answer-reading-question` Skill assets, schemas,
+  fixtures and Skill-local tests independently from persistence migrations.
+
+**Non-goals:** no shell/filesystem/default coding tools; no Agent database access; no Canon
+mutation, active-pointer movement, illustration publication or derivative publication; no
+multi-Agent topology.
+
+**Phase Verification:** the eight PLANs and 25.2-VALIDATION prove the machine entry gate,
+pinned SDK loading, zero
+ambient discovery, typed tools, cancellation-without-Artifact, replay lineage, legal citations
+and responsive Agent Workspace behavior. Alembic chain:
+`24idxjournal1 → 26agentrun01`.
+
+## Phase 25.3 — Pi Package Compatibility and Governance
+
+**Goal:** qualify controlled Pi ecosystem reuse without allowing packages, MCP or renderers to
+bypass NovelMind permissions, evidence, Canon, Artifact or approval boundaries.
+
+**Depends on:** Phase 25.2.
+
+### Plans
+
+- **25.3-00 Governance Preflight:** fail closed until Phase 25.2 has a matching passed
+  verification artifact and Phase 22 evidence remains qualified.
+- **25.3-01 Package lock and audit:** exact versions/SHAs, lockfile, license/dependency/
+  lifecycle review and adopt/fork/pattern-only/reject verdicts.
+- **25.3-02 Tool Registry Manifest:** schema hashes, declared permissions and duplicate
+  Tool/Skill collision fail-closed before server listen.
+- **25.3-03 Isolated MCP Spike:** allowlisted external tools only; output is
+  `external_evidence` with `prohibited_from_canon=true`.
+- **25.3-04 Permission Policy and Approval Contract:** own the complete action vocabulary,
+  authoritative ApprovalRequest schema and permanent Original Canon/active-pointer denies.
+- **25.3-05 Web renderer feasibility:** reuse Artifact/Tool rendering patterns only; reject
+  browser key storage, IndexedDB authority and replacement ChatPanel/session stores.
+- **25.3-06 Web Approval UX and Transport:** own approval SSE frames, confirm/reject UX and
+  owner-scoped transport without transferring authority to the browser.
+
+**Non-goals:** no dynamic package installation, ambient global packages, general memory
+replacement, direct database access, shell/host filesystem access or multi-Agent execution.
+
+**Phase Verification:** reproducible `npm ci --ignore-scripts`, startup collision/permission
+gates, isolated external evidence, complete policy matrix and removable optional packages.
+Alembic chain continues `26agentrun01 → 27approval01`.
+
+## Agent Consumption Map — Phase 26–39
+
+| Phase | Agent consumption |
+|---|---|
+| 26 | `answer-reading-question` → CitedAnswerArtifact |
+| 27 | Agent candidates → WorldModel Validator/Gate |
+| 28 | `analyze-chapter` / `build-story-arc` → candidate narrative Artifacts |
+| 29 | frozen SkillRun + Artifact qualification |
+| 30 | `build-visual-bible` |
+| 31 | `detect-key-scenes` |
+| 32 | `compile-scene-spec` |
+| 33 | `illustrate-scene` → proposal-ready IllustrationRevision |
+| 34 | Agent proposes; user approves; deterministic service publishes anchor/asset |
+| 35 | `create-canon-fork` → approved deterministic fork materialization |
+| 36 | Agent is a branch-scoped editor collaborator; deterministic Revision Service applies |
+| 37 | `continue-derivative-story` → DraftArtifact + ContinuityReport |
+| 38 | branch-aware visual Skills |
+| 39 | `prepare-export` + deterministic exporter |
+
+### Phase 25.2–39 Planning Artifact Status (2026-08-02)
+
+| Range | CONTEXT / RESEARCH / PATTERNS / VALIDATION | PLAN files | Planning verdict |
+|---|---:|---:|---|
+| Phase 25.2–25.3 | 8/8 | 15 | PLANNED |
+| Phase 26–29 | 16/16 + shared Agent contract | 21 | PLANNED |
+| Phase 30–34 | 20/20 + shared Agent contract | 24 | PLANNED |
+| Phase 35–39 | 20/20 + shared Agent contract | 25 | PLANNED |
+
+The corrected portfolio contains 85 plans: 10 reused Kimi foundation plans, five corrective
+foundation slices, 56 deterministic/domain-gate plans and 14 Agent-integration plans. This
+remains a planning verdict only.
 
 ## Baseline Reconciliation — Phase 21–25.1
 
 | Phase | Status | Evidence / remaining gate |
 |---|---|---|
 | 21 branch recognition | COMPLETE | branch-delta spike; old branch is evidence only |
-| 22 CI/Nightly authority | ACTIVE / BLOCKED-OBSERVATION | gap plans G1–G3; 0/3 scheduled green |
+| 22 CI/Nightly authority | BLOCKED / DEFERRED BY USER | G2 awaits operator setup; 0/3 scheduled green; only Phase 26–39 planning is waived |
 | 23 layer registry and NU/NM boundary | IMPLEMENTED | ADRs, facet read-only contract |
 | 24 indexing journal, reconcile, retrieval router | IMPLEMENTED | merged on master; operational qualification remains Phase 29 |
 | 25 facet/API/provenance/cost honesty | IMPLEMENTED | master contracts and tests |
 | 25.1 Analysis Chat workspace/range anchor | IMPLEMENTED | default chat view and chapter-range wiring |
 
-Phase 22 is the active cursor. Phases 26+ cannot be reported `ACTIVE` until its three-run
-gate closes.
+Phase 22 remains blocked and unverified. The user explicitly allowed Phase 26–39 planning;
+implementation is not unlocked. Phase 25.2 requires Phase 22 qualification; Phase 25.3
+requires Phase 25.2; Phase 26+ requires all dependencies declared by its Agent integration.
 
 ---
 
 # v1.2 — Trusted Novel Understanding
 
-## Phase 26 — Question-Driven Retrieval and Evidence
+### Phase 26: Question-Driven Retrieval and Evidence
+
+**Status:** PLANNED / EXECUTION BLOCKED — Phase 22 Nightly qualification remains 0/3 and
+Phase 25.2 and Phase 25.3 have no passed verification artifacts.
 
 **Goal:** turn a reader/analyst question into a typed retrieval plan, fuse the required
 dimensions and materialize source-verified citations.
 
-**Depends on:** Phase 22, Phase 24, Phase 25.1.
+**Depends on:** Phase 22, Phase 24, Phase 25.1, Phase 25.2, Phase 25.3.
 
 ### Plans
 
@@ -81,6 +193,9 @@ dimensions and materialize source-verified citations.
 
 **Phase Verification:** implementation contracts pass; sample set covers every dimension and
 fallback; answer quality is reported separately, not inferred from implementation.
+
+- **26-05 Agent integration:** extend `answer-reading-question` over the validated QueryPlan,
+  ToolRegistryManifest, Frozen Manifest and CitedAnswerArtifact contracts.
 
 ## Phase 27 — World Model and Epistemic Layers
 
@@ -116,6 +231,9 @@ interpretation distinct.
 **Phase Verification:** world projections are queryable and versioned; coverage and
 interpretive quality are measured independently.
 
+- **27-05 Agent integration:** generate WorldModelCandidateArtifacts; only deterministic
+  Validator/Gate may publish typed facts or inference layers.
+
 ## Phase 28 — Whole-Book Narrative Memory Convergence
 
 **Goal:** converge every chapter and semantic arc into a candidate-only whole-book model.
@@ -148,6 +266,9 @@ interpretive quality are measured independently.
 
 **Phase Verification:** all chapters have terminal states, semantic hierarchy is continuous,
 cross-dimension manifests agree, and candidate-only invariants hold.
+
+- **28-05 Agent integration:** register `analyze-chapter` and `build-story-arc`; persist
+  ChapterAnalysisArtifact/StoryArcArtifact with candidate-only terminal-state validation.
 
 ## Phase 29 — Quality Qualification and v1.2 Closure
 
@@ -182,6 +303,9 @@ cross-dimension manifests agree, and candidate-only invariants hold.
 
 ---
 
+- **29-05 Agent integration:** evaluate frozen SkillRun, ToolRun, Artifact, Manifest, model,
+  source and dataset lineage without re-running mutable Agent state.
+
 # v1.3 — Visual Narrative
 
 ## Phase 30 — Visual Bible
@@ -198,6 +322,9 @@ generated asset silently becomes canon.
 **Verification:** schema, consistency, rights/provenance, browser review; **Test, Fix, and
 Confirm** after each plan with frozen entity fixtures.
 
+- **30-05 Agent integration:** register `build-visual-bible`, produce VisualBibleArtifact and
+  require evidence/rights validation plus user approval before accepted visual authority.
+
 ## Phase 31 — Key Scene Detection
 
 **Goal:** identify illustration-worthy scenes without reducing importance to embedding
@@ -210,6 +337,9 @@ ranking; 31-03 human review and frozen key-scene set.
 
 **Verification:** precision/diversity/coverage review; **Test, Fix, and Confirm** against
 high-action, quiet-emotional and visually ambiguous scenes.
+
+- **31-04 Agent integration:** register `detect-key-scenes`; keep model proposals separate
+  from deterministic score/diversity/spoiler validation and user selection.
 
 ## Phase 32 — Scene Spec and Prompt Compiler
 
@@ -225,6 +355,9 @@ prompt version and no unsupported detail disguised as canon.
 **Verification:** golden compiler fixtures and adapter contract tests; **Test, Fix, and
 Confirm** via prompt diffs and adversarial unsupported details.
 
+- **32-05 Agent integration:** register `compile-scene-spec`; consume validated SceneCandidate
+  and VisualBible versions and emit SceneSpecArtifact/PromptArtifact without unsupported Canon.
+
 ## Phase 33 — Illustration Generation and Consistency
 
 **Goal:** generate reviewable illustration candidates with durable job, cost and consistency
@@ -238,6 +371,9 @@ human approval and provider-neutral API.
 
 **Verification:** mocked provider, optional hard-budget live canary and consistency set;
 **Test, Fix, and Confirm** failure/retry/duplicate and identity drift.
+
+- **33-05 Agent integration:** register `illustrate-scene`; generation ends at a validated,
+  proposal-ready IllustrationRevision and does not publish.
 
 ## Phase 34 — In-Text Anchors, Reader and Export
 
@@ -255,6 +391,9 @@ Fix, and Confirm** on changed offsets and unavailable images.
 
 ---
 
+- **34-05 Agent integration:** Agent proposes IllustrationAnchorProposal; Web ApprovalRequest
+  authorizes deterministic asset/anchor publication and reader/export consumption.
+
 # v1.4 — Canon Fork and Constrained Derivatives
 
 ## Phase 35 — Triple Knowledge Spaces and Canon Fork
@@ -271,6 +410,9 @@ in original evaluation or facet production.
 **Verification:** cross-space adversarial tests; **Test, Fix, and Confirm** with deliberate
 contamination attempts.
 
+- **35-05 Agent integration:** register `create-canon-fork`; approval precedes deterministic
+  branch materialization and Original Canon remains immutable.
+
 ## Phase 36 — Derivative Project and Editor
 
 **Goal:** provide owner-scoped derivative projects, plans, chapters and versioned editing.
@@ -284,6 +426,9 @@ Canon Fork selection.
 **Verification:** API/concurrency/recovery/browser tests; **Test, Fix, and Confirm** crash,
 conflict and rollback paths.
 
+- **36-05 Agent integration:** register branch-scoped `edit-derivative-story`; Agent proposes
+  a patch and deterministic CAS Revision Service applies an approved proposal.
+
 ## Phase 37 — Constrained Generation
 
 **Goal:** generate continuation/rewrites against an auditable story-state package.
@@ -296,6 +441,9 @@ no silent write-back to original canon.
 
 **Verification:** frozen continuation set and contradiction tests; **Test, Fix, and Confirm**
 with intentional canon violations and allowed divergences.
+
+- **37-05 Agent integration:** register `continue-derivative-story`; separate ordinary draft
+  approval, divergence approval and deterministic derivative revision publication.
 
 ## Phase 38 — Derivative Visual Consistency
 
@@ -311,6 +459,9 @@ assets belong to derivative namespace.
 **Verification:** namespace and identity consistency tests; **Test, Fix, and Confirm** mixed
 original/derivative asset scenarios.
 
+- **38-05 Agent integration:** register branch-aware visual Skill; publish only validated and
+  approved derivative assets without mutating Original visual authority.
+
 ## Phase 39 — Export, UAT and v1.4 Audit
 
 **Goal:** ship a reproducible derivative package and independently audit the complete flow.
@@ -325,6 +476,9 @@ mutation and three-dimensional status report.
 audit; **Test, Fix, and Confirm** every failed end-to-end checkpoint.
 
 ---
+
+- **39-05 Agent integration:** register `prepare-export`; Agent prepares a frozen manifest,
+  user approves export, and deterministic exporter materializes the bundle.
 
 ## Supersession and Backlog Map
 
@@ -342,5 +496,6 @@ audit; **Test, Fix, and Confirm** every failed end-to-end checkpoint.
 
 ## Next
 
-Execute Phase 22 G1–G3. After three consecutive scheduled green observations, begin
-Phase 26 planning artifacts from the contracts above.
+Resume Phase 22 G2/G3 and complete Phase 25.2 plus Phase 25.3 verification before executing Phase 26.
+Phase 26–39 planning artifacts are complete and must remain reviewable without being
+misreported as implementation or quality qualification.

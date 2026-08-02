@@ -1,0 +1,31 @@
+# CHECKSUMS.txt — agent-service/vendor/pi-packages
+
+审计证据目录：adopt 的运行时包精确 pin 的 tarball 副本 + 校验和。
+
+## sha256（已 vendored tarball）
+
+```
+4631ce4180008f24b0e98c475fd734cce9b86d0176c1adff1cb8275b798a0c28  earendil-works-pi-agent-core-0.83.0.tgz
+```
+
+## 说明
+
+- 其余 adopt 运行时包（`@earendil-works/pi-ai`、`@earendil-works/pi-coding-agent`、
+  `@earendil-works/pi-storage-sqlite-node` 0.83.0）的 tarball 在 CI 治理 job 中以
+  `npm pack <pkg>@<pin> --pack-destination vendor/pi-packages` 复现，并更新本校验和文件。
+  本地沙箱禁止 npm 写缓存日志，故本次仅 vendored pi-agent-core 一份。
+- 全部 4 个包的 tarball integrity（sha512，来自 agent-service/package-lock.json）如下，
+  verify-lockfile.mjs 已逐项核对 packages.lock.json ↔ package-lock.json 一致：
+
+```
+@earendil-works/pi-agent-core@0.83.0
+  sha512-RorGp9OH5l3ElpuC5a5ZQ2eWcchZGXflXRzVGkV99y3y6tT+LLNyxoYIdVKvTKWEObwhExeQbTH0fI2tE4iX4g==
+@earendil-works/pi-ai@0.83.0
+  sha512-m3IZD4g3er0V8TC9+Vpgw/sjTKqcJlkcIBy/JvsgRubuuik3tAVzyugUg4rVrShIkkOT69mEd34NEqKUIsl6JQ==
+@earendil-works/pi-coding-agent@0.83.0
+  sha512-uYhF+FsZxogoSX/AxBcUdiY+ZklubwaXyAoEGA2eQwsHcyEAhUYIKh/WLXe/a8+k8eTCmxb+ZN2Zo9mzQtzbWw==
+@earendil-works/pi-storage-sqlite-node@0.83.0
+  sha512-kgoseZj0VGPM2ldwcfyVeEY6QJSGgmiqcPXpKi2FlQFlHjpVEX+VEoWkjUvNl99yTRkCvBoveVqETV5FSI9qQQ==
+```
+
+重新校验方式：`cd agent-service/vendor/pi-packages && sha256sum *.tgz`，与上方一致即通过。

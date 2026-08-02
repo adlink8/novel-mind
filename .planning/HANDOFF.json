@@ -1,55 +1,46 @@
 {
   "version": "1.0",
-  "timestamp": "2026-07-16T20:30:00.000Z",
-  "phase": "13",
-  "phase_name": "candidate-memory-contracts-and-provenance-authority",
-  "phase_dir": ".planning/phases/13-candidate-memory-contracts-and-provenance-authority",
-  "plan": 3,
-  "task": "complete",
-  "total_tasks": 3,
-  "status": "phase_verified",
-  "authorization": {
-    "granted_by": "user",
-    "message": "查看13-18阶段任务 编排GSD子代理执行",
-    "scope": ["13", "14", "15", "16", "17", "18"],
-    "granted_at": "2026-07-16",
-    "notes": "Phase 13 remainder complete and verified. Proceed 14→15→16→17; Phase 18 parallel."
-  },
-  "completed_tasks": [
-    {"id": 1, "name": "Define strict memory and provenance contracts", "status": "done", "commit": "a452380"},
-    {"id": 2, "name": "Canonicalize hashes and enforce package-local references", "status": "done", "commit": "bdc515c"},
-    {"id": 3, "name": "Persist explicit-version candidates behind Phase 12 eligibility", "status": "done", "commit": "7622889"},
-    {"id": 4, "name": "Validate graph/range/claim leaf closure", "status": "done", "commit": "59b29b8"},
-    {"id": 5, "name": "Seal database-row manifests with re-slice", "status": "done", "commit": "11f7191"},
-    {"id": 6, "name": "Fresh-observer no-pointer proofs", "status": "done", "commit": "32338ed"}
+  "timestamp": "2026-07-31T11:20:40.992Z",
+  "phase": 22,
+  "phase_name": "ci-nightly-gap-closure",
+  "phase_dir": ".planning/phases/22-ci-nightly-gap-closure",
+  "plan": "22-G2",
+  "task": 6,
+  "total_tasks": 6,
+  "status": "blocked",
+  "reason": "Operator-owned self-hosted Runner and inventory token are unavailable; user authorized Phase 25.2-39 planning only while execution remains locked.",
+  "completed": [
+    "Hosted Nightly preflight/finalizer implemented in commit 495b29a.",
+    "PR #31 merged to master as baseline 912ca6b.",
+    "Control-plane dispatch run 30623438107 produced signed fail-closed artifacts.",
+    "Remote evidence recorded in commit b337487 and PR #33."
   ],
-  "remaining_tasks": [],
-  "verification": {
-    "artifact": ".planning/phases/13-candidate-memory-contracts-and-provenance-authority/13-VERIFICATION.md",
-    "status": "passed",
-    "tests": "60 passed (Phase 13 narrative_memory consolidated suite)"
-  },
-  "orchestration": {
-    "wave_a_parallel": ["phase-13-remainder DONE", "phase-18 continues"],
-    "wave_b": ["phase-14 now unblocked"],
-    "wave_c": ["phase-15 after 14 verified"],
-    "wave_d": ["phase-16 after 15 verified"],
-    "wave_e": ["phase-17 after 12-16 verified"]
-  },
-  "blockers": [],
-  "human_actions_pending": [],
-  "decisions": [
+  "remaining": [
+    "Merge evidence PR #33 after checks remain green.",
+    "Configure NIGHTLY_RUNNER_READ_TOKEN and the labeled self-hosted Runner.",
+    "Inspect one real scheduled provider-path artifact.",
+    "Write 22-G2-SUMMARY.md after verification.",
+    "Record 3/3 consecutive scheduled green observations for G3."
+  ],
+  "blockers": [
     {
-      "decision": "Phase 13 verification passed; Phase 14 unblocked",
-      "rationale": "V08-MEM-01..05 evidenced by unit+PostgreSQL suites and no-pointer observer",
-      "phase": "13"
+      "type": "external",
+      "detail": "Repository Runner inventory has zero matching self-hosted Linux Ollama runners."
     },
     {
-      "decision": "Do not commit unrelated dirty working tree files",
-      "rationale": "Large unrelated WIP exists; only stage plan-declared files",
-      "phase": "all"
+      "type": "human_action",
+      "detail": "Provision Runner and repository Administration-read token per 22-G2-USER-SETUP.md."
     }
   ],
-  "next_action": "Execute Phase 14 plans with provider_calls_allowed gate; Phase 18 may continue in parallel.",
-  "context_notes": "Planning-only lock remains cleared by user authorization 2026-07-16."
+  "decisions": [
+    "blocked_dependency is not a successful quality result.",
+    "Only event=schedule observations count toward the three-run gate.",
+    "Phase 25.2-39 planning is unlocked by explicit user override without changing the Phase 22 verdict or implementation gates."
+  ],
+  "uncommitted_task_files": [],
+  "preserved_user_files": [
+    ".playwright-cli/",
+    "backend/storage/"
+  ],
+  "next_action": "Review the corrected Phase 25.2-39 plans; do not execute until Phase 22 and declared upstream verification gates pass. Use $gsd-resume-work only if returning to deferred Phase 22."
 }

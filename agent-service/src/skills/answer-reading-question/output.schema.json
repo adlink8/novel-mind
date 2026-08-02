@@ -1,0 +1,124 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CitedAnswerArtifact",
+  "description": "Cited Answer Artifact 信封（D-10）。镜像 backend app.schemas.agent_runtime.CitedAnswerArtifact：type / schema_version / owner / novel / branch / producing skill+version / model lineage / source versions / input_hash / evidence_refs / answer / status / parent_revision。",
+  "type": "object",
+  "required": [
+    "type",
+    "schema_version",
+    "owner_id",
+    "novel_id",
+    "producing_skill",
+    "producing_skill_version",
+    "skill_version_id",
+    "model_lineage",
+    "source_versions",
+    "input_hash",
+    "evidence_refs",
+    "answer",
+    "status"
+  ],
+  "properties": {
+    "type": {
+      "const": "cited_answer"
+    },
+    "schema_version": {
+      "const": "cited-answer.v1"
+    },
+    "owner_id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "novel_id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "branch": {
+      "type": ["string", "null"],
+      "description": "衍生分支；原始主线为 null"
+    },
+    "producing_skill": {
+      "type": "string",
+      "minLength": 1
+    },
+    "producing_skill_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "skill_version_id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "model_lineage": {
+      "type": "object",
+      "description": "agent runtime + 模型血缘（provider/model/revision）"
+    },
+    "source_versions": {
+      "type": "object",
+      "description": "数据源版本（novel/chapter/检索等）"
+    },
+    "input_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "运行输入规范化 JSON 的 SHA-256（重放追溯）"
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1,
+      "description": "引证列表，必须 ⊆ 冻结 manifest 白名单"
+    },
+    "answer": {
+      "type": "object",
+      "required": ["answer_blocks"],
+      "properties": {
+        "answer_blocks": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["block_id", "text", "evidence_refs"],
+            "properties": {
+              "block_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              },
+              "text": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4000
+              },
+              "evidence_refs": {
+                "type": "array",
+                "items": { "type": "string" },
+                "minItems": 1
+              }
+            }
+          }
+        },
+        "clarifying_question": {
+          "type": ["string", "null"]
+        },
+        "uncertainty": {
+          "type": ["object", "null"]
+        },
+        "suggestion_candidates": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    "status": {
+      "enum": ["candidate", "validated", "approved", "published", "rejected"],
+      "description": "产物状态；finalize 写入时恒为 candidate"
+    },
+    "parent_revision": {
+      "type": ["string", "null"],
+      "description": "父修订引用；首个修订为 null"
+    }
+  },
+  "additionalProperties": false
+}

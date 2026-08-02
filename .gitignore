@@ -47,6 +47,10 @@ test_*.txt
 nul
 tsconfig.tsbuildinfo
 
+# --- 治理测试进程级转译产物（governance.test.ts 生成，勿提交）---
+agent-service/tests/fixtures/.gov-tmp/
+agent-service/tests/fixtures/.tmp-gov-*
+
 # --- 后端上传的测试数据 ---
 backend/uploads/
 test_novel.txt
@@ -77,4 +81,9 @@ backend/_up*.py
 
 # --- 本地数据库备份 dump（体积大，不进版本库，保留本地）---
 backups/*.dump
+
+# --- git 损坏备份与本地环境目录（不提交）---
+.git-corrupt-*/
+.claude/
+.playwright-cli/
 

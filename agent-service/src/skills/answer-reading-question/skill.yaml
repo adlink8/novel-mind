@@ -1,0 +1,32 @@
+# answer-reading-question skill 契约（D-09 / D-14）
+# 字段镜像 backend 注册入口（app.schemas.agent_runtime.SkillVersionRegister）。
+# allowed_tools 只含 25.2-02 注册的 7 个域工具中的 6 个只读工具：按 25.2-RESEARCH
+# Open Question 4，首版技能白名单排除叙事记忆结构工具（保持 D-01 干净，直到
+# Validator 故事落地；25.2-02 Handoff 第 4 项）。
+name: answer-reading-question
+version: 1.0.0
+description: >-
+  给定问题与小说，通过只读域工具收集证据，物化 evidence_refs，冻结 manifest，
+  产出血缘绑定的 Cited Answer Artifact（D-14 首技能）。
+allowed_tools:
+  - get_novel
+  - get_chapter
+  - search_novel_text
+  - get_timeline
+  - get_relationships
+  - get_clues
+read_permissions:
+  - canon
+  - derivative
+write_permissions: []
+forbidden_spaces:
+  - canon:original
+  - derivative:write
+budget:
+  max_calls: 20
+  max_input_tokens: 30000
+  max_output_tokens: 6000
+  max_cost_usd: "1.00"
+approval_required_for: []
+input_schema: ./input.schema.json
+output_schema: ./output.schema.json

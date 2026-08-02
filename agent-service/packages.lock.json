@@ -1,0 +1,275 @@
+{
+  "version": 1,
+  "generated_by": "25.3-01",
+  "description": "D-04 治理锁清单：包裁决（verdict）、精确 pin、integrity、D-05 权限清单。npm 的 package-lock.json 仍是 CI lockfile；本清单在其上叠加裁决/来源/权限元数据。",
+  "packages": [
+    {
+      "name": "@earendil-works/pi-agent-core",
+      "version": "0.83.0",
+      "source": "npm",
+      "integrity": "sha512-RorGp9OH5l3ElpuC5a5ZQ2eWcchZGXflXRzVGkV99y3y6tT+LLNyxoYIdVKvTKWEObwhExeQbTH0fI2tE4iX4g==",
+      "verdict": "adopt",
+      "scope": "agent-runtime-core",
+      "installed": true,
+      "qualification_report": "qualification/earendil-pi-agent-core.md",
+      "permission_manifest": {
+        "network": "allowlist",
+        "network_allowlist": ["api.anthropic.com", "api.openai.com", "generativelanguage.googleapis.com", "api.deepseek.com"],
+        "filesystem": "deny",
+        "shell": "deny",
+        "env": "deny",
+        "secrets": "named-only",
+        "tools": [],
+        "artifact_writes": []
+      }
+    },
+    {
+      "name": "@earendil-works/pi-ai",
+      "version": "0.83.0",
+      "source": "npm",
+      "integrity": "sha512-m3IZD4g3er0V8TC9+Vpgw/sjTKqcJlkcIBy/JvsgRubuuik3tAVzyugUg4rVrShIkkOT69mEd34NEqKUIsl6JQ==",
+      "verdict": "adopt",
+      "scope": "agent-runtime-core",
+      "installed": true,
+      "qualification_report": "qualification/earendil-pi-ai.md",
+      "permission_manifest": {
+        "network": "allowlist",
+        "network_allowlist": ["api.anthropic.com", "api.openai.com", "generativelanguage.googleapis.com", "api.deepseek.com"],
+        "filesystem": "deny",
+        "shell": "deny",
+        "env": "deny",
+        "secrets": "named-only",
+        "tools": [],
+        "artifact_writes": []
+      }
+    },
+    {
+      "name": "@earendil-works/pi-coding-agent",
+      "version": "0.83.0",
+      "source": "npm",
+      "integrity": "sha512-uYhF+FsZxogoSX/AxBcUdiY+ZklubwaXyAoEGA2eQwsHcyEAhUYIKh/WLXe/a8+k8eTCmxb+ZN2Zo9mzQtzbWw==",
+      "verdict": "adopt",
+      "scope": "agent-runtime-core",
+      "installed": true,
+      "qualification_report": "qualification/earendil-pi-coding-agent.md",
+      "permission_manifest": {
+        "network": "allowlist",
+        "network_allowlist": ["api.anthropic.com", "api.openai.com", "generativelanguage.googleapis.com", "api.deepseek.com"],
+        "filesystem": "deny",
+        "shell": "deny",
+        "env": "deny",
+        "secrets": "named-only",
+        "tools": [],
+        "artifact_writes": []
+      }
+    },
+    {
+      "name": "@earendil-works/pi-storage-sqlite-node",
+      "version": "0.83.0",
+      "source": "npm",
+      "integrity": "sha512-kgoseZj0VGPM2ldwcfyVeEY6QJSGgmiqcPXpKi2FlQFlHjpVEX+VEoWkjUvNl99yTRkCvBoveVqETV5FSI9qQQ==",
+      "verdict": "adopt",
+      "scope": "spike-only",
+      "installed": true,
+      "qualification_report": "qualification/earendil-pi-storage-sqlite-node.md",
+      "permission_manifest": {
+        "network": "deny",
+        "network_allowlist": [],
+        "filesystem": "deny",
+        "shell": "deny",
+        "env": "deny",
+        "secrets": "named-only",
+        "tools": [],
+        "artifact_writes": []
+      }
+    },
+    {
+      "name": "typebox",
+      "version": "1.3.7",
+      "source": "npm",
+      "integrity": "sha512-meKuifc33Pccx0O6PdIzYMq3Og8zvP4TIi/a+Bw3AEMZMxOD0+RHGQvpglEe6Zdy3wZ8nqn/j95h8LUZLk/6Hg==",
+      "verdict": "adopt",
+      "scope": "runtime-data-validation",
+      "installed": true,
+      "qualification_report": "qualification/typebox.md",
+      "permission_manifest": {
+        "network": "deny",
+        "network_allowlist": [],
+        "filesystem": "deny",
+        "shell": "deny",
+        "env": "deny",
+        "secrets": "named-only",
+        "tools": [],
+        "artifact_writes": []
+      }
+    },
+    {
+      "name": "yaml",
+      "version": "2.9.0",
+      "source": "npm",
+      "integrity": "sha512-2AvhNX3mb8zd6Zy7INTtSpl1F15HW6Wnqj0srWlkKLcpYl/gMIMJiyuGq2KeI2YFxUPjdlB+3Lc10seMLtL4cA==",
+      "verdict": "adopt",
+      "scope": "runtime-data-validation",
+      "installed": true,
+      "qualification_report": "qualification/yaml.md",
+      "permission_manifest": {
+        "network": "deny",
+        "network_allowlist": [],
+        "filesystem": "deny",
+        "shell": "deny",
+        "env": "deny",
+        "secrets": "named-only",
+        "tools": [],
+        "artifact_writes": []
+      }
+    },
+    {
+      "name": "ajv",
+      "version": "8.20.0",
+      "source": "npm",
+      "integrity": "sha512-Thbli+OlOj+iMPYFBVBfJ3OmCAnaSyNn4M1vz9T6Gka5Jt9ba/HIR56joy65tY6kx/FCF5VXNB819Y7/GUrBGA==",
+      "verdict": "adopt",
+      "scope": "runtime-data-validation",
+      "installed": true,
+      "qualification_report": "qualification/ajv.md",
+      "permission_manifest": {
+        "network": "deny",
+        "network_allowlist": [],
+        "filesystem": "deny",
+        "shell": "deny",
+        "env": "deny",
+        "secrets": "named-only",
+        "tools": [],
+        "artifact_writes": []
+      }
+    },
+    {
+      "name": "ajv-formats",
+      "version": "3.0.1",
+      "source": "npm",
+      "integrity": "sha512-8iUql50EUR+uUcdRQ3HDqa6EVyo3docL8g5WJ3FNcWmu62IbkGUue/pEyLBW8VGKKucTPgqeks4fIU1DA4yowQ==",
+      "verdict": "adopt",
+      "scope": "runtime-data-validation",
+      "installed": true,
+      "qualification_report": "qualification/ajv-formats.md",
+      "permission_manifest": {
+        "network": "deny",
+        "network_allowlist": [],
+        "filesystem": "deny",
+        "shell": "deny",
+        "env": "deny",
+        "secrets": "named-only",
+        "tools": [],
+        "artifact_writes": []
+      }
+    },
+    {
+      "name": "pi-mcp-adapter",
+      "version": "2.17.0",
+      "source": "npm",
+      "integrity": null,
+      "verdict": "adopt",
+      "scope": "external-tools-only",
+      "installed": false,
+      "qualification_report": "qualification/pi-mcp-adapter.md",
+      "permission_manifest": {
+        "network": "allowlist",
+        "network_allowlist": [],
+        "filesystem": "deny",
+        "shell": "deny",
+        "env": "deny",
+        "secrets": "named-only",
+        "tools": ["mcp"],
+        "artifact_writes": ["external_evidence"]
+      }
+    },
+    {
+      "name": "@gotgenes/pi-permission-system",
+      "version": "24.0.0",
+      "source": "npm",
+      "integrity": null,
+      "verdict": "pattern-only",
+      "scope": "policy-semantics-donor",
+      "installed": false,
+      "qualification_report": "qualification/gotgenes-pi-permission-system.md",
+      "permission_manifest": null
+    },
+    {
+      "name": "@earendil-works/pi-web-ui",
+      "version": "0.75.3",
+      "source": "npm",
+      "integrity": null,
+      "verdict": "pattern-only",
+      "scope": "renderer-patterns-only",
+      "installed": false,
+      "qualification_report": "qualification/earendil-pi-web-ui.md",
+      "permission_manifest": null
+    },
+    {
+      "name": "pi-web-access",
+      "version": "0.0.0",
+      "source": "npm",
+      "integrity": null,
+      "verdict": "reject",
+      "scope": "deferred-external-research",
+      "installed": false,
+      "qualification_report": null,
+      "permission_manifest": null
+    },
+    {
+      "name": "pi-subagents",
+      "version": "0.0.0",
+      "source": "npm",
+      "integrity": null,
+      "verdict": "reject",
+      "scope": "deferred-reviewer-roles",
+      "installed": false,
+      "qualification_report": null,
+      "permission_manifest": null
+    },
+    {
+      "name": "pi-acp",
+      "version": "0.0.0",
+      "source": "npm",
+      "integrity": null,
+      "verdict": "reject",
+      "scope": "dev-tool-only",
+      "installed": false,
+      "qualification_report": null,
+      "permission_manifest": null
+    },
+    {
+      "name": "pi-memory",
+      "version": "0.0.0",
+      "source": "npm",
+      "integrity": null,
+      "verdict": "pattern-only",
+      "scope": "memory-patterns-only",
+      "installed": false,
+      "qualification_report": null,
+      "permission_manifest": null
+    },
+    {
+      "name": "@remnic/plugin-pi",
+      "version": "0.0.0",
+      "source": "npm",
+      "integrity": null,
+      "verdict": "pattern-only",
+      "scope": "memory-patterns-only",
+      "installed": false,
+      "qualification_report": null,
+      "permission_manifest": null
+    },
+    {
+      "name": "@oh-my-pi/omp-stats",
+      "version": "0.0.0",
+      "source": "npm",
+      "integrity": null,
+      "verdict": "pattern-only",
+      "scope": "metrics-patterns-only",
+      "installed": false,
+      "qualification_report": null,
+      "permission_manifest": null
+    }
+  ]
+}

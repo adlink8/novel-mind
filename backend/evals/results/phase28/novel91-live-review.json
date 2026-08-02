@@ -1,0 +1,1848 @@
+{
+  "schema_version": "rag-quality-live-review.v1",
+  "status": "semantic_review_passed",
+  "qualification_status": "not_qualified",
+  "quality_comparable": false,
+  "fixture": "evals/results/phase28/novel91-quality-candidate.json",
+  "fixture_hash": "b41c658a034d552e9321af7a7f32f2d220f2cdd07cfb62ff9e53eb08b9e8cad5",
+  "snapshot_hash": "bfa00cde22f358ba5eca2d56a12d73b85f99a3dd77dcc62f8e52efe38314e0c0",
+  "candidate_status": "candidate_frozen_requires_semantic_review",
+  "judge_lineage": {
+    "provider": "vertex_google",
+    "model_family": "vertex_gemini_live_judge",
+    "model_id": "vertex_google/gemini-3.5-flash-lite",
+    "weights/revision": "vertex-gemini-3.5-flash-lite-2026-07-28",
+    "endpoint_class": "live_external_review",
+    "prompt_hash": "3bd4cef0d9a74e3930b9ed5e1e47fd59da76f5277e9cfd80eea0e1c11545b992",
+    "prompt_version": "novel91.live.semantic-review.v2",
+    "schema_hash": "abbbaed9fb1b458af7e7e8af8b45e8dc835ae862d5c312b18ddb6004c2bd622a",
+    "decoding": {
+      "temperature": 0,
+      "max_tokens": 220
+    },
+    "runtime": "vertex_live",
+    "started_at": "2026-07-28T05:01:47.445107Z"
+  },
+  "started_at": "2026-07-28T05:01:47.445228+00:00",
+  "counts": {
+    "cases": 100,
+    "accepted": 100,
+    "rejected": 0,
+    "errors": 0,
+    "accepted_rate": 1.0
+  },
+  "reason_counts": {
+    "DIRECT_EVIDENCE": 1,
+    "DIRECT_MATCH": 14,
+    "DIRECT_SUPPORT": 10,
+    "EXACT_MATCH": 43,
+    "EXPLICIT_MATCH": 11,
+    "EXPLICIT_SUPPORT": 19
+  },
+  "usage": {
+    "input_tokens": 35418,
+    "output_tokens": 3834,
+    "cost_usd_recorded": 0.0,
+    "estimated_cost_usd": 0.02223144,
+    "cost_status": "estimated_from_price_snapshot",
+    "pricing_snapshot": "evals\\pricing\\vertex-gemini-3.5-flash-lite-2026-07-28.json"
+  },
+  "results": [
+    {
+      "case_id": "novel91-candidate-001",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXACT_MATCH"
+        ]
+      },
+      "response_hash": "afa4092f6aee6e1b3f47f3c2f6ddb14dff04abc871ae8c4254e7ab139c00f5a9",
+      "input_tokens": 344,
+      "output_tokens": 38
+    },
+    {
+      "case_id": "novel91-candidate-002",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXACT_MATCH"
+        ]
+      },
+      "response_hash": "afa4092f6aee6e1b3f47f3c2f6ddb14dff04abc871ae8c4254e7ab139c00f5a9",
+      "input_tokens": 373,
+      "output_tokens": 38
+    },
+    {
+      "case_id": "novel91-candidate-003",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXACT_MATCH"
+        ]
+      },
+      "response_hash": "afa4092f6aee6e1b3f47f3c2f6ddb14dff04abc871ae8c4254e7ab139c00f5a9",
+      "input_tokens": 341,
+      "output_tokens": 38
+    },
+    {
+      "case_id": "novel91-candidate-004",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXACT_MATCH"
+        ]
+      },
+      "response_hash": "afa4092f6aee6e1b3f47f3c2f6ddb14dff04abc871ae8c4254e7ab139c00f5a9",
+      "input_tokens": 348,
+      "output_tokens": 38
+    },
+    {
+      "case_id": "novel91-candidate-005",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXACT_MATCH"
+        ]
+      },
+      "response_hash": "afa4092f6aee6e1b3f47f3c2f6ddb14dff04abc871ae8c4254e7ab139c00f5a9",
+      "input_tokens": 353,
+      "output_tokens": 38
+    },
+    {
+      "case_id": "novel91-candidate-006",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXPLICIT_SUPPORT"
+        ]
+      },
+      "response_hash": "1e378541cac300fd17a0ef3678bbecdc72c91226f3d2b6e853200d3eba766659",
+      "input_tokens": 345,
+      "output_tokens": 39
+    },
+    {
+      "case_id": "novel91-candidate-007",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "DIRECT_MATCH"
+        ]
+      },
+      "response_hash": "57ec8c22ace13545377ea95541141c03d8d946f87e87378ef70ca605ce2fe273",
+      "input_tokens": 365,
+      "output_tokens": 37
+    },
+    {
+      "case_id": "novel91-candidate-008",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "DIRECT_MATCH"
+        ]
+      },
+      "response_hash": "98b08aab6ae781258ede1b9f9336c48a6fde8031b9da18e7240e578c10d888b6",
+      "input_tokens": 362,
+      "output_tokens": 49
+    },
+    {
+      "case_id": "novel91-candidate-009",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "DIRECT_SUPPORT"
+        ]
+      },
+      "response_hash": "1b8ab382092bafa08466109bcd51ec7cfeeb15946384f2bb0ad5d95472473884",
+      "input_tokens": 342,
+      "output_tokens": 37
+    },
+    {
+      "case_id": "novel91-candidate-010",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXACT_MATCH"
+        ]
+      },
+      "response_hash": "afa4092f6aee6e1b3f47f3c2f6ddb14dff04abc871ae8c4254e7ab139c00f5a9",
+      "input_tokens": 349,
+      "output_tokens": 38
+    },
+    {
+      "case_id": "novel91-candidate-011",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXPLICIT_SUPPORT"
+        ]
+      },
+      "response_hash": "1e378541cac300fd17a0ef3678bbecdc72c91226f3d2b6e853200d3eba766659",
+      "input_tokens": 340,
+      "output_tokens": 39
+    },
+    {
+      "case_id": "novel91-candidate-012",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXACT_MATCH"
+        ]
+      },
+      "response_hash": "afa4092f6aee6e1b3f47f3c2f6ddb14dff04abc871ae8c4254e7ab139c00f5a9",
+      "input_tokens": 348,
+      "output_tokens": 38
+    },
+    {
+      "case_id": "novel91-candidate-013",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXACT_MATCH"
+        ]
+      },
+      "response_hash": "afa4092f6aee6e1b3f47f3c2f6ddb14dff04abc871ae8c4254e7ab139c00f5a9",
+      "input_tokens": 349,
+      "output_tokens": 38
+    },
+    {
+      "case_id": "novel91-candidate-014",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXPLICIT_SUPPORT"
+        ]
+      },
+      "response_hash": "1e378541cac300fd17a0ef3678bbecdc72c91226f3d2b6e853200d3eba766659",
+      "input_tokens": 357,
+      "output_tokens": 39
+    },
+    {
+      "case_id": "novel91-candidate-015",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "DIRECT_MATCH"
+        ]
+      },
+      "response_hash": "57ec8c22ace13545377ea95541141c03d8d946f87e87378ef70ca605ce2fe273",
+      "input_tokens": 341,
+      "output_tokens": 37
+    },
+    {
+      "case_id": "novel91-candidate-016",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXACT_MATCH"
+        ]
+      },
+      "response_hash": "afa4092f6aee6e1b3f47f3c2f6ddb14dff04abc871ae8c4254e7ab139c00f5a9",
+      "input_tokens": 348,
+      "output_tokens": 38
+    },
+    {
+      "case_id": "novel91-candidate-017",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXACT_MATCH"
+        ]
+      },
+      "response_hash": "afa4092f6aee6e1b3f47f3c2f6ddb14dff04abc871ae8c4254e7ab139c00f5a9",
+      "input_tokens": 367,
+      "output_tokens": 38
+    },
+    {
+      "case_id": "novel91-candidate-018",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "DIRECT_SUPPORT"
+        ]
+      },
+      "response_hash": "1b8ab382092bafa08466109bcd51ec7cfeeb15946384f2bb0ad5d95472473884",
+      "input_tokens": 348,
+      "output_tokens": 37
+    },
+    {
+      "case_id": "novel91-candidate-019",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXPLICIT_SUPPORT"
+        ]
+      },
+      "response_hash": "1e378541cac300fd17a0ef3678bbecdc72c91226f3d2b6e853200d3eba766659",
+      "input_tokens": 344,
+      "output_tokens": 39
+    },
+    {
+      "case_id": "novel91-candidate-020",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "DIRECT_MATCH"
+        ]
+      },
+      "response_hash": "57ec8c22ace13545377ea95541141c03d8d946f87e87378ef70ca605ce2fe273",
+      "input_tokens": 383,
+      "output_tokens": 37
+    },
+    {
+      "case_id": "novel91-candidate-021",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXACT_MATCH"
+        ]
+      },
+      "response_hash": "afa4092f6aee6e1b3f47f3c2f6ddb14dff04abc871ae8c4254e7ab139c00f5a9",
+      "input_tokens": 357,
+      "output_tokens": 38
+    },
+    {
+      "case_id": "novel91-candidate-022",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "DIRECT_MATCH"
+        ]
+      },
+      "response_hash": "57ec8c22ace13545377ea95541141c03d8d946f87e87378ef70ca605ce2fe273",
+      "input_tokens": 347,
+      "output_tokens": 37
+    },
+    {
+      "case_id": "novel91-candidate-023",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXPLICIT_SUPPORT"
+        ]
+      },
+      "response_hash": "1e378541cac300fd17a0ef3678bbecdc72c91226f3d2b6e853200d3eba766659",
+      "input_tokens": 369,
+      "output_tokens": 39
+    },
+    {
+      "case_id": "novel91-candidate-024",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXPLICIT_SUPPORT"
+        ]
+      },
+      "response_hash": "1e378541cac300fd17a0ef3678bbecdc72c91226f3d2b6e853200d3eba766659",
+      "input_tokens": 368,
+      "output_tokens": 39
+    },
+    {
+      "case_id": "novel91-candidate-025",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXACT_MATCH"
+        ]
+      },
+      "response_hash": "afa4092f6aee6e1b3f47f3c2f6ddb14dff04abc871ae8c4254e7ab139c00f5a9",
+      "input_tokens": 356,
+      "output_tokens": 38
+    },
+    {
+      "case_id": "novel91-candidate-026",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXPLICIT_MATCH"
+        ]
+      },
+      "response_hash": "b8bf52fea14da1fc70d1f3ad5ae088f7334a5ef07938b65a4237b34ef08e2e92",
+      "input_tokens": 348,
+      "output_tokens": 39
+    },
+    {
+      "case_id": "novel91-candidate-027",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXACT_MATCH"
+        ]
+      },
+      "response_hash": "afa4092f6aee6e1b3f47f3c2f6ddb14dff04abc871ae8c4254e7ab139c00f5a9",
+      "input_tokens": 364,
+      "output_tokens": 38
+    },
+    {
+      "case_id": "novel91-candidate-028",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXPLICIT_MATCH"
+        ]
+      },
+      "response_hash": "b8bf52fea14da1fc70d1f3ad5ae088f7334a5ef07938b65a4237b34ef08e2e92",
+      "input_tokens": 343,
+      "output_tokens": 39
+    },
+    {
+      "case_id": "novel91-candidate-029",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXACT_MATCH"
+        ]
+      },
+      "response_hash": "afa4092f6aee6e1b3f47f3c2f6ddb14dff04abc871ae8c4254e7ab139c00f5a9",
+      "input_tokens": 368,
+      "output_tokens": 38
+    },
+    {
+      "case_id": "novel91-candidate-030",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "DIRECT_MATCH"
+        ]
+      },
+      "response_hash": "57ec8c22ace13545377ea95541141c03d8d946f87e87378ef70ca605ce2fe273",
+      "input_tokens": 351,
+      "output_tokens": 37
+    },
+    {
+      "case_id": "novel91-candidate-031",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXACT_MATCH"
+        ]
+      },
+      "response_hash": "afa4092f6aee6e1b3f47f3c2f6ddb14dff04abc871ae8c4254e7ab139c00f5a9",
+      "input_tokens": 349,
+      "output_tokens": 38
+    },
+    {
+      "case_id": "novel91-candidate-032",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "DIRECT_MATCH"
+        ]
+      },
+      "response_hash": "57ec8c22ace13545377ea95541141c03d8d946f87e87378ef70ca605ce2fe273",
+      "input_tokens": 352,
+      "output_tokens": 37
+    },
+    {
+      "case_id": "novel91-candidate-033",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXPLICIT_SUPPORT"
+        ]
+      },
+      "response_hash": "1e378541cac300fd17a0ef3678bbecdc72c91226f3d2b6e853200d3eba766659",
+      "input_tokens": 370,
+      "output_tokens": 39
+    },
+    {
+      "case_id": "novel91-candidate-034",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXPLICIT_MATCH"
+        ]
+      },
+      "response_hash": "b8bf52fea14da1fc70d1f3ad5ae088f7334a5ef07938b65a4237b34ef08e2e92",
+      "input_tokens": 355,
+      "output_tokens": 39
+    },
+    {
+      "case_id": "novel91-candidate-035",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXPLICIT_SUPPORT"
+        ]
+      },
+      "response_hash": "1e378541cac300fd17a0ef3678bbecdc72c91226f3d2b6e853200d3eba766659",
+      "input_tokens": 414,
+      "output_tokens": 39
+    },
+    {
+      "case_id": "novel91-candidate-036",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "DIRECT_MATCH"
+        ]
+      },
+      "response_hash": "57ec8c22ace13545377ea95541141c03d8d946f87e87378ef70ca605ce2fe273",
+      "input_tokens": 375,
+      "output_tokens": 37
+    },
+    {
+      "case_id": "novel91-candidate-037",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXPLICIT_SUPPORT"
+        ]
+      },
+      "response_hash": "1e378541cac300fd17a0ef3678bbecdc72c91226f3d2b6e853200d3eba766659",
+      "input_tokens": 370,
+      "output_tokens": 39
+    },
+    {
+      "case_id": "novel91-candidate-038",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXACT_MATCH"
+        ]
+      },
+      "response_hash": "afa4092f6aee6e1b3f47f3c2f6ddb14dff04abc871ae8c4254e7ab139c00f5a9",
+      "input_tokens": 356,
+      "output_tokens": 38
+    },
+    {
+      "case_id": "novel91-candidate-039",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXACT_MATCH"
+        ]
+      },
+      "response_hash": "afa4092f6aee6e1b3f47f3c2f6ddb14dff04abc871ae8c4254e7ab139c00f5a9",
+      "input_tokens": 352,
+      "output_tokens": 38
+    },
+    {
+      "case_id": "novel91-candidate-040",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXACT_MATCH"
+        ]
+      },
+      "response_hash": "afa4092f6aee6e1b3f47f3c2f6ddb14dff04abc871ae8c4254e7ab139c00f5a9",
+      "input_tokens": 365,
+      "output_tokens": 38
+    },
+    {
+      "case_id": "novel91-candidate-041",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXPLICIT_MATCH"
+        ]
+      },
+      "response_hash": "b8bf52fea14da1fc70d1f3ad5ae088f7334a5ef07938b65a4237b34ef08e2e92",
+      "input_tokens": 335,
+      "output_tokens": 39
+    },
+    {
+      "case_id": "novel91-candidate-042",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXPLICIT_SUPPORT"
+        ]
+      },
+      "response_hash": "1e378541cac300fd17a0ef3678bbecdc72c91226f3d2b6e853200d3eba766659",
+      "input_tokens": 344,
+      "output_tokens": 39
+    },
+    {
+      "case_id": "novel91-candidate-043",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXACT_MATCH"
+        ]
+      },
+      "response_hash": "afa4092f6aee6e1b3f47f3c2f6ddb14dff04abc871ae8c4254e7ab139c00f5a9",
+      "input_tokens": 336,
+      "output_tokens": 38
+    },
+    {
+      "case_id": "novel91-candidate-044",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXACT_MATCH"
+        ]
+      },
+      "response_hash": "afa4092f6aee6e1b3f47f3c2f6ddb14dff04abc871ae8c4254e7ab139c00f5a9",
+      "input_tokens": 364,
+      "output_tokens": 38
+    },
+    {
+      "case_id": "novel91-candidate-045",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXACT_MATCH"
+        ]
+      },
+      "response_hash": "afa4092f6aee6e1b3f47f3c2f6ddb14dff04abc871ae8c4254e7ab139c00f5a9",
+      "input_tokens": 342,
+      "output_tokens": 38
+    },
+    {
+      "case_id": "novel91-candidate-046",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "DIRECT_SUPPORT"
+        ]
+      },
+      "response_hash": "1b8ab382092bafa08466109bcd51ec7cfeeb15946384f2bb0ad5d95472473884",
+      "input_tokens": 340,
+      "output_tokens": 37
+    },
+    {
+      "case_id": "novel91-candidate-047",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXPLICIT_MATCH"
+        ]
+      },
+      "response_hash": "b8bf52fea14da1fc70d1f3ad5ae088f7334a5ef07938b65a4237b34ef08e2e92",
+      "input_tokens": 399,
+      "output_tokens": 39
+    },
+    {
+      "case_id": "novel91-candidate-048",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXACT_MATCH"
+        ]
+      },
+      "response_hash": "afa4092f6aee6e1b3f47f3c2f6ddb14dff04abc871ae8c4254e7ab139c00f5a9",
+      "input_tokens": 341,
+      "output_tokens": 38
+    },
+    {
+      "case_id": "novel91-candidate-049",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "DIRECT_MATCH"
+        ]
+      },
+      "response_hash": "57ec8c22ace13545377ea95541141c03d8d946f87e87378ef70ca605ce2fe273",
+      "input_tokens": 357,
+      "output_tokens": 37
+    },
+    {
+      "case_id": "novel91-candidate-050",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "DIRECT_SUPPORT"
+        ]
+      },
+      "response_hash": "1b8ab382092bafa08466109bcd51ec7cfeeb15946384f2bb0ad5d95472473884",
+      "input_tokens": 350,
+      "output_tokens": 37
+    },
+    {
+      "case_id": "novel91-candidate-051",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXPLICIT_SUPPORT"
+        ]
+      },
+      "response_hash": "1e378541cac300fd17a0ef3678bbecdc72c91226f3d2b6e853200d3eba766659",
+      "input_tokens": 365,
+      "output_tokens": 39
+    },
+    {
+      "case_id": "novel91-candidate-052",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "DIRECT_MATCH"
+        ]
+      },
+      "response_hash": "57ec8c22ace13545377ea95541141c03d8d946f87e87378ef70ca605ce2fe273",
+      "input_tokens": 353,
+      "output_tokens": 37
+    },
+    {
+      "case_id": "novel91-candidate-053",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXPLICIT_MATCH"
+        ]
+      },
+      "response_hash": "b8bf52fea14da1fc70d1f3ad5ae088f7334a5ef07938b65a4237b34ef08e2e92",
+      "input_tokens": 342,
+      "output_tokens": 39
+    },
+    {
+      "case_id": "novel91-candidate-054",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXACT_MATCH"
+        ]
+      },
+      "response_hash": "afa4092f6aee6e1b3f47f3c2f6ddb14dff04abc871ae8c4254e7ab139c00f5a9",
+      "input_tokens": 350,
+      "output_tokens": 38
+    },
+    {
+      "case_id": "novel91-candidate-055",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXACT_MATCH"
+        ]
+      },
+      "response_hash": "afa4092f6aee6e1b3f47f3c2f6ddb14dff04abc871ae8c4254e7ab139c00f5a9",
+      "input_tokens": 345,
+      "output_tokens": 38
+    },
+    {
+      "case_id": "novel91-candidate-056",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXPLICIT_MATCH"
+        ]
+      },
+      "response_hash": "b8bf52fea14da1fc70d1f3ad5ae088f7334a5ef07938b65a4237b34ef08e2e92",
+      "input_tokens": 337,
+      "output_tokens": 39
+    },
+    {
+      "case_id": "novel91-candidate-057",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": []
+      },
+      "response_hash": "30b1fc828cb4547135b0e644396fa189c677be116a52fbd1b333c9537bf62bc3",
+      "input_tokens": 341,
+      "output_tokens": 34
+    },
+    {
+      "case_id": "novel91-candidate-058",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXPLICIT_MATCH"
+        ]
+      },
+      "response_hash": "b8bf52fea14da1fc70d1f3ad5ae088f7334a5ef07938b65a4237b34ef08e2e92",
+      "input_tokens": 349,
+      "output_tokens": 39
+    },
+    {
+      "case_id": "novel91-candidate-059",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXPLICIT_MATCH"
+        ]
+      },
+      "response_hash": "b8bf52fea14da1fc70d1f3ad5ae088f7334a5ef07938b65a4237b34ef08e2e92",
+      "input_tokens": 344,
+      "output_tokens": 39
+    },
+    {
+      "case_id": "novel91-candidate-060",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXACT_MATCH"
+        ]
+      },
+      "response_hash": "afa4092f6aee6e1b3f47f3c2f6ddb14dff04abc871ae8c4254e7ab139c00f5a9",
+      "input_tokens": 353,
+      "output_tokens": 38
+    },
+    {
+      "case_id": "novel91-candidate-061",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "DIRECT_SUPPORT"
+        ]
+      },
+      "response_hash": "1b8ab382092bafa08466109bcd51ec7cfeeb15946384f2bb0ad5d95472473884",
+      "input_tokens": 349,
+      "output_tokens": 37
+    },
+    {
+      "case_id": "novel91-candidate-062",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "DIRECT_SUPPORT"
+        ]
+      },
+      "response_hash": "37d0742ad01f4dbee7d5f86f6536dc73ee231070ddb5de41fba28b42c8e2d6c0",
+      "input_tokens": 344,
+      "output_tokens": 49
+    },
+    {
+      "case_id": "novel91-candidate-063",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXACT_MATCH"
+        ]
+      },
+      "response_hash": "afa4092f6aee6e1b3f47f3c2f6ddb14dff04abc871ae8c4254e7ab139c00f5a9",
+      "input_tokens": 347,
+      "output_tokens": 38
+    },
+    {
+      "case_id": "novel91-candidate-064",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXACT_MATCH"
+        ]
+      },
+      "response_hash": "afa4092f6aee6e1b3f47f3c2f6ddb14dff04abc871ae8c4254e7ab139c00f5a9",
+      "input_tokens": 352,
+      "output_tokens": 38
+    },
+    {
+      "case_id": "novel91-candidate-065",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXPLICIT_SUPPORT"
+        ]
+      },
+      "response_hash": "1e378541cac300fd17a0ef3678bbecdc72c91226f3d2b6e853200d3eba766659",
+      "input_tokens": 345,
+      "output_tokens": 39
+    },
+    {
+      "case_id": "novel91-candidate-066",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXACT_MATCH"
+        ]
+      },
+      "response_hash": "afa4092f6aee6e1b3f47f3c2f6ddb14dff04abc871ae8c4254e7ab139c00f5a9",
+      "input_tokens": 348,
+      "output_tokens": 38
+    },
+    {
+      "case_id": "novel91-candidate-067",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "DIRECT_SUPPORT"
+        ]
+      },
+      "response_hash": "1b8ab382092bafa08466109bcd51ec7cfeeb15946384f2bb0ad5d95472473884",
+      "input_tokens": 347,
+      "output_tokens": 37
+    },
+    {
+      "case_id": "novel91-candidate-068",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXACT_MATCH"
+        ]
+      },
+      "response_hash": "afa4092f6aee6e1b3f47f3c2f6ddb14dff04abc871ae8c4254e7ab139c00f5a9",
+      "input_tokens": 337,
+      "output_tokens": 38
+    },
+    {
+      "case_id": "novel91-candidate-069",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXACT_MATCH"
+        ]
+      },
+      "response_hash": "afa4092f6aee6e1b3f47f3c2f6ddb14dff04abc871ae8c4254e7ab139c00f5a9",
+      "input_tokens": 348,
+      "output_tokens": 38
+    },
+    {
+      "case_id": "novel91-candidate-070",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXACT_MATCH"
+        ]
+      },
+      "response_hash": "afa4092f6aee6e1b3f47f3c2f6ddb14dff04abc871ae8c4254e7ab139c00f5a9",
+      "input_tokens": 359,
+      "output_tokens": 38
+    },
+    {
+      "case_id": "novel91-candidate-071",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXPLICIT_MATCH"
+        ]
+      },
+      "response_hash": "b8bf52fea14da1fc70d1f3ad5ae088f7334a5ef07938b65a4237b34ef08e2e92",
+      "input_tokens": 354,
+      "output_tokens": 39
+    },
+    {
+      "case_id": "novel91-candidate-072",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "DIRECT_MATCH"
+        ]
+      },
+      "response_hash": "57ec8c22ace13545377ea95541141c03d8d946f87e87378ef70ca605ce2fe273",
+      "input_tokens": 363,
+      "output_tokens": 37
+    },
+    {
+      "case_id": "novel91-candidate-073",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXPLICIT_SUPPORT"
+        ]
+      },
+      "response_hash": "1e378541cac300fd17a0ef3678bbecdc72c91226f3d2b6e853200d3eba766659",
+      "input_tokens": 347,
+      "output_tokens": 39
+    },
+    {
+      "case_id": "novel91-candidate-074",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXPLICIT_SUPPORT"
+        ]
+      },
+      "response_hash": "1e378541cac300fd17a0ef3678bbecdc72c91226f3d2b6e853200d3eba766659",
+      "input_tokens": 361,
+      "output_tokens": 39
+    },
+    {
+      "case_id": "novel91-candidate-075",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "DIRECT_SUPPORT"
+        ]
+      },
+      "response_hash": "1b8ab382092bafa08466109bcd51ec7cfeeb15946384f2bb0ad5d95472473884",
+      "input_tokens": 361,
+      "output_tokens": 37
+    },
+    {
+      "case_id": "novel91-candidate-076",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXACT_MATCH"
+        ]
+      },
+      "response_hash": "afa4092f6aee6e1b3f47f3c2f6ddb14dff04abc871ae8c4254e7ab139c00f5a9",
+      "input_tokens": 345,
+      "output_tokens": 38
+    },
+    {
+      "case_id": "novel91-candidate-077",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXPLICIT_MATCH"
+        ]
+      },
+      "response_hash": "b8bf52fea14da1fc70d1f3ad5ae088f7334a5ef07938b65a4237b34ef08e2e92",
+      "input_tokens": 339,
+      "output_tokens": 39
+    },
+    {
+      "case_id": "novel91-candidate-078",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXACT_MATCH"
+        ]
+      },
+      "response_hash": "afa4092f6aee6e1b3f47f3c2f6ddb14dff04abc871ae8c4254e7ab139c00f5a9",
+      "input_tokens": 351,
+      "output_tokens": 38
+    },
+    {
+      "case_id": "novel91-candidate-079",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXACT_MATCH"
+        ]
+      },
+      "response_hash": "afa4092f6aee6e1b3f47f3c2f6ddb14dff04abc871ae8c4254e7ab139c00f5a9",
+      "input_tokens": 378,
+      "output_tokens": 38
+    },
+    {
+      "case_id": "novel91-candidate-080",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXPLICIT_SUPPORT"
+        ]
+      },
+      "response_hash": "1e378541cac300fd17a0ef3678bbecdc72c91226f3d2b6e853200d3eba766659",
+      "input_tokens": 338,
+      "output_tokens": 39
+    },
+    {
+      "case_id": "novel91-candidate-081",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "DIRECT_MATCH"
+        ]
+      },
+      "response_hash": "57ec8c22ace13545377ea95541141c03d8d946f87e87378ef70ca605ce2fe273",
+      "input_tokens": 347,
+      "output_tokens": 37
+    },
+    {
+      "case_id": "novel91-candidate-082",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXACT_MATCH"
+        ]
+      },
+      "response_hash": "afa4092f6aee6e1b3f47f3c2f6ddb14dff04abc871ae8c4254e7ab139c00f5a9",
+      "input_tokens": 370,
+      "output_tokens": 38
+    },
+    {
+      "case_id": "novel91-candidate-083",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "DIRECT_SUPPORT"
+        ]
+      },
+      "response_hash": "1b8ab382092bafa08466109bcd51ec7cfeeb15946384f2bb0ad5d95472473884",
+      "input_tokens": 343,
+      "output_tokens": 37
+    },
+    {
+      "case_id": "novel91-candidate-084",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXPLICIT_SUPPORT"
+        ]
+      },
+      "response_hash": "1e378541cac300fd17a0ef3678bbecdc72c91226f3d2b6e853200d3eba766659",
+      "input_tokens": 349,
+      "output_tokens": 39
+    },
+    {
+      "case_id": "novel91-candidate-085",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXACT_MATCH"
+        ]
+      },
+      "response_hash": "afa4092f6aee6e1b3f47f3c2f6ddb14dff04abc871ae8c4254e7ab139c00f5a9",
+      "input_tokens": 364,
+      "output_tokens": 38
+    },
+    {
+      "case_id": "novel91-candidate-086",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "DIRECT_EVIDENCE"
+        ]
+      },
+      "response_hash": "a87583be45f014fa47980d994b3a289e17d825340608fa45a293a41e65777689",
+      "input_tokens": 355,
+      "output_tokens": 50
+    },
+    {
+      "case_id": "novel91-candidate-087",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": []
+      },
+      "response_hash": "30b1fc828cb4547135b0e644396fa189c677be116a52fbd1b333c9537bf62bc3",
+      "input_tokens": 354,
+      "output_tokens": 34
+    },
+    {
+      "case_id": "novel91-candidate-088",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXACT_MATCH"
+        ]
+      },
+      "response_hash": "afa4092f6aee6e1b3f47f3c2f6ddb14dff04abc871ae8c4254e7ab139c00f5a9",
+      "input_tokens": 349,
+      "output_tokens": 38
+    },
+    {
+      "case_id": "novel91-candidate-089",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "DIRECT_SUPPORT"
+        ]
+      },
+      "response_hash": "1b8ab382092bafa08466109bcd51ec7cfeeb15946384f2bb0ad5d95472473884",
+      "input_tokens": 343,
+      "output_tokens": 37
+    },
+    {
+      "case_id": "novel91-candidate-090",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "DIRECT_MATCH"
+        ]
+      },
+      "response_hash": "57ec8c22ace13545377ea95541141c03d8d946f87e87378ef70ca605ce2fe273",
+      "input_tokens": 363,
+      "output_tokens": 37
+    },
+    {
+      "case_id": "novel91-candidate-091",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXACT_MATCH"
+        ]
+      },
+      "response_hash": "afa4092f6aee6e1b3f47f3c2f6ddb14dff04abc871ae8c4254e7ab139c00f5a9",
+      "input_tokens": 350,
+      "output_tokens": 38
+    },
+    {
+      "case_id": "novel91-candidate-092",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXPLICIT_SUPPORT"
+        ]
+      },
+      "response_hash": "1e378541cac300fd17a0ef3678bbecdc72c91226f3d2b6e853200d3eba766659",
+      "input_tokens": 367,
+      "output_tokens": 39
+    },
+    {
+      "case_id": "novel91-candidate-093",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXACT_MATCH"
+        ]
+      },
+      "response_hash": "afa4092f6aee6e1b3f47f3c2f6ddb14dff04abc871ae8c4254e7ab139c00f5a9",
+      "input_tokens": 345,
+      "output_tokens": 38
+    },
+    {
+      "case_id": "novel91-candidate-094",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXACT_MATCH"
+        ]
+      },
+      "response_hash": "afa4092f6aee6e1b3f47f3c2f6ddb14dff04abc871ae8c4254e7ab139c00f5a9",
+      "input_tokens": 352,
+      "output_tokens": 38
+    },
+    {
+      "case_id": "novel91-candidate-095",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXACT_MATCH"
+        ]
+      },
+      "response_hash": "afa4092f6aee6e1b3f47f3c2f6ddb14dff04abc871ae8c4254e7ab139c00f5a9",
+      "input_tokens": 365,
+      "output_tokens": 38
+    },
+    {
+      "case_id": "novel91-candidate-096",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "DIRECT_MATCH"
+        ]
+      },
+      "response_hash": "57ec8c22ace13545377ea95541141c03d8d946f87e87378ef70ca605ce2fe273",
+      "input_tokens": 409,
+      "output_tokens": 37
+    },
+    {
+      "case_id": "novel91-candidate-097",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXACT_MATCH"
+        ]
+      },
+      "response_hash": "afa4092f6aee6e1b3f47f3c2f6ddb14dff04abc871ae8c4254e7ab139c00f5a9",
+      "input_tokens": 349,
+      "output_tokens": 38
+    },
+    {
+      "case_id": "novel91-candidate-098",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXACT_MATCH"
+        ]
+      },
+      "response_hash": "afa4092f6aee6e1b3f47f3c2f6ddb14dff04abc871ae8c4254e7ab139c00f5a9",
+      "input_tokens": 344,
+      "output_tokens": 38
+    },
+    {
+      "case_id": "novel91-candidate-099",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXPLICIT_SUPPORT"
+        ]
+      },
+      "response_hash": "1e378541cac300fd17a0ef3678bbecdc72c91226f3d2b6e853200d3eba766659",
+      "input_tokens": 356,
+      "output_tokens": 39
+    },
+    {
+      "case_id": "novel91-candidate-100",
+      "status": "reviewed",
+      "verdict": {
+        "classification": "accept",
+        "accepted": true,
+        "faithfulness": 4,
+        "coverage": 4,
+        "sufficiency": 4,
+        "critical_ambiguity": 0,
+        "reason_codes": [
+          "EXPLICIT_SUPPORT"
+        ]
+      },
+      "response_hash": "1e378541cac300fd17a0ef3678bbecdc72c91226f3d2b6e853200d3eba766659",
+      "input_tokens": 368,
+      "output_tokens": 39
+    }
+  ]
+}

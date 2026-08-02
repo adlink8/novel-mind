@@ -1,0 +1,49 @@
+{
+  "name": "answer-reading-question",
+  "description": "skill-local fixture：一组独立于 examples/basic.json 的合法 input + expected_output，供 25.2-07 Skill-local 测试与 25.2-05 loader 消费。",
+  "input": {
+    "question": "主角在第一章里获得的第一项能力是什么？",
+    "novel_id": 7,
+    "chapter_range": {
+      "chapter_start": 1,
+      "chapter_end": 5
+    }
+  },
+  "expected_output": {
+    "type": "cited_answer",
+    "schema_version": "cited-answer.v1",
+    "owner_id": 7,
+    "novel_id": 7,
+    "branch": null,
+    "producing_skill": "answer-reading-question",
+    "producing_skill_version": "1.0.0",
+    "skill_version_id": 1,
+    "model_lineage": {
+      "provider": "fixture",
+      "model": "stub-model",
+      "revision": "stub-1"
+    },
+    "source_versions": {
+      "novel": "v1",
+      "chapters": {
+        "1": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+      }
+    },
+    "input_hash": "c22442ffa834d1e3f04e8d6cd62a78b8c0b5e1c2b4c8e88f4e8b2f4c8e88f4e8",
+    "evidence_refs": ["evidence:1"],
+    "answer": {
+      "answer_blocks": [
+        {
+          "block_id": "b1",
+          "text": "主角在第一章中获得了控火能力。",
+          "evidence_refs": ["evidence:1"]
+        }
+      ],
+      "clarifying_question": null,
+      "uncertainty": null,
+      "suggestion_candidates": []
+    },
+    "status": "candidate",
+    "parent_revision": null
+  }
+}
