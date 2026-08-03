@@ -11,6 +11,11 @@ revision of a canonical ``SceneSpec``; it never becomes source truth. One table:
   negative constraints, unresolved uncertainties, the redacted preview and a
   candidate-only review state. A human edit creates a new revision
   (``parent_prompt_revision_id``); a candidate is never overwritten in place.
+- ``prompt_revision_review_events`` (Phase 32-04): append-only human/machine
+  review actions (approve/reject/supersede/needs_relink) with an idempotent
+  ``event_key``; the revision row's ``review_state`` is only a projection.
+  Approval marks the PromptRevision as an approved Phase 33 input and never
+  rewrites the SceneSpec or original source (D-32-01/D-32-04).
 
 Design conventions (following ``visual_bible.py`` / ``key_scene.py``):
 - No active-pointer / promotion / current-revision column (D-32-01).
@@ -33,6 +38,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
+from sqlalchemy.event import listen
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, JSONB, TimestampMixin
@@ -45,6 +51,12 @@ PROMPT_REVIEW_STATES = (
     "superseded",
     "needs_relink",
 )
+# Review actions mirror ``SPEC_REVIEW_ACTIONS`` in schemas/scene_spec.py.
+# ``edit`` is NOT a review action here: a human edit creates an explicit new
+# PromptRevision candidate through the prompt seam (D-32-04) instead of
+# changing the immutable row's state.
+PROMPT_REVIEW_ACTIONS = ("approve", "reject", "supersede", "needs_relink")
+PROMPT_ACTOR_SOURCES = ("human", "machine")
 
 
 def _sql_values(values: tuple[str, ...]) -> str:
@@ -200,3 +212,86 @@ class PromptRevision(TimestampMixin, Base):
     canonical_payload_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     idempotency_key: Mapped[str] = mapped_column(String(64), nullable=False)
     projection_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+
+
+class PromptRevisionReviewEvent(TimestampMixin, Base):
+    """Append-only human/machine review action with idempotent event key (D-32-04).
+
+    One event per explicit review action on one PromptRevision candidate. The
+    revision row's ``review_state`` is a projection; the event rows are the
+    append-only audit history (same convention as
+    ``VisualBibleReviewEvent`` / ``SceneReviewDecision``). Approval only marks
+    the PromptRevision as an approved Phase 33 *input*; it never rewrites the
+    SceneSpec or the original source (D-32-01/D-32-04).
+    """
+
+    __tablename__ = "prompt_revision_review_events"
+    __table_args__ = (
+        UniqueConstraint(
+            "owner_id",
+            "novel_id",
+            "revision_id",
+            "event_key",
+            name="uq_prompt_revision_review_events_key",
+        ),
+        Index(
+            "idx_prompt_revision_review_events_revision",
+            "owner_id",
+            "novel_id",
+            "revision_id",
+        ),
+        ForeignKeyConstraint(
+            ["owner_id", "novel_id", "revision_id"],
+            [
+                "prompt_revisions.owner_id",
+                "prompt_revisions.novel_id",
+                "prompt_revisions.id",
+            ],
+            ondelete="CASCADE",
+            name="fk_prompt_revision_review_events_revision_scope",
+        ),
+        CheckConstraint(
+            f"action IN ({_sql_values(PROMPT_REVIEW_ACTIONS)})",
+            name="ck_prompt_revision_review_events_action",
+        ),
+        CheckConstraint(
+            f"actor_source IN ({_sql_values(PROMPT_ACTOR_SOURCES)})",
+            name="ck_prompt_revision_review_events_actor_source",
+        ),
+        CheckConstraint(
+            f"from_review_state IN ({_sql_values(PROMPT_REVIEW_STATES)})",
+            name="ck_prompt_revision_review_events_from_state",
+        ),
+        CheckConstraint(
+            f"to_review_state IN ({_sql_values(PROMPT_REVIEW_STATES)})",
+            name="ck_prompt_revision_review_events_to_state",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    owner_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    novel_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    revision_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    action: Mapped[str] = mapped_column(String(24), nullable=False)
+    actor_source: Mapped[str] = mapped_column(String(16), nullable=False)
+    actor: Mapped[str] = mapped_column(String(200), nullable=False)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    event_key: Mapped[str] = mapped_column(String(160), nullable=False)
+    from_review_state: Mapped[str] = mapped_column(String(16), nullable=False)
+    to_review_state: Mapped[str] = mapped_column(String(16), nullable=False)
+    details: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+
+
+def _reject_prompt_review_mutation(
+    _mapper: object, _connection: object, target: object
+) -> None:
+    raise ValueError(
+        f"{type(target).__name__} review events are immutable (append-only)"
+    )
+
+
+# Review events are append-only: no in-place edit or delete of an event and no
+# replay of a review action. The PromptRevision row's review_state projection
+# is the only mutable review surface (D-32-04).
+listen(PromptRevisionReviewEvent, "before_update", _reject_prompt_review_mutation)
+listen(PromptRevisionReviewEvent, "before_delete", _reject_prompt_review_mutation)

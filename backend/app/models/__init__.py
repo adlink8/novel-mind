@@ -214,7 +214,10 @@ from app.models.scene_spec import (
     SceneSpecUncertainty,
     SceneSpecVersion,
 )
-from app.models.prompt_revision import PromptRevision
+from app.models.prompt_revision import (
+    PromptRevision,
+    PromptRevisionReviewEvent,
+)
 
 __all__ = [
     "Base",
@@ -360,4 +363,5 @@ __all__ = [
     "SceneSpecEvidenceRef",
     "SceneSpecUncertainty",
     "PromptRevision",
+    "PromptRevisionReviewEvent",
 ]

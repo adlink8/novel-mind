@@ -21,6 +21,15 @@ Candidate-only, provider-neutral → provider-specific compiled prompt endpoints
   edits fail closed; no image provider is called.
 - ``GET  /api/novels/{novel_id}/prompt-revisions/{revision_id}/diff`` —
   deterministic diff against the revision's parent (auditable edit lineage).
+- ``POST /api/novels/{novel_id}/prompt-revisions/{revision_id}/review`` —
+  append one explicit, idempotent review action (approve/reject/supersede/
+  needs_relink). The server re-verifies owner/novel/revision scope, the
+  ``from_review_state``, the legal transition and (for approvals) the stale/
+  hash approval gate; approval only marks the PromptRevision as an approved
+  Phase 33 input (D-32-04).
+- ``GET  /api/novels/{novel_id}/prompt-revisions/{revision_id}/history`` —
+  the append-only review event history plus the current state, staleness
+  marker and approval-gate reason codes.
 
 Every route uses ``require_owned_novel``; a revision/spec outside the caller's
 owner/novel scope is indistinguishable from "not found". No route invokes an
@@ -40,7 +49,12 @@ from app.models import Novel, User
 from app.schemas.scene_spec import (
     PromptArtifactLineage,
     PromptRevisionView,
+    SceneSpecGateError,
+    SpecActorSource,
     SpecDetailKind,
+    SpecReviewAction,
+    SpecReviewEventInput,
+    SpecReviewState,
     StrictSceneSpecModel,
 )
 from app.services.prompt_compiler.adapters import (
@@ -52,6 +66,13 @@ from app.services.prompt_compiler.adapters import (
     PromptRevisionNotFound,
     PromptRevisionService,
     PromptRevisionServiceError,
+)
+from app.services.prompt_compiler.revisions import (
+    PromptRevisionReviewEnvelope,
+    PromptRevisionReviewService,
+    PromptReviewConflict,
+    PromptReviewNotFound,
+    build_review_envelope,
 )
 
 router = APIRouter(dependencies=[Depends(require_user)])
@@ -138,6 +159,17 @@ class PromptDiffResponse(StrictWireModel):
 class PromptEditResponse(StrictWireModel):
     revision: PromptRevisionView
     diff: PromptDiffResponse
+
+
+class PromptReviewRequest(StrictWireModel):
+    """One explicit review action; scope and legality are decided server-side."""
+
+    action: SpecReviewAction
+    actor_source: SpecActorSource
+    actor: str = Field(min_length=1, max_length=200)
+    reason: str = Field(min_length=1, max_length=1000)
+    event_key: str = Field(min_length=1, max_length=160)
+    from_review_state: SpecReviewState
 
 
 def _not_found() -> HTTPException:
@@ -389,3 +421,76 @@ async def edit_prompt_revision(
     except (PromptRevisionServiceError, PromptCompileError, PromptRevisionConflict) as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     return PromptEditResponse(revision=result.view, diff=_diff_view(result.diff))
+
+
+# ---------------------------------------------------------------------------
+# Review routes (append-only, explicit, owner/version/hash gated)
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/{novel_id}/prompt-revisions/{revision_id}/review",
+    response_model=PromptRevisionReviewEnvelope,
+)
+async def review_prompt_revision(
+    revision_id: int,
+    payload: PromptReviewRequest,
+    novel: Novel = Depends(require_owned_novel),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """Append one explicit, idempotent review action (approve/reject/supersede/
+    needs_relink) on a compiled prompt candidate.
+
+    The server re-verifies owner/novel/revision scope, the decision's
+    ``from_review_state``, the legal transition and (for approvals) the stale/
+    hash approval gate. A repeated ``event_key`` replays the existing event and
+    never appends a second one. Approval only marks the PromptRevision as an
+    approved Phase 33 input; the SceneSpec and the original source are never
+    rewritten and no image provider is called (D-32-04).
+    """
+    owner_id = current_user.id
+    novel_id = novel.id
+    event = SpecReviewEventInput(
+        owner_id=owner_id,
+        novel_id=novel_id,
+        revision_id=revision_id,
+        event_key=payload.event_key,
+        action=payload.action,
+        actor_source=payload.actor_source,
+        actor=payload.actor,
+        reason=payload.reason,
+        from_review_state=payload.from_review_state,
+    )
+    review = PromptRevisionReviewService(db)
+    try:
+        return await review.append_event(
+            owner_id=owner_id, novel_id=novel_id, event=event
+        )
+    except PromptReviewNotFound:
+        raise _not_found() from None
+    except (PromptReviewConflict, SceneSpecGateError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.get(
+    "/{novel_id}/prompt-revisions/{revision_id}/history",
+    response_model=PromptRevisionReviewEnvelope,
+)
+async def get_prompt_revision_history(
+    revision_id: int,
+    novel: Novel = Depends(require_owned_novel),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """Append-only review event history plus current state, staleness marker
+    and (for an approvable candidate) the approval-gate reason codes."""
+    try:
+        return await build_review_envelope(
+            db,
+            owner_id=current_user.id,
+            novel_id=novel.id,
+            revision_id=revision_id,
+        )
+    except PromptReviewNotFound:
+        raise _not_found() from None
