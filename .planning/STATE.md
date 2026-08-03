@@ -50,6 +50,9 @@ No single aggregate completion percentage is authoritative.
 6. `26`: **IMPLEMENTED & VERIFIED (2026-08-02/03)** — QueryPlan contract + durable trace,
    dimension adapters/fusion, leaf EvidenceRef + frozen manifest, shared consumers,
    answer-reading-question skill integration, structured-output integrity.
+7. `27`: **IMPLEMENTED & VERIFIED (2026-08-03)** — event fact/causal edge, character
+   epistemic history, entity/rule/faction/place/item, four-label authority + disclosure,
+   propose-world-model-candidates skill (tool registry 7→12).
 
 ## Planning Portfolio
 
@@ -58,7 +61,8 @@ No single aggregate completion percentage is authoritative.
 | Phase 25.2 | VERIFIED | 8 | ✅ 2026-08-02 (user execution override) |
 | Phase 25.3 | VERIFIED | 7 | ✅ 2026-08-02 |
 | Phase 26 | VERIFIED | 7 | ✅ 2026-08-02/03 (user execution override) |
-| Phase 27–29 | PLANNED | 15 | BLOCKED by Phase 22 3/3 |
+| Phase 27 | VERIFIED | 5 | ✅ 2026-08-03 (user execution override) |
+| Phase 28–29 | PLANNED | 10 | BLOCKED by Phase 22 3/3 |
 | Phase 30–34 | PLANNED | 24 | BLOCKED by upstream execution dependencies |
 | Phase 35–39 | PLANNED | 25 | BLOCKED by upstream execution dependencies |
 
@@ -144,6 +148,16 @@ created.
 - Phase 28+ still require a passed Phase 27 verification artifact per ROADMAP contracts;
   this override does not waive those.
 
+## Execution Override — Phase 28 (2026-08-03, user authorized)
+
+- User authorized continuing phase execution and skipping the Phase 22 3/3 gate for Phase 28
+  (2026-08-03, "可以多子代理进行 不设限"). Scope: Phase 28-01..05 (failure classification and
+  recovery, chapter state terminal convergence, semantic arc/volume/global, cross-dimension
+  closure, Agent integration) proceed without Phase 22 real scheduled green evidence.
+- Phase 22 verdict is NOT changed: remains blocked at 0/3 and must not be marked complete.
+- Phase 29+ still require a passed Phase 28 verification artifact per ROADMAP contracts;
+  this override does not waive those.
+
 ## Execution Cursor
 
 Phase 22 execution is paused. Its recovery entry remains:
@@ -151,11 +165,11 @@ Phase 22 execution is paused. Its recovery entry remains:
 `.planning/phases/22-ci-nightly-gap-closure/22-G2-PLAN.md`
 
 Phase 26–39 planning is complete, including the AgentVN planning integration recorded on
-2026-08-02. Phase 25.2, Phase 25.3 and Phase 26 are implemented and verified
-under the 2026-08-02 execution overrides (26-VERIFICATION passed at `cb071bc`).
-Phase 27+ execution requires a passed upstream Phase 26 VERIFICATION (exists) plus
+2026-08-02. Phase 25.2, Phase 25.3, Phase 26 and Phase 27 are implemented and verified
+under the 2026-08-02/03 execution overrides (27-VERIFICATION passed at `0616920`).
+Phase 28 execution is authorized by the 2026-08-03 Phase 28 override.
+Phase 29+ execution requires a passed upstream Phase 28 VERIFICATION (in progress) plus
 Phase 22 real scheduled green evidence (0/3, not satisfied) or a further explicit override.
-If Phase 22 is resumed, use `$gsd-resume-work`; do not mark it complete early.
 If Phase 22 is resumed, use `$gsd-resume-work`; do not mark it complete early.
 
 ## Roadmap
