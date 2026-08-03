@@ -201,6 +201,12 @@ from app.models.visual_bible import (
     VisualEvidenceRef,
     VisualReferenceAsset,
 )
+from app.models.key_scene import (
+    SceneCandidate,
+    SceneCandidateSet,
+    SceneEvidenceRange,
+    SceneReviewDecision,
+)
 
 __all__ = [
     "Base",
@@ -336,4 +342,8 @@ __all__ = [
     "VisualEvidenceRef",
     "VisualReferenceAsset",
     "VisualBibleReviewEvent",
+    "SceneCandidateSet",
+    "SceneCandidate",
+    "SceneEvidenceRange",
+    "SceneReviewDecision",
 ]
