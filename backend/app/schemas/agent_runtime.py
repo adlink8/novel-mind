@@ -517,5 +517,54 @@ class VisualBibleArtifact(StrictAgentRuntimeModel):
         return value
 
 
+# ────────────────────────── Phase 31 Key Scene Artifact 信封（REQ-VIS-02 / REQ-AGENT-02/03/04） ──────────────────────────
+
+
+class SceneCandidateArtifact(StrictAgentRuntimeModel):
+    """智能体产物的 SceneCandidateArtifact 信封（Phase 31 / D-31-01..D-31-05）。
+
+    Agent 产出的是 **candidate-only** 的关键场景候选集契约：
+    ``scene_candidate_set`` 携带完整 ``SceneCandidateSetContract``（ordered
+    candidates / diversity keys / evidence refs / spoiler cutoff / salience
+    reasons / advisory ``speaker_dialogue_signal`` + 全量 lineage hash），其
+    ``review_state`` 恒为 ``candidate``——用户选择/审查（``key_scene:approve``）
+    是显式、append-only 的服务端状态迁移（D-31-04），Agent 绝不能直接授予或伪造
+    批准。确定性 score/diversity/density/spoiler validator 拥有 permission /
+    evidence / state-transition / publication 权威（D-31-01/D-31-03）。REQ-VIS-06
+    speaker/dialogue heuristic 信号是诊断候选元数据（D-31-05），绝不进入
+    evidence_refs / citation / Canon / 审批原因。``tool_runs`` 携带 ToolRun
+    血缘。与 CitedAnswerArtifact 信封纪律一致：type / schema_version / owner /
+    novel / branch / producing skill+version / model lineage / source versions /
+    input_hash / evidence_refs / status / parent_revision / normalization
+    （26-06 修复血缘 trail）。
+    """
+
+    type: Literal["scene_candidate"] = "scene_candidate"
+    schema_version: Literal["scene-candidate.v1"] = "scene-candidate.v1"
+    owner_id: int
+    novel_id: int
+    branch: str | None = None
+    producing_skill: str = Field(min_length=1, max_length=120)
+    producing_skill_version: str = Field(min_length=1, max_length=32)
+    skill_version_id: int = Field(gt=0)
+    model_lineage: dict[str, Any]
+    source_versions: dict[str, Any]
+    input_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    evidence_refs: list[str] = Field(min_length=1)
+    scene_candidate_set: dict[str, Any]
+    tool_runs: list[dict[str, Any]] = Field(min_length=1)
+    status: Literal["candidate", "validated", "approved", "published", "rejected"]
+    parent_revision: str | None = None
+    normalization: NormalizationTrail
+
+    @field_validator("tool_runs")
+    @classmethod
+    def _tool_runs_shape(cls, value: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        for item in value:
+            if not isinstance(item, dict) or not item.get("tool_name"):
+                raise ValueError("each tool run requires tool_name")
+        return value
+
+
 # 供 OpenAPI 引用，避免未使用告警。
 _ = (StrictReaderChatModel,)

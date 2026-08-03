@@ -16,7 +16,7 @@ import { defineTool } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { fastapiToolCall } from "./fastapi-client.js";
 
-/** 12 个域工具名（固定顺序；唯一 allowlist 事实源）。 */
+/** 13 个域工具名（固定顺序；唯一 allowlist 事实源）。 */
 export const DOMAIN_TOOL_NAMES = [
   "get_novel",
   "get_chapter",
@@ -30,6 +30,7 @@ export const DOMAIN_TOOL_NAMES = [
   "get_character_knowledge",
   "get_world_rules",
   "get_evidence_span",
+  "get_visual_bible",
 ] as const;
 
 /** 工具注册时的运行级授权（端用户 JWT 或 per-run 内部令牌）。 */
@@ -228,6 +229,24 @@ export function buildDomainTools(auth: ToolAuth) {
       }),
       execute: (toolCallId, params, signal) =>
         fastapiToolCall("get_evidence_span", params as unknown, signal, auth),
+    }),
+    // ── Phase 30 Visual Bible 只读工具（31-04）──
+    defineTool({
+      name: "get_visual_bible",
+      label: "Get Visual Bible Version",
+      description:
+        "Visual Bible 候选版本视图（Phase 30/31）。owner/novel 范围服务端强制；candidate-only 只读——approval 权威只在 FastAPI review API（D-30-04），本工具绝不批准/发布任何版本。",
+      parameters: Type.Object({
+        novel_id: Type.Integer({ minimum: 1, description: "小说 ID" }),
+        version_id: Type.Optional(
+          Type.Integer({ minimum: 1, description: "Visual Bible 版本 ID（缺省列表）" }),
+        ),
+        approved_only: Type.Optional(
+          Type.Boolean({ description: "只返回 review_state=approved 的候选版本" }),
+        ),
+      }),
+      execute: (toolCallId, params, signal) =>
+        fastapiToolCall("get_visual_bible", params as unknown, signal, auth),
     }),
   ];
 }

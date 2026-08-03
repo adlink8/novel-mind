@@ -303,9 +303,9 @@ describe("governance/permission-manifest.ts（D-05 ajv，fail-closed）", () => 
 // ────────────────────────── Task 2: ToolRegistryManifest 构建 + 碰撞门 ──────────────────────────
 
 describe("governance/tool-registry-manifest.ts（D-06 构建 + collision 门）", () => {
-  it("manifest: domainToolEntries 恰 12 个域工具，字段完整", () => {
+  it("manifest: domainToolEntries 恰 13 个域工具，字段完整", () => {
     const entries = domainToolEntries();
-    expect(entries).toHaveLength(12);
+    expect(entries).toHaveLength(13);
     expect(entries.map((e) => e.tool_name)).toEqual([
       "get_novel",
       "get_chapter",
@@ -319,6 +319,7 @@ describe("governance/tool-registry-manifest.ts（D-06 构建 + collision 门）"
       "get_character_knowledge",
       "get_world_rules",
       "get_evidence_span",
+      "get_visual_bible",
     ]);
     for (const entry of entries) {
       expect(entry.provider_package).toBe("agent-service");
@@ -424,7 +425,7 @@ describe("governance/tool-registry-manifest.ts（D-06 构建 + collision 门）"
       ],
     };
     const manifest = buildToolRegistryManifest([domainToolEntries(), extensionToolEntries(lock)]);
-    expect(manifest).toHaveLength(14);
+    expect(manifest).toHaveLength(15);
     expect(manifest.map((e) => e.tool_name)).toContain("get_novel_timeline");
     expect(manifest.map((e) => e.tool_name)).toContain("get_novel_summary");
   });
@@ -461,7 +462,7 @@ describe("governance/tool-registry-manifest.ts（D-06 构建 + collision 门）"
       enabledLock.mcp?.enabled ? [proxy] : [],
     ]);
     expect(manifest2.map((e) => e.tool_name)).toContain("mcp");
-    expect(manifest2).toHaveLength(13);
+    expect(manifest2).toHaveLength(14);
   });
 });
 
@@ -472,11 +473,11 @@ describe("启动治理链 runGovernanceChain（server.ts，先于 listen）", ()
     // fixture 目录位于系统 temp，交由 OS 清理（沙箱删除守卫限制 bulk delete）。
   });
 
-  it("chain: 合法锁 → 返回含 12 个域工具的 manifest", () => {
+  it("chain: 合法锁 → 返回含 13 个域工具的 manifest", () => {
     const { dir, paths } = fixturePaths();
     track(dir);
     const manifest = runGovernanceChain(paths);
-    expect(manifest).toHaveLength(12);
+    expect(manifest).toHaveLength(13);
     expect(manifest.map((e) => e.tool_name)).toEqual([
       "get_novel",
       "get_chapter",
@@ -490,6 +491,7 @@ describe("启动治理链 runGovernanceChain（server.ts，先于 listen）", ()
       "get_character_knowledge",
       "get_world_rules",
       "get_evidence_span",
+      "get_visual_bible",
     ]);
   });
 
@@ -821,7 +823,7 @@ describe("进程级 fail-closed（投毒配置 → 非零退出 + 指名错误�
     expect(output).toMatch(/get_novel/);
   });
 
-  it("(d) 诚实配置 → 治理链通过，进程存活（GOVERNANCE_OK 12，exit 0）", () => {
+  it("(d) 诚实配置 → 治理链通过，进程存活（GOVERNANCE_OK 13，exit 0）", () => {
     const work = createProcessHarness();
     const { dir, paths } = fixturePaths();
     track(dir);
@@ -832,6 +834,6 @@ describe("进程级 fail-closed（投毒配置 → 非零退出 + 指名错误�
       { encoding: "utf8" },
     );
     expect(result.status).toBe(0);
-    expect(`${result.stdout ?? ""}`).toMatch(/GOVERNANCE_OK 12/);
+    expect(`${result.stdout ?? ""}`).toMatch(/GOVERNANCE_OK 13/);
   });
 });

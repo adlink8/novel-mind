@@ -46,6 +46,11 @@ from app.services.agent_tools.errors import (
     ToolTimeoutError,
     UpstreamError,
 )
+from app.services.visual_bible.authority import (
+    CandidateNotFoundError,
+    list_versions as list_visual_bible_versions,
+    load_version_view as load_visual_bible_version_view,
+)
 from app.services.clues.query import build_clue_envelope
 from app.services.narrative_memory.structure_query import (
     StructureQueryError,
@@ -64,9 +69,10 @@ from app.services.world_model.knowledge_queries import KnowledgeQueries
 
 logger = logging.getLogger(__name__)
 
-# 冻结的 12 个只读域工具名（25.2-03 skill.yaml 的 allowed_tools 白名单镜像此表；
+# 冻结的 13 个只读域工具名（25.2-03 skill.yaml 的 allowed_tools 白名单镜像此表；
 # 27-05 起加入 Phase 27 世界模型工具 get_events / get_character_state /
-# get_character_knowledge / get_world_rules / get_evidence_span）。
+# get_character_knowledge / get_world_rules / get_evidence_span；31-04 起加入
+# Phase 30 Visual Bible 只读工具 get_visual_bible）。
 TOOL_NAMES: tuple[str, ...] = (
     "get_novel",
     "get_chapter",
@@ -80,6 +86,7 @@ TOOL_NAMES: tuple[str, ...] = (
     "get_character_knowledge",
     "get_world_rules",
     "get_evidence_span",
+    "get_visual_bible",
 )
 
 # per-tool 默认字节上限（agent-service 侧同样硬编码 64 KiB，见 RESEARCH Code Examples）。
@@ -419,6 +426,42 @@ async def _default_get_evidence_span(
     }
 
 
+async def _default_get_visual_bible(
+    db,
+    *,
+    owner_id: int,
+    novel_id: int,
+    version_id: int | None,
+    approved_only: bool,
+) -> dict[str, Any] | None:
+    """按 owner/novel 范围读取 Visual Bible 候选版本视图（31-04 只读工具）。
+
+    显式 ``version_id`` → 单个候选信封（owner/novel 越界 → None，404-hide）；
+    缺省 → 版本列表。``approved_only=True`` 只保留 review_state=approved 的
+    版本（D-30-04 approval 权威仍只在 FastAPI review API，本工具只读）。
+    """
+    if version_id is not None:
+        try:
+            view = await load_visual_bible_version_view(
+                db,
+                owner_id=owner_id,
+                novel_id=novel_id,
+                version_id=version_id,
+            )
+        except CandidateNotFoundError:
+            return None
+        return view.model_dump(mode="json")
+    views = await list_visual_bible_versions(
+        db, owner_id=owner_id, novel_id=novel_id
+    )
+    if approved_only:
+        views = [view for view in views if view.review_state == "approved"]
+    return {
+        "items": [view.model_dump(mode="json") for view in views],
+        "total": len(views),
+    }
+
+
 async def _resolve_world_model_version(
     db,
     *,
@@ -477,6 +520,8 @@ class ToolFacade:
             "get_character_knowledge": self._get_character_knowledge,
             "get_world_rules": self._get_world_rules,
             "get_evidence_span": self._get_evidence_span,
+            # Phase 30 Visual Bible 只读工具（31-04）。
+            "get_visual_bible": self._get_visual_bible,
         }
 
     # ── 公共入口 ──
@@ -807,6 +852,19 @@ class ToolFacade:
                 f"章节 {span['chapter_number']} 超出当前阅读进度截止点 {cutoff}"
             )
         return span
+
+    async def _get_visual_bible(self, *, db, novel, owner_id, params):
+        svc = self._svc("get_visual_bible", _default_get_visual_bible)
+        payload = await svc(
+            db,
+            owner_id=owner_id,
+            novel_id=novel.id,
+            version_id=params.get("version_id"),
+            approved_only=bool(params.get("approved_only", False)),
+        )
+        if payload is None:
+            raise NotFoundError("visual bible version not found in scope")
+        return payload
 
 
 def _json_default(obj: Any) -> str:

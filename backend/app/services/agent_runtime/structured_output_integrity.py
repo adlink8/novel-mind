@@ -29,10 +29,16 @@ from app.schemas.agent_runtime import (
     ChapterAnalysisArtifact,
     CitedAnswerArtifact,
     ExternalEvidenceArtifact,
+    SceneCandidateArtifact,
     SkillEvaluationArtifact,
     StoryArcArtifact,
     VisualBibleArtifact,
     WorldModelCandidateArtifact,
+)
+from app.schemas.key_scene import (
+    KeySceneGateError,
+    SceneCandidateSetContract,
+    validate_candidate_set_contract,
 )
 from app.schemas.visual_bible import (
     VisualAuthority,
@@ -112,6 +118,16 @@ BLOCKED_VISUAL_BIBLE_APPROVAL_BYPASS = (
 BLOCKED_VISUAL_BIBLE_EVIDENCE_MISMATCH = (
     "integrity: visual bible canon claim evidence keys must be a subset of envelope evidence_refs"
 )
+# Phase 31 Key Scene 确定性边界（D-31-01..D-31-05）。
+BLOCKED_SCENE_CANDIDATE_PAYLOAD = (
+    "integrity: scene candidate set payload failed domain validation"
+)
+BLOCKED_SCENE_CANDIDATE_APPROVAL_BYPASS = (
+    "integrity: scene candidate approval bypass blocked — review_state must be candidate"
+)
+BLOCKED_SCENE_CANDIDATE_EVIDENCE_MISMATCH = (
+    "integrity: scene candidate evidence keys must be a subset of envelope evidence_refs"
+)
 
 
 @dataclass(frozen=True)
@@ -167,6 +183,8 @@ def evaluate_integrity(*, envelope: dict[str, Any], run: SkillRun) -> IntegrityD
         return _evaluate_skill_evaluation(envelope, run)
     if artifact_type == "visual_bible":
         return _evaluate_visual_bible(envelope, run)
+    if artifact_type == "scene_candidate":
+        return _evaluate_scene_candidate(envelope, run)
     return IntegrityDecision(False, BLOCKED_UNKNOWN_TYPE)
 
 
@@ -536,5 +554,68 @@ def _evaluate_visual_bible(
     envelope_keys = set(envelope.get("evidence_refs") or [])
     if not claim_keys.issubset(envelope_keys):
         return IntegrityDecision(False, BLOCKED_VISUAL_BIBLE_EVIDENCE_MISMATCH)
+
+    return IntegrityDecision(True)
+
+
+def _evaluate_scene_candidate(
+    envelope: dict[str, Any], run: SkillRun
+) -> IntegrityDecision:
+    """Phase 31 SceneCandidateArtifact 信封 integrity gate（D-31-01..D-31-05）。
+
+    与其余信封纪律一致（evidence/lineage/status/trail/protected），并在
+    ``scene_candidate_set`` 负载上做确定性域边界校验：
+      - ``scene_candidate_set`` 必须是严格 ``SceneCandidateSetContract`` 且通过
+        ``validate_candidate_set_contract``（候选证据血缘、spoiler cutoff、
+        heuristic-signal isolation、manifest hash 重放全部服务端重算，
+        D-31-02/D-31-03/D-31-05）；
+      - ``review_state`` 恒为 ``candidate``——Agent 声称任何非 candidate
+        review_state（approval bypass）→ blocked（用户选择/审查是服务端显式、
+        append-only 的 ``key_scene:approve`` 迁移，D-31-04）；
+      - 每个候选的 evidence key 必须 ⊆ 信封顶层 ``evidence_refs``（leaf-evidence
+        资格门，D-31-02）；speaker/dialogue heuristic 信号是诊断元数据
+        （D-31-05），结构性隔离由 ``validate_candidate_set_contract`` 强制。
+    任何失败 → 稳定 blocked，零写入；FastAPI 与确定性 validators 保留
+    permission / evidence / state-transition / publication 权威。
+    """
+    # 0. heuristic candidate-only 无 EvidenceRef 资格 → 不能进关键场景网关。
+    if not envelope.get("evidence_refs"):
+        return IntegrityDecision(False, BLOCKED_NO_EVIDENCE)
+
+    # 1. 严格 wire schema。
+    try:
+        model = SceneCandidateArtifact.model_validate(envelope)
+    except ValidationError as exc:
+        return IntegrityDecision(False, f"{BLOCKED_SCHEMA} ({_first_validation_error(exc)})")
+
+    # 2. 共享 lineage/status/trail/protected 门。
+    blocked = _check_common_lineage(envelope=envelope, run=run, wire=model)
+    if blocked is not None:
+        return blocked
+
+    # 3. scene_candidate_set 负载：严格域契约 + approval bypass 门 + 证据血缘。
+    payload = envelope.get("scene_candidate_set")
+    if not isinstance(payload, dict):
+        return IntegrityDecision(False, BLOCKED_SCENE_CANDIDATE_PAYLOAD)
+    if payload.get("review_state") != "candidate":
+        return IntegrityDecision(False, BLOCKED_SCENE_CANDIDATE_APPROVAL_BYPASS)
+    try:
+        set_ = SceneCandidateSetContract.model_validate(payload)
+        validate_candidate_set_contract(set_)
+    except (ValidationError, KeySceneGateError) as exc:
+        return IntegrityDecision(
+            False,
+            f"{BLOCKED_SCENE_CANDIDATE_PAYLOAD} ({exc})",
+        )
+
+    # 4. 每个候选的 leaf evidence 必须 ⊆ 信封 evidence_refs（D-31-02）。
+    candidate_keys = {
+        ref.evidence_key
+        for candidate in set_.candidates
+        for ref in candidate.evidence_ranges
+    }
+    envelope_keys = set(envelope.get("evidence_refs") or [])
+    if not candidate_keys.issubset(envelope_keys):
+        return IntegrityDecision(False, BLOCKED_SCENE_CANDIDATE_EVIDENCE_MISMATCH)
 
     return IntegrityDecision(True)

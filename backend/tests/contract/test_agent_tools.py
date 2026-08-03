@@ -71,6 +71,7 @@ _PARAMS_BY_TOOL = {
         "source_end": 5,
         "content_hash": "a" * 64,
     },
+    "get_visual_bible": {"version_id": 1},
 }
 
 
@@ -120,7 +121,7 @@ def test_every_error_class_code_is_in_frozen_table():
         ), AgentToolError)
 
 
-def test_tool_names_are_exactly_the_12_contract_tools():
+def test_tool_names_are_exactly_the_13_contract_tools():
     assert set(TOOL_NAMES) == {
         "get_novel",
         "get_chapter",
@@ -135,6 +136,8 @@ def test_tool_names_are_exactly_the_12_contract_tools():
         "get_character_knowledge",
         "get_world_rules",
         "get_evidence_span",
+        # Phase 30 Visual Bible 只读工具（31-04）。
+        "get_visual_bible",
     }
 
 

@@ -1,0 +1,63 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DetectKeyScenesInput",
+  "description": "detect-key-scenes Phase 31 运行输入：novel_id（必填）；branch、version_key、cutoff_chapter、source_snapshot（D-31 冻结快照血缘）、approved_visual_bible_revision_id/hash（可选，D-31-01 已批准 Visual Bible 血缘）与 max_candidates 可选。锚定字段仅声明意图范围，最终 scope/cutoff/evidence 由服务端强制（D-31-01/D-31-02，fail closed）。",
+  "type": "object",
+  "required": ["novel_id"],
+  "properties": {
+    "novel_id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "目标小说 ID（必须与运行路径中的 novel_id 一致）"
+    },
+    "branch": {
+      "type": ["string", "null"],
+      "maxLength": 80,
+      "description": "衍生分支；原始主线为 null（owner/novel/branch 血缘绑定）"
+    },
+    "version_key": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120,
+      "description": "候选集版本键（幂等重放溯源）"
+    },
+    "cutoff_chapter": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "剧透截止章节（D-31-02）；超过服务端截止点将被拒绝（beyond_cutoff）"
+    },
+    "source_snapshot": {
+      "type": "object",
+      "description": "D-31 冻结 source snapshot 血缘（可选；缺失时以 run 的 source_versions / frozen manifest 为准）",
+      "required": ["snapshot_hash"],
+      "properties": {
+        "snapshot_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "dataset_lineage": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      }
+    },
+    "approved_visual_bible_revision_id": {
+      "type": ["integer", "null"],
+      "minimum": 1,
+      "description": "已批准 Visual Bible 修订 ID（与 hash 成对；D-31-01 服务端重验 owner/approved/hash）"
+    },
+    "approved_visual_bible_revision_hash": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "已批准 Visual Bible 修订 manifest hash（与 id 成对）"
+    },
+    "max_candidates": {
+      "type": ["integer", "null"],
+      "minimum": 1,
+      "maximum": 256,
+      "description": "候选数上限（可选；服务端兜底预算）"
+    }
+  },
+  "additionalProperties": false
+}

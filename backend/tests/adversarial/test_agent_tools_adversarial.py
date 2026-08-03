@@ -35,7 +35,7 @@ ROOT = Path(__file__).resolve().parents[2]
 AGENT_TOOLS_SERVICE = ROOT / "app" / "services" / "agent_tools"
 AGENT_TOOLS_API = ROOT / "app" / "api" / "agent_tools.py"
 
-# 12 个只读工具名（与 facade.TOOL_NAMES 一致性由测试断言）。
+# 13 个只读工具名（与 facade.TOOL_NAMES 一致性由测试断言）。
 ALL_TOOLS = (
     "get_novel",
     "get_chapter",
@@ -50,6 +50,8 @@ ALL_TOOLS = (
     "get_character_knowledge",
     "get_world_rules",
     "get_evidence_span",
+    # Phase 30 Visual Bible 只读工具（31-04）。
+    "get_visual_bible",
 )
 
 # 每个工具的 HTTP 路由（cross-owner 轴使用）。
@@ -66,6 +68,7 @@ TOOL_ROUTES = {
     "get_character_knowledge": "/api/agent-tools/get_character_knowledge",
     "get_world_rules": "/api/agent-tools/get_world_rules",
     "get_evidence_span": "/api/agent-tools/get_evidence_span",
+    "get_visual_bible": "/api/agent-tools/get_visual_bible",
 }
 
 # 受保护内容哨兵：断言任何响应体都不含它。
@@ -95,6 +98,7 @@ def _params(tool: str, **extra) -> dict:
             "source_end": 5,
             "content_hash": "a" * 64,
         },
+        "get_visual_bible": {"version_id": 1},
     }[tool]
     return {**base, **extra}
 
@@ -268,6 +272,18 @@ def _service_stub(tool: str, handler):
             content_hash=content_hash,
         )
 
+    async def stub_visual_bible(
+        db, *, owner_id, novel_id, version_id, approved_only
+    ):
+        return await _call_handler(
+            handler,
+            db=db,
+            owner_id=owner_id,
+            novel_id=novel_id,
+            version_id=version_id,
+            approved_only=approved_only,
+        )
+
     stubs = {
         "get_novel": stub_get_novel,
         "get_chapter": stub_get_chapter,
@@ -281,6 +297,7 @@ def _service_stub(tool: str, handler):
         "get_character_knowledge": stub_character_knowledge,
         "get_world_rules": stub_world_rules,
         "get_evidence_span": stub_evidence_span,
+        "get_visual_bible": stub_visual_bible,
     }
     return stubs[tool]
 
@@ -370,6 +387,8 @@ async def test_beyond_cutoff_no_content_leak(tool):
             "source_end": 5,
             "content_hash": "a" * 64,
         },
+        # get_visual_bible 无章节范围参数：底层读取本就候选/只读。
+        "get_visual_bible": {},
     }[tool]
 
     if tool == "get_chapter":
@@ -461,11 +480,15 @@ async def test_beyond_cutoff_no_content_leak(tool):
             "excerpt": "安全切片",
         }
 
+    async def safe_visual_bible(db, **kw):
+        return {"items": [], "total": 0}
+
     safe = {
         "get_novel": safe_get_novel,
         "search_novel_text": safe_search,
         "get_clues": safe_clues,
         "get_evidence_span": safe_evidence_span,
+        "get_visual_bible": safe_visual_bible,
     }[tool]
     facade = ToolFacade(
         cutoff_resolver=_fake_cutoff,
@@ -582,6 +605,18 @@ async def test_oversized_response_returns_output_too_large(tool):
             "excerpt": "癸" * 70000,
         }
 
+    async def huge_visual_bible(db, **kw):
+        return {
+            "items": [
+                {
+                    "version_key": "vb-main",
+                    "manifest_hash": "a" * 64,
+                    "entities": [{"description": "子" * 70000}],
+                }
+            ],
+            "total": 1,
+        }
+
     huge = {
         "get_novel": huge_get_novel,
         "get_chapter": huge_get_chapter,
@@ -595,6 +630,7 @@ async def test_oversized_response_returns_output_too_large(tool):
         "get_character_knowledge": huge_character_knowledge,
         "get_world_rules": huge_world_rules,
         "get_evidence_span": huge_evidence_span,
+        "get_visual_bible": huge_visual_bible,
     }[tool]
     facade = ToolFacade(
         byte_cap=64 * 1024,
@@ -746,11 +782,15 @@ async def test_full_book_spoof_without_persisted_switch_is_cutoff_limited(tool):
             "excerpt": "安全切片",
         }
 
+    async def safe_visual_bible(db, **kw):
+        return {"items": [], "total": 0}
+
     safe = {
         "get_novel": safe_novel,
         "search_novel_text": safe_search,
         "get_narrative_memory": safe_nm,
         "get_evidence_span": safe_evidence_span,
+        "get_visual_bible": safe_visual_bible,
     }[tool]
     facade = ToolFacade(
         cutoff_resolver=_fake_cutoff,

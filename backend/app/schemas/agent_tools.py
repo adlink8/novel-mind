@@ -171,6 +171,21 @@ class GetEvidenceSpanRequest(StrictAgentToolModel):
     )
 
 
+class GetVisualBibleRequest(StrictAgentToolModel):
+    """Visual Bible 候选版本视图（31-04，Phase 30 Visual Bible 只读）。
+
+    显式 ``version_id`` → 单个候选信封；缺省 → 版本列表。
+    ``approved_only=True`` 只保留 review_state=approved 的版本（D-30-04）；
+    approval 权威仍只在 FastAPI review API，本工具只读。
+    """
+
+    version_id: int | None = Field(default=None, gt=0, description="Visual Bible 版本 ID")
+    approved_only: bool = Field(
+        default=False,
+        description="只返回已批准（review_state=approved）的候选版本",
+    )
+
+
 # ────────────────────────── 统一错误信封 ──────────────────────────
 
 

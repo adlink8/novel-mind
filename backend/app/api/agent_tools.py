@@ -35,6 +35,7 @@ from app.schemas.agent_tools import (
     GetNovelRequest,
     GetRelationshipsRequest,
     GetTimelineRequest,
+    GetVisualBibleRequest,
     GetWorldRulesRequest,
     SearchNovelTextRequest,
 )
@@ -261,6 +262,23 @@ async def tool_get_evidence_span(
     """leaf 证据跨度（D-07/D-08）：按 chapter+offsets+content_hash 物化原文。"""
     return await _run_tool(
         "get_evidence_span",
+        db=db,
+        novel=novel,
+        owner_id=current_user.id,
+        params=_params(body),
+    )
+
+
+@router.post("/get_visual_bible")
+async def tool_get_visual_bible(
+    body: GetVisualBibleRequest | None = None,
+    novel: Novel = Depends(require_owned_novel),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """Visual Bible 候选版本视图（31-04；owner 范围服务端强制，candidate-only）。"""
+    return await _run_tool(
+        "get_visual_bible",
         db=db,
         novel=novel,
         owner_id=current_user.id,
