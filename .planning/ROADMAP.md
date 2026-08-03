@@ -27,7 +27,7 @@
 |---|---|---|---|---|
 | v1.1 execution baseline | 21–25.1 | partial | partial | blocked by Phase 22 |
 | agent runtime foundation | 25.2–25.3 | **IMPLEMENTED & VERIFIED (2026-08-02)** | partial | blocked by Phase 22 3/3 |
-| v1.2 trusted novel understanding | 26–29 | **26/27/28 VERIFIED (2026-08-03)** | planned | blocked by Phase 22 3/3 |
+| v1.2 trusted novel understanding | 26–29 | **26/27/28/29 VERIFIED (2026-08-03)** | planned | blocked by Phase 22 3/3 |
 | v1.3 visual narrative | 30–34 | planned | planned | planned |
 | v1.4 Canon Fork derivatives | 35–39 | planned | planned | planned |
 
@@ -134,7 +134,7 @@ Alembic chain continues `26agentrun01 → 27approval01`.
 | Phase 26 | 7/7 + shared Agent contract | 7 | **VERIFIED 2026-08-02/03** |
 | Phase 27 | 5/5 + shared Agent contract | 5 | **VERIFIED 2026-08-03** |
 | Phase 28 | 5/5 + shared Agent contract | 5 | **VERIFIED 2026-08-03** |
-| Phase 29 | 2/2 + shared Agent contract | 5 | PLANNED |
+| Phase 29 | 5/5 + shared Agent contract | 5 | **VERIFIED 2026-08-03** |
 | Phase 30–34 | 20/20 + shared Agent contract | 24 | PLANNED |
 | Phase 35–39 | 20/20 + shared Agent contract | 25 | PLANNED |
 
@@ -157,11 +157,13 @@ Phase 25.2–25.3 are implemented and verified; Phases 26–39 remain planning v
 | 26 Question-Driven Retrieval & Evidence | **VERIFIED 2026-08-02/03** | `26-VERIFICATION.md` passed; QueryPlan, adapters/fusion, evidence manifest, consumers, skill integration, structured-output integrity |
 | 27 Novel World Model | **VERIFIED 2026-08-03** | `27-VERIFICATION.md` passed; event/causal, epistemic history, entity/rule, authority, propose-world-model-candidates skill |
 | 28 Whole-Book Narrative Memory | **VERIFIED 2026-08-03** | `28-VERIFICATION.md` passed; failure/recovery, chapter terminality, arc/volume/global, closure, analyze-chapter/build-story-arc skills |
+| 29 Quality Qualification | **VERIFIED 2026-08-03** | `29-VERIFICATION.md` passed; gold set, bucket evaluation, browser UAT, three-dimension audit, evaluate-reading-skill-runs skill |
 
 Phase 22 remains blocked and unverified. The user authorized the Phase 25.2, Phase 26,
-Phase 27 and Phase 28 execution overrides (2026-08-02/03); each phase proceeded on the
-passed upstream verification artifact. Phase 29 still requires Phase 22 3/3 real scheduled
-green evidence plus a passed Phase 28 verification artifact (exists).
+Phase 27, Phase 28 and Phase 29 execution overrides (2026-08-02/03); each phase proceeded
+on the passed upstream verification artifact. v1.2 milestone (Phases 26–29) is implemented
+and verified. Phase 30 still requires Phase 22 3/3 real scheduled green evidence plus a
+passed Phase 29 verification artifact (exists).
 
 ---
 
@@ -290,6 +292,8 @@ cross-dimension manifests agree, and candidate-only invariants hold.
   uncertainty-bearing candidates; progress reuses Agent SSE/Job notification over DB checkpoints.
 
 ## Phase 29 — Quality Qualification and v1.2 Closure
+
+**Status:** IMPLEMENTED & VERIFIED (2026-08-03, `29-VERIFICATION.md` passed at `efa4f77`)
 
 **Goal:** prove that question-driven understanding is useful, faithful and usable.
 
@@ -518,7 +522,7 @@ audit; **Test, Fix, and Confirm** every failed end-to-end checkpoint.
 ## Next
 
 Phase 22 (CI/Nightly authority) remains the last unverified gate — 0/3 scheduled green.
-Phase 25.2, 25.3, 26, 27 and 28 are verified (2026-08-02/03). Phase 29 execution requires
-Phase 22 3/3 real scheduled green evidence plus a passed Phase 28 verification artifact
-(exists); until then, Phase 29-01 (Reading QA gold set) can be planned but not executed
-without a further explicit override.
+Phase 25.2, 25.3, 26, 27, 28 and 29 are verified (2026-08-02/03), completing the v1.2
+milestone (26–29). Phase 30 (Visual Bible) execution requires Phase 22 3/3 real scheduled
+green evidence plus a passed Phase 29 verification artifact (exists); until then, Phase 30
+plans can be executed only under a further explicit override.

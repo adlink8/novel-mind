@@ -57,6 +57,9 @@ No single aggregate completion percentage is authoritative.
    terminal convergence + frozen source manifest, semantic arc/volume/global candidates,
    cross-dimension closure + one-click analysis, analyze-chapter/build-story-arc skills.
    Migration head `20260801_2801`; backend 1352p, agent-service 433p.
+9. `29`: **IMPLEMENTED & VERIFIED (2026-08-03)** — eight-bucket gold set, bucket-level
+   evaluation with parity runner, browser UAT contract/smoke, three-dimension v1.2 audit,
+   evaluate-reading-skill-runs skill. Backend 1197p, agent-service 491p.
 
 ## Planning Portfolio
 
@@ -67,8 +70,8 @@ No single aggregate completion percentage is authoritative.
 | Phase 26 | VERIFIED | 7 | ✅ 2026-08-02/03 (user execution override) |
 | Phase 27 | VERIFIED | 5 | ✅ 2026-08-03 (user execution override) |
 | Phase 28 | VERIFIED | 5 | ✅ 2026-08-03 (user execution override) |
-| Phase 29 | PLANNED | 5 | BLOCKED by Phase 22 3/3 |
-| Phase 30–34 | PLANNED | 24 | BLOCKED by upstream execution dependencies |
+| Phase 29 | VERIFIED | 5 | ✅ 2026-08-03 (user execution override) |
+| Phase 30–34 | PLANNED | 24 | BLOCKED by Phase 22 3/3 |
 | Phase 35–39 | PLANNED | 25 | BLOCKED by upstream execution dependencies |
 
 The earlier 55-plan structural verdict did not prove Issue #29 Agent-consumption coverage.
@@ -113,6 +116,10 @@ created.
   passed (source_commit `a7414c5`); backend 1352p (unit 650 + narrative_memory 157 +
   adversarial 223 + agent_runtime 96 + ci 37); agent-service vitest 433p, tsc 0, alembic
   single head `20260801_2801`.
+- **2026-08-03 Phase 29 verification**: 29-01..29-05 delivered; `29-VERIFICATION.md`
+  passed (source_commit `efa4f77`); backend 1197p (unit 683 + integration/qualification 90
+  + adversarial 239 + agent_runtime 115 + ci 37); agent-service vitest 491p, tsc 0, alembic
+  single head `20260801_2801` (no new migration). **Completes v1.2 milestone (26–29).**
 - **2026-08-03 stub-SUT finding (recorded, deferred)**: current nightly benchmark scores
   with deterministic stubs (`default_stub_*`, no live model calls); Ollama is only a health
   gate. Full G2 deployment (runner+Ollama+Docker) is premature for the stub pipeline.
@@ -190,8 +197,9 @@ Phase 22 execution is paused. Its recovery entry remains:
 Phase 26–39 planning is complete, including the AgentVN planning integration recorded on
 2026-08-02. Phase 25.2, Phase 25.3, Phase 26, Phase 27 and Phase 28 are implemented and
 verified under the 2026-08-02/03 execution overrides (28-VERIFICATION passed at `a7414c5`).
-Phase 29 execution is authorized by the 2026-08-03 Phase 29 override.
-Phase 30+ execution requires a passed upstream Phase 29 VERIFICATION (in progress) plus
+Phase 29 execution is authorized by the 2026-08-03 Phase 29 override, and Phase 29 is
+now verified (29-VERIFICATION passed at `efa4f77`), completing the v1.2 milestone (26–29).
+Phase 30+ execution requires a passed upstream Phase 29 VERIFICATION (exists) plus
 Phase 22 real scheduled green evidence (0/3, not satisfied) or a further explicit override.
 If Phase 22 is resumed, use `$gsd-resume-work`; do not mark it complete early.
 
