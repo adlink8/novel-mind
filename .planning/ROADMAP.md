@@ -27,7 +27,7 @@
 |---|---|---|---|---|
 | v1.1 execution baseline | 21–25.1 | partial | partial | blocked by Phase 22 |
 | agent runtime foundation | 25.2–25.3 | **IMPLEMENTED & VERIFIED (2026-08-02)** | partial | blocked by Phase 22 3/3 |
-| v1.2 trusted novel understanding | 26–29 | **26 VERIFIED (2026-08-02)** | planned | blocked by Phase 22 3/3 |
+| v1.2 trusted novel understanding | 26–29 | **26/27/28 VERIFIED (2026-08-03)** | planned | blocked by Phase 22 3/3 |
 | v1.3 visual narrative | 30–34 | planned | planned | planned |
 | v1.4 Canon Fork derivatives | 35–39 | planned | planned | planned |
 
@@ -132,7 +132,9 @@ Alembic chain continues `26agentrun01 → 27approval01`.
 |---|---:|---:|---|
 | Phase 25.2–25.3 | 8/8 | 15 | **VERIFIED 2026-08-02** |
 | Phase 26 | 7/7 + shared Agent contract | 7 | **VERIFIED 2026-08-02/03** |
-| Phase 27–29 | 12/12 + shared Agent contract | 15 | PLANNED |
+| Phase 27 | 5/5 + shared Agent contract | 5 | **VERIFIED 2026-08-03** |
+| Phase 28 | 5/5 + shared Agent contract | 5 | **VERIFIED 2026-08-03** |
+| Phase 29 | 2/2 + shared Agent contract | 5 | PLANNED |
 | Phase 30–34 | 20/20 + shared Agent contract | 24 | PLANNED |
 | Phase 35–39 | 20/20 + shared Agent contract | 25 | PLANNED |
 
@@ -153,11 +155,13 @@ Phase 25.2–25.3 are implemented and verified; Phases 26–39 remain planning v
 | 25.2 Embedded Novel Agent Runtime | **VERIFIED 2026-08-02** | `25.2-VERIFICATION.md` passed; agent-service 223p, backend 195p |
 | 25.3 Pi Package Compatibility & Governance | **VERIFIED 2026-08-02** | `25.3-VERIFICATION.md` passed; MCP isolation, approval, renderer |
 | 26 Question-Driven Retrieval & Evidence | **VERIFIED 2026-08-02/03** | `26-VERIFICATION.md` passed; QueryPlan, adapters/fusion, evidence manifest, consumers, skill integration, structured-output integrity |
+| 27 Novel World Model | **VERIFIED 2026-08-03** | `27-VERIFICATION.md` passed; event/causal, epistemic history, entity/rule, authority, propose-world-model-candidates skill |
+| 28 Whole-Book Narrative Memory | **VERIFIED 2026-08-03** | `28-VERIFICATION.md` passed; failure/recovery, chapter terminality, arc/volume/global, closure, analyze-chapter/build-story-arc skills |
 
-Phase 22 remains blocked and unverified. The user authorized the Phase 25.2 and Phase 26
-execution overrides (2026-08-02); Phase 25.3 proceeded on the passed Phase 25.2 artifact,
-Phase 26 on the passed 25.3 artifact. Phase 27+ still requires Phase 22 3/3 real scheduled
-green evidence plus a passed Phase 26 verification artifact (exists).
+Phase 22 remains blocked and unverified. The user authorized the Phase 25.2, Phase 26,
+Phase 27 and Phase 28 execution overrides (2026-08-02/03); each phase proceeded on the
+passed upstream verification artifact. Phase 29 still requires Phase 22 3/3 real scheduled
+green evidence plus a passed Phase 28 verification artifact (exists).
 
 ---
 
@@ -246,6 +250,8 @@ interpretive quality are measured independently.
   Validator/Gate may publish typed facts or inference layers.
 
 ## Phase 28 — Whole-Book Narrative Memory Convergence
+
+**Status:** IMPLEMENTED & VERIFIED (2026-08-03, `28-VERIFICATION.md` passed at `a7414c5`)
 
 **Goal:** converge every chapter and semantic arc into a candidate-only whole-book model.
 
@@ -512,7 +518,7 @@ audit; **Test, Fix, and Confirm** every failed end-to-end checkpoint.
 ## Next
 
 Phase 22 (CI/Nightly authority) remains the last unverified gate — 0/3 scheduled green.
-Phase 25.2, 25.3 and 26 are verified (2026-08-02/03). Phase 27 execution requires Phase 22
-3/3 real scheduled green evidence plus a passed Phase 26 verification artifact (exists);
-until then, Phase 27-01 (Event Fact and Causal Edge contracts) can be planned but not
-executed without a further explicit override.
+Phase 25.2, 25.3, 26, 27 and 28 are verified (2026-08-02/03). Phase 29 execution requires
+Phase 22 3/3 real scheduled green evidence plus a passed Phase 28 verification artifact
+(exists); until then, Phase 29-01 (Reading QA gold set) can be planned but not executed
+without a further explicit override.

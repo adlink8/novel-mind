@@ -53,13 +53,10 @@ No single aggregate completion percentage is authoritative.
 7. `27`: **IMPLEMENTED & VERIFIED (2026-08-03)** — event fact/causal edge, character
    epistemic history, entity/rule/faction/place/item, four-label authority + disclosure,
    propose-world-model-candidates skill (tool registry 7→12).
-8. `28-01`: **IMPLEMENTED (2026-08-03, execution override per user)** — durable
-   failure/recovery contract (stable reason codes, terminal states completed/isolated/
-   blocked, idempotency key, checkpoint journal, cost/cache ledger), chapter isolation
-   + dependency blocking without whole-book restart, exact-checksum cache gate;
-   migration head moved to `20260801_2801`; recovery unit (16p), adversarial safety
-   (9p), checkpoint-migration integration (5p) green. Verification pending an
-   independent test subagent.
+8. `28`: **IMPLEMENTED & VERIFIED (2026-08-03)** — failure/recovery checkpoints, chapter
+   terminal convergence + frozen source manifest, semantic arc/volume/global candidates,
+   cross-dimension closure + one-click analysis, analyze-chapter/build-story-arc skills.
+   Migration head `20260801_2801`; backend 1352p, agent-service 433p.
 
 ## Planning Portfolio
 
@@ -69,7 +66,8 @@ No single aggregate completion percentage is authoritative.
 | Phase 25.3 | VERIFIED | 7 | ✅ 2026-08-02 |
 | Phase 26 | VERIFIED | 7 | ✅ 2026-08-02/03 (user execution override) |
 | Phase 27 | VERIFIED | 5 | ✅ 2026-08-03 (user execution override) |
-| Phase 28–29 | PLANNED | 10 | BLOCKED by Phase 22 3/3 |
+| Phase 28 | VERIFIED | 5 | ✅ 2026-08-03 (user execution override) |
+| Phase 29 | PLANNED | 5 | BLOCKED by Phase 22 3/3 |
 | Phase 30–34 | PLANNED | 24 | BLOCKED by upstream execution dependencies |
 | Phase 35–39 | PLANNED | 25 | BLOCKED by upstream execution dependencies |
 
@@ -107,6 +105,14 @@ created.
   backend 920p (unit 548 + integration/queryplan 68 + adversarial 129 + agent_runtime 60
   + ci 37 + contract 78), agent-service vitest 282p, tsc 0, alembic single head
   `20260801_2601`.
+- **2026-08-03 Phase 27 verification**: 27-01..27-05 delivered; `27-VERIFICATION.md`
+  passed (source_commit `0616920`); backend unit 622 + world_model 128 + adversarial 212
+  + agent_runtime 76 + queryplan 164 + ci 37 + contract 118; agent-service vitest 331p,
+  tsc 0, alembic single head `20260801_2703`.
+- **2026-08-03 Phase 28 verification**: 28-01..28-05 delivered; `28-VERIFICATION.md`
+  passed (source_commit `a7414c5`); backend 1352p (unit 650 + narrative_memory 157 +
+  adversarial 223 + agent_runtime 96 + ci 37); agent-service vitest 433p, tsc 0, alembic
+  single head `20260801_2801`.
 - **2026-08-03 stub-SUT finding (recorded, deferred)**: current nightly benchmark scores
   with deterministic stubs (`default_stub_*`, no live model calls); Ollama is only a health
   gate. Full G2 deployment (runner+Ollama+Docker) is premature for the stub pipeline.
@@ -172,10 +178,9 @@ Phase 22 execution is paused. Its recovery entry remains:
 `.planning/phases/22-ci-nightly-gap-closure/22-G2-PLAN.md`
 
 Phase 26–39 planning is complete, including the AgentVN planning integration recorded on
-2026-08-02. Phase 25.2, Phase 25.3, Phase 26 and Phase 27 are implemented and verified
-under the 2026-08-02/03 execution overrides (27-VERIFICATION passed at `0616920`).
-Phase 28 execution is authorized by the 2026-08-03 Phase 28 override.
-Phase 29+ execution requires a passed upstream Phase 28 VERIFICATION (in progress) plus
+2026-08-02. Phase 25.2, Phase 25.3, Phase 26, Phase 27 and Phase 28 are implemented and
+verified under the 2026-08-02/03 execution overrides (28-VERIFICATION passed at `a7414c5`).
+Phase 29 execution requires a passed upstream Phase 28 VERIFICATION (exists) plus
 Phase 22 real scheduled green evidence (0/3, not satisfied) or a further explicit override.
 If Phase 22 is resumed, use `$gsd-resume-work`; do not mark it complete early.
 
