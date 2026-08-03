@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import json
+import re
 from decimal import Decimal
 from enum import StrEnum
 from hashlib import sha256
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Literal, Sequence
 
 from pydantic import (
     BaseModel,
@@ -129,6 +130,21 @@ class StageKind(StrEnum):
     MANIFEST_VALIDATION = "manifest_validation"
 
 
+# Bounded context/continuity contract for ChapterAnalysisArtifact (D-08).
+# These are hard caps that keep the candidate context payload finite; they are
+# also the `max_length` lineage values bound onto the artifact itself.
+CONTEXT_SUMMARY_MAX_LENGTH = 2000
+NEXT_HINT_MAX_LENGTH = 1000
+CONTINUITY_NOTES_MAX_LENGTH = 1200
+SPOILER_POLICY_VERSION_DEFAULT = "spoiler-policy.v1"
+NEXT_HINT_BLOCKED_REASON = "hint_unsafe_future_spoiler"
+# Namespaced digest prefixes. Digests are compressed payloads only; the
+# namespace keeps them disjoint from authoritative content hashes so they can
+# never be mistaken for an EvidenceRef or a retrieval-index input.
+CHAPTER_DIGEST_NAMESPACE = "narrative-memory.chapter-digest.v1"
+CHUNK_DIGEST_NAMESPACE = "narrative-memory.chunk-digest.v1"
+
+
 class BuildOutcome(StrEnum):
     COMPLETED_CANDIDATE = "completed_candidate"
     PARTIAL = "partial"
@@ -167,6 +183,9 @@ class RunPolicy(BuilderFrozenModel):
     decoding_hash: Hash64
     config_hash: Hash64
     policy_hash: Hash64
+    # Lineage bound onto every ChapterAnalysisArtifact context field (D-08):
+    # the spoiler policy decides what the next-context hint may disclose.
+    spoiler_policy_version: VersionLabel = SPOILER_POLICY_VERSION_DEFAULT
 
     @model_validator(mode="after")
     def validate_order(self) -> "RunPolicy":
@@ -297,6 +316,163 @@ class StageLineage(BuilderFrozenModel):
     decoding_hash: Hash64
     config_hash: Hash64
     policy_hash: Hash64
+
+
+class ChapterAnalysisArtifact(BuilderFrozenModel):
+    """Immutable candidate chapter context/continuity artifact (D-08).
+
+    ``chapter_digest`` and ``chunk_digests`` are compressed payloads only —
+    namespaced hashes used for context compaction. They are never
+    retrieval-index inputs and never ``EvidenceRef`` authority. The free-text
+    fields are bounded by ``max_length`` and the spoiler policy; ``next_context_hint``
+    must never disclose facts beyond ``cutoff``, otherwise it is omitted and
+    ``next_hint_reason_code`` records the stable block reason.
+    """
+
+    schema_version: VersionLabel
+    chapter_id: PositiveInt
+    chapter_number: PositiveInt
+    # Source/input binding: the frozen snapshot and the exact input package that
+    # produced this artifact.
+    source_snapshot_hash: Hash64
+    input_hash: Hash64
+    # Context boundary: this analysis is valid only through `cutoff`.
+    cutoff: PositiveInt
+    max_length: PositiveInt
+    spoiler_policy_version: VersionLabel
+    # Compressed payload digests (never indexed, never EvidenceRefs).
+    chapter_digest: Hash64
+    chunk_digests: Annotated[tuple[Hash64, ...], Field(max_length=512)]
+    previous_context_summary: (
+        Annotated[StrictStr, StringConstraints(max_length=CONTEXT_SUMMARY_MAX_LENGTH)]
+        | None
+    ) = None
+    next_context_hint: (
+        Annotated[StrictStr, StringConstraints(max_length=NEXT_HINT_MAX_LENGTH)]
+        | None
+    ) = None
+    next_hint_reason_code: VersionLabel | None = None
+    continuity_notes: (
+        Annotated[StrictStr, StringConstraints(max_length=CONTINUITY_NOTES_MAX_LENGTH)]
+        | None
+    ) = None
+
+    @model_validator(mode="after")
+    def validate_hint_reason(self) -> "ChapterAnalysisArtifact":
+        if self.next_context_hint is None and self.next_hint_reason_code is None:
+            raise ValueError(
+                "next_context_hint omitted without a stable reason code"
+            )
+        if (
+            self.next_hint_reason_code is not None
+            and self.next_context_hint is not None
+        ):
+            raise ValueError(
+                "next_context_hint cannot carry both a hint and a block reason"
+            )
+        if len(self.chunk_digests) != len(set(self.chunk_digests)):
+            raise ValueError("chunk_digests must be unique")
+        return self
+
+
+def chapter_digest_for(value: str | dict[str, Any]) -> str:
+    """Namespaced compressed-payload digest for a chapter analysis context."""
+    canonical = value if isinstance(value, str) else _stable_json(value)
+    return sha256(
+        f"{CHAPTER_DIGEST_NAMESPACE}\n{canonical}".encode("utf-8")
+    ).hexdigest()
+
+
+def chunk_digest_for(chunk_repr: str | dict[str, Any]) -> str:
+    """Namespaced compressed-payload digest for one context chunk."""
+    canonical = chunk_repr if isinstance(chunk_repr, str) else _stable_json(chunk_repr)
+    return sha256(
+        f"{CHUNK_DIGEST_NAMESPACE}\n{canonical}".encode("utf-8")
+    ).hexdigest()
+
+
+def hint_safe_at_cutoff(hint: str, *, cutoff: int) -> bool:
+    """A next-context hint is safe only within the current cutoff.
+
+    Any reference to a chapter strictly beyond ``cutoff`` would leak future
+    facts, so such hints are rejected. Unverifiable hints fail closed.
+    """
+    if not hint:
+        return True
+    for match in re.finditer(r"(?:chapter[:\s]+|ch\.)?(\d{1,5})", hint, re.IGNORECASE):
+        try:
+            number = int(match.group(1))
+        except ValueError:
+            continue
+        # Disambiguation-only references to chapters <= cutoff are allowed.
+        if number > cutoff:
+            return False
+    return True
+
+
+def build_chapter_analysis_artifact(
+    *,
+    chapter_id: int,
+    chapter_number: int,
+    source_snapshot_hash: str,
+    input_hash: str,
+    spoiler_policy_version: str,
+    max_length: int,
+    context_payload: str | dict[str, Any],
+    chunk_reprs: Sequence[str | dict[str, Any]],
+    previous_context_summary: str | None = None,
+    next_context_hint: str | None = None,
+    continuity_notes: str | None = None,
+) -> ChapterAnalysisArtifact:
+    """Build the bounded candidate artifact with spoiler-safe next hint.
+
+    If ``next_context_hint`` cannot be proven safe at the chapter cutoff, it is
+    omitted and the stable ``hint_unsafe_future_spoiler`` reason is recorded.
+    """
+    if next_context_hint and not hint_safe_at_cutoff(
+        next_context_hint, cutoff=chapter_number
+    ):
+        next_context_hint = None
+        next_hint_reason_code = NEXT_HINT_BLOCKED_REASON
+    else:
+        next_hint_reason_code = None
+    return ChapterAnalysisArtifact(
+        schema_version="chapter-analysis-artifact.v1",
+        chapter_id=chapter_id,
+        chapter_number=chapter_number,
+        source_snapshot_hash=source_snapshot_hash,
+        input_hash=input_hash,
+        cutoff=chapter_number,
+        max_length=max_length,
+        spoiler_policy_version=spoiler_policy_version,
+        chapter_digest=chapter_digest_for(context_payload),
+        chunk_digests=tuple(chunk_digest_for(chunk) for chunk in chunk_reprs),
+        previous_context_summary=previous_context_summary,
+        next_context_hint=next_context_hint,
+        next_hint_reason_code=next_hint_reason_code,
+        continuity_notes=continuity_notes,
+    )
+
+
+def assert_digests_never_evidence_refs(
+    digests: Sequence[str],
+    *,
+    authority_content_hashes: Sequence[str],
+    retrieval_index_inputs: Sequence[str] = (),
+) -> None:
+    """Fail closed if any digest doubles as evidence/retrieval authority.
+
+    Digests are compressed payloads only (D-08). If one collides with an
+    authoritative source content hash or a retrieval-index input, the artifact
+    is invalid and must be rejected.
+    """
+    authority = set(authority_content_hashes)
+    indexed = set(retrieval_index_inputs)
+    for digest in digests:
+        if digest in authority:
+            raise ValueError("chapter digest cannot double as an EvidenceRef hash")
+        if digest in indexed:
+            raise ValueError("chapter digest cannot enter the retrieval index")
 
 
 class ResumePlanItem(BuilderFrozenModel):

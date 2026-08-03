@@ -6,7 +6,9 @@ import pytest
 from pydantic import ValidationError
 
 from app.services.narrative_memory.builder_contracts import (
+    NEXT_HINT_BLOCKED_REASON,
     BudgetPolicy,
+    ChapterAnalysisArtifact,
     ChapterStateInputPackage,
     ChapterStateModelOutput,
     EvidenceLeafRef,
@@ -15,8 +17,13 @@ from app.services.narrative_memory.builder_contracts import (
     RunPolicy,
     SourceStatus,
     StageKind,
+    assert_digests_never_evidence_refs,
     assert_no_forbidden_keys,
+    build_chapter_analysis_artifact,
+    chapter_digest_for,
+    chunk_digest_for,
     exact_cache_key,
+    hint_safe_at_cutoff,
     package_checksum,
 )
 from app.services.narrative_memory.contracts import ModelLineage
@@ -218,3 +225,92 @@ def test_model_output_rejects_chat_keys() -> None:
 def test_assert_no_forbidden_keys_nested() -> None:
     with pytest.raises(ValueError, match="forbidden key"):
         assert_no_forbidden_keys({"ok": 1, "nested": {"similarity_score": 0.1}})
+
+
+# ---------------------------------------------------------------------------
+# ChapterAnalysisArtifact context/continuity contract and digest role guard
+# ---------------------------------------------------------------------------
+
+
+def _artifact(**overrides) -> ChapterAnalysisArtifact:
+    base = {
+        "chapter_id": 1,
+        "chapter_number": 3,
+        "source_snapshot_hash": HEX,
+        "input_hash": "b" * 64,
+        "spoiler_policy_version": "spoiler-policy.v1",
+        "max_length": 2000,
+        "context_payload": {"claims": 2},
+        "chunk_reprs": ["chunk-a", "chunk-b"],
+        "previous_context_summary": "prior chapter context",
+        "next_context_hint": "disambiguation within chapter 3",
+        "continuity_notes": "snapshot bound",
+    }
+    base.update(overrides)
+    return build_chapter_analysis_artifact(**base)
+
+
+def test_artifact_binds_source_input_cutoff_length_and_spoiler() -> None:
+    artifact = _artifact()
+    assert artifact.schema_version == "chapter-analysis-artifact.v1"
+    assert artifact.source_snapshot_hash == HEX
+    assert artifact.input_hash == "b" * 64
+    assert artifact.cutoff == 3
+    assert artifact.max_length == 2000
+    assert artifact.spoiler_policy_version == "spoiler-policy.v1"
+    assert artifact.chapter_digest == chapter_digest_for({"claims": 2})
+    assert artifact.chunk_digests == (
+        chunk_digest_for("chunk-a"),
+        chunk_digest_for("chunk-b"),
+    )
+
+
+def test_artifact_next_hint_must_be_safe_at_cutoff() -> None:
+    safe = _artifact(next_context_hint="disambiguate chapter 2 vs chapter 3")
+    assert safe.next_context_hint is not None
+    assert safe.next_hint_reason_code is None
+    unsafe = _artifact(
+        next_context_hint="chapter 99 will reveal the betrayal",
+    )
+    assert unsafe.next_context_hint is None
+    assert unsafe.next_hint_reason_code == NEXT_HINT_BLOCKED_REASON
+    assert hint_safe_at_cutoff("chapter 3 only", cutoff=3)
+    assert not hint_safe_at_cutoff("chapter 4 spoiler", cutoff=3)
+
+
+def test_artifact_digests_never_double_as_evidence_or_index() -> None:
+    artifact = _artifact()
+    digests = [artifact.chapter_digest, *artifact.chunk_digests]
+    # No collision with authoritative hashes or indexed payloads.
+    assert_digests_never_evidence_refs(
+        digests, authority_content_hashes=["c" * 64], retrieval_index_inputs=[]
+    )
+    with pytest.raises(ValueError, match="EvidenceRef"):
+        assert_digests_never_evidence_refs(
+            digests, authority_content_hashes=[artifact.chapter_digest]
+        )
+    with pytest.raises(ValueError, match="retrieval index"):
+        assert_digests_never_evidence_refs(
+            digests,
+            authority_content_hashes=[],
+            retrieval_index_inputs=[artifact.chunk_digests[0]],
+        )
+    # Digests are namespaced so they cannot equal a source content hash.
+    assert artifact.chapter_digest != HEX
+    assert all(d != HEX for d in artifact.chunk_digests)
+
+
+def test_artifact_omitted_hint_requires_reason() -> None:
+    with pytest.raises(ValueError, match="reason code"):
+        ChapterAnalysisArtifact(
+            schema_version="chapter-analysis-artifact.v1",
+            chapter_id=1,
+            chapter_number=1,
+            source_snapshot_hash=HEX,
+            input_hash=HEX,
+            cutoff=1,
+            max_length=100,
+            spoiler_policy_version="spoiler-policy.v1",
+            chapter_digest=chapter_digest_for({}),
+            chunk_digests=(),
+        )

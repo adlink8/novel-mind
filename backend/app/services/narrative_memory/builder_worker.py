@@ -14,17 +14,24 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.models.chunk_build import ChunkHierarchyNode
 from app.models.novel import Chapter
 from app.models.narrative_memory import NarrativeMemoryVersion
-from app.models.narrative_memory_builder import NarrativeMemoryBuildStage
+from app.models.narrative_memory_builder import (
+    NarrativeMemoryBuildRun,
+    NarrativeMemoryBuildStage,
+)
 from app.services.narrative_memory.audit import audit_assets, provider_calls_allowed
 from app.services.narrative_memory.audit_contracts import EligibilityReport
 from app.services.narrative_memory.audit_sources import AssetInventorySource
 from app.services.narrative_memory.authority import CandidateAuthority
 from app.services.narrative_memory.builder_contracts import (
+    CONTEXT_SUMMARY_MAX_LENGTH,
+    CONTINUITY_NOTES_MAX_LENGTH,
+    NEXT_HINT_MAX_LENGTH,
     ModelDeploymentSnapshot,
     ReasonCode,
     RunPolicy,
     SourceStatus,
     StageKind,
+    build_chapter_analysis_artifact,
     package_checksum,
 )
 from app.services.narrative_memory.builder_gateway import (
@@ -52,6 +59,13 @@ from app.services.narrative_memory.builder_repository import (
 )
 from app.services.narrative_memory.contracts import ModelLineage, NodeKind
 from app.services.narrative_memory.recovery import RecoveryCoordinator
+from app.services.narrative_memory.source_manifest import (
+    compute_source_manifest,
+    detect_chapter_drift,
+    frozen_manifest_from_progress,
+    recompute_source_manifest,
+    store_frozen_manifest,
+)
 
 
 FORBIDDEN_IMPORT_FRAGMENTS = (
@@ -79,6 +93,7 @@ class WorkerResult:
     transport_calls: int
     worker_artifact_checksum: str | None = None
     database_manifest_checksum: str | None = None
+    source_manifest_checksum: str | None = None
 
 
 class NarrativeMemoryBuilderWorker:
@@ -162,6 +177,12 @@ class NarrativeMemoryBuilderWorker:
             progress["chapter_numbers"] = [
                 chapter.chapter_number for chapter in chapters
             ]
+            # Freeze the source manifest (D-05): the snapshot drives chapter
+            # execution and is DB-recomputable; drift fails closed on resume.
+            manifest = await compute_source_manifest(
+                session, version=version, chapters=chapters
+            )
+            progress = store_frozen_manifest(progress, manifest)
             await repo.update_run_status(run.id, status=run.status, progress=progress)
             run.source_snapshot_hash = version.source_snapshot_hash
             await session.commit()
@@ -214,6 +235,13 @@ class NarrativeMemoryBuilderWorker:
             recovery = RecoveryCoordinator(repo)
             await repo.increment_resume_count(run_id)
 
+            # Source drift fail-closed (D-05): recompute the frozen manifest
+            # from current authority rows; any drifted chapter is blocked rather
+            # than re-run against stale evidence, and never restarts the book.
+            source_drift = await self._source_drift_map(
+                session, run=run, version=version
+            )
+
             processed = 0
             # Phase A: chapter states — resume plan drives what may run.
             plan = await recovery.resume_plan(run_id)
@@ -233,6 +261,21 @@ class NarrativeMemoryBuilderWorker:
                         run_id, status="cancelled", reason="cancel_requested"
                     )
                     break
+                chapter_number = int(stage.chapter_start or 0)
+                if chapter_number in source_drift:
+                    # Fail closed: block the drifted chapter with a stable
+                    # reason so the run is partial, not silently stale.
+                    await repo.mark_stage(
+                        stage,
+                        status="blocked_dependency",
+                        reason=source_drift[chapter_number],
+                        reason_code=ReasonCode.SOURCE_DRIFT,
+                        journal=True,
+                    )
+                    processed += 1
+                    await session.flush()
+                    await repo.heartbeat(run_id, claimed_lease)
+                    continue
                 await self._run_chapter_stage(
                     session,
                     repo=repo,
@@ -349,6 +392,34 @@ class NarrativeMemoryBuilderWorker:
                 policy_hash=policy.policy_hash,
             )
             package_cs, cache_key = chapter_cache_identity(input_package)
+            # Bounded candidate context/continuity artifact (D-08). Digests are
+            # compressed payloads only; the next hint is spoiler-safe by
+            # construction (references only chapters <= cutoff).
+            analysis_artifact = build_chapter_analysis_artifact(
+                chapter_id=chapter_id,
+                chapter_number=chapter_number,
+                source_snapshot_hash=version.source_snapshot_hash,
+                input_hash=package_cs,
+                spoiler_policy_version=policy.spoiler_policy_version,
+                max_length=max(
+                    CONTEXT_SUMMARY_MAX_LENGTH,
+                    NEXT_HINT_MAX_LENGTH,
+                    CONTINUITY_NOTES_MAX_LENGTH,
+                ),
+                context_payload=input_package.model_dump(mode="json"),
+                chunk_reprs=[
+                    leaf.model_dump(mode="json")
+                    for leaf in input_package.evidence_leaves
+                ],
+                previous_context_summary=self._bounded_previous_context(
+                    input_package
+                ),
+                next_context_hint=self._safe_next_hint(input_package),
+                continuity_notes=(
+                    f"source_snapshot:{version.source_snapshot_hash[:12]};"
+                    f"input:{package_cs[:12]}"
+                ),
+            )
 
             def validate_output(raw: Any) -> dict[str, Any]:
                 # Cache hits store the already-validated envelope.
@@ -422,6 +493,10 @@ class NarrativeMemoryBuilderWorker:
                     "cache_hit": result.cache_hit,
                     "attempt_count": attempt_count,
                     "calls": result.attempt_number,
+                    "chapter_analysis_artifact": analysis_artifact.model_dump(
+                        mode="json"
+                    ),
+                    "chapter_digest": analysis_artifact.chapter_digest,
                 },
                 journal=True,
             )
@@ -477,6 +552,47 @@ class NarrativeMemoryBuilderWorker:
                     status="failed",
                     reason=f"{type(exc).__name__}:{exc}"[:160],
                 )
+
+    async def _source_drift_map(
+        self,
+        session: AsyncSession,
+        *,
+        run: NarrativeMemoryBuildRun,
+        version: NarrativeMemoryVersion,
+    ) -> dict[int, str]:
+        """Recompute the frozen manifest and return per-chapter drift reasons.
+
+        Empty dict means the source is unchanged and the run may proceed. A
+        non-empty dict means those chapters must be blocked (fail closed) rather
+        than processed with stale evidence (D-05).
+        """
+        frozen = frozen_manifest_from_progress(run.progress)
+        if frozen is None:
+            return {}
+        recomputed = await recompute_source_manifest(session, version=version)
+        return detect_chapter_drift(frozen, recomputed)
+
+    @staticmethod
+    def _bounded_previous_context(input_package) -> str:
+        """Deterministic bounded summary of the frozen inputs for this chapter."""
+        return (
+            f"Frozen snapshot {input_package.source_snapshot_hash[:12]}, "
+            f"hierarchy {input_package.hierarchy_build_id[:12]}, "
+            f"{len(input_package.evidence_leaves)} evidence leaves, "
+            f"cutoff chapter {input_package.chapter_number}."
+        )
+
+    @staticmethod
+    def _safe_next_hint(input_package) -> str:
+        """Disambiguation-only next hint, safe at the chapter cutoff by construction.
+
+        It references only the current chapter and its evidence spans — never a
+        fact from a later chapter.
+        """
+        return (
+            f"Continue disambiguation within chapter {input_package.chapter_number}; "
+            f"evidence spans {len(input_package.evidence_leaves)} leaves."
+        )
 
     async def _ensure_boundary_and_parents(
         self,
@@ -1287,6 +1403,11 @@ class NarrativeMemoryBuilderWorker:
         elif failed and not completed:
             status = "failed"
             reason = "all_failed"
+        elif blocked:
+            # D-05: drift-blocked chapters fail closed — the run is partial,
+            # never falsely "completed" and never an unconditional restart.
+            status = "partial"
+            reason = "chapter_or_parent_blocked"
         elif stages and all(
             s.status == "completed"
             for s in stages
@@ -1350,6 +1471,9 @@ class NarrativeMemoryBuilderWorker:
             failed_stages=failed,
             blocked_stages=blocked,
             transport_calls=self.transport_calls,
+            source_manifest_checksum=(
+                (run.progress or {}).get("source_manifest_checksum") if run else None
+            ),
         )
 
     async def _snapshot_result(
@@ -1372,6 +1496,9 @@ class NarrativeMemoryBuilderWorker:
                 s.stage_key for s in stages if s.status == "blocked_dependency"
             ),
             transport_calls=transport_calls,
+            source_manifest_checksum=(
+                (run.progress or {}).get("source_manifest_checksum") if run else None
+            ),
         )
 
 
