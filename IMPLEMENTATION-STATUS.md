@@ -222,3 +222,21 @@ Key metrics:
 | Alembic | 单 head `20260801_2801`（Phase 29 无新 migration） | `alembic heads` |
 | 已知环境限制 | 同前：e2e Next dev server 编译失败、openapi subprocess 挂起、`.venv` 路径 3 失败、live UAT 需 provider key、前端 29 typecheck 遗留 | 2026-08-03 本机 |
 | 仍阻塞 | Phase 22 Nightly 3/3 未达成（0/3）；Phase 30 执行需 Phase 22 3/3 + 29-VERIFICATION（已存在）或进一步 override | `.planning/STATE.md` |
+
+---
+
+## 2026-08-03 快照（Phase 30 实现并验证；snapshot: master @ 67908b1）
+
+以下事实覆盖上文旧节中的对应记录：
+
+| 项 | 当前值 | 证据 |
+|---|---|---|
+| Phase 30 Visual Bible | **VERIFIED 2026-08-03** | `30-VERIFICATION.md` passed（source_commit `67908b1`） |
+| 后端测试 | **1212 passed**（unit 732 + visual_bible unit 49 + integration 22 + adversarial 239 + agent_runtime 133 + ci 37） | 独立测试子代理 2026-08-03 |
+| agent-service | **543 passed / 16 files**；tsc 0 errors | `cd agent-service && npx vitest run` |
+| 前端 | **315 passed / 39 files** | `cd frontend && npx vitest run` |
+| Visual Bible | candidate 契约（6 模型）、证据物化 + owner-scoped API、工作区 UI、review/versioning envelope、build-visual-bible skill | `backend/app/models/visual_bible.py` + `backend/app/services/visual_bible/` + `frontend/src/components/visual-bible/` |
+| Agent skills | 6 skills：answer-reading-question、propose-world-model-candidates、analyze-chapter、build-story-arc、evaluate-reading-skill-runs、build-visual-bible | `agent-service/src/skills/` |
+| Alembic | 单 head `20260801_visual_bible` | `alembic heads` |
+| 已知环境限制 | 同前：e2e Next dev server 编译失败、openapi subprocess 挂起、live UAT 需 provider key、前端 29 typecheck 遗留 | 2026-08-03 本机 |
+| 仍阻塞 | Phase 22 Nightly 3/3 未达成（0/3）；Phase 31 执行需 Phase 22 3/3 + 30-VERIFICATION（已存在）或进一步 override | `.planning/STATE.md` |
