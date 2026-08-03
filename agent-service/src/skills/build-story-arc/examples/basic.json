@@ -1,0 +1,147 @@
+{
+  "input": {
+    "novel_id": 1,
+    "branch": null,
+    "chapter_range": {
+      "chapter_start": 1,
+      "chapter_end": 3
+    },
+    "cutoff": 3,
+    "source_snapshot": {
+      "snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "dataset_lineage": "build-story-arc-v1"
+    }
+  },
+  "expected_output": {
+    "type": "story_arc",
+    "schema_version": "story-arc.v1",
+    "owner_id": 1,
+    "novel_id": 1,
+    "branch": null,
+    "producing_skill": "build-story-arc",
+    "producing_skill_version": "1.0.0",
+    "skill_version_id": 1,
+    "model_lineage": {
+      "provider": "fixture",
+      "model": "stub-model",
+      "revision": "stub-1"
+    },
+    "source_versions": {
+      "novel": "v1",
+      "narrative_memory": "v1"
+    },
+    "input_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "evidence_refs": ["evidence:1", "evidence:2", "evidence:3"],
+    "outline_candidate": {
+      "schema_version": "outline-candidate-artifact.v1",
+      "policy_version": "arc-policy.v1",
+      "owner_id": 1,
+      "novel_id": 1,
+      "version_id": 1,
+      "source_snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "hierarchy_build_id": "hierarchy:1",
+      "hierarchy_checksum": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "input_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "chapter_min": 1,
+      "chapter_max": 3,
+      "arcs": [
+        {
+          "stage_key": "story_arc:1-3",
+          "node_kind": "story_arc",
+          "chapter_start": 1,
+          "chapter_end": 3,
+          "chapter_numbers": [1, 2, 3],
+          "coverage": "complete",
+          "uncertainty": "likely",
+          "confidence": 0.8,
+          "boundary_uncertainties": [
+            { "side": "start", "chapter_number": 1, "reason": "snapshot_edge" },
+            { "side": "end", "chapter_number": 3, "reason": "snapshot_edge" }
+          ],
+          "evidence_lineage": {
+            "1": { "claim_count": 2, "max_uncertainty": "likely", "mean_confidence": 0.8 }
+          },
+          "input_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        }
+      ],
+      "covered_ranges": [[1, 3]],
+      "gaps": [],
+      "overlaps": [],
+      "candidate_status": "candidate",
+      "lineage": {
+        "source_snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "hierarchy_build_id": "hierarchy:1",
+        "hierarchy_checksum": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "checksum": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    },
+    "mainline_candidate": {
+      "schema_version": "mainline-candidate-artifact.v1",
+      "policy_version": "arc-policy.v1",
+      "owner_id": 1,
+      "novel_id": 1,
+      "version_id": 1,
+      "source_snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "hierarchy_build_id": "hierarchy:1",
+      "hierarchy_checksum": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "input_hash": "9999999999999999999999999999999999999999999999999999999999999999",
+      "chapter_min": 1,
+      "chapter_max": 3,
+      "volumes": [
+        {
+          "stage_key": "volume:1",
+          "node_kind": "volume",
+          "chapter_start": 1,
+          "chapter_end": 3,
+          "arc_stage_keys": ["story_arc:1-3"],
+          "coverage": "complete",
+          "uncertainty": "likely",
+          "confidence": 0.8,
+          "boundary_uncertainties": [
+            { "side": "start", "chapter_number": 1, "reason": "snapshot_edge" },
+            { "side": "end", "chapter_number": 3, "reason": "snapshot_edge" }
+          ],
+          "input_hash": "8888888888888888888888888888888888888888888888888888888888888888"
+        }
+      ],
+      "global_projection": {
+        "stage_key": "global_story:book",
+        "node_kind": "global_story",
+        "chapter_start": 1,
+        "chapter_end": 3,
+        "child_stage_keys": ["volume:1"],
+        "coverage": "complete",
+        "uncertainty": "likely",
+        "confidence": 0.8,
+        "boundary_uncertainties": [
+          { "side": "start", "chapter_number": 1, "reason": "snapshot_edge" },
+          { "side": "end", "chapter_number": 3, "reason": "snapshot_edge" }
+        ],
+        "input_hash": "7777777777777777777777777777777777777777777777777777777777777777"
+      },
+      "covered_ranges": [[1, 3]],
+      "gaps": [],
+      "overlaps": [],
+      "candidate_status": "candidate",
+      "lineage": {
+        "source_snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "hierarchy_build_id": "hierarchy:1",
+        "hierarchy_checksum": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "checksum": "6666666666666666666666666666666666666666666666666666666666666666"
+    },
+    "tool_runs": [
+      { "tool_name": "get_narrative_memory", "calls": 1 },
+      { "tool_name": "get_events", "calls": 1 },
+      { "tool_name": "get_evidence_span", "calls": 3 }
+    ],
+    "status": "candidate",
+    "parent_revision": null,
+    "normalization": {
+      "raw_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "repaired_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "normalization_actions": [],
+      "warnings": []
+    }
+  }
+}

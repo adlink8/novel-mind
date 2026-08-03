@@ -37,10 +37,12 @@ export const D09_FIELDS = [
 /** 默认技能根目录：`src/skills`（相对本文件）。 */
 const DEFAULT_SKILLS_ROOT = fileURLToPath(new URL("../skills", import.meta.url));
 
-/** 25.2 允许加载的技能目录集（单一 allowlist；27-05 加入世界模型技能）。 */
+/** 25.2 允许加载的技能目录集（单一 allowlist；27-05 加入世界模型技能，28-05 加入叙事记忆技能）。 */
 export const ALLOWLISTED_SKILL_DIRS = [
   "answer-reading-question",
   "propose-world-model-candidates",
+  "analyze-chapter",
+  "build-story-arc",
 ] as const;
 
 /** 加载失败（缺字段/未知工具/坏 schema），fail-closed，错误信息指名根因。 */

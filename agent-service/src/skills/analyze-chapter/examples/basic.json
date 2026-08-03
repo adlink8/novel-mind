@@ -1,0 +1,66 @@
+{
+  "input": {
+    "novel_id": 1,
+    "chapter_id": 1,
+    "branch": null,
+    "cutoff": 1,
+    "source_snapshot": {
+      "snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "dataset_lineage": "analyze-chapter-v1"
+    }
+  },
+  "expected_output": {
+    "type": "chapter_analysis",
+    "schema_version": "chapter-analysis.v1",
+    "owner_id": 1,
+    "novel_id": 1,
+    "branch": null,
+    "producing_skill": "analyze-chapter",
+    "producing_skill_version": "1.0.0",
+    "skill_version_id": 1,
+    "model_lineage": {
+      "provider": "fixture",
+      "model": "stub-model",
+      "revision": "stub-1"
+    },
+    "source_versions": {
+      "novel": "v1",
+      "chapter": {
+        "1": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      }
+    },
+    "input_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "evidence_refs": ["evidence:1"],
+    "analysis": {
+      "schema_version": "chapter-analysis-artifact.v1",
+      "chapter_id": 1,
+      "chapter_number": 1,
+      "source_snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "input_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "cutoff": 1,
+      "max_length": 2000,
+      "spoiler_policy_version": "spoiler-policy.v1",
+      "chapter_digest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "chunk_digests": [
+        "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      ],
+      "previous_context_summary": "第一章之前：阿宁进入竹林。",
+      "next_context_hint": "第二章仍围绕使者的踪迹。",
+      "next_hint_reason_code": null,
+      "continuity_notes": "source_snapshot:aaaa;input:dddd"
+    },
+    "tool_runs": [
+      { "tool_name": "get_chapter", "calls": 1 },
+      { "tool_name": "get_evidence_span", "calls": 1 },
+      { "tool_name": "get_narrative_memory", "calls": 1 }
+    ],
+    "status": "candidate",
+    "parent_revision": null,
+    "normalization": {
+      "raw_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "repaired_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "normalization_actions": [],
+      "warnings": []
+    }
+  }
+}

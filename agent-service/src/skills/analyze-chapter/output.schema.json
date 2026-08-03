@@ -1,0 +1,217 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ChapterAnalysisArtifact",
+  "description": "ChapterAnalysisArtifact 信封（D-08 / Phase 28）。镜像 backend app.schemas.agent_runtime.ChapterAnalysisArtifact：type / schema_version / owner / novel / branch / producing skill+version / model lineage / source versions / input_hash / evidence_refs / analysis / tool_runs / status / parent_revision / normalization。analysis 是受 bounds 约束的章节上下文/连续性候选负载：chapter_digest / chunk_digests 是压缩负载（D-08，绝不作为检索索引输入或 EvidenceRef）；previous_context_summary / next_context_hint / continuity_notes 受 max_length / cutoff / spoiler policy 约束；next_context_hint 只消歧、绝不泄漏未来事实。artifact_id / revision_id 由后端确定性 finalizer 在写入时分配，不在本信封内。",
+  "type": "object",
+  "required": [
+    "type",
+    "schema_version",
+    "owner_id",
+    "novel_id",
+    "producing_skill",
+    "producing_skill_version",
+    "skill_version_id",
+    "model_lineage",
+    "source_versions",
+    "input_hash",
+    "evidence_refs",
+    "analysis",
+    "tool_runs",
+    "status"
+  ],
+  "properties": {
+    "type": {
+      "const": "chapter_analysis"
+    },
+    "schema_version": {
+      "const": "chapter-analysis.v1"
+    },
+    "owner_id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "novel_id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "branch": {
+      "type": ["string", "null"],
+      "description": "衍生分支；原始主线为 null"
+    },
+    "producing_skill": {
+      "type": "string",
+      "minLength": 1
+    },
+    "producing_skill_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "skill_version_id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "model_lineage": {
+      "type": "object",
+      "description": "agent runtime + 模型血缘（provider/model/revision）"
+    },
+    "source_versions": {
+      "type": "object",
+      "description": "数据源版本（novel/chapter/检索等；source snapshot 血缘）"
+    },
+    "input_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "运行输入规范化 JSON 的 SHA-256（重放追溯）"
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1,
+      "description": "leaf 证据引用，必须 ⊆ 冻结 manifest 白名单（D-07/D-08）；chapter_digest/chunk_digests 是压缩负载，绝不作为 EvidenceRef"
+    },
+    "analysis": {
+      "type": "object",
+      "description": "受 bounds 约束的章节上下文/连续性候选负载（D-08）：chapter_digest 与 chunk_digests 是 namespaced 压缩 digest（绝不索引、绝不 EvidenceRef）；previous_context_summary / next_context_hint / continuity_notes 受 max_length / cutoff / spoiler policy 约束。",
+      "required": [
+        "schema_version",
+        "chapter_id",
+        "chapter_number",
+        "source_snapshot_hash",
+        "input_hash",
+        "cutoff",
+        "max_length",
+        "spoiler_policy_version",
+        "chapter_digest",
+        "chunk_digests"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "chapter-analysis-artifact.v1"
+        },
+        "chapter_id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "chapter_number": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "source_snapshot_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "D-07 冻结 source snapshot 血缘"
+        },
+        "input_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "本分析产出的精确输入 package 血缘"
+        },
+        "cutoff": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "本分析有效的截止点；context/hint 不得越界"
+        },
+        "max_length": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "context 字段的显式长度上界（D-08 max_length）"
+        },
+        "spoiler_policy_version": {
+          "type": "string",
+          "minLength": 1,
+          "description": "spoiler policy 版本（决定 next hint 可披露范围）"
+        },
+        "chapter_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "namespaced 压缩负载 digest（narrative-memory.chapter-digest.v1；绝不作为 EvidenceRef / 检索索引输入）"
+        },
+        "chunk_digests": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "maxItems": 512,
+          "description": "chunk 压缩负载 digest（narrative-memory.chunk-digest.v1；绝不作为 EvidenceRef / 检索索引输入）"
+        },
+        "previous_context_summary": {
+          "type": ["string", "null"],
+          "maxLength": 2000,
+          "description": "上一上下文摘要（D-08 lineage-bound candidate context，非 Canon）"
+        },
+        "next_context_hint": {
+          "type": ["string", "null"],
+          "maxLength": 1000,
+          "description": "下一上下文提示：仅消歧、绝不泄漏未来事实（unverifiable/越界 → 置 null 并给出 next_hint_reason_code）"
+        },
+        "next_hint_reason_code": {
+          "type": ["string", "null"],
+          "description": "next_context_hint 被阻断的稳定原因码（如 hint_unsafe_future_spoiler）"
+        },
+        "continuity_notes": {
+          "type": ["string", "null"],
+          "maxLength": 1200,
+          "description": "连续性备注（受 max_length / cutoff / spoiler policy 约束）"
+        }
+      }
+    },
+    "tool_runs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["tool_name", "calls"],
+        "properties": {
+          "tool_name": { "type": "string", "minLength": 1 },
+          "calls": { "type": "integer", "minimum": 0 }
+        }
+      },
+      "description": "ToolRun 血缘：本 run 使用的 allowlist 工具与调用次数"
+    },
+    "status": {
+      "enum": ["candidate", "validated", "approved", "published", "rejected"],
+      "description": "产物状态；finalize 写入时恒为 candidate（无自动 promotion）"
+    },
+    "parent_revision": {
+      "type": ["string", "null"],
+      "description": "父修订引用；首个修订为 null"
+    },
+    "normalization": {
+      "type": "object",
+      "description": "26-06 修复血缘 trail：repaired_hash 是对不含本 trail 的 repaired payload 的 canonical SHA-256；raw_hash 是原始模型输出的 canonical SHA-256；normalization_actions 每项含 path/action/after。",
+      "required": ["raw_hash", "repaired_hash", "normalization_actions", "warnings"],
+      "properties": {
+        "raw_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "repaired_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "normalization_actions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path", "action", "after"],
+            "properties": {
+              "path": { "type": "string", "minLength": 1 },
+              "action": {
+                "type": "string",
+                "enum": ["alias", "alias_dedup", "enum_canonicalize", "container_shape", "lineage_merge"]
+              },
+              "before": {},
+              "after": {},
+              "reason": { "type": "string" }
+            }
+          }
+        },
+        "warnings": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

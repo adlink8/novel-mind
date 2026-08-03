@@ -316,5 +316,77 @@ class WorldModelCandidateArtifact(StrictAgentRuntimeModel):
     normalization: NormalizationTrail
 
 
+# ────────────────────────── Phase 28 Narrative Memory Artifact 信封（D-08/D-09） ──────────────────────────
+
+
+class ChapterAnalysisArtifact(StrictAgentRuntimeModel):
+    """智能体产物的 ChapterAnalysisArtifact 信封（Phase 28 / D-08）。
+
+    Agent 产出的是**candidate-only 的章节上下文/连续性分析**，不是事实；确定性
+    terminal-state/evidence 校验与 finalizer 拥有 permission/evidence/
+    state-transition/publication 权威。``analysis`` 携带受 bounds 约束的候选
+    上下文：``chapter_digest`` / ``chunk_digests`` 是 namespaced 压缩负载
+    （绝不作为 EvidenceRef 或检索索引输入）；``previous_context_summary`` /
+    ``next_context_hint`` / ``continuity_notes`` 受 ``max_length`` /
+    ``cutoff`` / ``spoiler_policy_version`` 约束；``next_context_hint`` 仅消歧、
+    绝不泄漏未来事实（越界 → 置 null 并以 ``next_hint_reason_code`` 记录稳定
+    阻断原因）。``tool_runs`` 携带 ToolRun 血缘。与 CitedAnswerArtifact 信封
+    纪律一致：type / schema_version / owner / novel / branch / producing
+    skill+version / model lineage / source versions / input_hash /
+    evidence_refs / status / parent_revision / normalization（26-06 trail）。
+    """
+
+    type: Literal["chapter_analysis"] = "chapter_analysis"
+    schema_version: Literal["chapter-analysis.v1"] = "chapter-analysis.v1"
+    owner_id: int
+    novel_id: int
+    branch: str | None = None
+    producing_skill: str = Field(min_length=1, max_length=120)
+    producing_skill_version: str = Field(min_length=1, max_length=32)
+    skill_version_id: int = Field(gt=0)
+    model_lineage: dict[str, Any]
+    source_versions: dict[str, Any]
+    input_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    evidence_refs: list[str] = Field(min_length=1)
+    analysis: dict[str, Any]
+    tool_runs: list[dict[str, Any]] = Field(min_length=1)
+    status: Literal["candidate", "validated", "approved", "published", "rejected"]
+    parent_revision: str | None = None
+    normalization: NormalizationTrail
+
+
+class StoryArcArtifact(StrictAgentRuntimeModel):
+    """智能体产物的 StoryArcArtifact 信封（Phase 28 / D-05/D-07/D-09）。
+
+    Agent 产出的是**candidate-only 的故事弧候选**：``outline_candidate``
+    （OutlineCandidateArtifact）与 ``mainline_candidate``
+    （MainlineCandidateArtifact）保留 source snapshot/range、input hashes、
+    证据血缘、边界不确定性与 ``candidate_status="candidate"``，**绝不进入
+    Canon**（D-09）；确定性 terminal-state/coverage validators 拥有
+    permission/evidence/state-transition/publication 权威。``tool_runs``
+    携带 ToolRun 血缘。与 CitedAnswerArtifact 信封纪律一致（lineage /
+    evidence_refs / status / parent_revision / normalization）。
+    """
+
+    type: Literal["story_arc"] = "story_arc"
+    schema_version: Literal["story-arc.v1"] = "story-arc.v1"
+    owner_id: int
+    novel_id: int
+    branch: str | None = None
+    producing_skill: str = Field(min_length=1, max_length=120)
+    producing_skill_version: str = Field(min_length=1, max_length=32)
+    skill_version_id: int = Field(gt=0)
+    model_lineage: dict[str, Any]
+    source_versions: dict[str, Any]
+    input_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    evidence_refs: list[str] = Field(min_length=1)
+    outline_candidate: dict[str, Any]
+    mainline_candidate: dict[str, Any]
+    tool_runs: list[dict[str, Any]] = Field(min_length=1)
+    status: Literal["candidate", "validated", "approved", "published", "rejected"]
+    parent_revision: str | None = None
+    normalization: NormalizationTrail
+
+
 # 供 OpenAPI 引用，避免未使用告警。
 _ = (StrictReaderChatModel,)

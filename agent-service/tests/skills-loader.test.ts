@@ -81,11 +81,13 @@ describe("skill loader（fail-closed 矩阵）", () => {
     expect(skillInstructions(skill)).toContain("Question");
   });
 
-  it("loadAllowlistedSkills 加载恰为 allowlisted 技能集（26 + 27 两个技能）", () => {
+  it("loadAllowlistedSkills 加载恰为 allowlisted 技能集（26 + 27 + 28 四个技能）", () => {
     const skills = loadAllowlistedSkills();
-    expect(skills).toHaveLength(2);
+    expect(skills).toHaveLength(4);
     expect(skills.map((s) => s.name).sort()).toEqual([
+      "analyze-chapter",
       "answer-reading-question",
+      "build-story-arc",
       "propose-world-model-candidates",
     ]);
   });

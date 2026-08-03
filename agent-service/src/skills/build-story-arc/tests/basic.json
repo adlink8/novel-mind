@@ -1,0 +1,145 @@
+{
+  "input": {
+    "novel_id": 1,
+    "branch": null,
+    "chapter_range": {
+      "chapter_start": 1,
+      "chapter_end": 2
+    },
+    "source_snapshot": {
+      "snapshot_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+      "dataset_lineage": "build-story-arc-fixture-v1"
+    }
+  },
+  "expected_output": {
+    "type": "story_arc",
+    "schema_version": "story-arc.v1",
+    "owner_id": 1,
+    "novel_id": 1,
+    "branch": null,
+    "producing_skill": "build-story-arc",
+    "producing_skill_version": "1.0.0",
+    "skill_version_id": 1,
+    "model_lineage": {
+      "provider": "fixture",
+      "model": "stub-model",
+      "revision": "stub-1"
+    },
+    "source_versions": {
+      "novel": "v1",
+      "narrative_memory": "v1"
+    },
+    "input_hash": "2222222222222222222222222222222222222222222222222222222222222222",
+    "evidence_refs": ["evidence:1", "evidence:2"],
+    "outline_candidate": {
+      "schema_version": "outline-candidate-artifact.v1",
+      "policy_version": "arc-policy.v1",
+      "owner_id": 1,
+      "novel_id": 1,
+      "version_id": 1,
+      "source_snapshot_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+      "hierarchy_build_id": "hierarchy:1",
+      "hierarchy_checksum": "3333333333333333333333333333333333333333333333333333333333333333",
+      "input_hash": "4444444444444444444444444444444444444444444444444444444444444444",
+      "chapter_min": 1,
+      "chapter_max": 2,
+      "arcs": [
+        {
+          "stage_key": "story_arc:1-2",
+          "node_kind": "story_arc",
+          "chapter_start": 1,
+          "chapter_end": 2,
+          "chapter_numbers": [1, 2],
+          "coverage": "complete",
+          "uncertainty": "likely",
+          "confidence": 0.8,
+          "boundary_uncertainties": [
+            { "side": "start", "chapter_number": 1, "reason": "snapshot_edge" },
+            { "side": "end", "chapter_number": 2, "reason": "snapshot_edge" }
+          ],
+          "evidence_lineage": {
+            "1": { "claim_count": 1, "max_uncertainty": "likely", "mean_confidence": 0.8 }
+          },
+          "input_hash": "5555555555555555555555555555555555555555555555555555555555555555"
+        }
+      ],
+      "covered_ranges": [[1, 2]],
+      "gaps": [],
+      "overlaps": [],
+      "candidate_status": "candidate",
+      "lineage": {
+        "source_snapshot_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+        "hierarchy_build_id": "hierarchy:1",
+        "hierarchy_checksum": "3333333333333333333333333333333333333333333333333333333333333333"
+      },
+      "checksum": "6666666666666666666666666666666666666666666666666666666666666666"
+    },
+    "mainline_candidate": {
+      "schema_version": "mainline-candidate-artifact.v1",
+      "policy_version": "arc-policy.v1",
+      "owner_id": 1,
+      "novel_id": 1,
+      "version_id": 1,
+      "source_snapshot_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+      "hierarchy_build_id": "hierarchy:1",
+      "hierarchy_checksum": "3333333333333333333333333333333333333333333333333333333333333333",
+      "input_hash": "7777777777777777777777777777777777777777777777777777777777777777",
+      "chapter_min": 1,
+      "chapter_max": 2,
+      "volumes": [
+        {
+          "stage_key": "volume:1",
+          "node_kind": "volume",
+          "chapter_start": 1,
+          "chapter_end": 2,
+          "arc_stage_keys": ["story_arc:1-2"],
+          "coverage": "complete",
+          "uncertainty": "likely",
+          "confidence": 0.8,
+          "boundary_uncertainties": [
+            { "side": "start", "chapter_number": 1, "reason": "snapshot_edge" },
+            { "side": "end", "chapter_number": 2, "reason": "snapshot_edge" }
+          ],
+          "input_hash": "8888888888888888888888888888888888888888888888888888888888888888"
+        }
+      ],
+      "global_projection": {
+        "stage_key": "global_story:book",
+        "node_kind": "global_story",
+        "chapter_start": 1,
+        "chapter_end": 2,
+        "child_stage_keys": ["volume:1"],
+        "coverage": "complete",
+        "uncertainty": "likely",
+        "confidence": 0.8,
+        "boundary_uncertainties": [
+          { "side": "start", "chapter_number": 1, "reason": "snapshot_edge" },
+          { "side": "end", "chapter_number": 2, "reason": "snapshot_edge" }
+        ],
+        "input_hash": "9999999999999999999999999999999999999999999999999999999999999999"
+      },
+      "covered_ranges": [[1, 2]],
+      "gaps": [],
+      "overlaps": [],
+      "candidate_status": "candidate",
+      "lineage": {
+        "source_snapshot_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+        "hierarchy_build_id": "hierarchy:1",
+        "hierarchy_checksum": "3333333333333333333333333333333333333333333333333333333333333333"
+      },
+      "checksum": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "tool_runs": [
+      { "tool_name": "get_narrative_memory", "calls": 1 },
+      { "tool_name": "get_evidence_span", "calls": 2 }
+    ],
+    "status": "candidate",
+    "parent_revision": null,
+    "normalization": {
+      "raw_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "repaired_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "normalization_actions": [],
+      "warnings": []
+    }
+  }
+}
