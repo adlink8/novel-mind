@@ -280,5 +280,41 @@ class ExternalEvidenceArtifact(StrictAgentRuntimeModel):
     release_status: Literal["external"] = "external"
 
 
+# ────────────────────────── World Model Candidate Artifact 信封（Phase 27） ──────────────────────────
+
+
+class WorldModelCandidateArtifact(StrictAgentRuntimeModel):
+    """智能体产物的 World Model Candidate 信封（Phase 27 / D-01..D-06）。
+
+    Agent 产出的是**候选投影**（typed world-model projections），不是事实；只有
+    确定性 WorldModel Validator/Gate 能把候选转换为 validated/published 投影。
+    所有 evidence_refs 必须属于 run 冻结 manifest 白名单（finalize 服务端校验，
+    D-07/D-08）。``candidates`` 是 agent 提案的类型化候选（events/edges/
+    knowledge/rules/exceptions/entities 等 claims），其 authority label 保持
+    原样——绝不静默升级为 ``canon_fact``（D-01）；具体 claim 的合法性由
+    WorldModelGate 在发布时逐条裁决。与 CitedAnswerArtifact 信封纪律一致：
+    type / schema_version / owner / novel / branch / producing skill+version /
+    model lineage / source versions / input_hash / evidence_refs / status /
+    parent_revision / normalization（26-06 修复血缘 trail）。
+    """
+
+    type: Literal["world_model_candidate"] = "world_model_candidate"
+    schema_version: Literal["world-model-candidate.v1"] = "world-model-candidate.v1"
+    owner_id: int
+    novel_id: int
+    branch: str | None = None
+    producing_skill: str = Field(min_length=1, max_length=120)
+    producing_skill_version: str = Field(min_length=1, max_length=32)
+    skill_version_id: int = Field(gt=0)
+    model_lineage: dict[str, Any]
+    source_versions: dict[str, Any]
+    input_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    evidence_refs: list[str] = Field(min_length=1)
+    candidates: dict[str, Any]
+    status: Literal["candidate", "validated", "approved", "published", "rejected"]
+    parent_revision: str | None = None
+    normalization: NormalizationTrail
+
+
 # 供 OpenAPI 引用，避免未使用告警。
 _ = (StrictReaderChatModel,)

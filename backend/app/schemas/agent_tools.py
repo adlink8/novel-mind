@@ -103,6 +103,74 @@ class GetNarrativeMemoryRequest(StrictAgentToolModel):
     )
 
 
+# ────────────────────────── Phase 27 世界模型工具请求模型（27-05） ──────────────────────────
+
+
+class GetEventsRequest(StrictAgentToolModel):
+    """世界模型事件/因果投影（REQ-WM-01，D-05 cutoff 服务端强制）。
+
+    version_id 缺省取该 owner/novel 最新版本；cutoff 显式提供时超过服务端
+    截止点被拒绝（beyond_cutoff）。返回候选投影（含证据、lineage、conflicts）。
+    """
+
+    version_id: int | None = Field(default=None, gt=0, description="世界模型版本 ID")
+    cutoff: int | None = Field(default=None, ge=1, description="截止章节（D-05）")
+
+
+class GetCharacterStateRequest(StrictAgentToolModel):
+    """角色状态/目标/动机（REQ-WM-02，D-05 cutoff/POV 服务端强制）。
+
+    只返回 aspect ∈ {state, goal, motivation} 的声明；hidden knowledge 在
+    disclosure_cutoff 之前绝不下发（D-05）。无可见声明时 abstained，绝不编造。
+    """
+
+    subject: str = Field(..., min_length=1, max_length=100, description="角色名")
+    version_id: int | None = Field(default=None, gt=0, description="世界模型版本 ID")
+    cutoff: int | None = Field(default=None, ge=1, description="截止章节（D-05）")
+    pov: str | None = Field(default=None, max_length=100, description="视角过滤（POV）")
+
+
+class GetCharacterKnowledgeRequest(StrictAgentToolModel):
+    """角色知识（REQ-WM-02，D-05 cutoff/POV 服务端强制）。
+
+    只返回 aspect=knowledge 的声明；mistaken belief / hidden knowledge 保持显式
+    标签，绝不静默升级为事实。
+    """
+
+    subject: str = Field(..., min_length=1, max_length=100, description="角色名")
+    version_id: int | None = Field(default=None, gt=0, description="世界模型版本 ID")
+    cutoff: int | None = Field(default=None, ge=1, description="截止章节（D-05）")
+    pov: str | None = Field(default=None, max_length=100, description="视角过滤（POV）")
+
+
+class GetWorldRulesRequest(StrictAgentToolModel):
+    """世界规则与规则例外（REQ-WM-03，D-05 cutoff 服务端强制）。
+
+    规则例外是 first-class 记录，绝不折叠进规则语句（D-04）。
+    """
+
+    version_id: int | None = Field(default=None, gt=0, description="世界模型版本 ID")
+    cutoff: int | None = Field(default=None, ge=1, description="截止章节（D-05）")
+
+
+class GetEvidenceSpanRequest(StrictAgentToolModel):
+    """leaf 证据跨度（D-07/D-08）：按 chapter+offsets+content_hash 物化原文。
+
+    只返回冻结原文切片；offsets 非法或 content_hash 与切片不匹配 → 拒绝。
+    """
+
+    chapter_id: int = Field(..., gt=0, description="章节 ID")
+    source_start: int = Field(..., ge=0, description="切片起点（含，code-point）")
+    source_end: int = Field(..., gt=0, description="切片终点（不含）")
+    content_hash: str = Field(
+        ...,
+        min_length=64,
+        max_length=64,
+        pattern="^[0-9a-f]{64}$",
+        description="该切片内容的 SHA-256",
+    )
+
+
 # ────────────────────────── 统一错误信封 ──────────────────────────
 
 

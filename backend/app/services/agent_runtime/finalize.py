@@ -188,7 +188,7 @@ async def finalize_skill_run(
         # 引证合法性：每个 evidence_ref 必须属于冻结 manifest 白名单。
         allowed = _frozen_allowlist(run)
         try:
-            _validate_cited_answer(envelope, allowed)
+            _validate_artifact_evidence(envelope, allowed)
         except ValueError as exc:
             run.status = "failed"
             run.stop_reason = stop_reason
@@ -237,17 +237,24 @@ def _frozen_allowlist(run: SkillRun) -> set[str]:
     return {str(ref) for ref in manifest.get("evidence_refs") or []}
 
 
-def _validate_cited_answer(envelope: dict[str, Any], allowed: set[str]) -> None:
-    """把 Cited Answer 的 answer 部分构造成 ReaderAnswerEnvelope 并做白名单校验。"""
-    answer = envelope.get("answer")
-    if not isinstance(answer, dict):
-        raise ValueError("cited answer missing 'answer' payload")
-    reader_envelope = ReaderAnswerEnvelope.model_validate(answer)
-    validate_answer_against_manifest(reader_envelope, allowed)
+def _validate_artifact_evidence(envelope: dict[str, Any], allowed: set[str]) -> None:
+    """冻结 manifest 白名单校验（T-25.2-03-02 / Phase 27 扩展）。
+
+    - cited_answer：构造 ReaderAnswerEnvelope 校验 answer_blocks 内引用，
+      并校验顶层 evidence_refs；
+    - world_model_candidate 等其它类型：校验顶层 evidence_refs（claim 级
+      证据合法性由确定性 WorldModelGate 在发布时裁决，finalize 不越权）。
+    """
+    if envelope.get("type") == "cited_answer":
+        answer = envelope.get("answer")
+        if not isinstance(answer, dict):
+            raise ValueError("cited answer missing 'answer' payload")
+        reader_envelope = ReaderAnswerEnvelope.model_validate(answer)
+        validate_answer_against_manifest(reader_envelope, allowed)
     # 顶层 evidence_refs 同样必须属于白名单。
     for ref in envelope.get("evidence_refs") or []:
         if str(ref) not in allowed:
-            raise ValueError(f"cited answer: unknown evidence ref {ref!r}")
+            raise ValueError(f"unknown evidence ref {ref!r}")
 
 
 def expected_input_hash(input_data: dict[str, Any]) -> str:

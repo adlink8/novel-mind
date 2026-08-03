@@ -1,0 +1,55 @@
+# propose-world-model-candidates skill 契约（D-01..D-06 / REQ-WM-01..04 / REQ-AGENT-02/03 / Phase 27）
+# 字段镜像 backend 注册入口（app.schemas.agent_runtime.SkillVersionRegister）。
+#
+# Phase 27 版本化世界模型候选技能：
+#   - 本技能是 Phase 27 确定性能力的 Agent 消费边界（D-01）；允许的工具
+#     allowlist 只含 27-05 注册的 6 个只读域工具（含既有 get_relationships），
+#     编排绝不越出该 allowlist（未知工具/白名单外调用 → fail closed）。
+#   - write_permissions 恒为空：Agent 不直接写任何域状态（不写 Canon、不发布
+#     typed projection）。唯一输出通道是后端确定性 finalizer 持久化的
+#     WorldModelCandidateArtifact（candidate-only）；确定性 WorldModel
+#     Validator/Gate 拥有 legality/state-transition/publication 权威。
+#   - approval_required_for 声明唯一的审批动作 `world_model:user_interpretation`：
+#     user interpretation 需要 owner 作用域确认（D-06）；canon_fact 发布同样
+#     需要显式审批（D-01）——但那是 Gate/Publisher 的权威，不在这里授权 Agent。
+#   - 版本由 `version` 钉住（当前 1.0.0）；每次 run 经 skill_version_id 绑定
+#     SkillVersion 血缘（run 绑定 owner/novel/branch、SkillRun、ToolRuns、
+#     input hash、source snapshot、model/runtime lineage、output Artifact
+#     revision）。
+#   - 模型结构化输出走共享 26-06 normalizer + 严格 post-repair validator；
+#     normalization_actions / raw_hash / repaired_hash / warnings 保留在官方
+#     WorldModelCandidateArtifact 上。
+name: propose-world-model-candidates
+version: 1.0.0
+description: >-
+  Phase 27 版本化世界模型候选技能：给定小说（owner/novel/branch + version/cutoff
+  可选），通过 6 个只读域工具（get_events / get_character_state /
+  get_character_knowledge / get_relationships / get_world_rules /
+  get_evidence_span）收集证据，产出血缘绑定的 WorldModelCandidateArtifact
+  （typed candidates）。Agent 只提案候选投影，绝不直接发布 Canon fact；确定性
+  WorldModel Validator/Gate 单独发布 typed projections。未知工具/权限/血缘/
+  schema drift 一律 fail closed。
+allowed_tools:
+  - get_events
+  - get_character_state
+  - get_character_knowledge
+  - get_relationships
+  - get_world_rules
+  - get_evidence_span
+read_permissions:
+  - canon
+  - derivative
+  - world_model
+write_permissions: []
+forbidden_spaces:
+  - canon:original
+  - derivative:write
+budget:
+  max_calls: 30
+  max_input_tokens: 40000
+  max_output_tokens: 8000
+  max_cost_usd: "1.50"
+approval_required_for:
+  - world_model:user_interpretation
+input_schema: ./input.schema.json
+output_schema: ./output.schema.json

@@ -117,7 +117,7 @@ def test_external_ref_in_cited_answer_fails_manifest_validation():
 
 
 def test_finalize_gate_rejects_external_ref_with_stable_code():
-    """finalize 路径的 _validate_cited_answer 对 mcp:// 引用抛错；稳定错误码为 failed_validation。"""
+    """finalize 路径的 _validate_artifact_evidence 对 mcp:// 引用抛错；稳定错误码为 failed_validation。"""
     envelope = {
         "type": "cited_answer",
         "evidence_refs": ["mcp://external-research/1"],
@@ -129,7 +129,7 @@ def test_finalize_gate_rejects_external_ref_with_stable_code():
         },
     }
     with pytest.raises(ValueError):
-        finalize._validate_cited_answer(envelope, {"selection:primary"})
+        finalize._validate_artifact_evidence(envelope, {"selection:primary"})
     # 稳定错误码：任何引证校验失败都映射到 failed_validation（25.2-03 契约）。
     assert finalize.ERROR_CODE_FAILED_VALIDATION == "failed_validation"
 

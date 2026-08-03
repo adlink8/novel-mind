@@ -81,10 +81,13 @@ describe("skill loader（fail-closed 矩阵）", () => {
     expect(skillInstructions(skill)).toContain("Question");
   });
 
-  it("loadAllowlistedSkills 加载恰为 allowlisted 技能集", () => {
+  it("loadAllowlistedSkills 加载恰为 allowlisted 技能集（26 + 27 两个技能）", () => {
     const skills = loadAllowlistedSkills();
-    expect(skills).toHaveLength(1);
-    expect(skills[0].name).toBe("answer-reading-question");
+    expect(skills).toHaveLength(2);
+    expect(skills.map((s) => s.name).sort()).toEqual([
+      "answer-reading-question",
+      "propose-world-model-candidates",
+    ]);
   });
 
   it("allowed_tools 含未知域工具 → fail-closed，错误消息指名工具", () => {

@@ -28,6 +28,7 @@ from app.models.agent_runtime import SkillRun
 from app.schemas.agent_runtime import (
     CitedAnswerArtifact,
     ExternalEvidenceArtifact,
+    WorldModelCandidateArtifact,
 )
 
 # 受保护字段：normalizer 绝不合成，服务端也禁止出现在信封中（extra=forbid 兜底，
@@ -105,6 +106,8 @@ def evaluate_integrity(*, envelope: dict[str, Any], run: SkillRun) -> IntegrityD
         return _evaluate_cited_answer(envelope, run)
     if artifact_type == "external_evidence":
         return _evaluate_external_evidence(envelope)
+    if artifact_type == "world_model_candidate":
+        return _evaluate_world_model_candidate(envelope, run)
     return IntegrityDecision(False, BLOCKED_UNKNOWN_TYPE)
 
 
@@ -160,4 +163,56 @@ def _evaluate_external_evidence(envelope: dict[str, Any]) -> IntegrityDecision:
         ExternalEvidenceArtifact.model_validate(envelope)
     except ValidationError as exc:
         return IntegrityDecision(False, f"{BLOCKED_SCHEMA} ({_first_validation_error(exc)})")
+    return IntegrityDecision(True)
+
+
+def _evaluate_world_model_candidate(
+    envelope: dict[str, Any], run: SkillRun
+) -> IntegrityDecision:
+    """Phase 27 世界模型候选信封 integrity gate（D-01..D-06 / D-16）。
+
+    与 cited_answer 纪律一致：无证据的启发式候选不能进世界模型网关；lineage
+    （owner/novel/skill_version/input_hash）必须与 run 一致；status 恒为
+    candidate；trail 可重放；受保护字段（authority/cutoff/fork/approval）绝不
+    出现在信封中。candidates 内部 claim 的合法性由确定性 WorldModelGate 在
+    发布时裁决，本 gate 不越权。
+    """
+    # 0. heuristic candidate-only 无 EvidenceRef 资格 → 不能进世界模型网关。
+    if not envelope.get("evidence_refs"):
+        return IntegrityDecision(False, BLOCKED_NO_EVIDENCE)
+
+    # 1. 严格 wire schema（extra=forbid + 必需字段 + hash 格式 + trail 形状）。
+    try:
+        model = WorldModelCandidateArtifact.model_validate(envelope)
+    except ValidationError as exc:
+        return IntegrityDecision(False, f"{BLOCKED_SCHEMA} ({_first_validation_error(exc)})")
+
+    # 2. run lineage：owner/novel/skill_version/input_hash 必须与 run 一致。
+    if model.owner_id != run.owner_id:
+        return IntegrityDecision(False, BLOCKED_LINEAGE_OWNER)
+    if model.novel_id != run.novel_id:
+        return IntegrityDecision(False, BLOCKED_LINEAGE_NOVEL)
+    if model.skill_version_id != run.skill_version_id:
+        return IntegrityDecision(False, BLOCKED_LINEAGE_SKILL)
+    if model.input_hash != run.input_hash:
+        return IntegrityDecision(False, BLOCKED_LINEAGE_INPUT_HASH)
+    if model.status != "candidate":
+        return IntegrityDecision(False, f"{BLOCKED_STATUS} (got {model.status!r})")
+
+    # 3. 完整性 trail 重放：repaired_hash 必须等于剥离 trail 后的 payload 的 hash。
+    recomputed = canonical_content_hash(_strip_trail(envelope))
+    if recomputed != model.normalization.repaired_hash:
+        return IntegrityDecision(False, BLOCKED_STALE_REPAIRED_HASH)
+    if not model.normalization.normalization_actions and (
+        model.normalization.raw_hash != model.normalization.repaired_hash
+    ):
+        return IntegrityDecision(False, BLOCKED_TRAIL_INCONSISTENT)
+
+    # 4. 受保护字段合成检查（authority/cutoff/fork/approval 绝不出现；
+    #    extra=forbid 已兜底，此处为纵深防御 + 明确原因）。
+    forbidden = [key for key in FORBIDDEN_PROTECTED_KEYS if key in envelope]
+    if forbidden:
+        return IntegrityDecision(False, f"{BLOCKED_PROTECTED_SYNTHESIS}: {sorted(forbidden)}")
+
+    # 5. leaf-evidence 白名单校验由 finalize 的 _validate_artifact_evidence 承担。
     return IntegrityDecision(True)

@@ -60,6 +60,17 @@ _PARAMS_BY_TOOL = {
     "get_relationships": {},
     "get_clues": {},
     "get_narrative_memory": {},
+    # Phase 27 世界模型工具（27-05）。
+    "get_events": {"version_id": 1},
+    "get_character_state": {"version_id": 1, "subject": "林安"},
+    "get_character_knowledge": {"version_id": 1, "subject": "林安"},
+    "get_world_rules": {"version_id": 1},
+    "get_evidence_span": {
+        "chapter_id": 1,
+        "source_start": 0,
+        "source_end": 5,
+        "content_hash": "a" * 64,
+    },
 }
 
 
@@ -109,7 +120,7 @@ def test_every_error_class_code_is_in_frozen_table():
         ), AgentToolError)
 
 
-def test_tool_names_are_exactly_the_7_contract_tools():
+def test_tool_names_are_exactly_the_12_contract_tools():
     assert set(TOOL_NAMES) == {
         "get_novel",
         "get_chapter",
@@ -118,6 +129,12 @@ def test_tool_names_are_exactly_the_7_contract_tools():
         "get_relationships",
         "get_clues",
         "get_narrative_memory",
+        # Phase 27 世界模型只读工具（27-05）。
+        "get_events",
+        "get_character_state",
+        "get_character_knowledge",
+        "get_world_rules",
+        "get_evidence_span",
     }
 
 

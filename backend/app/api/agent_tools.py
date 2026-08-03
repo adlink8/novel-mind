@@ -26,11 +26,16 @@ from app.core.security import require_user
 from app.models import Novel, User
 from app.schemas.agent_tools import (
     GetChapterRequest,
+    GetCharacterKnowledgeRequest,
+    GetCharacterStateRequest,
     GetCluesRequest,
+    GetEventsRequest,
+    GetEvidenceSpanRequest,
     GetNarrativeMemoryRequest,
     GetNovelRequest,
     GetRelationshipsRequest,
     GetTimelineRequest,
+    GetWorldRulesRequest,
     SearchNovelTextRequest,
 )
 from app.services.agent_tools.errors import (
@@ -168,6 +173,94 @@ async def tool_get_narrative_memory(
     """叙事记忆结构（候选-only，ADR-0002，响应带 release_status="candidate"）。"""
     return await _run_tool(
         "get_narrative_memory",
+        db=db,
+        novel=novel,
+        owner_id=current_user.id,
+        params=_params(body),
+    )
+
+
+# ────────────────────────── Phase 27 世界模型只读工具（27-05） ──────────────────────────
+
+
+@router.post("/get_events")
+async def tool_get_events(
+    body: GetEventsRequest | None = None,
+    novel: Novel = Depends(require_owned_novel),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """世界模型事件/因果候选投影（D-05 cutoff 服务端强制）。"""
+    return await _run_tool(
+        "get_events",
+        db=db,
+        novel=novel,
+        owner_id=current_user.id,
+        params=_params(body),
+    )
+
+
+@router.post("/get_character_state")
+async def tool_get_character_state(
+    body: GetCharacterStateRequest | None = None,
+    novel: Novel = Depends(require_owned_novel),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """角色状态/目标/动机（REQ-WM-02，D-05 cutoff/POV 服务端强制）。"""
+    return await _run_tool(
+        "get_character_state",
+        db=db,
+        novel=novel,
+        owner_id=current_user.id,
+        params=_params(body),
+    )
+
+
+@router.post("/get_character_knowledge")
+async def tool_get_character_knowledge(
+    body: GetCharacterKnowledgeRequest | None = None,
+    novel: Novel = Depends(require_owned_novel),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """角色知识（REQ-WM-02，D-05 cutoff/POV 服务端强制）。"""
+    return await _run_tool(
+        "get_character_knowledge",
+        db=db,
+        novel=novel,
+        owner_id=current_user.id,
+        params=_params(body),
+    )
+
+
+@router.post("/get_world_rules")
+async def tool_get_world_rules(
+    body: GetWorldRulesRequest | None = None,
+    novel: Novel = Depends(require_owned_novel),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """世界规则与规则例外（REQ-WM-03，D-04 例外 first-class，D-05 cutoff 强制）。"""
+    return await _run_tool(
+        "get_world_rules",
+        db=db,
+        novel=novel,
+        owner_id=current_user.id,
+        params=_params(body),
+    )
+
+
+@router.post("/get_evidence_span")
+async def tool_get_evidence_span(
+    body: GetEvidenceSpanRequest | None = None,
+    novel: Novel = Depends(require_owned_novel),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """leaf 证据跨度（D-07/D-08）：按 chapter+offsets+content_hash 物化原文。"""
+    return await _run_tool(
+        "get_evidence_span",
         db=db,
         novel=novel,
         owner_id=current_user.id,

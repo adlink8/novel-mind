@@ -11,8 +11,8 @@ import {
 } from "../src/tools/fastapi-client.js";
 
 /**
- * registry.test.ts（25.2-05 Task 1）：
- * - 7 个工具注册、TypeBox 参数拒绝错误类型
+ * registry.test.ts（25.2-05 Task 1 + 27-05 Phase 27 世界模型工具）：
+ * - 12 个工具注册、TypeBox 参数拒绝错误类型
  * - facade 错误信封 → 冻结 AGENT_TOOL_ERRORS 精确镜像
  * - 64 KiB+1 字节 → output_too_large
  * - 运行级 abort 取消 in-flight fetch
@@ -20,8 +20,8 @@ import {
  * 全部使用 mock fetch，不真连 backend。
  */
 
-/** 7 个域工具名（测试侧镜像，与 DOMAIN_TOOL_NAMES 断言一致）。 */
-const SEVEN_TOOL_NAMES = [
+/** 12 个域工具名（测试侧镜像，与 DOMAIN_TOOL_NAMES 断言一致）。 */
+const TWELVE_TOOL_NAMES = [
   "get_novel",
   "get_chapter",
   "search_novel_text",
@@ -29,18 +29,23 @@ const SEVEN_TOOL_NAMES = [
   "get_relationships",
   "get_clues",
   "get_narrative_memory",
+  "get_events",
+  "get_character_state",
+  "get_character_knowledge",
+  "get_world_rules",
+  "get_evidence_span",
 ] as const;
 
 describe("domain tool registry", () => {
-  it("DOMAIN_TOOL_NAMES 恰为 7 个冻结工具名", () => {
-    expect([...DOMAIN_TOOL_NAMES]).toEqual([...SEVEN_TOOL_NAMES]);
+  it("DOMAIN_TOOL_NAMES 恰为 12 个冻结工具名", () => {
+    expect([...DOMAIN_TOOL_NAMES]).toEqual([...TWELVE_TOOL_NAMES]);
   });
 
-  it("buildDomainTools 返回 7 个 defineTool，名称与 DOMAIN_TOOL_NAMES 一致", () => {
+  it("buildDomainTools 返回 12 个 defineTool，名称与 DOMAIN_TOOL_NAMES 一致", () => {
     const tools = buildDomainTools("Bearer per-run-token");
-    expect(tools).toHaveLength(7);
+    expect(tools).toHaveLength(12);
     const names = tools.map((t) => t.name);
-    expect(names).toEqual([...SEVEN_TOOL_NAMES]);
+    expect(names).toEqual([...TWELVE_TOOL_NAMES]);
     // 每个工具都是 defineTool（含 execute 五参签名）
     for (const tool of tools) {
       expect(typeof tool.execute).toBe("function");

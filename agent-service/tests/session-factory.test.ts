@@ -76,7 +76,7 @@ describe("session factory", () => {
     vi.unstubAllGlobals();
   });
 
-  it("恒定传 noTools:\"all\" + 非空 tools allowlist + 7 个 customTools（真实 skill）", async () => {
+  it("恒定传 noTools:\"all\" + 非空 tools allowlist + customTools（真实 skill）", async () => {
     const skill = loadSkill("answer-reading-question");
     const dirs = createControlledAgentDir();
     await createSession({ auth: "Bearer per-run-token", skill, modelRuntime: {} as never, dirs });
@@ -95,7 +95,7 @@ describe("session factory", () => {
     }
     // 首技能白名单排除 get_narrative_memory（Open Question 4）
     expect(tools).not.toContain("get_narrative_memory");
-    // customTools 恰为 7 个域工具
+    // customTools 恰为全部域工具（DOMAIN_TOOL_NAMES 单一事实源）
     const customTools = options.customTools as Array<{ name: string }>;
     expect(customTools).toHaveLength(DOMAIN_TOOL_NAMES.length);
     expect(customTools.map((t) => t.name)).toEqual([...DOMAIN_TOOL_NAMES]);

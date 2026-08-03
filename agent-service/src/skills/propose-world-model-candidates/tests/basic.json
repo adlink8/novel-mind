@@ -1,0 +1,57 @@
+{
+  "input": {
+    "novel_id": 1,
+    "branch": null,
+    "version_id": 1,
+    "cutoff": 3
+  },
+  "expected_output": {
+    "type": "world_model_candidate",
+    "schema_version": "world-model-candidate.v1",
+    "owner_id": 1,
+    "novel_id": 1,
+    "branch": null,
+    "producing_skill": "propose-world-model-candidates",
+    "producing_skill_version": "1.0.0",
+    "skill_version_id": 1,
+    "model_lineage": {
+      "provider": "fixture",
+      "model": "stub-model",
+      "revision": "stub-1"
+    },
+    "source_versions": {
+      "novel": "v1",
+      "world_model": "v1"
+    },
+    "input_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "evidence_refs": ["evidence:1"],
+    "candidates": {
+      "projection_version": 1,
+      "tool_runs": [
+        { "tool_name": "get_world_rules", "calls": 1 },
+        { "tool_name": "get_evidence_span", "calls": 1 }
+      ],
+      "claims": [
+        {
+          "claim_kind": "world_rule",
+          "claim_key": "rule-bamboo-grove",
+          "proposition": "竹林是使者现身之地。",
+          "subject": null,
+          "authority": "probable_inference",
+          "confidence": 0.8,
+          "disclosure_cutoff": 1,
+          "evidence_refs": ["evidence:1"],
+          "details": { "rule_name": "bamboo-grove" }
+        }
+      ]
+    },
+    "status": "candidate",
+    "parent_revision": null,
+    "normalization": {
+      "raw_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "repaired_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "normalization_actions": [],
+      "warnings": []
+    }
+  }
+}

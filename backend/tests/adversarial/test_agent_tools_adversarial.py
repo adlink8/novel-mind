@@ -35,7 +35,7 @@ ROOT = Path(__file__).resolve().parents[2]
 AGENT_TOOLS_SERVICE = ROOT / "app" / "services" / "agent_tools"
 AGENT_TOOLS_API = ROOT / "app" / "api" / "agent_tools.py"
 
-# 7 个只读工具名（与 facade.TOOL_NAMES 一致性由测试断言）。
+# 12 个只读工具名（与 facade.TOOL_NAMES 一致性由测试断言）。
 ALL_TOOLS = (
     "get_novel",
     "get_chapter",
@@ -44,6 +44,12 @@ ALL_TOOLS = (
     "get_relationships",
     "get_clues",
     "get_narrative_memory",
+    # Phase 27 世界模型只读工具（27-05）。
+    "get_events",
+    "get_character_state",
+    "get_character_knowledge",
+    "get_world_rules",
+    "get_evidence_span",
 )
 
 # 每个工具的 HTTP 路由（cross-owner 轴使用）。
@@ -55,6 +61,11 @@ TOOL_ROUTES = {
     "get_relationships": "/api/agent-tools/get_relationships",
     "get_clues": "/api/agent-tools/get_clues",
     "get_narrative_memory": "/api/agent-tools/get_narrative_memory",
+    "get_events": "/api/agent-tools/get_events",
+    "get_character_state": "/api/agent-tools/get_character_state",
+    "get_character_knowledge": "/api/agent-tools/get_character_knowledge",
+    "get_world_rules": "/api/agent-tools/get_world_rules",
+    "get_evidence_span": "/api/agent-tools/get_evidence_span",
 }
 
 # 受保护内容哨兵：断言任何响应体都不含它。
@@ -73,6 +84,17 @@ def _params(tool: str, **extra) -> dict:
         "get_relationships": {},
         "get_clues": {},
         "get_narrative_memory": {},
+        # Phase 27 世界模型工具（27-05）。
+        "get_events": {"version_id": 1},
+        "get_character_state": {"version_id": 1, "subject": "林安"},
+        "get_character_knowledge": {"version_id": 1, "subject": "林安"},
+        "get_world_rules": {"version_id": 1},
+        "get_evidence_span": {
+            "chapter_id": 1,
+            "source_start": 0,
+            "source_end": 5,
+            "content_hash": "a" * 64,
+        },
     }[tool]
     return {**base, **extra}
 
@@ -186,6 +208,66 @@ def _service_stub(tool: str, handler):
             through_chapter=through_chapter,
         )
 
+    async def stub_events(db, *, owner_id, novel_id, version_id, cutoff):
+        return await _call_handler(
+            handler,
+            db=db,
+            owner_id=owner_id,
+            novel_id=novel_id,
+            version_id=version_id,
+            cutoff=cutoff,
+        )
+
+    async def stub_character_state(
+        db, *, owner_id, novel_id, version_id, subject, cutoff, pov
+    ):
+        return await _call_handler(
+            handler,
+            db=db,
+            owner_id=owner_id,
+            novel_id=novel_id,
+            version_id=version_id,
+            subject=subject,
+            cutoff=cutoff,
+            pov=pov,
+        )
+
+    async def stub_character_knowledge(
+        db, *, owner_id, novel_id, version_id, subject, cutoff, pov
+    ):
+        return await _call_handler(
+            handler,
+            db=db,
+            owner_id=owner_id,
+            novel_id=novel_id,
+            version_id=version_id,
+            subject=subject,
+            cutoff=cutoff,
+            pov=pov,
+        )
+
+    async def stub_world_rules(db, *, owner_id, novel_id, version_id, cutoff):
+        return await _call_handler(
+            handler,
+            db=db,
+            owner_id=owner_id,
+            novel_id=novel_id,
+            version_id=version_id,
+            cutoff=cutoff,
+        )
+
+    async def stub_evidence_span(
+        db, *, chapter_id, source_start, source_end, content_hash
+    ):
+        return await _call_handler(
+            handler,
+            db=db,
+            chapter_id=chapter_id,
+            source_start=source_start,
+            source_end=source_end,
+            content_hash=content_hash,
+        )
+
     stubs = {
         "get_novel": stub_get_novel,
         "get_chapter": stub_get_chapter,
@@ -194,6 +276,11 @@ def _service_stub(tool: str, handler):
         "get_relationships": stub_relationships,
         "get_clues": stub_clues,
         "get_narrative_memory": stub_nm,
+        "get_events": stub_events,
+        "get_character_state": stub_character_state,
+        "get_character_knowledge": stub_character_knowledge,
+        "get_world_rules": stub_world_rules,
+        "get_evidence_span": stub_evidence_span,
     }
     return stubs[tool]
 
@@ -267,6 +354,22 @@ async def test_beyond_cutoff_no_content_leak(tool):
         "get_novel": {},
         "search_novel_text": {"query": "对抗"},
         "get_clues": {},
+        # Phase 27 世界模型工具：显式 cutoff 超过服务端截止点 → beyond_cutoff。
+        "get_events": {"version_id": 1, "cutoff": BEYOND_CHAPTER},
+        "get_character_state": {
+            "version_id": 1, "subject": "林安", "cutoff": BEYOND_CHAPTER
+        },
+        "get_character_knowledge": {
+            "version_id": 1, "subject": "林安", "cutoff": BEYOND_CHAPTER
+        },
+        "get_world_rules": {"version_id": 1, "cutoff": BEYOND_CHAPTER},
+        # get_evidence_span 按章节号执行 cutoff（handler 在服务返回后裁决）。
+        "get_evidence_span": {
+            "chapter_id": 1,
+            "source_start": 0,
+            "source_end": 5,
+            "content_hash": "a" * 64,
+        },
     }[tool]
 
     if tool == "get_chapter":
@@ -283,7 +386,42 @@ async def test_beyond_cutoff_no_content_leak(tool):
         assert PROTECTED not in str(excinfo.value)
         return
 
-    if tool in ("get_timeline", "get_relationships", "get_narrative_memory"):
+    if tool == "get_evidence_span":
+        # stub 返回超截止点章节的 span → handler 在服务返回后拒绝（beyond_cutoff）。
+        service = _service_stub(
+            tool,
+            lambda db, **kw: {
+                "evidence_key": "evidence:1",
+                "chapter_id": 1,
+                "chapter_number": BEYOND_CHAPTER,
+                "novel_id": 1,
+                "source_start": 0,
+                "source_end": 5,
+                "content_hash": "a" * 64,
+                "excerpt": PROTECTED,
+            },
+        )
+        facade = ToolFacade(
+            cutoff_resolver=_fake_cutoff,
+            service_overrides={"get_evidence_span": service},
+        )
+        with pytest.raises(AgentToolError) as excinfo:
+            await facade.execute(
+                tool, db=object(), novel=_novel(), owner_id=1, params=params
+            )
+        assert excinfo.value.code == "beyond_cutoff"
+        assert PROTECTED not in str(excinfo.value)
+        return
+
+    if tool in (
+        "get_timeline",
+        "get_relationships",
+        "get_narrative_memory",
+        "get_events",
+        "get_character_state",
+        "get_character_knowledge",
+        "get_world_rules",
+    ):
         called = []
 
         def mark(*a, **kw):
@@ -311,10 +449,23 @@ async def test_beyond_cutoff_no_content_leak(tool):
     async def safe_clues(db, **kw):
         return {"active": None, "running_candidate": None}
 
+    async def safe_evidence_span(db, **kw):
+        return {
+            "evidence_key": "evidence:1",
+            "chapter_id": 1,
+            "chapter_number": 1,
+            "novel_id": 1,
+            "source_start": 0,
+            "source_end": 5,
+            "content_hash": "a" * 64,
+            "excerpt": "安全切片",
+        }
+
     safe = {
         "get_novel": safe_get_novel,
         "search_novel_text": safe_search,
         "get_clues": safe_clues,
+        "get_evidence_span": safe_evidence_span,
     }[tool]
     facade = ToolFacade(
         cutoff_resolver=_fake_cutoff,
@@ -407,6 +558,30 @@ async def test_oversized_response_returns_output_too_large(tool):
     async def huge_nm(db, **kw):
         return {"versions": [{"blob": "戊" * 70000}]}
 
+    async def huge_events(db, **kw):
+        return {"events": [{"description": "己" * 70000}]}
+
+    async def huge_character_state(db, **kw):
+        return {"claims": [{"proposition": "庚" * 70000}]}
+
+    async def huge_character_knowledge(db, **kw):
+        return {"claims": [{"proposition": "辛" * 70000}]}
+
+    async def huge_world_rules(db, **kw):
+        return {"rules": [{"statement": "壬" * 70000}]}
+
+    async def huge_evidence_span(db, **kw):
+        return {
+            "evidence_key": "evidence:1",
+            "chapter_id": 1,
+            "chapter_number": 1,
+            "novel_id": 1,
+            "source_start": 0,
+            "source_end": 5,
+            "content_hash": "a" * 64,
+            "excerpt": "癸" * 70000,
+        }
+
     huge = {
         "get_novel": huge_get_novel,
         "get_chapter": huge_get_chapter,
@@ -415,6 +590,11 @@ async def test_oversized_response_returns_output_too_large(tool):
         "get_relationships": huge_relationships,
         "get_clues": huge_clues,
         "get_narrative_memory": huge_nm,
+        "get_events": huge_events,
+        "get_character_state": huge_character_state,
+        "get_character_knowledge": huge_character_knowledge,
+        "get_world_rules": huge_world_rules,
+        "get_evidence_span": huge_evidence_span,
     }[tool]
     facade = ToolFacade(
         byte_cap=64 * 1024,
@@ -497,6 +677,38 @@ async def test_full_book_spoof_without_persisted_switch_is_cutoff_limited(tool):
         )
         return
 
+    if tool in (
+        "get_events",
+        "get_character_state",
+        "get_character_knowledge",
+        "get_world_rules",
+    ):
+        # 世界模型工具：full_book 伪造必须被忽略——stub 收到的 cutoff 恒为服务端
+        # 截止点（fake=3），绝不因 full_book=true 扩展到整本书。
+        received_cutoffs: list[int] = []
+        safe_payloads = {
+            "get_events": {"events": []},
+            "get_character_state": {"claims": [], "status": "abstained"},
+            "get_character_knowledge": {"claims": [], "status": "abstained"},
+            "get_world_rules": {"rules": [], "exceptions": []},
+        }
+
+        def record_world_cutoff(db, *, cutoff, **kw):
+            received_cutoffs.append(int(cutoff))
+            return safe_payloads[tool]
+
+        facade = ToolFacade(
+            cutoff_resolver=_fake_cutoff,
+            service_overrides={tool: _service_stub(tool, record_world_cutoff)},
+        )
+        await facade.execute(
+            tool, db=object(), novel=_novel(), owner_id=1, params=params
+        )
+        assert received_cutoffs == [3], (
+            f"{tool} 响应了伪造的 full_book=true（无持久化开关）"
+        )
+        return
+
     if tool == "get_chapter":
         service = _service_stub(tool, lambda db, **kw: _chapter(BEYOND_CHAPTER, PROTECTED))
         facade = ToolFacade(
@@ -511,7 +723,8 @@ async def test_full_book_spoof_without_persisted_switch_is_cutoff_limited(tool):
         assert PROTECTED not in str(excinfo.value)
         return
 
-    # get_novel / search_novel_text / get_narrative_memory：无泄漏即视为 cutoff-limited。
+    # get_novel / search_novel_text / get_narrative_memory / get_evidence_span：
+    # 无泄漏即视为 cutoff-limited（get_evidence_span 的章节 cutoff 由 handler 裁决）。
     async def safe_novel(db, **kw):
         return _novel()
 
@@ -521,10 +734,23 @@ async def test_full_book_spoof_without_persisted_switch_is_cutoff_limited(tool):
     async def safe_nm(db, **kw):
         return {"versions": []}
 
+    async def safe_evidence_span(db, **kw):
+        return {
+            "evidence_key": "evidence:1",
+            "chapter_id": 1,
+            "chapter_number": 1,
+            "novel_id": 1,
+            "source_start": 0,
+            "source_end": 5,
+            "content_hash": "a" * 64,
+            "excerpt": "安全切片",
+        }
+
     safe = {
         "get_novel": safe_novel,
         "search_novel_text": safe_search,
         "get_narrative_memory": safe_nm,
+        "get_evidence_span": safe_evidence_span,
     }[tool]
     facade = ToolFacade(
         cutoff_resolver=_fake_cutoff,

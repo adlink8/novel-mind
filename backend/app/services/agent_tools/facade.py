@@ -53,12 +53,20 @@ from app.services.narrative_memory.structure_query import (
     load_structure_tree,
 )
 from app.services.novel_service import novel_service
+from app.services.queryplan.adapters import chapter_content_hash
+from app.services.queryplan.contracts import leaf_evidence_key
 from app.services.relationships.query import relationship_graph_query_service
 from app.services.timeline.query import build_version_view, resolve_chapter_cutoff
+from app.services.world_model.entity_queries import WorldEntityQueries
+from app.services.world_model.event_queries import WorldModelEventQueries
+from app.services.world_model.knowledge import EpistemicAspect, KnowledgeResultStatus
+from app.services.world_model.knowledge_queries import KnowledgeQueries
 
 logger = logging.getLogger(__name__)
 
-# 冻结的 7 个只读工具名（25.2-03 skill.yaml 的 allowed_tools 白名单镜像此表）。
+# 冻结的 12 个只读域工具名（25.2-03 skill.yaml 的 allowed_tools 白名单镜像此表；
+# 27-05 起加入 Phase 27 世界模型工具 get_events / get_character_state /
+# get_character_knowledge / get_world_rules / get_evidence_span）。
 TOOL_NAMES: tuple[str, ...] = (
     "get_novel",
     "get_chapter",
@@ -67,6 +75,11 @@ TOOL_NAMES: tuple[str, ...] = (
     "get_relationships",
     "get_clues",
     "get_narrative_memory",
+    "get_events",
+    "get_character_state",
+    "get_character_knowledge",
+    "get_world_rules",
+    "get_evidence_span",
 )
 
 # per-tool 默认字节上限（agent-service 侧同样硬编码 64 KiB，见 RESEARCH Code Examples）。
@@ -228,6 +241,202 @@ async def _default_get_narrative_memory(
     raise InvalidInputError(f"不支持的 narrative_memory 视图: {view!r}")
 
 
+# ────────────────────────── Phase 27 世界模型默认服务入口（27-05） ──────────────────────────
+
+
+def _epistemic_answer_to_json(answer) -> dict[str, Any]:
+    """把 EpistemicAnswer 序列化为 JSON 安全 payload（claims/evidence 是 pydantic）。"""
+    return {
+        "status": answer.status.value,
+        "subject": answer.subject,
+        "claims": [claim.model_dump(mode="json") for claim in answer.claims],
+        "evidence": [ref.model_dump(mode="json") for ref in answer.evidence],
+        "has_approval": answer.has_approval,
+        "message": answer.message,
+    }
+
+
+def _merge_state_answers(
+    *, subject: str, answers: list[Any], message: str
+) -> dict[str, Any]:
+    """合并 state/goal/motivation 三个 aspect 的查询结果（无编造，abstain 优先）。"""
+    claims = tuple(claim for answer in answers for claim in answer.claims)
+    evidence = tuple(ref for answer in answers for ref in answer.evidence)
+    approved = any(answer.has_approval for answer in answers)
+    if not claims:
+        status = KnowledgeResultStatus.ABSTAINED
+    elif approved:
+        status = KnowledgeResultStatus.ANSWERED
+    else:
+        status = KnowledgeResultStatus.CANDIDATE_ONLY
+    return {
+        "status": status.value,
+        "subject": subject,
+        "claims": [claim.model_dump(mode="json") for claim in claims],
+        "evidence": [ref.model_dump(mode="json") for ref in evidence],
+        "has_approval": approved,
+        "message": message,
+    }
+
+
+async def _default_get_events(
+    db,
+    *,
+    owner_id: int,
+    novel_id: int,
+    version_id: int,
+    cutoff: int,
+) -> dict[str, Any] | None:
+    """世界模型事件/因果投影（D-05 cutoff 过滤；无投影 → None → 404-hide）。"""
+    projection = await WorldModelEventQueries(db).query_cutoff_projection(
+        owner_id=owner_id,
+        novel_id=novel_id,
+        version_id=version_id,
+        cutoff=cutoff,
+    )
+    return projection.model_dump(mode="json") if projection is not None else None
+
+
+async def _default_get_character_state(
+    db,
+    *,
+    owner_id: int,
+    novel_id: int,
+    version_id: int,
+    subject: str,
+    cutoff: int,
+    pov: str | None,
+) -> dict[str, Any]:
+    """角色状态/目标/动机（aspect ∈ state/goal/motivation 合并，D-05）。"""
+    queries = KnowledgeQueries(db)
+    answers = [
+        await queries.query_character_knowledge(
+            owner_id=owner_id,
+            novel_id=novel_id,
+            version_id=version_id,
+            subject=subject,
+            cutoff=cutoff,
+            pov=pov,
+            aspect=aspect,
+        )
+        for aspect in (EpistemicAspect.STATE, EpistemicAspect.GOAL, EpistemicAspect.MOTIVATION)
+    ]
+    return _merge_state_answers(
+        subject=subject,
+        answers=answers,
+        message="character state merged across state/goal/motivation (D-05)",
+    )
+
+
+async def _default_get_character_knowledge(
+    db,
+    *,
+    owner_id: int,
+    novel_id: int,
+    version_id: int,
+    subject: str,
+    cutoff: int,
+    pov: str | None,
+) -> dict[str, Any]:
+    """角色知识（aspect=knowledge；mistaken/hidden 保持显式标签，D-05）。"""
+    answer = await KnowledgeQueries(db).query_character_knowledge(
+        owner_id=owner_id,
+        novel_id=novel_id,
+        version_id=version_id,
+        subject=subject,
+        cutoff=cutoff,
+        pov=pov,
+        aspect=EpistemicAspect.KNOWLEDGE,
+    )
+    return _epistemic_answer_to_json(answer)
+
+
+async def _default_get_world_rules(
+    db,
+    *,
+    owner_id: int,
+    novel_id: int,
+    version_id: int,
+    cutoff: int,
+) -> dict[str, Any]:
+    """世界规则与规则例外（D-05 cutoff 过滤；例外是 first-class，D-04）。"""
+    queries = WorldEntityQueries(db)
+    rules = [
+        rule.model_dump(mode="json")
+        for rule in await queries.query_rules(
+            owner_id=owner_id, novel_id=novel_id, version_id=version_id
+        )
+        if rule.disclosure_cutoff <= cutoff
+    ]
+    exceptions = [
+        exc.model_dump(mode="json")
+        for exc in await queries.query_rule_exceptions(
+            owner_id=owner_id, novel_id=novel_id, version_id=version_id
+        )
+        if exc.disclosure_cutoff <= cutoff
+    ]
+    return {"rules": rules, "exceptions": exceptions}
+
+
+async def _default_get_evidence_span(
+    db,
+    *,
+    chapter_id: int,
+    source_start: int,
+    source_end: int,
+    content_hash: str,
+) -> dict[str, Any] | None:
+    """按 chapter+offsets+content_hash 物化 leaf 证据跨度（D-07/D-08）。
+
+    chapter 缺失 → None（404-hide）；offsets 非法 / hash 与原文切片不匹配 →
+    InvalidInputError（fail closed，绝不返回错误切片）。
+    """
+    chapter = await novel_service.get_chapter(db, chapter_id)
+    if chapter is None:
+        return None
+    content = chapter.content
+    if source_start < 0 or source_end > len(content) or source_end <= source_start:
+        raise InvalidInputError(
+            f"offsets [{source_start},{source_end}) 不是合法 half-open 区间"
+        )
+    excerpt = content[source_start:source_end]
+    if chapter_content_hash(excerpt) != content_hash:
+        raise InvalidInputError("evidence content hash 与原文切片不匹配")
+    return {
+        "evidence_key": leaf_evidence_key(
+            chapter_id=chapter_id,
+            source_start=source_start,
+            source_end=source_end,
+            content_hash=content_hash,
+        ),
+        "chapter_id": chapter_id,
+        "chapter_number": chapter.chapter_number,
+        "novel_id": chapter.novel_id,
+        "source_start": source_start,
+        "source_end": source_end,
+        "content_hash": content_hash,
+        "excerpt": excerpt,
+    }
+
+
+async def _resolve_world_model_version(
+    db,
+    *,
+    owner_id: int,
+    novel_id: int,
+    version_id: int | None,
+) -> int:
+    """显式 version 直接返回；缺省取该 owner/novel 最新版本（无 → 404-hide）。"""
+    if version_id is not None:
+        return int(version_id)
+    versions = await WorldModelEventQueries(db).list_versions(
+        owner_id=owner_id, novel_id=novel_id
+    )
+    if not versions:
+        raise NotFoundError("world-model projection not found in owner scope")
+    return versions[-1]
+
+
 # ────────────────────────── 门面本体 ──────────────────────────
 
 
@@ -262,6 +471,12 @@ class ToolFacade:
             "get_relationships": self._get_relationships,
             "get_clues": self._get_clues,
             "get_narrative_memory": self._get_narrative_memory,
+            # Phase 27 世界模型只读工具（27-05）。
+            "get_events": self._get_events,
+            "get_character_state": self._get_character_state,
+            "get_character_knowledge": self._get_character_knowledge,
+            "get_world_rules": self._get_world_rules,
+            "get_evidence_span": self._get_evidence_span,
         }
 
     # ── 公共入口 ──
@@ -476,6 +691,122 @@ class ToolFacade:
             "view": view,
             "data": data,
         }
+
+    # ── Phase 27 世界模型只读工具（27-05） ──
+
+    async def _resolve_world_cutoff(self, db, novel, params) -> int:
+        """服务端截止点权威（D-05/D-07）：显式 cutoff 超限 → beyond_cutoff。
+
+        full_book 只读持久化开关（_persisted_full_book）；显式 cutoff 提供时
+        超过服务端截止点被拒绝，绝不越权到整本书。
+        """
+        persisted_full_book = _persisted_full_book(novel)
+        server_cutoff = (
+            None if persisted_full_book else await self.cutoff_resolver(db, novel)
+        )
+        explicit = params.get("cutoff")
+        if explicit is not None:
+            if server_cutoff is not None and int(explicit) > int(server_cutoff):
+                raise BeyondCutoffError(
+                    f"cutoff {explicit} 超出服务端截止点 {server_cutoff}"
+                )
+            return int(explicit)
+        return int(server_cutoff or 0)
+
+    async def _get_events(self, *, db, novel, owner_id, params):
+        svc = self._svc("get_events", _default_get_events)
+        version_id = await _resolve_world_model_version(
+            db,
+            owner_id=owner_id,
+            novel_id=novel.id,
+            version_id=params.get("version_id"),
+        )
+        cutoff = await self._resolve_world_cutoff(db, novel, params)
+        payload = await svc(
+            db,
+            owner_id=owner_id,
+            novel_id=novel.id,
+            version_id=version_id,
+            cutoff=cutoff,
+        )
+        if payload is None:
+            raise NotFoundError("world-model events not found in scope")
+        return payload
+
+    async def _get_character_state(self, *, db, novel, owner_id, params):
+        svc = self._svc("get_character_state", _default_get_character_state)
+        version_id = await _resolve_world_model_version(
+            db,
+            owner_id=owner_id,
+            novel_id=novel.id,
+            version_id=params.get("version_id"),
+        )
+        cutoff = await self._resolve_world_cutoff(db, novel, params)
+        return await svc(
+            db,
+            owner_id=owner_id,
+            novel_id=novel.id,
+            version_id=version_id,
+            subject=str(params["subject"]),
+            cutoff=cutoff,
+            pov=params.get("pov"),
+        )
+
+    async def _get_character_knowledge(self, *, db, novel, owner_id, params):
+        svc = self._svc("get_character_knowledge", _default_get_character_knowledge)
+        version_id = await _resolve_world_model_version(
+            db,
+            owner_id=owner_id,
+            novel_id=novel.id,
+            version_id=params.get("version_id"),
+        )
+        cutoff = await self._resolve_world_cutoff(db, novel, params)
+        return await svc(
+            db,
+            owner_id=owner_id,
+            novel_id=novel.id,
+            version_id=version_id,
+            subject=str(params["subject"]),
+            cutoff=cutoff,
+            pov=params.get("pov"),
+        )
+
+    async def _get_world_rules(self, *, db, novel, owner_id, params):
+        svc = self._svc("get_world_rules", _default_get_world_rules)
+        version_id = await _resolve_world_model_version(
+            db,
+            owner_id=owner_id,
+            novel_id=novel.id,
+            version_id=params.get("version_id"),
+        )
+        cutoff = await self._resolve_world_cutoff(db, novel, params)
+        return await svc(
+            db,
+            owner_id=owner_id,
+            novel_id=novel.id,
+            version_id=version_id,
+            cutoff=cutoff,
+        )
+
+    async def _get_evidence_span(self, *, db, novel, owner_id, params):
+        svc = self._svc("get_evidence_span", _default_get_evidence_span)
+        span = await svc(
+            db,
+            chapter_id=int(params["chapter_id"]),
+            source_start=int(params["source_start"]),
+            source_end=int(params["source_end"]),
+            content_hash=str(params["content_hash"]),
+        )
+        if span is None:
+            raise NotFoundError("章节不存在")
+        if span.get("novel_id") != novel.id:
+            raise NotFoundError("章节不存在")
+        cutoff = await self.cutoff_resolver(db, novel)
+        if cutoff is not None and int(span["chapter_number"]) > int(cutoff):
+            raise BeyondCutoffError(
+                f"章节 {span['chapter_number']} 超出当前阅读进度截止点 {cutoff}"
+            )
+        return span
 
 
 def _json_default(obj: Any) -> str:
