@@ -1,0 +1,165 @@
+{
+  "description": "compile-scene-spec skill-local fixture（Phase 32 / REQ-VIS-03）：同一 frozen key-scene set + approved Visual Bible revision 引用 → PromptArtifact（type=prompt，携带 PromptRevisionContract + 派生自的 SceneSpecContract）。review_state 恒为 candidate；scene_spec:approve 只授权 Phase 33 消费。",
+  "input": {
+    "novel_id": 1,
+    "branch": null,
+    "spec_key": "spec-main",
+    "candidate_set_id": 10,
+    "candidate_key": "ks-main-0",
+    "visual_bible_version_id": 20,
+    "source_snapshot_id": "ss-1",
+    "revision_number": 1
+  },
+  "expected_output": {
+    "type": "prompt",
+    "schema_version": "prompt-revision.v1",
+    "owner_id": 1,
+    "novel_id": 1,
+    "branch": null,
+    "producing_skill": "compile-scene-spec",
+    "producing_skill_version": "1.0.0",
+    "skill_version_id": 1,
+    "model_lineage": {
+      "provider": "fixture",
+      "model": "stub-model",
+      "revision": "stub-1"
+    },
+    "source_versions": {
+      "novel": "v1",
+      "source_snapshot_hash": "1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    "input_hash": "2222222222222222222222222222222222222222222222222222222222222222",
+    "evidence_refs": [
+      "ev-ayla-hair"
+    ],
+    "prompt_revision": {
+      "schema_version": "prompt-revision.v1",
+      "artifact_kind": "prompt_revision",
+      "owner_id": 1,
+      "novel_id": 1,
+      "prompt_key": "prompt-main",
+      "revision_number": 1,
+      "parent_prompt_revision_id": null,
+      "scene_spec_hash": "7777777777777777777777777777777777777777777777777777777777777777",
+      "visual_bible_revision_hash": "4444444444444444444444444444444444444444444444444444444444444444",
+      "source_snapshot_id": "ss-1",
+      "source_snapshot_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+      "cutoff_chapter": 2,
+      "schema_hash": "5555555555555555555555555555555555555555555555555555555555555555",
+      "prompt_schema_hash": "a001a001a001a001a001a001a001a001a001a001a001a001a001a001a001a001",
+      "compiler_version": "1.0.0",
+      "adapter_id": "mock-provider",
+      "adapter_version": "1.0.0",
+      "config_hash": "b002b002b002b002b002b002b002b002b002b002b002b002b002b002b002b002",
+      "input_hash": "c003c003c003c003c003c003c003c003c003c003c003c003c003c003c003c003",
+      "prompt_hash": "d004d004d004d004d004d004d004d004d004d004d004d004d004d004d004d004",
+      "sections": {
+        "subject": "Ayla, a tall woman with braided amber hair and green eyes",
+        "action": "Ayla drew her sword as the rain fell hard across the courtyard walls."
+      },
+      "negative_constraints": ["the scene must stay in the medieval era; no modern objects"],
+      "uncertainties": ["cast member 'mara' has no Visual Bible entity"],
+      "prompt_text": "[subject]\nAyla, a tall woman with braided amber hair and green eyes",
+      "redacted_preview": "[subject]\nAyla, a tall woman with braided amber hair and green eyes",
+      "review_state": "candidate"
+    },
+    "scene_spec": {
+      "schema_version": "scene-spec.v1",
+      "artifact_kind": "scene_spec",
+      "owner_id": 1,
+      "novel_id": 1,
+      "spec_key": "spec-main",
+      "revision_number": 1,
+      "scene_candidate_id": 5,
+      "scene_candidate_hash": "3333333333333333333333333333333333333333333333333333333333333333",
+      "visual_bible_revision_id": 20,
+      "visual_bible_revision_hash": "4444444444444444444444444444444444444444444444444444444444444444",
+      "source_snapshot_id": "ss-1",
+      "source_snapshot_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+      "cutoff_chapter": 2,
+      "schema_hash": "5555555555555555555555555555555555555555555555555555555555555555",
+      "compiler_id": "scene-spec.v1",
+      "compiler_version": "1.0.0",
+      "policy_hash": "6666666666666666666666666666666666666666666666666666666666666666",
+      "config_hash": null,
+      "content_hash": "7777777777777777777777777777777777777777777777777777777777777777",
+      "details": [
+        {
+          "detail_key": "subject:ayla",
+          "kind": "subject",
+          "source": "visual_bible",
+          "text": "Ayla, a tall woman with braided amber hair and green eyes",
+          "author": null,
+          "rationale": null,
+          "spoiler_cutoff": 2,
+          "evidence_refs": [],
+          "visual_bible_refs": [
+            {
+              "stable_id": "ayla",
+              "claim_key": null,
+              "revision_id": 20,
+              "revision_hash": "4444444444444444444444444444444444444444444444444444444444444444"
+            }
+          ]
+        },
+        {
+          "detail_key": "action:scene-ch1-0-40",
+          "kind": "action",
+          "source": "evidence",
+          "text": "Ayla drew her sword as the rain fell hard across the courtyard walls.",
+          "author": null,
+          "rationale": null,
+          "spoiler_cutoff": 2,
+          "evidence_refs": [
+            {
+              "evidence_key": "ev-ayla-hair:action",
+              "source_snapshot_id": "ss-1",
+              "source_snapshot_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+              "chapter_id": 1,
+              "chapter_number": 1,
+              "source_start": 0,
+              "source_end": 40,
+              "content_hash": "8888888888888888888888888888888888888888888888888888888888888888",
+              "excerpt": "Ayla drew her sword as the rain fell hard ac",
+              "cutoff_chapter": 2
+            }
+          ],
+          "visual_bible_refs": []
+        }
+      ],
+      "negative_constraints": [
+        {
+          "constraint_key": "nc-no-modern-era",
+          "scope": "era",
+          "source": "visual_bible",
+          "text": "the scene must stay in the medieval era; no modern objects",
+          "author": null,
+          "rationale": null,
+          "spoiler_cutoff": 2,
+          "evidence_refs": [],
+          "visual_bible_refs": []
+        }
+      ],
+      "uncertainties": [
+        {
+          "uncertainty_key": "subject-missing:mara",
+          "reason": "missing_evidence",
+          "detail": "cast member 'mara' has no Visual Bible entity"
+        }
+      ],
+      "review_state": "candidate"
+    },
+    "tool_runs": [
+      { "tool_name": "get_evidence_span", "calls": 1 },
+      { "tool_name": "get_visual_bible", "calls": 1 }
+    ],
+    "status": "candidate",
+    "parent_revision": null,
+    "normalization": {
+      "raw_hash": "9999999999999999999999999999999999999999999999999999999999999999",
+      "repaired_hash": "9999999999999999999999999999999999999999999999999999999999999999",
+      "normalization_actions": [],
+      "warnings": []
+    }
+  }
+}

@@ -566,5 +566,97 @@ class SceneCandidateArtifact(StrictAgentRuntimeModel):
         return value
 
 
+# ────────────────────────── Phase 32 Scene Spec / Prompt Artifact 信封（REQ-VIS-03 / REQ-AGENT-02/03/04） ──────────────────────────
+
+
+class SceneSpecArtifact(StrictAgentRuntimeModel):
+    """智能体产物的 SceneSpecArtifact 信封（Phase 32 / D-32-01..D-32-04）。
+
+    Agent 产出的是 **candidate-only** 的 SceneSpecContract：``scene_spec``
+    携带完整 SceneSpecContract（spec_key / scene_candidate_hash /
+    visual_bible_revision_hash / source snapshot / cutoff / compiler lineage /
+    details / negative_constraints / uncertainties），其 ``review_state`` 恒为
+    ``candidate``——用户审查/批准（``scene_spec:approve``）是显式、append-only
+    的服务端状态迁移（D-32-04），只授权 Phase 33 消费，Agent 绝不能直接授予或
+    伪造批准。确定性 Canon/Visual Bible 一致性与未支持细节 validator 拥有
+    permission / evidence / state-transition / publication 权威（D-32-02）；无
+    unsupported Canon，缺失引用只能以 reason-coded uncertainties 呈现。``tool_runs``
+    携带 ToolRun 血缘。与 CitedAnswerArtifact 信封纪律一致：type / schema_version /
+    owner / novel / branch / producing skill+version / model lineage /
+    source versions / input_hash / evidence_refs / status / parent_revision /
+    normalization（26-06 修复血缘 trail）。
+    """
+
+    type: Literal["scene_spec"] = "scene_spec"
+    schema_version: Literal["scene-spec.v1"] = "scene-spec.v1"
+    owner_id: int
+    novel_id: int
+    branch: str | None = None
+    producing_skill: str = Field(min_length=1, max_length=120)
+    producing_skill_version: str = Field(min_length=1, max_length=32)
+    skill_version_id: int = Field(gt=0)
+    model_lineage: dict[str, Any]
+    source_versions: dict[str, Any]
+    input_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    evidence_refs: list[str] = Field(min_length=1)
+    scene_spec: dict[str, Any]
+    tool_runs: list[dict[str, Any]] = Field(min_length=1)
+    status: Literal["candidate", "validated", "approved", "published", "rejected"]
+    parent_revision: str | None = None
+    normalization: NormalizationTrail
+
+    @field_validator("tool_runs")
+    @classmethod
+    def _tool_runs_shape(cls, value: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        for item in value:
+            if not isinstance(item, dict) or not item.get("tool_name"):
+                raise ValueError("each tool run requires tool_name")
+        return value
+
+
+class PromptArtifact(StrictAgentRuntimeModel):
+    """智能体产物的 PromptArtifact 信封（Phase 32 / D-32-01..D-32-04）。
+
+    Agent 产出的是 **candidate-only** 的 provider-neutral 派生 prompt：
+    ``prompt_revision`` 携带完整 PromptRevisionContract（adapter lineage +
+    可重放 input_hash/prompt_hash），``scene_spec`` 携带其派生自的
+    SceneSpecContract（prompt 派生血缘，D-32-03）——prompt 字符串永远不是权威
+    （D-32-01）。``review_state`` 恒为 ``candidate``——用户审查/批准
+    （``scene_spec:approve``）是显式、append-only 的服务端状态迁移（D-32-04），
+    只授权 Phase 33 消费，Agent 绝不能直接授予或伪造批准。确定性 Canon/Visual
+    Bible 一致性与未支持细节 validator 拥有 permission / evidence /
+    state-transition / publication 权威（D-32-02）。``tool_runs`` 携带 ToolRun
+    血缘。与 CitedAnswerArtifact 信封纪律一致（lineage / evidence_refs / status /
+    parent_revision / normalization）。
+    """
+
+    type: Literal["prompt"] = "prompt"
+    schema_version: Literal["prompt-revision.v1"] = "prompt-revision.v1"
+    owner_id: int
+    novel_id: int
+    branch: str | None = None
+    producing_skill: str = Field(min_length=1, max_length=120)
+    producing_skill_version: str = Field(min_length=1, max_length=32)
+    skill_version_id: int = Field(gt=0)
+    model_lineage: dict[str, Any]
+    source_versions: dict[str, Any]
+    input_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    evidence_refs: list[str] = Field(min_length=1)
+    prompt_revision: dict[str, Any]
+    scene_spec: dict[str, Any]
+    tool_runs: list[dict[str, Any]] = Field(min_length=1)
+    status: Literal["candidate", "validated", "approved", "published", "rejected"]
+    parent_revision: str | None = None
+    normalization: NormalizationTrail
+
+    @field_validator("tool_runs")
+    @classmethod
+    def _tool_runs_shape(cls, value: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        for item in value:
+            if not isinstance(item, dict) or not item.get("tool_name"):
+                raise ValueError("each tool run requires tool_name")
+        return value
+
+
 # 供 OpenAPI 引用，避免未使用告警。
 _ = (StrictReaderChatModel,)
