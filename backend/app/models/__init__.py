@@ -218,6 +218,17 @@ from app.models.prompt_revision import (
     PromptRevision,
     PromptRevisionReviewEvent,
 )
+from app.models.illustration_job import (
+    IllustrationAttempt,
+    IllustrationBudgetLedger,
+    IllustrationBudgetReservation,
+    IllustrationJob,
+    IllustrationReviewEvent,
+)
+from app.models.illustration import (
+    AssetRevision,
+    ConsistencyReport,
+)
 
 __all__ = [
     "Base",
@@ -364,4 +375,11 @@ __all__ = [
     "SceneSpecUncertainty",
     "PromptRevision",
     "PromptRevisionReviewEvent",
+    "IllustrationJob",
+    "IllustrationAttempt",
+    "IllustrationBudgetLedger",
+    "IllustrationBudgetReservation",
+    "IllustrationReviewEvent",
+    "AssetRevision",
+    "ConsistencyReport",
 ]
