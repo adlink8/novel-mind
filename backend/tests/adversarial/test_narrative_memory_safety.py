@@ -59,6 +59,18 @@ RECOVERY_FORBIDDEN_IMPORTS = (
 
 RECOVERY_MODULES = ("recovery.py", "builder_contracts.py", "builder_repository.py")
 
+# Phase 28-03 candidate hierarchy modules: immutable candidate-only output,
+# provider-free, and never a pointer/promotion/cutover write path (D-07/D-09).
+HIERARCHY_MODULES = ("arc_planner.py", "global_builder.py", "hierarchy.py")
+HIERARCHY_FORBIDDEN_IMPORTS = (
+    "reader_chat",
+    "builder_gateway",
+    "builder_budget",
+    "litellm",
+    "openai",
+    "ai_service",
+)
+
 
 def _imports_of(tree: ast.AST) -> list[str]:
     out: list[str] = []
@@ -149,6 +161,49 @@ def test_worker_never_writes_active_pointer() -> None:
     # The worker's own forbidden-list constant and scanner may mention the
     # fragment text, but it must never be *invoked*.
     assert "set_active_pointer(" not in _stripped_source("builder_worker.py")
+
+
+def test_hierarchy_modules_never_write_canon_or_pointer() -> None:
+    """28-03 candidate hierarchy modules stay provider-free and never promote.
+
+    Outline/Mainline candidates are immutable candidate-only outputs; any
+    invocation of a pointer/promotion/cutover path or a provider/chat import
+    in these modules would violate D-06/D-07/D-09 and must fail closed.
+    """
+    for name in HIERARCHY_MODULES:
+        source = _source(name)
+        tree = ast.parse(source)
+        calls = _call_names(tree)
+        imports = _imports_of(tree)
+        forbidden = FORBIDDEN_POINTER_FRAGMENTS - {
+            "current_version",
+            "promote",
+            "promotion",
+        }
+        assert forbidden.isdisjoint(calls), f"{name}: {calls & forbidden}"
+        for imp in imports:
+            assert "active_pointer" not in imp
+            for banned in HIERARCHY_FORBIDDEN_IMPORTS:
+                assert banned not in imp, f"{name} imports {imp}"
+        assert "set_active_pointer(" not in source
+        assert "active_pointer" not in _stripped_source(name)
+        # Candidate-only outputs must never write the DB by themselves; the
+        # persistence seam lives in the candidate authority, not generation.
+        assert "session.commit(" not in source
+        assert "session.flush(" not in source
+
+
+def test_hierarchy_modules_export_no_chat_or_pointer_contract() -> None:
+    """Reader chat is never a fact source (D-06); no active-pointer contract."""
+    for name in HIERARCHY_MODULES:
+        source = _source(name)
+        tree = ast.parse(source)
+        calls = _call_names(tree)
+        assert "reader_chat" not in calls, f"{name} references reader_chat"
+        assert "promote_timeline" not in calls
+        assert "promote_clue" not in calls
+        assert "conversation_id" not in calls
+        assert "message_id" not in calls
 
 
 def test_failure_matrix_is_consistent() -> None:
