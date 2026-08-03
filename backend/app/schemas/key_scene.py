@@ -713,3 +713,34 @@ class SceneCandidateSetView(StrictKeySceneModel):
     review_state: KeySceneReviewState
     candidates: list[SceneCandidateView] = Field(default_factory=list)
     review_decisions: list[SceneReviewDecisionView] = Field(default_factory=list)
+
+
+class FrozenKeySceneSetView(StrictKeySceneModel):
+    """Frozen key-scene set envelope (Phase 31-03, D-31-04).
+
+    Candidate-only approved subset of one set plus a recomputable frozen
+    manifest hash. Only ``approved`` candidates appear here; rejected and
+    unresolved candidates stay in the full set history and never reach
+    downstream readers/export (the no-active-pointer cutover rule).
+    """
+
+    id: int
+    owner_id: int
+    novel_id: int
+    version_key: str
+    revision_number: int
+    parent_set_id: int | None = None
+    source_snapshot_id: str
+    source_snapshot_hash: str
+    cutoff_chapter: int
+    schema_version: str
+    schema_hash: str
+    policy_hash: str
+    detector_id: str
+    detector_version: str
+    manifest_hash: str
+    approved_visual_bible_revision_id: int | None = None
+    approved_visual_bible_revision_hash: str | None = None
+    review_state: KeySceneReviewState
+    candidates: list[SceneCandidateView] = Field(default_factory=list)
+    review_decisions: list[SceneReviewDecisionView] = Field(default_factory=list)

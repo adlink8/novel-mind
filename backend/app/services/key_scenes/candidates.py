@@ -134,6 +134,23 @@ def _set_idempotency_key(set_: SceneCandidateSetContract) -> str:
     )
 
 
+def derive_candidate_review_states(
+    decision_rows: Sequence[SceneReviewDecisionRow],
+) -> dict[str, KeySceneReviewState]:
+    """Effective per-candidate review state derived from append-only decisions.
+
+    Candidate rows are immutable (D-31-01 append-only event guard), so the
+    candidate's effective review state is the ``to_review_state`` of the last
+    (highest id) decision targeting that candidate; with no decision it stays
+    ``candidate``. Rejected candidates remain auditable and never disappear.
+    """
+    states: dict[str, KeySceneReviewState] = {}
+    for row in decision_rows:
+        if row.candidate_key is not None:
+            states[row.candidate_key] = KeySceneReviewState(row.to_review_state)
+    return states
+
+
 def _child_idempotency_key(
     *,
     kind: str,
@@ -592,6 +609,8 @@ class CandidateService:
                 )
             )
 
+        effective_states = derive_candidate_review_states(decision_rows)
+
         candidate_views = [
             SceneCandidateView(
                 candidate_key=row.candidate_key,
@@ -622,7 +641,11 @@ class CandidateService:
                         row.heuristic_signal
                     )
                 ),
-                review_state=KeySceneReviewState(row.review_state),
+                # Candidate rows are immutable; the effective review state is
+                # derived from the append-only decisions (D-31-04).
+                review_state=effective_states.get(
+                    row.candidate_key, KeySceneReviewState(row.review_state)
+                ),
             )
             for row in candidate_rows
         ]

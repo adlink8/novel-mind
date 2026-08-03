@@ -28,10 +28,15 @@ from app.core.database import get_db
 from app.core.security import require_user
 from app.models import Novel, User
 from app.schemas.key_scene import (
+    FrozenKeySceneSetView,
+    KeySceneActorSource,
     KeySceneGateError,
+    KeySceneReviewAction,
+    KeySceneReviewState,
     StrictKeySceneModel,
     SceneCandidateSetView,
     SceneCoordinates,
+    SceneReviewDecisionInput,
 )
 from app.services.key_scenes.candidates import (
     CandidateGenerationInput,
@@ -40,6 +45,12 @@ from app.services.key_scenes.candidates import (
     KeySceneCandidateNotFound,
     load_candidate_set_view,
     list_candidate_sets,
+)
+from app.services.key_scenes.review import (
+    KeySceneReviewError,
+    KeySceneReviewNotFound,
+    KeySceneReviewService,
+    load_frozen_set_view,
 )
 from app.services.key_scenes.scoring import DEFAULT_SCENE_POLICY
 
@@ -93,6 +104,35 @@ class KeySceneSetListResponse(KeySceneWireModel):
 class KeySceneGenerateResponse(KeySceneWireModel):
     set: SceneCandidateSetView
     replayed: bool = False
+
+
+class KeySceneReviewRequest(KeySceneWireModel):
+    """One explicit candidate review action; scope comes from the path."""
+
+    decision_key: str = Field(min_length=1, max_length=160)
+    action: KeySceneReviewAction
+    actor_source: KeySceneActorSource
+    actor: str = Field(min_length=1, max_length=200)
+    reason: str = Field(min_length=1, max_length=1000)
+    from_review_state: KeySceneReviewState
+    candidate_key: str = Field(min_length=1, max_length=180)
+
+
+class KeySceneReviewResponse(KeySceneWireModel):
+    set: SceneCandidateSetView
+
+
+class KeySceneFreezeRequest(KeySceneWireModel):
+    """Explicit set freeze; the decision key is server-derived (idempotent)."""
+
+    actor_source: KeySceneActorSource = KeySceneActorSource.HUMAN
+    actor: str = Field(min_length=1, max_length=200)
+    reason: str = Field(min_length=1, max_length=1000)
+
+
+class KeySceneFreezeResponse(KeySceneWireModel):
+    set: SceneCandidateSetView
+    frozen: FrozenKeySceneSetView
 
 
 def _not_found() -> HTTPException:
@@ -195,3 +235,139 @@ async def generate_key_scene_set(
         set_id=set_id,
     )
     return KeySceneGenerateResponse(set=view, replayed=persisted.replayed)
+
+
+# ---------------------------------------------------------------------------
+# Review / freeze routes (explicit human action, append-only, idempotent)
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/{novel_id}/key-scenes/{set_id}/review",
+    response_model=KeySceneReviewResponse,
+)
+async def review_key_scene_candidate(
+    set_id: int,
+    payload: KeySceneReviewRequest,
+    novel: Novel = Depends(require_owned_novel),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """Append one explicit candidate review action (approve/reject/needs_relink).
+
+    The server re-verifies owner/novel/set scope, candidate membership, the
+    decision's ``from_review_state``, the legal transition and (for approvals)
+    the persisted evidence gate. A repeated ``decision_key`` replays without a
+    second decision. Rejected candidates remain in the append-only audit
+    history and never become canon (D-31-04).
+    """
+    owner_id = current_user.id
+    novel_id = novel.id
+    decision = SceneReviewDecisionInput(
+        owner_id=owner_id,
+        novel_id=novel_id,
+        set_id=set_id,
+        decision_key=payload.decision_key,
+        action=payload.action,
+        actor_source=payload.actor_source,
+        actor=payload.actor,
+        reason=payload.reason,
+        from_review_state=payload.from_review_state,
+        candidate_key=payload.candidate_key,
+    )
+    review = KeySceneReviewService(db)
+    try:
+        await review.append_decision(
+            owner_id=owner_id,
+            novel_id=novel_id,
+            decision=decision,
+        )
+    except (KeySceneReviewNotFound, KeySceneCandidateNotFound):
+        raise _not_found() from None
+    except (KeySceneGateError, KeySceneReviewError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    try:
+        view = await load_candidate_set_view(
+            db,
+            owner_id=owner_id,
+            novel_id=novel_id,
+            set_id=set_id,
+        )
+    except KeySceneCandidateNotFound:
+        raise _not_found() from None
+    return KeySceneReviewResponse(set=view)
+
+
+@router.post(
+    "/{novel_id}/key-scenes/{set_id}/freeze",
+    response_model=KeySceneFreezeResponse,
+)
+async def freeze_key_scene_set(
+    set_id: int,
+    payload: KeySceneFreezeRequest,
+    novel: Novel = Depends(require_owned_novel),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """Freeze the key-scene set: explicit set-level approval with the freeze gate.
+
+    The gate requires at least one approved candidate and re-verifies every
+    approved candidate's persisted evidence lineage before the set moves to
+    ``approved``. The frozen manifest is recomputed over the approved subset
+    only — rejected/unresolved candidates never enter downstream Phase 32.
+    """
+    owner_id = current_user.id
+    novel_id = novel.id
+    review = KeySceneReviewService(db)
+    try:
+        await review.freeze(
+            owner_id=owner_id,
+            novel_id=novel_id,
+            set_id=set_id,
+            actor=payload.actor,
+            reason=payload.reason,
+        )
+    except KeySceneReviewNotFound:
+        raise _not_found() from None
+    except (KeySceneGateError, KeySceneReviewError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    try:
+        view = await load_candidate_set_view(
+            db,
+            owner_id=owner_id,
+            novel_id=novel_id,
+            set_id=set_id,
+        )
+        frozen = await load_frozen_set_view(
+            db,
+            owner_id=owner_id,
+            novel_id=novel_id,
+            set_id=set_id,
+        )
+    except (KeySceneCandidateNotFound, KeySceneReviewNotFound):
+        raise _not_found() from None
+    return KeySceneFreezeResponse(set=view, frozen=frozen)
+
+
+@router.get(
+    "/{novel_id}/key-scenes/{set_id}/frozen",
+    response_model=FrozenKeySceneSetView,
+)
+async def get_frozen_key_scene_set(
+    set_id: int,
+    novel: Novel = Depends(require_owned_novel),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """Read the frozen candidate subset (approved candidates + frozen manifest)."""
+    try:
+        return await load_frozen_set_view(
+            db,
+            owner_id=current_user.id,
+            novel_id=novel.id,
+            set_id=set_id,
+        )
+    except KeySceneReviewNotFound:
+        raise _not_found() from None
