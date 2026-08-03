@@ -28,7 +28,7 @@
 | v1.1 execution baseline | 21–25.1 | partial | partial | blocked by Phase 22 |
 | agent runtime foundation | 25.2–25.3 | **IMPLEMENTED & VERIFIED (2026-08-02)** | partial | blocked by Phase 22 3/3 |
 | v1.2 trusted novel understanding | 26–29 | **26/27/28/29 VERIFIED (2026-08-03)** | planned | blocked by Phase 22 3/3 |
-| v1.3 visual narrative | 30–34 | **30 VERIFIED (2026-08-03)** | planned | blocked by Phase 22 3/3 |
+| v1.3 visual narrative | 30–34 | **30/31 VERIFIED (2026-08-03)** | planned | blocked by Phase 22 3/3 |
 | v1.4 Canon Fork derivatives | 35–39 | planned | planned | planned |
 
 # Agent Runtime Foundation — Phase 25.2–25.3
@@ -136,12 +136,13 @@ Alembic chain continues `26agentrun01 → 27approval01`.
 | Phase 28 | 5/5 + shared Agent contract | 5 | **VERIFIED 2026-08-03** |
 | Phase 29 | 5/5 + shared Agent contract | 5 | **VERIFIED 2026-08-03** |
 | Phase 30 | 5/5 + shared Agent contract | 5 | **VERIFIED 2026-08-03** |
-| Phase 31–34 | 15/15 + shared Agent contract | 19 | PLANNED |
+| Phase 31 | 4/4 + shared Agent contract | 4 | **VERIFIED 2026-08-03** |
+| Phase 32–34 | 11/11 + shared Agent contract | 15 | PLANNED |
 | Phase 35–39 | 20/20 + shared Agent contract | 25 | PLANNED |
 
 The corrected portfolio contains 86 plans: 10 reused Kimi foundation plans, five corrective
 foundation slices, 57 deterministic/domain/shared-integrity plans and 14 Agent-integration plans.
-Phase 25.2–30 are implemented and verified; Phases 31–39 remain planning verdicts only.
+Phase 25.2–31 are implemented and verified; Phases 32–39 remain planning verdicts only.
 
 ## Baseline Reconciliation — Phase 21–25.1
 
@@ -160,12 +161,14 @@ Phase 25.2–30 are implemented and verified; Phases 31–39 remain planning ver
 | 28 Whole-Book Narrative Memory | **VERIFIED 2026-08-03** | `28-VERIFICATION.md` passed; failure/recovery, chapter terminality, arc/volume/global, closure, analyze-chapter/build-story-arc skills |
 | 29 Quality Qualification | **VERIFIED 2026-08-03** | `29-VERIFICATION.md` passed; gold set, bucket evaluation, browser UAT, three-dimension audit, evaluate-reading-skill-runs skill |
 | 30 Visual Bible | **VERIFIED 2026-08-03** | `30-VERIFICATION.md` passed; candidate contract, evidence materialization, workspace UI, review/versioning, build-visual-bible skill |
+| 31 Key Scene Detection | **VERIFIED 2026-08-03** | `31-VERIFICATION.md` passed; scene contract/boundaries, salience+diversity ranking, human review + frozen set, detect-key-scenes skill |
 
 Phase 22 remains blocked and unverified. The user authorized the Phase 25.2, Phase 26,
-Phase 27, Phase 28, Phase 29 and Phase 30 execution overrides (2026-08-02/03); each phase
-proceeded on the passed upstream verification artifact. v1.2 milestone (Phases 26–29) and
-Phase 30 are implemented and verified. Phase 31 still requires Phase 22 3/3 real scheduled
-green evidence plus a passed Phase 30 verification artifact (exists).
+Phase 27, Phase 28, Phase 29, Phase 30 and Phase 31 execution overrides (2026-08-02/03);
+each phase proceeded on the passed upstream verification artifact. v1.2 milestone
+(Phases 26–29), Phase 30 and Phase 31 are implemented and verified. Phase 32 still
+requires Phase 22 3/3 real scheduled green evidence plus a passed Phase 31 verification
+artifact (exists).
 
 ---
 
@@ -354,6 +357,8 @@ Confirm** after each plan with frozen entity fixtures.
 
 ## Phase 31 — Key Scene Detection
 
+**Status:** IMPLEMENTED & VERIFIED (2026-08-03, `31-VERIFICATION.md` passed at `fae6b68`)
+
 **Goal:** identify illustration-worthy scenes without reducing importance to embedding
 similarity.
 
@@ -526,8 +531,8 @@ audit; **Test, Fix, and Confirm** every failed end-to-end checkpoint.
 ## Next
 
 Phase 22 (CI/Nightly authority) remains the last unverified gate — 0/3 scheduled green.
-Phase 25.2, 25.3, 26, 27, 28, 29 and 30 are verified (2026-08-02/03), completing the
-v1.2 milestone (26–29) and Phase 30 (Visual Bible). Phase 31 (Key Scene Detection)
-execution requires Phase 22 3/3 real scheduled green evidence plus a passed Phase 30
-verification artifact (exists); until then, Phase 31 plans can be executed only under a
+Phase 25.2, 25.3, 26, 27, 28, 29, 30 and 31 are verified (2026-08-02/03), completing the
+v1.2 milestone (26–29) and Phases 30–31 of v1.3. Phase 32 (Scene Spec and Prompt Compiler)
+execution requires Phase 22 3/3 real scheduled green evidence plus a passed Phase 31
+verification artifact (exists); until then, Phase 32 plans can be executed only under a
 further explicit override.

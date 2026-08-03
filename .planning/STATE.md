@@ -64,6 +64,9 @@ No single aggregate completion percentage is authoritative.
     evidence materialization + owner-scoped API, workspace UI, review/versioning envelope,
     build-visual-bible skill. Migration head `20260801_visual_bible`; backend 1212p,
     agent-service 543p, frontend 315p.
+11. `31`: **IMPLEMENTED & VERIFIED (2026-08-03)** — key scene contract/boundaries, salience
+    + diversity ranking, human review + frozen set, detect-key-scenes skill (tool 12→13).
+    Migration head `20260801_key_scene`; backend 1355p, agent-service 597p, frontend 330p.
 
 ## Planning Portfolio
 
@@ -76,7 +79,8 @@ No single aggregate completion percentage is authoritative.
 | Phase 28 | VERIFIED | 5 | ✅ 2026-08-03 (user execution override) |
 | Phase 29 | VERIFIED | 5 | ✅ 2026-08-03 (user execution override) |
 | Phase 30 | VERIFIED | 5 | ✅ 2026-08-03 (user execution override) |
-| Phase 31–34 | PLANNED | 19 | BLOCKED by Phase 22 3/3 |
+| Phase 31 | VERIFIED | 4 | ✅ 2026-08-03 (user execution override) |
+| Phase 32–34 | PLANNED | 15 | BLOCKED by Phase 22 3/3 |
 | Phase 35–39 | PLANNED | 25 | BLOCKED by upstream execution dependencies |
 
 The earlier 55-plan structural verdict did not prove Issue #29 Agent-consumption coverage.
@@ -129,6 +133,11 @@ created.
   passed (source_commit `67908b1`); backend 1212p (unit 732 + visual_bible unit 49 +
   integration 22 + adversarial 239 + agent_runtime 133 + ci 37); agent-service vitest 543p,
   frontend vitest 315p, tsc 0, alembic single head `20260801_visual_bible`.
+- **2026-08-03 Phase 31 verification**: 31-01..31-04 delivered; `31-VERIFICATION.md`
+  passed (source_commit `fae6b68`); backend 1355p (unit 786 + key_scenes unit 54 +
+  integration 26 + adversarial 245 + agent_runtime 151 + visual_bible 22 + ci 37);
+  agent-service vitest 597p, frontend vitest 330p, tsc 0, alembic single head
+  `20260801_key_scene`.
 - **2026-08-03 stub-SUT finding (recorded, deferred)**: current nightly benchmark scores
   with deterministic stubs (`default_stub_*`, no live model calls); Ollama is only a health
   gate. Full G2 deployment (runner+Ollama+Docker) is premature for the stub pipeline.
@@ -230,8 +239,9 @@ Phase 29 execution is authorized by the 2026-08-03 Phase 29 override, and Phase 
 now verified (29-VERIFICATION passed at `efa4f77`), completing the v1.2 milestone (26–29).
 Phase 30 execution is authorized by the 2026-08-03 Phase 30 override, and Phase 30 is now
 verified (30-VERIFICATION passed at `67908b1`).
-Phase 31 execution is authorized by the 2026-08-03 Phase 31 override.
-Phase 32+ execution requires a passed upstream Phase 31 VERIFICATION (in progress) plus
+Phase 31 execution is authorized by the 2026-08-03 Phase 31 override, and Phase 31 is now
+verified (31-VERIFICATION passed at `fae6b68`).
+Phase 32+ execution requires a passed upstream Phase 31 VERIFICATION (exists) plus
 Phase 22 real scheduled green evidence (0/3, not satisfied) or a further explicit override.
 If Phase 22 is resumed, use `$gsd-resume-work`; do not mark it complete early.
 
