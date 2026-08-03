@@ -233,3 +233,210 @@ def test_modules_never_touch_provider_or_promotion():
         src = (QUAL_DIR / name).read_text(encoding="utf-8")
         for forbidden in ("litellm", "openai", "prepare_baseline", "ActiveBaseline"):
             assert forbidden not in src, f"{name} contains {forbidden!r}"
+
+
+# ---------------------------------------------------------------------------
+# Phase 29-02 runner adversarial tests: manifest forgery / budget spoof /
+# pointer vocabulary / lineage spoof must block qualification (D-04/D-05).
+# ---------------------------------------------------------------------------
+
+from app.services.narrative_memory.contracts import (  # noqa: E402
+    BudgetTotals,
+    CandidateManifest,
+    DimensionKind,
+    DimensionResult,
+    DimensionStatus,
+    candidate_manifest_checksum,
+    dimension_result_checksum,
+)
+from app.services.qualification.runner import (  # noqa: E402
+    CODE_BUDGET_OVERRUN,
+    CODE_MANIFEST_CHECKSUM_FAILED,
+    CODE_MANIFEST_PARITY_FAILED,
+    run_qualification,
+)
+
+_RUNNER_LINEAGE = {"hierarchy_build_id": "b" * 64}
+
+
+def _runner_header(gold_set) -> dict:
+    return {
+        "db_fingerprint": "db-fp-adversarial-001",
+        "dataset_version": gold_set.dataset_version,
+        "source_snapshot": gold_set.source_snapshot_hash,
+        "commit": gold_set.source.commit,
+        "model": "queryplan-nm-candidate.v1",
+        "prompt": "prompt-hash-001",
+        "schema_version": "reading-qa-canon.v1",
+        "config": "config-hash-001",
+        "budget": {
+            "max_calls": 100,
+            "max_cost_usd": "5.00",
+        },
+    }
+
+
+def _runner_clean_artifacts(gold_set) -> dict[str, dict]:
+    out: dict[str, dict] = {}
+    for sample in gold_set.samples:
+        if sample.expected_answerability == "answerable":
+            sa = sample.source_answers[0]
+            out[sample.id] = {
+                "answer": sa.answer,
+                "cited_evidence": [r.model_dump(mode="json") for r in sa.evidence],
+                "retrieved_leaf_ids": [r.evidence_key() for r in sa.evidence],
+                "abstained": False,
+            }
+        else:
+            out[sample.id] = {
+                "answer": "",
+                "cited_evidence": [],
+                "retrieved_leaf_ids": [],
+                "abstained": True,
+            }
+        out[sample.id].update(
+            {
+                "faithfulness": 1.0,
+                "relevance": 1.0,
+                "latency_ms": 10.0,
+                "calls": 2,
+                "input_tokens": 60,
+                "output_tokens": 40,
+                "cost_usd": 0.002,
+            }
+        )
+    return out
+
+
+def _runner_manifest(snapshot: str, **overrides) -> CandidateManifest:
+    kwargs = dict(
+        source_snapshot_hash=overrides.pop("snapshot", snapshot),
+        cutoff=6,
+        owner_id=1,
+        version_id=1,
+        version_key="v1",
+        budget=BudgetTotals(
+            calls=10, input_tokens=2_000, output_tokens=1_000,
+            cost_usd="0.5", cache_hits=1,
+        ),
+        lineage=overrides.pop("lineage", _RUNNER_LINEAGE),
+    )
+    for field, value in overrides.items():
+        kwargs[field] = value
+    dimension = DimensionResult(
+        dimension=DimensionKind.TIMELINE,
+        status=DimensionStatus.AVAILABLE,
+        progress=1.0,
+        source_snapshot_hash=kwargs["source_snapshot_hash"],
+        cutoff=kwargs["cutoff"],
+        owner_id=kwargs["owner_id"],
+        version_id=kwargs["version_id"],
+        version_key=kwargs["version_key"],
+        budget=kwargs["budget"],
+        lineage=kwargs["lineage"],
+        checksum="0" * 64,
+    )
+    dimension = dimension.model_copy(
+        update={"checksum": dimension_result_checksum(dimension)}
+    )
+    placeholder = CandidateManifest(
+        dimensions=(dimension,),
+        checksum="0" * 64,
+        **kwargs,
+    )
+    return placeholder.model_copy(
+        update={"checksum": candidate_manifest_checksum(placeholder)}
+    )
+
+
+def test_runner_manifest_snapshot_forgery_blocks(gold_set):
+    cand = _runner_clean_artifacts(gold_set)
+    base = _runner_clean_artifacts(gold_set)
+    forged_manifest = _runner_manifest(
+        gold_set.source_snapshot_hash, source_snapshot_hash="e" * 64
+    )
+    report = run_qualification(
+        gold_set=gold_set,
+        header=_runner_header(gold_set),
+        candidate_artifacts=cand,
+        baseline_artifacts=base,
+        candidate_manifest=_runner_manifest(gold_set.source_snapshot_hash),
+        baseline_manifest=forged_manifest,
+    )
+    assert report.verdict == "blocked"
+    assert CODE_MANIFEST_PARITY_FAILED in report.blocked_reasons
+    assert report.buckets == ()  # lineage spoof stops metric aggregation
+
+
+def test_runner_candidate_baseline_budget_spoof_blocks(gold_set):
+    cand = _runner_clean_artifacts(gold_set)
+    base = _runner_clean_artifacts(gold_set)
+    big_budget = BudgetTotals(
+        calls=10_000, input_tokens=2_000, output_tokens=1_000,
+        cost_usd="0.5", cache_hits=1,
+    )
+    report = run_qualification(
+        gold_set=gold_set,
+        header=_runner_header(gold_set),
+        candidate_artifacts=cand,
+        baseline_artifacts=base,
+        candidate_manifest=_runner_manifest(gold_set.source_snapshot_hash),
+        baseline_manifest=_runner_manifest(
+            gold_set.source_snapshot_hash, budget=big_budget
+        ),
+    )
+    assert report.verdict == "blocked"
+    assert CODE_MANIFEST_PARITY_FAILED in report.blocked_reasons
+    assert report.buckets == ()
+
+
+def test_runner_pointer_vocabulary_manifest_blocks(gold_set):
+    cand = _runner_clean_artifacts(gold_set)
+    base = _runner_clean_artifacts(gold_set)
+    poisoned = _runner_manifest(
+        gold_set.source_snapshot_hash,
+        lineage={**_RUNNER_LINEAGE, "active_pointer": "reader-chat-current"},
+    )
+    report = run_qualification(
+        gold_set=gold_set,
+        header=_runner_header(gold_set),
+        candidate_artifacts=cand,
+        baseline_artifacts=base,
+        candidate_manifest=_runner_manifest(gold_set.source_snapshot_hash),
+        baseline_manifest=poisoned,
+    )
+    assert report.verdict == "blocked"
+    assert CODE_MANIFEST_CHECKSUM_FAILED in report.blocked_reasons
+    assert report.buckets == ()
+
+
+def test_runner_artifact_budget_overrun_blocks(gold_set):
+    cand = _runner_clean_artifacts(gold_set)
+    cand["local_01"]["calls"] = 10_000  # > max_calls 100
+    report = run_qualification(
+        gold_set=gold_set,
+        header=_runner_header(gold_set),
+        candidate_artifacts=cand,
+        baseline_artifacts=_runner_clean_artifacts(gold_set),
+    )
+    assert report.verdict == "blocked"
+    assert CODE_BUDGET_OVERRUN in report.blocked_reasons
+    assert report.buckets == ()
+
+
+def test_runner_lineage_spoof_blocks_without_metrics(gold_set):
+    cand = _runner_clean_artifacts(gold_set)
+    cand["local_01"]["owner_id"] = gold_set.owner_id + 1
+    report = run_qualification(
+        gold_set=gold_set,
+        header=_runner_header(gold_set),
+        candidate_artifacts=cand,
+        baseline_artifacts=_runner_clean_artifacts(gold_set),
+    )
+    assert report.verdict == "blocked"
+    assert "cross_owner" in report.blocked_reasons
+    # Violation-driven blocks still expose per-bucket metrics (not hidden).
+    assert report.buckets
+    bucket = next(b for b in report.buckets if b.bucket.value == "local")
+    assert bucket.blocked_reasons
+
