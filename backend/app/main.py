@@ -47,6 +47,7 @@ from app.api.reader_chat import router as reader_chat_router
 from app.api.relationships import router as relationships_router
 from app.api.settings import router as settings_router
 from app.api.usage import router as usage_router
+from app.api.visual_bible import router as visual_bible_router
 from app.config import settings
 from app.core.logging import RequestLoggingMiddleware, setup_logging
 from app.services.agent_tools.errors import AgentToolError
@@ -258,6 +259,11 @@ app.include_router(
     agent_router,
     prefix="/api/agent",
     tags=["智能体运行时"],
+)
+app.include_router(
+    visual_bible_router,
+    prefix="/api/novels",
+    tags=["视觉圣经"],
 )
 
 
