@@ -275,12 +275,17 @@ class VisualBibleAuthorityService:
         owner_id: int,
         novel_id: int,
         event: VisualReviewEventInput,
+        details: dict | None = None,
     ) -> VisualBibleVersion:
         """Append an explicit, idempotent review action and update the projection.
 
         A repeated ``event_key`` (retried approval) only replays the existing
         state; it never appends a second event and never creates a second
         approval (D-30-04).
+
+        ``details`` is an optional audit payload (budget/rights/lineage snapshot)
+        persisted on the append-only event row; the review seam (Phase 30-04)
+        supplies it so an approval is fully replayable.
         """
         self._require_scope(owner_id=owner_id, novel_id=novel_id)
         if event.owner_id != owner_id or event.novel_id != novel_id:
@@ -327,7 +332,7 @@ class VisualBibleAuthorityService:
             event_key=event.event_key,
             from_review_state=event.from_review_state.value,
             to_review_state=to_state.value,
-            details={},
+            details=details or {},
         )
         self._session.add(review_row)
         version.review_state = to_state.value

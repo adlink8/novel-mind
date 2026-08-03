@@ -5,13 +5,17 @@ Candidate-only, evidence-linked, versioned Artifact endpoints:
 - ``GET  /api/novels/{novel_id}/visual-bible`` — list candidate revisions.
 - ``GET  /api/novels/{novel_id}/visual-bible/{version_id}`` — one full
   candidate envelope (authority labels + evidence + review state + rights).
+- ``GET  /api/novels/{novel_id}/visual-bible/{version_id}/review-envelope`` —
+  review/versioning envelope (history events, approval-gate reason codes,
+  parent revision and an immutable revision ref for Scene Candidate use).
 - ``POST /api/novels/{novel_id}/visual-bible`` — explicitly create one
   candidate revision; canon evidence is re-verified server-side against the
   owning novel before anything is persisted. Missing/conflicting evidence is
   returned reason-coded (fail closed) and never promotes a candidate.
 - ``POST /api/novels/{novel_id}/visual-bible/{version_id}/review`` — apply one
   append-only, idempotent review action (approve/reject/edit/supersede/
-  needs_relink); legality is decided server-side.
+  needs_relink); legality is decided server-side and approval is gated on
+  persisted evidence + cleared rights before it is appended.
 
 Every route uses ``require_owned_novel``; a version/event outside the caller's
 owner/novel scope is indistinguishable from "not found" (no owner leak). No
@@ -52,6 +56,11 @@ from app.services.visual_bible.authority import (
 )
 from app.services.visual_bible.evidence import (
     VisualBibleEvidenceService,
+)
+from app.services.visual_bible.review import (
+    VisualBibleReviewEnvelope,
+    VisualBibleReviewService,
+    build_review_envelope,
 )
 
 router = APIRouter(dependencies=[Depends(require_user)])
@@ -223,9 +232,32 @@ async def create_visual_bible_version(
     return VisualBibleCreateResponse(version=view, replayed=persisted.replayed)
 
 
+@router.get(
+    "/{novel_id}/visual-bible/{version_id}/review-envelope",
+    response_model=VisualBibleReviewEnvelope,
+)
+async def get_visual_bible_review_envelope(
+    version_id: int,
+    novel: Novel = Depends(require_owned_novel),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """Review/versioning envelope: history, reason codes, lineage, revision ref."""
+
+    try:
+        return await build_review_envelope(
+            db,
+            owner_id=current_user.id,
+            novel_id=novel.id,
+            version_id=version_id,
+        )
+    except CandidateNotFoundError:
+        raise _not_found() from None
+
+
 @router.post(
     "/{novel_id}/visual-bible/{version_id}/review",
-    response_model=VisualBibleVersionView,
+    response_model=VisualBibleReviewEnvelope,
 )
 async def review_visual_bible_version(
     version_id: int,
@@ -234,7 +266,13 @@ async def review_visual_bible_version(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_user),
 ):
-    """Apply one append-only, idempotent review action (server-decided legality)."""
+    """Apply one append-only, idempotent review action (server-decided legality).
+
+    Approval runs the server-side gate first: a canon_fact claim without
+    persisted evidence or a non-rights-cleared reference asset blocks with a
+    stable reason code (fail closed). The response is the review envelope so
+    downstream consumers get an immutable revision ref plus history.
+    """
 
     event = VisualReviewEventInput(
         owner_id=current_user.id,
@@ -247,9 +285,9 @@ async def review_visual_bible_version(
         event_key=payload.event_key,
         from_review_state=payload.from_review_state,
     )
-    authority = VisualBibleAuthorityService(db)
+    review = VisualBibleReviewService(db)
     try:
-        await authority.apply_review(
+        await review.append_event(
             owner_id=current_user.id,
             novel_id=novel.id,
             event=event,
@@ -260,7 +298,7 @@ async def review_visual_bible_version(
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
     try:
-        return await load_version_view(
+        return await build_review_envelope(
             db,
             owner_id=current_user.id,
             novel_id=novel.id,

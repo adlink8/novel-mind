@@ -17,6 +17,10 @@ import {
 } from "@/lib/visual-bible-api";
 import { VisualBibleEntitySheet } from "./entity-sheet";
 import { ReferenceAssetStatus } from "./reference-asset-status";
+import {
+  REVIEW_ACTION_LABEL_TEXT,
+  VisualReviewActions,
+} from "./review-actions";
 
 /**
  * 30-03 colocated vitest —— Visual Bible 工作区。
@@ -370,6 +374,97 @@ describe("VisualBibleEntitySheet (envelope workspace)", () => {
     expect(
       screen.queryByTestId("visual-bible-review-actions")
     ).not.toBeInTheDocument();
+  });
+});
+
+describe("VisualReviewActions (explicit review action bar)", () => {
+  it("submits only the explicit action for the current review state", () => {
+    const onReview = vi.fn();
+    render(
+      <VisualReviewActions reviewState="candidate" onReview={onReview} />
+    );
+    const actions = [
+      ...new Set(
+        screen
+          .getAllByTestId(/^visual-bible-review-action-/)
+          .map((b) => b.getAttribute("data-action"))
+      ),
+    ].sort();
+    expect(actions).toEqual([
+      "approve",
+      "edit",
+      "needs_relink",
+      "reject",
+      "supersede",
+    ]);
+    fireEvent.click(screen.getByTestId("visual-bible-review-action-approve"));
+    expect(onReview).toHaveBeenCalledWith("approve", undefined);
+    expect(onReview).toHaveBeenCalledTimes(1);
+  });
+
+  it("forwards the optional audit reason with the action", () => {
+    const onReview = vi.fn();
+    render(
+      <VisualReviewActions reviewState="candidate" onReview={onReview} />
+    );
+    fireEvent.change(screen.getByTestId("visual-bible-review-reason"), {
+      target: { value: "rights cleared by uploader" },
+    });
+    fireEvent.click(screen.getByTestId("visual-bible-review-action-approve"));
+    expect(onReview).toHaveBeenCalledWith("approve", "rights cleared by uploader");
+  });
+
+  it("does not send an empty reason", () => {
+    const onReview = vi.fn();
+    render(
+      <VisualReviewActions reviewState="candidate" onReview={onReview} />
+    );
+    fireEvent.change(screen.getByTestId("visual-bible-review-reason"), {
+      target: { value: "   " },
+    });
+    fireEvent.click(screen.getByTestId("visual-bible-review-action-approve"));
+    expect(onReview).toHaveBeenCalledWith("approve", undefined);
+  });
+
+  it("locks actions for a terminal review state", () => {
+    render(
+      <VisualReviewActions reviewState="superseded" onReview={vi.fn()} />
+    );
+    expect(screen.getByTestId("visual-bible-review-locked")).toBeInTheDocument();
+    expect(
+      screen.queryByTestId("visual-bible-review-actions")
+    ).not.toBeInTheDocument();
+  });
+
+  it("disables every action while a submission is in flight", () => {
+    const onReview = vi.fn();
+    render(
+      <VisualReviewActions
+        reviewState="candidate"
+        onReview={onReview}
+        disabled
+      />
+    );
+    const approve = screen.getByTestId(
+      "visual-bible-review-action-approve"
+    ) as HTMLButtonElement;
+    expect(approve.disabled).toBe(true);
+    expect(
+      (screen.getByTestId("visual-bible-review-reason") as HTMLInputElement)
+        .disabled
+    ).toBe(true);
+    fireEvent.click(approve);
+    expect(onReview).not.toHaveBeenCalled();
+  });
+
+  it("renders the action vocabulary in Chinese for human review", () => {
+    render(
+      <VisualReviewActions reviewState="candidate" onReview={vi.fn()} />
+    );
+    expect(screen.getByText(REVIEW_ACTION_LABEL_TEXT.approve)).toBeInTheDocument();
+    expect(
+      screen.getByText(REVIEW_ACTION_LABEL_TEXT.needs_relink)
+    ).toBeInTheDocument();
   });
 });
 

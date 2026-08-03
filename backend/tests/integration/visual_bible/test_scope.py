@@ -271,6 +271,7 @@ def basic_version_payload(
     source_snapshot_id: str = "ss-1",
     cutoff: int = 2,
     version_key: str = "vb-main",
+    asset_rights: str = "cleared",
 ) -> dict[str, Any]:
     """vb-basic-v1: character/place canon claims + style interpretation."""
     snapshot_hash = _snapshot_hash(
@@ -351,7 +352,7 @@ def basic_version_payload(
             evidence=[],
         ),
     ]
-    assets = [_asset_payload(asset_key="ref-ayla-sketch", rights_status="pending")]
+    assets = [_asset_payload(asset_key="ref-ayla-sketch", rights_status=asset_rights)]
     version = build_version_contract(
         owner_id=ids["owner_id"],
         novel_id=ids["novel_id"],
@@ -454,7 +455,9 @@ async def test_create_candidate_exposes_evidence_authority_and_rights(api_client
     base = f"/api/novels/{ids['novel_id']}/visual-bible"
 
     resp = await client.post(
-        base, json={"version": basic_version_payload(ids)}, headers=headers
+        base,
+        json={"version": basic_version_payload(ids, asset_rights="pending")},
+        headers=headers,
     )
     assert resp.status_code == 201, resp.text
     body = resp.json()

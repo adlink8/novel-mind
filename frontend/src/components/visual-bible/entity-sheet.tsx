@@ -38,6 +38,10 @@ import {
   type VisualEvidenceJumpTarget,
 } from "./evidence-panel";
 import { ReferenceAssetStatus } from "./reference-asset-status";
+import {
+  REVIEW_ACTION_LABEL_TEXT,
+  VisualReviewActions,
+} from "./review-actions";
 
 // ---------------------------------------------------------------------------
 // Labels / badges (four distinct authority labels, never collapsed)
@@ -103,26 +107,6 @@ export function ReviewStateBadge({ state }: { state: VisualReviewState }) {
     </span>
   );
 }
-
-/** Mirror of backend LEGAL_REVIEW_TRANSITIONS — server is the final judge. */
-export const LEGAL_VISUAL_REVIEW_ACTIONS: Record<
-  VisualReviewState,
-  VisualReviewAction[]
-> = {
-  candidate: ["approve", "reject", "edit", "supersede", "needs_relink"],
-  needs_relink: ["approve", "reject", "edit", "supersede"],
-  approved: ["supersede", "needs_relink"],
-  rejected: ["edit", "supersede"],
-  superseded: [],
-};
-
-export const REVIEW_ACTION_LABEL_TEXT: Record<VisualReviewAction, string> = {
-  approve: "批准",
-  reject: "拒绝",
-  edit: "编辑",
-  supersede: "取代",
-  needs_relink: "需要重新关联",
-};
 
 // ---------------------------------------------------------------------------
 // Entity sheet (presentational)
@@ -221,57 +205,6 @@ export function EntitySheet({
 }
 
 // ---------------------------------------------------------------------------
-// Review action bar (explicit actions only; server decides legality)
-// ---------------------------------------------------------------------------
-
-export type ReviewActionBarProps = {
-  reviewState: VisualReviewState;
-  onReview: (action: VisualReviewAction) => void;
-  disabled?: boolean;
-  className?: string;
-};
-
-export function ReviewActionBar({
-  reviewState,
-  onReview,
-  disabled,
-  className,
-}: ReviewActionBarProps) {
-  const actions = LEGAL_VISUAL_REVIEW_ACTIONS[reviewState] ?? [];
-  if (actions.length === 0) {
-    return (
-      <p
-        data-testid="visual-bible-review-locked"
-        className={cn("text-[11px] text-muted-foreground", className)}
-      >
-        该状态不允许进一步审查操作
-      </p>
-    );
-  }
-  return (
-    <div
-      data-testid="visual-bible-review-actions"
-      data-state={reviewState}
-      className={cn("flex flex-wrap items-center gap-1.5", className)}
-    >
-      {actions.map((action) => (
-        <button
-          key={action}
-          type="button"
-          data-testid={`visual-bible-review-action-${action}`}
-          data-action={action}
-          disabled={disabled}
-          className="rounded-full border border-border bg-background px-2 py-0.5 text-[11px] text-foreground transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50"
-          onClick={() => onReview(action)}
-        >
-          {REVIEW_ACTION_LABEL_TEXT[action]}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Fetching workspace wrapper (owner/novel/version scoped envelope)
 // ---------------------------------------------------------------------------
 
@@ -282,7 +215,10 @@ export type VisualBibleEntitySheetProps = {
     novelId: string | number,
     versionId: number
   ) => Promise<VisualBibleVersionView>;
-  onReview?: (action: VisualReviewAction) => void | Promise<void>;
+  onReview?: (
+    action: VisualReviewAction,
+    reason?: string
+  ) => void | Promise<void>;
   onCitationNavigate?: (target: VisualEvidenceJumpTarget) => void;
   className?: string;
 };
@@ -327,10 +263,10 @@ export function VisualBibleEntitySheet({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [novelId, versionId]);
 
-  const handleReview = async (action: VisualReviewAction) => {
+  const handleReview = async (action: VisualReviewAction, reason?: string) => {
     if (!version || submitting) return;
     if (onReview) {
-      await onReview(action);
+      await onReview(action, reason);
       return;
     }
     setSubmitting(true);
@@ -339,7 +275,9 @@ export function VisualBibleEntitySheet({
         action,
         actor_source: "human",
         actor: "owner",
-        reason: `人工审查：${REVIEW_ACTION_LABEL_TEXT[action]}`,
+        reason: reason
+          ? `人工审查：${REVIEW_ACTION_LABEL_TEXT[action]} — ${reason}`
+          : `人工审查：${REVIEW_ACTION_LABEL_TEXT[action]}`,
         event_key: `vb-${version.id}-${action}-${Date.now()}`,
         from_review_state: version.review_state,
       });
@@ -425,7 +363,7 @@ export function VisualBibleEntitySheet({
         </div>
       ) : null}
 
-      <ReviewActionBar
+      <VisualReviewActions
         reviewState={version.review_state}
         onReview={handleReview}
         disabled={submitting}
