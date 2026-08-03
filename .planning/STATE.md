@@ -188,6 +188,16 @@ created.
 - Phase 30+ still require a passed Phase 29 verification artifact per ROADMAP contracts;
   this override does not waive those.
 
+## Execution Override — Phase 30 (2026-08-03, user authorized)
+
+- User authorized skipping the Phase 22 3/3 gate for Phase 30 implementation (2026-08-03,
+  interactive confirmation "授权跳过门禁"). Scope: Phase 30-01..05 (visual entity schema and
+  evidence, character/place/item sheets, style/negative constraints, Visual Bible review/
+  versioning, Agent integration) proceed without Phase 22 real scheduled green evidence.
+- Phase 22 verdict is NOT changed: remains blocked at 0/3 and must not be marked complete.
+- Phase 31+ still require a passed Phase 30 verification artifact per ROADMAP contracts;
+  this override does not waive those.
+
 ## Execution Cursor
 
 Phase 22 execution is paused. Its recovery entry remains:
@@ -199,7 +209,8 @@ Phase 26–39 planning is complete, including the AgentVN planning integration r
 verified under the 2026-08-02/03 execution overrides (28-VERIFICATION passed at `a7414c5`).
 Phase 29 execution is authorized by the 2026-08-03 Phase 29 override, and Phase 29 is
 now verified (29-VERIFICATION passed at `efa4f77`), completing the v1.2 milestone (26–29).
-Phase 30+ execution requires a passed upstream Phase 29 VERIFICATION (exists) plus
+Phase 30 execution is authorized by the 2026-08-03 Phase 30 override.
+Phase 31+ execution requires a passed upstream Phase 30 VERIFICATION (in progress) plus
 Phase 22 real scheduled green evidence (0/3, not satisfied) or a further explicit override.
 If Phase 22 is resumed, use `$gsd-resume-work`; do not mark it complete early.
 
