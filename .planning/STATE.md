@@ -226,6 +226,16 @@ created.
 - Phase 32+ still require a passed Phase 31 verification artifact per ROADMAP contracts;
   this override does not waive those.
 
+## Execution Override — Phase 32 (2026-08-03, user authorized)
+
+- User authorized skipping the Phase 22 3/3 gate for Phase 32 implementation (2026-08-03,
+  interactive confirmation "授权跳过门禁"). Scope: Phase 32-01..05 (Scene Spec schema,
+  evidence-to-spec compiler, provider prompt adapters, validation/safety/prompt preview,
+  Agent integration) proceed without Phase 22 real scheduled green evidence.
+- Phase 22 verdict is NOT changed: remains blocked at 0/3 and must not be marked complete.
+- Phase 33+ still require a passed Phase 32 verification artifact per ROADMAP contracts;
+  this override does not waive those.
+
 ## Execution Cursor
 
 Phase 22 execution is paused. Its recovery entry remains:
@@ -241,7 +251,8 @@ Phase 30 execution is authorized by the 2026-08-03 Phase 30 override, and Phase 
 verified (30-VERIFICATION passed at `67908b1`).
 Phase 31 execution is authorized by the 2026-08-03 Phase 31 override, and Phase 31 is now
 verified (31-VERIFICATION passed at `fae6b68`).
-Phase 32+ execution requires a passed upstream Phase 31 VERIFICATION (exists) plus
+Phase 32 execution is authorized by the 2026-08-03 Phase 32 override.
+Phase 33+ execution requires a passed upstream Phase 32 VERIFICATION (in progress) plus
 Phase 22 real scheduled green evidence (0/3, not satisfied) or a further explicit override.
 If Phase 22 is resumed, use `$gsd-resume-work`; do not mark it complete early.
 
