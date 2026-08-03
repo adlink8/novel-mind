@@ -207,6 +207,14 @@ from app.models.key_scene import (
     SceneEvidenceRange,
     SceneReviewDecision,
 )
+from app.models.scene_spec import (
+    SceneSpecDetail,
+    SceneSpecEvidenceRef,
+    SceneSpecNegativeConstraint,
+    SceneSpecUncertainty,
+    SceneSpecVersion,
+)
+from app.models.prompt_revision import PromptRevision
 
 __all__ = [
     "Base",
@@ -346,4 +354,10 @@ __all__ = [
     "SceneCandidate",
     "SceneEvidenceRange",
     "SceneReviewDecision",
+    "SceneSpecVersion",
+    "SceneSpecDetail",
+    "SceneSpecNegativeConstraint",
+    "SceneSpecEvidenceRef",
+    "SceneSpecUncertainty",
+    "PromptRevision",
 ]
