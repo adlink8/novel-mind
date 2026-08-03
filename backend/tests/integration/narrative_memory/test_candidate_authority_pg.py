@@ -394,7 +394,7 @@ def test_migration_roundtrip_removes_functions_triggers_and_tables(
 
     run_alembic("upgrade", "head", database_url=empty_postgres)
     current = run_alembic("current", database_url=empty_postgres)
-    assert "20260801_2703" in (current.stdout + current.stderr)
+    assert "20260801_2801" in (current.stdout + current.stderr)
 
 
 def test_scope_fks_version_owner_and_source_leaf_closure_fail_closed(
@@ -754,7 +754,7 @@ def test_database_schema_has_no_memory_control_plane_or_pointer(
     engine.dispose()
 
     current = run_alembic("current", database_url=empty_postgres)
-    assert "20260801_2703" in (current.stdout + current.stderr)
+    assert "20260801_2801" in (current.stdout + current.stderr)
 
     engine = create_engine(empty_postgres)
     with engine.connect() as conn:

@@ -71,6 +71,56 @@ class SourceStatus(StrEnum):
     LINEAGE_MISMATCH = "lineage_mismatch"
 
 
+class TerminalState(StrEnum):
+    """Explicit durable terminal state for a builder stage (D-02/D-04).
+
+    No stage may silently sit in `pending`/`running` forever. Every stage
+    converges to exactly one terminal state, or carries a recoverable
+    checkpoint that the recovery coordinator can resume.
+    """
+
+    COMPLETED = "completed"
+    ISOLATED = "isolated"
+    BLOCKED = "blocked"
+
+
+class FailureClass(StrEnum):
+    """Coarse failure families used to route recovery behaviour."""
+
+    CANCELLED = "cancelled"
+    BUDGET = "budget"
+    PROVIDER = "provider"
+    SCHEMA = "schema"
+    SOURCE_DRIFT = "source_drift"
+    OWNER_MISMATCH = "owner_mismatch"
+    STALE_CACHE = "stale_cache"
+    INTERNAL = "internal"
+
+
+class ReasonCode(StrEnum):
+    """Stable, replayable reason-code taxonomy for terminal states.
+
+    Reason codes are versioned contract strings. They are stored verbatim on
+    the stage row and inside the immutable checkpoint journal so that a later
+    resume or audit can reproduce *why* a stage stopped without re-running it.
+    """
+
+    COMPLETED_CANDIDATE = "completed_candidate"
+    CANCEL_REQUESTED = "cancel_requested"
+    CANCELLED_BEFORE_PERSIST = "cancelled_before_persist"
+    BUDGET_EXCEEDED = "budget_exceeded"
+    UNKNOWN_PRICING = "unknown_pricing"
+    PROVIDER_TRANSPORT_ERROR = "provider_transport_error"
+    SCHEMA_INVALID = "schema_invalid"
+    SOURCE_DRIFT = "source_snapshot_drift"
+    STALE_CACHE = "stale_cache_rejected"
+    OWNER_MISMATCH = "owner_mismatch"
+    DEPENDENCY_FAILED = "dependency_failed"
+    PARENT_INCOMPLETE = "parent_incomplete"
+    NO_HIERARCHY_CHAPTERS = "no_hierarchy_chapters"
+    INTERNAL_ERROR = "internal_error"
+
+
 class StageKind(StrEnum):
     CHAPTER_STATE = "chapter_state"
     ARC_VOLUME_PLAN = "arc_volume_plan"
@@ -236,6 +286,92 @@ class StageCheckpoint(BuilderFrozenModel):
     cache_key: VersionLabel | None = None
     artifact_checksum: Hash64 | None = None
     reason_code: VersionLabel | None = None
+
+
+class StageLineage(BuilderFrozenModel):
+    """Exact lineage that gates cache reuse (D-04: checksum-identical only)."""
+
+    model_lineage: ModelLineage
+    prompt_hash: Hash64
+    schema_hash: Hash64
+    decoding_hash: Hash64
+    config_hash: Hash64
+    policy_hash: Hash64
+
+
+class ResumePlanItem(BuilderFrozenModel):
+    """One stage's decision in the idempotent resume plan."""
+
+    stage_key: Key
+    status: VersionLabel
+    terminal_state: TerminalState | None = None
+    reason_code: ReasonCode | None = None
+    attempt_count: int = 0
+    runnable: StrictBool = False
+    blocked_by: tuple[Key, ...] = ()
+
+
+class ResumePlan(BuilderFrozenModel):
+    """Deterministic resume view over a run's stages (D-03/D-04).
+
+    `runnable` stages are exactly the ones that still need work; terminal
+    stages (completed/isolated/blocked) are never re-run. The plan is derived
+    from durable rows only, so crash recovery rehydrates from the DB.
+    """
+
+    run_id: PositiveInt
+    runnable: tuple[ResumePlanItem, ...]
+    terminal: tuple[ResumePlanItem, ...]
+    has_silent_pending: StrictBool
+    silent_pending_keys: tuple[Key, ...] = ()
+
+
+def classify_failure(
+    exc: BaseException,
+    *,
+    attempt_count: int | None = None,
+) -> tuple[ReasonCode, FailureClass]:
+    """Map any exception to a stable reason code + failure class.
+
+    This is the single classification seam. It never raises and never returns
+    an unstable string, so failure handling is replayable across restarts.
+    """
+    from app.services.narrative_memory.builder_budget import (
+        BudgetExceeded,
+        UnknownPricing,
+    )
+    from app.services.narrative_memory.builder_gateway import (
+        CancelledBeforePersist,
+        GatewayError,
+    )
+    from app.services.narrative_memory.builder_packages import PackageBuildError
+    from app.services.narrative_memory.builder_repository import (
+        BuilderRepositoryError,
+    )
+
+    name = type(exc).__name__
+    if isinstance(exc, CancelledBeforePersist):
+        return ReasonCode.CANCELLED_BEFORE_PERSIST, FailureClass.CANCELLED
+    if isinstance(exc, UnknownPricing):
+        return ReasonCode.UNKNOWN_PRICING, FailureClass.BUDGET
+    if isinstance(exc, BudgetExceeded):
+        return ReasonCode.BUDGET_EXCEEDED, FailureClass.BUDGET
+    if isinstance(exc, PackageBuildError):
+        return ReasonCode.SCHEMA_INVALID, FailureClass.SCHEMA
+    if isinstance(exc, GatewayError):
+        return ReasonCode.PROVIDER_TRANSPORT_ERROR, FailureClass.PROVIDER
+    if isinstance(exc, BuilderRepositoryError):
+        text = str(exc)
+        if "eligibility" in text and "mismatch" in text:
+            return ReasonCode.SOURCE_DRIFT, FailureClass.SOURCE_DRIFT
+        if "chapter id" in text or "hierarchy" in text:
+            return ReasonCode.NO_HIERARCHY_CHAPTERS, FailureClass.SOURCE_DRIFT
+        return ReasonCode.INTERNAL_ERROR, FailureClass.INTERNAL
+    if "owner" in name.lower() or "owner" in str(exc).lower():
+        return ReasonCode.OWNER_MISMATCH, FailureClass.OWNER_MISMATCH
+    if name in {"ValueError", "TypeError", "AssertionError"}:
+        return ReasonCode.SCHEMA_INVALID, FailureClass.SCHEMA
+    return ReasonCode.INTERNAL_ERROR, FailureClass.INTERNAL
 
 
 class CallAuditRecord(BuilderFrozenModel):

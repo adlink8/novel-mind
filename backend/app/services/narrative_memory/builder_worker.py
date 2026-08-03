@@ -21,6 +21,7 @@ from app.services.narrative_memory.audit_sources import AssetInventorySource
 from app.services.narrative_memory.authority import CandidateAuthority
 from app.services.narrative_memory.builder_contracts import (
     ModelDeploymentSnapshot,
+    ReasonCode,
     RunPolicy,
     SourceStatus,
     StageKind,
@@ -50,6 +51,7 @@ from app.services.narrative_memory.builder_repository import (
     BuilderRepositoryError,
 )
 from app.services.narrative_memory.contracts import ModelLineage, NodeKind
+from app.services.narrative_memory.recovery import RecoveryCoordinator
 
 
 FORBIDDEN_IMPORT_FRAGMENTS = (
@@ -161,6 +163,7 @@ class NarrativeMemoryBuilderWorker:
                 chapter.chapter_number for chapter in chapters
             ]
             await repo.update_run_status(run.id, status=run.status, progress=progress)
+            run.source_snapshot_hash = version.source_snapshot_hash
             await session.commit()
             return run.id
 
@@ -208,8 +211,13 @@ class NarrativeMemoryBuilderWorker:
                     session, run_id, gateway.transport_calls
                 )
 
+            recovery = RecoveryCoordinator(repo)
+            await repo.increment_resume_count(run_id)
+
             processed = 0
-            # Phase A: chapter states
+            # Phase A: chapter states — resume plan drives what may run.
+            plan = await recovery.resume_plan(run_id)
+            runnable_keys = {item.stage_key for item in plan.runnable}
             stages = await repo.list_stages(run_id)
             chapter_stages = [
                 s for s in stages if s.stage_kind == StageKind.CHAPTER_STATE.value
@@ -217,9 +225,8 @@ class NarrativeMemoryBuilderWorker:
             for stage in chapter_stages:
                 if max_stages is not None and processed >= max_stages:
                     break
-                # Skip completed and hard-failed stages so batch resume can make
-                # forward progress; operators requeue failed→pending explicitly.
-                if stage.status in {"completed", "failed", "cancelled"}:
+                # Terminal stages (completed/isolated/blocked) are never re-run.
+                if stage.stage_key not in runnable_keys:
                     continue
                 if await repo.is_cancelled(run_id):
                     await repo.update_run_status(
@@ -234,6 +241,7 @@ class NarrativeMemoryBuilderWorker:
                     run_id=run_id,
                     stage=stage,
                     policy=policy,
+                    recovery=recovery,
                 )
                 processed += 1
                 await session.flush()
@@ -256,6 +264,7 @@ class NarrativeMemoryBuilderWorker:
                     max_stages=max_stages,
                     processed=processed,
                     lease_id=claimed_lease,
+                    recovery=recovery,
                 )
 
             # Phase C: global + manifest if parents complete
@@ -266,6 +275,7 @@ class NarrativeMemoryBuilderWorker:
                 version=version,
                 run_id=run_id,
                 policy=policy,
+                recovery=recovery,
             )
 
             self.transport_calls += gateway.transport_calls
@@ -294,11 +304,20 @@ class NarrativeMemoryBuilderWorker:
         run_id: int,
         stage: NarrativeMemoryBuildStage,
         policy: RunPolicy,
+        recovery: RecoveryCoordinator | None = None,
     ) -> None:
         stage_key = stage.stage_key
         chapter_number = int(stage.chapter_start or 0)
         chapter_id = await self._chapter_id_for_stage(session, repo, run_id, stage)
-        await repo.mark_stage(stage, status="running", increment_attempt=True)
+        attempt_count = int(stage.attempt_count or 0) + 1
+        idempotency_key = f"{run_id}:{stage_key}:{attempt_count}"
+        await repo.mark_stage(
+            stage,
+            status="running",
+            increment_attempt=True,
+            reason_code=None,
+            idempotency_key=idempotency_key,
+        )
         try:
             leaves = await load_chapter_evidence_leaves(
                 session,
@@ -393,36 +412,71 @@ class NarrativeMemoryBuilderWorker:
                 package_checksum=package_cs,
                 cache_key=cache_key,
                 artifact_checksum=artifact,
+                reason_code=ReasonCode.COMPLETED_CANDIDATE,
+                source_checksum=version.source_snapshot_hash,
+                model_lineage=lineage.model_dump(mode="json"),
+                idempotency_key=idempotency_key,
                 checkpoint={
                     "chapter_id": chapter_id,
                     "chapter_number": chapter_number,
                     "cache_hit": result.cache_hit,
+                    "attempt_count": attempt_count,
+                    "calls": result.attempt_number,
                 },
+                journal=True,
             )
         except CancelledBeforePersist:
             stage = await self._reload_stage(session, run_id, stage_key)
-            await repo.mark_stage(
-                stage, status="cancelled", reason="cancelled_before_persist"
-            )
+            if recovery is not None:
+                await recovery.cancel_stage(run_id=run_id, stage=stage)
+            else:
+                await repo.mark_stage(
+                    stage, status="cancelled", reason="cancelled_before_persist"
+                )
             raise
         except (UnknownPricing, BudgetExceeded) as exc:
             stage = await self._reload_stage(session, run_id, stage_key)
-            await repo.mark_stage(
-                stage, status="paused_budget", reason=type(exc).__name__
-            )
-            await repo.update_run_status(
-                run_id, status="paused_budget", reason=type(exc).__name__
-            )
+            if recovery is not None:
+                await recovery.pause_budget(
+                    run_id=run_id, stage=stage, exc=exc
+                )
+            else:
+                await repo.mark_stage(
+                    stage, status="paused_budget", reason=type(exc).__name__
+                )
+                await repo.update_run_status(
+                    run_id, status="paused_budget", reason=type(exc).__name__
+                )
         except (PackageBuildError, GatewayError, BuilderRepositoryError) as exc:
             stage = await self._reload_stage(session, run_id, stage_key)
-            await repo.mark_stage(stage, status="failed", reason=str(exc)[:160])
+            if recovery is not None:
+                await recovery.isolate_chapter(
+                    session,
+                    run_id=run_id,
+                    stage=stage,
+                    exc=exc,
+                    attempt_count=attempt_count,
+                )
+            else:
+                await repo.mark_stage(stage, status="failed", reason=str(exc)[:160])
         except Exception as exc:  # noqa: BLE001 - durable failure isolation
             if session.in_transaction() and session.is_active is False:
                 await session.rollback()
             stage = await self._reload_stage(session, run_id, stage_key)
-            await repo.mark_stage(
-                stage, status="failed", reason=f"{type(exc).__name__}:{exc}"[:160]
-            )
+            if recovery is not None:
+                await recovery.isolate_chapter(
+                    session,
+                    run_id=run_id,
+                    stage=stage,
+                    exc=exc,
+                    attempt_count=attempt_count,
+                )
+            else:
+                await repo.mark_stage(
+                    stage,
+                    status="failed",
+                    reason=f"{type(exc).__name__}:{exc}"[:160],
+                )
 
     async def _ensure_boundary_and_parents(
         self,
@@ -436,6 +490,7 @@ class NarrativeMemoryBuilderWorker:
         max_stages: int | None,
         processed: int,
         lease_id: str,
+        recovery: RecoveryCoordinator | None = None,
     ) -> None:
         try:
             from app.services.narrative_memory.arc_planner import (
@@ -557,6 +612,7 @@ class NarrativeMemoryBuilderWorker:
                 stage=stage,
                 policy=policy,
                 boundary_checksum=checksum,
+                recovery=recovery,
             )
             local_processed += 1
             await repo.heartbeat(run_id, lease_id)
@@ -572,7 +628,9 @@ class NarrativeMemoryBuilderWorker:
         stage: NarrativeMemoryBuildStage,
         policy: RunPolicy,
         boundary_checksum: str,
+        recovery: RecoveryCoordinator | None = None,
     ) -> None:
+        attempt_count = int(stage.attempt_count or 0) + 1
         await repo.mark_stage(stage, status="running", increment_attempt=True)
         try:
             chapter_numbers = list(
@@ -674,21 +732,43 @@ class NarrativeMemoryBuilderWorker:
                 package_checksum=package_cs,
                 cache_key=cache_key,
                 artifact_checksum=result.output["artifact_checksum"],
+                reason_code=ReasonCode.COMPLETED_CANDIDATE,
+                source_checksum=version.source_snapshot_hash,
+                model_lineage=ModelLineage.model_validate(
+                    version.model_lineage
+                ).model_dump(mode="json"),
+                idempotency_key=f"{run_id}:{stage.stage_key}:{attempt_count}",
                 checkpoint={"boundary_plan_checksum": boundary_checksum},
+                journal=True,
             )
         except CancelledBeforePersist:
             stage = await self._reload_stage(session, run_id, stage.stage_key)
-            await repo.mark_stage(
-                stage, status="cancelled", reason="cancelled_before_persist"
-            )
+            if recovery is not None:
+                await recovery.cancel_stage(run_id=run_id, stage=stage)
+            else:
+                await repo.mark_stage(
+                    stage, status="cancelled", reason="cancelled_before_persist"
+                )
         except (UnknownPricing, BudgetExceeded) as exc:
             stage = await self._reload_stage(session, run_id, stage.stage_key)
-            await repo.mark_stage(
-                stage, status="paused_budget", reason=type(exc).__name__
-            )
+            if recovery is not None:
+                await recovery.pause_budget(run_id=run_id, stage=stage, exc=exc)
+            else:
+                await repo.mark_stage(
+                    stage, status="paused_budget", reason=type(exc).__name__
+                )
         except Exception as exc:  # noqa: BLE001
             stage = await self._reload_stage(session, run_id, stage.stage_key)
-            await repo.mark_stage(stage, status="failed", reason=str(exc)[:160])
+            if recovery is not None:
+                await recovery.isolate_chapter(
+                    session,
+                    run_id=run_id,
+                    stage=stage,
+                    exc=exc,
+                    attempt_count=attempt_count,
+                )
+            else:
+                await repo.mark_stage(stage, status="failed", reason=str(exc)[:160])
 
     async def _maybe_run_global_and_manifest(
         self,
@@ -699,6 +779,7 @@ class NarrativeMemoryBuilderWorker:
         version: NarrativeMemoryVersion,
         run_id: int,
         policy: RunPolicy,
+        recovery: RecoveryCoordinator | None = None,
     ) -> None:
         stages = await repo.list_stages(run_id)
         parents = [
@@ -720,6 +801,8 @@ class NarrativeMemoryBuilderWorker:
                     global_stage,
                     status="blocked_dependency",
                     reason="parent_incomplete_or_failed",
+                    reason_code=ReasonCode.PARENT_INCOMPLETE,
+                    journal=True,
                 )
             return
         if any(p.status != "completed" for p in parents):
@@ -734,6 +817,7 @@ class NarrativeMemoryBuilderWorker:
                 stage=global_stage,
                 policy=policy,
                 parents=parents,
+                recovery=recovery,
             )
         stages = await repo.list_stages(run_id)
         global_stage = next(
@@ -754,6 +838,7 @@ class NarrativeMemoryBuilderWorker:
             run_id=run_id,
             stage=manifest_stage,
             worker_artifact=global_stage.artifact_checksum,
+            recovery=recovery,
         )
 
     async def _run_global_stage(
@@ -767,7 +852,9 @@ class NarrativeMemoryBuilderWorker:
         stage: NarrativeMemoryBuildStage,
         policy: RunPolicy,
         parents: Sequence[NarrativeMemoryBuildStage],
+        recovery: RecoveryCoordinator | None = None,
     ) -> None:
+        attempt_count = int(stage.attempt_count or 0) + 1
         await repo.mark_stage(stage, status="running", increment_attempt=True)
         try:
             from app.models.narrative_memory import (
@@ -892,16 +979,35 @@ class NarrativeMemoryBuilderWorker:
                 package_checksum=package_cs,
                 cache_key=cache_key,
                 artifact_checksum=result.output["artifact_checksum"],
+                reason_code=ReasonCode.COMPLETED_CANDIDATE,
+                source_checksum=version.source_snapshot_hash,
+                model_lineage=ModelLineage.model_validate(
+                    version.model_lineage
+                ).model_dump(mode="json"),
+                idempotency_key=f"{run_id}:{stage.stage_key}:{attempt_count}",
                 checkpoint={},
+                journal=True,
             )
         except CancelledBeforePersist:
             stage = await self._reload_stage(session, run_id, stage.stage_key)
-            await repo.mark_stage(
-                stage, status="cancelled", reason="cancelled_before_persist"
-            )
+            if recovery is not None:
+                await recovery.cancel_stage(run_id=run_id, stage=stage)
+            else:
+                await repo.mark_stage(
+                    stage, status="cancelled", reason="cancelled_before_persist"
+                )
         except Exception as exc:  # noqa: BLE001
             stage = await self._reload_stage(session, run_id, stage.stage_key)
-            await repo.mark_stage(stage, status="failed", reason=str(exc)[:160])
+            if recovery is not None:
+                await recovery.isolate_chapter(
+                    session,
+                    run_id=run_id,
+                    stage=stage,
+                    exc=exc,
+                    attempt_count=attempt_count,
+                )
+            else:
+                await repo.mark_stage(stage, status="failed", reason=str(exc)[:160])
 
     async def _run_manifest_stage(
         self,
@@ -912,6 +1018,7 @@ class NarrativeMemoryBuilderWorker:
         run_id: int,
         stage: NarrativeMemoryBuildStage,
         worker_artifact: str | None,
+        recovery: RecoveryCoordinator | None = None,
     ) -> None:
         await repo.mark_stage(stage, status="running", increment_attempt=True)
         try:
@@ -944,10 +1051,12 @@ class NarrativeMemoryBuilderWorker:
                         stage,
                         status="failed",
                         reason="structural_blocked",
+                        reason_code=ReasonCode.DEPENDENCY_FAILED,
                         checkpoint={
                             "reasons": list(sealed.structural.reason_codes),
                             "database_manifest_checksum": db_checksum,
                         },
+                        journal=True,
                     )
                     await write_build_report(
                         session,
@@ -976,16 +1085,20 @@ class NarrativeMemoryBuilderWorker:
                 status="completed",
                 artifact_checksum=db_checksum,
                 package_checksum=db_checksum,
+                reason_code=ReasonCode.COMPLETED_CANDIDATE,
                 checkpoint={
                     "database_manifest_checksum": db_checksum,
                     "worker_artifact_checksum": worker_artifact,
                 },
+                journal=True,
             )
         except Exception as exc:  # noqa: BLE001
             await repo.mark_stage(
                 stage,
                 status="failed",
                 reason=f"{type(exc).__name__}:{str(exc)}"[:160],
+                reason_code=ReasonCode.INTERNAL_ERROR,
+                journal=True,
             )
 
     async def _reload_stage(
@@ -1154,6 +1267,7 @@ class NarrativeMemoryBuilderWorker:
     ) -> WorkerResult:
         from app.models.narrative_memory_builder import NarrativeMemoryBuildRun
 
+        await repo.recompute_terminal_states(run_id)
         stages = await repo.list_stages(run_id)
         completed = tuple(s.stage_key for s in stages if s.status == "completed")
         failed = tuple(s.stage_key for s in stages if s.status == "failed")
@@ -1163,6 +1277,7 @@ class NarrativeMemoryBuilderWorker:
         if run.cancel_requested and run.status != "completed":
             status = "cancelled"
             reason = "cancel_requested"
+            await repo.set_run_error_code(run_id, "cancel_requested")
         elif run.status == "paused_budget":
             status = "paused_budget"
             reason = run.status_reason

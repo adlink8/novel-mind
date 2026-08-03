@@ -1,6 +1,6 @@
 ---
 gsd_state_version: 2
-updated_at: 2026-08-02
+updated_at: 2026-08-03
 baseline_branch: master
 baseline_commit: 912ca6b423d6c2309bc2972cbfc083c4eaa280e1
 active_milestone: v1.1
@@ -53,6 +53,13 @@ No single aggregate completion percentage is authoritative.
 7. `27`: **IMPLEMENTED & VERIFIED (2026-08-03)** — event fact/causal edge, character
    epistemic history, entity/rule/faction/place/item, four-label authority + disclosure,
    propose-world-model-candidates skill (tool registry 7→12).
+8. `28-01`: **IMPLEMENTED (2026-08-03, execution override per user)** — durable
+   failure/recovery contract (stable reason codes, terminal states completed/isolated/
+   blocked, idempotency key, checkpoint journal, cost/cache ledger), chapter isolation
+   + dependency blocking without whole-book restart, exact-checksum cache gate;
+   migration head moved to `20260801_2801`; recovery unit (16p), adversarial safety
+   (9p), checkpoint-migration integration (5p) green. Verification pending an
+   independent test subagent.
 
 ## Planning Portfolio
 

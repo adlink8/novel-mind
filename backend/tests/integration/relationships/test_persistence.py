@@ -307,7 +307,7 @@ def test_migration_from_phase08_head_creates_relationship_tables(
 
     run_alembic("upgrade", "head", database_url=empty_postgres)
     current = run_alembic("current", database_url=empty_postgres)
-    assert "20260801_2703" in (current.stdout + current.stderr)
+    assert "20260801_2801" in (current.stdout + current.stderr)
 
     engine = create_engine(empty_postgres)
     with engine.connect() as conn:
