@@ -1,0 +1,690 @@
+{
+  "schema_version": "reading-qa-gold.v1",
+  "dataset_version": "reading-qa.v1",
+  "partition": "frozen",
+  "dataset": "single_book",
+  "owner_id": 1,
+  "novel_id": 1,
+  "version_id": 1,
+  "source_snapshot_hash": "9a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9",
+  "source": {
+    "novel_title": "雾港谜案",
+    "canonicalization_version": "reading-qa-canon.v1",
+    "commit": "912ca6b423d6c2309bc2972cbfc083c4eaa280e1",
+    "chapters": [
+      {
+        "chapter_id": 101,
+        "chapter_number": 1,
+        "content": "林安回到雾港镇。父亲留下的旧书店还亮着灯，店员阿澄说：“您父亲最后借出的书是《雾中灯塔》。”林安上阁楼，在一本旧笔记本里看见一行字：北门见。",
+        "content_hash": "8de7ac194e8624278146ca3101bb42d0f9f7c8bcaa345a4fafed7c749b96cd92"
+      },
+      {
+        "chapter_id": 102,
+        "chapter_number": 2,
+        "content": "林安如约来到北门。旧钟楼下站着一个灰衣人，递给他一把铜钥匙：“灯塔地下室，子夜。”灰衣人转身消失在雾里。",
+        "content_hash": "e690513faca6718374278552a147305d38e5a139932cd014318b8fe11bdd3799"
+      },
+      {
+        "chapter_id": 103,
+        "chapter_number": 3,
+        "content": "子夜，林安用那把钥匙打开灯塔地下室的门。手稿摊在桌上，记着父亲调查镇上走私的经过。手稿里夹着一张老照片，照片上阿澄与灰衣人并肩站着。",
+        "content_hash": "143d7c99c7977588e996ae2d90bb0b47e745b6ba99ff67bcd83a5b1801ebe232"
+      },
+      {
+        "chapter_id": 104,
+        "chapter_number": 4,
+        "content": "阿澄承认灰衣人是她的哥哥沈默。沈默当年因走私案入狱，上个月越狱。父亲去世前最后见过的人，就是沈默。",
+        "content_hash": "f9fd47bed62005528cbe24a58f5dbe2161c5d23e02c760f30cce82613e4fed77"
+      },
+      {
+        "chapter_id": 105,
+        "chapter_number": 5,
+        "content": "走私的主谋是镇长夫人何太太。何太太借灯塔地下室藏货，沈默则躲藏在北门的旧钟楼里，寻找指证她的证据。",
+        "content_hash": "8f0021439e002343c6b3fb571715cd945994d5f9457c9495e6f03a111d7a85a6"
+      },
+      {
+        "chapter_id": 106,
+        "chapter_number": 6,
+        "content": "林安与沈默联手把证据交给警局。何太太被捕，灯塔重新亮起。真相只有一个：父亲是被何太太灭口的。",
+        "content_hash": "7435960b4dfdd0cc991d081ca1fc5bf7b4df152ce8e8d8a7a0571c3eb4f6245e"
+      }
+    ]
+  },
+  "curators": [
+    "curator-a",
+    "curator-b"
+  ],
+  "samples": [
+    {
+      "id": "local_01",
+      "bucket": "local",
+      "query": "林安回到雾港镇后，在哪里看见了“北门见”三个字？",
+      "through_chapter": 1,
+      "full_book_authorized": false,
+      "expected_answerability": "answerable",
+      "source_answers": [
+        {
+          "answer": "在阁楼的旧笔记本里",
+          "authority": "canon_fact",
+          "cutoff_label": "at_cutoff",
+          "evidence": [
+            {
+              "chapter_id": 101,
+              "chapter_number": 1,
+              "source_start": 55,
+              "source_end": 69,
+              "content_hash": "2d88e4f8190644ba862e43beb2974d51b5a720293d23b628c18798124bd71b50",
+              "source_snapshot_hash": "9a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9"
+            }
+          ]
+        }
+      ],
+      "spoiler_forbidden": [],
+      "no_answer_rationale": null,
+      "ambiguity": {
+        "ambiguous": false,
+        "note": null
+      },
+      "curator_ratings": [
+        {
+          "curator": "curator-a",
+          "valid": true,
+          "evidence_complete": true,
+          "cutoff_ok": true
+        },
+        {
+          "curator": "curator-b",
+          "valid": true,
+          "evidence_complete": true,
+          "cutoff_ok": true
+        }
+      ]
+    },
+    {
+      "id": "local_02",
+      "bucket": "local",
+      "query": "父亲最后借出的书叫什么？",
+      "through_chapter": 1,
+      "full_book_authorized": false,
+      "expected_answerability": "answerable",
+      "source_answers": [
+        {
+          "answer": "《雾中灯塔》",
+          "authority": "canon_fact",
+          "cutoff_label": "at_cutoff",
+          "evidence": [
+            {
+              "chapter_id": 101,
+              "chapter_number": 1,
+              "source_start": 31,
+              "source_end": 44,
+              "content_hash": "82cbc7ea14ae22732480c9717e1748e9830b7dd74be03b09398769f446681c42",
+              "source_snapshot_hash": "9a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9"
+            }
+          ]
+        }
+      ],
+      "spoiler_forbidden": [],
+      "no_answer_rationale": null,
+      "ambiguity": {
+        "ambiguous": false,
+        "note": null
+      },
+      "curator_ratings": [
+        {
+          "curator": "curator-a",
+          "valid": true,
+          "evidence_complete": true,
+          "cutoff_ok": true
+        },
+        {
+          "curator": "curator-b",
+          "valid": true,
+          "evidence_complete": true,
+          "cutoff_ok": true
+        }
+      ]
+    },
+    {
+      "id": "cross_01",
+      "bucket": "cross_chapter",
+      "query": "灰衣人交给林安的钥匙，最后打开了什么？",
+      "through_chapter": 3,
+      "full_book_authorized": false,
+      "expected_answerability": "answerable",
+      "source_answers": [
+        {
+          "answer": "灯塔地下室的门",
+          "authority": "canon_fact",
+          "cutoff_label": "at_cutoff",
+          "evidence": [
+            {
+              "chapter_id": 102,
+              "chapter_number": 2,
+              "source_start": 31,
+              "source_end": 39,
+              "content_hash": "38881e8dea1a3d87e7dd1722acfe0c333e6a4abb272fc5e74ce516d07c5fbe18",
+              "source_snapshot_hash": "9a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9"
+            },
+            {
+              "chapter_id": 103,
+              "chapter_number": 3,
+              "source_start": 10,
+              "source_end": 19,
+              "content_hash": "a34bdc183d0fdf9d261139c2140c4799ea36bc64b0fcbd915f457c8587a2f801",
+              "source_snapshot_hash": "9a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9"
+            }
+          ]
+        }
+      ],
+      "spoiler_forbidden": [],
+      "no_answer_rationale": null,
+      "ambiguity": {
+        "ambiguous": false,
+        "note": null
+      },
+      "curator_ratings": [
+        {
+          "curator": "curator-a",
+          "valid": true,
+          "evidence_complete": true,
+          "cutoff_ok": true
+        },
+        {
+          "curator": "curator-b",
+          "valid": true,
+          "evidence_complete": true,
+          "cutoff_ok": true
+        }
+      ]
+    },
+    {
+      "id": "cross_02",
+      "bucket": "cross_chapter",
+      "query": "照片与阿澄的坦白，揭示出灰衣人是谁？",
+      "through_chapter": 4,
+      "full_book_authorized": false,
+      "expected_answerability": "answerable",
+      "source_answers": [
+        {
+          "answer": "灰衣人是阿澄的哥哥沈默",
+          "authority": "canon_fact",
+          "cutoff_label": "at_cutoff",
+          "evidence": [
+            {
+              "chapter_id": 103,
+              "chapter_number": 3,
+              "source_start": 52,
+              "source_end": 65,
+              "content_hash": "54c880016aec6f32e0449a7dc0561417863523a486f5197dc23d1bccaa7580b5",
+              "source_snapshot_hash": "9a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9"
+            },
+            {
+              "chapter_id": 104,
+              "chapter_number": 4,
+              "source_start": 4,
+              "source_end": 14,
+              "content_hash": "4f09dcaf602582c148d54a52227e25c387abc49f7011858d0105c2fd12eaacc8",
+              "source_snapshot_hash": "9a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9"
+            }
+          ]
+        }
+      ],
+      "spoiler_forbidden": [],
+      "no_answer_rationale": null,
+      "ambiguity": {
+        "ambiguous": false,
+        "note": null
+      },
+      "curator_ratings": [
+        {
+          "curator": "curator-a",
+          "valid": true,
+          "evidence_complete": true,
+          "cutoff_ok": true
+        },
+        {
+          "curator": "curator-b",
+          "valid": true,
+          "evidence_complete": true,
+          "cutoff_ok": true
+        }
+      ]
+    },
+    {
+      "id": "global_01",
+      "bucket": "global",
+      "query": "整个故事中，父亲最终是被谁灭口的？",
+      "through_chapter": 6,
+      "full_book_authorized": true,
+      "expected_answerability": "answerable",
+      "source_answers": [
+        {
+          "answer": "何太太",
+          "authority": "canon_fact",
+          "cutoff_label": "at_cutoff",
+          "evidence": [
+            {
+              "chapter_id": 105,
+              "chapter_number": 5,
+              "source_start": 0,
+              "source_end": 13,
+              "content_hash": "02676ab094a32eacdd630455dc557cdd80e3aea84df6cbf12a36efb7da64d262",
+              "source_snapshot_hash": "9a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9"
+            },
+            {
+              "chapter_id": 106,
+              "chapter_number": 6,
+              "source_start": 35,
+              "source_end": 45,
+              "content_hash": "a95e06159b819aab025c9c626e5466c26278efa4faa4c69b54f45f0f250824b7",
+              "source_snapshot_hash": "9a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9"
+            }
+          ]
+        }
+      ],
+      "spoiler_forbidden": [],
+      "no_answer_rationale": null,
+      "ambiguity": {
+        "ambiguous": false,
+        "note": null
+      },
+      "curator_ratings": [
+        {
+          "curator": "curator-a",
+          "valid": true,
+          "evidence_complete": true,
+          "cutoff_ok": true
+        },
+        {
+          "curator": "curator-b",
+          "valid": true,
+          "evidence_complete": true,
+          "cutoff_ok": true
+        }
+      ]
+    },
+    {
+      "id": "causal_01",
+      "bucket": "causal",
+      "query": "沈默越狱后为什么冒险留在雾港镇？",
+      "through_chapter": 5,
+      "full_book_authorized": false,
+      "expected_answerability": "answerable",
+      "source_answers": [
+        {
+          "answer": "他要寻找指证走私主谋何太太的证据",
+          "authority": "probable_inference",
+          "cutoff_label": "within_cutoff",
+          "evidence": [
+            {
+              "chapter_id": 104,
+              "chapter_number": 4,
+              "source_start": 26,
+              "source_end": 31,
+              "content_hash": "0a301c64f04f477f7382e67c36e6d8ca1cf2d4f1941901f62d37c7aea6e6dbcb",
+              "source_snapshot_hash": "9a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9"
+            },
+            {
+              "chapter_id": 105,
+              "chapter_number": 5,
+              "source_start": 40,
+              "source_end": 48,
+              "content_hash": "749ee1b50f17e97028ff491851ae14c8150685215cef8633162aad212402de55",
+              "source_snapshot_hash": "9a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9"
+            }
+          ]
+        }
+      ],
+      "spoiler_forbidden": [],
+      "no_answer_rationale": null,
+      "ambiguity": {
+        "ambiguous": false,
+        "note": null
+      },
+      "curator_ratings": [
+        {
+          "curator": "curator-a",
+          "valid": true,
+          "evidence_complete": true,
+          "cutoff_ok": true
+        },
+        {
+          "curator": "curator-b",
+          "valid": true,
+          "evidence_complete": true,
+          "cutoff_ok": true
+        }
+      ]
+    },
+    {
+      "id": "causal_02",
+      "bucket": "causal",
+      "query": "父亲为什么会被灭口？",
+      "through_chapter": 6,
+      "full_book_authorized": true,
+      "expected_answerability": "answerable",
+      "source_answers": [
+        {
+          "answer": "因为他在调查何太太的走私生意",
+          "authority": "probable_inference",
+          "cutoff_label": "at_cutoff",
+          "evidence": [
+            {
+              "chapter_id": 103,
+              "chapter_number": 3,
+              "source_start": 29,
+              "source_end": 40,
+              "content_hash": "2a6df814533169a7d1ad2ae683715e68fa6cd6391c9328f643ff04b8ac744376",
+              "source_snapshot_hash": "9a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9"
+            },
+            {
+              "chapter_id": 106,
+              "chapter_number": 6,
+              "source_start": 35,
+              "source_end": 45,
+              "content_hash": "a95e06159b819aab025c9c626e5466c26278efa4faa4c69b54f45f0f250824b7",
+              "source_snapshot_hash": "9a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9"
+            }
+          ]
+        }
+      ],
+      "spoiler_forbidden": [],
+      "no_answer_rationale": null,
+      "ambiguity": {
+        "ambiguous": false,
+        "note": null
+      },
+      "curator_ratings": [
+        {
+          "curator": "curator-a",
+          "valid": true,
+          "evidence_complete": true,
+          "cutoff_ok": true
+        },
+        {
+          "curator": "curator-b",
+          "valid": true,
+          "evidence_complete": true,
+          "cutoff_ok": true
+        }
+      ]
+    },
+    {
+      "id": "character_knowledge_01",
+      "bucket": "character_knowledge",
+      "query": "读到第三章结束时，林安知道灰衣人的真实身份吗？",
+      "through_chapter": 3,
+      "full_book_authorized": false,
+      "expected_answerability": "answerable",
+      "source_answers": [
+        {
+          "answer": "不知道。照片只显示阿澄与灰衣人站在一起，身份要到第四章才揭晓。",
+          "authority": "canon_fact",
+          "cutoff_label": "at_cutoff",
+          "evidence": [
+            {
+              "chapter_id": 103,
+              "chapter_number": 3,
+              "source_start": 52,
+              "source_end": 65,
+              "content_hash": "54c880016aec6f32e0449a7dc0561417863523a486f5197dc23d1bccaa7580b5",
+              "source_snapshot_hash": "9a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9"
+            }
+          ]
+        }
+      ],
+      "spoiler_forbidden": [],
+      "no_answer_rationale": null,
+      "ambiguity": {
+        "ambiguous": false,
+        "note": null
+      },
+      "curator_ratings": [
+        {
+          "curator": "curator-a",
+          "valid": true,
+          "evidence_complete": true,
+          "cutoff_ok": true
+        },
+        {
+          "curator": "curator-b",
+          "valid": true,
+          "evidence_complete": true,
+          "cutoff_ok": true
+        }
+      ]
+    },
+    {
+      "id": "character_knowledge_02",
+      "bucket": "character_knowledge",
+      "query": "在第二章，林安从灰衣人那里得到了什么？",
+      "through_chapter": 2,
+      "full_book_authorized": false,
+      "expected_answerability": "answerable",
+      "source_answers": [
+        {
+          "answer": "一把铜钥匙",
+          "authority": "canon_fact",
+          "cutoff_label": "at_cutoff",
+          "evidence": [
+            {
+              "chapter_id": 102,
+              "chapter_number": 2,
+              "source_start": 21,
+              "source_end": 29,
+              "content_hash": "417ec8480e9f05e32014e513ad9b2ab27d768d1b375d73a13e1669d56249bfc9",
+              "source_snapshot_hash": "9a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9"
+            }
+          ]
+        }
+      ],
+      "spoiler_forbidden": [],
+      "no_answer_rationale": null,
+      "ambiguity": {
+        "ambiguous": false,
+        "note": null
+      },
+      "curator_ratings": [
+        {
+          "curator": "curator-a",
+          "valid": true,
+          "evidence_complete": true,
+          "cutoff_ok": true
+        },
+        {
+          "curator": "curator-b",
+          "valid": true,
+          "evidence_complete": true,
+          "cutoff_ok": true
+        }
+      ]
+    },
+    {
+      "id": "world_rule_01",
+      "bucket": "world_rule",
+      "query": "何太太在雾港镇是什么身份？",
+      "through_chapter": 5,
+      "full_book_authorized": false,
+      "expected_answerability": "answerable",
+      "source_answers": [
+        {
+          "answer": "镇长夫人",
+          "authority": "canon_fact",
+          "cutoff_label": "at_cutoff",
+          "evidence": [
+            {
+              "chapter_id": 105,
+              "chapter_number": 5,
+              "source_start": 6,
+              "source_end": 13,
+              "content_hash": "9d9e9443016fb7bd156ee2df09c7e2f2cfbe028b237949138cac0606b3d07aba",
+              "source_snapshot_hash": "9a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9"
+            }
+          ]
+        }
+      ],
+      "spoiler_forbidden": [],
+      "no_answer_rationale": null,
+      "ambiguity": {
+        "ambiguous": false,
+        "note": null
+      },
+      "curator_ratings": [
+        {
+          "curator": "curator-a",
+          "valid": true,
+          "evidence_complete": true,
+          "cutoff_ok": true
+        },
+        {
+          "curator": "curator-b",
+          "valid": true,
+          "evidence_complete": true,
+          "cutoff_ok": true
+        }
+      ]
+    },
+    {
+      "id": "world_rule_02",
+      "bucket": "world_rule",
+      "query": "灯塔地下室在走私活动中用来做什么？",
+      "through_chapter": 5,
+      "full_book_authorized": false,
+      "expected_answerability": "answerable",
+      "source_answers": [
+        {
+          "answer": "用来藏货",
+          "authority": "canon_fact",
+          "cutoff_label": "at_cutoff",
+          "evidence": [
+            {
+              "chapter_id": 105,
+              "chapter_number": 5,
+              "source_start": 17,
+              "source_end": 25,
+              "content_hash": "c78ecc660244accbb11506f599c6f80ad002b17e82604eb38f85841ddf83460a",
+              "source_snapshot_hash": "9a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9"
+            }
+          ]
+        }
+      ],
+      "spoiler_forbidden": [],
+      "no_answer_rationale": null,
+      "ambiguity": {
+        "ambiguous": false,
+        "note": null
+      },
+      "curator_ratings": [
+        {
+          "curator": "curator-a",
+          "valid": true,
+          "evidence_complete": true,
+          "cutoff_ok": true
+        },
+        {
+          "curator": "curator-b",
+          "valid": true,
+          "evidence_complete": true,
+          "cutoff_ok": true
+        }
+      ]
+    },
+    {
+      "id": "no_answer_01",
+      "bucket": "no_answer",
+      "query": "林安的母亲叫什么名字？",
+      "through_chapter": 6,
+      "full_book_authorized": true,
+      "expected_answerability": "no_answer",
+      "source_answers": [],
+      "spoiler_forbidden": [],
+      "no_answer_rationale": "整个故事从未提及林安母亲的名字",
+      "ambiguity": {
+        "ambiguous": false,
+        "note": null
+      },
+      "curator_ratings": [
+        {
+          "curator": "curator-a",
+          "valid": true,
+          "evidence_complete": true,
+          "cutoff_ok": true
+        },
+        {
+          "curator": "curator-b",
+          "valid": true,
+          "evidence_complete": true,
+          "cutoff_ok": true
+        }
+      ]
+    },
+    {
+      "id": "spoiler_01",
+      "bucket": "spoiler",
+      "query": "故事的结局中，谁被警方逮捕？",
+      "through_chapter": 1,
+      "full_book_authorized": false,
+      "expected_answerability": "spoiler_risk",
+      "source_answers": [],
+      "spoiler_forbidden": [
+        {
+          "chapter_number": 6
+        }
+      ],
+      "no_answer_rationale": null,
+      "ambiguity": {
+        "ambiguous": false,
+        "note": null
+      },
+      "curator_ratings": [
+        {
+          "curator": "curator-a",
+          "valid": true,
+          "evidence_complete": true,
+          "cutoff_ok": true
+        },
+        {
+          "curator": "curator-b",
+          "valid": true,
+          "evidence_complete": true,
+          "cutoff_ok": true
+        }
+      ]
+    },
+    {
+      "id": "spoiler_02",
+      "bucket": "spoiler",
+      "query": "灯塔最终怎么样了？",
+      "through_chapter": 1,
+      "full_book_authorized": false,
+      "expected_answerability": "spoiler_risk",
+      "source_answers": [],
+      "spoiler_forbidden": [
+        {
+          "chapter_number": 6
+        }
+      ],
+      "no_answer_rationale": null,
+      "ambiguity": {
+        "ambiguous": false,
+        "note": null
+      },
+      "curator_ratings": [
+        {
+          "curator": "curator-a",
+          "valid": true,
+          "evidence_complete": true,
+          "cutoff_ok": true
+        },
+        {
+          "curator": "curator-b",
+          "valid": true,
+          "evidence_complete": true,
+          "cutoff_ok": true
+        }
+      ]
+    }
+  ],
+  "fingerprint": "7f4020d072dcd3258d07835683f322a819f0d5d33788e9c23d237d4815e322c0"
+}
