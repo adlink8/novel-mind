@@ -180,6 +180,13 @@ from app.models.world_model_event import (
     WorldModelEvent,
 )
 from app.models.world_model_knowledge import WorldModelKnowledge
+from app.models.world_model_entity import (
+    WorldModelAliasReview,
+    WorldModelEntity,
+    WorldModelEntityLink,
+    WorldModelRule,
+    WorldModelRuleException,
+)
 # 31-34 迁移在链上但模型未注册：补齐注册使 ORM metadata 与迁移链一致
 # （否则 alembic check 把四张既有表判为待删除的 drift）。
 from app.models.canon_space import CanonSpaceArtifact
@@ -306,6 +313,11 @@ __all__ = [
     "WorldModelCausalEdge",
     "WorldModelConflict",
     "WorldModelKnowledge",
+    "WorldModelEntity",
+    "WorldModelRule",
+    "WorldModelRuleException",
+    "WorldModelEntityLink",
+    "WorldModelAliasReview",
     "CanonSpaceArtifact",
     "FanFictionRevision",
     "FanFictionOverride",

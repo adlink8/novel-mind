@@ -58,8 +58,8 @@ def test_migration_round_trip_and_single_head(empty_postgres: str) -> None:
                 .scalars()
                 .all()
             )
-        # Single live head after full upgrade (Phase 17 is tip; Phase 16 is mid-chain).
-        assert heads == ["18appsetting1"]
+        # Single live head after full upgrade (Phase 27-03 is tip; Phase 16 is mid-chain).
+        assert heads == ["20260801_2703"]
     finally:
         engine.dispose()
 

@@ -96,6 +96,13 @@ created.
   backend 920p (unit 548 + integration/queryplan 68 + adversarial 129 + agent_runtime 60
   + ci 37 + contract 78), agent-service vitest 282p, tsc 0, alembic single head
   `20260801_2601`.
+- **2026-08-03 stub-SUT finding (recorded, deferred)**: current nightly benchmark scores
+  with deterministic stubs (`default_stub_*`, no live model calls); Ollama is only a health
+  gate. Full G2 deployment (runner+Ollama+Docker) is premature for the stub pipeline.
+  Decision: defer the lightweight unblock path (drop `ollama` label + `--live-health`, add
+  `sut: "deterministic-stub"` marker, register plain Linux runner) until real model scoring
+  is needed (Phase 29 / Pi-gateway live adapters). Full note in
+  `22-RESEARCH.md` (Stub-SUT Nightly Finding).
 
 ## Execution Override (2026-08-02, user authorized)
 

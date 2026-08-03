@@ -33,6 +33,19 @@ DOMAIN_FACT_TABLES = {
 }
 
 
+def _current_head(database_url: str) -> str:
+    """Discover the single current alembic head dynamically."""
+    heads = run_alembic("heads", database_url=database_url)
+    head_lines = [
+        line.strip()
+        for line in (heads.stdout + heads.stderr).splitlines()
+        if line.strip() and not line.strip().startswith("INFO")
+    ]
+    revision_tokens = [line.split()[0] for line in head_lines if line]
+    assert len(revision_tokens) == 1, f"expected a single head, got {revision_tokens}"
+    return revision_tokens[0]
+
+
 def test_migration_from_phase09_head_creates_reader_chat_tables(
     empty_postgres: str, require_postgres: None
 ):
@@ -47,7 +60,8 @@ def test_migration_from_phase09_head_creates_reader_chat_tables(
     run_alembic("upgrade", "head", database_url=empty_postgres)
     current = run_alembic("current", database_url=empty_postgres)
     out = current.stdout + current.stderr
-    assert "20260801_2601" in out
+    # The single chain head (advanced by later phases, e.g. world_model).
+    assert _current_head(empty_postgres) in out
 
     engine = create_engine(empty_postgres)
     with engine.connect() as conn:
@@ -85,16 +99,8 @@ def test_alembic_single_head_after_reader_chat(
     empty_postgres: str, require_postgres: None
 ):
     run_alembic("upgrade", "head", database_url=empty_postgres)
-    heads = run_alembic("heads", database_url=empty_postgres)
-    head_lines = [
-        line.strip()
-        for line in (heads.stdout + heads.stderr).splitlines()
-        if line.strip() and not line.strip().startswith("INFO")
-    ]
-    # Exactly one head revision token
-    revision_tokens = [line.split()[0] for line in head_lines if line]
-    assert len(revision_tokens) == 1
-    assert revision_tokens[0] == "20260801_2601"
+    # Exactly one head revision token — chain advanced by later phases.
+    assert _current_head(empty_postgres)
 
 
 def test_selection_offset_check_and_role_constraints(

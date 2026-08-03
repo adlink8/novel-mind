@@ -30,18 +30,28 @@ AGENT_TABLES = {
 }
 
 
-def test_heads_show_agent_runtime(empty_postgres: str, require_postgres: None):
-    """upgrade to head 后 alembic heads 只显示一个 head 20260801_2601。"""
-    run_alembic("upgrade", "head", database_url=empty_postgres)
-    heads = run_alembic("heads", database_url=empty_postgres)
+def _current_head(database_url: str) -> str:
+    """Discover the single current alembic head dynamically."""
+    heads = run_alembic("heads", database_url=database_url)
     head_lines = [
         line.strip()
         for line in (heads.stdout + heads.stderr).splitlines()
         if line.strip() and not line.strip().startswith("INFO")
     ]
     revision_tokens = [line.split()[0] for line in head_lines if line]
-    assert len(revision_tokens) == 1
-    assert revision_tokens[0] == "20260801_2601"
+    assert len(revision_tokens) == 1, f"expected a single head, got {revision_tokens}"
+    return revision_tokens[0]
+
+
+def test_heads_show_agent_runtime(empty_postgres: str, require_postgres: None):
+    """upgrade to head 后 alembic heads 只显示一个 head（链式包含 agent_runtime）。"""
+    run_alembic("upgrade", "head", database_url=empty_postgres)
+    head = _current_head(empty_postgres)
+    # 单一 head 即线性链尾：agent_runtime 迁移（20260801_2601）在链中，
+    # 且 27-01/02/03 world_model 迁移已在其后推进 head。
+    assert head.startswith("20260801_")
+    history = run_alembic("history", database_url=empty_postgres)
+    assert "20260801_2601" in history.stdout + history.stderr
 
 
 def test_six_tables_and_key_constraints(empty_postgres: str, require_postgres: None):
@@ -105,7 +115,7 @@ def test_downgrade_then_reupgrade_cycle(empty_postgres: str, require_postgres: N
 
     run_alembic("upgrade", "head", database_url=empty_postgres)
     current = run_alembic("current", database_url=empty_postgres)
-    assert "20260801_2601" in current.stdout + current.stderr
+    assert _current_head(empty_postgres) in current.stdout + current.stderr
     engine = create_engine(empty_postgres)
     with engine.connect() as conn:
         assert AGENT_TABLES <= set(inspect(conn).get_table_names())
