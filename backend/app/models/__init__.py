@@ -193,6 +193,14 @@ from app.models.canon_space import CanonSpaceArtifact
 from app.models.fanfiction_revision import FanFictionRevision
 from app.models.fanfiction_override import FanFictionOverride
 from app.models.reader_bookmark import ReaderBookmark
+from app.models.visual_bible import (
+    VisualBibleReviewEvent,
+    VisualBibleVersion,
+    VisualClaim,
+    VisualEntity,
+    VisualEvidenceRef,
+    VisualReferenceAsset,
+)
 
 __all__ = [
     "Base",
@@ -322,4 +330,10 @@ __all__ = [
     "FanFictionRevision",
     "FanFictionOverride",
     "ReaderBookmark",
+    "VisualBibleVersion",
+    "VisualEntity",
+    "VisualClaim",
+    "VisualEvidenceRef",
+    "VisualReferenceAsset",
+    "VisualBibleReviewEvent",
 ]
