@@ -258,3 +258,21 @@ Key metrics:
 | Alembic | 单 head `20260801_key_scene` | `alembic heads` |
 | 已知环境限制 | 同前：e2e Next dev server 编译失败、openapi subprocess 挂起、CI PG 残留 composite type（需 schema reset）、live UAT 需 provider key、前端 29 typecheck 遗留 | 2026-08-03 本机 |
 | 仍阻塞 | Phase 22 Nightly 3/3 未达成（0/3）；Phase 32 执行需 Phase 22 3/3 + 31-VERIFICATION（已存在）或进一步 override | `.planning/STATE.md` |
+
+---
+
+## 2026-08-03 快照（Phase 32 实现并验证；snapshot: master @ ca06706）
+
+以下事实覆盖上文旧节中的对应记录：
+
+| 项 | 当前值 | 证据 |
+|---|---|---|
+| Phase 32 Scene Spec and Prompt Compiler | **VERIFIED 2026-08-03** | `32-VERIFICATION.md` passed（source_commit `ca06706`） |
+| 后端测试 | **1443 passed**（unit 875 + scene_spec 66 + prompt_compiler 48 + adversarial 245 + agent_runtime 172 + ci 37） | 独立测试子代理 2026-08-03 |
+| agent-service | **655 passed / 18 files**；tsc 0 errors | `cd agent-service && npx vitest run` |
+| 前端 | **348 passed / 41 files** | `cd frontend && npx vitest run` |
+| Scene Spec / Prompt | SceneSpec/PromptRevision 契约、evidence-to-spec 编译器、provider 适配器、validation/preview/review、compile-scene-spec skill | `backend/app/services/scene_spec/` + `backend/app/services/prompt_compiler/` + `frontend/src/components/scene-spec/` |
+| Agent skills | 8 skills：+compile-scene-spec | `agent-service/src/skills/` |
+| Alembic | 单 head `20260801_prompt_review_events` | `alembic heads` |
+| 已知环境限制 | 同前：e2e Next dev server 编译失败、openapi subprocess 挂起、`test_postgres_migrations.py` 过期 head pin、live UAT 需 provider key、前端 29 typecheck 遗留 | 2026-08-03 本机 |
+| 仍阻塞 | Phase 22 Nightly 3/3 未达成（0/3）；Phase 33 执行需 Phase 22 3/3 + 32-VERIFICATION（已存在）或进一步 override | `.planning/STATE.md` |
