@@ -54,6 +54,12 @@ from app.services.world_model.event_repository import (
     WorldModelEventRepository,
     WorldModelRepositoryError,
 )
+from app.services.world_model.authority import (
+    AuthorityEnvelope,
+    ConversionReason,
+    conversion_gate,
+    preserved_envelope,
+)
 from app.services.world_model.gates import (
     GateReason,
     WorldModelGate,
@@ -70,6 +76,9 @@ from app.services.world_model.rules import (
     RuleExceptionClaim,
     RuleGate,
     SourceKind,
+)
+from app.services.world_model.knowledge import (
+    SourceKind as KnowledgeSourceKind,
 )
 
 pytestmark = [pytest.mark.unit]
@@ -740,3 +749,166 @@ def test_uncertain_merges_stay_candidate_review_not_canon():
     # No entity carries the other's primary_name after review generation.
     names = {entity.primary_name for entity in projection.entities}
     assert "南境军" in names and "南疆军" in names
+
+
+# ===========================================================================
+# Phase 27-04 authority envelope / conversion gate / disclosure (REQ-WM-04)
+# ===========================================================================
+# Attacks covered:
+# - the four authority labels stay distinct through the envelope (no collapse);
+# - unauthorized upgrades (inference/interpretation -> canon_fact) fail closed;
+# - user_interpretation requires explicit confirmation (D-06);
+# - Reader Chat / user conversation can never be relabeled into any authority;
+# - any silent relabel requires the target authority to be approved;
+# - disclosure timing hides future facts / hidden knowledge (D-05);
+# - preserved_envelope returns None on every rejected conversion.
+# ===========================================================================
+
+
+def _envelope(
+    label: Authority,
+    *,
+    known_at: int = 1,
+    disclosure_cutoff: int = 3,
+    approved: bool = False,
+    source_kind: KnowledgeSourceKind = KnowledgeSourceKind.CANON_SOURCE,
+    is_override: bool = False,
+) -> AuthorityEnvelope:
+    return AuthorityEnvelope(
+        label=label,
+        known_at=known_at,
+        disclosure_cutoff=disclosure_cutoff,
+        approved=approved,
+        source_kind=source_kind,
+        is_override=is_override,
+    )
+
+
+def test_four_authority_labels_stay_distinct_in_the_envelope():
+    labels = {
+        envelope.label
+        for envelope in (
+            _envelope(Authority.CANON_FACT),
+            _envelope(Authority.PROBABLE_INFERENCE),
+            _envelope(Authority.LITERARY_INTERPRETATION),
+            _envelope(Authority.USER_INTERPRETATION),
+        )
+    }
+    assert labels == {
+        Authority.CANON_FACT,
+        Authority.PROBABLE_INFERENCE,
+        Authority.LITERARY_INTERPRETATION,
+        Authority.USER_INTERPRETATION,
+    }
+    # No two authorities serialize to the same value.
+    values = [label.value for label in labels]
+    assert len(values) == len(set(values))
+
+
+def test_preserving_label_always_passes_without_approval():
+    envelope = _envelope(Authority.PROBABLE_INFERENCE)
+    verdict = conversion_gate(envelope, Authority.PROBABLE_INFERENCE)
+    assert verdict.ok is True
+    assert verdict.reason == ConversionReason.LABEL_PRESERVED
+
+
+def test_inference_to_canon_fact_without_approval_is_rejected():
+    envelope = _envelope(Authority.PROBABLE_INFERENCE)
+    verdict = conversion_gate(envelope, Authority.CANON_FACT)
+    assert verdict.ok is False
+    assert verdict.reason == ConversionReason.AUTHORITY_UPGRADE
+    assert preserved_envelope(envelope, Authority.CANON_FACT) is None
+
+
+def test_interpretation_to_canon_fact_requires_explicit_approval():
+    envelope = _envelope(Authority.LITERARY_INTERPRETATION)
+    assert conversion_gate(envelope, Authority.CANON_FACT).ok is False
+    approved = conversion_gate(
+        envelope,
+        Authority.CANON_FACT,
+        approvals=frozenset({Authority.CANON_FACT}),
+    )
+    assert approved.ok is True
+    relabeled = preserved_envelope(
+        envelope,
+        Authority.CANON_FACT,
+        approvals=frozenset({Authority.CANON_FACT}),
+    )
+    assert relabeled is not None
+    assert relabeled.label == Authority.CANON_FACT
+    # Disclosure timing and override isolation survive the conversion.
+    assert relabeled.disclosure_cutoff == envelope.disclosure_cutoff
+    assert relabeled.is_override == envelope.is_override
+
+
+def test_user_interpretation_requires_confirmation():
+    envelope = _envelope(Authority.PROBABLE_INFERENCE)
+    verdict = conversion_gate(envelope, Authority.USER_INTERPRETATION)
+    assert verdict.ok is False
+    assert verdict.reason == ConversionReason.MISSING_APPROVAL
+    approved = conversion_gate(
+        envelope,
+        Authority.USER_INTERPRETATION,
+        approvals=frozenset({Authority.USER_INTERPRETATION}),
+    )
+    assert approved.ok is True
+
+
+def test_chat_source_can_never_be_relabeled():
+    envelope = _envelope(
+        Authority.USER_INTERPRETATION,
+        source_kind=KnowledgeSourceKind.READER_CHAT,
+    )
+    for target in Authority:
+        verdict = conversion_gate(
+            envelope,
+            target,
+            approvals=frozenset(Authority),
+        )
+        if target == envelope.label:
+            assert verdict.ok is True, "label preservation is always allowed"
+        else:
+            assert verdict.ok is False
+            assert verdict.reason == ConversionReason.CHAT_NOT_FACT_SOURCE
+
+
+def test_silent_lateral_relabel_requires_target_approval():
+    envelope = _envelope(Authority.PROBABLE_INFERENCE)
+    # probable_inference -> literary_interpretation without approval: rejected.
+    verdict = conversion_gate(envelope, Authority.LITERARY_INTERPRETATION)
+    assert verdict.ok is False
+    assert verdict.reason == ConversionReason.UNAUTHORIZED_CONVERSION
+    # With the target authority explicitly approved the relabel is explicit.
+    approved = conversion_gate(
+        envelope,
+        Authority.LITERARY_INTERPRETATION,
+        approvals=frozenset({Authority.LITERARY_INTERPRETATION}),
+    )
+    assert approved.ok is True
+
+
+def test_canon_fact_downgrade_is_safe_without_approval():
+    envelope = _envelope(Authority.CANON_FACT)
+    verdict = conversion_gate(envelope, Authority.PROBABLE_INFERENCE)
+    assert verdict.ok is True
+
+
+def test_disclosure_timing_hides_future_facts():
+    envelope = _envelope(Authority.PROBABLE_INFERENCE, disclosure_cutoff=3)
+    assert envelope.visible_at(2) is False
+    assert envelope.disclosed_after(2) is True
+    assert envelope.visible_at(3) is True
+    assert envelope.disclosed_after(3) is False
+
+
+def test_override_is_isolated_from_original_candidate():
+    original = _envelope(Authority.PROBABLE_INFERENCE)
+    override = _envelope(
+        Authority.USER_INTERPRETATION,
+        is_override=True,
+        source_kind=KnowledgeSourceKind.HUMAN_OVERRIDE,
+    )
+    assert original.is_original_candidate is True
+    assert override.is_original_candidate is False
+    assert original.is_override is False
+    assert override.is_override is True

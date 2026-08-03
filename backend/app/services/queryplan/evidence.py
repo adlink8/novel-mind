@@ -27,6 +27,10 @@ from app.services.queryplan.adapters import (
     SourceSnapshot,
     chapter_content_hash,
 )
+from app.services.queryplan.contracts import (
+    WorldProjectionItem,
+    leaf_evidence_key,
+)
 from app.services.queryplan.fusion import FusionResult
 from app.services.queryplan.schemas import (
     AvailabilityStatus,
@@ -100,12 +104,17 @@ class OmittedEntry:
 
 
 def evidence_key(ref: EvidenceRef) -> str:
-    """Deterministic leaf-only allowlist key.
+    """Deterministic leaf-only allowlist key (shared contract).
 
     Composed only of leaf fields (chapter + Unicode offsets + content hash);
     a summary, score, routing id or chat-text id can never produce this shape.
     """
-    return f"qp:{ref.chapter_id}:{ref.source_start}:{ref.source_end}:{ref.content_hash}"
+    return leaf_evidence_key(
+        chapter_id=ref.chapter_id,
+        source_start=ref.source_start,
+        source_end=ref.source_end,
+        content_hash=ref.content_hash,
+    )
 
 
 def effective_through_chapter(plan: QueryPlan, source: SourceSnapshot) -> int:
@@ -335,3 +344,78 @@ def build_omitted_records(fused: FusionResult) -> tuple[OmittedEntry, ...]:
             )
         )
     return tuple(records)
+
+
+def _world_projection_omitted(
+    items: Sequence[WorldProjectionItem],
+    overrides: Sequence[WorldProjectionItem],
+) -> tuple[OmittedEntry, ...]:
+    """Record candidate-only / isolated-override claims; never as evidence.
+
+    Only approved candidate refs may enter the manifest; candidate-only items and
+    user-interpretation overrides are recorded as omitted so nothing is silently
+    dropped or promoted (D-02/D-06).
+    """
+    records: list[OmittedEntry] = []
+    for item in items:
+        if item.approved:
+            continue
+        records.append(
+            OmittedEntry(
+                kind="world_projection_candidate",
+                reason="candidate_only_not_evidence",
+                provenance="world_projection_reader_v1",
+                count=1,
+                dimension="world_projection",
+                status="candidate_only",
+                chapter_number=item.chapter_number,
+            )
+        )
+    for item in overrides:
+        records.append(
+            OmittedEntry(
+                kind="world_projection_override",
+                reason="user_override_isolated_from_candidate_projection",
+                provenance="world_projection_reader_v1",
+                count=1,
+                dimension="world_projection",
+                status="override",
+                chapter_number=item.chapter_number,
+            )
+        )
+    return tuple(records)
+
+
+def freeze_world_projection_manifest(
+    *,
+    plan: QueryPlan,
+    source: SourceSnapshot,
+    refs: Sequence[EvidenceRef],
+    items: Sequence[WorldProjectionItem] = (),
+    overrides: Sequence[WorldProjectionItem] = (),
+) -> FrozenManifest:
+    """Freeze world projection leaf evidence into an immutable manifest.
+
+    Every ref is re-sliced against the frozen snapshot (D-07); any stale hash,
+    offset, spoiler or version mismatch fails closed before a manifest exists.
+    Candidate-only items and isolated overrides are recorded as omitted — they
+    never become evidence (D-02/D-06).
+    """
+    through_chapter = effective_through_chapter(plan, source)
+    cutoff_mode = plan.spoiler_cutoff.mode
+    evidence = tuple(
+        materialize_evidence_ref(
+            ref,
+            source=source,
+            through_chapter=through_chapter,
+            cutoff_mode=cutoff_mode,
+        )
+        for ref in refs
+    )
+    omitted = _world_projection_omitted(items, overrides)
+    return freeze_manifest(
+        plan=plan,
+        source=source,
+        evidence=evidence,
+        omitted=omitted,
+    )

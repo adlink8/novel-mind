@@ -655,6 +655,54 @@ export interface QueryPlanTraceView {
     excerpt: string;
   }>;
   abstained: boolean;
+  /** 27-04：world projection authority/disclosure/evidence 契约（可缺省）。 */
+  world_projection?: WorldProjectionView | null;
+}
+
+/**
+ * 27-04：World projection 序列化契约（后端 queryplan/contracts.py 镜像）。
+ * authority 严格四标签之一；candidate-only 经 approved 标识；user
+ * interpretation 隔离在 overrides 中（D-06）。
+ */
+export type WorldAuthorityLabel =
+  | "canon_fact"
+  | "probable_inference"
+  | "literary_interpretation"
+  | "user_interpretation";
+
+export interface WorldProjectionItemView {
+  claim_key: string;
+  kind: "character" | "world";
+  subject: string;
+  aspect: string;
+  proposition: string;
+  authority: WorldAuthorityLabel;
+  known_at: number;
+  disclosure_cutoff: number;
+  pov: string | null;
+  gate_status: "pending" | "passed" | "rejected";
+  approved: boolean;
+  is_override: boolean;
+  evidence_key: string;
+  chapter_id: number;
+  chapter_number: number;
+  source_start: number;
+  source_end: number;
+  content_hash: string;
+  source_snapshot_hash: string;
+  lineage: string[];
+}
+
+export interface WorldProjectionView {
+  schema_version: string;
+  available: boolean;
+  status: "available" | "candidate_only" | "unavailable";
+  cutoff: number;
+  items: WorldProjectionItemView[];
+  overrides: WorldProjectionItemView[];
+  authorities: WorldAuthorityLabel[];
+  manifest_checksum?: string | null;
+  snapshot_hash?: string | null;
 }
 
 export interface MessageView {

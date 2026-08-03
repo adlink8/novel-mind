@@ -74,6 +74,7 @@ class QueryDimension(StrEnum):
     CLUES_FORESHAOWING = "clues_foreshadowing"
     WORLD_RULES = "world_rules"
     NARRATIVE_UNITS = "narrative_units"
+    WORLD_PROJECTION = "world_projection"
 
 
 class CutoffMode(StrEnum):

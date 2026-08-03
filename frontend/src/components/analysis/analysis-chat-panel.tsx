@@ -44,6 +44,7 @@ import {
   type MessageView,
 } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { WorldModelEvidencePanel } from "./world-model-evidence-panel";
 
 /**
  * 25.3-05：Analysis workspace 共享 artifact 预览入口——经类型键渲染器注册表
@@ -51,6 +52,7 @@ import { cn } from "@/lib/utils";
  * 解析产物正文；实现见 cited-answer-artifact.tsx。
  */
 export { ArtifactPreview } from "./cited-answer-artifact";
+export { WorldModelEvidencePanel } from "./world-model-evidence-panel";
 
 export type AnalysisChapterRef = {
   id: number;
@@ -549,6 +551,15 @@ export function AnalysisChatPanel({
                   ? " · 部分维度不可用"
                   : ""}
               </p>
+            ) : null}
+            {m.queryplan?.world_projection ? (
+              <div className="px-1 pt-1">
+                <WorldModelEvidencePanel
+                  novelId={novelId}
+                  worldProjection={m.queryplan.world_projection}
+                  onCitationNavigate={handleCitationNavigate}
+                />
+              </div>
             ) : null}
           </div>
         ))}

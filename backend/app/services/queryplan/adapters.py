@@ -32,6 +32,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Protocol
 
+from app.services.queryplan.contracts import WorldProjectionItem
 from app.services.queryplan.schemas import (
     AvailabilityStatus,
     CutoffMode,
@@ -50,11 +51,15 @@ class ReasonCode(StrEnum):
     HEURISTIC_CANDIDATE_ONLY = "heuristic_candidate_only"
     READER_UNAVAILABLE = "reader_unavailable"
     DIMENSION_UNAVAILABLE = "dimension_unavailable"
+    NO_WORLD_PROJECTION = "no_world_projection"
+    WORLD_PROJECTION_ABSTAINED = "world_projection_abstained"
+    WORLD_PROJECTION_CANDIDATE_ONLY = "world_projection_candidate_only"
 
 
 PROVENANCE_EXACT_READER = "exact_reader_v1"
 PROVENANCE_HEURISTIC = "deterministic_heuristic_v1"
 PROVENANCE_CONTRACT = "deterministic_contract_v1"
+PROVENANCE_WORLD_PROJECTION = "world_projection_reader_v1"
 
 # Production reader ids wired through the ReaderResolver. ``None`` means no
 # production reader exists yet (character_state / world_rules → Phase 27), which
@@ -64,6 +69,7 @@ READER_TIMELINE_EVENTS = "timeline_events"
 READER_RELATIONSHIPS_GRAPH = "relationships_graph"
 READER_CLUES_QUERY = "clues_query"
 READER_KNOWLEDGE_UNITS_UNITS = "knowledge_units_units"
+READER_WORLD_PROJECTION = "world_projection"
 
 
 # ---------------------------------------------------------------------------
@@ -136,6 +142,46 @@ class ReaderOutcome:
     provenance: str = PROVENANCE_EXACT_READER
 
 
+class WorldProjectionUnavailableError(RuntimeError):
+    """The world projection reader explicitly declines service (no projection)."""
+
+
+@dataclass(frozen=True)
+class WorldProjectionOutcome:
+    """Verified output of the world projection reader (Phase 27-04 / REQ-WM-04).
+
+    ``status`` is one of ``available`` / ``candidate_only`` / ``abstained``:
+
+    - ``available`` — at least one approved candidate claim is visible at the
+      cutoff/POV; its leaf evidence refs may mark the dimension available.
+    - ``candidate_only`` — claims exist but none are approved yet; reported as
+      partial, never evidence (D-02 candidate-only, no promotion).
+    - ``abstained`` — the projection exists but nothing is visible at the
+      cutoff/POV (D-05 disclosure); reported as explicit unavailable, never
+      empty-success.
+
+    ``refs`` are the allowlisted leaf EvidenceRefs of the approved candidates.
+    ``items`` carry the authority / disclosure / evidence / lineage contract for
+    the browser; ``overrides`` are the isolated user-interpretation claims
+    (D-06) — they never join the candidate items or the manifest evidence.
+    """
+
+    status: str
+    cutoff: int
+    refs: tuple[EvidenceRef, ...]
+    items: tuple[WorldProjectionItem, ...] = ()
+    overrides: tuple[WorldProjectionItem, ...] = ()
+    provenance: str = PROVENANCE_WORLD_PROJECTION
+
+
+class WorldProjectionReaderCallable(Protocol):
+    """A world projection reader; ``None`` means no projection exists at all."""
+
+    async def __call__(
+        self, context: ReaderContext
+    ) -> WorldProjectionOutcome | None: ...
+
+
 @dataclass(frozen=True)
 class HeuristicCandidate:
     """Deterministic recall candidate; never a fact, EvidenceRef or citation.
@@ -172,6 +218,8 @@ class DimensionResult:
     stage: FallbackStage
     refs: tuple[EvidenceRef, ...] = ()
     candidates: tuple[HeuristicCandidate, ...] = ()
+    world_items: tuple[WorldProjectionItem, ...] = ()
+    world_overrides: tuple[WorldProjectionItem, ...] = ()
 
     @property
     def evidence_eligible(self) -> bool:
@@ -461,7 +509,105 @@ DEFAULT_ADAPTERS: dict[QueryDimension, DimensionAdapter] = {
     QueryDimension.NARRATIVE_UNITS: DimensionAdapter(
         QueryDimension.NARRATIVE_UNITS, READER_KNOWLEDGE_UNITS_UNITS, GENERIC_HEURISTIC_KEYWORDS
     ),
+    QueryDimension.WORLD_PROJECTION: DimensionAdapter(
+        QueryDimension.WORLD_PROJECTION, READER_WORLD_PROJECTION, ()
+    ),
 }
+
+
+async def run_world_projection_adapter(
+    adapter: DimensionAdapter,
+    *,
+    source: SourceSnapshot,
+    through_chapter: int,
+    resolver: ReaderResolver | None = None,
+    question: str | None = None,
+) -> DimensionResult:
+    """Execute the world projection dimension against the injected reader.
+
+    Fail-closed availability (REQ-WM-04 / D-05):
+    - no world projection at all           -> ``unavailable`` (never empty-success)
+    - projection exists but nothing visible-> ``unavailable`` (abstained)
+    - projection exists, none approved     -> ``partial``  (candidate-only)
+    - projection exists with approved refs -> ``available`` (evidence-eligible)
+    """
+    context = ReaderContext(
+        owner_id=source.owner_id,
+        novel_id=source.novel_id,
+        version_id=source.version_id,
+        through_chapter=through_chapter,
+        snapshot_hash=source.snapshot_hash,
+        dimension=adapter.dimension,
+        question=question,
+    )
+    if resolver is None:
+        return DimensionResult(
+            dimension=adapter.dimension,
+            status=AvailabilityStatus.UNAVAILABLE,
+            reason=ReasonCode.NO_WORLD_PROJECTION.value,
+            provenance=PROVENANCE_CONTRACT,
+            stage=FallbackStage.STABLE_UNAVAILABLE,
+        )
+    try:
+        reader = await resolver(adapter.reader_id)
+    except Exception:
+        reader = None
+    if reader is None:
+        return DimensionResult(
+            dimension=adapter.dimension,
+            status=AvailabilityStatus.UNAVAILABLE,
+            reason=ReasonCode.NO_WORLD_PROJECTION.value,
+            provenance=PROVENANCE_CONTRACT,
+            stage=FallbackStage.STABLE_UNAVAILABLE,
+        )
+    try:
+        outcome = await reader(context)
+    except WorldProjectionUnavailableError:
+        outcome = None
+    except Exception:
+        outcome = None
+    if outcome is None:
+        return DimensionResult(
+            dimension=adapter.dimension,
+            status=AvailabilityStatus.UNAVAILABLE,
+            reason=ReasonCode.NO_WORLD_PROJECTION.value,
+            provenance=PROVENANCE_CONTRACT,
+            stage=FallbackStage.STABLE_UNAVAILABLE,
+        )
+
+    refs = tuple(
+        ref for ref in outcome.refs if int(ref.chapter_number) <= through_chapter
+    )
+    if outcome.status == "available" and refs:
+        return DimensionResult(
+            dimension=adapter.dimension,
+            status=AvailabilityStatus.AVAILABLE,
+            reason=ReasonCode.READER_OK.value,
+            provenance=outcome.provenance,
+            stage=FallbackStage.EXACT_READER,
+            refs=refs,
+            world_items=outcome.items,
+            world_overrides=outcome.overrides,
+        )
+    if outcome.status == "candidate_only":
+        return DimensionResult(
+            dimension=adapter.dimension,
+            status=AvailabilityStatus.PARTIAL,
+            reason=ReasonCode.WORLD_PROJECTION_CANDIDATE_ONLY.value,
+            provenance=outcome.provenance,
+            stage=FallbackStage.EXACT_READER,
+            world_items=outcome.items,
+            world_overrides=outcome.overrides,
+        )
+    return DimensionResult(
+        dimension=adapter.dimension,
+        status=AvailabilityStatus.UNAVAILABLE,
+        reason=ReasonCode.WORLD_PROJECTION_ABSTAINED.value,
+        provenance=outcome.provenance,
+        stage=FallbackStage.STABLE_UNAVAILABLE,
+        world_items=outcome.items,
+        world_overrides=outcome.overrides,
+    )
 
 
 async def run_adapter(
@@ -473,6 +619,14 @@ async def run_adapter(
     question: str | None = None,
 ) -> DimensionResult:
     """Execute one dimension's three-stage chain against a frozen snapshot."""
+    if adapter.reader_id == READER_WORLD_PROJECTION:
+        return await run_world_projection_adapter(
+            adapter,
+            source=source,
+            through_chapter=through_chapter,
+            resolver=resolver,
+            question=question,
+        )
     context = ReaderContext(
         owner_id=source.owner_id,
         novel_id=source.novel_id,

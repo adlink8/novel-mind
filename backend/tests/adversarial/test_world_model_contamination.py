@@ -17,6 +17,13 @@ from pathlib import Path
 
 import pytest
 
+from app.services.queryplan.adapters import (
+    READER_WORLD_PROJECTION,
+    SourceSnapshot,
+    run_plan_adapters,
+)
+from app.services.queryplan.parser import parse_query_plan
+from app.services.queryplan.schemas import QueryDimension, QueryPlan
 from app.services.world_model.contracts import Authority
 from app.services.world_model.knowledge import (
     EpistemicClaim,
@@ -27,7 +34,11 @@ from app.services.world_model.knowledge import (
     SourceKind,
     build_knowledge_projection,
 )
-from app.services.world_model.queries import EpistemicQueryEngine
+from app.services.world_model.queries import (
+    EpistemicQueryEngine,
+    WorldProjectionAnswer,
+    world_projection_reader,
+)
 
 pytestmark = [pytest.mark.unit]
 
@@ -242,3 +253,195 @@ def test_contradiction_is_preserved_and_queryable():
         owner_id=1, novel_id=1, version_id=10, status=EpistemicStatus.CONTRADICTION
     )
     assert [claim.knowledge_key for claim in contradictions] == ["k-alive-fact"]
+
+
+# ===========================================================================
+# Phase 27-04 world projection: user interpretation isolation + chat bounds
+# (REQ-WM-04, D-06)
+# ===========================================================================
+
+
+def _world_claim(
+    *,
+    key: str,
+    authority: str = "probable_inference",
+    disclosure_cutoff: int = 3,
+    gate_status: str = "passed",
+    source_kind: str = "canon_source",
+    snapshot_hash: str = "c" * 64,
+    source_start: int = 0,
+    source_end: int = 12,
+) -> EpistemicClaim:
+    return EpistemicClaim(
+        claim_kind="character_knowledge",
+        knowledge_key=key,
+        subject="lin-an",
+        aspect="knowledge",
+        proposition=f"claim {key}",
+        known_at=disclosure_cutoff,
+        disclosure_cutoff=disclosure_cutoff,
+        pov="lin-an",
+        pov_kind="character",
+        source_kind=source_kind,
+        authority=authority,
+        confidence=0.9,
+        epistemic_status=EpistemicStatus.ASSERTED,
+        transition_from=None,
+        lineage=[key],
+        source_refs=(
+            {
+                "evidence_id": f"ev-{key}",
+                "chapter_id": 1,
+                "chapter_number": 1,
+                "source_start": source_start,
+                "source_end": source_end,
+                "content_hash": "1" * 64,
+                "source_snapshot_hash": snapshot_hash,
+            },
+        ),
+        gate_status=gate_status,
+        gate_reason=None,
+        owner_id=1,
+        novel_id=1,
+        version_id=1,
+    )
+
+
+def test_world_projection_isolates_user_interpretation_overrides():
+    """query_world_projection never merges user interpretation into candidates."""
+    claims = (
+        _world_claim(key="k-canon", authority="canon_fact"),
+        _world_claim(
+            key="k-user-read",
+            authority="user_interpretation",
+            source_kind="human_override",
+            source_start=4,
+            source_end=20,
+        ),
+    )
+    engine = EpistemicQueryEngine(claims)
+    answer = engine.query_world_projection(
+        owner_id=1, novel_id=1, version_id=1, cutoff=8
+    )
+    assert isinstance(answer, WorldProjectionAnswer)
+    assert answer.status == KnowledgeResultStatus.ANSWERED
+    assert answer.available is True
+    # user_interpretation claims live only in overrides, never in items.
+    item_authorities = {claim.authority for claim in answer.items}
+    override_authorities = {claim.authority for claim in answer.overrides}
+    assert Authority.USER_INTERPRETATION not in item_authorities
+    assert override_authorities == {Authority.USER_INTERPRETATION}
+    assert Authority.CANON_FACT in item_authorities
+
+
+def test_world_projection_hides_user_override_from_authority_allowlist():
+    claims = (
+        _world_claim(key="k-canon", authority="canon_fact"),
+        _world_claim(
+            key="k-user-read",
+            authority="user_interpretation",
+            source_kind="human_override",
+        ),
+    )
+    engine = EpistemicQueryEngine(claims)
+    answer = engine.query_world_projection(
+        owner_id=1,
+        novel_id=1,
+        version_id=1,
+        cutoff=8,
+        authorities=frozenset({Authority.USER_INTERPRETATION}),
+    )
+    # An allowlist filter selects labels, it never relabels; the override is
+    # still isolated from the candidate items.
+    assert answer.status == KnowledgeResultStatus.CANDIDATE_ONLY
+    assert answer.items == ()
+    assert {claim.authority for claim in answer.overrides} == {
+        Authority.USER_INTERPRETATION
+    }
+
+
+async def _world_plan() -> QueryPlan:
+    result = parse_query_plan(
+        {
+            "intent": "analysis",
+            "owner_id": 1,
+            "novel_id": 1,
+            "version_id": 1,
+            "question_text": "林安知道什么？",
+            "reading_progress": {
+                "through_chapter": 8,
+                "snapshot_hash": "c" * 64,
+                "full_book_authorized": False,
+            },
+            "chapter_range": {"chapter_start": 1, "chapter_end": 8},
+            "dimensions": ["world_projection"],
+            "source": "analysis_chat",
+        }
+    )
+    assert isinstance(result, QueryPlan), result
+    return result
+
+
+async def _world_resolver(claims):
+    async def resolver(reader_id: str):
+        if reader_id != READER_WORLD_PROJECTION:
+            return None
+
+        async def reader(context):
+            return await world_projection_reader(claims, context=context)
+
+        return reader
+
+    return resolver
+
+
+async def test_chat_claims_can_never_enter_a_world_projection():
+    plan = await _world_plan()
+    source = SourceSnapshot(
+        owner_id=1,
+        novel_id=1,
+        version_id=1,
+        snapshot_hash="c" * 64,
+        chapters=(),
+    )
+    # A chat-sourced claim that somehow materialized is still excluded.
+    chat_claim = EpistemicClaim.model_validate(
+        {
+            **scenario("chat_contamination")["claims"][0],
+            "gate_status": "passed",
+        }
+    )
+    assert chat_claim.source_kind == SourceKind.READER_CHAT
+    results = await run_plan_adapters(
+        plan,
+        source=source,
+        resolver=await _world_resolver((chat_claim,)),
+    )
+    world = next(
+        r for r in results if r.dimension == QueryDimension.WORLD_PROJECTION
+    )
+    assert world.status.value == "unavailable"
+    assert world.refs == ()
+
+
+async def test_stale_snapshot_world_projection_fails_closed():
+    plan = await _world_plan()
+    source = SourceSnapshot(
+        owner_id=1,
+        novel_id=1,
+        version_id=1,
+        snapshot_hash="c" * 64,
+        chapters=(),
+    )
+    # A claim whose evidence belongs to a different snapshot lineage.
+    claim = _world_claim(key="k-stale", snapshot_hash="0" * 64)
+    results = await run_plan_adapters(
+        plan,
+        source=source,
+        resolver=await _world_resolver((claim,)),
+    )
+    world = next(
+        r for r in results if r.dimension == QueryDimension.WORLD_PROJECTION
+    )
+    assert world.status.value == "unavailable"
+    assert world.refs == ()

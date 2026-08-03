@@ -39,6 +39,10 @@ from app.services.queryplan.adapters import (
     SourceSnapshot,
     run_plan_adapters,
 )
+from app.services.queryplan.contracts import (
+    WorldProjectionItem,
+    WorldProjectionView,
+)
 from app.services.queryplan.evidence import (
     FrozenManifest,
     build_omitted_records,
@@ -53,8 +57,10 @@ from app.services.queryplan.fusion import (
 )
 from app.services.queryplan.parser import parse_query_plan
 from app.services.queryplan.schemas import (
+    AvailabilityStatus,
     BlockedResult,
     ChapterRangeAnchor,
+    QueryDimension,
     QueryPlan,
     QueryPlanIntent,
     QueryPlanRequest,
@@ -168,6 +174,7 @@ class ConsumerQueryPlanView:
     allowed_evidence_ids: tuple[str, ...]
     citation_jump: tuple[CitationJumpTarget, ...]
     abstained: bool
+    world_projection: dict[str, Any] | None = None
 
     def canonical_dict(self) -> dict[str, Any]:
         return {
@@ -184,10 +191,59 @@ class ConsumerQueryPlanView:
             "allowed_evidence_ids": list(self.allowed_evidence_ids),
             "citation_jump": [jump.canonical_dict() for jump in self.citation_jump],
             "abstained": self.abstained,
+            "world_projection": self.world_projection,
         }
 
 
 ConsumerExecution = QueryPlanAnswer | ConsumerManifestResult
+
+
+def build_world_projection_view(
+    manifest: FrozenManifest,
+    dimension_results: Sequence[DimensionResult] | None,
+) -> WorldProjectionView | None:
+    """Serialize the world projection dimension into the consumer view.
+
+    Returns ``None`` when the plan did not request the world projection
+    dimension. ``available`` is True only for approved candidate evidence; a
+    missing or fully hidden projection stays explicit ``unavailable`` — never an
+    empty success (D-05). The view binds to the frozen manifest checksum so
+    evidence lineage stays durable and replayable.
+    """
+    if not dimension_results:
+        return None
+    world_result = next(
+        (
+            result
+            for result in dimension_results
+            if result.dimension == QueryDimension.WORLD_PROJECTION
+        ),
+        None,
+    )
+    if world_result is None:
+        return None
+    if world_result.status == AvailabilityStatus.AVAILABLE:
+        status = "available"
+        available = True
+    elif world_result.status == AvailabilityStatus.PARTIAL:
+        status = "candidate_only"
+        available = False
+    else:
+        status = "unavailable"
+        available = False
+    items: tuple[WorldProjectionItem, ...] = world_result.world_items
+    overrides: tuple[WorldProjectionItem, ...] = world_result.world_overrides
+    authorities = tuple(dict.fromkeys(item.authority for item in items))
+    return WorldProjectionView(
+        available=available,
+        status=status,
+        cutoff=manifest.through_chapter,
+        items=items,
+        overrides=overrides,
+        authorities=authorities,
+        manifest_checksum=manifest.manifest_checksum,
+        snapshot_hash=manifest.snapshot_hash,
+    )
 
 
 class QueryPlanService:
@@ -263,7 +319,11 @@ class QueryPlanService:
         return plan
 
     def consumer_view(
-        self, plan: QueryPlan, manifest: FrozenManifest
+        self,
+        plan: QueryPlan,
+        manifest: FrozenManifest,
+        *,
+        dimension_results: Sequence[DimensionResult] | None = None,
     ) -> ConsumerQueryPlanView:
         """Build the consumer-facing trace/availability/fallback/citation view."""
         availability = tuple(
@@ -286,6 +346,7 @@ class QueryPlanService:
             )
             for entry in manifest.evidence
         )
+        world_projection = build_world_projection_view(manifest, dimension_results)
         return ConsumerQueryPlanView(
             trace_id=plan.trace.trace_id,
             plan_hash=plan.trace.canonical_payload_hash,
@@ -300,6 +361,11 @@ class QueryPlanService:
             allowed_evidence_ids=tuple(sorted(manifest.allowed_evidence_ids())),
             citation_jump=citation_jump,
             abstained=not manifest.allowed_evidence_ids(),
+            world_projection=(
+                world_projection.model_dump(mode="json")
+                if world_projection is not None
+                else None
+            ),
         )
 
     async def execute_consumer_manifest(
@@ -323,7 +389,9 @@ class QueryPlanService:
             budget=budget,
         )
         result = ConsumerManifestResult(plan=plan, manifest=manifest, fused=fused)
-        return result, self.consumer_view(plan, manifest)
+        return result, self.consumer_view(
+            plan, manifest, dimension_results=fused.dimension_results
+        )
 
     async def execute_consumer(
         self,
@@ -347,7 +415,9 @@ class QueryPlanService:
             budget=budget,
             answer_producer=answer_producer,
         )
-        return answer, self.consumer_view(plan, answer.manifest)
+        return answer, self.consumer_view(
+            plan, answer.manifest, dimension_results=answer.fused.dimension_results
+        )
 
     # ------------------------------------------------------------------ core
 
