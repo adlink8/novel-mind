@@ -331,7 +331,7 @@ describe("AnalysisChatPanel", () => {
     );
     fireEvent.click(screen.getByTestId("reader-chat-citation"));
     expect(mocks.routerPush).toHaveBeenCalledWith(
-      "/novels/11?chapter=23&start=10&from=timeline"
+      "/novels/11?chapter=23&start=10&end=14&from=timeline"
     );
   });
 

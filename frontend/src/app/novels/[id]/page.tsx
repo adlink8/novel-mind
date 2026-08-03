@@ -98,6 +98,10 @@ function NovelReaderInner() {
   const novelId = String(params.id);
   const chapterQuery = searchParams.get("chapter");
   const fromTimeline = searchParams.get("from") === "timeline";
+  // Citation deep-link: `?chapter=<id>&start=<cp>&end=<cp>&from=timeline` must
+  // land on the exact source text after the chapter loads (Phase 29-03 / D-06).
+  const highlightStartParam = searchParams.get("start");
+  const highlightEndParam = searchParams.get("end");
 
   const [novel, setNovel] = useState<Novel | null>(null);
   const [chapters, setChapters] = useState<Chapter[]>([]);
@@ -318,6 +322,17 @@ function NovelReaderInner() {
         const res = await novelsApi.getChapter(novelId, String(currentChapterId));
         setChapterContent(res.data);
 
+        // Citation deep-link (from Analysis Chat / timeline): highlight the
+        // exact code-point range once the target chapter is loaded.
+        if (fromTimeline && highlightStartParam != null && highlightEndParam != null) {
+          const s = Number(highlightStartParam);
+          const e = Number(highlightEndParam);
+          if (Number.isFinite(s) && Number.isFinite(e) && e > s && e <= (res.data.content?.length ?? 0)) {
+            setHighlightRange({ sourceStart: s, sourceEnd: e });
+            window.setTimeout(() => setHighlightRange(null), 8000);
+          }
+        }
+
         // 同章且有存档 → 恢复章内位置；新章/时间线定位章 → 从头开始
         const saved = loadProgress(novelId);
         const sameChapter = saved?.chapterId === currentChapterId;
@@ -363,7 +378,7 @@ function NovelReaderInner() {
     }
 
     loadChapter();
-  }, [currentChapterId, novelId, progressWritable]);
+  }, [currentChapterId, novelId, progressWritable, fromTimeline, highlightStartParam, highlightEndParam]);
 
   const persistProgress = useCallback(
     (chapterId: number, percent: number) => {

@@ -191,6 +191,7 @@ export function AnalysisChatPanel({
       const res = await readerChatApi.listConversations(novelId, { limit: 50 });
       if (req !== listRequestRef.current) return;
       setConversations(res.data.items);
+      setError(null);
       setActiveId((prev) => {
         if (prev && res.data.items.some((c) => c.id === prev)) return prev;
         const firstActive = res.data.items.find((c) => c.status === "active");
@@ -213,6 +214,7 @@ export function AnalysisChatPanel({
         });
         if (req !== msgRequestRef.current) return;
         setMessages(res.data.items);
+        setError(null);
         const lastUser = [...res.data.items]
           .reverse()
           .find((m) => m.role === "user" && m.generation_job);
@@ -436,6 +438,7 @@ export function AnalysisChatPanel({
     const params = new URLSearchParams();
     params.set("chapter", String(target.chapter_id));
     params.set("start", String(target.source_start));
+    params.set("end", String(target.source_end));
     params.set("from", "timeline");
     router.push(`/novels/${novelId}?${params.toString()}`);
   };
@@ -567,6 +570,7 @@ export function AnalysisChatPanel({
           <div
             data-testid="analysis-chat-job-status"
             data-status={activeJob.status}
+            aria-live="polite"
             className="rounded-lg border border-border/60 bg-muted/40 px-3 py-2 text-xs"
           >
             <div className="flex items-center justify-between gap-2">

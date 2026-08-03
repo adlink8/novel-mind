@@ -132,6 +132,17 @@ export function ReaderChatPanel({
     closeOnEscape: false,
   });
 
+  // Desktop: move keyboard focus to the input when the expanded panel opens so
+  // keyboard users can start typing immediately (D-06 accessibility). Mobile is
+  // intentionally excluded — auto-focusing would pop the on-screen keyboard.
+  useEffect(() => {
+    if (!open || collapsed || layout !== "desktop") return;
+    const input = panelRef.current?.querySelector<HTMLTextAreaElement>(
+      '[data-testid="reader-chat-input"]'
+    );
+    input?.focus();
+  }, [open, collapsed, layout]);
+
   // Restore presentation-only active conversation id (lazy init alternative for novel change)
   const [hydratedNovel, setHydratedNovel] = useState<string | null>(null);
   if (hydratedNovel !== novelId) {
@@ -159,6 +170,7 @@ export function ReaderChatPanel({
       const res = await readerChatApi.listConversations(novelId, { limit: 50 });
       if (req !== listRequestRef.current) return;
       setConversations(res.data.items);
+      setError(null);
       setActiveId((prev) => {
         if (prev && res.data.items.some((c) => c.id === prev)) return prev;
         const firstActive = res.data.items.find((c) => c.status === "active");
@@ -183,6 +195,7 @@ export function ReaderChatPanel({
         });
         if (req !== msgRequestRef.current) return;
         setMessages(res.data.items);
+        setError(null);
         // Surface non-terminal job from latest user message
         const lastUser = [...res.data.items]
           .reverse()
@@ -680,6 +693,7 @@ export function ReaderChatPanel({
               <div
                 data-testid="reader-chat-job-status"
                 data-status={activeJob.status}
+                aria-live="polite"
                 className="rounded-lg border border-border/60 bg-muted/40 px-3 py-2 text-xs"
               >
                 <div className="flex items-center justify-between gap-2">
@@ -801,7 +815,7 @@ export function ReaderChatPanel({
 
   if (layout === "mobile") {
     return (
-      <div className="fixed inset-x-0 bottom-[calc(4.75rem_+_env(safe-area-inset-bottom))] z-40 px-0 sm:px-2 md:bottom-6">
+      <div className="fixed inset-x-0 bottom-[calc(4.75rem_+_env(safe-area-inset-bottom))] z-40 overflow-hidden px-0 sm:px-2 md:bottom-6">
         {panelBody}
       </div>
     );
@@ -837,13 +851,23 @@ export function MessageBubble({
       ) : null}
       {!isUser && message.citations.length > 0 ? (
         <div className="mt-2 flex flex-wrap gap-1.5">
-          {message.citations.map((c) => (
-            <CitationChip
-              key={`${c.block_id}-${c.context_evidence_ref_id}`}
-              citation={c}
-              onNavigate={onCitationNavigate}
-            />
-          ))}
+          {message.citations
+            .filter(
+              // Defensive spoiler/quality gate: only render citations with a
+              // valid non-empty code-point range (D-06 spoiler-safe rendering).
+              (c) =>
+                c.chapter_id > 0 &&
+                Number.isInteger(c.source_start) &&
+                Number.isInteger(c.source_end) &&
+                c.source_end > c.source_start
+            )
+            .map((c) => (
+              <CitationChip
+                key={`${c.block_id}-${c.context_evidence_ref_id}`}
+                citation={c}
+                onNavigate={onCitationNavigate}
+              />
+            ))}
         </div>
       ) : null}
       {message.body.includes("[suggestion:") ? (
@@ -871,7 +895,8 @@ export function CitationChip({
       data-testid="reader-chat-citation"
       data-source-start={citation.source_start}
       data-chapter-id={citation.chapter_id}
-      className="rounded-full border border-primary/30 bg-primary/5 px-2 py-0.5 text-[11px] text-primary hover:bg-primary/10"
+      aria-label={`跳转到引用原文：第 ${citation.chapter_id} 章片段 @${citation.source_start}`}
+      className="rounded-full border border-primary/30 bg-primary/5 px-2 py-0.5 text-[11px] text-primary transition-colors hover:bg-primary/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
       onClick={() =>
         onNavigate({
           chapter_id: citation.chapter_id,
