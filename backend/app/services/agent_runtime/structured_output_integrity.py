@@ -31,7 +31,15 @@ from app.schemas.agent_runtime import (
     ExternalEvidenceArtifact,
     SkillEvaluationArtifact,
     StoryArcArtifact,
+    VisualBibleArtifact,
     WorldModelCandidateArtifact,
+)
+from app.schemas.visual_bible import (
+    VisualAuthority,
+    VisualBibleGateError,
+    VisualBibleVersionContract,
+    VisualReviewState,
+    validate_version_contract,
 )
 from app.services.narrative_memory.arc_planner import (
     OutlineCandidateArtifact,
@@ -96,6 +104,14 @@ BLOCKED_EVALUATION_REPORT_STALE = (
 BLOCKED_EVALUATION_SOURCE_SNAPSHOT = (
     "integrity: skill evaluation report source snapshot mismatches envelope lineage"
 )
+# Phase 30 Visual Bible 确定性边界（D-30-01..D-30-04）。
+BLOCKED_VISUAL_BIBLE_PAYLOAD = "integrity: visual bible payload failed domain validation"
+BLOCKED_VISUAL_BIBLE_APPROVAL_BYPASS = (
+    "integrity: visual bible approval bypass blocked — review_state must be candidate"
+)
+BLOCKED_VISUAL_BIBLE_EVIDENCE_MISMATCH = (
+    "integrity: visual bible canon claim evidence keys must be a subset of envelope evidence_refs"
+)
 
 
 @dataclass(frozen=True)
@@ -149,6 +165,8 @@ def evaluate_integrity(*, envelope: dict[str, Any], run: SkillRun) -> IntegrityD
         return _evaluate_story_arc(envelope, run)
     if artifact_type == "skill_evaluation":
         return _evaluate_skill_evaluation(envelope, run)
+    if artifact_type == "visual_bible":
+        return _evaluate_visual_bible(envelope, run)
     return IntegrityDecision(False, BLOCKED_UNKNOWN_TYPE)
 
 
@@ -456,5 +474,67 @@ def _evaluate_skill_evaluation(
         and dataset_version != report.header.dataset_version
     ):
         return IntegrityDecision(False, BLOCKED_EVALUATION_SOURCE_SNAPSHOT)
+
+    return IntegrityDecision(True)
+
+
+def _evaluate_visual_bible(
+    envelope: dict[str, Any], run: SkillRun
+) -> IntegrityDecision:
+    """Phase 30 VisualBibleArtifact 信封 integrity gate（D-30-01..D-30-04）。
+
+    与其余信封纪律一致（evidence/lineage/status/trail/protected），并在
+    ``visual_bible`` 负载上做确定性域边界校验：
+      - ``visual_bible`` 必须是严格 ``VisualBibleVersionContract`` 且通过
+        ``validate_version_contract``（claim hash / manifest hash / evidence
+        refs 结构 / 唯一 stable ID / spoiler cutoff 全部服务端重算）；
+      - ``review_state`` 恒为 ``candidate``——Agent 声称任何非 candidate
+        review_state（approval bypass）→ blocked（approval 是服务端显式、
+        append-only 的 ``visual_bible:approve`` 迁移，D-30-04）；
+      - 每个 canon_fact claim 的 evidence_key 必须 ⊆ 信封顶层
+        ``evidence_refs``（leaf-evidence 资格门，D-30-02）。
+    任何失败 → 稳定 blocked，零写入；FastAPI 与确定性 validators 保留
+    permission / evidence / state-transition / publication 权威。
+    """
+    # 0. heuristic candidate-only 无 EvidenceRef 资格 → 不能进 Visual Bible 网关。
+    if not envelope.get("evidence_refs"):
+        return IntegrityDecision(False, BLOCKED_NO_EVIDENCE)
+
+    # 1. 严格 wire schema。
+    try:
+        model = VisualBibleArtifact.model_validate(envelope)
+    except ValidationError as exc:
+        return IntegrityDecision(False, f"{BLOCKED_SCHEMA} ({_first_validation_error(exc)})")
+
+    # 2. 共享 lineage/status/trail/protected 门。
+    blocked = _check_common_lineage(envelope=envelope, run=run, wire=model)
+    if blocked is not None:
+        return blocked
+
+    # 3. visual_bible 负载：严格域契约 + approval bypass 门。
+    vb_payload = envelope.get("visual_bible")
+    if not isinstance(vb_payload, dict):
+        return IntegrityDecision(False, BLOCKED_VISUAL_BIBLE_PAYLOAD)
+    if vb_payload.get("review_state") != VisualReviewState.CANDIDATE.value:
+        return IntegrityDecision(False, BLOCKED_VISUAL_BIBLE_APPROVAL_BYPASS)
+    try:
+        version = VisualBibleVersionContract.model_validate(vb_payload)
+        validate_version_contract(version)
+    except (ValidationError, VisualBibleGateError) as exc:
+        return IntegrityDecision(
+            False,
+            f"{BLOCKED_VISUAL_BIBLE_PAYLOAD} ({exc})",
+        )
+
+    # 4. canon_fact claim 的 leaf evidence 必须 ⊆ 信封 evidence_refs（D-30-02）。
+    claim_keys = {
+        ref.evidence_key
+        for claim in version.claims
+        if claim.authority is VisualAuthority.CANON_FACT
+        for ref in claim.evidence_refs
+    }
+    envelope_keys = set(envelope.get("evidence_refs") or [])
+    if not claim_keys.issubset(envelope_keys):
+        return IntegrityDecision(False, BLOCKED_VISUAL_BIBLE_EVIDENCE_MISMATCH)
 
     return IntegrityDecision(True)

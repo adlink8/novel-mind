@@ -471,5 +471,51 @@ class SkillEvaluationArtifact(StrictAgentRuntimeModel):
         return value
 
 
+# ────────────────────────── Phase 30 Visual Bible Artifact 信封（REQ-VIS-01 / REQ-AGENT-02/03/04） ──────────────────────────
+
+
+class VisualBibleArtifact(StrictAgentRuntimeModel):
+    """智能体产物的 VisualBibleArtifact 信封（Phase 30 / D-30-01..D-30-04）。
+
+    Agent 产出的是 **candidate-only** 的 Visual Bible 版本契约：``visual_bible``
+    携带完整 ``VisualBibleVersionContract``（entities / claims / evidence refs /
+    reference assets + 全量 lineage hash），其 ``review_state`` 恒为
+    ``candidate``——approval 是显式、append-only 的服务端状态迁移
+    （``visual_bible:approve`` 用户批准），Agent 绝不能直接授予或伪造批准。
+    确定性 evidence/rights/authority-label validator 拥有 permission / evidence /
+    state-transition / publication 权威（D-30-01/D-30-04）。``tool_runs`` 携带
+    ToolRun 血缘。与 CitedAnswerArtifact 信封纪律一致：type / schema_version /
+    owner / novel / branch / producing skill+version / model lineage /
+    source versions / input_hash / evidence_refs / status / parent_revision /
+    normalization（26-06 修复血缘 trail）。
+    """
+
+    type: Literal["visual_bible"] = "visual_bible"
+    schema_version: Literal["visual-bible.v1"] = "visual-bible.v1"
+    owner_id: int
+    novel_id: int
+    branch: str | None = None
+    producing_skill: str = Field(min_length=1, max_length=120)
+    producing_skill_version: str = Field(min_length=1, max_length=32)
+    skill_version_id: int = Field(gt=0)
+    model_lineage: dict[str, Any]
+    source_versions: dict[str, Any]
+    input_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    evidence_refs: list[str] = Field(min_length=1)
+    visual_bible: dict[str, Any]
+    tool_runs: list[dict[str, Any]] = Field(min_length=1)
+    status: Literal["candidate", "validated", "approved", "published", "rejected"]
+    parent_revision: str | None = None
+    normalization: NormalizationTrail
+
+    @field_validator("tool_runs")
+    @classmethod
+    def _tool_runs_shape(cls, value: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        for item in value:
+            if not isinstance(item, dict) or not item.get("tool_name"):
+                raise ValueError("each tool run requires tool_name")
+        return value
+
+
 # 供 OpenAPI 引用，避免未使用告警。
 _ = (StrictReaderChatModel,)
