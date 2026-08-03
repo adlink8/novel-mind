@@ -184,3 +184,22 @@ Key metrics:
 | Alembic | 单 head `20260801_2601`；upgrade/downgrade 可逆；alembic check 零 drift | `alembic heads` |
 | 已知环境限制 | 同前：openapi subprocess 挂起、Next dev server 编译失败（e2e 受限）、live provider UAT 需 key、前端遗留 29 typecheck 错误（FanFictionChapter，与 Phase 26 无关） | 2026-08-02/03 本机 |
 | 仍阻塞 | Phase 22 Nightly 3/3 未达成（0/3）；Phase 27 执行需 Phase 22 3/3 + 26-VERIFICATION（已存在）或进一步 override | `.planning/STATE.md` |
+
+---
+
+## 2026-08-03 快照（Phase 27/28 实现并验证；snapshot: master @ a7414c5）
+
+以下事实覆盖上文旧节中的对应记录：
+
+| 项 | 当前值 | 证据 |
+|---|---|---|
+| Phase 27 Novel World Model | **VERIFIED 2026-08-03** | `27-VERIFICATION.md` passed（source_commit `0616920`） |
+| Phase 28 Whole-Book Narrative Memory | **VERIFIED 2026-08-03** | `28-VERIFICATION.md` passed（source_commit `a7414c5`） |
+| 后端测试（Phase 27/28 相关） | unit 650 + narrative_memory 157 + adversarial 223 + agent_runtime 96 + ci 37 = **1352 passed**（28 全量） | 独立测试子代理 2026-08-03 |
+| agent-service | **433 passed / 14 files**；tsc 0 errors | `cd agent-service && npx vitest run` |
+| World Model | 事件/因果边（证据门控）、角色 epistemic 历史（cutoff/POV）、实体/规则/例外、四 label authority + disclosure | `backend/app/services/world_model/` + migrations 2701/2702/2703 |
+| Narrative Memory | failure/recovery checkpoints、章节终态 + frozen manifest、语义弧/卷/全局、跨维度闭合 + 一键分析 | `backend/app/services/narrative_memory/` + migration `20260801_2801` |
+| Agent skills | answer-reading-question、propose-world-model-candidates、analyze-chapter、build-story-arc（4 skills） | `agent-service/src/skills/` |
+| Alembic | 单 head `20260801_2801` | `alembic heads` |
+| 已知环境限制 | 同前 + `test_qualification_command_pg.py` 3 失败为既有 `.venv` 路径硬编码；narrative_memory 集成套件在 Windows 需分批串行跑 | 2026-08-03 本机 |
+| 仍阻塞 | Phase 22 Nightly 3/3 未达成（0/3）；Phase 29 执行需 Phase 22 3/3 + 28-VERIFICATION（已存在）或进一步 override | `.planning/STATE.md` |
