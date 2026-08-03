@@ -1,0 +1,92 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "EvaluateReadingSkillRunsInput",
+  "description": "evaluate-reading-skill-runs Phase 29 运行输入：novel_id（必填）与冻结评估引用。被评估的 SkillRun / ToolRun / Artifact / FrozenManifest 记录经引用 + hash 绑定（run_id / artifact_id / revision_id / content_hash + dataset_version / source_snapshot_hash），绝不重跑可变 Agent 状态；最终 scope / cutoff 由服务端强制。",
+  "type": "object",
+  "required": ["novel_id", "dataset", "evaluated_run"],
+  "properties": {
+    "novel_id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "目标小说 ID（必须与运行路径中的 novel_id 一致；owner/novel/branch 血缘绑定）"
+    },
+    "branch": {
+      "type": ["string", "null"],
+      "maxLength": 80,
+      "description": "衍生分支；原始主线为 null"
+    },
+    "dataset": {
+      "type": "object",
+      "description": "冻结 dataset 血缘（D-02：dataset_version + source snapshot 必填）",
+      "required": ["dataset_version", "source_snapshot_hash"],
+      "properties": {
+        "dataset_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "冻结数据集版本（如 reading-qa.v1）"
+        },
+        "source_snapshot_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "冻结 source snapshot 血缘"
+        },
+        "dataset_lineage": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "数据集血缘标签（可选）"
+        }
+      },
+      "additionalProperties": false
+    },
+    "evaluated_run": {
+      "type": "object",
+      "description": "被评估的冻结 SkillRun / ToolRun / Artifact / FrozenManifest 引用（D-02/D-05）",
+      "required": ["run_id", "artifact_id", "revision_id", "content_hash"],
+      "properties": {
+        "run_id": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "被评估冻结 SkillRun id"
+        },
+        "artifact_id": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "被评估冻结 Artifact id"
+        },
+        "revision_id": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "被评估冻结 ArtifactRevision id"
+        },
+        "content_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "被评估冻结修订内容 hash（防重放漂移）"
+        }
+      },
+      "additionalProperties": false
+    },
+    "evaluation": {
+      "type": "object",
+      "description": "确定性评估参数（可选；cutoff 由服务端强制）",
+      "required": ["top_k"],
+      "properties": {
+        "top_k": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50,
+          "description": "检索 top-k（默认 8）"
+        },
+        "cutoff": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "声明意图截止点；超过服务端截止点将被拒绝（beyond_cutoff）"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

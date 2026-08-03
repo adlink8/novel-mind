@@ -1,0 +1,122 @@
+{
+  "input": {
+    "novel_id": 1,
+    "branch": null,
+    "dataset": {
+      "dataset_version": "reading-qa.v1",
+      "source_snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "dataset_lineage": "reading-qa-gold.v1"
+    },
+    "evaluated_run": {
+      "run_id": 42,
+      "artifact_id": 7,
+      "revision_id": 9,
+      "content_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    "evaluation": {
+      "top_k": 8,
+      "cutoff": 2
+    }
+  },
+  "expected_output": {
+    "type": "skill_evaluation",
+    "schema_version": "skill-evaluation.v1",
+    "owner_id": 1,
+    "novel_id": 1,
+    "branch": null,
+    "producing_skill": "evaluate-reading-skill-runs",
+    "producing_skill_version": "1.0.0",
+    "skill_version_id": 1,
+    "model_lineage": {
+      "provider": "fixture",
+      "model": "stub-model",
+      "revision": "stub-1"
+    },
+    "source_versions": {
+      "novel": "v1",
+      "dataset_version": "reading-qa.v1",
+      "source_snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "input_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "evidence_refs": [
+      "qp:1:0:10:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    ],
+    "evaluated_run": {
+      "run_id": 42,
+      "status": "completed",
+      "branch": null,
+      "input_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "tool_runs": [
+        { "tool_name": "get_chapter", "calls": 1 },
+        { "tool_name": "get_evidence_span", "calls": 1 }
+      ]
+    },
+    "evaluated_artifact": {
+      "artifact_id": 7,
+      "revision_id": 9,
+      "type": "cited_answer",
+      "schema_version": "cited-answer.v1",
+      "content_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "status": "candidate"
+    },
+    "report": {
+      "report_version": "reading-qa-qualification.v1",
+      "header": {
+        "db_fingerprint": "db-fp-fixture-001",
+        "dataset_version": "reading-qa.v1",
+        "source_snapshot": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "commit": "912ca6b423d6c2309bc2972cbfc083c4eaa280e1",
+        "model": "queryplan-nm-candidate.v1",
+        "prompt": "prompt-hash-fixture",
+        "schema_version": "reading-qa-canon.v1",
+        "config": "config-hash-fixture",
+        "budget": {
+          "max_calls": 100,
+          "max_input_tokens": 50000,
+          "max_output_tokens": 20000,
+          "max_cost_usd": "5.00"
+        }
+      },
+      "buckets": [
+        {
+          "bucket": "local",
+          "metrics": {
+            "candidate": { "citation_accept_rate": 1.0, "recall": 1.0, "latency_p50_ms": 12.0 },
+            "baseline": { "citation_accept_rate": 1.0, "recall": 1.0, "latency_p50_ms": 12.0 }
+          },
+          "worst_cases": [],
+          "blocked_reasons": [],
+          "sample_count": 1
+        }
+      ],
+      "operations": {
+        "latency_p50_ms": 12.0,
+        "latency_p95_ms": 18.0,
+        "cost_usd_total": 0.016,
+        "calls_total": 16,
+        "tokens_total": 800,
+        "fallback_count": 0,
+        "provider_error_count": 0,
+        "reused_case_count": 0
+      },
+      "manifest": null,
+      "blocked_reasons": [],
+      "verdict": "qualified_candidate",
+      "checksum": "0000000000000000000000000000000000000000000000000000000000000000",
+      "disclaimer": "candidate-only evaluation; never a promotion or active pointer."
+    },
+    "tool_runs": [
+      { "tool_name": "get_evidence_span", "calls": 1 },
+      { "tool_name": "get_narrative_memory", "calls": 1 },
+      { "tool_name": "search_novel_text", "calls": 1 }
+    ],
+    "status": "candidate",
+    "parent_revision": null,
+    "normalization": {
+      "raw_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "repaired_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "normalization_actions": [],
+      "warnings": []
+    }
+  }
+}

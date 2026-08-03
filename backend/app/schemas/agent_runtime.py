@@ -388,5 +388,88 @@ class StoryArcArtifact(StrictAgentRuntimeModel):
     normalization: NormalizationTrail
 
 
+# ────────────────────────── Phase 29 Skill Evaluation Artifact 信封（REQ-QA-01..03 / REQ-AGENT-03） ──────────────────────────
+
+
+class EvaluatedSkillRunLineage(StrictAgentRuntimeModel):
+    """被评估冻结 SkillRun + ToolRun 血缘（Phase 29 / D-02/D-05）。
+
+    只允许 completed/failed 冻结终态：running 等可变 Agent 状态绝不作为评估
+    证据；评估冻结 Skill/model/source/Artifact/dataset 版本，绝不重跑可变
+    Agent 会话状态。
+    """
+
+    run_id: int = Field(gt=0)
+    status: Literal["completed", "failed"]
+    branch: str | None = None
+    input_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    tool_runs: list[dict[str, Any]] = Field(min_length=1)
+
+    @field_validator("tool_runs")
+    @classmethod
+    def _tool_runs_shape(cls, value: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        for item in value:
+            if not isinstance(item, dict) or not item.get("tool_name"):
+                raise ValueError("each tool run requires tool_name")
+        return value
+
+
+class EvaluatedArtifactLineage(StrictAgentRuntimeModel):
+    """被评估冻结 Artifact 修订血缘（Phase 29 / D-02/D-05）。"""
+
+    artifact_id: int = Field(gt=0)
+    revision_id: int = Field(gt=0)
+    type: str = Field(min_length=1, max_length=40)
+    schema_version: str = Field(min_length=1, max_length=32)
+    content_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    status: Literal["candidate", "validated", "approved", "published", "rejected"]
+
+
+class SkillEvaluationArtifact(StrictAgentRuntimeModel):
+    """智能体产物的 SkillEvaluationArtifact 信封（Phase 29 / REQ-QA-01..03）。
+
+    本信封是 Phase 29 确定性评估能力的 Agent 消费边界：``evaluated_run`` /
+    ``evaluated_artifact`` 绑定被评估的冻结 SkillRun / ToolRun / Artifact 血缘，
+    ``report`` 是密封 QualificationReport（verdict 只允许 qualified_candidate /
+    blocked；checksum 可重放——后端确定性评估 runner 产出，不可由 Agent/UI
+    更改）。**无 ApprovalRequest、无 Publisher、无 promotion**；verdict 权威只
+    属于确定性评估 runner（immutable evaluation runner and milestone audit）。
+    与 CitedAnswerArtifact 信封纪律一致：type / schema_version / owner / novel /
+    branch / producing skill+version / model lineage / source versions /
+    input_hash / evidence_refs / status / parent_revision / normalization
+    （26-06 修复血缘 trail）。
+    """
+
+    type: Literal["skill_evaluation"] = "skill_evaluation"
+    schema_version: Literal["skill-evaluation.v1"] = "skill-evaluation.v1"
+    owner_id: int
+    novel_id: int
+    branch: str | None = None
+    producing_skill: str = Field(min_length=1, max_length=120)
+    producing_skill_version: str = Field(min_length=1, max_length=32)
+    skill_version_id: int = Field(gt=0)
+    model_lineage: dict[str, Any]
+    source_versions: dict[str, Any]
+    input_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    evidence_refs: list[str] = Field(min_length=1)
+    evaluated_run: EvaluatedSkillRunLineage
+    evaluated_artifact: EvaluatedArtifactLineage
+    # 密封 QualificationReport payload（完整 dump；domain 校验由 integrity gate
+    # 对 qualification.report.QualificationReport 重放 checksum 完成）。
+    report: dict[str, Any]
+    tool_runs: list[dict[str, Any]] = Field(min_length=1)
+    status: Literal["candidate", "validated", "approved", "published", "rejected"]
+    parent_revision: str | None = None
+    normalization: NormalizationTrail
+
+    @field_validator("tool_runs")
+    @classmethod
+    def _tool_runs_shape(cls, value: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        for item in value:
+            if not isinstance(item, dict) or not item.get("tool_name"):
+                raise ValueError("each tool run requires tool_name")
+        return value
+
+
 # 供 OpenAPI 引用，避免未使用告警。
 _ = (StrictReaderChatModel,)

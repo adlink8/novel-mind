@@ -29,6 +29,7 @@ from app.schemas.agent_runtime import (
     ChapterAnalysisArtifact,
     CitedAnswerArtifact,
     ExternalEvidenceArtifact,
+    SkillEvaluationArtifact,
     StoryArcArtifact,
     WorldModelCandidateArtifact,
 )
@@ -43,6 +44,7 @@ from app.services.narrative_memory.builder_contracts import (
 from app.services.narrative_memory.global_builder import (
     MainlineCandidateArtifact,
 )
+from app.services.qualification.report import QualificationReport
 
 # 受保护字段：normalizer 绝不合成，服务端也禁止出现在信封中（extra=forbid 兜底，
 # 这里给出明确的 blocked 原因）。owner/branch/evidence_refs 是 lineage 提供的
@@ -84,6 +86,16 @@ BLOCKED_FUTURE_HINT = (
 )
 BLOCKED_OUTLINE_CANON = "integrity: outline candidate must remain candidate-only"
 BLOCKED_MAINLINE_CANON = "integrity: mainline candidate must remain candidate-only"
+# Phase 29 确定性评估边界（D-02/D-05）。
+BLOCKED_EVALUATION_REPORT = (
+    "integrity: skill evaluation report failed sealed qualification validation"
+)
+BLOCKED_EVALUATION_REPORT_STALE = (
+    "integrity: skill evaluation report checksum replay mismatch — payload changed"
+)
+BLOCKED_EVALUATION_SOURCE_SNAPSHOT = (
+    "integrity: skill evaluation report source snapshot mismatches envelope lineage"
+)
 
 
 @dataclass(frozen=True)
@@ -135,6 +147,8 @@ def evaluate_integrity(*, envelope: dict[str, Any], run: SkillRun) -> IntegrityD
         return _evaluate_chapter_analysis(envelope, run)
     if artifact_type == "story_arc":
         return _evaluate_story_arc(envelope, run)
+    if artifact_type == "skill_evaluation":
+        return _evaluate_skill_evaluation(envelope, run)
     return IntegrityDecision(False, BLOCKED_UNKNOWN_TYPE)
 
 
@@ -381,5 +395,66 @@ def _evaluate_story_arc(envelope: dict[str, Any], run: SkillRun) -> IntegrityDec
         return IntegrityDecision(
             False, f"{BLOCKED_MAINLINE_CANON} ({_first_validation_error(exc)})"
         )
+
+    return IntegrityDecision(True)
+
+
+def _evaluate_skill_evaluation(
+    envelope: dict[str, Any], run: SkillRun
+) -> IntegrityDecision:
+    """Phase 29 SkillEvaluationArtifact 信封 integrity gate（D-02/D-05/D-16）。
+
+    与其余信封纪律一致（evidence/lineage/status/trail/protected），并在
+    ``report`` 上做确定性评估边界校验：
+      - report 必须是密封的 ``QualificationReport``（verdict 只允许
+        qualified_candidate / blocked，无 promotion 词）；
+      - report checksum 必须可重放（后端确定性评估 runner 产出，不可由
+        Agent/UI 更改）；
+      - report header 的 source snapshot / dataset version 必须与信封
+        ``source_versions`` 血缘绑定（可选但若提供则必须一致）。
+    任何失败 → 稳定 blocked，零写入；无 ApprovalRequest / Publisher / promotion。
+    """
+    # 0. heuristic candidate-only 无 EvidenceRef 资格 → 不能进评估网关。
+    if not envelope.get("evidence_refs"):
+        return IntegrityDecision(False, BLOCKED_NO_EVIDENCE)
+
+    # 1. 严格 wire schema。
+    try:
+        model = SkillEvaluationArtifact.model_validate(envelope)
+    except ValidationError as exc:
+        return IntegrityDecision(False, f"{BLOCKED_SCHEMA} ({_first_validation_error(exc)})")
+
+    # 2. 共享 lineage/status/trail/protected 门（evaluated_run/evaluated_artifact
+    #    只允许冻结终态，由 wire schema 的 enum/shape 强制）。
+    blocked = _check_common_lineage(envelope=envelope, run=run, wire=model)
+    if blocked is not None:
+        return blocked
+
+    # 3. 密封 QualificationReport：two-value verdict + checksum 重放（D-05）。
+    report_payload = envelope.get("report")
+    if not isinstance(report_payload, dict):
+        return IntegrityDecision(False, BLOCKED_EVALUATION_REPORT)
+    try:
+        report = QualificationReport.model_validate(report_payload)
+    except ValidationError as exc:
+        return IntegrityDecision(
+            False,
+            f"{BLOCKED_EVALUATION_REPORT} ({_first_validation_error(exc)})",
+        )
+    if not report.checksum_valid:
+        return IntegrityDecision(False, BLOCKED_EVALUATION_REPORT_STALE)
+
+    # 4. dataset/source 血缘绑定：report header 与信封 source_versions 一致
+    #    （可选；若提供则必须匹配，D-02 纵深防御）。
+    source_versions = envelope.get("source_versions") or {}
+    snapshot = source_versions.get("source_snapshot_hash")
+    if snapshot is not None and snapshot != report.header.source_snapshot:
+        return IntegrityDecision(False, BLOCKED_EVALUATION_SOURCE_SNAPSHOT)
+    dataset_version = source_versions.get("dataset_version")
+    if (
+        dataset_version is not None
+        and dataset_version != report.header.dataset_version
+    ):
+        return IntegrityDecision(False, BLOCKED_EVALUATION_SOURCE_SNAPSHOT)
 
     return IntegrityDecision(True)
