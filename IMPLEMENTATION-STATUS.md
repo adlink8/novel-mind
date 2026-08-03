@@ -203,3 +203,22 @@ Key metrics:
 | Alembic | 单 head `20260801_2801` | `alembic heads` |
 | 已知环境限制 | 同前 + `test_qualification_command_pg.py` 3 失败为既有 `.venv` 路径硬编码；narrative_memory 集成套件在 Windows 需分批串行跑 | 2026-08-03 本机 |
 | 仍阻塞 | Phase 22 Nightly 3/3 未达成（0/3）；Phase 29 执行需 Phase 22 3/3 + 28-VERIFICATION（已存在）或进一步 override | `.planning/STATE.md` |
+
+---
+
+## 2026-08-03 快照（Phase 29 实现并验证，v1.2 里程碑完成；snapshot: master @ efa4f77）
+
+以下事实覆盖上文旧节中的对应记录：
+
+| 项 | 当前值 | 证据 |
+|---|---|---|
+| Phase 29 Quality Qualification | **VERIFIED 2026-08-03** | `29-VERIFICATION.md` passed（source_commit `efa4f77`） |
+| v1.2 里程碑（26–29） | **完成**（实现 + 验证） | 26/27/28/29 VERIFICATION 均 passed |
+| 后端测试 | **1197 passed**（unit 683 + integration/qualification 90 + adversarial 239 + agent_runtime 115 + ci 37） | 独立测试子代理 2026-08-03 |
+| agent-service | **491 passed / 15 files**；tsc 0 errors | `cd agent-service && npx vitest run` |
+| Reading QA | 八桶 gold set（local/cross-chapter/global/causal/character/world/no-answer/spoiler）+ 分桶评测 + 三维审计 | `backend/app/services/qualification/` + `backend/evals/reading_qa_v1.json` |
+| Browser UAT | 服务端契约 28p + e2e specs（33 tests）；citation jump/accessibility/spoiler-safe | `test_browser_contract.py` + `frontend/e2e/reader-chat-quality.spec.ts` |
+| Agent skills | 5 skills：answer-reading-question、propose-world-model-candidates、analyze-chapter、build-story-arc、evaluate-reading-skill-runs | `agent-service/src/skills/` |
+| Alembic | 单 head `20260801_2801`（Phase 29 无新 migration） | `alembic heads` |
+| 已知环境限制 | 同前：e2e Next dev server 编译失败、openapi subprocess 挂起、`.venv` 路径 3 失败、live UAT 需 provider key、前端 29 typecheck 遗留 | 2026-08-03 本机 |
+| 仍阻塞 | Phase 22 Nightly 3/3 未达成（0/3）；Phase 30 执行需 Phase 22 3/3 + 29-VERIFICATION（已存在）或进一步 override | `.planning/STATE.md` |
