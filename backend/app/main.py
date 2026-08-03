@@ -49,6 +49,7 @@ from app.api.settings import router as settings_router
 from app.api.usage import router as usage_router
 from app.api.visual_bible import router as visual_bible_router
 from app.api.key_scenes import router as key_scenes_router
+from app.api.scene_specs import router as scene_specs_router
 from app.config import settings
 from app.core.logging import RequestLoggingMiddleware, setup_logging
 from app.services.agent_tools.errors import AgentToolError
@@ -270,6 +271,11 @@ app.include_router(
     key_scenes_router,
     prefix="/api/novels",
     tags=["关键场景"],
+)
+app.include_router(
+    scene_specs_router,
+    prefix="/api/novels",
+    tags=["场景规格"],
 )
 
 
