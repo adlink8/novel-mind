@@ -174,6 +174,11 @@ from app.models.agent_runtime import (
     SkillVersion,
 )
 from app.models.queryplan import QueryPlanTrace
+from app.models.world_model_event import (
+    WorldModelCausalEdge,
+    WorldModelConflict,
+    WorldModelEvent,
+)
 # 31-34 迁移在链上但模型未注册：补齐注册使 ORM metadata 与迁移链一致
 # （否则 alembic check 把四张既有表判为待删除的 drift）。
 from app.models.canon_space import CanonSpaceArtifact
@@ -296,6 +301,9 @@ __all__ = [
     "NovelAgentProfile",
     "ApprovalRequest",
     "QueryPlanTrace",
+    "WorldModelEvent",
+    "WorldModelCausalEdge",
+    "WorldModelConflict",
     "CanonSpaceArtifact",
     "FanFictionRevision",
     "FanFictionOverride",
