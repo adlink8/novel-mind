@@ -67,6 +67,10 @@ No single aggregate completion percentage is authoritative.
 11. `31`: **IMPLEMENTED & VERIFIED (2026-08-03)** — key scene contract/boundaries, salience
     + diversity ranking, human review + frozen set, detect-key-scenes skill (tool 12→13).
     Migration head `20260801_key_scene`; backend 1355p, agent-service 597p, frontend 330p.
+12. `32`: **IMPLEMENTED & VERIFIED (2026-08-03)** — SceneSpec/PromptRevision contract,
+    evidence-to-spec compiler, provider prompt adapters, validation/preview, compile-scene-spec
+    skill (8 skills). Migration head `20260801_prompt_review_events`; backend 1443p,
+    agent-service 655p, frontend 348p.
 
 ## Planning Portfolio
 
@@ -80,7 +84,8 @@ No single aggregate completion percentage is authoritative.
 | Phase 29 | VERIFIED | 5 | ✅ 2026-08-03 (user execution override) |
 | Phase 30 | VERIFIED | 5 | ✅ 2026-08-03 (user execution override) |
 | Phase 31 | VERIFIED | 4 | ✅ 2026-08-03 (user execution override) |
-| Phase 32–34 | PLANNED | 15 | BLOCKED by Phase 22 3/3 |
+| Phase 32 | VERIFIED | 5 | ✅ 2026-08-03 (user execution override) |
+| Phase 33–34 | PLANNED | 10 | BLOCKED by Phase 22 3/3 |
 | Phase 35–39 | PLANNED | 25 | BLOCKED by upstream execution dependencies |
 
 The earlier 55-plan structural verdict did not prove Issue #29 Agent-consumption coverage.
@@ -138,6 +143,11 @@ created.
   integration 26 + adversarial 245 + agent_runtime 151 + visual_bible 22 + ci 37);
   agent-service vitest 597p, frontend vitest 330p, tsc 0, alembic single head
   `20260801_key_scene`.
+- **2026-08-03 Phase 32 verification**: 32-01..32-05 delivered; `32-VERIFICATION.md`
+  passed (source_commit `ca06706`); backend 1443p (unit 875 + scene_spec unit 58 +
+  integration 8 + prompt_compiler unit 31 + integration 17 + adversarial 245 +
+  agent_runtime 172 + ci 37); agent-service vitest 655p, frontend vitest 348p, tsc 0,
+  alembic single head `20260801_prompt_review_events`.
 - **2026-08-03 stub-SUT finding (recorded, deferred)**: current nightly benchmark scores
   with deterministic stubs (`default_stub_*`, no live model calls); Ollama is only a health
   gate. Full G2 deployment (runner+Ollama+Docker) is premature for the stub pipeline.
@@ -251,8 +261,9 @@ Phase 30 execution is authorized by the 2026-08-03 Phase 30 override, and Phase 
 verified (30-VERIFICATION passed at `67908b1`).
 Phase 31 execution is authorized by the 2026-08-03 Phase 31 override, and Phase 31 is now
 verified (31-VERIFICATION passed at `fae6b68`).
-Phase 32 execution is authorized by the 2026-08-03 Phase 32 override.
-Phase 33+ execution requires a passed upstream Phase 32 VERIFICATION (in progress) plus
+Phase 32 execution is authorized by the 2026-08-03 Phase 32 override, and Phase 32 is now
+verified (32-VERIFICATION passed at `ca06706`).
+Phase 33+ execution requires a passed upstream Phase 32 VERIFICATION (exists) plus
 Phase 22 real scheduled green evidence (0/3, not satisfied) or a further explicit override.
 If Phase 22 is resumed, use `$gsd-resume-work`; do not mark it complete early.
 
