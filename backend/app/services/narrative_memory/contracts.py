@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 from hashlib import sha256
 from enum import StrEnum
-from typing import Annotated, Literal, TypeAlias
+from typing import Annotated, Any, Literal, TypeAlias
 
 from pydantic import (
     BaseModel,
@@ -574,3 +574,122 @@ def edge_checksum(value: MemoryEdge) -> str:
 
 def source_link_checksum(value: ExactSourceLink) -> str:
     return _component_checksum("source-link", value)
+
+
+# ---------------------------------------------------------------------------
+# Phase 28-04: cross-dimension closure contract (REQ-NM-03/04, D-04/D-06/D-07).
+# ``DimensionResult`` and ``CandidateManifest`` share one immutable
+# snapshot/cutoff/owner/version/budget/lineage contract so Phase 29-02
+# evaluation and 29-04 audit can reject any parity mismatch. All outputs are
+# candidate-only; no pointer cutover exists anywhere in this contract.
+# ---------------------------------------------------------------------------
+
+
+class DimensionStatus(StrEnum):
+    AVAILABLE = "available"
+    PARTIAL = "partial"
+    BLOCKED = "blocked"
+
+
+class DimensionKind(StrEnum):
+    TIMELINE = "timeline"
+    RELATIONSHIP = "relationship"
+    CLUE = "clue"
+    CHARACTER = "character"
+    WORLD = "world"
+
+
+DIMENSION_RESULT_SCHEMA_VERSION = "dimension-result.v1"
+CANDIDATE_MANIFEST_SCHEMA_VERSION = "candidate-manifest.v1"
+
+
+class BudgetTotals(StrictFrozenModel):
+    """Settled calls/tokens/cost/cache ledger totals bound onto a result."""
+
+    calls: Annotated[StrictInt, Field(ge=0)]
+    input_tokens: Annotated[StrictInt, Field(ge=0)]
+    output_tokens: Annotated[StrictInt, Field(ge=0)]
+    cost_usd: Annotated[StrictStr, StringConstraints(pattern=r"^\d+(\.\d+)?$")]
+    cache_hits: Annotated[StrictInt, Field(ge=0)]
+
+
+class DimensionResult(StrictFrozenModel):
+    """Immutable per-dimension closure result (available/partial/blocked).
+
+    ``snapshot`` (``source_snapshot_hash``), ``cutoff``, ``owner_id``,
+    ``version_id``/``version_key``, ``budget`` and ``lineage`` are the shared
+    parity contract: every dimension must carry them identically to the
+    ``CandidateManifest`` header or the closure fails closed. ``blocked_reason``
+    is required exactly when ``status == blocked``.
+    """
+
+    schema_version: VersionLabel = DIMENSION_RESULT_SCHEMA_VERSION
+    dimension: DimensionKind
+    status: DimensionStatus
+    progress: Annotated[StrictFloat, Field(ge=0.0, le=1.0)]
+    blocked_reason: VersionLabel | None = None
+    source_snapshot_hash: Hash64
+    cutoff: PositiveInt
+    owner_id: PositiveInt
+    version_id: PositiveInt
+    version_key: Key
+    budget: BudgetTotals
+    lineage: dict[str, Any] = Field(default_factory=dict)
+    checksum: Hash64
+
+    @model_validator(mode="after")
+    def validate_blocked_reason(self) -> "DimensionResult":
+        if self.status == DimensionStatus.BLOCKED and not self.blocked_reason:
+            raise ValueError("blocked dimension requires a stable blocked_reason")
+        if self.blocked_reason is not None and self.status != DimensionStatus.BLOCKED:
+            raise ValueError("blocked_reason is only valid for blocked dimensions")
+        return self
+
+
+class CandidateManifest(StrictFrozenModel):
+    """Immutable cross-dimension candidate manifest (Phase 28 → 29/29-04).
+
+    Carries the single authoritative snapshot/cutoff/owner/version/budget/
+    lineage header that every ``DimensionResult`` must match, plus a stable
+    checksum. Consumers (closure, 29-02 evaluation, 29-04 audit) must reject a
+    manifest whose checksum or per-dimension parity is inconsistent. Candidate
+    only: nothing here is or resolves to an active pointer.
+    """
+
+    schema_version: VersionLabel = CANDIDATE_MANIFEST_SCHEMA_VERSION
+    source_snapshot_hash: Hash64
+    cutoff: PositiveInt
+    owner_id: PositiveInt
+    version_id: PositiveInt
+    version_key: Key
+    budget: BudgetTotals
+    lineage: dict[str, Any] = Field(default_factory=dict)
+    dimensions: Annotated[tuple[DimensionResult, ...], Field(min_length=1)]
+    checksum: Hash64
+
+
+def _component_dict_checksum(component: str, payload: dict[str, Any]) -> str:
+    encoded = (
+        f"narrative-memory.v1:{component}\n"
+        + json.dumps(
+            payload,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+    )
+    return sha256(encoded.encode("utf-8")).hexdigest()
+
+
+def dimension_result_checksum(value: DimensionResult) -> str:
+    """Deterministic checksum over every DimensionResult field but checksum."""
+    payload = value.model_dump(mode="json")
+    payload.pop("checksum", None)
+    return _component_dict_checksum("dimension-result", payload)
+
+
+def candidate_manifest_checksum(value: CandidateManifest) -> str:
+    """Deterministic checksum over every CandidateManifest field but checksum."""
+    payload = value.model_dump(mode="json")
+    payload.pop("checksum", None)
+    return _component_dict_checksum("candidate-manifest", payload)
