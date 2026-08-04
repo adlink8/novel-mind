@@ -229,6 +229,10 @@ from app.models.illustration import (
     AssetRevision,
     ConsistencyReport,
 )
+from app.models.illustration_anchor import (
+    IllustrationAnchor,
+    IllustrationAnchorProposal,
+)
 
 __all__ = [
     "Base",
@@ -382,4 +386,6 @@ __all__ = [
     "IllustrationReviewEvent",
     "AssetRevision",
     "ConsistencyReport",
+    "IllustrationAnchor",
+    "IllustrationAnchorProposal",
 ]
