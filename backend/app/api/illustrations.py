@@ -15,11 +15,20 @@ Candidate-only, durable-job, provider-neutral endpoints:
   — candidate-only immutable AssetRevision read envelopes (never canon).
 - ``GET  /api/novels/{novel_id}/illustrations/assets/{asset_id}/bytes`` —
   owner-scoped asset bytes for the candidate gallery (raw paths never exposed).
+- ``POST .../assets/{asset_id}/consistency/evaluate`` — run the frozen-fixture
+  consistency evaluator and persist a versioned evidence report (idempotent
+  replay; a duplicate report_key with different evidence fails closed).
+- ``GET  .../assets/{asset_id}/consistency`` / ``.../consistency/compare`` —
+  read-only consistency evidence and candidate-vs-report compare.
+- ``GET  /api/novels/{novel_id}/illustrations/consistency-reports`` — list all
+  reports for the novel.
 
 Every route uses ``require_owned_novel``; a prompt/job/asset outside the
 caller's owner/novel scope is indistinguishable from "not found". No route
 promotes a generated candidate and nothing here becomes reader visible
-(D-33-03, Phase 33 ends at candidate for Phase 34).
+(D-33-03, Phase 33 ends at candidate for Phase 34). Consistency scores are
+review signals with evaluator/model/fixture lineage and can never auto-approve
+(D-33-04).
 """
 
 from __future__ import annotations
@@ -49,6 +58,16 @@ from app.schemas.illustration import (
     StrictIllustrationModel,
     build_illustration_idempotency_key,
     validate_illustration_job_contract,
+)
+from app.services.illustrations.consistency import (
+    CandidateConsistencyEvidence,
+    ConsistencyEvaluator,
+    ConsistencyReportConflict,
+    ConsistencyReportNotFound,
+    ConsistencyReportService,
+    ConsistencyReportView,
+    FrozenCharacterFixture,
+    report_view,
 )
 from app.services.illustrations.gateway import (
     GenerationGateError,
@@ -102,6 +121,39 @@ class IllustrationCreateJobResponse(StrictWireModel):
 class AssetListResponse(StrictWireModel):
     items: list[AssetRevisionView]
     total: int
+
+
+class ConsistencyEvaluateRequest(StrictWireModel):
+    """Candidate consistency evidence for one scene evaluation (D-33-04).
+
+    The candidate's declared identity/style descriptors and the negative
+    constraints it contains are compared against the frozen per-character
+    fixture; scope comes from the path, never the body.
+    """
+
+    character_key: str = Field(min_length=1, max_length=60)
+    scene_key: str = Field(min_length=1, max_length=60)
+    report_key: str | None = Field(default=None, min_length=1, max_length=180)
+    identity_attributes: list[str] = Field(default_factory=list, max_length=64)
+    style_attributes: list[str] = Field(default_factory=list, max_length=64)
+    negative_constraints_present: list[str] = Field(
+        default_factory=list, max_length=64
+    )
+
+
+class ConsistencyEvaluateResponse(StrictWireModel):
+    report: ConsistencyReportView
+    replayed: bool = False
+
+
+class ConsistencyReportListResponse(StrictWireModel):
+    items: list[ConsistencyReportView]
+    total: int
+
+
+class ConsistencyCompareResponse(StrictWireModel):
+    candidate: AssetRevisionView
+    report: ConsistencyReportView | None = None
 
 
 class IllustrationJobConflict(ValueError):
@@ -349,6 +401,24 @@ def _storage() -> AssetStorage:
     return AssetStorage(AssetStorage.default_storage_root())
 
 
+# Consistency evaluator seam (D-33-04): the default registry is empty, so any
+# evaluation fails closed to ``unavailable`` until fixtures are configured.
+# Tests seed the deterministic mock fixture set through this seam.
+_consistency_fixtures: dict[str, FrozenCharacterFixture] = {}
+
+
+def set_illustration_consistency_fixtures(
+    fixtures: dict[str, FrozenCharacterFixture] | None,
+) -> None:
+    """Override the frozen consistency fixture registry (used by tests)."""
+    global _consistency_fixtures
+    _consistency_fixtures = dict(fixtures or {})
+
+
+def _consistency_evaluator() -> ConsistencyEvaluator:
+    return ConsistencyEvaluator(_consistency_fixtures)
+
+
 # ---------------------------------------------------------------------------
 # View builders
 # ---------------------------------------------------------------------------
@@ -593,3 +663,126 @@ async def retry_illustration_job(
     if dispatch_enabled:
         background_tasks.add_task(dispatch_illustration_job, job.id)
     return _job_view(job)
+
+
+# ---------------------------------------------------------------------------
+# Consistency evidence routes (D-33-04: review signals, never canon)
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/{novel_id}/illustrations/assets/{asset_id}/consistency/evaluate",
+    response_model=ConsistencyEvaluateResponse,
+    status_code=201,
+)
+async def evaluate_asset_consistency(
+    asset_id: int,
+    payload: ConsistencyEvaluateRequest,
+    novel: Novel = Depends(require_owned_novel),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """Run the frozen-fixture evaluator and persist one versioned report.
+
+    The candidate is owner-scoped (the asset must belong to the caller's
+    novel). A duplicate ``report_key`` with identical evidence replays the
+    existing report; a different evaluation under the same key fails closed.
+    The score is evidence for human review and can never approve the candidate.
+    """
+    service = ConsistencyReportService(db, evaluator=_consistency_evaluator())
+    report_key = payload.report_key or f"{payload.character_key}:{payload.scene_key}"
+    evidence = CandidateConsistencyEvidence(
+        character_key=payload.character_key,
+        scene_key=payload.scene_key,
+        identity_attributes=tuple(payload.identity_attributes),
+        style_attributes=tuple(payload.style_attributes),
+        negative_constraints_present=tuple(payload.negative_constraints_present),
+    )
+    try:
+        report, replayed = await service.evaluate(
+            owner_id=current_user.id,
+            novel_id=novel.id,
+            asset_revision_id=asset_id,
+            report_key=report_key,
+            evidence=evidence,
+        )
+    except ConsistencyReportNotFound:
+        raise _not_found() from None
+    except ConsistencyReportConflict as exc:
+        raise _conflict(str(exc)) from exc
+    await db.commit()
+    return ConsistencyEvaluateResponse(report=report_view(report), replayed=replayed)
+
+
+@router.get(
+    "/{novel_id}/illustrations/assets/{asset_id}/consistency",
+    response_model=ConsistencyReportView,
+)
+async def get_asset_consistency_report(
+    asset_id: int,
+    novel: Novel = Depends(require_owned_novel),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """Read the latest consistency evidence for one candidate asset."""
+    try:
+        await IllustrationJobService(db).get_asset(
+            owner_id=current_user.id, novel_id=novel.id, asset_id=asset_id
+        )
+    except IllustrationJobNotFound:
+        raise _not_found() from None
+    report = await ConsistencyReportService(
+        db, evaluator=_consistency_evaluator()
+    ).get_latest(
+        owner_id=current_user.id, novel_id=novel.id, asset_revision_id=asset_id
+    )
+    if report is None:
+        raise HTTPException(status_code=404, detail="no consistency report for this asset")
+    return report_view(report)
+
+
+@router.get(
+    "/{novel_id}/illustrations/assets/{asset_id}/consistency/compare",
+    response_model=ConsistencyCompareResponse,
+)
+async def compare_asset_consistency(
+    asset_id: int,
+    novel: Novel = Depends(require_owned_novel),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """Read-only compare: candidate asset + its latest consistency evidence."""
+    service = IllustrationJobService(db)
+    try:
+        asset = await service.get_asset(
+            owner_id=current_user.id, novel_id=novel.id, asset_id=asset_id
+        )
+    except IllustrationJobNotFound:
+        raise _not_found() from None
+    report = await ConsistencyReportService(
+        db, evaluator=_consistency_evaluator()
+    ).get_latest(
+        owner_id=current_user.id, novel_id=novel.id, asset_revision_id=asset.id
+    )
+    return ConsistencyCompareResponse(
+        candidate=_asset_view(asset),
+        report=report_view(report) if report is not None else None,
+    )
+
+
+@router.get(
+    "/{novel_id}/illustrations/consistency-reports",
+    response_model=ConsistencyReportListResponse,
+)
+async def list_consistency_reports(
+    novel: Novel = Depends(require_owned_novel),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """List all consistency evidence reports for the caller's novel."""
+    reports = await ConsistencyReportService(
+        db, evaluator=_consistency_evaluator()
+    ).list_reports(owner_id=current_user.id, novel_id=novel.id)
+    return ConsistencyReportListResponse(
+        items=[report_view(report) for report in reports], total=len(reports)
+    )
