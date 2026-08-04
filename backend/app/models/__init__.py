@@ -194,6 +194,7 @@ from app.models.canon_fork import CanonFork
 from app.models.derivative_project import DerivativeProject
 from app.models.derivative_chapter import DerivativeChapter
 from app.models.derivative_revision import DerivativeRevision
+from app.models.derivative_context import ContextPackageRecord
 from app.models.canon_contamination import CanonContaminationBlock
 from app.models.fanfiction_revision import FanFictionRevision
 from app.models.fanfiction_override import FanFictionOverride
@@ -368,6 +369,7 @@ __all__ = [
     "DerivativeProject",
     "DerivativeChapter",
     "DerivativeRevision",
+    "ContextPackageRecord",
     "CanonContaminationBlock",
     "FanFictionRevision",
     "FanFictionOverride",
