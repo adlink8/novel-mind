@@ -95,6 +95,12 @@ No single aggregate completion percentage is authoritative.
     draft generation, consistency gates + BranchSuggestion, explicit divergence override,
     continue-derivative-story skill (tool 18→20, 13 skills). Migration head
     `20260802_derivative_override01`; backend 2059p, agent-service 927p, frontend 404p.
+18. `38`: **IMPLEMENTED & VERIFIED (2026-08-05)** — forked Visual Bible schema/lineage/
+    immutable-original boundary, derivative Scene Spec compiler + 8 gates, candidate asset
+    storage + cross-chapter consistency + PublishedDerivativeVisualAsset DTO/query, review
+    seam + review UI panel, illustrate-derivative-scene skill + publish_derivative_visual
+    action (tool 20→21, 14 skills). Migration head `20260802_derivative_asset01`; backend
+    2157p, agent-service 974p, frontend 416p.
 
 ## Planning Portfolio
 
@@ -114,7 +120,8 @@ No single aggregate completion percentage is authoritative.
 | Phase 35 | VERIFIED | 5 | ✅ 2026-08-04 (user execution override) |
 | Phase 36 | VERIFIED | 5 | ✅ 2026-08-04 (user execution override) |
 | Phase 37 | VERIFIED | 5 | ✅ 2026-08-04 (user execution override) |
-| Phase 38–39 | PLANNED | 10 | BLOCKED by Phase 22 3/3 + upstream execution dependencies |
+| Phase 38 | VERIFIED | 5 | ✅ 2026-08-05 (user execution override) |
+| Phase 39 | PLANNED | 5 | BLOCKED by Phase 22 3/3 + upstream execution dependencies |
 
 The earlier 55-plan structural verdict did not prove Issue #29 Agent-consumption coverage.
 The corrected 86-plan portfolio must cover REQ-AGENT-01..08, AgentVN-derived candidate-only
@@ -197,6 +204,12 @@ created.
   passed (source_commit `b8594e3`); backend 2059p (unit 1171 + derivative_generation 108 +
   integration 30 + adversarial 451 + agent_runtime 263 + ci 37); agent-service vitest 927p,
   frontend vitest 404p, tsc 0, alembic single head `20260802_derivative_override01`.
+- **2026-08-05 Phase 38 verification**: 38-01..38-05 delivered; `38-VERIFICATION.md`
+  passed (source_commit `fad8978`); backend 2157p (unit 1214 + derivative 10-file integration
+  121 + adversarial 500 + agent_runtime 285 + ci 37); agent-service vitest 974p, frontend
+  vitest 416p, tsc 0, alembic single head `20260802_derivative_asset01`. Two stale assertions
+  (migration round-trip downgrade target; editor-gate no-publish scope vs approval-gated
+  agent-tools action domain) fixed by lead at `fad8978` and re-verified.
 - **2026-08-03 stub-SUT finding (recorded, deferred)**: current nightly benchmark scores
   with deterministic stubs (`default_stub_*`, no live model calls); Ollama is only a health
   gate. Full G2 deployment (runner+Ollama+Docker) is premature for the stub pipeline.
@@ -352,7 +365,8 @@ verified (34-VERIFICATION passed at `68819ac`), completing the v1.3 milestone (3
 Phase 35 execution is authorized by the 2026-08-04 Phase 35–39 override, and Phase 35 is
 now verified (35-VERIFICATION passed at `5992c25`). Phase 36 is now verified
 (36-VERIFICATION passed at `a354a1e`). Phase 37 is now verified (37-VERIFICATION passed at
-`b8594e3`). Phases 38–39 continue under the same override.
+`b8594e3`). Phase 38 is now verified (38-VERIFICATION passed at `fad8978`). Phase 39
+continues under the same override.
 Phase 22 remains 0/3 (not satisfied, verdict unchanged).
 If Phase 22 is resumed, use `$gsd-resume-work`; do not mark it complete early.
 

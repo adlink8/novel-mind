@@ -367,3 +367,22 @@ Key metrics:
 | Alembic | 单 head `20260802_derivative_override01` | `alembic heads` |
 | 已知环境限制 | 同前：e2e Next dev server 编译失败、openapi subprocess 挂起、agent_runtime 需 `-o timeout=600`、前端 29 typecheck 遗留 | 2026-08-04 本机 |
 | 仍阻塞 | Phase 22 Nightly 3/3 未达成（0/3）；Phase 38 执行继续在 35-39 override 下 | `.planning/STATE.md` |
+
+---
+
+## 2026-08-05 快照（Phase 38 实现并验证；snapshot: master @ fad8978）
+
+以下事实覆盖上文旧节中的对应记录：
+
+| 项 | 当前值 | 证据 |
+|---|---|---|
+| Phase 38 Derivative Visual Consistency | **VERIFIED 2026-08-05** | `38-VERIFICATION.md` passed（source_commit `fad8978`） |
+| 后端测试 | **2157 passed**（unit 1214 + derivative 10-file 集成 121 + adversarial 500 + agent_runtime 285 + ci 37） | 独立测试子代理 2026-08-05 |
+| agent-service | **974 passed / 24 files**；tsc 0 errors | `cd agent-service && npx vitest run` |
+| 前端 | **416 passed / 47 files** | `cd frontend && npm test` |
+| Derivative Visual Consistency | fork Visual Bible schema/lineage/不可变 Original 边界、derivative Scene Spec compiler + 8 gates、candidate 资产存储 + 跨章一致性 + PublishedDerivativeVisualAsset DTO/query、review seam/UI 面板、illustrate-derivative-scene skill + publish_derivative_visual action | `backend/app/services/derivative_visual/` + `frontend/src/components/writing/visual-review-panel.tsx` |
+| Agent skills | 14 skills：+illustrate-derivative-scene；facade TOOL_NAMES 20→21 | `agent-service/src/skills/` |
+| Alembic | 单 head `20260802_derivative_asset01` | `alembic heads` |
+| 已知环境限制 | 同前：e2e Next dev server 编译失败（38-04 e2e 6 用例 route-mock 可解析）、openapi subprocess 挂起、agent_runtime 需 `-o timeout=600`、前端 39 typecheck 遗留（新增文件 0 错误） | 2026-08-05 本机 |
+| 已修复 stale 断言 | `test_derivative_visual_schema` downgrade 目标改为 `20260802_derivative_override01`；`test_derivative_editor_gate` no-publish 检查限定浏览器编辑器表面（排除 approval-gated agent-tools action 域） | commit `fad8978`，7p/8p 复验通过 |
+| 仍阻塞 | Phase 22 Nightly 3/3 未达成（0/3）；Phase 39 执行继续在 35-39 override 下 | `.planning/STATE.md` |

@@ -29,7 +29,7 @@
 | agent runtime foundation | 25.2–25.3 | **IMPLEMENTED & VERIFIED (2026-08-02)** | partial | blocked by Phase 22 3/3 |
 | v1.2 trusted novel understanding | 26–29 | **26/27/28/29 VERIFIED (2026-08-03)** | planned | blocked by Phase 22 3/3 |
 | v1.3 visual narrative | 30–34 | **30/31/32/33/34 VERIFIED (2026-08-04)** | planned | blocked by Phase 22 3/3 |
-| v1.4 Canon Fork derivatives | 35–39 | **35/36/37 VERIFIED (2026-08-04)** | planned | blocked by Phase 22 3/3 |
+| v1.4 Canon Fork derivatives | 35–39 | **35/36/37/38 VERIFIED (2026-08-05)** | planned | blocked by Phase 22 3/3 |
 
 # Agent Runtime Foundation — Phase 25.2–25.3
 
@@ -123,7 +123,7 @@ Alembic chain continues `26agentrun01 → 27approval01`.
 | 35 | `create-canon-fork` → approved deterministic fork materialization |
 | 36 | Agent is a branch-scoped editor collaborator; deterministic Revision Service applies |
 | 37 | `continue-derivative-story` → DraftArtifact + ContinuityReport |
-| 38 | branch-aware visual Skills |
+| 38 | `illustrate-derivative-scene` → BranchVisualBibleArtifact + BranchIllustrationRevision |
 | 39 | `prepare-export` + deterministic exporter |
 
 ### Phase 25.2–39 Planning Artifact Status (2026-08-02)
@@ -143,11 +143,12 @@ Alembic chain continues `26agentrun01 → 27approval01`.
 | Phase 35 | 5/5 + shared Agent contract | 5 | **VERIFIED 2026-08-04** |
 | Phase 36 | 5/5 + shared Agent contract | 5 | **VERIFIED 2026-08-04** |
 | Phase 37 | 5/5 + shared Agent contract | 5 | **VERIFIED 2026-08-04** |
-| Phase 38–39 | 5/5 + shared Agent contract | 10 | PLANNED |
+| Phase 38 | 5/5 + shared Agent contract | 5 | **VERIFIED 2026-08-05** |
+| Phase 39 | 5/5 + shared Agent contract | 5 | PLANNED |
 
 The corrected portfolio contains 86 plans: 10 reused Kimi foundation plans, five corrective
 foundation slices, 57 deterministic/domain/shared-integrity plans and 14 Agent-integration plans.
-Phase 25.2–37 are implemented and verified; Phases 38–39 remain planning verdicts only.
+Phase 25.2–38 are implemented and verified; Phase 39 remains a planning verdict only.
 
 ## Baseline Reconciliation — Phase 21–25.1
 
@@ -173,14 +174,15 @@ Phase 25.2–37 are implemented and verified; Phases 38–39 remain planning ver
 | 35 Triple Knowledge Spaces and Canon Fork | **VERIFIED 2026-08-04** | `35-VERIFICATION.md` passed; 3-space contract, fork snapshot/cutoff, isolated retrieval/citations, contamination guards, create-canon-fork skill + materializer |
 | 36 Derivative Project and Editor | **VERIFIED 2026-08-04** | `36-VERIFICATION.md` passed; project CRUD, chapter plan + Markdown editor, autosave CAS/history/diff/rollback, browser UAT + gate, edit-derivative-story skill |
 | 37 Constrained Generation | **VERIFIED 2026-08-04** | `37-VERIFICATION.md` passed; context package, constrained draft generation, consistency gates + BranchSuggestion, divergence override, continue-derivative-story skill |
+| 38 Derivative Visual Consistency | **VERIFIED 2026-08-05** | `38-VERIFICATION.md` passed; forked Visual Bible, derivative Scene Specs, candidate assets + cross-chapter consistency, review/version lineage + UI, illustrate-derivative-scene skill |
 
 Phase 22 remains blocked and unverified. The user authorized the Phase 25.2, Phase 26,
 Phase 27, Phase 28, Phase 29, Phase 30, Phase 31, Phase 32, Phase 33, Phase 34, Phase 35,
-Phase 36 and Phase 37 execution overrides (2026-08-02/03/04); each phase proceeded on the
-passed upstream verification artifact. v1.2 milestone (Phases 26–29), v1.3 milestone
-(Phases 30–34) and Phases 35–37 of v1.4 are implemented and verified. Phase 38 still
-requires Phase 22 3/3 real scheduled green evidence plus a passed Phase 37 verification
-artifact (exists).
+Phase 36, Phase 37 and Phase 38 execution overrides (2026-08-02/03/04/05); each phase
+proceeded on the passed upstream verification artifact. v1.2 milestone (Phases 26–29),
+v1.3 milestone (Phases 30–34) and Phases 35–38 of v1.4 are implemented and verified.
+Phase 39 still requires Phase 22 3/3 real scheduled green evidence plus a passed Phase 38
+verification artifact (exists).
 
 ---
 
@@ -505,11 +507,13 @@ with intentional canon violations and allowed divergences.
 
 ## Phase 38 — Derivative Visual Consistency
 
+**Status:** IMPLEMENTED & VERIFIED (2026-08-05, `38-VERIFICATION.md` passed at `fad8978`)
+
 **Goal:** extend the Visual Bible and illustration pipeline without contaminating original
 visual authority.
 
 **Plans:** 38-01 forked Visual Bible; 38-02 derivative Scene Specs; 38-03 generation and
-cross-chapter consistency; 38-04 review/version lineage.
+cross-chapter consistency; 38-04 review/version lineage; 38-05 branch-aware Agent skill.
 
 **Must-Haves:** original references remain immutable; divergence is explicit; generated
 assets belong to derivative namespace.
@@ -517,8 +521,9 @@ assets belong to derivative namespace.
 **Verification:** namespace and identity consistency tests; **Test, Fix, and Confirm** mixed
 original/derivative asset scenarios.
 
-- **38-05 Agent integration:** register branch-aware visual Skill; publish only validated and
-  approved derivative assets without mutating Original visual authority.
+- **38-05 Agent integration:** register branch-aware visual Skill (`illustrate-derivative-
+  scene`); publish only validated and approved derivative assets without mutating Original
+  visual authority.
 
 ## Phase 39 — Export, UAT and v1.4 Audit
 
@@ -555,7 +560,7 @@ audit; **Test, Fix, and Confirm** every failed end-to-end checkpoint.
 ## Next
 
 Phase 22 (CI/Nightly authority) remains the last unverified gate — 0/3 scheduled green.
-Phase 25.2, 25.3, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36 and 37 are verified
-(2026-08-02/03/04), completing the v1.2 milestone (26–29), the v1.3 milestone (30–34) and
-Phases 35–37 of v1.4. Phase 38 (Derivative Visual Consistency) execution continues under
+Phase 25.2, 25.3, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37 and 38 are verified
+(2026-08-02/03/04/05), completing the v1.2 milestone (26–29), the v1.3 milestone (30–34) and
+Phases 35–38 of v1.4. Phase 39 (Export, UAT and v1.4 Audit) execution continues under
 the 2026-08-04 Phase 35–39 override.
