@@ -100,10 +100,12 @@ export function IllustrationGallery({
   };
 
   useEffect(() => {
+    // `load` 是异步数据加载；首个 setState（loading/error）在 effect 同步段内触发
+    // react-hooks/set-state-in-effect 规则，但这是受控加载 pattern，行为是预期的。
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [novelId]);
-
   const handleReview = async (
     item: IllustrationGalleryItemView,
     action: IllustrationReviewAction,

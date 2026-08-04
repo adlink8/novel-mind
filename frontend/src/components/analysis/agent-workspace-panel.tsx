@@ -143,6 +143,8 @@ export function AgentWorkspacePanel({
   const runIdRef = useRef<number | null>(null);
 
   // 换书时同步重置（render 期重置，不 unmount —— 保住 tab 切换的其余状态）。
+  // 渲染期只调整 state（React 官方「adjusting state during render」模式）；
+  // refs（runId/abort）清理移到下方 effect，避免渲染期访问 ref。
   const [loadedNovel, setLoadedNovel] = useState<string | null>(null);
   if (loadedNovel !== novelId) {
     setLoadedNovel(novelId);
@@ -151,15 +153,19 @@ export function AgentWorkspacePanel({
     setAnswer("");
     setToolCalls([]);
     setRunId(null);
-    runIdRef.current = null;
     setRunStatus(null);
     setArtifact(null);
     setError(null);
     setApprovalRequest(null);
     setApprovalOpen(false);
+  }
+
+  // 换书时清理流控制器与 runId 镜像 ref（effect 中访问 ref 合法）。
+  useEffect(() => {
     abortRef.current?.abort();
     abortRef.current = null;
-  }
+    runIdRef.current = null;
+  }, [loadedNovel]);
 
   const busy = runStatus !== null && !RUN_TERMINAL.has(runStatus);
 
@@ -188,6 +194,7 @@ export function AgentWorkspacePanel({
   useEffect(() => {
     if (!novelId) return;
     let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setRestoring(true);
     void (async () => {
       try {

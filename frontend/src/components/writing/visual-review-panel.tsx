@@ -129,6 +129,9 @@ export function VisualReviewPanel({ novelId, className }: VisualReviewPanelProps
   );
 
   useEffect(() => {
+    // `loadList` 是异步数据加载；首个 setState（loading/error）在 effect 同步段内触发
+    // react-hooks/set-state-in-effect 规则，但这是受控加载 pattern，行为是预期的。
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadList();
   }, [loadList]);
 
@@ -145,6 +148,7 @@ export function VisualReviewPanel({ novelId, className }: VisualReviewPanelProps
   // Auto-select the first candidate once the queue resolves.
   useEffect(() => {
     if (candidates.length === 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDetail(null);
       setSelectedId(null);
       return;

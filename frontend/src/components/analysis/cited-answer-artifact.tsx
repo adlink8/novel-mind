@@ -216,7 +216,15 @@ export function ArtifactPreview({
   novelId,
   onCitationNavigate,
 }: ArtifactRendererProps) {
-  const Renderer = resolveArtifactRenderer(artifact.type);
+  // ARTIFACT_RENDERERS 是模块级常量注册表（组件定义恒在模块顶层），
+  // 这里经受控条件选择静态组件引用，渲染期不会重新创建组件（state 稳定）。
+  const type = artifact.type;
+  const Renderer =
+    type === "cited_answer"
+      ? CitedAnswerArtifactView
+      : type === "external_evidence"
+        ? ExternalEvidenceView
+        : UnknownArtifactFallback;
   return (
     <Renderer
       artifact={artifact}
