@@ -23,13 +23,14 @@ import {
  * 全部使用 mock fetch，不真连 backend。
  */
 
-/** 21 个域工具名（测试侧镜像，与 DOMAIN_TOOL_NAMES 断言一致；31-04 加入
+/** 23 个域工具名（测试侧镜像，与 DOMAIN_TOOL_NAMES 断言一致；31-04 加入
  * get_visual_bible，33-05 加入 generate_image_candidate，34-05 加入
  * publish_illustration / attach_illustration_to_text action，35-05 加入
  * create_canon_fork action，36-05 加入 apply_derivative_edit action，37-05 加入
  * allow_divergence / publish_derivative_revision action，38-05 加入
- * publish_derivative_visual action）。 */
-const TOOL_NAMES_21 = [
+ * publish_derivative_visual action，39-05 加入 approve_export /
+ * materialize_export action）。 */
+const TOOL_NAMES_23 = [
   "get_novel",
   "get_chapter",
   "search_novel_text",
@@ -51,18 +52,20 @@ const TOOL_NAMES_21 = [
   "allow_divergence",
   "publish_derivative_revision",
   "publish_derivative_visual",
+  "approve_export",
+  "materialize_export",
 ] as const;
 
 describe("domain tool registry", () => {
-  it("DOMAIN_TOOL_NAMES 恰为 21 个冻结工具名", () => {
-    expect([...DOMAIN_TOOL_NAMES]).toEqual([...TOOL_NAMES_21]);
+  it("DOMAIN_TOOL_NAMES 恰为 23 个冻结工具名", () => {
+    expect([...DOMAIN_TOOL_NAMES]).toEqual([...TOOL_NAMES_23]);
   });
 
-  it("buildDomainTools 返回 21 个 defineTool，名称与 DOMAIN_TOOL_NAMES 一致", () => {
+  it("buildDomainTools 返回 23 个 defineTool，名称与 DOMAIN_TOOL_NAMES 一致", () => {
     const tools = buildDomainTools("Bearer per-run-token");
-    expect(tools).toHaveLength(21);
+    expect(tools).toHaveLength(23);
     const names = tools.map((t) => t.name);
-    expect(names).toEqual([...TOOL_NAMES_21]);
+    expect(names).toEqual([...TOOL_NAMES_23]);
     // 每个工具都是 defineTool（含 execute 五参签名）
     for (const tool of tools) {
       expect(typeof tool.execute).toBe("function");

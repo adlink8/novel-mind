@@ -564,6 +564,100 @@ class PublishDerivativeVisualRequest(StrictAgentToolModel):
     )
 
 
+# ────────────────────────── Phase 39 derivative export action 工具（39-05） ──────────────────────────
+
+
+class ApproveExportRequest(StrictAgentToolModel):
+    """Phase 39 approve_export action 请求（39-05，REQ-FORK-05 / REQ-AGENT-03/04/07）。
+
+    为**一个已 finalize 候选 ExportPreparationArtifact**创建**一个 pending Web
+    ApprovalRequest**（action=approve_export，payload_hash 绑定 artifact
+    revision + 确定性 preparation_hash，D-11/D-15）。服务端 action 只接受
+    owner/novel/branch/fork/project scope 内的 candidate artifact；确定性
+    preparation 服务重放冻结 manifest（stale/伪造 hash → fail closed）。
+    novel_id 由查询参数注入（require_owned_novel），绝不放进请求体。
+    **绝不物化**——只有独立 approve_export approval 被用户批准后，确定性
+    materializer（materialize_export）才能把候选 artifact 推进为 approved 并
+    产出可复现 bundle；Agent 绝不写 Original Canon / 域表 / Artifact 状态 /
+    bundle。
+    """
+
+    branch: str | None = Field(
+        default=None, max_length=80, description="衍生分支；原始主线为 null"
+    )
+    fork: str | None = Field(
+        default=None, max_length=80, description="衍生 fork（仅 derivative mode；original 必须为 null）"
+    )
+    project_id: int = Field(
+        gt=0, description="derivative project ID（服务端重验 owner/novel + fanfiction_canon 空间）"
+    )
+    artifact_id: int = Field(
+        gt=0, description="候选 ExportPreparationArtifact ID（服务端重验 owner/novel + candidate status）"
+    )
+    artifact_revision_id: int = Field(
+        gt=0, description="候选 ArtifactRevision ID（approval payload 绑定；必须是当前修订）"
+    )
+    preparation_hash: str = Field(
+        min_length=64,
+        max_length=64,
+        pattern="^[0-9a-f]{64}$",
+        description="候选冻结 preparation hash（服务端从 artifact revision + 冻结 manifest 重放；stale → fail closed）",
+    )
+    approval_note: str | None = Field(
+        default=None, max_length=4000, description="供 approval 展示的显式批准备注"
+    )
+    # D-15 血缘绑定（可选）：agent 会话已知的 run/skill 血缘。
+    run_id: int | None = Field(default=None, gt=0, description="SkillRun ID 血缘")
+    skill_version_id: int | None = Field(default=None, gt=0, description="SkillVersion ID 血缘")
+
+
+class MaterializeExportRequest(StrictAgentToolModel):
+    """Phase 39 materialize_export action 请求（39-05，REQ-FORK-05 / REQ-AGENT-03/04/07）。
+
+    确定性 materializer 消费**一个已批准的 approve_export ApprovalRequest**：
+    只接受 owner/novel/branch/fork/project scope 内已 finalize 的候选
+    ExportPreparationArtifact + preparation_hash 匹配的 approve_export
+    approval；服务端原子校验 approval action + 相同 preparation_hash 绑定 +
+    artifact revision 血缘 + 冻结 manifest 重放，才把候选 artifact 推进为
+    approved 并产出可复现 bundle（frozen manifest 复算）。novel_id 由查询参数
+    注入（require_owned_novel），绝不放进请求体。download 只读、永不改变
+    Artifact status / approval lineage。forged/expired/cancelled/rejected
+    approval、stale hash、wrong scope、pending/rejected artifact → fail
+    closed，无 bundle 或权威写入。
+    """
+
+    branch: str | None = Field(
+        default=None, max_length=80, description="衍生分支；原始主线为 null"
+    )
+    fork: str | None = Field(
+        default=None, max_length=80, description="衍生 fork（仅 derivative mode；original 必须为 null）"
+    )
+    project_id: int = Field(
+        gt=0, description="derivative project ID（服务端重验 owner/novel + fanfiction_canon 空间）"
+    )
+    artifact_id: int = Field(
+        gt=0, description="候选 ExportPreparationArtifact ID（只接受 approved artifact）"
+    )
+    artifact_revision_id: int = Field(
+        gt=0, description="候选 ArtifactRevision ID（approval payload 绑定；必须是当前修订）"
+    )
+    approval_id: int = Field(
+        gt=0, description="已批准的 approve_export ApprovalRequest ID（服务端重验 action + status + preparation_hash）"
+    )
+    preparation_hash: str = Field(
+        min_length=64,
+        max_length=64,
+        pattern="^[0-9a-f]{64}$",
+        description="候选冻结 preparation hash（必须与 approve_export approval payload_hash 一致）",
+    )
+    reason: str | None = Field(
+        default=None, max_length=4000, description="确定性 materialize 理由（展示/审计）"
+    )
+    # D-15 血缘绑定（可选）：agent 会话已知的 run/skill 血缘。
+    run_id: int | None = Field(default=None, gt=0, description="SkillRun ID 血缘")
+    skill_version_id: int | None = Field(default=None, gt=0, description="SkillVersion ID 血缘")
+
+
 # ────────────────────────── 统一错误信封 ──────────────────────────
 
 

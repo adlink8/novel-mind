@@ -37,7 +37,7 @@ export const D09_FIELDS = [
 /** 默认技能根目录：`src/skills`（相对本文件）。 */
 const DEFAULT_SKILLS_ROOT = fileURLToPath(new URL("../skills", import.meta.url));
 
-/** 25.2 允许加载的技能目录集（单一 allowlist；27-05 加入世界模型技能，28-05 加入叙事记忆技能，29-05 加入评估技能，30-05 加入 Visual Bible 技能，31-04 加入关键场景检测技能，32-05 加入 Scene Spec/Prompt 编译技能，33-05 加入插图生成技能，34-05 加入锚点提议技能，35-05 加入 canon fork 技能，36-05 加入 derivative 编辑技能，37-05 加入 constrained derivative generation 技能，38-05 加入 branch-aware derivative visual 技能）。 */
+/** 25.2 允许加载的技能目录集（单一 allowlist；27-05 加入世界模型技能，28-05 加入叙事记忆技能，29-05 加入评估技能，30-05 加入 Visual Bible 技能，31-04 加入关键场景检测技能，32-05 加入 Scene Spec/Prompt 编译技能，33-05 加入插图生成技能，34-05 加入锚点提议技能，35-05 加入 canon fork 技能，36-05 加入 derivative 编辑技能，37-05 加入 constrained derivative generation 技能，38-05 加入 branch-aware derivative visual 技能，39-05 加入 Phase 39 derivative export 技能 prepare-export）。 */
 export const ALLOWLISTED_SKILL_DIRS = [
   "answer-reading-question",
   "propose-world-model-candidates",
@@ -53,6 +53,7 @@ export const ALLOWLISTED_SKILL_DIRS = [
   "edit-derivative-story",
   "continue-derivative-story",
   "illustrate-derivative-scene",
+  "prepare-export",
 ] as const;
 
 /** 加载失败（缺字段/未知工具/坏 schema），fail-closed，错误信息指名根因。 */

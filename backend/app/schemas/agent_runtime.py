@@ -1257,5 +1257,101 @@ class BranchVisualBibleArtifact(StrictAgentRuntimeModel):
         return value
 
 
+# ────────────────────────── Phase 39 Export Preparation Artifact 信封（REQ-FORK-05 / REQ-AGENT-02/03/04/07） ──────────────────────────
+
+
+class ExportPreparationSourceSnapshotRef(StrictAgentRuntimeModel):
+    """Source snapshot 血缘 ref（D-39-01：project 冻结 fork 血缘只读）。"""
+
+    source_snapshot_id: str = Field(min_length=1, max_length=160)
+    source_snapshot_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    source_manifest_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    cutoff_chapter: int = Field(ge=1)
+
+
+class ExportPreparationBaseRevisionRef(StrictAgentRuntimeModel):
+    """Project 冻结 fork 血缘 ref（revision/version/snapshot 对齐，D-39-01）。"""
+
+    project_manifest_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    scope_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    cutoff_snapshot_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    text_version_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+class ExportPreparationPayload(StrictAgentRuntimeModel):
+    """Phase 39 ExportPreparation 负载（D-39-01/D-39-02 / REQ-FORK-05）。
+
+    携带完整 branch-aware 血缘：project/fork scope、source snapshot ref、base
+    revision ref、content_hash（候选声称的 frozen manifest/snapshot hash）、
+    evidence refs、runtime/model/generator lineage 与 validator report。
+    ``authority_space`` 恒为 ``derivative`` + ``fork`` 必须（Original Canon
+    不可变，REQ-FORK-05）；``review_state`` 恒为 ``candidate``（finalize 时）
+    ——只有确定性 validator + 独立 ``approve_export`` Web ApprovalRequest →
+    materializer 能推进 approved。``approval_request_id`` /
+    ``materialize_lineage`` 由服务端分配，模型输出不含。
+    """
+
+    schema_version: Literal["export-preparation.v1"] = "export-preparation.v1"
+    artifact_kind: Literal["export_preparation"] = "export_preparation"
+    authority_space: Literal["derivative"] = "derivative"
+    fork: str = Field(min_length=1, max_length=80)
+    project_id: int = Field(gt=0)
+    project_key: str = Field(min_length=1, max_length=128)
+    source_snapshot: ExportPreparationSourceSnapshotRef
+    base_revision: ExportPreparationBaseRevisionRef
+    content_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    evidence_refs: list[str] = Field(min_length=1)
+    generator_lineage: dict[str, Any] = Field(default_factory=dict)
+    validator_report: dict[str, Any] = Field(default_factory=dict)
+    review_state: Literal["candidate"] = "candidate"
+    approval_request_id: int | None = Field(default=None, gt=0)
+    materialize_lineage: dict[str, Any] = Field(default_factory=dict)
+
+
+class ExportPreparationArtifact(StrictAgentRuntimeModel):
+    """智能体产物的 ExportPreparationArtifact 信封（Phase 39 / D-39-01/D-39-02）。
+
+    Agent 产出的是 **candidate-only** 的 derivative export 准备：``preparation``
+    （完整 ExportPreparationPayload）携带 branch-aware 血缘（SkillRun/ToolRun、
+    owner/novel/branch/fork、project scope、source snapshot、base revision、
+    content hash、evidence refs、runtime/model/generator lineage 与 validator
+    report）。``review_state`` 恒为 ``candidate``（finalize 时）——只有确定性
+    validator + 独立 ``approve_export`` Web ApprovalRequest → 确定性
+    materializer（``app.services.derivative_export.materializer.
+    materialize_export``）能把候选 artifact 推进为 approved 并产出可复现
+    bundle；Agent/浏览器绝不物化、绝不触碰 Original Canon（REQ-FORK-05）。
+    ``tool_runs`` 携带 ToolRun 血缘。与 CitedAnswerArtifact 信封纪律一致：type /
+    schema_version / owner / novel / branch / producing skill+version / model
+    lineage / source versions / input_hash / evidence_refs / status /
+    parent_revision / normalization（26-06 修复血缘 trail）。
+    """
+
+    type: Literal["export_preparation"] = "export_preparation"
+    schema_version: Literal["export-preparation.v1"] = "export-preparation.v1"
+    owner_id: int = Field(gt=0)
+    novel_id: int = Field(gt=0)
+    branch: str | None = None
+    producing_skill: str = Field(min_length=1, max_length=120)
+    producing_skill_version: str = Field(min_length=1, max_length=32)
+    skill_version_id: int = Field(gt=0)
+    model_lineage: dict[str, Any]
+    source_versions: dict[str, Any]
+    input_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    evidence_refs: list[str] = Field(min_length=1)
+    preparation: ExportPreparationPayload
+    tool_runs: list[dict[str, Any]] = Field(min_length=1)
+    status: Literal["candidate", "validated", "approved", "published", "rejected"]
+    parent_revision: str | None = None
+    normalization: NormalizationTrail
+
+    @field_validator("tool_runs")
+    @classmethod
+    def _tool_runs_shape(cls, value: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        for item in value:
+            if not isinstance(item, dict) or not item.get("tool_name"):
+                raise ValueError("each tool run requires tool_name")
+        return value
+
+
 # 供 OpenAPI 引用，避免未使用告警。
 _ = (StrictReaderChatModel,)

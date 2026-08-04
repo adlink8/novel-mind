@@ -107,6 +107,14 @@ logger = logging.getLogger(__name__)
 # fork_id；blocked candidate / wrong owner/branch/fork → fail closed）。绝不发布——
 # 确定性 review seam（review_candidate_asset -> apply_derivative_asset_review）拥有
 # approved published asset 物化，绝不写 Original Visual Bible。
+# 39-05 起加入 Phase 39 derivative export action 工具 approve_export /
+# materialize_export——前者为已 finalize 候选 ExportPreparationArtifact 创建
+# pending Web ApprovalRequest（payload_hash 绑定 artifact revision + 确定性
+# preparation_hash；wrong owner/branch/fork/stale hash → fail closed）；后者是
+# 确定性 materializer：只接受 approved artifact + preparation_hash 匹配的
+# approve_export ApprovalRequest，把候选 artifact 推进为 approved 并产出可复现
+# bundle（frozen manifest 复算），绝不写 Original Canon / 域表 / Artifact 状态 /
+# bundle（download 只读）。
 TOOL_NAMES: tuple[str, ...] = (
     "get_novel",
     "get_chapter",
@@ -129,6 +137,8 @@ TOOL_NAMES: tuple[str, ...] = (
     "allow_divergence",
     "publish_derivative_revision",
     "publish_derivative_visual",
+    "approve_export",
+    "materialize_export",
 )
 
 # per-tool 默认字节上限（agent-service 侧同样硬编码 64 KiB，见 RESEARCH Code Examples）。
@@ -918,6 +928,89 @@ async def _default_publish_derivative_visual(
         raise InvalidInputError(f"{exc.code}: {exc.detail}") from None
 
 
+async def _default_approve_export(
+    db,
+    *,
+    owner_id: int,
+    novel_id: int,
+    params: dict[str, Any],
+) -> dict[str, Any]:
+    """Phase 39 action 工具默认服务：创建**一个** pending approve_export
+    ApprovalRequest（D-39-01/D-39-02）。
+
+    委托 `derivative_export.materializer.request_approve_export`：只接受
+    owner/novel/branch/fork/project scope 内已 finalize 的候选
+    ExportPreparationArtifact + 确定性 preparation_hash 重放（stale/伪造 hash /
+    wrong owner/branch/fork/project → fail closed）；创建 pending Web
+    ApprovalRequest（action=approve_export，payload_hash 绑定 artifact
+    revision + preparation_hash，D-11/D-15）。**绝不物化、绝不写 Original
+    Canon / 域表 / Artifact 状态 / bundle**。
+    """
+    from app.services.derivative_export.materializer import (
+        ExportMaterializationError,
+        request_approve_export,
+    )
+
+    try:
+        return await request_approve_export(
+            db,
+            owner_id=owner_id,
+            novel_id=novel_id,
+            project_id=int(params["project_id"]),
+            artifact_id=int(params["artifact_id"]),
+            artifact_revision_id=int(params["artifact_revision_id"]),
+            preparation_hash=str(params["preparation_hash"]),
+            actor_id=owner_id,
+            branch=params.get("branch"),
+            fork=params.get("fork"),
+            approval_note=params.get("approval_note"),
+            run_id=params.get("run_id"),
+            skill_version_id=params.get("skill_version_id"),
+        )
+    except ExportMaterializationError as exc:
+        raise InvalidInputError(f"{exc.code}: {exc.detail}") from None
+
+
+async def _default_materialize_export(
+    db,
+    *,
+    owner_id: int,
+    novel_id: int,
+    params: dict[str, Any],
+) -> dict[str, Any]:
+    """Phase 39 action 工具默认服务：确定性 materializer（D-39-01/D-39-02）。
+
+    委托 `derivative_export.materializer.materialize_export`：只接受 approved
+    artifact + preparation_hash 匹配的 approve_export ApprovalRequest，原子校验
+    approval action + 相同 hash 绑定 + artifact revision 血缘 + owner/novel/
+    branch/fork/project scope + 冻结 manifest 重放，才把候选 artifact 推进为
+    approved 并产出可复现 bundle。**绝不写 Original Canon / 域表 / approval
+    lineage**（download 只读）。
+    """
+    from app.services.derivative_export.materializer import (
+        ExportMaterializationError,
+        materialize_export,
+    )
+
+    try:
+        return await materialize_export(
+            db,
+            owner_id=owner_id,
+            novel_id=novel_id,
+            project_id=int(params["project_id"]),
+            artifact_id=int(params["artifact_id"]),
+            artifact_revision_id=int(params["artifact_revision_id"]),
+            approval_id=int(params["approval_id"]),
+            preparation_hash=str(params["preparation_hash"]),
+            reason=params.get("reason"),
+            actor_id=owner_id,
+            branch=params.get("branch"),
+            fork=params.get("fork"),
+        )
+    except ExportMaterializationError as exc:
+        raise InvalidInputError(f"{exc.code}: {exc.detail}") from None
+
+
 def _agent_edit_proposal_view_for_tool(result) -> dict[str, Any]:
     """DerivativeEditProposal approval ORM → JSON-safe 工具响应。
 
@@ -1052,7 +1145,7 @@ async def _resolve_world_model_version(
 
 
 class ToolFacade:
-    """12 个只读工具 + 9 个候选 action 工具的统一执行门面。
+    """12 个只读工具 + 11 个候选 action 工具的统一执行门面。
 
     所有强制点（字节上限 / 超时 / budget hook / 错误码映射）都在
     ``execute`` 内完成；owner / cutoff 逻辑复用现有服务。Phase 33 的
@@ -1068,7 +1161,13 @@ class ToolFacade:
     Fanfiction Canon 物化。Phase 38 ``publish_derivative_visual`` 只为已存储
     candidate 创建 pending publish ApprovalRequest（绑定候选冻结血缘）——
     确定性 review seam 拥有 approved published asset 物化，绝不写 Original
-    Visual Bible。
+    Visual Bible。Phase 39 ``approve_export`` 只为已 finalize 候选
+    ExportPreparationArtifact 创建 pending approve_export ApprovalRequest
+    （绑定 artifact revision + preparation_hash）；``materialize_export`` 是
+    确定性 materializer——只接受 approved artifact + preparation_hash 匹配的
+    approve_export approval，把候选 artifact 推进为 approved 并产出可复现
+    bundle（frozen manifest 复算），绝不写 Original Canon / 域表 / approval
+    lineage（download 只读）。
     """
 
     def __init__(
@@ -1126,6 +1225,13 @@ class ToolFacade:
             # pending publish ApprovalRequest（绑定候选冻结血缘）；确定性 review
             # seam 拥有 approved published asset 物化，绝不写 Original Visual Bible。
             "publish_derivative_visual": self._publish_derivative_visual,
+            # Phase 39 derivative export action 工具（39-05）：approve_export 只
+            # 创建 pending approve_export ApprovalRequest（绑定 artifact revision +
+            # preparation_hash）；materialize_export 是确定性 materializer——只
+            # 接受 approved artifact + preparation_hash 匹配的 approval，把候选
+            # artifact 推进为 approved 并产出可复现 bundle，绝不写 Original Canon。
+            "approve_export": self._approve_export,
+            "materialize_export": self._materialize_export,
         }
 
     # ── 公共入口 ──
@@ -1545,6 +1651,28 @@ class ToolFacade:
     async def _publish_derivative_visual(self, *, db, novel, owner_id, params):
         """创建独立 publish ApprovalRequest（绑定候选冻结血缘；candidate-only，38-05）。"""
         svc = self._svc("publish_derivative_visual", _default_publish_derivative_visual)
+        return await svc(
+            db,
+            owner_id=owner_id,
+            novel_id=novel.id,
+            params=params,
+        )
+
+    async def _approve_export(self, *, db, novel, owner_id, params):
+        """创建独立 approve_export ApprovalRequest（绑定 artifact revision +
+        preparation_hash；candidate-only，39-05）。"""
+        svc = self._svc("approve_export", _default_approve_export)
+        return await svc(
+            db,
+            owner_id=owner_id,
+            novel_id=novel.id,
+            params=params,
+        )
+
+    async def _materialize_export(self, *, db, novel, owner_id, params):
+        """确定性 materializer：只接受 approved artifact + preparation_hash 匹配的
+        approve_export approval，产出可复现 bundle（approved-only，39-05）。"""
+        svc = self._svc("materialize_export", _default_materialize_export)
         return await svc(
             db,
             owner_id=owner_id,

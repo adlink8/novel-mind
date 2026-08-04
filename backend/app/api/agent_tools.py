@@ -28,6 +28,7 @@ from app.schemas.agent_tools import (
     AllowDivergenceRequest,
     AnchorProposalActionRequest,
     ApplyDerivativeEditRequest,
+    ApproveExportRequest,
     CreateCanonForkRequest,
     GenerateImageCandidateRequest,
     GetChapterRequest,
@@ -42,6 +43,7 @@ from app.schemas.agent_tools import (
     GetTimelineRequest,
     GetVisualBibleRequest,
     GetWorldRulesRequest,
+    MaterializeExportRequest,
     PublishDerivativeRevisionRequest,
     PublishDerivativeVisualRequest,
     SearchNovelTextRequest,
@@ -494,6 +496,62 @@ async def tool_publish_derivative_visual(
     """
     return await _run_tool(
         "publish_derivative_visual",
+        db=db,
+        novel=novel,
+        owner_id=current_user.id,
+        params=_params(body),
+    )
+
+
+@router.post("/approve_export")
+async def tool_approve_export(
+    body: ApproveExportRequest | None = None,
+    novel: Novel = Depends(require_owned_novel),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """Phase 39 approve_export action（39-05，REQ-FORK-05 / REQ-AGENT-03/04/07）：
+    为**一个**已 finalize 候选 ExportPreparationArtifact 创建**一个** pending
+    Web ApprovalRequest（action=approve_export，payload_hash 绑定 artifact
+    revision + 确定性 preparation_hash，D-11/D-15）。
+
+    服务端 action 只接受 owner/novel/branch/fork/project scope 内已 finalize
+    的候选 artifact；确定性 preparation 服务重放冻结 manifest（stale/伪造 hash /
+    wrong owner/branch/fork/project → fail closed）。**绝不物化**——只有独立
+    approve_export approval 被用户批准后，确定性 materializer（
+    materialize_export）才能把候选 artifact 推进为 approved 并产出可复现
+    bundle；Agent 绝不写 Original Canon / 域表 / Artifact 状态 / bundle。
+    """
+    return await _run_tool(
+        "approve_export",
+        db=db,
+        novel=novel,
+        owner_id=current_user.id,
+        params=_params(body),
+    )
+
+
+@router.post("/materialize_export")
+async def tool_materialize_export(
+    body: MaterializeExportRequest | None = None,
+    novel: Novel = Depends(require_owned_novel),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """Phase 39 materialize_export action（39-05，REQ-FORK-05 / REQ-AGENT-03/04/07）：
+    确定性 materializer 消费**一个**已批准的 approve_export ApprovalRequest。
+
+    只接受 owner/novel/branch/fork/project scope 内已 finalize 的候选
+    ExportPreparationArtifact + preparation_hash 匹配的 approve_export
+    approval；服务端原子校验 approval action + 相同 preparation_hash 绑定 +
+    artifact revision 血缘 + 冻结 manifest 重放，才把候选 artifact 推进为
+    approved 并产出可复现 bundle（frozen manifest 复算）。forged/expired/
+    cancelled/rejected approval、stale hash、wrong scope、pending/rejected
+    artifact → fail closed，无 bundle 或权威写入。download 只读、永不改变
+    Artifact status / approval lineage。
+    """
+    return await _run_tool(
+        "materialize_export",
         db=db,
         novel=novel,
         owner_id=current_user.id,

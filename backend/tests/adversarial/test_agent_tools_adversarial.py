@@ -76,6 +76,13 @@ ACTION_TOOLS = (
     # pending publish ApprovalRequest（绑定候选冻结血缘）；确定性 review seam
     # 拥有 approved published asset 物化，绝不写 Original Visual Bible。
     "publish_derivative_visual",
+    # Phase 39 derivative export action 工具（39-05）：approve_export 创建
+    # pending approve_export ApprovalRequest（绑定 artifact revision +
+    # preparation_hash）；materialize_export 是确定性 materializer（只接受
+    # approved artifact + preparation_hash 匹配的 approval，产出可复现 bundle）。
+    # 由 test_phase_39_skill.py 专项覆盖（伪造/过期/取消/拒绝审批等对抗路径）。
+    "approve_export",
+    "materialize_export",
 )
 
 # 每个工具的 HTTP 路由（cross-owner 轴使用）。

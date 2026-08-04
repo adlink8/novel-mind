@@ -40,6 +40,7 @@ from app.api.dependencies import require_owned_novel
 from app.core.database import get_db
 from app.core.security import require_user
 from app.models import Novel, User
+from app.schemas.agent_tools import StrictAgentToolModel
 from app.services.derivative_export.audit import (
     PHASE22_GREEN_REQUIRED,
     DerivativeExportAuditEvidence,
@@ -54,9 +55,18 @@ from app.services.derivative_export.manifest import (
     seal_derivative_export_manifest,
 )
 from app.services.derivative_export.markdown import render_markdown
+from app.services.derivative_export.materializer import (
+    ExportMaterializationError,
+    materialize_export,
+    request_approve_export,
+)
 from app.services.derivative_export.package import (
     DERIVATIVE_EXPORT_PACKAGE_SCHEMA_VERSION,
     build_derivative_export_package,
+)
+from app.services.derivative_export.preparation import (
+    EXPORT_PREPARATION_SCHEMA_VERSION,
+    prepare_export,
 )
 from app.services.derivative_export.snapshot import (
     ExportSnapshotError,
@@ -103,6 +113,103 @@ class DerivativeExportPrepareResponse(BaseModel):
     revision_count: int = Field(ge=0)
     citation_count: int = Field(ge=0)
     missing_asset_count: int = Field(ge=0)
+
+
+class DerivativeExportAgentPrepareRequest(StrictAgentToolModel):
+    """Deterministic preparation freeze intent (39-05, authenticated read-only)."""
+
+    branch: str | None = Field(
+        default=None, max_length=80, description="衍生分支；原始主线为 null"
+    )
+    fork: str | None = Field(
+        default=None, max_length=80, description="衍生 fork（仅 derivative mode；original 必须为 null）"
+    )
+    evidence_refs: list[str] = Field(
+        min_length=1, description="run 引用的 leaf 证据键（必须属于冻结 manifest 白名单）"
+    )
+    generator_lineage: dict = Field(default_factory=dict)
+
+
+class DerivativeExportAgentPrepareResponse(BaseModel):
+    """Frozen candidate ExportPreparation payload read envelope (39-05)."""
+
+    preparation: dict
+    preparation_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    snapshot_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    manifest_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    schema_version: str = EXPORT_PREPARATION_SCHEMA_VERSION
+    export_version: str = DERIVATIVE_EXPORT_VERSION
+    project_id: int = Field(gt=0)
+    fork_id: int = Field(gt=0)
+    chapter_count: int = Field(ge=0)
+    asset_count: int = Field(ge=0)
+    revision_count: int = Field(ge=0)
+    citation_count: int = Field(ge=0)
+    candidate_only: bool = True
+
+
+class DerivativeExportAgentApproveRequest(StrictAgentToolModel):
+    """Server-authoritative approve_export request (39-05).
+
+    Binds the frozen candidate artifact revision + preparation_hash; project_id
+    comes from the URL path, novel_id from require_owned_novel.
+    """
+
+    branch: str | None = Field(
+        default=None, max_length=80, description="衍生分支；原始主线为 null"
+    )
+    fork: str | None = Field(
+        default=None, max_length=80, description="衍生 fork（仅 derivative mode；original 必须为 null）"
+    )
+    artifact_id: int = Field(
+        gt=0, description="候选 ExportPreparationArtifact ID（服务端重验 owner/novel + candidate status）"
+    )
+    artifact_revision_id: int = Field(
+        gt=0, description="候选 ArtifactRevision ID（approval payload 绑定；必须是当前修订）"
+    )
+    preparation_hash: str = Field(
+        min_length=64,
+        max_length=64,
+        pattern="^[0-9a-f]{64}$",
+        description="候选冻结 preparation hash（服务端从 artifact revision + 冻结 manifest 重放；stale → fail closed）",
+    )
+    approval_note: str | None = Field(
+        default=None, max_length=4000, description="供 approval 展示的显式批准备注"
+    )
+
+
+class DerivativeExportAgentMaterializeRequest(StrictAgentToolModel):
+    """Deterministic materialize_export request (39-05).
+
+    Consumes an approved approve_export approval bound to the frozen artifact
+    revision + preparation_hash; project_id from the URL path, novel_id from
+    require_owned_novel.
+    """
+
+    branch: str | None = Field(
+        default=None, max_length=80, description="衍生分支；原始主线为 null"
+    )
+    fork: str | None = Field(
+        default=None, max_length=80, description="衍生 fork（仅 derivative mode；original 必须为 null）"
+    )
+    artifact_id: int = Field(
+        gt=0, description="候选 ExportPreparationArtifact ID（只接受 approved artifact）"
+    )
+    artifact_revision_id: int = Field(
+        gt=0, description="候选 ArtifactRevision ID（approval payload 绑定；必须是当前修订）"
+    )
+    approval_id: int = Field(
+        gt=0, description="已批准的 approve_export ApprovalRequest ID（服务端重验 action + status + preparation_hash）"
+    )
+    preparation_hash: str = Field(
+        min_length=64,
+        max_length=64,
+        pattern="^[0-9a-f]{64}$",
+        description="候选冻结 preparation hash（必须与 approve_export approval payload_hash 一致）",
+    )
+    reason: str | None = Field(
+        default=None, max_length=4000, description="确定性 materialize 理由（展示/审计）"
+    )
 
 
 # Storage seam (integration tests override the bytes backend, 34-04 pattern).
@@ -396,8 +503,136 @@ async def audit_derivative_export(
     return report
 
 
+# ---------------------------------------------------------------------------
+# Phase 39-05: Agent preparation / approval / materialization routes (D-39-01)
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    DERIVATIVE_EXPORT_PATH + "/agent/prepare",
+    response_model=DerivativeExportAgentPrepareResponse,
+)
+async def agent_prepare_export(
+    project_id: int,
+    body: DerivativeExportAgentPrepareRequest,
+    novel: Novel = Depends(require_owned_novel),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+) -> DerivativeExportAgentPrepareResponse:
+    """Deterministic preparation freeze (authenticated, read-only).
+
+    Freezes the owner/novel/project-scoped approved-only snapshot + sealed
+    manifest + preparation_hash. This is the official candidate
+    ``ExportPreparationPayload`` the run may carry; it never writes any row and
+    the same DB state always returns the same preparation_hash.
+    """
+    try:
+        frozen = await prepare_export(
+            db,
+            owner_id=current_user.id,
+            novel_id=novel.id,
+            project_id=project_id,
+            branch=body.branch,
+            fork=body.fork,
+            evidence_refs=body.evidence_refs,
+            generator_lineage=dict(body.generator_lineage),
+            storage=_storage(),
+        )
+    except ExportSnapshotError as exc:
+        raise _map_error(exc) from exc
+    snapshot = frozen.snapshot
+    return DerivativeExportAgentPrepareResponse(
+        preparation=frozen.preparation_payload,
+        preparation_hash=frozen.preparation_hash,
+        snapshot_hash=snapshot.snapshot_hash,
+        manifest_hash=frozen.manifest.manifest_hash,
+        schema_version=EXPORT_PREPARATION_SCHEMA_VERSION,
+        export_version=DERIVATIVE_EXPORT_VERSION,
+        project_id=snapshot.project_id,
+        fork_id=snapshot.fork_id,
+        chapter_count=len(snapshot.chapters),
+        asset_count=len(snapshot.assets),
+        revision_count=len(snapshot.revisions),
+        citation_count=len(snapshot.citations),
+        candidate_only=True,
+    )
+
+
+def _map_materialize_error(exc: ExportMaterializationError) -> HTTPException:
+    return HTTPException(status_code=400, detail=f"{exc.code}: {exc.detail}")
+
+
+@router.post(DERIVATIVE_EXPORT_PATH + "/agent/approve")
+async def agent_approve_export(
+    project_id: int,
+    body: DerivativeExportAgentApproveRequest,
+    novel: Novel = Depends(require_owned_novel),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """Server-authoritative approve_export (39-05, candidate-only).
+
+    Binds the frozen candidate artifact revision + preparation_hash and creates
+    one pending ``approve_export`` Web ApprovalRequest. Never materializes.
+    """
+    try:
+        return await request_approve_export(
+            db,
+            owner_id=current_user.id,
+            novel_id=novel.id,
+            project_id=project_id,
+            artifact_id=body.artifact_id,
+            artifact_revision_id=body.artifact_revision_id,
+            preparation_hash=body.preparation_hash,
+            actor_id=current_user.id,
+            branch=body.branch,
+            fork=body.fork,
+            approval_note=body.approval_note,
+        )
+    except ExportMaterializationError as exc:
+        raise _map_materialize_error(exc) from exc
+
+
+@router.post(DERIVATIVE_EXPORT_PATH + "/agent/materialize")
+async def agent_materialize_export(
+    project_id: int,
+    body: DerivativeExportAgentMaterializeRequest,
+    novel: Novel = Depends(require_owned_novel),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """Deterministic materialize_export (39-05, approved-only).
+
+    Consumes an approved approve_export approval bound to the frozen artifact
+    revision + preparation_hash, promotes the candidate artifact to approved and
+    produces the reproducible bundle metadata. Download stays read-only.
+    """
+    try:
+        return await materialize_export(
+            db,
+            owner_id=current_user.id,
+            novel_id=novel.id,
+            project_id=project_id,
+            artifact_id=body.artifact_id,
+            artifact_revision_id=body.artifact_revision_id,
+            approval_id=body.approval_id,
+            preparation_hash=body.preparation_hash,
+            reason=body.reason,
+            actor_id=current_user.id,
+            branch=body.branch,
+            fork=body.fork,
+            storage=_storage(),
+        )
+    except ExportMaterializationError as exc:
+        raise _map_materialize_error(exc) from exc
+
+
 __all__ = [
     "DERIVATIVE_EXPORT_PATH",
+    "DerivativeExportAgentApproveRequest",
+    "DerivativeExportAgentMaterializeRequest",
+    "DerivativeExportAgentPrepareRequest",
+    "DerivativeExportAgentPrepareResponse",
     "DerivativeExportPrepareResponse",
     "PHASE22_TRUTH",
     "PHASE22_TRUTH_SOURCE",

@@ -16,7 +16,7 @@ import { defineTool } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { fastapiToolCall } from "./fastapi-client.js";
 
-/** 21 个域工具名（固定顺序；唯一 allowlist 事实源）。 */
+/** 23 个域工具名（固定顺序；唯一 allowlist 事实源）。 */
 export const DOMAIN_TOOL_NAMES = [
   "get_novel",
   "get_chapter",
@@ -39,6 +39,8 @@ export const DOMAIN_TOOL_NAMES = [
   "allow_divergence",
   "publish_derivative_revision",
   "publish_derivative_visual",
+  "approve_export",
+  "materialize_export",
 ] as const;
 
 /** 工具注册时的运行级授权（端用户 JWT 或 per-run 内部令牌）。 */
@@ -353,6 +355,25 @@ export function buildDomainTools(auth: ToolAuth) {
       execute: (toolCallId, params, signal) =>
         fastapiToolCall("publish_derivative_visual", params as unknown, signal, auth),
     }),
+    // ── Phase 39 derivative export action 工具（39-05）──
+    defineTool({
+      name: "approve_export",
+      label: "Approve Export (Proposal)",
+      description:
+        "Phase 39 action（REQ-FORK-05 / REQ-AGENT-03/04/07）：为已 finalize 候选 ExportPreparationArtifact 提议**一个**独立 approve_export ApprovalRequest（candidate-only）。服务端 action 只接受 owner/novel/branch/fork/project scope 内的 candidate artifact，payload_hash 绑定 artifact revision + 确定性 preparation_hash（服务端重放冻结 manifest；wrong owner/branch/fork/stale hash → fail closed）。绝不物化——只有独立 approve_export approval 被用户批准后，确定性 materializer（materialize_export）才能把候选 artifact 推进为 approved 并产出可复现 bundle；Agent 绝不写 Original Canon / 域表 / Artifact 状态 / bundle。",
+      parameters: approveExportParams(),
+      execute: (toolCallId, params, signal) =>
+        fastapiToolCall("approve_export", params as unknown, signal, auth),
+    }),
+    defineTool({
+      name: "materialize_export",
+      label: "Materialize Export (Approved Only)",
+      description:
+        "Phase 39 action（REQ-FORK-05 / REQ-AGENT-03/04/07）：确定性 materializer 消费一个已批准的 approve_export ApprovalRequest（candidate-only 边界）。只接受 owner/novel/branch/fork/project scope 内已 finalize 的候选 ExportPreparationArtifact + preparation_hash 匹配的 approve_export approval；服务端原子校验 approval action + 相同 preparation_hash 绑定 + artifact revision 血缘 + 冻结 manifest 重放，才把候选 artifact 推进为 approved 并产出可复现 bundle（Markdown/EPUB/package 由 frozen manifest 复算）。download 只读、永不改变 Artifact status / approval lineage。forged/expired/cancelled/rejected approval、stale hash、wrong scope、pending/rejected artifact → fail closed，无 bundle 或权威写入。",
+      parameters: materializeExportParams(),
+      execute: (toolCallId, params, signal) =>
+        fastapiToolCall("materialize_export", params as unknown, signal, auth),
+    }),
   ];
 }
 
@@ -501,6 +522,49 @@ function publishDerivativeVisualParams() {
     skill_version_id: Type.Optional(Type.Integer({ minimum: 1, description: "SkillVersion ID 血缘" })),
     artifact_id: Type.Optional(Type.Integer({ minimum: 1, description: "Artifact ID 血缘" })),
     artifact_revision_id: Type.Optional(Type.Integer({ minimum: 1, description: "ArtifactRevision ID 血缘" })),
+  });
+}
+
+/** Phase 39 approve_export action 工具参数（镜像 backend schemas.agent_tools）。 */
+function approveExportParams() {
+  return Type.Object({
+    novel_id: Type.Integer({ minimum: 1, description: "小说 ID" }),
+    branch: Type.Optional(Type.String({ maxLength: 80, description: "衍生分支；原始主线为 null" })),
+    fork: Type.Optional(Type.String({ maxLength: 80, description: "衍生 fork（仅 derivative mode）" })),
+    project_id: Type.Integer({ minimum: 1, description: "derivative project ID（服务端重验 owner/novel + fanfiction_canon 空间）" }),
+    artifact_id: Type.Integer({ minimum: 1, description: "候选 ExportPreparationArtifact ID（服务端重验 owner/novel + candidate status）" }),
+    artifact_revision_id: Type.Integer({ minimum: 1, description: "候选 ArtifactRevision ID（approval payload 绑定）" }),
+    preparation_hash: Type.String({
+      minLength: 64,
+      maxLength: 64,
+      pattern: "^[0-9a-f]{64}$",
+      description: "候选冻结 preparation hash（服务端从 artifact revision + 冻结 manifest 重放；stale → fail closed）",
+    }),
+    approval_note: Type.Optional(Type.String({ maxLength: 4000, description: "供 approval 展示的显式批准备注" })),
+    run_id: Type.Optional(Type.Integer({ minimum: 1, description: "SkillRun ID 血缘" })),
+    skill_version_id: Type.Optional(Type.Integer({ minimum: 1, description: "SkillVersion ID 血缘" })),
+  });
+}
+
+/** Phase 39 materialize_export action 工具参数（镜像 backend schemas.agent_tools）。 */
+function materializeExportParams() {
+  return Type.Object({
+    novel_id: Type.Integer({ minimum: 1, description: "小说 ID" }),
+    branch: Type.Optional(Type.String({ maxLength: 80, description: "衍生分支；原始主线为 null" })),
+    fork: Type.Optional(Type.String({ maxLength: 80, description: "衍生 fork（仅 derivative mode）" })),
+    project_id: Type.Integer({ minimum: 1, description: "derivative project ID（服务端重验 owner/novel + fanfiction_canon 空间）" }),
+    artifact_id: Type.Integer({ minimum: 1, description: "候选 ExportPreparationArtifact ID（只接受 approved artifact）" }),
+    artifact_revision_id: Type.Integer({ minimum: 1, description: "候选 ArtifactRevision ID（approval payload 绑定）" }),
+    approval_id: Type.Integer({ minimum: 1, description: "已批准的 approve_export ApprovalRequest ID（服务端重验 action + status + preparation_hash）" }),
+    preparation_hash: Type.String({
+      minLength: 64,
+      maxLength: 64,
+      pattern: "^[0-9a-f]{64}$",
+      description: "候选冻结 preparation hash（必须与 approve_export approval payload_hash 一致）",
+    }),
+    reason: Type.Optional(Type.String({ maxLength: 4000, description: "确定性 materialize 理由（展示/审计）" })),
+    run_id: Type.Optional(Type.Integer({ minimum: 1, description: "SkillRun ID 血缘" })),
+    skill_version_id: Type.Optional(Type.Integer({ minimum: 1, description: "SkillVersion ID 血缘" })),
   });
 }
 

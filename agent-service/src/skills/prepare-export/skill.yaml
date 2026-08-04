@@ -1,0 +1,85 @@
+# prepare-export skill 契约（REQ-FORK-05 / REQ-AGENT-02/03/04/07 / Phase 39）
+# 字段镜像 backend 注册入口（app.schemas.agent_runtime.SkillVersionRegister）。
+#
+# Phase 39 版本化 branch-aware derivative export 技能：
+#   - 本技能是 Phase 39 确定性 derivative export 域能力（39-01 frozen
+#     ExportSnapshot + sealed manifest → 39-02 bounded provenance package +
+#     three-dimension audit → 39-05 确定性 preparation/materialization）的
+#     Agent 消费边界；允许的工具 allowlist 含 4 个只读域工具 + 2 个 action 工具
+#     （approve_export / materialize_export），编排绝不越出该 allowlist
+#     （未知工具/白名单外调用 → fail closed）。
+#   - 本技能消费只读 branch 上下文（owner/novel/branch/fork 血缘绑定）+ 已
+#     approved/published derivative revisions/assets/citations/policy，产出
+#     **候选-only** ExportPreparationArtifact（完整 branch-aware 血缘，
+#     review_state 恒为 candidate）。Agent 输出恒为候选——绝不物化。
+#   - **确定性物化属于后端**：action 工具 approve_export 只为已 finalize 候选
+#     artifact 创建 pending Web ApprovalRequest（action=approve_export，
+#     payload_hash 绑定 artifact revision + 确定性 preparation_hash）。只有
+#     确定性 materializer（app.services.derivative_export.materializer.
+#     materialize_export）在独立 approval 被用户批准后原子校验 approval action
+#     + 相同 preparation_hash 绑定 + artifact revision 血缘 + owner/novel/
+#     branch/fork/project scope，才把候选 artifact 推进为 approved 并产出
+#     可复现 bundle（frozen manifest 复算）。Agent/浏览器绝不物化。
+#   - materialize_export 只接受 approved artifact + preparation_hash 匹配的
+#     approve_export ApprovalRequest；download 只读、永不改变 Artifact status
+#     或 approval lineage（D-39-02）。
+#   - **Original 权威不可变**：无任何 Original 写路径（REQ-FORK-05，D-39-02）。
+#   - write_permissions 恒为空：Agent 不直接写任何域状态（不写 Original Canon、
+#     不写 domain 表、不写 ApprovalRequest 决策、不写 Artifact 状态、不写
+#     bundle）。action 工具只创建 candidate + pending ApprovalRequest。
+#   - 版本由 `version` 钉住（当前 1.0.0）；每次 run 经 skill_version_id 绑定
+#     SkillVersion 血缘（run 绑定 owner/novel/branch/fork、SkillRun、ToolRuns、
+#     source/input hashes、model/runtime lineage、Artifact revision）。
+#   - 模型结构化输出走共享 26-06 normalizer + 严格 post-repair validator；
+#     normalization_actions / raw_hash / repaired_hash / warnings 保留在官方
+#     ExportPreparationArtifact 上。Agent 只产出候选——绝不物化（D-39-01）。
+name: prepare-export
+version: 1.0.0
+description: >-
+  Phase 39 版本化 branch-aware derivative export 技能（REQ-FORK-05 /
+  REQ-AGENT-02/03/04/07）：给定 owner/novel/branch（+ fork，derivative mode）+
+  approved/published derivative revisions/assets/citations/export policy，通过
+  4 个只读域工具 + 2 个 action 工具（approve_export / materialize_export）
+  消费 Phase 39 确定性 derivative export 域能力，产出候选
+  ExportPreparationArtifact（完整 branch-aware 血缘，review_state 恒为
+  candidate，candidate-only）。Action 工具只创建 pending Web
+  ApprovalRequest（approval 权威在 FastAPI，D-11）；只有确定性 materializer
+  （app.services.derivative_export.materializer.materialize_export）在独立
+  approval 被用户批准后原子校验 approval action + 相同 preparation_hash 绑定
+  + artifact revision 血缘 + owner/novel/branch/fork/project scope，才把候选
+  artifact 推进为 approved 并产出可复现 bundle（D-39-01/D-39-02）。materialize_export
+  只接受 approved artifact + preparation_hash 匹配的 approve_export
+  ApprovalRequest；download 只读、永不改变 Artifact status 或 approval
+  lineage。Agent/浏览器绝不物化；Original Canon 不可变、绝不覆盖。
+  未知工具/权限/血缘/schema drift/错误 owner/branch/fork/approval bypass/
+  stale hash/pending-rejected artifact/取消 → 一律 fail closed，无 bundle 或
+  权威写入。
+allowed_tools:
+  - get_novel
+  - get_chapter
+  - search_novel_text
+  - get_narrative_memory
+  - approve_export
+  - materialize_export
+read_permissions:
+  - canon
+  - fanfiction_canon
+write_permissions: []
+forbidden_spaces:
+  - canon:original
+  - user_interpretation
+  - derivative:autosave
+  - derivative:direct_write
+  - derivative_export:write
+  - approval_request
+  - materializer_service
+  - published_assets
+budget:
+  max_calls: 40
+  max_input_tokens: 40000
+  max_output_tokens: 12000
+  max_cost_usd: "4.00"
+approval_required_for:
+  - approve_export
+input_schema: ./input.schema.json
+output_schema: ./output.schema.json
