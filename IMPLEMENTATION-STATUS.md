@@ -313,3 +313,21 @@ Key metrics:
 | Alembic | 单 head `20260801_illustration_anchors` | `alembic heads` |
 | 已知环境限制 | 同前：e2e Next dev server 编译失败、openapi subprocess 挂起、live UAT 需 provider key、前端 29 typecheck 遗留 | 2026-08-04 本机 |
 | 仍阻塞 | Phase 22 Nightly 3/3 未达成（0/3）；Phase 35 执行需 Phase 22 3/3 + 34-VERIFICATION（已存在）或进一步 override | `.planning/STATE.md` |
+
+---
+
+## 2026-08-04 快照（Phase 35 实现并验证；snapshot: master @ 5992c25）
+
+以下事实覆盖上文旧节中的对应记录：
+
+| 项 | 当前值 | 证据 |
+|---|---|---|
+| Phase 35 Triple Knowledge Spaces and Canon Fork | **VERIFIED 2026-08-04** | `35-VERIFICATION.md` passed（source_commit `5992c25`） |
+| 后端测试 | **1720 passed**（unit 1052 + canon_fork unit 50 + integration 43 + adversarial 329 + agent_runtime 219 + ci 37） | 独立测试子代理 2026-08-04 |
+| agent-service | **825 passed / 21 files**；tsc 0 errors | `cd agent-service && npx vitest run` |
+| 前端 | **386 passed / 44 files** | `cd frontend && npx vitest run` |
+| Canon Fork | 三空间不可混用契约、fork snapshot/cutoff、检索/引用隔离、负向污染 guard、create-canon-fork skill + 确定性 materializer | `backend/app/services/canon_fork/` + `backend/app/models/canon_space.py` |
+| Agent skills | 11 skills：+create-canon-fork | `agent-service/src/skills/` |
+| Alembic | 单 head `20260801_canon_contamination04` | `alembic heads` |
+| 已知环境限制 | 同前：e2e Next dev server 编译失败、openapi subprocess 挂起、live UAT 需 provider key、前端 29 typecheck 遗留 | 2026-08-04 本机 |
+| 仍阻塞 | Phase 22 Nightly 3/3 未达成（0/3）；Phase 36 执行继续在 35-39 override 下 | `.planning/STATE.md` |
