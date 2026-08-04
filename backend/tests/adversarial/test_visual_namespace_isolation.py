@@ -62,6 +62,18 @@ MIGRATION_SOURCE = (
     BACKEND_ROOT / "migrations" / "versions" / "38_derivative_visual01.py"
 ).read_text(encoding="utf-8")
 
+# Phase 38-04: independent review seam + review API + frontend review panel.
+REVIEW_SOURCE = (
+    BACKEND_ROOT / "app" / "services" / "derivative_visual" / "review.py"
+).read_text(encoding="utf-8")
+REVIEW_API_SOURCE = (
+    BACKEND_ROOT / "app" / "api" / "derivative_visual_review.py"
+).read_text(encoding="utf-8")
+FRONTEND_ROOT = BACKEND_ROOT.parent / "frontend"
+REVIEW_PANEL_SOURCE = (
+    FRONTEND_ROOT / "src" / "components" / "writing" / "visual-review-panel.tsx"
+).read_text(encoding="utf-8")
+
 HEX64 = "a" * 64
 
 
@@ -557,3 +569,138 @@ def test_scene_spec_is_owner_scoped_in_api_and_service():
     # The API never bypasses the owner-scoped service seam.
     assert "require_owned_novel" in API_SOURCE
     assert "DerivativeSceneSpecService(db)" in API_SOURCE
+
+
+# ---------------------------------------------------------------------------
+# Phase 38-04: independent review seam + review API + frontend review panel
+# ---------------------------------------------------------------------------
+
+
+def test_review_seam_has_no_db_get_bypass_and_is_owner_novel_scoped():
+    # T-38-04-01: the review seam never loads a candidate by primary key
+    # without the owner/novel scope filter — a bare db.get bypass would break
+    # the owner boundary (a foreign owner could approve someone else's asset).
+    assert "DerivativeVisualCandidateAsset.owner_id == owner_id" in REVIEW_SOURCE
+    assert "DerivativeVisualCandidateAsset.novel_id == novel_id" in REVIEW_SOURCE
+    tree = ast.parse(REVIEW_SOURCE)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call) and getattr(node.func, "attr", "") in {
+            "get",
+            "get_one",
+        }:
+            raise AssertionError(
+                f"review seam db.get bypass found at line {node.lineno}"
+            )
+
+
+def test_review_seam_never_writes_original_and_keeps_original_namespace_sealed():
+    # T-38-04-02: source-hash immutability — the review seam has no Original
+    # Visual Bible write path and never instantiates an Original row.
+    assert "visual_bible_versions" not in REVIEW_SOURCE
+    assert "VisualBibleVersion(" not in REVIEW_SOURCE
+    # The Original Canon namespace never appears anywhere in the seam; the
+    # sealed derivative namespace is enforced by the DTO/model, never here.
+    assert "original_canon" not in REVIEW_SOURCE
+    assert "user_interpretation" not in REVIEW_SOURCE
+
+
+def test_review_state_machine_is_fail_closed_for_blocked_and_terminal_states():
+    # The deterministic transition map (schemas/derivative_visual_asset.py) is
+    # the single source of truth; the review seam reuses it and cannot bypass
+    # it. ``blocked`` (identity drift / undeclared divergence) has an empty
+    # legal action set, so approval always fails closed.
+    from app.schemas.derivative_visual_asset import (
+        DerivativeAssetGateError,
+        DerivativeAssetReviewAction,
+        DerivativeVisualAssetState,
+        derivative_asset_review_state_after,
+        is_legal_derivative_asset_review_action,
+    )
+
+    assert not is_legal_derivative_asset_review_action(
+        DerivativeVisualAssetState.BLOCKED, DerivativeAssetReviewAction.APPROVE
+    )
+    assert not is_legal_derivative_asset_review_action(
+        DerivativeVisualAssetState.BLOCKED, DerivativeAssetReviewAction.REJECT
+    )
+    assert not is_legal_derivative_asset_review_action(
+        DerivativeVisualAssetState.BLOCKED, DerivativeAssetReviewAction.SUPERSEDE
+    )
+    # A blocked candidate can never be approved: the state-after helper raises.
+    with pytest.raises(DerivativeAssetGateError, match="illegal"):
+        derivative_asset_review_state_after(
+            DerivativeVisualAssetState.BLOCKED, DerivativeAssetReviewAction.APPROVE
+        )
+    # superseded is terminal too.
+    assert not is_legal_derivative_asset_review_action(
+        DerivativeVisualAssetState.SUPERSEDED, DerivativeAssetReviewAction.APPROVE
+    )
+    with pytest.raises(DerivativeAssetGateError, match="illegal"):
+        derivative_asset_review_state_after(
+            DerivativeVisualAssetState.SUPERSEDED, DerivativeAssetReviewAction.APPROVE
+        )
+    # An already-approved candidate cannot be approved again.
+    assert not is_legal_derivative_asset_review_action(
+        DerivativeVisualAssetState.APPROVED, DerivativeAssetReviewAction.APPROVE
+    )
+    with pytest.raises(DerivativeAssetGateError, match="illegal"):
+        derivative_asset_review_state_after(
+            DerivativeVisualAssetState.APPROVED, DerivativeAssetReviewAction.APPROVE
+        )
+    # The only explicit path to ``approved`` is an approve action from a
+    # candidate/needs_review state.
+    assert (
+        derivative_asset_review_state_after(
+            DerivativeVisualAssetState.CANDIDATE, DerivativeAssetReviewAction.APPROVE
+        )
+        is DerivativeVisualAssetState.APPROVED
+    )
+    assert (
+        derivative_asset_review_state_after(
+            DerivativeVisualAssetState.NEEDS_REVIEW,
+            DerivativeAssetReviewAction.APPROVE,
+        )
+        is DerivativeVisualAssetState.APPROVED
+    )
+    # The review seam actually applies the legal-transition check before any
+    # event is appended (defense-in-depth, not only the store layer).
+    assert "is_legal_derivative_asset_review_action" in REVIEW_SOURCE
+    assert "derivative_asset_review_state_after" in REVIEW_SOURCE
+
+
+def test_review_api_uses_owned_novel_and_uniform_404():
+    # T-38-04-01: the review API starts from require_owned_novel (a mismatched
+    # owner/novel is an identical 404) and converts scope/not-found failures to
+    # one uniform 404 detail — no owner enumeration.
+    assert "require_owned_novel" in REVIEW_API_SOURCE
+    assert "require_user" in REVIEW_API_SOURCE
+    assert "extra=\"forbid\"" in REVIEW_API_SOURCE
+    assert "derivative review candidate not found in scope" in REVIEW_API_SOURCE
+    assert "status_code=404" in REVIEW_API_SOURCE
+    # A blocked approval must fail closed with a conflict (409), never 200.
+    assert "status_code=409" in REVIEW_API_SOURCE
+
+
+def test_review_panel_requires_explicit_reason_and_has_no_auto_approve():
+    # The review panel renders explicit approve/reject/supersede buttons that
+    # stay disabled until a reason is typed, and it never auto-approves.
+    assert "derivative-review-action-${action}" in REVIEW_PANEL_SOURCE
+    assert "LEGAL_DERIVATIVE_REVIEW_ACTIONS" in REVIEW_PANEL_SOURCE
+    # The legal-action mirror covers the full closed action vocabulary.
+    assert '"approve", "reject", "supersede"' in REVIEW_PANEL_SOURCE
+    assert "blocked: []" in REVIEW_PANEL_SOURCE
+    assert "superseded: []" in REVIEW_PANEL_SOURCE
+    # No auto-approve: the action is gated on a non-empty trimmed reason.
+    assert "if (!trimmed) return;" in REVIEW_PANEL_SOURCE
+    assert "disabled={submitting || !reason.trim()}" in REVIEW_PANEL_SOURCE
+    # The blocked/terminal states render a locked state with no action bar.
+    assert "derivative-review-locked" in REVIEW_PANEL_SOURCE
+    assert "derivative-review-actions" in REVIEW_PANEL_SOURCE
+    # The panel only submits the explicit action + from_review_state to the
+    # server; review truth is never stored client-side.
+    assert "from_review_state" in REVIEW_PANEL_SOURCE
+    assert 'actor_source: "human"' in REVIEW_PANEL_SOURCE
+    # No unsafe rendering path in the panel (no dangerouslySetInnerHTML and no
+    # direct .innerHTML assignment; the docstring may name the rule itself).
+    assert "dangerouslySetInnerHTML" not in REVIEW_PANEL_SOURCE
+    assert ".innerHTML" not in REVIEW_PANEL_SOURCE

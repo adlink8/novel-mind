@@ -14,6 +14,7 @@ import { useCallback, useEffect, useState } from "react";
 import { GitBranch, Loader2, Plus } from "lucide-react";
 
 import { MarkdownEditor } from "@/components/writing/markdown-editor";
+import { VisualReviewPanel } from "@/components/writing/visual-review-panel";
 import { PageContainer, PageHeader } from "@/components/page-header";
 import { novelsApi, type Novel } from "@/lib/api";
 import {
@@ -274,6 +275,12 @@ export default function WritingPage() {
         </div>
         <p className="mt-5 text-xs text-muted-foreground">{status}</p>
       </section>
+
+      {novelId != null ? (
+        <section className="rounded-3xl border border-border bg-secondary/40 p-5 sm:p-6">
+          <VisualReviewPanel novelId={novelId} />
+        </section>
+      ) : null}
     </PageContainer>
   );
 }

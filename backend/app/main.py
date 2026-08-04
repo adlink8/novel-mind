@@ -64,6 +64,7 @@ from app.api.derivative_generation import router as derivative_generation_router
 from app.api.derivative_overrides import router as derivative_overrides_router
 from app.api.derivative_visual import router as derivative_visual_router
 from app.api.derivative_visual_assets import router as derivative_visual_assets_router
+from app.api.derivative_visual_review import router as derivative_visual_review_router
 from app.api.agent_derivative_edits import router as agent_derivative_edits_router
 from app.config import settings
 from app.core.logging import RequestLoggingMiddleware, setup_logging
@@ -361,6 +362,11 @@ app.include_router(
     derivative_visual_assets_router,
     prefix="/api/novels",
     tags=["Derivative Visual Assets"],
+)
+app.include_router(
+    derivative_visual_review_router,
+    prefix="/api/novels",
+    tags=["Derivative Visual Review"],
 )
 app.include_router(
     agent_derivative_edits_router,
