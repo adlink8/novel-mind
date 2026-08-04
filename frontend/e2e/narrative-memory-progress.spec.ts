@@ -146,13 +146,13 @@ test.describe("narrative-memory progress panel (Phase 28-04)", () => {
       "data-status",
       "partial"
     );
-    await expect(page.getByTestId("nm-dimension-status-world")).toHaveTextContent(
+    await expect(page.getByTestId("nm-dimension-status-world")).toContainText(
       "阻塞"
     );
-    await expect(page.getByTestId("nm-dimension-reason-world")).toHaveTextContent(
+    await expect(page.getByTestId("nm-dimension-reason-world")).toContainText(
       "no_candidate_content"
     );
-    await expect(page.getByTestId("nm-candidate-badge")).toHaveTextContent(
+    await expect(page.getByTestId("nm-candidate-badge")).toContainText(
       "candidate_preview"
     );
     await expect(page.getByTestId("nm-manifest-checksum")).toContainText(
@@ -161,7 +161,7 @@ test.describe("narrative-memory progress panel (Phase 28-04)", () => {
     await expect(page.getByTestId("nm-resume-state")).toContainText(
       "DB checkpoint 权威"
     );
-    await expect(page.getByTestId("nm-progress-value")).toHaveTextContent("60%");
+    await expect(page.getByTestId("nm-progress-value")).toContainText("60%");
   });
 
   test("reload refetches the DB-backed report (browser memory is never authority)", async ({
@@ -189,7 +189,7 @@ test.describe("narrative-memory progress panel (Phase 28-04)", () => {
     await expect(page.getByTestId("nm-manifest-checksum")).toContainText(
       MANIFEST.slice(0, 12)
     );
-    await expect(page.getByTestId("nm-resume-count")).toHaveTextContent("×1");
+    await expect(page.getByTestId("nm-resume-count")).toContainText("×1");
   });
 
   test("UI never calls the removed /analyze/stream endpoint", async ({ page }) => {

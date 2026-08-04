@@ -107,7 +107,19 @@ async function mockAuthAndNovel(page: Page) {
 }
 
 async function mockConversations(page: Page, messages: unknown[]) {
-  const conversations = [
+  const conversations: Array<{
+    id: number;
+    novel_id: number;
+    title: string;
+    status: string;
+    next_sequence: number;
+    last_opened_at: string | null;
+    created_at: string;
+    updated_at: string;
+    last_message_sequence: number | null;
+    last_message_role: string | null;
+    last_message_at: string | null;
+  }> = [
     {
       id: 1,
       novel_id: 11,
@@ -233,7 +245,7 @@ test("analysis chat exposes the shared QueryPlan trace (chapter_range anchor)", 
   await page.goto("/analysis?novel=11");
 
   await expect(page.getByTestId("analysis-chat-panel")).toBeVisible();
-  await expect(page.getByTestId("analysis-chat-msg-anchor-10")).toHaveTextContent(
+  await expect(page.getByTestId("analysis-chat-msg-anchor-10")).toContainText(
     "范围：第 1–2 章"
   );
   const trace = page.getByTestId("analysis-chat-queryplan-11");

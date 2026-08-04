@@ -459,19 +459,19 @@ test.describe("derivative export browser UAT", () => {
     await readyPanel(page);
 
     // Provenance + counts come from the approved artifact envelope.
-    await expect(page.getByTestId("derivative-export-approved-badge")).toHaveTextContent("已批准");
-    await expect(page.getByTestId("derivative-export-preparation-id")).toHaveTextContent(`#${ARTIFACT_ID}`);
-    await expect(page.getByTestId("derivative-export-revision")).toHaveTextContent(`#${REVISION_ID}`);
-    await expect(page.getByTestId("derivative-export-version")).toHaveTextContent("v1.0.0");
+    await expect(page.getByTestId("derivative-export-approved-badge")).toContainText("已批准");
+    await expect(page.getByTestId("derivative-export-preparation-id")).toContainText(`#${ARTIFACT_ID}`);
+    await expect(page.getByTestId("derivative-export-revision")).toContainText(`#${REVISION_ID}`);
+    await expect(page.getByTestId("derivative-export-version")).toContainText("v1.0.0");
     await expect(page.getByTestId("derivative-export-manifest-checksum")).toContainText(
       MANIFEST_CHECKSUM.slice(0, 8)
     );
-    await expect(page.getByTestId("derivative-export-counts")).toHaveTextContent(
+    await expect(page.getByTestId("derivative-export-counts")).toContainText(
       "2 章 · 1 资产 · 1 引用 · 2 修订"
     );
     // Three-dimension audit: quality blocked (Phase 22 0/3), never green.
     await expect(page.getByTestId("derivative-export-audit")).toHaveAttribute("data-verdict", "blocked");
-    await expect(page.getByTestId("derivative-export-phase22")).toHaveTextContent("0/3");
+    await expect(page.getByTestId("derivative-export-phase22")).toContainText("0/3");
 
     // The browser submits the approved artifact's materialize request only.
     await page.getByTestId("derivative-export-button-markdown").click();
@@ -493,8 +493,8 @@ test.describe("derivative export browser UAT", () => {
     // EPUB, missing TLS/backup/monitoring evidence, Phase 22 0/3) keeps the
     // verdict blocked — the UI never renders a promotion / green state.
     await expect(page.getByTestId("derivative-export-audit")).toHaveAttribute("data-verdict", "blocked");
-    await expect(page.getByTestId("derivative-export-verdict")).toHaveTextContent("阻断（不可发布）");
-    await expect(page.getByTestId("derivative-export-phase22")).toHaveTextContent("0/3");
+    await expect(page.getByTestId("derivative-export-verdict")).toContainText("阻断（不可发布）");
+    await expect(page.getByTestId("derivative-export-phase22")).toContainText("0/3");
     await expect(page.getByText("阻断（不可发布）")).toHaveCount(1);
     await expect(page.getByText("合格候选")).toHaveCount(0);
   });
@@ -522,7 +522,7 @@ test.describe("derivative export browser UAT", () => {
 
     await page.reload();
     await readyPanel(page);
-    await expect(page.getByTestId("derivative-export-preparation-id")).toHaveTextContent(`#${ARTIFACT_ID}`);
+    await expect(page.getByTestId("derivative-export-preparation-id")).toContainText(`#${ARTIFACT_ID}`);
     await expect(page.getByTestId("derivative-export-audit")).toHaveAttribute("data-verdict", "blocked");
 
     await page.getByTestId("derivative-export-button-markdown").click();
@@ -564,7 +564,7 @@ test.describe("derivative export browser UAT", () => {
 
     await gotoWriting(page);
     // No content leak: the panel reports the explicit empty state, no export actions.
-    await expect(page.getByTestId("derivative-export-empty")).toHaveTextContent(
+    await expect(page.getByTestId("derivative-export-empty")).toContainText(
       "没有已批准的导出准备",
       { timeout: 20_000 }
     );
@@ -590,7 +590,7 @@ test.describe("derivative export browser UAT", () => {
     state.approvalStatus = "pending";
     await mockApp(page, state);
     await gotoWriting(page);
-    await expect(page.getByTestId("derivative-export-empty")).toHaveTextContent(
+    await expect(page.getByTestId("derivative-export-empty")).toContainText(
       "没有已批准的导出准备",
       { timeout: 20_000 }
     );
