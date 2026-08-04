@@ -276,3 +276,21 @@ Key metrics:
 | Alembic | 单 head `20260801_prompt_review_events` | `alembic heads` |
 | 已知环境限制 | 同前：e2e Next dev server 编译失败、openapi subprocess 挂起、`test_postgres_migrations.py` 过期 head pin、live UAT 需 provider key、前端 29 typecheck 遗留 | 2026-08-03 本机 |
 | 仍阻塞 | Phase 22 Nightly 3/3 未达成（0/3）；Phase 33 执行需 Phase 22 3/3 + 32-VERIFICATION（已存在）或进一步 override | `.planning/STATE.md` |
+
+---
+
+## 2026-08-04 快照（Phase 33 实现并验证；snapshot: master @ 1b8a658）
+
+以下事实覆盖上文旧节中的对应记录：
+
+| 项 | 当前值 | 证据 |
+|---|---|---|
+| Phase 33 Illustration Generation & Consistency | **VERIFIED 2026-08-04** | `33-VERIFICATION.md` passed（source_commit `1b8a658`） |
+| 后端测试 | **1485 passed**（unit 927 + illustrations unit 52 + integration 30 + adversarial 251 + agent_runtime 188 + ci 37） | 独立测试子代理 2026-08-03/04 |
+| agent-service | **714 passed / 19 files**；tsc 0 errors | `cd agent-service && npx vitest run` |
+| 前端 | **367 passed / 42 files** | `cd frontend && npx vitest run` |
+| Illustration | job/asset/budget 契约、mock 生成 + durable worker + 存储、identity/style 一致性评分、review/compare/approval 工作流、illustrate-scene skill（工具 14） | `backend/app/services/illustrations/` + `frontend/src/components/illustrations/` |
+| Agent skills | 9 skills：+illustrate-scene | `agent-service/src/skills/` |
+| Alembic | 单 head `20260801_illustration_jobs` | `alembic heads` |
+| 已知环境限制 | 同前：e2e Next dev server 编译失败、openapi subprocess 挂起、live UAT 需 provider key、前端 29 typecheck 遗留 | 2026-08-04 本机 |
+| 仍阻塞 | Phase 22 Nightly 3/3 未达成（0/3）；Phase 34 执行需 Phase 22 3/3 + 33-VERIFICATION（已存在）或进一步 override | `.planning/STATE.md` |
