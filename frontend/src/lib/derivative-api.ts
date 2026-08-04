@@ -144,6 +144,108 @@ export interface DerivativeChapterPatchBody {
 export interface DerivativeChapterReorderResponse extends DerivativeChapterListResponse {}
 
 // ---------------------------------------------------------------------------
+// Derivative chapter revision / autosave / diff / rollback (Phase 36-03/04)
+// ---------------------------------------------------------------------------
+
+/** Why an immutable revision row exists; release is never a row kind (D-36-02). */
+export type DerivativeRevisionKind = "create" | "autosave" | "rollback";
+
+/** Rollback journal: explicit owner actions are approved; drafts are not. */
+export type DerivativeRevisionApproval = "not_required" | "approved";
+
+/** History row without the full content (keeps the listing lean). */
+export interface DerivativeRevisionSummary {
+  id: number;
+  chapter_id: number;
+  project_id: number;
+  revision_number: number;
+  parent_revision_id: number | null;
+  kind: DerivativeRevisionKind;
+  content_checksum: string;
+  actor_id: number | null;
+  reason: string | null;
+  approval_state: DerivativeRevisionApproval;
+  created_at: string;
+}
+
+/** Full immutable revision row, including the canonical Markdown snapshot. */
+export interface DerivativeRevisionView extends DerivativeRevisionSummary {
+  owner_id: number;
+  novel_id: number;
+  content: string;
+  updated_at: string;
+}
+
+export interface DerivativeRevisionHistoryResponse {
+  chapter_id: number;
+  project_id: number;
+  total: number;
+  items: DerivativeRevisionSummary[];
+}
+
+/** Client intent: save the current Markdown draft under a CAS token. */
+export interface DerivativeAutosaveBody {
+  content: string;
+  base_revision: number;
+}
+
+export interface DerivativeAutosaveResponse {
+  status: "saved" | "noop";
+  chapter: DerivativeChapterView;
+  revision: DerivativeRevisionView;
+  message: string | null;
+}
+
+/** One deterministic diff line inside a hunk. */
+export interface DerivativeDiffLine {
+  op: "context" | "add" | "delete";
+  text: string;
+}
+
+/** One contiguous changed region (unified-diff style, 1-based line numbers). */
+export interface DerivativeDiffHunk {
+  old_start: number;
+  old_count: number;
+  new_start: number;
+  new_count: number;
+  lines: DerivativeDiffLine[];
+}
+
+export interface DerivativeDiffResponse {
+  base_revision_id: number;
+  base_revision_number: number;
+  target_revision_id: number;
+  target_revision_number: number;
+  additions: number;
+  deletions: number;
+  hunks: DerivativeDiffHunk[];
+}
+
+/** Client intent: restore a historical revision as a NEW child snapshot. */
+export interface DerivativeRollbackBody {
+  target_revision_id: number;
+  reason?: string | null;
+  /** Optimistic-concurrency token; a stale value is rejected (409). */
+  base_revision: number;
+}
+
+export interface DerivativeRollbackResponse {
+  chapter: DerivativeChapterView;
+  revision: DerivativeRevisionView;
+  target_revision_id: number;
+  message: string | null;
+}
+
+/** 409 conflict carries the latest head so the stale client can recover. */
+export interface DerivativeConflictDetail {
+  code?: string;
+  message?: string;
+  current_revision_number?: number;
+  current_checksum?: string;
+  current_revision?: DerivativeRevisionView;
+}
+
+// ---------------------------------------------------------------------------
 // API client
 // ---------------------------------------------------------------------------
 
@@ -211,5 +313,70 @@ export const derivativeApi = {
   ) =>
     api.delete(
       `/novels/${novelId}/derivative-projects/${projectId}/chapters/${chapterId}`
+    ),
+
+  // ---- Revision surface (Phase 36-03) ----
+
+  /** Conditional-CAS draft autosave; a stale base is a 409 carrying the head. */
+  autosaveChapter: (
+    novelId: number | string,
+    projectId: number,
+    chapterId: number,
+    body: DerivativeAutosaveBody
+  ) =>
+    api.post<DerivativeAutosaveResponse>(
+      `/novels/${novelId}/derivative-projects/${projectId}/chapters/${chapterId}/autosave`,
+      body
+    ),
+
+  /** Newest-first append-only history of one chapter. */
+  listRevisions: (
+    novelId: number | string,
+    projectId: number,
+    chapterId: number
+  ) =>
+    api.get<DerivativeRevisionHistoryResponse>(
+      `/novels/${novelId}/derivative-projects/${projectId}/chapters/${chapterId}/revisions`
+    ),
+
+  /** Read one immutable revision; a foreign/missing revision is an identical 404. */
+  getRevision: (
+    novelId: number | string,
+    projectId: number,
+    chapterId: number,
+    revisionId: number
+  ) =>
+    api.get<DerivativeRevisionView>(
+      `/novels/${novelId}/derivative-projects/${projectId}/chapters/${chapterId}/revisions/${revisionId}`
+    ),
+
+  /** Deterministic canonical-Markdown diff from base to target revision. */
+  diffRevisions: (
+    novelId: number | string,
+    projectId: number,
+    chapterId: number,
+    baseRevisionId: number,
+    targetRevisionId: number
+  ) =>
+    api.get<DerivativeDiffResponse>(
+      `/novels/${novelId}/derivative-projects/${projectId}/chapters/${chapterId}/diff`,
+      {
+        params: {
+          base_revision_id: baseRevisionId,
+          target_revision_id: targetRevisionId,
+        },
+      }
+    ),
+
+  /** Restore a target revision as a NEW child; history is never overwritten. */
+  rollbackChapter: (
+    novelId: number | string,
+    projectId: number,
+    chapterId: number,
+    body: DerivativeRollbackBody
+  ) =>
+    api.post<DerivativeRollbackResponse>(
+      `/novels/${novelId}/derivative-projects/${projectId}/chapters/${chapterId}/rollback`,
+      body
     ),
 };

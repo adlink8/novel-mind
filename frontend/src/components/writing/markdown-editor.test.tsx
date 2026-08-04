@@ -7,6 +7,10 @@ const mocks = vi.hoisted(() => ({
   createChapter: vi.fn(),
   reorderChapters: vi.fn(),
   deleteChapter: vi.fn(),
+  listRevisions: vi.fn(),
+  getRevision: vi.fn(),
+  diffRevisions: vi.fn(),
+  rollbackChapter: vi.fn(),
 }));
 
 vi.mock("@/lib/derivative-api", () => ({
@@ -16,6 +20,10 @@ vi.mock("@/lib/derivative-api", () => ({
     createChapter: mocks.createChapter,
     reorderChapters: mocks.reorderChapters,
     deleteChapter: mocks.deleteChapter,
+    listRevisions: mocks.listRevisions,
+    getRevision: mocks.getRevision,
+    diffRevisions: mocks.diffRevisions,
+    rollbackChapter: mocks.rollbackChapter,
   },
 }));
 
@@ -104,6 +112,71 @@ beforeEach(() => {
   });
   mocks.reorderChapters.mockResolvedValue({ data: { items: [chapterB, chapterA] } });
   mocks.deleteChapter.mockResolvedValue({});
+  mocks.listRevisions.mockResolvedValue({
+    data: {
+      chapter_id: 10,
+      project_id: 5,
+      total: 1,
+      items: [
+        {
+          id: 30,
+          chapter_id: 10,
+          project_id: 5,
+          revision_number: 2,
+          parent_revision_id: 10,
+          kind: "autosave",
+          content_checksum: H64,
+          actor_id: 1,
+          reason: null,
+          approval_state: "not_required",
+          created_at: "2026-08-04T00:00:02Z",
+        },
+        {
+          id: 10,
+          chapter_id: 10,
+          project_id: 5,
+          revision_number: 1,
+          parent_revision_id: null,
+          kind: "create",
+          content_checksum: H64,
+          actor_id: 1,
+          reason: null,
+          approval_state: "not_required",
+          created_at: "2026-08-04T00:00:01Z",
+        },
+      ],
+    },
+  });
+  mocks.getRevision.mockResolvedValue({
+    data: {
+      ...chapterA,
+      id: 10,
+      content: "## 开场\n服务器端更新",
+      updated_at: "2026-08-04T00:00:00Z",
+    },
+  });
+  mocks.diffRevisions.mockResolvedValue({
+    data: {
+      base_revision_id: 10,
+      base_revision_number: 1,
+      target_revision_id: 30,
+      target_revision_number: 2,
+      additions: 1,
+      deletions: 1,
+      hunks: [
+        {
+          old_start: 1,
+          old_count: 1,
+          new_start: 1,
+          new_count: 1,
+          lines: [
+            { op: "delete", text: "正文" },
+            { op: "add", text: "服务器端更新" },
+          ],
+        },
+      ],
+    },
+  });
 });
 
 afterEach(() => cleanup());
@@ -219,6 +292,31 @@ describe("MarkdownEditor", () => {
     await screen.findByText(/第一章/);
     // No archived state here — but the read-only surface must not offer a
     // publish action; the component never renders a publish control.
+    expect(screen.queryByRole("button", { name: /发布/i })).not.toBeInTheDocument();
+  });
+
+  it("embeds the revision history/recovery/rollback panel (36-04)", async () => {
+    // Render with the server-updated chapter (revision 2) so the history head
+    // v2 matches the editor's CAS token.
+    renderEditor([serverChapterA]);
+    await screen.findByText(/第一章/);
+
+    // The embedded panel is present and closed by default (no hidden fetches).
+    expect(screen.getByTestId("revision-history")).toBeInTheDocument();
+    expect(mocks.listRevisions).not.toHaveBeenCalled();
+    expect(screen.getByTestId("revision-history-summary")).toHaveTextContent("当前 v2");
+
+    // Opening it fetches the newest-first immutable history for the chapter.
+    fireEvent.click(screen.getByTestId("revision-history-toggle"));
+    await waitFor(() => expect(mocks.listRevisions).toHaveBeenCalledWith(11, 5, 10));
+    const rows = await screen.findAllByTestId("revision-row");
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toHaveTextContent("v2");
+    // The non-head row offers an explicit two-step rollback control.
+    expect(
+      rows[1].querySelector('[data-testid="revision-rollback"]')
+    ).not.toBeNull();
+    // No publish action exists anywhere on the editor surface.
     expect(screen.queryByRole("button", { name: /发布/i })).not.toBeInTheDocument();
   });
 });

@@ -36,10 +36,19 @@ export default function WritingPage() {
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState("加载书架中…");
 
+  // Phase 36-04 refresh recovery: remember the selected project per novel so a
+  // page reload restores the working project instead of always the first one.
+
   const selectProject = useCallback((next: DerivativeProjectView | null) => {
     setProject(next);
     setChapters([]);
     setError(null);
+    if (next) {
+      window.sessionStorage.setItem(
+        `novelmind:writing:project:${next.novel_id}`,
+        String(next.id)
+      );
+    }
   }, []);
 
   // 1. Load the owner's shelf.
@@ -76,7 +85,14 @@ export default function WritingPage() {
             ? "选择或创建 derivative project 开始写作"
             : "还没有项目；用显式 fork 创建一个"
         );
-        selectProject(items[0] ?? null);
+        // Refresh recovery: restore the project selected before the reload when
+        // it still exists in this novel's owner-scoped list.
+        const remembered = window.sessionStorage.getItem(
+          `novelmind:writing:project:${novelId}`
+        );
+        selectProject(
+          items.find((item) => String(item.id) === remembered) ?? items[0] ?? null
+        );
       })
       .catch(() => setStatus("项目或 fork 加载失败，请稍后重试"));
     // selectProject is a stable useCallback([]); the novel switch runs once.

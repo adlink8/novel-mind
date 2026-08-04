@@ -27,6 +27,7 @@ import type {
   DerivativeChapterView,
   DerivativeProjectView,
 } from "@/lib/derivative-api";
+import { RevisionHistory } from "./revision-history";
 
 export type EditorSaveState =
   | "idle"
@@ -184,6 +185,32 @@ export function MarkdownEditor({
       setErrorText("重新加载失败，请稍后重试。");
     }
   }, [novelId, project.id, onChaptersChange]);
+
+  // Phase 36-04: a historical snapshot is loaded back into the editor as a
+  // pending draft; it flows through the same CAS autosave as any edit.
+  const recoverDraft = useCallback((markdown: string) => {
+    setMarkdownDraft(markdown);
+    setSaveState("dirty");
+    setErrorText(null);
+  }, []);
+
+  // Phase 36-04: apply the server-returned chapter after a confirmed rollback.
+  // The new head (content + CAS token) is taken from the actual response, so
+  // the UI never fabricates a rollback success (T-36-04-02).
+  const applyRollback = useCallback(
+    (next: DerivativeChapterView, message: string | null) => {
+      const updated = (chaptersRef.current ?? []).map((c) =>
+        c.id === next.id ? next : c
+      );
+      chaptersRef.current = updated;
+      onChaptersChange(updated);
+      setTitleDraft(next.title);
+      setMarkdownDraft(next.markdown);
+      setSaveState("idle");
+      setErrorText(message ? `已回滚：${message}` : "已回滚到所选版本");
+    },
+    [onChaptersChange]
+  );
 
   const createChapter = async () => {
     if (blocked) return;
@@ -457,6 +484,18 @@ export function MarkdownEditor({
             </div>
           )}
         </div>
+      </div>
+
+      <div className="mt-5">
+        <RevisionHistory
+          novelId={novelId}
+          project={project}
+          chapter={selected}
+          saveState={saveState}
+          onRecoverDraft={recoverDraft}
+          onRollbackApplied={applyRollback}
+          readOnly={blocked}
+        />
       </div>
     </section>
   );
