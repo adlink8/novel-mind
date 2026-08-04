@@ -69,6 +69,23 @@ DERIVATIVE_VISUAL_AUTHORITY_LABELS = (
     "user_interpretation",
 )
 
+# Phase 38-03: candidate asset review/consistency vocabularies (D-38-03).
+# ``blocked`` = deterministic identity drift / undeclared divergence — the
+# asset can never be published. ``needs_review`` = concern/unavailable signal;
+# only an explicit human ``approved`` state ever becomes reader-visible.
+DERIVATIVE_ASSET_STATES = (
+    "candidate",
+    "needs_review",
+    "approved",
+    "rejected",
+    "superseded",
+    "blocked",
+)
+DERIVATIVE_ASSET_ACTIONS = ("approve", "reject", "supersede")
+DERIVATIVE_CONSISTENCY_VERDICTS = ("pass", "concern", "fail", "unavailable")
+# D-38-01: candidate bytes share the sealed derivative Visual Bible namespace.
+DERIVATIVE_ASSET_NAMESPACE = DERIVATIVE_VISUAL_NAMESPACE
+
 
 def _sql_values(values: tuple[str, ...]) -> str:
     return ",".join(f"'{value}'" for value in values)
@@ -496,6 +513,234 @@ class DerivativeVisualReviewEvent(TimestampMixin, Base):
     details: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
 
 
+class DerivativeVisualCandidateAsset(TimestampMixin, Base):
+    """Immutable derivative asset candidate (D-38-03, REQ-FORK-04/REQ-CRE-06).
+
+    One provider output stored as write-only candidate bytes under the
+    allowlisted derivative storage root. The row carries a generated
+    ``asset_id``, the replayed content checksum, the frozen canonical
+    ``scene_spec_hash`` the asset is bound to, the full identity/source/
+    generator lineage and the deterministic cross-chapter consistency review
+    signal. Only the ``review_state`` projection may move (candidate /
+    needs_review / approved / rejected / superseded / blocked); every other
+    column is frozen and content rows are append-only, so an Original Visual
+    Bible asset can never be overwritten and a candidate can never silently
+    become canon.
+    """
+
+    __tablename__ = "derivative_visual_candidates"
+    __table_args__ = (
+        UniqueConstraint(
+            "owner_id",
+            "novel_id",
+            "id",
+            name="uq_derivative_visual_candidates_scope",
+        ),
+        UniqueConstraint(
+            "owner_id",
+            "novel_id",
+            "visual_version_id",
+            "asset_key",
+            name="uq_derivative_visual_candidates_key",
+        ),
+        UniqueConstraint(
+            "owner_id",
+            "novel_id",
+            "visual_version_id",
+            "asset_id",
+            name="uq_derivative_visual_candidates_asset_id",
+        ),
+        UniqueConstraint(
+            "idempotency_key",
+            name="uq_derivative_visual_candidates_idempotency",
+        ),
+        Index(
+            "idx_derivative_visual_candidates_scope",
+            "owner_id",
+            "novel_id",
+            "review_state",
+        ),
+        Index(
+            "idx_derivative_visual_candidates_identity",
+            "owner_id",
+            "novel_id",
+            "visual_version_id",
+            "identity_key",
+        ),
+        ForeignKeyConstraint(
+            ["owner_id", "novel_id", "visual_version_id"],
+            [
+                "derivative_visual_versions.owner_id",
+                "derivative_visual_versions.novel_id",
+                "derivative_visual_versions.id",
+            ],
+            ondelete="CASCADE",
+            name="fk_derivative_visual_candidates_version_scope",
+        ),
+        # D-38-01: the candidate bytes always live in the sealed derivative
+        # namespace; an Original Canon asset can never be a write target.
+        CheckConstraint(
+            "visual_namespace = 'fanfiction_visual'",
+            name="ck_derivative_visual_candidates_namespace",
+        ),
+        CheckConstraint(
+            f"review_state IN ({_sql_values(DERIVATIVE_ASSET_STATES)})",
+            name="ck_derivative_visual_candidates_review_state",
+        ),
+        CheckConstraint(
+            f"consistency_verdict IN ({_sql_values(DERIVATIVE_CONSISTENCY_VERDICTS)})",
+            name="ck_derivative_visual_candidates_verdict",
+        ),
+        CheckConstraint("size_bytes > 0", name="ck_derivative_visual_candidates_size"),
+        CheckConstraint("chapter_number >= 1", name="ck_derivative_visual_candidates_chapter"),
+        CheckConstraint("cutoff_chapter >= 1", name="ck_derivative_visual_candidates_cutoff"),
+        CheckConstraint(
+            "length(content_hash) = 64",
+            name="ck_derivative_visual_candidates_content_hash",
+        ),
+        CheckConstraint(
+            "length(scene_spec_hash) = 64",
+            name="ck_derivative_visual_candidates_scene_spec_hash",
+        ),
+        CheckConstraint(
+            "length(source_snapshot_hash) = 64",
+            name="ck_derivative_visual_candidates_snapshot_hash",
+        ),
+        CheckConstraint(
+            "length(source_manifest_hash) = 64",
+            name="ck_derivative_visual_candidates_source_manifest_hash",
+        ),
+        CheckConstraint(
+            "length(divergence_manifest_hash) = 64",
+            name="ck_derivative_visual_candidates_divergence_hash",
+        ),
+        CheckConstraint(
+            "length(canonical_payload_hash) = 64",
+            name="ck_derivative_visual_candidates_payload_hash",
+        ),
+        CheckConstraint(
+            "length(idempotency_key) = 64",
+            name="ck_derivative_visual_candidates_idempotency_key",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    owner_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    novel_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    project_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    fork_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    # Approved derivative visual fork version this candidate is bound to.
+    visual_version_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    visual_version_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    version_key: Mapped[str] = mapped_column(String(160), nullable=False)
+    # D-38-03: idempotent asset_key + generated asset_id (never a client path).
+    asset_key: Mapped[str] = mapped_column(String(180), nullable=False)
+    asset_id: Mapped[str] = mapped_column(String(200), nullable=False)
+    storage_key: Mapped[str] = mapped_column(String(320), nullable=False)
+    mime_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
+    # Sealed derivative namespace + frozen source snapshot lineage.
+    visual_namespace: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        default=DERIVATIVE_VISUAL_NAMESPACE,
+        server_default=DERIVATIVE_VISUAL_NAMESPACE,
+    )
+    scene_spec_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    chapter_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    source_snapshot_id: Mapped[str] = mapped_column(String(160), nullable=False)
+    source_snapshot_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    source_manifest_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    cutoff_chapter: Mapped[int] = mapped_column(Integer, nullable=False)
+    # D-38-03: full identity/source/generator lineage (hash-pinned, no paths).
+    identity_key: Mapped[str] = mapped_column(String(180), nullable=False)
+    identity_lineage: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    source_refs: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    generator_lineage: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    divergence_manifest_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    # Deterministic cross-chapter consistency review signal (D-38-03).
+    consistency_evidence: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    consistency_report: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    consistency_verdict: Mapped[str] = mapped_column(String(24), nullable=False)
+    review_state: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="candidate", server_default="candidate"
+    )
+    canonical_payload: Mapped[dict] = mapped_column(
+        JSONB, nullable=False, default=dict
+    )
+    canonical_payload_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    idempotency_key: Mapped[str] = mapped_column(String(64), nullable=False)
+    projection_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    schema_version: Mapped[str] = mapped_column(String(64), nullable=False)
+
+
+class DerivativeVisualCandidateReviewEvent(TimestampMixin, Base):
+    """Append-only human/machine review action on a candidate asset.
+
+    Approval moves only the candidate ``review_state`` projection; the
+    Original Visual Bible rows and the candidate bytes/lineage are never
+    touched (REQ-FORK-04 / D-38-03). Repeated ``event_key`` replays without a
+    second event.
+    """
+
+    __tablename__ = "derivative_visual_candidate_review_events"
+    __table_args__ = (
+        UniqueConstraint(
+            "owner_id",
+            "novel_id",
+            "candidate_id",
+            "event_key",
+            name="uq_derivative_visual_candidate_review_key",
+        ),
+        Index(
+            "idx_derivative_visual_candidate_review_candidate",
+            "owner_id",
+            "novel_id",
+            "candidate_id",
+        ),
+        ForeignKeyConstraint(
+            ["owner_id", "novel_id", "candidate_id"],
+            [
+                "derivative_visual_candidates.owner_id",
+                "derivative_visual_candidates.novel_id",
+                "derivative_visual_candidates.id",
+            ],
+            ondelete="CASCADE",
+            name="fk_derivative_visual_candidate_review_scope",
+        ),
+        CheckConstraint(
+            f"action IN ({_sql_values(DERIVATIVE_ASSET_ACTIONS)})",
+            name="ck_derivative_visual_candidate_review_action",
+        ),
+        CheckConstraint(
+            f"actor_source IN ({_sql_values(DERIVATIVE_VISUAL_ACTOR_SOURCES)})",
+            name="ck_derivative_visual_candidate_review_actor_source",
+        ),
+        CheckConstraint(
+            f"from_review_state IN ({_sql_values(DERIVATIVE_ASSET_STATES)})",
+            name="ck_derivative_visual_candidate_review_from_state",
+        ),
+        CheckConstraint(
+            f"to_review_state IN ({_sql_values(DERIVATIVE_ASSET_STATES)})",
+            name="ck_derivative_visual_candidate_review_to_state",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    owner_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    novel_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    candidate_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    action: Mapped[str] = mapped_column(String(24), nullable=False)
+    actor_source: Mapped[str] = mapped_column(String(16), nullable=False)
+    actor: Mapped[str] = mapped_column(String(200), nullable=False)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    event_key: Mapped[str] = mapped_column(String(160), nullable=False)
+    from_review_state: Mapped[str] = mapped_column(String(16), nullable=False)
+    to_review_state: Mapped[str] = mapped_column(String(16), nullable=False)
+    details: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+
+
 def _reject_version_lineage_mutation(
     _mapper: object, _connection: object, target: object
 ) -> None:
@@ -539,3 +784,54 @@ event.listen(DerivativeVisualAsset, "before_update", _reject_content_mutation)
 event.listen(DerivativeVisualAsset, "before_delete", _reject_content_mutation)
 event.listen(DerivativeVisualReviewEvent, "before_update", _reject_content_mutation)
 event.listen(DerivativeVisualReviewEvent, "before_delete", _reject_content_mutation)
+
+
+def _reject_candidate_lineage_mutation(
+    _mapper: object, _connection: object, target: object
+) -> None:
+    """A candidate asset is immutable; only the ``review_state`` projection moves.
+
+    The storage key, content hash, scene spec hash, source snapshot lineage,
+    identity/source/generator lineage, divergence manifest and the frozen
+    consistency review signal can never be edited in place — a changed
+    candidate must be stored as a new candidate (REQ-FORK-04 / D-38-03).
+    """
+    from sqlalchemy import inspect as _sa_inspect
+
+    state = _sa_inspect(target)
+    changed = {
+        attr.key
+        for attr in state.attrs
+        if attr.key not in {"created_at", "updated_at"} and attr.history.has_changes()
+    }
+    forbidden = changed - {"review_state"}
+    if forbidden:
+        raise ValueError(
+            f"{type(target).__name__} candidate lineage is immutable; only the "
+            "review_state projection may change — store a new candidate "
+            f"instead of mutating: {sorted(forbidden)}"
+        )
+
+
+# Candidate rows and their review events are append-only; approval/rejection is
+# an explicit review event that moves only the candidate review_state.
+event.listen(
+    DerivativeVisualCandidateAsset,
+    "before_update",
+    _reject_candidate_lineage_mutation,
+)
+event.listen(
+    DerivativeVisualCandidateAsset,
+    "before_delete",
+    _reject_content_mutation,
+)
+event.listen(
+    DerivativeVisualCandidateReviewEvent,
+    "before_update",
+    _reject_content_mutation,
+)
+event.listen(
+    DerivativeVisualCandidateReviewEvent,
+    "before_delete",
+    _reject_content_mutation,
+)
