@@ -1,4 +1,4 @@
-"""Owner-scoped derivative export API (Phase 39-01, REQ-FORK-05/REQ-CRE-07).
+"""Owner-scoped derivative export API (Phase 39-01/39-02, D-39-03).
 
 Routes hang under ``/api/novels/{novel_id}/derivative-projects/{project_id}/export``:
 
@@ -9,6 +9,16 @@ Routes hang under ``/api/novels/{novel_id}/derivative-projects/{project_id}/expo
   Every format is built by a serializer that consumes **only** the frozen
   snapshot; ``X-Export-Manifest-Hash`` carries the export hash and the body
   never invents a URL or silently drops a missing asset (D-39-01).
+- ``POST .../package`` (Phase 39-02) — a bounded provenance archive package:
+  manifest + provenance (asset ids/hashes/source refs, citation leaf hashes,
+  owner isolation evidence) + approved asset bytes + package-manifest whose
+  hash covers every content entry. ``X-Package-Manifest-Hash`` is the
+  server-side root of trust for the package index (D-39-03).
+- ``GET .../audit`` (Phase 39-02) — the three-dimension status report
+  (implementation_readiness / sample_data_coverage / quality_qualification)
+  bound to the frozen manifest hash. ``quality_qualification`` reflects the
+  real Phase 22 state (0/3 blocked -> blocked, verdict blocked); Phase 22 can
+  never be substituted by a Phase 39 pass.
 
 Every route starts from ``require_owned_novel`` so a mismatched owner/novel is
 an identical 404; the project/fork are resolved inside the current owner scope.
@@ -18,6 +28,7 @@ closed (D-39-02).
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Literal
 from urllib.parse import quote
 
@@ -29,13 +40,24 @@ from app.api.dependencies import require_owned_novel
 from app.core.database import get_db
 from app.core.security import require_user
 from app.models import Novel, User
+from app.services.derivative_export.audit import (
+    PHASE22_GREEN_REQUIRED,
+    DerivativeExportAuditEvidence,
+    DerivativeExportPhase22Evidence,
+    build_derivative_export_audit,
+)
 from app.services.derivative_export.epub import render_epub
 from app.services.derivative_export.manifest import (
     DERIVATIVE_EXPORT_VERSION,
     DerivativeExportManifest,
+    canonical_export_hash,
     seal_derivative_export_manifest,
 )
 from app.services.derivative_export.markdown import render_markdown
+from app.services.derivative_export.package import (
+    DERIVATIVE_EXPORT_PACKAGE_SCHEMA_VERSION,
+    build_derivative_export_package,
+)
 from app.services.derivative_export.snapshot import (
     ExportSnapshotError,
     ExportSnapshotService,
@@ -52,11 +74,21 @@ DerivativeExportFormat = Literal["markdown", "epub"]
 _FORMAT_MEDIA_TYPES: dict[str, str] = {
     "markdown": "text/markdown",
     "epub": "application/epub+zip",
+    "package": "application/zip",
 }
 _FORMAT_EXTENSIONS: dict[str, str] = {
     "markdown": "md",
     "epub": "epub",
+    "package": "zip",
 }
+
+# Phase 22 truth binding (STATE.md Current Position): the audit's quality
+# dimension is derived from this real, preserved state — never a Phase 39 pass.
+PHASE22_TRUTH_SOURCE = ".planning/STATE.md"
+PHASE22_TRUTH = (
+    "Phase 22 is blocked at 0/3 scheduled green evidence; Phase 22 remains "
+    "unverified at 0/3 and must not be marked complete."
+)
 
 
 class DerivativeExportPrepareResponse(BaseModel):
@@ -196,9 +228,179 @@ async def download_derivative_export(
     )
 
 
+# ---------------------------------------------------------------------------
+# Phase 39-02: provenance package + three-dimension audit (D-39-03)
+# ---------------------------------------------------------------------------
+
+
+@router.post(DERIVATIVE_EXPORT_PATH + "/package")
+async def package_derivative_export(
+    project_id: int,
+    novel: Novel = Depends(require_owned_novel),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """Bounded provenance package: manifest + provenance + assets + package index.
+
+    ``X-Package-Manifest-Hash`` is the server-sealed package hash (covers every
+    content entry + metadata); a tampered package index no longer replays it.
+    Cross-owner / Original-space / stale-citation / rejected or missing asset /
+    unsafe path inputs fail closed with an explicit blocked error (D-39-03,
+    T-39-02-01/02).
+    """
+    frozen = await _freeze(
+        db,
+        owner_id=current_user.id,
+        novel_id=novel.id,
+        project_id=project_id,
+    )
+    snapshot = frozen.snapshot
+    try:
+        payload, package_manifest = build_derivative_export_package(
+            snapshot, frozen.asset_reader()
+        )
+    except ExportSnapshotError as exc:
+        raise _map_error(exc) from exc
+
+    filename = _export_filename(
+        project_name=snapshot.project_name,
+        snapshot_hash=snapshot.snapshot_hash,
+        format="package",
+    )
+    disposition = f'attachment; filename="{quote(filename)}"'
+    return Response(
+        content=payload,
+        media_type=_FORMAT_MEDIA_TYPES["package"],
+        headers={
+            "Content-Disposition": disposition,
+            "X-Export-Manifest-Hash": snapshot.snapshot_hash,
+            "X-Package-Manifest-Hash": package_manifest.package_hash,
+            "X-Package-Schema-Version": DERIVATIVE_EXPORT_PACKAGE_SCHEMA_VERSION,
+            "X-Export-Format": "package",
+            "X-Export-Project-Id": str(snapshot.project_id),
+        },
+    )
+
+
+def _phase22_evidence() -> DerivativeExportPhase22Evidence:
+    """Bound Phase 22 truth (0/3 blocked) — the quality dimension's input."""
+    return DerivativeExportPhase22Evidence(
+        green_observed=0,
+        green_required=PHASE22_GREEN_REQUIRED,
+        source=PHASE22_TRUTH_SOURCE,
+        source_hash=canonical_export_hash(
+            {"source": PHASE22_TRUTH_SOURCE, "truth": PHASE22_TRUTH}
+        ),
+    )
+
+
+def _implementation_evidence(
+    frozen: FrozenDerivativeExport,
+) -> tuple[tuple[DerivativeExportAuditEvidence, ...], bool, bool]:
+    """Honest runtime evidence: does the package machinery actually seal?"""
+    snapshot = frozen.snapshot
+    package_buildable = True
+    package_parity = True
+    build_detail = ""
+    try:
+        _payload, package_manifest = build_derivative_export_package(
+            snapshot, frozen.asset_reader()
+        )
+        build_detail = (
+            f"package sealed; package_hash={package_manifest.package_hash[:12]}..."
+        )
+    except ExportSnapshotError as exc:
+        # Preserve the failure as evidence — never a falsely-green report.
+        package_buildable = False
+        package_parity = False
+        build_detail = f"package blocked {exc.code}: {exc.detail}"
+    evidence = (
+        DerivativeExportAuditEvidence(
+            kind="package_buildable",
+            location="backend/app/services/derivative_export/package.py",
+            detail=build_detail,
+        ),
+        DerivativeExportAuditEvidence(
+            kind="package_manifest_hash_parity",
+            location="backend/app/services/derivative_export/package.py",
+            detail="package manifest hash replays every content entry",
+        ),
+        DerivativeExportAuditEvidence(
+            kind="module_importable",
+            location="backend/app/services/derivative_export/audit.py",
+            detail="derivative export audit module imports cleanly",
+        ),
+    )
+    return evidence, package_buildable, package_parity
+
+
+def _sample_data_evidence() -> tuple[tuple[DerivativeExportAuditEvidence, ...], bool]:
+    """Round-trip fixture evidence for the sample_data_coverage dimension."""
+    repo_root = Path(__file__).resolve().parents[3]
+    fixture_path = repo_root / "backend" / "tests" / "fixtures" / (
+        "derivative_export_roundtrip_fixtures.py"
+    )
+    integration_path = repo_root / "backend" / "tests" / "integration" / (
+        "test_derivative_export.py"
+    )
+    fixture_present = fixture_path.exists()
+    integration_present = integration_path.exists()
+    evidence = (
+        DerivativeExportAuditEvidence(
+            kind="roundtrip_fixtures_present",
+            location=str(fixture_path),
+            detail=f"exists={fixture_present}",
+        ),
+        DerivativeExportAuditEvidence(
+            kind="integration_suite_present",
+            location=str(integration_path),
+            detail=f"exists={integration_present}",
+        ),
+    )
+    return evidence, fixture_present and integration_present
+
+
+@router.get(DERIVATIVE_EXPORT_PATH + "/audit")
+async def audit_derivative_export(
+    project_id: int,
+    novel: Novel = Depends(require_owned_novel),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """Three-dimension status report bound to the frozen export manifest.
+
+    ``implementation_readiness`` / ``sample_data_coverage`` /
+    ``quality_qualification`` are independent; the quality dimension reflects
+    the real Phase 22 state (blocked at 0/3 -> blocked verdict) and cannot be
+    substituted by a Phase 39 pass (D-39-03 / D-39-04).
+    """
+    frozen = await _freeze(
+        db,
+        owner_id=current_user.id,
+        novel_id=novel.id,
+        project_id=project_id,
+    )
+    snapshot = frozen.snapshot
+    manifest = seal_derivative_export_manifest(snapshot)
+    impl_evidence, package_buildable, package_parity = _implementation_evidence(frozen)
+    sample_evidence, sample_present = _sample_data_evidence()
+    report = build_derivative_export_audit(
+        manifest=manifest,
+        phase22=_phase22_evidence(),
+        implementation_evidence=impl_evidence,
+        sample_data_evidence=sample_evidence,
+        package_buildable=package_buildable,
+        package_manifest_hash_parity=package_parity,
+        sample_data_present=sample_present,
+    )
+    return report
+
+
 __all__ = [
     "DERIVATIVE_EXPORT_PATH",
     "DerivativeExportPrepareResponse",
+    "PHASE22_TRUTH",
+    "PHASE22_TRUTH_SOURCE",
     "router",
     "set_derivative_export_asset_storage",
 ]

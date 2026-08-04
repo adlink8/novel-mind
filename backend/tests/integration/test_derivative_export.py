@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import json
 import tempfile
 import uuid
 from datetime import datetime, timezone
@@ -56,9 +57,11 @@ from app.models.novel import Novel
 from app.models.user import User
 from app.models.visual_bible import VisualBibleVersion
 from app.services.derivative_editor.chapters import canonicalize_markdown, markdown_checksum
+from app.services.derivative_export.audit import audit_report_hash
 from app.services.derivative_export.manifest import (
     derivative_export_manifest_hash,
 )
+from app.services.derivative_export.package import derivative_export_package_hash
 from app.services.derivative_export.snapshot import (
     ExportSnapshotError,
     ExportSnapshotService,
@@ -73,6 +76,12 @@ PREPARE_BASE = (
 )
 DOWNLOAD_BASE = (
     "/api/novels/{novel_id}/derivative-projects/{project_id}/export/download"
+)
+PACKAGE_BASE = (
+    "/api/novels/{novel_id}/derivative-projects/{project_id}/export/package"
+)
+AUDIT_BASE = (
+    "/api/novels/{novel_id}/derivative-projects/{project_id}/export/audit"
 )
 
 TINY_PNG = base64.b64decode(
@@ -904,3 +913,102 @@ async def test_export_never_mutates_original_space(
     # D-39-02: the export reads only; it never touches the Original space.
     assert original_before == original_after
     assert artifact_before == artifact_after == 0
+
+
+async def test_package_download_round_trip(
+    api_client, asset_storage: DerivativeAssetStorage
+):
+    """Phase 39-02 package endpoint: bounded archive + replayable package hash."""
+    from httpx import ASGITransport, AsyncClient
+
+    from app.core.database import get_db
+    from app.main import app
+
+    factory, sync_url, _ = api_client
+    ids = _seed_chain(sync_url, asset_storage, suffix=f"pkg_{uuid.uuid4().hex[:6]}")
+    headers = {"Authorization": f"Bearer {ids['token']}"}
+    novel_id = ids["novel_id"]
+    project_id = ids["project_id"]
+
+    async def override_get_db():
+        async with factory() as session:
+            yield session
+
+    app.dependency_overrides[get_db] = override_get_db
+    transport = ASGITransport(app=app)
+    try:
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            resp = await client.post(
+                PACKAGE_BASE.format(novel_id=novel_id, project_id=project_id),
+                headers=headers,
+            )
+            assert resp.status_code == 200, resp.text
+            assert resp.headers["X-Package-Manifest-Hash"]
+            assert resp.headers["X-Export-Manifest-Hash"]
+            assert "application/zip" in resp.headers["content-type"]
+            with ZipFile(BytesIO(resp.content)) as archive:
+                names = archive.namelist()
+                assert names[0] == "manifest.json"
+                assert "provenance.json" in names
+                assert "package-manifest.json" in names
+                index = json.loads(archive.read("package-manifest.json"))
+                provenance = json.loads(archive.read("provenance.json"))
+                image = archive.read(f"assets/{TINY_PNG_HASH}.png")
+            assert hashlib.sha256(image).hexdigest() == TINY_PNG_HASH
+            assert derivative_export_package_hash(index) == index["package_hash"]
+            assert index["package_hash"] == resp.headers["X-Package-Manifest-Hash"]
+            # Provenance carries owner isolation + asset/citation hashes.
+            assert provenance["owner_isolation"]["space_allowed"] is True
+            assert provenance["owner_isolation"]["revisions_owner_scoped"] is True
+            assert provenance["assets"][0]["content_hash"] == TINY_PNG_HASH
+            assert provenance["citations"][0]["citation_hash"]
+    finally:
+        app.dependency_overrides.clear()
+
+
+async def test_audit_endpoint_reports_blocked_quality(
+    api_client, asset_storage: DerivativeAssetStorage
+):
+    """Phase 39-02 audit endpoint: three independent dimensions, quality blocked."""
+    from httpx import ASGITransport, AsyncClient
+
+    from app.core.database import get_db
+    from app.main import app
+
+    factory, sync_url, _ = api_client
+    ids = _seed_chain(sync_url, asset_storage, suffix=f"aud_{uuid.uuid4().hex[:6]}")
+    headers = {"Authorization": f"Bearer {ids['token']}"}
+    novel_id = ids["novel_id"]
+    project_id = ids["project_id"]
+
+    async def override_get_db():
+        async with factory() as session:
+            yield session
+
+    app.dependency_overrides[get_db] = override_get_db
+    transport = ASGITransport(app=app)
+    try:
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            resp = await client.get(
+                AUDIT_BASE.format(novel_id=novel_id, project_id=project_id),
+                headers=headers,
+            )
+            assert resp.status_code == 200, resp.text
+            body = resp.json()
+            kinds = [d["dimension"] for d in body["dimensions"]]
+            assert kinds == [
+                "implementation_readiness",
+                "sample_data_coverage",
+                "quality_qualification",
+            ]
+            quality = body["dimensions"][2]
+            # Phase 22 remains 0/3 blocked -> quality blocked + verdict blocked.
+            assert quality["status"] == "blocked"
+            assert quality["blocked_reasons"]
+            assert body["verdict"] == "blocked"
+            assert body["phase22"]["green_observed"] == 0
+            assert body["snapshot_hash"]
+            # The report hash replays from the returned JSON.
+            assert audit_report_hash(body) == body["report_hash"]
+    finally:
+        app.dependency_overrides.clear()
