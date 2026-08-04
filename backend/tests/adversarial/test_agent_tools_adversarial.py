@@ -62,6 +62,8 @@ ALL_TOOLS = (
 ACTION_TOOLS = (
     "publish_illustration",
     "attach_illustration_to_text",
+    # Phase 35 fork 创建 action 工具（35-05）：创建候选 proposal + pending ApprovalRequest。
+    "create_canon_fork",
 )
 
 # 每个工具的 HTTP 路由（cross-owner 轴使用）。
