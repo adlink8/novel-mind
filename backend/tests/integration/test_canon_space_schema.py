@@ -393,6 +393,7 @@ async def test_migration_round_trip(pg_sync_url, pg_async_url, require_postgres)
 
     run_alembic("upgrade", "heads", database_url=pg_sync_url)
     current = run_alembic("current", database_url=pg_sync_url)
-    assert "20260801_canon_space01" in current.stdout
+    # Phase 35-02 adds the immutable canon_forks head on top of canon_space01.
+    assert "20260801_canon_fork01" in current.stdout
     check = run_alembic("check", database_url=pg_sync_url)
     assert check.returncode == 0, f"alembic check failed:\n{check.stdout}\n{check.stderr}"

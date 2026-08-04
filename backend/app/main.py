@@ -54,6 +54,7 @@ from app.api.prompt_revisions import router as prompt_revisions_router
 from app.api.illustrations import router as illustrations_router
 from app.api.illustration_anchors import router as illustration_anchors_router
 from app.api.export import router as export_router
+from app.api.canon_fork import router as canon_fork_router
 from app.config import settings
 from app.core.logging import RequestLoggingMiddleware, setup_logging
 from app.services.agent_tools.errors import AgentToolError
@@ -300,6 +301,11 @@ app.include_router(
     export_router,
     prefix="/api/novels",
     tags=["小说导出"],
+)
+app.include_router(
+    canon_fork_router,
+    prefix="/api/novels",
+    tags=["Canon Fork"],
 )
 
 
