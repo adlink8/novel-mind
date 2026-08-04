@@ -208,7 +208,13 @@ def test_tables_exist_after_upgrade(migrated_postgres):
 
 
 def test_migration_round_trip_downgrade_upgrade(migrated_postgres):
-    run_alembic("downgrade", "-1", database_url=migrated_postgres)
+    # Downgrade to the pre-Phase-38 head (20260802_derivative_override01) so the
+    # whole derivative Visual Bible surface (versions/entities/assets/review
+    # events, created by 38_derivative_visual01) is dropped; ``-1`` would only
+    # roll back the 38-03 asset candidate migration (2 tables).
+    run_alembic(
+        "downgrade", "20260802_derivative_override01", database_url=migrated_postgres
+    )
     engine = create_engine(migrated_postgres, poolclass=NullPool)
     try:
         with engine.connect() as conn:

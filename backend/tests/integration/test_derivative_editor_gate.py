@@ -215,9 +215,20 @@ def _sha256(text: str) -> str:
 
 
 async def test_no_publish_or_release_route_on_derivative_surface(api_client):
-    """Publishing is deferred to Phase 39; the editor surface cannot release."""
+    """Publishing is deferred to Phase 39; the editor surface cannot release.
+
+    The approval-gated agent action tools under ``/api/agent-tools/``
+    (``publish_derivative_revision``, 37-05) are **not** editor write routes:
+    they only create pending Web ApprovalRequests and are consumed by the
+    deterministic publisher seam. This gate scopes the no-publish check to the
+    browser editor surfaces (``/api/novels/.../derivative-*``).
+    """
     paths = list(app.openapi()["paths"].keys())
-    derivative_paths = [p for p in paths if "derivative" in p]
+    derivative_paths = [
+        p
+        for p in paths
+        if "derivative" in p and not p.startswith("/api/agent-tools/")
+    ]
     assert derivative_paths, "expected the derivative route surface to exist"
     for path in derivative_paths:
         lowered = path.lower()
