@@ -245,6 +245,12 @@ from app.models.illustration_anchor import (
     IllustrationAnchor,
     IllustrationAnchorProposal,
 )
+from app.models.derivative_visual import (
+    DerivativeVisualAsset,
+    DerivativeVisualEntity,
+    DerivativeVisualReviewEvent,
+    DerivativeVisualVersion,
+)
 
 __all__ = [
     "Base",
@@ -410,4 +416,8 @@ __all__ = [
     "ConsistencyReport",
     "IllustrationAnchor",
     "IllustrationAnchorProposal",
+    "DerivativeVisualVersion",
+    "DerivativeVisualEntity",
+    "DerivativeVisualAsset",
+    "DerivativeVisualReviewEvent",
 ]
