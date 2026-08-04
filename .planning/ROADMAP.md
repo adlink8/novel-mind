@@ -29,7 +29,7 @@
 | agent runtime foundation | 25.2–25.3 | **IMPLEMENTED & VERIFIED (2026-08-02)** | partial | blocked by Phase 22 3/3 |
 | v1.2 trusted novel understanding | 26–29 | **26/27/28/29 VERIFIED (2026-08-03)** | planned | blocked by Phase 22 3/3 |
 | v1.3 visual narrative | 30–34 | **30/31/32/33/34 VERIFIED (2026-08-04)** | planned | blocked by Phase 22 3/3 |
-| v1.4 Canon Fork derivatives | 35–39 | **35 VERIFIED (2026-08-04)** | planned | blocked by Phase 22 3/3 |
+| v1.4 Canon Fork derivatives | 35–39 | **35/36 VERIFIED (2026-08-04)** | planned | blocked by Phase 22 3/3 |
 
 # Agent Runtime Foundation — Phase 25.2–25.3
 
@@ -141,11 +141,12 @@ Alembic chain continues `26agentrun01 → 27approval01`.
 | Phase 33 | 5/5 + shared Agent contract | 5 | **VERIFIED 2026-08-04** |
 | Phase 34 | 5/5 + shared Agent contract | 5 | **VERIFIED 2026-08-04** |
 | Phase 35 | 5/5 + shared Agent contract | 5 | **VERIFIED 2026-08-04** |
-| Phase 36–39 | 15/15 + shared Agent contract | 20 | PLANNED |
+| Phase 36 | 5/5 + shared Agent contract | 5 | **VERIFIED 2026-08-04** |
+| Phase 37–39 | 10/10 + shared Agent contract | 15 | PLANNED |
 
 The corrected portfolio contains 86 plans: 10 reused Kimi foundation plans, five corrective
 foundation slices, 57 deterministic/domain/shared-integrity plans and 14 Agent-integration plans.
-Phase 25.2–35 are implemented and verified; Phases 36–39 remain planning verdicts only.
+Phase 25.2–36 are implemented and verified; Phases 37–39 remain planning verdicts only.
 
 ## Baseline Reconciliation — Phase 21–25.1
 
@@ -169,13 +170,15 @@ Phase 25.2–35 are implemented and verified; Phases 36–39 remain planning ver
 | 33 Illustration Generation & Consistency | **VERIFIED 2026-08-04** | `33-VERIFICATION.md` passed; job/asset/budget contract, mock generation + storage, consistency scoring, review/compare/approval, illustrate-scene skill |
 | 34 In-Text Anchors, Reader and Export | **VERIFIED 2026-08-04** | `34-VERIFICATION.md` passed; anchor contract, responsive reader, anchor repair, Markdown/HTML/EPUB export, propose-illustration-anchor skill + publish |
 | 35 Triple Knowledge Spaces and Canon Fork | **VERIFIED 2026-08-04** | `35-VERIFICATION.md` passed; 3-space contract, fork snapshot/cutoff, isolated retrieval/citations, contamination guards, create-canon-fork skill + materializer |
+| 36 Derivative Project and Editor | **VERIFIED 2026-08-04** | `36-VERIFICATION.md` passed; project CRUD, chapter plan + Markdown editor, autosave CAS/history/diff/rollback, browser UAT + gate, edit-derivative-story skill |
 
 Phase 22 remains blocked and unverified. The user authorized the Phase 25.2, Phase 26,
-Phase 27, Phase 28, Phase 29, Phase 30, Phase 31, Phase 32, Phase 33, Phase 34 and Phase 35
-execution overrides (2026-08-02/03/04); each phase proceeded on the passed upstream
-verification artifact. v1.2 milestone (Phases 26–29), v1.3 milestone (Phases 30–34) and
-Phase 35 of v1.4 are implemented and verified. Phase 36 still requires Phase 22 3/3 real
-scheduled green evidence plus a passed Phase 35 verification artifact (exists).
+Phase 27, Phase 28, Phase 29, Phase 30, Phase 31, Phase 32, Phase 33, Phase 34, Phase 35
+and Phase 36 execution overrides (2026-08-02/03/04); each phase proceeded on the passed
+upstream verification artifact. v1.2 milestone (Phases 26–29), v1.3 milestone (Phases
+30–34) and Phases 35–36 of v1.4 are implemented and verified. Phase 37 still requires
+Phase 22 3/3 real scheduled green evidence plus a passed Phase 36 verification artifact
+(exists).
 
 ---
 
@@ -463,6 +466,8 @@ contamination attempts.
 
 ## Phase 36 — Derivative Project and Editor
 
+**Status:** IMPLEMENTED & VERIFIED (2026-08-04, `36-VERIFICATION.md` passed at `a354a1e`)
+
 **Goal:** provide owner-scoped derivative projects, plans, chapters and versioned editing.
 
 **Plans:** 36-01 project/domain CRUD; 36-02 chapter plan and Markdown editor; 36-03 autosave,
@@ -546,7 +551,7 @@ audit; **Test, Fix, and Confirm** every failed end-to-end checkpoint.
 ## Next
 
 Phase 22 (CI/Nightly authority) remains the last unverified gate — 0/3 scheduled green.
-Phase 25.2, 25.3, 26, 27, 28, 29, 30, 31, 32, 33, 34 and 35 are verified
+Phase 25.2, 25.3, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35 and 36 are verified
 (2026-08-02/03/04), completing the v1.2 milestone (26–29), the v1.3 milestone (30–34) and
-Phase 35 of v1.4. Phase 36 (Derivative Project and Editor) execution continues under the
+Phases 35–36 of v1.4. Phase 37 (Constrained Generation) execution continues under the
 2026-08-04 Phase 35–39 override.
