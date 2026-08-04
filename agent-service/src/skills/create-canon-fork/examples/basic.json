@@ -1,0 +1,91 @@
+{
+  "description": "create-canon-fork skill-local fixture（Phase 35 / REQ-FORK-01）：只读 Original snapshot + fork 意图 + delta 意图 → CanonForkProposal + CanonDeltaArtifact（type=canon_fork_proposal）。proposal_status / delta_status 恒为 proposed；candidate → pending_approval → approved 只由服务端 proposal/approval/Fork materializer 推进；create_canon_fork 要求 Web ApprovalRequest，绝不物化 fork、绝不触碰 Original Canon。",
+  "input": {
+    "novel_id": 11,
+    "branch": null,
+    "fork": null,
+    "fork_key": "fork-aurora",
+    "requested_cutoff_chapter": 2,
+    "full_book_requested": false,
+    "expected_source_snapshot_hash": "4444444444444444444444444444444444444444444444444444444444444444",
+    "delta_key": "delta-aurora-01",
+    "delta_content": "Aurora wakes before dawn and walks the southern wall, tracing the light that Arin described.",
+    "delta_evidence_refs": ["chapter:1", "chapter:2"],
+    "requested_actions": ["create_canon_fork"]
+  },
+  "expected_output": {
+    "type": "canon_fork_proposal",
+    "schema_version": "canon-fork-proposal.v1",
+    "owner_id": 7,
+    "novel_id": 11,
+    "branch": null,
+    "producing_skill": "create-canon-fork",
+    "producing_skill_version": "1.0.0",
+    "skill_version_id": 9,
+    "model_lineage": {
+      "provider": "fixture",
+      "model": "stub-model",
+      "revision": "stub-1"
+    },
+    "source_versions": {
+      "novel": "v1",
+      "source_snapshot_hash": "4444444444444444444444444444444444444444444444444444444444444444"
+    },
+    "input_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "evidence_refs": ["chapter:1", "chapter:2"],
+    "tool_runs": [
+      { "tool_name": "get_novel", "calls": 1 },
+      { "tool_name": "get_chapter", "calls": 2 },
+      { "tool_name": "create_canon_fork", "calls": 1 }
+    ],
+    "status": "candidate",
+    "parent_revision": null,
+    "proposal": {
+      "schema_version": "canon-fork-proposal.v1",
+      "artifact_kind": "canon_fork_proposal",
+      "fork_key": "fork-aurora",
+      "branch": null,
+      "fork": null,
+      "source_version_key": "original:1",
+      "source_snapshot_id": "novel:11:4444444444444444",
+      "source_snapshot_hash": "4444444444444444444444444444444444444444444444444444444444444444",
+      "through_chapter": 2,
+      "full_book_authorized": false,
+      "cutoff_snapshot_hash": "5555555555555555555555555555555555555555555555555555555555555555",
+      "scope_hash": "6666666666666666666666666666666666666666666666666666666666666666",
+      "manifest_hash": "7777777777777777777777777777777777777777777777777777777777777777",
+      "citation_lineage": [
+        {
+          "leaf_key": "chapter:1",
+          "chapter_number": 1,
+          "content_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "source_snapshot_hash": "4444444444444444444444444444444444444444444444444444444444444444"
+        }
+      ],
+      "authorization": {
+        "source": "server_chapter_limit",
+        "authorized_cutoff_chapter": 2,
+        "granted_full_book": false
+      },
+      "proposal_status": "proposed",
+      "approval_request_id": null,
+      "fork_id": null
+    },
+    "delta": {
+      "schema_version": "canon-delta.v1",
+      "artifact_kind": "canon_delta",
+      "delta_key": "delta-aurora-01",
+      "base_revision": "7777777777777777777777777777777777777777777777777777777777777777",
+      "content": "Aurora wakes before dawn and walks the southern wall, tracing the light that Arin described.",
+      "content_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "evidence_refs": ["chapter:1", "chapter:2"],
+      "delta_status": "proposed"
+    },
+    "normalization": {
+      "raw_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "repaired_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "normalization_actions": [],
+      "warnings": []
+    }
+  }
+}

@@ -26,6 +26,7 @@ from app.core.security import require_user
 from app.models import Novel, User
 from app.schemas.agent_tools import (
     AnchorProposalActionRequest,
+    CreateCanonForkRequest,
     GenerateImageCandidateRequest,
     GetChapterRequest,
     GetCharacterKnowledgeRequest,
@@ -349,6 +350,33 @@ async def tool_attach_illustration_to_text(
     """
     return await _run_tool(
         "attach_illustration_to_text",
+        db=db,
+        novel=novel,
+        owner_id=current_user.id,
+        params=_params(body),
+    )
+
+
+@router.post("/create_canon_fork")
+async def tool_create_canon_fork(
+    body: CreateCanonForkRequest | None = None,
+    novel: Novel = Depends(require_owned_novel),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """Phase 35 canon fork 提议 action（35-05，REQ-FORK-01 / REQ-AGENT-03/04/07）：
+    创建**一个**候选 fork（candidate-only，D-35-03）。
+
+    服务端 proposal gate 只接受冻结 fork manifest（server-derived cutoff + 精确
+    source snapshot）+ delta 意图（delta_key + delta_content）；创建候选 CanonFork
+    （status=candidate）+ pending Web ApprovalRequest（action=create_canon_fork，
+    payload_hash 确定性重放，D-11/D-15）。绝不物化 fork——确定性 Fork materializer
+    在用户 Web 批准后原子校验 approval + payload + fork manifest + snapshot 重放 +
+    delta 血缘 + owner/novel/branch/fork scope 才把 fork 物化为 approved；Original
+    Canon 不可变、active pointer 恒 false。
+    """
+    return await _run_tool(
+        "create_canon_fork",
         db=db,
         novel=novel,
         owner_id=current_user.id,

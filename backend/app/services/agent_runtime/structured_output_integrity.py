@@ -26,6 +26,7 @@ from pydantic import ValidationError
 
 from app.models.agent_runtime import SkillRun
 from app.schemas.agent_runtime import (
+    CanonForkProposalArtifact,
     ChapterAnalysisArtifact,
     CitedAnswerArtifact,
     ExternalEvidenceArtifact,
@@ -186,6 +187,27 @@ BLOCKED_ANCHOR_PROPOSAL_BRANCH = (
     "integrity: illustration anchor proposal branch/authority_space mismatch — "
     "derivative mode requires branch + fork, original mode forbids them"
 )
+# Phase 35 Canon Fork 确定性边界（D-35-01..D-35-04）。
+BLOCKED_CANON_FORK_PAYLOAD = (
+    "integrity: canon fork proposal payload failed domain validation"
+)
+BLOCKED_CANON_FORK_APPROVAL_BYPASS = (
+    "integrity: canon fork proposal bypass blocked — proposal_status must be proposed"
+)
+BLOCKED_CANON_FORK_DELTA_APPROVAL_BYPASS = (
+    "integrity: canon delta bypass blocked — delta_status must be proposed"
+)
+BLOCKED_CANON_FORK_SOURCE_DRIFT = (
+    "integrity: canon fork proposal source_snapshot_hash drifts from envelope "
+    "source_versions"
+)
+BLOCKED_CANON_FORK_BRANCH = (
+    "integrity: canon fork proposal branch mismatch — envelope branch must match "
+    "the run branch"
+)
+BLOCKED_CANON_FORK_DELTA_HASH = (
+    "integrity: canon delta content_hash does not replay from the delta content"
+)
 
 
 @dataclass(frozen=True)
@@ -251,6 +273,8 @@ def evaluate_integrity(*, envelope: dict[str, Any], run: SkillRun) -> IntegrityD
         return _evaluate_illustration_revision(envelope, run)
     if artifact_type == "illustration_anchor_proposal":
         return _evaluate_illustration_anchor_proposal(envelope, run)
+    if artifact_type == "canon_fork_proposal":
+        return _evaluate_canon_fork_proposal(envelope, run)
     return IntegrityDecision(False, BLOCKED_UNKNOWN_TYPE)
 
 
@@ -1006,5 +1030,85 @@ def _evaluate_illustration_anchor_proposal(
     else:  # original authority space
         if branch or payload.get("fork"):
             return IntegrityDecision(False, BLOCKED_ANCHOR_PROPOSAL_BRANCH)
+
+    return IntegrityDecision(True)
+
+
+def _evaluate_canon_fork_proposal(
+    envelope: dict[str, Any], run: SkillRun
+) -> IntegrityDecision:
+    """Phase 35 CanonForkProposal 信封 integrity gate（D-35-01..D-35-04）。
+
+    与其余信封纪律一致（evidence/lineage/status/trail/protected），并在
+    ``proposal`` / ``delta`` 负载上做确定性域边界校验：
+      - 负载必须是严格 ``CanonForkProposalArtifact``（proposal + delta 全部必须；
+        approval_request_id / fork_id 由服务端分配）；
+      - ``proposal_status`` / ``delta_status`` 恒为 ``proposed``——Agent 声称任何
+        非 proposed 状态（approval bypass / pending_approval / approved / published
+        伪造）→ blocked（只有服务端 proposal/approval/Fork materializer 能推进
+        状态；Phase 35 绝不物化 fork，D-35-03）；
+      - proposal 的 source_snapshot_hash 必须与信封 ``source_versions`` 血缘绑定；
+      - delta 的 content_hash 必须从 delta content 重放（drift → blocked）；
+      - branch 门：信封 branch 必须与 run.branch 血缘一致；proposal/delta 的
+        branch/fork 必须与信封一致。
+    任何失败 → 稳定 blocked，零写入；FastAPI 与确定性 Fork materializer 保留
+    permission / evidence / state-transition / publication 权威。
+    """
+    # 0. heuristic candidate-only 无 EvidenceRef 资格 → 不能进 fork 网关。
+    if not envelope.get("evidence_refs"):
+        return IntegrityDecision(False, BLOCKED_NO_EVIDENCE)
+
+    # 1. 严格 wire schema。
+    try:
+        model = CanonForkProposalArtifact.model_validate(envelope)
+    except ValidationError as exc:
+        return IntegrityDecision(
+            False, f"{BLOCKED_SCHEMA} ({_first_validation_error(exc)})"
+        )
+
+    # 2. 共享 lineage/status/trail/protected 门。
+    blocked = _check_common_lineage(envelope=envelope, run=run, wire=model)
+    if blocked is not None:
+        return blocked
+
+    # 3. proposal/delta 负载：严格域契约 + approval bypass 门。
+    proposal = envelope.get("proposal")
+    delta = envelope.get("delta")
+    if not isinstance(proposal, dict) or not isinstance(delta, dict):
+        return IntegrityDecision(False, BLOCKED_CANON_FORK_PAYLOAD)
+    if proposal.get("proposal_status") != "proposed":
+        return IntegrityDecision(False, BLOCKED_CANON_FORK_APPROVAL_BYPASS)
+    if delta.get("delta_status") != "proposed":
+        return IntegrityDecision(False, BLOCKED_CANON_FORK_DELTA_APPROVAL_BYPASS)
+    try:
+        CanonForkProposalArtifact.model_validate(envelope)
+    except ValidationError as exc:
+        return IntegrityDecision(
+            False,
+            f"{BLOCKED_CANON_FORK_PAYLOAD} ({_first_validation_error(exc)})",
+        )
+
+    # 4. source snapshot 血缘绑定（D-35-03）。
+    source_versions = envelope.get("source_versions") or {}
+    snapshot = source_versions.get("source_snapshot_hash")
+    if snapshot is not None and snapshot != proposal.get("source_snapshot_hash"):
+        return IntegrityDecision(False, BLOCKED_CANON_FORK_SOURCE_DRIFT)
+
+    # 5. delta content hash 重放（drift → blocked）。口径与 materializer 一致：
+    #    sha256(raw UTF-8 bytes)，绝不把内容当 JSON 序列化后再哈希。
+    delta_content = delta.get("content")
+    delta_hash = delta.get("content_hash")
+    if not isinstance(delta_content, str) or not isinstance(delta_hash, str):
+        return IntegrityDecision(False, BLOCKED_CANON_FORK_DELTA_HASH)
+    if hashlib.sha256(delta_content.encode("utf-8")).hexdigest() != delta_hash:
+        return IntegrityDecision(False, BLOCKED_CANON_FORK_DELTA_HASH)
+
+    # 6. branch 门：信封 branch 必须与 run.branch 血缘一致；proposal 的 branch
+    #    必须与信封一致（wrong branch → fail closed）。
+    branch = envelope.get("branch")
+    if branch != run.branch:
+        return IntegrityDecision(False, BLOCKED_CANON_FORK_BRANCH)
+    if proposal.get("branch") != branch:
+        return IntegrityDecision(False, BLOCKED_CANON_FORK_BRANCH)
 
     return IntegrityDecision(True)

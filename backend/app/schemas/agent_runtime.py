@@ -840,5 +840,101 @@ class IllustrationAnchorProposalArtifact(StrictAgentRuntimeModel):
         return value
 
 
+# ────────────────────────── Phase 35 Canon Fork Proposal Artifact 信封（REQ-FORK-01 / REQ-AGENT-03/04/07） ──────────────────────────
+
+
+class CanonForkProposalPayload(StrictAgentRuntimeModel):
+    """Phase 35 CanonForkProposal 负载（D-35-01..D-35-04 / REQ-FORK-01）。
+
+    携带完整 branch-aware 血缘：fork_key、source snapshot、server-derived
+    cutoff、scope/manifest hashes、frozen citation lineage 与服务端授权记录。
+    ``proposal_status`` 是 Phase 35 唯一官方状态机（proposed → pending_approval
+    → approved），**finalize 写入时恒为 proposed**——只有服务端 proposal /
+    approval / deterministic Fork materializer 能推进状态；Phase 35 绝不物化
+    fork 或触碰 Original Canon（D-35-03）。
+    """
+
+    schema_version: Literal["canon-fork-proposal.v1"] = "canon-fork-proposal.v1"
+    artifact_kind: Literal["canon_fork_proposal"] = "canon_fork_proposal"
+    fork_key: str = Field(min_length=1, max_length=128)
+    branch: str | None = Field(default=None, max_length=80)
+    fork: str | None = Field(default=None, max_length=80)
+    source_version_key: str = Field(min_length=1, max_length=128)
+    source_snapshot_id: str = Field(min_length=1, max_length=160)
+    source_snapshot_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    through_chapter: int = Field(ge=1)
+    full_book_authorized: bool = False
+    cutoff_snapshot_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    scope_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    manifest_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    citation_lineage: list[dict[str, Any]] = Field(min_length=1)
+    authorization: dict[str, Any]
+    proposal_status: Literal["proposed", "pending_approval", "approved"] = "proposed"
+    approval_request_id: int | None = Field(default=None, gt=0)
+    fork_id: int | None = Field(default=None, gt=0)
+
+
+class CanonDeltaPayload(StrictAgentRuntimeModel):
+    """Phase 35 CanonDeltaArtifact 负载（D-35-01..D-35-04）。
+
+    候选 derivative 内容 + base revision（frozen fork manifest_hash，stale base
+    → fail closed）+ content hash + evidence refs。``delta_status`` 恒为
+    ``proposed``（finalize 时）——只有服务端 Fork materializer 在批准后物化。
+    """
+
+    schema_version: Literal["canon-delta.v1"] = "canon-delta.v1"
+    artifact_kind: Literal["canon_delta"] = "canon_delta"
+    delta_key: str = Field(min_length=1, max_length=160)
+    base_revision: str = Field(pattern=r"^[0-9a-f]{64}$")
+    content: str = Field(min_length=1, max_length=50000)
+    content_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    evidence_refs: list[str] = Field(default_factory=list)
+    delta_status: Literal["proposed", "pending_approval", "approved"] = "proposed"
+
+
+class CanonForkProposalArtifact(StrictAgentRuntimeModel):
+    """智能体产物的 CanonForkProposal 信封（Phase 35 / D-35-01..D-35-04）。
+
+    Agent 产出的是 **candidate-only** 的 fork 提议：``proposal``（完整冻结
+    CanonForkProposal）与 ``delta``（候选 CanonDeltaArtifact）携带完整
+    branch-aware 血缘（SkillRun/ToolRun、owner/novel/branch、source/input
+    hashes、evidence refs、runtime/model lineage、frozen manifest 与授权记录）。
+    ``proposal_status`` / ``delta_status`` 恒为 ``proposed``（finalize 时）——
+    只有服务端 proposal/approval/Fork materializer 能推进状态；Agent/浏览器绝不
+    物化 fork、绝不触碰 Original Canon（D-35-03）。``tool_runs`` 携带 ToolRun
+    血缘。与 CitedAnswerArtifact 信封纪律一致：type / schema_version / owner /
+    novel / branch / producing skill+version / model lineage / source versions /
+    input_hash / evidence_refs / status / parent_revision / normalization
+    （26-06 修复血缘 trail）。
+    """
+
+    type: Literal["canon_fork_proposal"] = "canon_fork_proposal"
+    schema_version: Literal["canon-fork-proposal.v1"] = "canon-fork-proposal.v1"
+    owner_id: int = Field(gt=0)
+    novel_id: int = Field(gt=0)
+    branch: str | None = None
+    producing_skill: str = Field(min_length=1, max_length=120)
+    producing_skill_version: str = Field(min_length=1, max_length=32)
+    skill_version_id: int = Field(gt=0)
+    model_lineage: dict[str, Any]
+    source_versions: dict[str, Any]
+    input_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    evidence_refs: list[str] = Field(min_length=1)
+    proposal: CanonForkProposalPayload
+    delta: CanonDeltaPayload
+    tool_runs: list[dict[str, Any]] = Field(min_length=1)
+    status: Literal["candidate", "validated", "approved", "published", "rejected"]
+    parent_revision: str | None = None
+    normalization: NormalizationTrail
+
+    @field_validator("tool_runs")
+    @classmethod
+    def _tool_runs_shape(cls, value: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        for item in value:
+            if not isinstance(item, dict) or not item.get("tool_name"):
+                raise ValueError("each tool run requires tool_name")
+        return value
+
+
 # 供 OpenAPI 引用，避免未使用告警。
 _ = (StrictReaderChatModel,)

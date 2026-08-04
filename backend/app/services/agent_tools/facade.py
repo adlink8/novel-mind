@@ -86,7 +86,10 @@ logger = logging.getLogger(__name__)
 # 绝不写 Canon / 域表 / ApprovalRequest / published 状态（D-33-01..D-33-03）；
 # 34-05 起加入 Phase 34 锚点提议 action 工具 publish_illustration /
 # attach_illustration_to_text——它们只创建候选 proposal + pending Web
-# ApprovalRequest（D-11/D-15），确定性 publisher 拥有 approved publication。
+# ApprovalRequest（D-11/D-15），确定性 publisher 拥有 approved publication；
+# 35-05 起加入 Phase 35 canon fork 提议 action 工具 create_canon_fork——它只
+# 创建候选 fork + pending Web ApprovalRequest（D-11/D-15），确定性 Fork
+# materializer 拥有 approved fork 物化。
 TOOL_NAMES: tuple[str, ...] = (
     "get_novel",
     "get_chapter",
@@ -104,6 +107,7 @@ TOOL_NAMES: tuple[str, ...] = (
     "generate_image_candidate",
     "publish_illustration",
     "attach_illustration_to_text",
+    "create_canon_fork",
 )
 
 # per-tool 默认字节上限（agent-service 侧同样硬编码 64 KiB，见 RESEARCH Code Examples）。
@@ -679,6 +683,76 @@ async def _default_attach_illustration_to_text(
     return _anchor_proposal_view_for_tool(result)
 
 
+async def _default_create_canon_fork(
+    db,
+    *,
+    owner_id: int,
+    novel_id: int,
+    params: dict[str, Any],
+) -> dict[str, Any]:
+    """Phase 35 action 工具默认服务：创建**一个**候选 canon fork（D-35-03）。
+
+    服务端 proposal gate 只接受冻结 fork manifest（server-derived cutoff +
+    精确 source snapshot）+ delta 意图；创建候选 CanonFork（status=candidate）+
+    pending Web ApprovalRequest（action=create_canon_fork，payload_hash 确定性
+    重放，D-11/D-15）。绝不物化 fork——确定性 Fork materializer 在用户 Web 批准后
+    原子校验 approval + payload + fork manifest + snapshot 重放 + delta 血缘 +
+    owner/novel/branch/fork scope 才把 fork 物化为 approved；Original Canon
+    不可变、active pointer 恒 false。
+    """
+    from app.services.canon_fork.materializer import (
+        ForkProposalError,
+        create_fork_proposal,
+    )
+
+    try:
+        result = await create_fork_proposal(
+            db,
+            owner_id=owner_id,
+            novel_id=novel_id,
+            request=params,
+        )
+    except ForkProposalError as exc:
+        raise InvalidInputError(f"{exc.code}: {exc.detail}") from None
+    await db.flush()
+    return _fork_proposal_view_for_tool(result)
+
+
+def _fork_proposal_view_for_tool(result) -> dict[str, Any]:
+    """CanonFork + ApprovalRequest ORM → JSON-safe 工具响应。
+
+    candidate-only：fork status 恒为 candidate、active 恒 false，绝不 approved/
+    published；approval_request_id / payload_hash 供 Web 审批轮询与确定性 Fork
+    materializer 引用。
+    """
+    fork = result.fork
+    approval = result.approval_request
+    return {
+        "fork_id": fork.id,
+        "owner_id": fork.owner_id,
+        "novel_id": fork.novel_id,
+        "fork_key": fork.fork_key,
+        "space": fork.space,
+        "status": fork.status,
+        "source_version_key": fork.source_version_key,
+        "source_snapshot_id": fork.source_snapshot_id,
+        "source_snapshot_hash": fork.source_snapshot_hash,
+        "through_chapter": fork.through_chapter,
+        "full_book_authorized": fork.full_book_authorized,
+        "cutoff_snapshot_hash": fork.cutoff_snapshot_hash,
+        "scope_hash": fork.scope_hash,
+        "manifest_hash": fork.manifest_hash,
+        "delta_content_hash": result.delta_content_hash,
+        "approval_request_id": approval.id,
+        "approval_action": approval.action,
+        "approval_status": approval.status,
+        "approval_payload_hash": approval.payload_hash,
+        "active": bool(fork.active),
+        "candidate_only": True,
+        "replayed": bool(result.replayed),
+    }
+
+
 def _anchor_proposal_view_for_tool(result) -> dict[str, Any]:
     """IllustrationAnchorProposal + ApprovalRequest ORM → JSON-safe 工具响应。
 
@@ -799,6 +873,10 @@ class ToolFacade:
             # pending Web ApprovalRequest；确定性 publisher 拥有 publication。
             "publish_illustration": self._publish_illustration,
             "attach_illustration_to_text": self._attach_illustration_to_text,
+            # Phase 35 canon fork 提议 action 工具（35-05）：只创建候选 fork +
+            # pending Web ApprovalRequest；确定性 Fork materializer 拥有 approved
+            # fork 物化。
+            "create_canon_fork": self._create_canon_fork,
         }
 
     # ── 公共入口 ──
@@ -1168,6 +1246,16 @@ class ToolFacade:
         svc = self._svc(
             "attach_illustration_to_text", _default_attach_illustration_to_text
         )
+        return await svc(
+            db,
+            owner_id=owner_id,
+            novel_id=novel.id,
+            params=params,
+        )
+
+    async def _create_canon_fork(self, *, db, novel, owner_id, params):
+        """创建候选 canon fork + pending Web ApprovalRequest（candidate-only，D-35-03）。"""
+        svc = self._svc("create_canon_fork", _default_create_canon_fork)
         return await svc(
             db,
             owner_id=owner_id,

@@ -16,7 +16,7 @@ import { defineTool } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { fastapiToolCall } from "./fastapi-client.js";
 
-/** 16 个域工具名（固定顺序；唯一 allowlist 事实源）。 */
+/** 17 个域工具名（固定顺序；唯一 allowlist 事实源）。 */
 export const DOMAIN_TOOL_NAMES = [
   "get_novel",
   "get_chapter",
@@ -34,6 +34,7 @@ export const DOMAIN_TOOL_NAMES = [
   "generate_image_candidate",
   "publish_illustration",
   "attach_illustration_to_text",
+  "create_canon_fork",
 ] as const;
 
 /** 工具注册时的运行级授权（端用户 JWT 或 per-run 内部令牌）。 */
@@ -299,7 +300,51 @@ export function buildDomainTools(auth: ToolAuth) {
       execute: (toolCallId, params, signal) =>
         fastapiToolCall("attach_illustration_to_text", params as unknown, signal, auth),
     }),
+    // ── Phase 35 canon fork 提议 action 工具（35-05）──
+    defineTool({
+      name: "create_canon_fork",
+      label: "Create Canon Fork (Proposal)",
+      description:
+        "Phase 35 action（REQ-FORK-01 / REQ-AGENT-03/04/07）：提议**一个** canon fork（candidate-only）。服务端 proposal gate 只接受冻结 fork manifest（server-derived cutoff + 精确 source snapshot，D-35-03）+ delta 意图（delta_key + delta_content）；创建候选 CanonFork（status=candidate）+ pending Web ApprovalRequest（action=create_canon_fork，payload_hash 确定性重放）。绝不物化 fork——确定性 Fork materializer（app.services.canon_fork.materializer）在用户 Web 批准后原子校验 approval + payload + fork manifest + snapshot 重放 + delta 血缘 + owner/novel/branch/fork scope 才把 fork 物化为 approved；Original Canon 不可变、active pointer 恒 false。",
+      parameters: canonForkParams(),
+      execute: (toolCallId, params, signal) =>
+        fastapiToolCall("create_canon_fork", params as unknown, signal, auth),
+    }),
   ];
+}
+
+/** Phase 35 canon fork 提议 action 工具参数（镜像 backend schemas.agent_tools）。 */
+function canonForkParams() {
+  return Type.Object({
+    novel_id: Type.Integer({ minimum: 1, description: "小说 ID" }),
+    branch: Type.Optional(Type.String({ maxLength: 80, description: "衍生分支；原始主线为 null" })),
+    fork: Type.Optional(Type.String({ maxLength: 80, description: "衍生 fork（仅 derivative mode）" })),
+    fork_key: Type.String({ minLength: 1, maxLength: 128, description: "幂等 fork 标识（owner/novel 范围内唯一且不可变，D-35-03）" }),
+    requested_cutoff_chapter: Type.Optional(
+      Type.Integer({ minimum: 1, description: "请求的 spoiler cutoff 章节（最终 cutoff 服务端派生）" }),
+    ),
+    full_book_requested: Type.Optional(
+      Type.Boolean({ description: "请求全本 cutoff（无显式服务端授权时 fail closed）" }),
+    ),
+    expected_source_snapshot_hash: Type.Optional(
+      Type.String({
+        minLength: 64,
+        maxLength: 64,
+        pattern: "^[0-9a-f]{64}$",
+        description: "预期的 source snapshot 血缘 hash（服务端重放；stale → 409）",
+      }),
+    ),
+    delta_key: Type.String({ minLength: 1, maxLength: 160, description: "幂等 delta 提案键（approval payload 绑定）" }),
+    delta_content: Type.String({ minLength: 1, maxLength: 50000, description: "候选 derivative 内容（服务端计算 content_hash 并绑定 approval payload）" }),
+    delta_evidence_refs: Type.Array(
+      Type.String({ minLength: 1, maxLength: 64 }),
+      { minItems: 1, description: "delta 引用的 leaf 证据键（必须属于冻结 citation lineage 白名单）" },
+    ),
+    run_id: Type.Optional(Type.Integer({ minimum: 1, description: "SkillRun ID 血缘" })),
+    skill_version_id: Type.Optional(Type.Integer({ minimum: 1, description: "SkillVersion ID 血缘" })),
+    artifact_id: Type.Optional(Type.Integer({ minimum: 1, description: "Artifact ID 血缘" })),
+    artifact_revision_id: Type.Optional(Type.Integer({ minimum: 1, description: "ArtifactRevision ID 血缘" })),
+  });
 }
 
 /** Phase 34 锚点提议 action 工具参数（镜像 backend schemas.agent_tools）。 */

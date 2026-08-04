@@ -1,0 +1,75 @@
+# create-canon-fork skill 契约（REQ-FORK-01 / REQ-AGENT-03/04/07 / Phase 35）
+# 字段镜像 backend 注册入口（app.schemas.agent_runtime.SkillVersionRegister）。
+#
+# Phase 35 版本化 canon fork 技能：
+#   - 本技能是 Phase 35 确定性 fork 域能力（D-35-01..D-35-04，proposal → Web
+#     Approval → deterministic Fork materializer → approved fork）的 Agent 消费边界；
+#     允许的工具 allowlist 含 7 个只读域工具 + 1 个 action 工具
+#     （create_canon_fork），编排绝不越出该 allowlist（未知工具/白名单外调用 →
+#     fail closed）。
+#   - 本技能消费只读 Original Canon snapshot（owner/novel/branch/fork 血缘绑定）
+#     + 解释/创作意图 → 通过 action 工具创建 **candidate CanonForkProposal**
+#     （status=candidate）+ 服务端权威 pending Web ApprovalRequest
+#     （action = create_canon_fork，payload_hash 确定性重放）。
+#   - **确定性 fork 物化属于后端**：只有 Phase 35 deterministic Fork materializer
+#     （app.services.canon_fork.materializer.materialize_approved_fork）在
+#     ApprovalRequest 批准后原子校验 approval action + payload hash + 冻结的
+#     CanonForkManifest + source snapshot 重放 + CanonDeltaArtifact 血缘 +
+#     owner/novel/branch/fork scope，才把 candidate fork 物化为 approved
+#     （status=approved）。Agent/浏览器绝不物化；Original Canon 不可变、
+#     active pointer 恒 false。
+#   - write_permissions 恒为空：Agent 不直接写任何域状态（不写 Original Canon、
+#     不写 canon fork/domain 表、不写 ApprovalRequest 行、不写 published 状态）。
+#     action 工具只创建候选 fork + pending ApprovalRequest。
+#   - 版本由 `version` 钉住（当前 1.0.0）；每次 run 经 skill_version_id 绑定
+#     SkillVersion 血缘（run 绑定 owner/novel/branch/fork、SkillRun、ToolRuns、
+#     source/input hashes、model/runtime lineage、Artifact revision）。
+#   - 模型结构化输出走共享 26-06 normalizer + 严格 post-repair validator；
+#     normalization_actions / raw_hash / repaired_hash / warnings 保留在官方
+#     CanonForkProposalArtifact 上。Agent 只产出候选 proposal + delta——绝不自动
+#     物化（D-35-03）。
+name: create-canon-fork
+version: 1.0.0
+description: >-
+  Phase 35 版本化 canon fork 技能（REQ-FORK-01 / REQ-AGENT-03/04/07）：给定
+  owner/novel/branch（可选 fork 用于 derivative mode）+ 只读 Original Canon
+  snapshot 血缘 + fork 意图（fork_key、requested cutoff、full_book_requested、
+  expected source snapshot hash）+ delta 意图（delta_key / delta_content /
+  evidence refs），通过 7 个只读域工具 + 1 个 action 工具（create_canon_fork）
+  消费 Phase 35 确定性 fork 域能力，产出候选 CanonForkProposal + CanonDeltaArtifact
+  （candidate-only）。Action 工具只创建候选 fork + pending Web ApprovalRequest
+  （approval 权威在 FastAPI，D-11）；只有确定性 Fork materializer
+  （backend app.services.canon_fork.materializer）在批准后原子校验 approval
+  action + payload hash + frozen manifest + source snapshot 重放 + delta 血缘 +
+  owner/novel/branch/fork scope，才物化 approved fork（D-35-03）。Agent/浏览器
+  绝不物化；Original Canon 不可变、active pointer 恒 false。未知工具/权限/血缘/
+  schema drift/错误 owner/branch/fork/approval bypass/stale revision/取消 →
+  一律 fail closed，无官方 Artifact 或域写入。
+allowed_tools:
+  - get_novel
+  - get_chapter
+  - search_novel_text
+  - get_timeline
+  - get_relationships
+  - get_clues
+  - get_narrative_memory
+  - create_canon_fork
+read_permissions:
+  - canon
+  - canon_fork
+write_permissions: []
+forbidden_spaces:
+  - canon:original
+  - canon_fork:write
+  - canon_fork:materialize
+  - approval_request
+  - fork_materializer
+budget:
+  max_calls: 40
+  max_input_tokens: 40000
+  max_output_tokens: 12000
+  max_cost_usd: "4.00"
+approval_required_for:
+  - create_canon_fork
+input_schema: ./input.schema.json
+output_schema: ./output.schema.json

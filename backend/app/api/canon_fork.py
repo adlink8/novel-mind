@@ -90,6 +90,29 @@ class CanonForkListResponse(BaseModel):
     message: str | None = None
 
 
+class CanonForkMaterializeRequest(BaseModel):
+    """Deterministic materialization delegation: the approved proposal + delta.
+
+    The client supplies only the approval decision and the proposal artifact
+    revision; owner/novel, the fork identity, the source snapshot replay, the
+    frozen manifest, the delta lineage and the payload hash are all re-validated
+    by the deterministic Fork materializer (D-35-03).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    approval_request_id: PositiveInt
+    artifact_revision_id: PositiveInt
+
+
+class CanonForkMaterializeResponse(BaseModel):
+    fork: CanonForkView
+    materialization_status: str = "approved"
+    materialization_hash: str
+    replayed: bool = False
+    message: str | None = None
+
+
 def _map_error(exc: CanonForkScopeError) -> HTTPException:
     # Keep the machine-readable code in the response detail so a fail-closed
     # rejection stays auditable on the wire (mirrors the error code convention
@@ -228,6 +251,59 @@ async def list_canon_forks(
         novel_id=novel.id,
         forks=forks,
         publication_status="candidate",
+        message=message,
+    )
+
+
+@router.post(
+    "/{novel_id}/canon-fork/{fork_id}/materialize",
+    response_model=CanonForkMaterializeResponse,
+)
+async def materialize_canon_fork(
+    fork_id: int,
+    body: CanonForkMaterializeRequest,
+    novel: Novel = Depends(require_owned_novel),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """Deterministic fork materialization boundary (D-35-03 / 35-05).
+
+    This route is the **sole HTTP delegation boundary** for this plan: it
+    forwards only the approved, validated CanonForkProposal + CanonDeltaArtifact
+    to ``materialize_approved_fork``. The deterministic Fork materializer owns
+    approved branch/fork materialization; Agent Service / browser can never
+    materialize a fork directly. Original Canon stays immutable and the active
+    pointer stays false.
+    """
+    from app.services.canon_fork.materializer import (
+        ForkMaterializeError,
+        materialize_approved_fork,
+    )
+
+    try:
+        outcome = await materialize_approved_fork(
+            db,
+            owner_id=current_user.id,
+            novel_id=novel.id,
+            fork_id=fork_id,
+            approval_request_id=body.approval_request_id,
+            artifact_revision_id=body.artifact_revision_id,
+        )
+    except ForkMaterializeError as exc:
+        raise HTTPException(
+            status_code=409, detail=f"{exc.code}: {exc.detail}"
+        ) from exc
+
+    message = (
+        "identical materialization replayed the approved fork"
+        if outcome.replayed
+        else "approved fork materialized (active pointer unchanged)"
+    )
+    return CanonForkMaterializeResponse(
+        fork=_to_view(outcome.fork),
+        materialization_status="approved",
+        materialization_hash=outcome.materialization_hash,
+        replayed=outcome.replayed,
         message=message,
     )
 

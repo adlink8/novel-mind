@@ -285,6 +285,63 @@ class AnchorProposalActionRequest(StrictAgentToolModel):
     )
 
 
+# ────────────────────────── Phase 35 canon fork 提议 action 工具（35-05） ──────────────────────────
+
+
+class CreateCanonForkRequest(StrictAgentToolModel):
+    """Phase 35 canon fork 提议 action 请求（35-05，REQ-FORK-01 / REQ-AGENT-03/04/07）。
+
+    只创建**一个候选 fork**（D-35-03）：服务端 proposal gate 只接受冻结 fork
+    manifest（server-derived cutoff + 精确 source snapshot）+ delta 意图
+    （delta_key + delta_content）；创建候选 CanonFork（status=candidate）+
+    pending Web ApprovalRequest（action=create_canon_fork，payload_hash 确定性
+    重放，D-11/D-15）。novel_id 由查询参数注入（require_owned_novel），绝不放进
+    请求体。绝不物化 fork——确定性 Fork materializer 在用户 Web 批准后原子校验
+    approval + payload + fork manifest + snapshot 重放 + delta 血缘 +
+    owner/novel/branch/fork scope 才把 fork 物化为 approved；Original Canon
+    不可变、active pointer 恒 false。
+    """
+
+    branch: str | None = Field(
+        default=None, max_length=80, description="衍生分支；原始主线为 null"
+    )
+    fork: str | None = Field(
+        default=None, max_length=80, description="衍生 fork（仅 derivative mode；original 必须为 null）"
+    )
+    fork_key: str = Field(
+        min_length=1, max_length=128, description="幂等 fork 标识（owner/novel 范围内唯一且不可变，D-35-03）"
+    )
+    requested_cutoff_chapter: int | None = Field(
+        default=None, ge=1, description="请求的 spoiler cutoff 章节（最终 cutoff 由服务端派生）"
+    )
+    full_book_requested: bool = Field(
+        default=False, description="请求全本 cutoff（无显式服务端授权时 fail closed，403）"
+    )
+    expected_source_snapshot_hash: str | None = Field(
+        default=None,
+        min_length=64,
+        max_length=64,
+        pattern="^[0-9a-f]{64}$",
+        description="预期的 source snapshot 血缘 hash（服务端重放；stale → 409 拒绝）",
+    )
+    delta_key: str = Field(
+        min_length=1, max_length=160, description="幂等 delta 提案键（approval payload 绑定）"
+    )
+    delta_content: str = Field(
+        min_length=1, max_length=50000, description="候选 derivative 内容（服务端计算 content_hash 并绑定 approval payload）"
+    )
+    delta_evidence_refs: list[str] = Field(
+        min_length=1, description="delta 引用的 leaf 证据键（必须属于冻结 citation lineage 白名单）"
+    )
+    # D-15 血缘绑定（可选）：agent 会话已知的 run/skill/artifact 血缘。
+    run_id: int | None = Field(default=None, gt=0, description="SkillRun ID 血缘")
+    skill_version_id: int | None = Field(default=None, gt=0, description="SkillVersion ID 血缘")
+    artifact_id: int | None = Field(default=None, gt=0, description="Artifact ID 血缘")
+    artifact_revision_id: int | None = Field(
+        default=None, gt=0, description="ArtifactRevision ID 血缘"
+    )
+
+
 # ────────────────────────── 统一错误信封 ──────────────────────────
 
 

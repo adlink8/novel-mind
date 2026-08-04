@@ -1,0 +1,91 @@
+{
+  "description": "create-canon-fork skill-local fixture（derivative mode，Phase 35 / REQ-FORK-01）：branch + fork derivative mode 下的 fork 提议。proposal_status / delta_status 恒为 proposed；只有服务端 proposal/approval/Fork materializer 能推进；Original Canon 不可变、active pointer 恒 false。",
+  "input": {
+    "novel_id": 12,
+    "branch": "deriv-branch",
+    "fork": "fork-aurora",
+    "fork_key": "fork-aurora",
+    "requested_cutoff_chapter": 3,
+    "full_book_requested": false,
+    "expected_source_snapshot_hash": null,
+    "delta_key": "delta-aurora-deriv-01",
+    "delta_content": "Aurora follows the lantern path north and finds the abandoned tower where Arin kept his journals.",
+    "delta_evidence_refs": ["chapter:1", "chapter:2", "chapter:3"],
+    "requested_actions": ["create_canon_fork"]
+  },
+  "expected_output": {
+    "type": "canon_fork_proposal",
+    "schema_version": "canon-fork-proposal.v1",
+    "owner_id": 8,
+    "novel_id": 12,
+    "branch": "deriv-branch",
+    "producing_skill": "create-canon-fork",
+    "producing_skill_version": "1.0.0",
+    "skill_version_id": 10,
+    "model_lineage": {
+      "provider": "fixture",
+      "model": "stub-model",
+      "revision": "stub-1"
+    },
+    "source_versions": {
+      "novel": "v1",
+      "source_snapshot_hash": "4444444444444444444444444444444444444444444444444444444444444444"
+    },
+    "input_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "evidence_refs": ["chapter:1", "chapter:2", "chapter:3"],
+    "tool_runs": [
+      { "tool_name": "get_novel", "calls": 1 },
+      { "tool_name": "get_timeline", "calls": 1 },
+      { "tool_name": "create_canon_fork", "calls": 1 }
+    ],
+    "status": "candidate",
+    "parent_revision": null,
+    "proposal": {
+      "schema_version": "canon-fork-proposal.v1",
+      "artifact_kind": "canon_fork_proposal",
+      "fork_key": "fork-aurora",
+      "branch": "deriv-branch",
+      "fork": "fork-aurora",
+      "source_version_key": "original:1",
+      "source_snapshot_id": "novel:12:4444444444444444",
+      "source_snapshot_hash": "4444444444444444444444444444444444444444444444444444444444444444",
+      "through_chapter": 3,
+      "full_book_authorized": false,
+      "cutoff_snapshot_hash": "5555555555555555555555555555555555555555555555555555555555555555",
+      "scope_hash": "6666666666666666666666666666666666666666666666666666666666666666",
+      "manifest_hash": "7777777777777777777777777777777777777777777777777777777777777777",
+      "citation_lineage": [
+        {
+          "leaf_key": "chapter:1",
+          "chapter_number": 1,
+          "content_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "source_snapshot_hash": "4444444444444444444444444444444444444444444444444444444444444444"
+        }
+      ],
+      "authorization": {
+        "source": "server_chapter_limit",
+        "authorized_cutoff_chapter": 3,
+        "granted_full_book": false
+      },
+      "proposal_status": "proposed",
+      "approval_request_id": null,
+      "fork_id": null
+    },
+    "delta": {
+      "schema_version": "canon-delta.v1",
+      "artifact_kind": "canon_delta",
+      "delta_key": "delta-aurora-deriv-01",
+      "base_revision": "7777777777777777777777777777777777777777777777777777777777777777",
+      "content": "Aurora follows the lantern path north and finds the abandoned tower where Arin kept his journals.",
+      "content_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "evidence_refs": ["chapter:1", "chapter:2", "chapter:3"],
+      "delta_status": "proposed"
+    },
+    "normalization": {
+      "raw_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "repaired_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "normalization_actions": [],
+      "warnings": []
+    }
+  }
+}

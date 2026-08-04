@@ -1,0 +1,80 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CreateCanonForkInput",
+  "description": "create-canon-fork Phase 35 运行输入：novel_id（必填）与确定性 fork 域按引用消费的输入锚——fork_key、requested_cutoff_chapter、full_book_requested、expected_source_snapshot_hash、delta_key、delta_content、delta_evidence_refs 与 requested_actions（create_canon_fork，要求 Web ApprovalRequest）。可选 branch / fork（derivative mode）。fork 意图字段仅声明意图范围，最终 scope / cutoff / full_book_authorized / 精确 source snapshot 由服务端强制（fail closed，D-35-03）。",
+  "type": "object",
+  "required": [
+    "novel_id",
+    "fork_key",
+    "delta_key",
+    "delta_content",
+    "delta_evidence_refs",
+    "requested_actions"
+  ],
+  "properties": {
+    "novel_id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "目标小说 ID（必须与运行路径中的 novel_id 一致）"
+    },
+    "branch": {
+      "type": ["string", "null"],
+      "maxLength": 80,
+      "description": "衍生分支；原始主线为 null（owner/novel/branch 血缘绑定）"
+    },
+    "fork": {
+      "type": ["string", "null"],
+      "maxLength": 80,
+      "description": "衍生 fork（仅 derivative mode；original 模式必须为 null）"
+    },
+    "fork_key": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "幂等 fork 标识（D-35-03：owner/novel 范围内 fork_key 唯一且不可变）"
+    },
+    "requested_cutoff_chapter": {
+      "type": ["integer", "null"],
+      "minimum": 1,
+      "description": "请求的 spoiler cutoff 章节；最终 cutoff 由服务端从 owner/novel + 显式授权派生（未来 cutoff 绝不扩大 scope）"
+    },
+    "full_book_requested": {
+      "type": "boolean",
+      "description": "请求全本 cutoff；无显式服务端授权（superuser）时 fail closed（403）"
+    },
+    "expected_source_snapshot_hash": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "预期的 source snapshot 血缘 hash（服务端重放；stale → 409 拒绝）"
+    },
+    "delta_key": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "description": "幂等 delta 提案键（approval payload 绑定，重放追溯）"
+    },
+    "delta_content": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 50000,
+      "description": "候选 derivative 内容（canon delta）；服务端计算 content_hash 并绑定 approval payload（D-35-03）"
+    },
+    "delta_evidence_refs": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1, "maxLength": 64 },
+      "description": "delta 引用的 leaf 证据键（必须属于冻结 citation lineage / frozen manifest 白名单）"
+    },
+    "requested_actions": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": ["create_canon_fork"]
+      },
+      "description": "请求的 Phase 35 action；创建 pending Web ApprovalRequest（D-11），Agent/浏览器绝不物化 fork"
+    }
+  },
+  "additionalProperties": false
+}
