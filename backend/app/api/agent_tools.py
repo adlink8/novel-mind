@@ -43,6 +43,7 @@ from app.schemas.agent_tools import (
     GetVisualBibleRequest,
     GetWorldRulesRequest,
     PublishDerivativeRevisionRequest,
+    PublishDerivativeVisualRequest,
     SearchNovelTextRequest,
 )
 from app.services.agent_tools.errors import (
@@ -461,6 +462,38 @@ async def tool_publish_derivative_revision(
     """
     return await _run_tool(
         "publish_derivative_revision",
+        db=db,
+        novel=novel,
+        owner_id=current_user.id,
+        params=_params(body),
+    )
+
+
+@router.post("/publish_derivative_visual")
+async def tool_publish_derivative_visual(
+    body: PublishDerivativeVisualRequest | None = None,
+    novel: Novel = Depends(require_owned_novel),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """Phase 38 branch-aware derivative visual action（38-05，REQ-FORK-04 /
+    REQ-AGENT-03/04/07）：为**一个**已存储 derivative candidate asset 创建
+    **一个** pending Web ApprovalRequest（action=publish_derivative_visual，
+    payload_hash 绑定候选冻结血缘：asset_id/content_hash/scene_spec_hash/
+    divergence_manifest_hash/consistency_verdict/source_snapshot_hash/fork_id，
+    D-11/D-15）。
+
+    服务端 action gate 只接受 owner/novel/fork scope 内可批准
+    （candidate/needs_review）的候选——blocked candidate（identity drift /
+    未声明 divergence）转移集为空，绝不可能被批准；wrong owner/branch/fork /
+    scene_spec_hash drift → fail closed。**绝不发布**——只有独立 approval 被用户
+    批准后，确定性 review seam（``review_candidate_asset`` →
+    ``apply_derivative_asset_review``）原子校验 approval + payload + fork scope
+    + 合法 review 转移才把 candidate 物化为 approved published asset；Original
+    Visual Bible 绝不被触碰。
+    """
+    return await _run_tool(
+        "publish_derivative_visual",
         db=db,
         novel=novel,
         owner_id=current_user.id,

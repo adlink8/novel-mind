@@ -26,6 +26,7 @@ from pydantic import ValidationError
 
 from app.models.agent_runtime import SkillRun
 from app.schemas.agent_runtime import (
+    BranchVisualBibleArtifact,
     CanonForkProposalArtifact,
     ChapterAnalysisArtifact,
     CitedAnswerArtifact,
@@ -252,6 +253,22 @@ BLOCKED_DERIVATIVE_DRAFT_SUGGESTION = (
     "fields and enabled_by_default=false; an enabled default or a missing "
     "conflict/delta/evidence field fails closed"
 )
+# Phase 38 Branch Visual Bible 确定性边界（D-38-03/D-38-04 / REQ-FORK-04）。
+BLOCKED_BRANCH_VISUAL_BIBLE_PAYLOAD = (
+    "integrity: branch visual bible revision payload failed domain validation"
+)
+BLOCKED_BRANCH_VISUAL_BIBLE_APPROVAL_BYPASS = (
+    "integrity: branch visual bible approval bypass blocked — review_state "
+    "must be candidate at finalize"
+)
+BLOCKED_BRANCH_VISUAL_BIBLE_BRANCH = (
+    "integrity: branch visual bible branch/authority_space mismatch — envelope "
+    "branch must match the run branch and derivative mode requires branch + fork"
+)
+BLOCKED_BRANCH_VISUAL_BIBLE_SOURCE_DRIFT = (
+    "integrity: branch visual bible source_snapshot_hash drifts from envelope "
+    "source_versions"
+)
 
 
 @dataclass(frozen=True)
@@ -323,6 +340,8 @@ def evaluate_integrity(*, envelope: dict[str, Any], run: SkillRun) -> IntegrityD
         return _evaluate_derivative_edit_proposal(envelope, run)
     if artifact_type == "derivative_draft":
         return _evaluate_derivative_draft(envelope, run)
+    if artifact_type == "branch_visual_bible":
+        return _evaluate_branch_visual_bible(envelope, run)
     return IntegrityDecision(False, BLOCKED_UNKNOWN_TYPE)
 
 
@@ -1349,5 +1368,75 @@ def _evaluate_derivative_draft(
     all_keys = citation_keys | suggestion_keys | divergence_keys
     if not all_keys.issubset(envelope_keys):
         return IntegrityDecision(False, BLOCKED_DERIVATIVE_DRAFT_EVIDENCE_MISMATCH)
+
+    return IntegrityDecision(True)
+
+
+def _evaluate_branch_visual_bible(
+    envelope: dict[str, Any], run: SkillRun
+) -> IntegrityDecision:
+    """Phase 38 BranchVisualBibleArtifact 信封 integrity gate（D-38-03/D-38-04）。
+
+    与其余信封纪律一致（evidence/lineage/status/trail/protected），并在
+    ``revision``（BranchIllustrationRevision）负载上做确定性域边界校验：
+      - ``revision`` 必须是严格 ``BranchIllustrationRevisionPayload``
+        （visual version / source snapshot / frozen Scene Spec / candidate
+        asset / identity/source/generator lineage / divergence manifest /
+        consistency verdict / validator report 全部必须、可重放）；
+      - ``review_state`` 恒为 ``candidate``——Agent 声称任何非 candidate
+        review_state（approval bypass / approved / published 伪造）→ blocked
+        （只有确定性 validator + 独立 ``publish_derivative_visual`` Web
+        ApprovalRequest → review seam 能推进状态；D-38-03/D-38-04）；
+      - ``branch`` 门：信封 branch 必须与 run.branch 血缘一致；
+        ``authority_space`` 恒为 ``derivative`` 且必须携带 fork
+        （wrong branch/fork → blocked；Original Visual Bible 不可变）；
+      - 负载的 source_snapshot_hash 必须与信封 ``source_versions`` 血缘绑定。
+    任何失败 → 稳定 blocked，零写入；FastAPI 与确定性 review seam /
+    published_assets 保留 permission / evidence / state-transition /
+    publication 权威。
+    """
+    # 0. heuristic candidate-only 无 EvidenceRef 资格 → 不能进 branch visual 网关。
+    if not envelope.get("evidence_refs"):
+        return IntegrityDecision(False, BLOCKED_NO_EVIDENCE)
+
+    # 1. 严格 wire schema。
+    try:
+        model = BranchVisualBibleArtifact.model_validate(envelope)
+    except ValidationError as exc:
+        return IntegrityDecision(
+            False, f"{BLOCKED_SCHEMA} ({_first_validation_error(exc)})"
+        )
+
+    # 2. 共享 lineage/status/trail/protected 门。
+    blocked = _check_common_lineage(envelope=envelope, run=run, wire=model)
+    if blocked is not None:
+        return blocked
+
+    # 3. revision 负载：严格域契约 + approval bypass 门。
+    payload = envelope.get("revision")
+    if not isinstance(payload, dict):
+        return IntegrityDecision(False, BLOCKED_BRANCH_VISUAL_BIBLE_PAYLOAD)
+    if payload.get("review_state") != "candidate":
+        return IntegrityDecision(False, BLOCKED_BRANCH_VISUAL_BIBLE_APPROVAL_BYPASS)
+    try:
+        revision = BranchVisualBibleArtifact.model_validate(envelope).revision
+    except ValidationError as exc:
+        return IntegrityDecision(
+            False,
+            f"{BLOCKED_BRANCH_VISUAL_BIBLE_PAYLOAD} ({_first_validation_error(exc)})",
+        )
+
+    # 4. source snapshot 血缘绑定（D-38-01）。
+    source_versions = envelope.get("source_versions") or {}
+    snapshot = source_versions.get("source_snapshot_hash")
+    if snapshot is not None and snapshot != revision.source_snapshot.source_snapshot_hash:
+        return IntegrityDecision(False, BLOCKED_BRANCH_VISUAL_BIBLE_SOURCE_DRIFT)
+
+    # 5. branch/authority_space 门（wrong branch/fork → fail closed）。
+    branch = envelope.get("branch")
+    if branch != run.branch:
+        return IntegrityDecision(False, BLOCKED_BRANCH_VISUAL_BIBLE_BRANCH)
+    if revision.authority_space != "derivative" or not branch or not revision.fork:
+        return IntegrityDecision(False, BLOCKED_BRANCH_VISUAL_BIBLE_BRANCH)
 
     return IntegrityDecision(True)

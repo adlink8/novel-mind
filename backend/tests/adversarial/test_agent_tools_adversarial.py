@@ -72,6 +72,10 @@ ACTION_TOOLS = (
     # approved Fanfiction Canon 物化。
     "allow_divergence",
     "publish_derivative_revision",
+    # Phase 38 branch-aware derivative visual action 工具（38-05）：创建
+    # pending publish ApprovalRequest（绑定候选冻结血缘）；确定性 review seam
+    # 拥有 approved published asset 物化，绝不写 Original Visual Bible。
+    "publish_derivative_visual",
 )
 
 # 每个工具的 HTTP 路由（cross-owner 轴使用）。

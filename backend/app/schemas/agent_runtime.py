@@ -1128,5 +1128,134 @@ class DraftArtifact(StrictAgentRuntimeModel):
         return value
 
 
+# ────────────────────────── Phase 38 Branch Visual Bible Artifact 信封（REQ-FORK-04 / REQ-AGENT-03/04/07） ──────────────────────────
+
+
+class BranchIllustrationVisualVersionRef(StrictAgentRuntimeModel):
+    """已批准 derivative Visual Bible fork version ref（D-38-01，hash-pinned）。"""
+
+    version_id: int = Field(gt=0)
+    version_key: str = Field(min_length=1, max_length=160)
+    version_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+class BranchIllustrationSourceSnapshotRef(StrictAgentRuntimeModel):
+    """Source snapshot 血缘 ref（D-38-01：Original Visual Bible snapshot 只读）。"""
+
+    source_snapshot_id: str = Field(min_length=1, max_length=160)
+    source_snapshot_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    source_manifest_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    cutoff_chapter: int = Field(ge=1)
+
+
+class BranchIllustrationCandidateAssetRef(StrictAgentRuntimeModel):
+    """已存储 candidate asset ref（D-38-03 生成 asset_id + content checksum 重放）。"""
+
+    candidate_asset_id: int = Field(gt=0)
+    asset_id: str = Field(min_length=1, max_length=200)
+    asset_key: str = Field(min_length=1, max_length=180)
+    content_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    mime_type: str = Field(min_length=1, max_length=100)
+
+
+class BranchIllustrationIdentityRow(StrictAgentRuntimeModel):
+    """One identity row pinned to the exact Original Visual Bible entity."""
+
+    stable_id: str = Field(min_length=1, max_length=180)
+    entity_key: str = Field(min_length=1, max_length=180)
+    entity_type: str = Field(pattern=r"^(character|place|item|faction|style)$")
+    source_entity_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+class BranchIllustrationSourceRef(StrictAgentRuntimeModel):
+    """One Original asset reference (source asset id + bytes hash)."""
+
+    asset_key: str = Field(min_length=1, max_length=180)
+    asset_id: str = Field(min_length=1, max_length=200)
+    source_asset_id: str = Field(min_length=1, max_length=200)
+    source_bytes_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+class BranchIllustrationRevisionPayload(StrictAgentRuntimeModel):
+    """Phase 38 BranchIllustrationRevision 负载（D-38-03/D-38-04 / REQ-FORK-04）。
+
+    携带完整 branch-aware 血缘：visual version ref、source snapshot ref、frozen
+    canonical Scene Spec hash、candidate asset ref、identity/source/generator
+    lineage、divergence manifest hash、consistency verdict 与 validator report。
+    ``authority_space`` 恒为 ``derivative`` + ``fork`` 必须（Original Visual
+    Bible 不可变，REQ-FORK-04）；``review_state`` 恒为 ``candidate``（finalize
+    时）——只有确定性 validator + 独立 ``publish_derivative_visual`` Web
+    ApprovalRequest → review seam 能推进 approved published。``approval_request_id``
+    / ``publish_lineage`` 由服务端分配，模型输出不含。
+    """
+
+    schema_version: Literal["branch-illustration-revision.v1"] = (
+        "branch-illustration-revision.v1"
+    )
+    artifact_kind: Literal["branch_illustration_revision"] = (
+        "branch_illustration_revision"
+    )
+    authority_space: Literal["derivative"] = "derivative"
+    fork: str = Field(min_length=1, max_length=80)
+    visual_version: BranchIllustrationVisualVersionRef
+    source_snapshot: BranchIllustrationSourceSnapshotRef
+    scene_spec_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    candidate_asset: BranchIllustrationCandidateAssetRef
+    identity_lineage: list[BranchIllustrationIdentityRow] = Field(default_factory=list)
+    source_refs: list[BranchIllustrationSourceRef] = Field(default_factory=list)
+    generator_lineage: dict[str, Any] = Field(default_factory=dict)
+    divergence_manifest_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    consistency_verdict: Literal["pass", "concern", "fail", "unavailable"]
+    validator_report: dict[str, Any] = Field(default_factory=dict)
+    review_state: Literal["candidate"] = "candidate"
+    approval_request_id: int | None = Field(default=None, gt=0)
+    publish_lineage: dict[str, Any] = Field(default_factory=dict)
+
+
+class BranchVisualBibleArtifact(StrictAgentRuntimeModel):
+    """智能体产物的 BranchVisualBibleArtifact 信封（Phase 38 / D-38-03/D-38-04）。
+
+    Agent 产出的是 **candidate-only** 的 branch Visual Bible 修订：``revision``
+    （完整 BranchIllustrationRevision）携带 branch-aware 血缘（SkillRun/ToolRun、
+    owner/novel/branch/fork、source snapshot、visual version、frozen Scene Spec、
+    candidate asset、identity/source/generator lineage、divergence manifest、
+    consistency verdict 与 validator report）。``review_state`` 恒为 ``candidate``
+    （finalize 时）——只有确定性 validator + 独立 ``publish_derivative_visual``
+    Web ApprovalRequest → review seam（``review_candidate_asset`` →
+    ``apply_derivative_asset_review``）能把 candidate 物化为 approved published
+    asset；Agent/浏览器绝不发布、绝不触碰 Original Visual Bible（REQ-FORK-04）。
+    ``tool_runs`` 携带 ToolRun 血缘。与 CitedAnswerArtifact 信封纪律一致：type /
+    schema_version / owner / novel / branch / producing skill+version / model
+    lineage / source versions / input_hash / evidence_refs / status /
+    parent_revision / normalization（26-06 修复血缘 trail）。
+    """
+
+    type: Literal["branch_visual_bible"] = "branch_visual_bible"
+    schema_version: Literal["branch-visual-bible.v1"] = "branch-visual-bible.v1"
+    owner_id: int = Field(gt=0)
+    novel_id: int = Field(gt=0)
+    branch: str | None = None
+    producing_skill: str = Field(min_length=1, max_length=120)
+    producing_skill_version: str = Field(min_length=1, max_length=32)
+    skill_version_id: int = Field(gt=0)
+    model_lineage: dict[str, Any]
+    source_versions: dict[str, Any]
+    input_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    evidence_refs: list[str] = Field(min_length=1)
+    revision: BranchIllustrationRevisionPayload
+    tool_runs: list[dict[str, Any]] = Field(min_length=1)
+    status: Literal["candidate", "validated", "approved", "published", "rejected"]
+    parent_revision: str | None = None
+    normalization: NormalizationTrail
+
+    @field_validator("tool_runs")
+    @classmethod
+    def _tool_runs_shape(cls, value: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        for item in value:
+            if not isinstance(item, dict) or not item.get("tool_name"):
+                raise ValueError("each tool run requires tool_name")
+        return value
+
+
 # 供 OpenAPI 引用，避免未使用告警。
 _ = (StrictReaderChatModel,)

@@ -517,6 +517,53 @@ class PublishDerivativeRevisionRequest(StrictAgentToolModel):
     )
 
 
+# ────────────────────────── Phase 38 branch-aware derivative visual action 工具（38-05） ──────────────────────────
+
+
+class PublishDerivativeVisualRequest(StrictAgentToolModel):
+    """Phase 38 derivative visual publish action 请求（38-05，REQ-FORK-04 / REQ-AGENT-03/04/07）。
+
+    只为**一个已存储 derivative candidate asset**创建**一个 pending Web
+    ApprovalRequest**（action=publish_derivative_visual，payload_hash 绑定候选
+    冻结血缘：asset_id/content_hash/scene_spec_hash/divergence_manifest_hash/
+    consistency_verdict/source_snapshot_hash/fork_id，D-11/D-15）。服务端 action
+    gate 只接受 owner/novel/fork scope 内可批准（candidate/needs_review）的候选
+    （blocked 候选转移集为空 → fail closed）；candidate_id 由调用方携带，scope /
+    fork 血缘由服务端从候选行确定性派生。novel_id 由查询参数注入
+    （require_owned_novel），绝不放进请求体。**绝不发布**——只有独立 approval
+    被用户批准后，确定性 review seam（app.services.derivative_visual.review.
+    review_candidate_asset → apply_derivative_asset_review）原子校验 approval +
+    payload + fork scope + 合法 review 转移才把 candidate 物化为 approved
+    published asset；Original Visual Bible 绝不被触碰。
+    """
+
+    branch: str | None = Field(
+        default=None, max_length=80, description="衍生分支；原始主线为 null"
+    )
+    fork: str | None = Field(
+        default=None, max_length=80, description="衍生 fork（仅 derivative mode；original 必须为 null）"
+    )
+    candidate_asset_id: int = Field(
+        gt=0, description="已存储 derivative candidate asset ID（服务端重验 owner/novel/fork 血缘 + approvable review_state）"
+    )
+    scene_spec_hash: str = Field(
+        min_length=64,
+        max_length=64,
+        pattern="^[0-9a-f]{64}$",
+        description="frozen canonical derivative Scene Spec 血缘 hash（服务端与候选血缘重放；drift → fail closed）",
+    )
+    approval_note: str | None = Field(
+        default=None, max_length=4000, description="供发布 approval 展示的显式批准备注"
+    )
+    # D-15 血缘绑定（可选）：agent 会话已知的 run/skill/artifact 血缘。
+    run_id: int | None = Field(default=None, gt=0, description="SkillRun ID 血缘")
+    skill_version_id: int | None = Field(default=None, gt=0, description="SkillVersion ID 血缘")
+    artifact_id: int | None = Field(default=None, gt=0, description="Artifact ID 血缘")
+    artifact_revision_id: int | None = Field(
+        default=None, gt=0, description="ArtifactRevision ID 血缘"
+    )
+
+
 # ────────────────────────── 统一错误信封 ──────────────────────────
 
 

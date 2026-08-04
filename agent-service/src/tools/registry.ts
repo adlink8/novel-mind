@@ -16,7 +16,7 @@ import { defineTool } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { fastapiToolCall } from "./fastapi-client.js";
 
-/** 20 个域工具名（固定顺序；唯一 allowlist 事实源）。 */
+/** 21 个域工具名（固定顺序；唯一 allowlist 事实源）。 */
 export const DOMAIN_TOOL_NAMES = [
   "get_novel",
   "get_chapter",
@@ -38,6 +38,7 @@ export const DOMAIN_TOOL_NAMES = [
   "apply_derivative_edit",
   "allow_divergence",
   "publish_derivative_revision",
+  "publish_derivative_visual",
 ] as const;
 
 /** 工具注册时的运行级授权（端用户 JWT 或 per-run 内部令牌）。 */
@@ -342,6 +343,16 @@ export function buildDomainTools(auth: ToolAuth) {
       execute: (toolCallId, params, signal) =>
         fastapiToolCall("publish_derivative_revision", params as unknown, signal, auth),
     }),
+    // ── Phase 38 branch-aware derivative visual action 工具（38-05）──
+    defineTool({
+      name: "publish_derivative_visual",
+      label: "Publish Derivative Visual (Proposal)",
+      description:
+        "Phase 38 action（REQ-FORK-04 / REQ-AGENT-03/04/07）：为已存储 derivative candidate asset 提议**一个**独立 publish ApprovalRequest（candidate-only）。服务端 action 只接受 owner/novel/fork scope 内可批准（candidate/needs_review）的候选，payload_hash 绑定候选冻结血缘（asset_id/content_hash/scene_spec_hash/divergence_manifest_hash/consistency_verdict/source_snapshot_hash/fork_id；blocked candidate / wrong owner/branch/fork → fail closed）。绝不发布——只有独立 publish_derivative_visual approval 被用户批准后，确定性 review seam（review_candidate_asset）才能把 candidate 物化为 approved published asset；Agent 绝不写 Original Canon / Visual Bible / domain 表 / published 状态。",
+      parameters: publishDerivativeVisualParams(),
+      execute: (toolCallId, params, signal) =>
+        fastapiToolCall("publish_derivative_visual", params as unknown, signal, auth),
+    }),
   ];
 }
 
@@ -463,6 +474,27 @@ function publishDerivativeRevisionParams() {
       maxLength: 64,
       pattern: "^[0-9a-f]{64}$",
       description: "候选 CanonDelta hash（必须与 allow_divergence approval 完全一致）",
+    }),
+    approval_note: Type.Optional(Type.String({ maxLength: 4000, description: "供发布 approval 展示的显式批准备注" })),
+    run_id: Type.Optional(Type.Integer({ minimum: 1, description: "SkillRun ID 血缘" })),
+    skill_version_id: Type.Optional(Type.Integer({ minimum: 1, description: "SkillVersion ID 血缘" })),
+    artifact_id: Type.Optional(Type.Integer({ minimum: 1, description: "Artifact ID 血缘" })),
+    artifact_revision_id: Type.Optional(Type.Integer({ minimum: 1, description: "ArtifactRevision ID 血缘" })),
+  });
+}
+
+/** Phase 38 publish_derivative_visual action 工具参数（镜像 backend schemas.agent_tools）。 */
+function publishDerivativeVisualParams() {
+  return Type.Object({
+    novel_id: Type.Integer({ minimum: 1, description: "小说 ID" }),
+    branch: Type.Optional(Type.String({ maxLength: 80, description: "衍生分支；原始主线为 null" })),
+    fork: Type.Optional(Type.String({ maxLength: 80, description: "衍生 fork（仅 derivative mode）" })),
+    candidate_asset_id: Type.Integer({ minimum: 1, description: "已存储 derivative candidate asset ID（服务端重验 owner/novel/fork 血缘 + approvable review_state）" }),
+    scene_spec_hash: Type.String({
+      minLength: 64,
+      maxLength: 64,
+      pattern: "^[0-9a-f]{64}$",
+      description: "frozen canonical derivative Scene Spec 血缘 hash（服务端与 candidate 血缘重放；drift → fail closed）",
     }),
     approval_note: Type.Optional(Type.String({ maxLength: 4000, description: "供发布 approval 展示的显式批准备注" })),
     run_id: Type.Optional(Type.Integer({ minimum: 1, description: "SkillRun ID 血缘" })),

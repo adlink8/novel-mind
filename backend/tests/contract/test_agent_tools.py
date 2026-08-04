@@ -156,6 +156,13 @@ _PARAMS_BY_TOOL = {
         "draft_hash": "a" * 64,
         "canon_delta_hash": "a" * 64,
     },
+    # Phase 38 branch-aware derivative visual action 工具（38-05）。
+    "publish_derivative_visual": {
+        "branch": "deriv-branch",
+        "fork": "fork-1",
+        "candidate_asset_id": 1,
+        "scene_spec_hash": "a" * 64,
+    },
 }
 
 
@@ -205,7 +212,7 @@ def test_every_error_class_code_is_in_frozen_table():
         ), AgentToolError)
 
 
-def test_tool_names_are_exactly_the_20_contract_tools():
+def test_tool_names_are_exactly_the_21_contract_tools():
     assert set(TOOL_NAMES) == {
         "get_novel",
         "get_chapter",
@@ -222,7 +229,7 @@ def test_tool_names_are_exactly_the_20_contract_tools():
         "get_evidence_span",
         # Phase 30 Visual Bible 只读工具（31-04）。
         "get_visual_bible",
-        # Phase 33/34/35/36/37 候选 action 工具。
+        # Phase 33/34/35/36/37/38 候选 action 工具。
         "generate_image_candidate",
         "publish_illustration",
         "attach_illustration_to_text",
@@ -230,6 +237,7 @@ def test_tool_names_are_exactly_the_20_contract_tools():
         "apply_derivative_edit",
         "allow_divergence",
         "publish_derivative_revision",
+        "publish_derivative_visual",
     }
 
 

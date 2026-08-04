@@ -100,6 +100,13 @@ logger = logging.getLogger(__name__)
 # ApprovalRequest（绑定相同 draft_hash + canon_delta_hash）。两者都绝不发布——
 # 确定性 revision publisher（consume_publish_approval -> approve_override）拥有
 # approved Fanfiction Canon 物化，绝不写 Original Canon。
+# 38-05 起加入 Phase 38 branch-aware derivative visual action 工具
+# publish_derivative_visual——它只为已存储 candidate asset 创建 pending Web
+# ApprovalRequest（payload_hash 绑定候选冻结血缘：asset_id/content_hash/
+# scene_spec_hash/divergence_manifest_hash/consistency_verdict/source_snapshot_hash/
+# fork_id；blocked candidate / wrong owner/branch/fork → fail closed）。绝不发布——
+# 确定性 review seam（review_candidate_asset -> apply_derivative_asset_review）拥有
+# approved published asset 物化，绝不写 Original Visual Bible。
 TOOL_NAMES: tuple[str, ...] = (
     "get_novel",
     "get_chapter",
@@ -121,6 +128,7 @@ TOOL_NAMES: tuple[str, ...] = (
     "apply_derivative_edit",
     "allow_divergence",
     "publish_derivative_revision",
+    "publish_derivative_visual",
 )
 
 # per-tool 默认字节上限（agent-service 侧同样硬编码 64 KiB，见 RESEARCH Code Examples）。
@@ -866,6 +874,50 @@ async def _default_publish_derivative_revision(
         raise InvalidInputError(f"{exc.code}: {exc.detail}") from None
 
 
+async def _default_publish_derivative_visual(
+    db,
+    *,
+    owner_id: int,
+    novel_id: int,
+    params: dict[str, Any],
+) -> dict[str, Any]:
+    """Phase 38 action 工具默认服务：为已存储 candidate 创建**一个** pending
+    ApprovalRequest（D-38-03/D-38-04）。
+
+    委托 `derivative_visual.agent_boundary.request_publish_derivative_visual`：
+    只接受 owner/novel/fork scope 内可批准（candidate/needs_review）的候选
+    （blocked candidate / wrong owner/branch/fork / scene_spec_hash drift →
+    fail closed）；创建 pending Web ApprovalRequest
+    （action=publish_derivative_visual，payload_hash 绑定候选冻结血缘，
+    D-11/D-15）。**绝不发布、绝不写 Original Visual Bible**——只有独立 approval
+    被用户批准后由确定性 review seam（review_candidate_asset）物化为 approved
+    published asset。
+    """
+    from app.services.derivative_visual.agent_boundary import (
+        DerivativeVisualBoundaryError,
+        request_publish_derivative_visual,
+    )
+
+    try:
+        return await request_publish_derivative_visual(
+            db,
+            owner_id=owner_id,
+            novel_id=novel_id,
+            candidate_asset_id=int(params["candidate_asset_id"]),
+            scene_spec_hash=str(params["scene_spec_hash"]),
+            actor_id=owner_id,
+            approval_note=params.get("approval_note"),
+            branch=params.get("branch"),
+            fork=params.get("fork"),
+            run_id=params.get("run_id"),
+            skill_version_id=params.get("skill_version_id"),
+            artifact_id=params.get("artifact_id"),
+            artifact_revision_id=params.get("artifact_revision_id"),
+        )
+    except DerivativeVisualBoundaryError as exc:
+        raise InvalidInputError(f"{exc.code}: {exc.detail}") from None
+
+
 def _agent_edit_proposal_view_for_tool(result) -> dict[str, Any]:
     """DerivativeEditProposal approval ORM → JSON-safe 工具响应。
 
@@ -1000,7 +1052,7 @@ async def _resolve_world_model_version(
 
 
 class ToolFacade:
-    """12 个只读工具 + 8 个候选 action 工具的统一执行门面。
+    """12 个只读工具 + 9 个候选 action 工具的统一执行门面。
 
     所有强制点（字节上限 / 超时 / budget hook / 错误码映射）都在
     ``execute`` 内完成；owner / cutoff 逻辑复用现有服务。Phase 33 的
@@ -1013,7 +1065,10 @@ class ToolFacade:
     Phase 37 ``allow_divergence`` / ``publish_derivative_revision`` 只创建
     divergence override / 独立 publish ApprovalRequest（相同 hash 绑定）——
     确定性 revision publisher（``consume_publish_approval``）拥有 approved
-    Fanfiction Canon 物化。
+    Fanfiction Canon 物化。Phase 38 ``publish_derivative_visual`` 只为已存储
+    candidate 创建 pending publish ApprovalRequest（绑定候选冻结血缘）——
+    确定性 review seam 拥有 approved published asset 物化，绝不写 Original
+    Visual Bible。
     """
 
     def __init__(
@@ -1067,6 +1122,10 @@ class ToolFacade:
             # 确定性 revision publisher 拥有 approved Fanfiction Canon 物化。
             "allow_divergence": self._allow_divergence,
             "publish_derivative_revision": self._publish_derivative_revision,
+            # Phase 38 branch-aware derivative visual action 工具（38-05）：只创建
+            # pending publish ApprovalRequest（绑定候选冻结血缘）；确定性 review
+            # seam 拥有 approved published asset 物化，绝不写 Original Visual Bible。
+            "publish_derivative_visual": self._publish_derivative_visual,
         }
 
     # ── 公共入口 ──
@@ -1476,6 +1535,16 @@ class ToolFacade:
     async def _publish_derivative_revision(self, *, db, novel, owner_id, params):
         """创建独立 publish ApprovalRequest（相同 hash 绑定；candidate-only，37-05）。"""
         svc = self._svc("publish_derivative_revision", _default_publish_derivative_revision)
+        return await svc(
+            db,
+            owner_id=owner_id,
+            novel_id=novel.id,
+            params=params,
+        )
+
+    async def _publish_derivative_visual(self, *, db, novel, owner_id, params):
+        """创建独立 publish ApprovalRequest（绑定候选冻结血缘；candidate-only，38-05）。"""
+        svc = self._svc("publish_derivative_visual", _default_publish_derivative_visual)
         return await svc(
             db,
             owner_id=owner_id,
