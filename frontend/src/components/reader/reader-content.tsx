@@ -9,11 +9,15 @@ import type { ReaderMode } from "@/components/reader/reader-preferences";
 import {
   buildSelectionPayload,
   captureSelectionFromRange,
+  codePointLength,
   codePointSlice,
   codePointToUtf16Index,
   splitPagesWithBases,
+  utf16IndexToCodePoint,
   type ChapterSelectionCoords,
 } from "@/lib/reader-selection";
+import type { IllustrationAnchorView } from "@/lib/illustration-anchor";
+import { IllustrationBlock } from "./illustration-block";
 
 interface ReaderContentProps {
   chapter: Chapter | null;
@@ -30,6 +34,8 @@ interface ReaderContentProps {
   onAskSelection?: (payload: SelectionCoordinate) => void;
   /** Highlight a code-point range within the current chapter (citation jump). */
   highlightRange?: { sourceStart: number; sourceEnd: number } | null;
+  /** Phase 34-02: published illustration anchors for the current chapter. */
+  anchors?: IllustrationAnchorView[];
   /** 分页阅读或整章长页阅读。 */
   readingMode?: ReaderMode;
   /** 进入本章时要恢复的章内进度 0-100（0 = 从头开始） */
@@ -70,6 +76,7 @@ export function ReaderContent({
   hasPrevChapter = false,
   onAskSelection,
   highlightRange = null,
+  anchors = [],
   readingMode = "paged",
   initialProgress = 0,
   fontSize = 18,
@@ -207,6 +214,16 @@ export function ReaderContent({
       setCaptured(null);
       return;
     }
+    // Phase 34-02: selections inside an inline illustration (caption) are not
+    // chapter text coordinates — drop the floating action instead of mapping.
+    const selectionHost =
+      range.commonAncestorContainer instanceof Element
+        ? range.commonAncestorContainer
+        : range.commonAncestorContainer.parentElement;
+    if (selectionHost?.closest("[data-reader-illustration]")) {
+      setCaptured(null);
+      return;
+    }
 
     const page = displayPages[Math.min(pageIndex, Math.max(displayPages.length - 1, 0))];
     const base = page?.sourceStartUtf16 ?? 0;
@@ -299,38 +316,28 @@ export function ReaderContent({
   const page = displayPages[safeIndex] || { text: "", sourceStartUtf16: 0 };
   const pageText = page.text;
 
-  // Render page text with optional highlight overlay spans (hooks before early return)
+  // Render page as interleaved paragraph + inline illustration blocks
+  // (hooks before early return). Illustrations are placed by exact source
+  // offsets — never by DOM index — and the anchor hash is re-verified inside
+  // IllustrationBlock before any approved asset renders (D-34-01).
   const chapterContent = chapter?.content ?? "";
   const pageBaseUtf16 = page.sourceStartUtf16;
-  let renderedPage: React.ReactNode = pageText;
-  if (chapterContent && highlightRange) {
-    const prefix = chapterContent.slice(0, pageBaseUtf16);
-    const pageCpStart = Array.from(prefix).length;
-    const pageCpEnd = pageCpStart + Array.from(pageText).length;
-    const hs = highlightRange.sourceStart;
-    const he = highlightRange.sourceEnd;
-    if (he > pageCpStart && hs < pageCpEnd) {
-      const localStart = Math.max(0, hs - pageCpStart);
-      const localEnd = Math.min(Array.from(pageText).length, he - pageCpStart);
-      const chars = Array.from(pageText);
-      const before = chars.slice(0, localStart).join("");
-      const mid = chars.slice(localStart, localEnd).join("");
-      const after = chars.slice(localEnd).join("");
-      renderedPage = (
-        <>
-          {before}
-          <mark
-            data-testid="reader-citation-highlight"
-            data-source-start={hs}
-            className="rounded bg-amber-200/80 px-0.5 text-inherit"
-          >
-            {mid}
-          </mark>
-          {after}
-        </>
-      );
-    }
-  }
+  const pageCpStart = utf16IndexToCodePoint(chapterContent, pageBaseUtf16);
+  const activeAnchors = useMemo(
+    () => anchors.filter((a) => a.chapter_id === chapter?.id),
+    [anchors, chapter?.id]
+  );
+  const pageBlocks = useMemo(
+    () =>
+      buildPageBlocks({
+        pageText,
+        pageCpStart,
+        highlightRange,
+        anchors: activeAnchors,
+        chapterContent,
+      }),
+    [pageText, pageCpStart, highlightRange, activeAnchors, chapterContent]
+  );
 
   if (!chapter) {
     return (
@@ -411,7 +418,8 @@ export function ReaderContent({
         </div>
       )}
 
-      {/* key 强制页内容节点重建；单一 text 节点便于选区映射 */}
+      {/* key 强制页内容节点重建；正文段落文本与插图块交错的 flow 布局，选区映射按
+          pageTextRef 内文本节点精确累积（插图块被 data-reader-illustration 跳过） */}
       <div
         key={`${chapter.id}-${safeIndex}`}
         ref={pageTextRef}
@@ -420,7 +428,28 @@ export function ReaderContent({
         className="relative whitespace-pre-wrap font-reading tracking-[0.02em] text-foreground/90"
         style={{ fontSize, lineHeight }}
       >
-        {renderedPage}
+        {pageBlocks.map((block) =>
+          block.kind === "text" ? (
+            <div key={block.index} data-reader-paragraph>
+              {block.highlight ? (
+                <HighlightedText
+                  text={block.text}
+                  highlight={block.highlight}
+                  sourceStart={highlightRange?.sourceStart ?? 0}
+                />
+              ) : (
+                block.text
+              )}
+            </div>
+          ) : (
+            <IllustrationBlock
+              key={`anchor-${block.anchor.id}`}
+              anchor={block.anchor}
+              novelId={chapter.novel_id}
+              chapterContent={chapterContent}
+            />
+          )
+        )}
       </div>
 
       {captured && onAskSelection ? (
@@ -482,4 +511,135 @@ export function excerptAt(
   sourceEnd: number
 ): string {
   return codePointSlice(content, sourceStart, sourceEnd);
+}
+
+// ---------------------------------------------------------------------------
+// Phase 34-02 — interleaved paragraph/illustration page blocks
+// ---------------------------------------------------------------------------
+
+type ReaderTextBlock = {
+  kind: "text";
+  index: number;
+  text: string;
+  highlight: { start: number; end: number } | null;
+};
+
+type ReaderIllustrationBlock = {
+  kind: "illustration";
+  anchor: IllustrationAnchorView;
+};
+
+type ReaderPageBlock = ReaderTextBlock | ReaderIllustrationBlock;
+
+/** Render a paragraph's highlight range (paragraph-local code-point offsets). */
+function HighlightedText({
+  text,
+  highlight,
+  sourceStart,
+}: {
+  text: string;
+  highlight: { start: number; end: number };
+  sourceStart: number;
+}) {
+  const chars = Array.from(text);
+  const before = chars.slice(0, highlight.start).join("");
+  const mid = chars.slice(highlight.start, highlight.end).join("");
+  const after = chars.slice(highlight.end).join("");
+  return (
+    <>
+      {before}
+      <mark
+        data-testid="reader-citation-highlight"
+        data-source-start={sourceStart}
+        className="rounded bg-amber-200/80 px-0.5 text-inherit"
+      >
+        {mid}
+      </mark>
+      {after}
+    </>
+  );
+}
+
+/**
+ * Split the visible page text into paragraph blocks (trailing newlines are
+ * kept attached so the text node concatenation still equals the page text,
+ * preserving selection coordinate mapping) and insert inline illustration
+ * blocks after the paragraph that contains each anchor's exact source start.
+ * Anchors are never placed by DOM index (D-34-01/02).
+ */
+export function buildPageBlocks(options: {
+  pageText: string;
+  pageCpStart: number;
+  highlightRange: { sourceStart: number; sourceEnd: number } | null;
+  anchors: IllustrationAnchorView[];
+  chapterContent: string;
+}): ReaderPageBlock[] {
+  const { pageText, pageCpStart, highlightRange, anchors } = options;
+  if (!pageText) return [];
+
+  const pageCpLen = codePointLength(pageText);
+  const pageCpEnd = pageCpStart + pageCpLen;
+
+  // Highlight local (page-relative code-point) range, if it overlaps the page.
+  let hlStart = -1;
+  let hlEnd = -1;
+  if (
+    highlightRange &&
+    highlightRange.sourceEnd > pageCpStart &&
+    highlightRange.sourceStart < pageCpEnd
+  ) {
+    hlStart = Math.max(0, highlightRange.sourceStart - pageCpStart);
+    hlEnd = Math.min(pageCpLen, highlightRange.sourceEnd - pageCpStart);
+  }
+
+  // Split into paragraphs, keeping trailing newline separators attached to the
+  // preceding paragraph so the text node concatenation equals the page text.
+  const paragraphs = (pageText.match(/[^\n]*\n*/g) ?? []).filter(
+    (part) => part !== ""
+  );
+
+  const textBlocks: ReaderTextBlock[] = [];
+  let cursor = 0;
+  paragraphs.forEach((text, index) => {
+    const len = codePointLength(text);
+    let highlight: { start: number; end: number } | null = null;
+    if (hlStart >= 0) {
+      const s = Math.max(hlStart, cursor);
+      const e = Math.min(hlEnd, cursor + len);
+      if (e > s) highlight = { start: s - cursor, end: e - cursor };
+    }
+    textBlocks.push({ kind: "text", index, text, highlight });
+    cursor += len;
+  });
+
+  // Map each anchor to the paragraph containing its exact source start.
+  const placements: Array<{ anchor: IllustrationAnchorView; after: number }> =
+    [];
+  for (const anchor of anchors) {
+    const localCp = anchor.source_start - pageCpStart;
+    if (localCp < 0 || localCp >= pageCpLen) continue;
+    let acc = 0;
+    let after = paragraphs.length - 1;
+    for (let i = 0; i < paragraphs.length; i += 1) {
+      const len = codePointLength(paragraphs[i]);
+      if (localCp >= acc && localCp < acc + len) {
+        after = i;
+        break;
+      }
+      acc += len;
+    }
+    placements.push({ anchor, after });
+  }
+  placements.sort((a, b) => a.after - b.after);
+
+  const blocks: ReaderPageBlock[] = [];
+  textBlocks.forEach((block, index) => {
+    blocks.push(block);
+    for (const placement of placements) {
+      if (placement.after === index) {
+        blocks.push({ kind: "illustration", anchor: placement.anchor });
+      }
+    }
+  });
+  return blocks;
 }

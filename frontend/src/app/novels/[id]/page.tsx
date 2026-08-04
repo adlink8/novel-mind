@@ -28,6 +28,10 @@ import {
   saveReaderChatPresentation,
 } from "@/lib/reader-selection";
 import {
+  illustrationAnchorApi,
+  type IllustrationAnchorView,
+} from "@/lib/illustration-anchor";
+import {
   ArrowLeft,
   BookOpenText,
   ChevronLeft,
@@ -107,6 +111,8 @@ function NovelReaderInner() {
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [currentChapterId, setCurrentChapterId] = useState<number>(0);
   const [chapterContent, setChapterContent] = useState<Chapter | null>(null);
+  /** Phase 34-02: published illustration anchors for the current chapter. */
+  const [chapterAnchors, setChapterAnchors] = useState<IllustrationAnchorView[]>([]);
   // 桌面（≥1280）默认展开目录，窄屏默认收起
   // 惰性初始，避免 effect 同步 setState
   const [sidebarOpen, setSidebarOpen] = useState(() => {
@@ -321,6 +327,20 @@ function NovelReaderInner() {
       try {
         const res = await novelsApi.getChapter(novelId, String(currentChapterId));
         setChapterContent(res.data);
+
+        // Phase 34-02: published reader-visible anchors for this chapter. The
+        // reader re-verifies each anchor hash against the current text before
+        // rendering an approved asset; a fetch failure degrades to no anchors.
+        try {
+          const anchorsRes = await illustrationAnchorApi.list(novelId);
+          setChapterAnchors(
+            anchorsRes.data.items.filter(
+              (a) => a.chapter_id === currentChapterId
+            )
+          );
+        } catch {
+          setChapterAnchors([]);
+        }
 
         // Citation deep-link (from Analysis Chat / timeline): highlight the
         // exact code-point range once the target chapter is loaded.
@@ -684,6 +704,7 @@ function NovelReaderInner() {
               hasPrevChapter={currentIndex > 0}
               onAskSelection={handleAskSelection}
               highlightRange={highlightRange}
+              anchors={chapterAnchors}
               readingMode={preferences.mode}
               initialProgress={restorePercent}
               fontSize={preferences.fontSize}
