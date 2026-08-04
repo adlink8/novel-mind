@@ -52,7 +52,8 @@ pytestmark = pytest.mark.integration
 
 HEX64 = "a" * 64
 PREV_REVISION = "20260801_canon_fork01"
-NEW_REVISION = "20260801_canon_contamination04"
+# The head has advanced to Phase 36-01; the round trip must land there.
+NEW_REVISION = "20260801_derivative_project01"
 
 
 def async_url(sync_url: str) -> str:
