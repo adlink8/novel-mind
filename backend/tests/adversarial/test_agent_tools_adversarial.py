@@ -56,6 +56,14 @@ ALL_TOOLS = (
     "generate_image_candidate",
 )
 
+# Phase 34 锚点 action 工具（34-05）：创建候选 proposal + pending ApprovalRequest。
+# 由 test_phase_34_skill.py 专项覆盖（伪造/过期/取消/拒绝审批等对抗路径），
+# 不参与本文件纯读 adversarial 轴。
+ACTION_TOOLS = (
+    "publish_illustration",
+    "attach_illustration_to_text",
+)
+
 # 每个工具的 HTTP 路由（cross-owner 轴使用）。
 TOOL_ROUTES = {
     "get_novel": "/api/agent-tools/get_novel",
@@ -974,7 +982,10 @@ def _imports_of(path: Path) -> list[str]:
 def test_static_gate_tool_names_match_facade():
     from app.services.agent_tools.facade import TOOL_NAMES
 
-    assert tuple(ALL_TOOLS) == TOOL_NAMES
+    # 读工具（纯只读 adversarial 轴）必须与 facade 读工具子集完全一致，防漂移。
+    assert tuple(ALL_TOOLS) == tuple(t for t in TOOL_NAMES if t not in ACTION_TOOLS)
+    # action 工具（34-05）由专项集成测试覆盖，不参与纯读 adversarial 轴。
+    assert set(ACTION_TOOLS) <= set(TOOL_NAMES)
 
 
 def test_static_gate_tool_surface_imports_no_domain_mutation_modules():
