@@ -386,3 +386,23 @@ Key metrics:
 | 已知环境限制 | 同前：e2e Next dev server 编译失败（38-04 e2e 6 用例 route-mock 可解析）、openapi subprocess 挂起、agent_runtime 需 `-o timeout=600`、前端 39 typecheck 遗留（新增文件 0 错误） | 2026-08-05 本机 |
 | 已修复 stale 断言 | `test_derivative_visual_schema` downgrade 目标改为 `20260802_derivative_override01`；`test_derivative_editor_gate` no-publish 检查限定浏览器编辑器表面（排除 approval-gated agent-tools action 域） | commit `fad8978`，7p/8p 复验通过 |
 | 仍阻塞 | Phase 22 Nightly 3/3 未达成（0/3）；Phase 39 执行继续在 35-39 override 下 | `.planning/STATE.md` |
+
+---
+
+## 2026-08-05 快照（Phase 39 实现并验证；snapshot: master @ c21c9e0）
+
+以下事实覆盖上文旧节中的对应记录：
+
+| 项 | 当前值 | 证据 |
+|---|---|---|
+| Phase 39 Derivative Export Closeout | **VERIFIED 2026-08-05** | `39-VERIFICATION.md` passed（source_commit `c21c9e0`） |
+| 后端测试 | **2229 passed**（unit 1258 + derivative export 集成/security 76 + adversarial 550 + agent_runtime 308 + ci 37） | 独立测试子代理 2026-08-05 |
+| agent-service | **1020 passed**；tsc 0 errors | `cd agent-service && npx vitest run` |
+| 前端 | **429 passed / 48 files** | `cd frontend && npm test` |
+| Derivative Export Closeout | 可重现 Markdown/EPUB export（frozen ExportSnapshot）、bounded provenance package、export browser UAT 面板、prepare-export skill + approve_export/materialize_export action、独立 audit gate（lineage 10 项 + REQ-SHIP-01 基线，qualified_candidate/blocked 无 promotion path） | `backend/app/services/derivative_export/` + `frontend/src/components/writing/export-panel.tsx` |
+| Agent skills | 15 skills：+prepare-export；facade TOOL_NAMES 21→23 | `agent-service/src/skills/` |
+| Alembic | 单 head `20260802_derivative_asset01` | `alembic heads` |
+| 已知环境限制 | 同前：e2e Next dev server 编译失败（39-03 e2e 36 用例 route-mock 可解析）、EPUB 无 validator 显式 unverified 不标绿、openapi subprocess 挂起、agent_runtime 需 `-o timeout=600`、前端 typecheck 遗留（新增文件 0 错误） | 2026-08-05 本机 |
+| audit gate 诚实状态 | Phase 39 milestone 已交付并验证；Phase 22 0/3 + REQ-SHIP-01 基线（TLS/secret/backup/monitoring/cost budget）缺证据 → 最终 verdict 恒 blocked，永不 promotion | `39-VERIFICATION.md` |
+| 里程碑 | **v1.4 (35–39) 完成**；v1.2 (26–29) + v1.3 (30–34) + v1.4 (35–39) 全 roadmap 交付 | `.planning/STATE.md` |
+| 仍阻塞 | Phase 22 Nightly 3/3 未达成（0/3，最终发布门唯一未验证项） | `.planning/STATE.md` |

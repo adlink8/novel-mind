@@ -101,6 +101,12 @@ No single aggregate completion percentage is authoritative.
     seam + review UI panel, illustrate-derivative-scene skill + publish_derivative_visual
     action (tool 20→21, 14 skills). Migration head `20260802_derivative_asset01`; backend
     2157p, agent-service 974p, frontend 416p.
+19. `39`: **IMPLEMENTED & VERIFIED (2026-08-05)** — derivative-only reproducible Markdown/
+    EPUB export, bounded provenance package + three-dimension audit, export browser UAT
+    panel, prepare-export skill + approve_export/materialize_export actions (tool 21→23,
+    15 skills), independent Phase 39 audit gate (lineage + REQ-SHIP-01 baseline, no
+    promotion path). Migration head `20260802_derivative_asset01`; backend 2229p,
+    agent-service 1020p, frontend 429p. **Completes the v1.4 milestone (35–39).**
 
 ## Planning Portfolio
 
@@ -121,7 +127,7 @@ No single aggregate completion percentage is authoritative.
 | Phase 36 | VERIFIED | 5 | ✅ 2026-08-04 (user execution override) |
 | Phase 37 | VERIFIED | 5 | ✅ 2026-08-04 (user execution override) |
 | Phase 38 | VERIFIED | 5 | ✅ 2026-08-05 (user execution override) |
-| Phase 39 | PLANNED | 5 | BLOCKED by Phase 22 3/3 + upstream execution dependencies |
+| Phase 39 | VERIFIED | 5 | ✅ 2026-08-05 (user execution override) |
 
 The earlier 55-plan structural verdict did not prove Issue #29 Agent-consumption coverage.
 The corrected 86-plan portfolio must cover REQ-AGENT-01..08, AgentVN-derived candidate-only
@@ -210,6 +216,11 @@ created.
   vitest 416p, tsc 0, alembic single head `20260802_derivative_asset01`. Two stale assertions
   (migration round-trip downgrade target; editor-gate no-publish scope vs approval-gated
   agent-tools action domain) fixed by lead at `fad8978` and re-verified.
+- **2026-08-05 Phase 39 verification**: 39-01..39-05 delivered; `39-VERIFICATION.md`
+  passed (source_commit `c21c9e0`); backend 2229p (unit 1258 + derivative export
+  integration/security 76 + adversarial 550 + agent_runtime 308 + ci 37); agent-service
+  vitest 1020p, frontend vitest 429p, tsc 0, alembic single head `20260802_derivative_asset01`.
+  **Completes the v1.4 milestone (35–39).**
 - **2026-08-03 stub-SUT finding (recorded, deferred)**: current nightly benchmark scores
   with deterministic stubs (`default_stub_*`, no live model calls); Ollama is only a health
   gate. Full G2 deployment (runner+Ollama+Docker) is premature for the stub pipeline.
@@ -365,8 +376,9 @@ verified (34-VERIFICATION passed at `68819ac`), completing the v1.3 milestone (3
 Phase 35 execution is authorized by the 2026-08-04 Phase 35–39 override, and Phase 35 is
 now verified (35-VERIFICATION passed at `5992c25`). Phase 36 is now verified
 (36-VERIFICATION passed at `a354a1e`). Phase 37 is now verified (37-VERIFICATION passed at
-`b8594e3`). Phase 38 is now verified (38-VERIFICATION passed at `fad8978`). Phase 39
-continues under the same override.
+`b8594e3`). Phase 38 is now verified (38-VERIFICATION passed at `fad8978`). Phase 39 is now
+verified (39-VERIFICATION passed at `c21c9e0`), **completing the v1.4 milestone (35–39)
+and the full roadmap through Phase 39**.
 Phase 22 remains 0/3 (not satisfied, verdict unchanged).
 If Phase 22 is resumed, use `$gsd-resume-work`; do not mark it complete early.
 
@@ -375,6 +387,6 @@ If Phase 22 is resumed, use `$gsd-resume-work`; do not mark it complete early.
 - Agent runtime foundation: Phase 25.2–25.3.
 - v1.2 trusted understanding: Phase 26–29.
 - v1.3 Visual Bible, key scenes and illustrations: Phase 30–34.
-- v1.4 Canon Fork and constrained derivatives: Phase 35–39.
+- v1.4 Canon Fork and constrained derivatives: Phase 35–39 (**COMPLETE 2026-08-05**).
 
 See `.planning/ROADMAP.md`.

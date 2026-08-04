@@ -29,7 +29,7 @@
 | agent runtime foundation | 25.2–25.3 | **IMPLEMENTED & VERIFIED (2026-08-02)** | partial | blocked by Phase 22 3/3 |
 | v1.2 trusted novel understanding | 26–29 | **26/27/28/29 VERIFIED (2026-08-03)** | planned | blocked by Phase 22 3/3 |
 | v1.3 visual narrative | 30–34 | **30/31/32/33/34 VERIFIED (2026-08-04)** | planned | blocked by Phase 22 3/3 |
-| v1.4 Canon Fork derivatives | 35–39 | **35/36/37/38 VERIFIED (2026-08-05)** | planned | blocked by Phase 22 3/3 |
+| v1.4 Canon Fork derivatives | 35–39 | **35/36/37/38/39 VERIFIED (2026-08-05)** | planned | blocked by Phase 22 3/3 |
 
 # Agent Runtime Foundation — Phase 25.2–25.3
 
@@ -144,11 +144,11 @@ Alembic chain continues `26agentrun01 → 27approval01`.
 | Phase 36 | 5/5 + shared Agent contract | 5 | **VERIFIED 2026-08-04** |
 | Phase 37 | 5/5 + shared Agent contract | 5 | **VERIFIED 2026-08-04** |
 | Phase 38 | 5/5 + shared Agent contract | 5 | **VERIFIED 2026-08-05** |
-| Phase 39 | 5/5 + shared Agent contract | 5 | PLANNED |
+| Phase 39 | 5/5 + shared Agent contract | 5 | **VERIFIED 2026-08-05** |
 
 The corrected portfolio contains 86 plans: 10 reused Kimi foundation plans, five corrective
 foundation slices, 57 deterministic/domain/shared-integrity plans and 14 Agent-integration plans.
-Phase 25.2–38 are implemented and verified; Phase 39 remains a planning verdict only.
+Phase 25.2–39 are implemented and verified. **The full roadmap through Phase 39 is delivered.**
 
 ## Baseline Reconciliation — Phase 21–25.1
 
@@ -175,14 +175,13 @@ Phase 25.2–38 are implemented and verified; Phase 39 remains a planning verdic
 | 36 Derivative Project and Editor | **VERIFIED 2026-08-04** | `36-VERIFICATION.md` passed; project CRUD, chapter plan + Markdown editor, autosave CAS/history/diff/rollback, browser UAT + gate, edit-derivative-story skill |
 | 37 Constrained Generation | **VERIFIED 2026-08-04** | `37-VERIFICATION.md` passed; context package, constrained draft generation, consistency gates + BranchSuggestion, divergence override, continue-derivative-story skill |
 | 38 Derivative Visual Consistency | **VERIFIED 2026-08-05** | `38-VERIFICATION.md` passed; forked Visual Bible, derivative Scene Specs, candidate assets + cross-chapter consistency, review/version lineage + UI, illustrate-derivative-scene skill |
+| 39 Derivative Export Closeout | **VERIFIED 2026-08-05** | `39-VERIFICATION.md` passed; reproducible Markdown/EPUB export, provenance package, browser UAT, prepare-export skill + deterministic preparation/materialization, independent audit gate (no promotion path) |
 
-Phase 22 remains blocked and unverified. The user authorized the Phase 25.2, Phase 26,
-Phase 27, Phase 28, Phase 29, Phase 30, Phase 31, Phase 32, Phase 33, Phase 34, Phase 35,
-Phase 36, Phase 37 and Phase 38 execution overrides (2026-08-02/03/04/05); each phase
-proceeded on the passed upstream verification artifact. v1.2 milestone (Phases 26–29),
-v1.3 milestone (Phases 30–34) and Phases 35–38 of v1.4 are implemented and verified.
-Phase 39 still requires Phase 22 3/3 real scheduled green evidence plus a passed Phase 38
-verification artifact (exists).
+Phase 22 remains blocked and unverified. The user authorized the Phase 25.2 through Phase 39
+execution overrides (2026-08-02/03/04/05); each phase proceeded on the passed upstream
+verification artifact. v1.2 milestone (Phases 26–29), v1.3 milestone (Phases 30–34) and the
+v1.4 milestone (Phases 35–39) are all implemented and verified. The full roadmap through
+Phase 39 is delivered under the overrides.
 
 ---
 
@@ -527,10 +526,13 @@ original/derivative asset scenarios.
 
 ## Phase 39 — Export, UAT and v1.4 Audit
 
+**Status:** IMPLEMENTED & VERIFIED (2026-08-05, `39-VERIFICATION.md` passed at `c21c9e0`)
+
 **Goal:** ship a reproducible derivative package and independently audit the complete flow.
 
 **Plans:** 39-01 Markdown/EPUB derivative export; 39-02 manifest/assets/citation package;
-39-03 end-to-end browser UAT; 39-04 security, quality and milestone audit.
+39-03 end-to-end browser UAT; 39-04 security, quality and milestone audit; 39-05 Agent
+integration (prepare-export).
 
 **Must-Haves:** export-version parity, asset provenance, owner isolation, no original-space
 mutation and three-dimensional status report.
@@ -560,7 +562,8 @@ audit; **Test, Fix, and Confirm** every failed end-to-end checkpoint.
 ## Next
 
 Phase 22 (CI/Nightly authority) remains the last unverified gate — 0/3 scheduled green.
-Phase 25.2, 25.3, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37 and 38 are verified
-(2026-08-02/03/04/05), completing the v1.2 milestone (26–29), the v1.3 milestone (30–34) and
-Phases 35–38 of v1.4. Phase 39 (Export, UAT and v1.4 Audit) execution continues under
-the 2026-08-04 Phase 35–39 override.
+Phase 25.2 through Phase 39 are all verified (2026-08-02/03/04/05), completing the v1.2
+milestone (26–29), the v1.3 milestone (30–34) and the v1.4 milestone (35–39). The full
+roadmap through Phase 39 is delivered under the user-authorized execution overrides. The
+Phase 39 closeout audit gate honestly reports `blocked` (Phase 22 0/3 + REQ-SHIP-01 gaps)
+and never promotes; neither blocker is hidden or downgraded.
