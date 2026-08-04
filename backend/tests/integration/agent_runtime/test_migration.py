@@ -48,8 +48,7 @@ def test_heads_show_agent_runtime(empty_postgres: str, require_postgres: None):
     run_alembic("upgrade", "head", database_url=empty_postgres)
     head = _current_head(empty_postgres)
     # 单一 head 即线性链尾：agent_runtime 迁移（20260801_2601）在链中，
-    # 且 27-01/02/03 world_model 迁移已在其后推进 head。
-    assert head.startswith("20260801_")
+    # 且后续 phase 迁移已在其后推进 head（前缀随 head 移动变化，不断言固定前缀）。
     history = run_alembic("history", database_url=empty_postgres)
     assert "20260801_2601" in history.stdout + history.stderr
 
