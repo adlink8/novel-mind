@@ -288,6 +288,17 @@ created.
 - Phase 35+ still require a passed Phase 34 verification artifact per ROADMAP contracts;
   this override does not waive those.
 
+## Execution Override — Phase 35–39 (2026-08-04, user authorized)
+
+- User authorized skipping the Phase 22 3/3 gate for Phase 35..39 implementation
+  (2026-08-04, interactive confirmation "授权跳过门禁"). Scope: Phase 35-01..05 (triple
+  knowledge spaces and Canon Fork), 36-01..05 (derivative project and editor), 37-01..05
+  (constrained generation), 38-01..05 (derivative visual consistency), 39-01..05
+  (derivative export, UAT and audit) all proceed without Phase 22 real scheduled green
+  evidence.
+- Phase 22 verdict is NOT changed: remains blocked at 0/3 and must not be marked complete.
+- v1.4 milestone (35–39) completes the roadmap; no further phase execution gates apply.
+
 ## Execution Cursor
 
 Phase 22 execution is paused. Its recovery entry remains:
@@ -309,8 +320,9 @@ Phase 33 execution is authorized by the 2026-08-03 Phase 33 override, and Phase 
 verified (33-VERIFICATION passed at `1b8a658`).
 Phase 34 execution is authorized by the 2026-08-04 Phase 34 override, and Phase 34 is now
 verified (34-VERIFICATION passed at `68819ac`), completing the v1.3 milestone (30–34).
-Phase 35+ execution requires a passed upstream Phase 34 VERIFICATION (exists) plus
-Phase 22 real scheduled green evidence (0/3, not satisfied) or a further explicit override.
+Phase 35–39 execution is authorized by the 2026-08-04 Phase 35–39 override; Phase 35 may
+proceed on the passed Phase 34 VERIFICATION artifact. Phase 22 remains 0/3 (not satisfied,
+verdict unchanged).
 If Phase 22 is resumed, use `$gsd-resume-work`; do not mark it complete early.
 
 ## Roadmap
