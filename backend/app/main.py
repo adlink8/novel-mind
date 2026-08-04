@@ -52,6 +52,7 @@ from app.api.key_scenes import router as key_scenes_router
 from app.api.scene_specs import router as scene_specs_router
 from app.api.prompt_revisions import router as prompt_revisions_router
 from app.api.illustrations import router as illustrations_router
+from app.api.illustration_anchors import router as illustration_anchors_router
 from app.config import settings
 from app.core.logging import RequestLoggingMiddleware, setup_logging
 from app.services.agent_tools.errors import AgentToolError
@@ -288,6 +289,11 @@ app.include_router(
     illustrations_router,
     prefix="/api/novels",
     tags=["插图生成"],
+)
+app.include_router(
+    illustration_anchors_router,
+    prefix="/api/novels",
+    tags=["插图锚点"],
 )
 
 

@@ -25,6 +25,7 @@ from app.core.database import get_db
 from app.core.security import require_user
 from app.models import Novel, User
 from app.schemas.agent_tools import (
+    AnchorProposalActionRequest,
     GenerateImageCandidateRequest,
     GetChapterRequest,
     GetCharacterKnowledgeRequest,
@@ -303,6 +304,51 @@ async def tool_generate_image_candidate(
     """
     return await _run_tool(
         "generate_image_candidate",
+        db=db,
+        novel=novel,
+        owner_id=current_user.id,
+        params=_params(body),
+    )
+
+
+@router.post("/publish_illustration")
+async def tool_publish_illustration(
+    body: AnchorProposalActionRequest | None = None,
+    novel: Novel = Depends(require_owned_novel),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """Phase 34 锚点提议 action（34-05）：创建**一个**候选 proposal + pending
+    Web ApprovalRequest（action=publish_illustration，D-11/D-15）。
+
+    服务端 proposal gate 只接受 proposal-ready + rights cleared 的 AssetRevision
+    （Phase 33 handoff）与精确 source span（D-34-01）。只创建 candidate
+    proposal（proposed → pending_approval），绝不发布——确定性 publisher 在用户
+    Web 批准后原子校验 approval + payload + scope 才创建 valid anchor；
+    Agent/浏览器绝不发布。
+    """
+    return await _run_tool(
+        "publish_illustration",
+        db=db,
+        novel=novel,
+        owner_id=current_user.id,
+        params=_params(body),
+    )
+
+
+@router.post("/attach_illustration_to_text")
+async def tool_attach_illustration_to_text(
+    body: AnchorProposalActionRequest | None = None,
+    novel: Novel = Depends(require_owned_novel),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """Phase 34 锚点提议 action（34-05）：把锚点绑定到**精确文本跨度**（candidate
+    -only）。与 publish_illustration 同 gate，但 ApprovalRequest action 为
+    attach_illustration_to_text（也要求 Web Approval）。绝不发布。
+    """
+    return await _run_tool(
+        "attach_illustration_to_text",
         db=db,
         novel=novel,
         owner_id=current_user.id,

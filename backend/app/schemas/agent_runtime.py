@@ -743,5 +743,102 @@ class IllustrationRevisionArtifact(StrictAgentRuntimeModel):
         return value
 
 
+class IllustrationAnchorProposalRange(StrictAgentRuntimeModel):
+    """Exact source span (code-point offsets) + optional paragraph range (D-34-01)."""
+
+    source_start: int = Field(ge=0)
+    source_end: int = Field(gt=0)
+    paragraph_start: int | None = Field(default=None, ge=1)
+    paragraph_end: int | None = Field(default=None, ge=1)
+
+
+class IllustrationAnchorProposalCopy(StrictAgentRuntimeModel):
+    """Accessible caption/alt/citation contract (D-34-02, never empty)."""
+
+    caption: str = Field(min_length=1, max_length=500)
+    alt_text: str = Field(min_length=1, max_length=500)
+    citation: str = Field(min_length=1, max_length=1000)
+
+
+class IllustrationAnchorProposalPayload(StrictAgentRuntimeModel):
+    """Phase 34 IllustrationAnchorProposal 负载（D-34-01..D-34-04 / REQ-VIS-05）。
+
+    携带完整 branch-aware 血缘：proposal key、authority space、chapter/精确
+    source span/hash、source snapshot、proposal-ready AssetRevision 引用、
+    presentation、requested action 与 proposal_status。``proposal_status`` 是
+    Phase 34 唯一官方状态机（proposed → pending_approval → valid），**finalize
+    写入时恒为 proposed**——只有服务端 proposal/approval/publisher 能推进状态；
+    Phase 34 绝不静默发布（D-34-01）。
+    """
+
+    schema_version: Literal["illustration-anchor-proposal.v1"] = (
+        "illustration-anchor-proposal.v1"
+    )
+    artifact_kind: Literal["illustration_anchor_proposal"] = (
+        "illustration_anchor_proposal"
+    )
+    proposal_key: str = Field(min_length=1, max_length=160)
+    authority_space: Literal["original", "derivative"] = "original"
+    fork: str | None = Field(default=None, max_length=80)
+    chapter_id: int = Field(gt=0)
+    chapter_number: int = Field(ge=1)
+    source_snapshot_id: str = Field(min_length=1, max_length=160)
+    source_snapshot_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    range: IllustrationAnchorProposalRange
+    excerpt: str = Field(min_length=1, max_length=20000)
+    anchor_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    chapter_content_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    proposal_asset_revision_id: int = Field(gt=0)
+    presentation: IllustrationAnchorProposalCopy
+    requested_action: Literal["publish_illustration", "attach_illustration_to_text"]
+    proposal_status: Literal["proposed", "pending_approval", "valid"] = "proposed"
+    approval_request_id: int | None = Field(default=None, gt=0)
+    proposal_id: int | None = Field(default=None, gt=0)
+
+
+class IllustrationAnchorProposalArtifact(StrictAgentRuntimeModel):
+    """智能体产物的 IllustrationAnchorProposal 信封（Phase 34 / D-34-01..D-34-04）。
+
+    Agent 产出的是 **candidate-only** 的锚点提议：``illustration_anchor_proposal``
+    携带完整 branch-aware 血缘（SkillRun/ToolRun、owner/novel/branch、source/input
+    hashes、evidence refs、runtime/model lineage、proposal-ready AssetRevision
+    引用与精确 source span）。``proposal_status`` 恒为 ``proposed``（finalize 时）
+    ——只有服务端 proposal/approval/publisher 能推进 proposed → pending_approval
+    → valid；Agent/浏览器绝不发布（D-34-01）。``tool_runs`` 携带 ToolRun 血缘。
+    与 CitedAnswerArtifact 信封纪律一致：type / schema_version / owner / novel /
+    branch / producing skill+version / model lineage / source versions /
+    input_hash / evidence_refs / status / parent_revision / normalization
+    （26-06 修复血缘 trail）。
+    """
+
+    type: Literal["illustration_anchor_proposal"] = "illustration_anchor_proposal"
+    schema_version: Literal["illustration-anchor-proposal.v1"] = (
+        "illustration-anchor-proposal.v1"
+    )
+    owner_id: int
+    novel_id: int
+    branch: str | None = None
+    producing_skill: str = Field(min_length=1, max_length=120)
+    producing_skill_version: str = Field(min_length=1, max_length=32)
+    skill_version_id: int = Field(gt=0)
+    model_lineage: dict[str, Any]
+    source_versions: dict[str, Any]
+    input_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    evidence_refs: list[str] = Field(min_length=1)
+    illustration_anchor_proposal: IllustrationAnchorProposalPayload
+    tool_runs: list[dict[str, Any]] = Field(min_length=1)
+    status: Literal["candidate", "validated", "approved", "published", "rejected"]
+    parent_revision: str | None = None
+    normalization: NormalizationTrail
+
+    @field_validator("tool_runs")
+    @classmethod
+    def _tool_runs_shape(cls, value: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        for item in value:
+            if not isinstance(item, dict) or not item.get("tool_name"):
+                raise ValueError("each tool run requires tool_name")
+        return value
+
+
 # 供 OpenAPI 引用，避免未使用告警。
 _ = (StrictReaderChatModel,)

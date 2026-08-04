@@ -210,6 +210,81 @@ class GenerateImageCandidateRequest(StrictAgentToolModel):
     height: int = Field(default=1024, ge=16, le=4096, description="图像高度")
 
 
+# ────────────────────────── Phase 34 锚点提议 action 工具（34-05） ──────────────────────────
+
+
+class AnchorProposalActionRequest(StrictAgentToolModel):
+    """Phase 34 锚点提议 action 请求（34-05，REQ-VIS-05 / REQ-AGENT-03/04/07）。
+
+    ``publish_illustration`` / ``attach_illustration_to_text`` 共用同一请求形状：
+    精确 source span（excerpt + anchor_hash + chapter_content_hash + source
+    snapshot）+ proposal-ready AssetRevision（Phase 33 handoff）。novel_id 由查询
+    参数注入（require_owned_novel），绝不放进请求体。服务端 proposal gate 只
+    接受 proposal-ready + rights cleared 的 AssetRevision 与精确 hash/range
+    （D-34-01）；创建候选 IllustrationAnchorProposal + pending Web
+    ApprovalRequest（action + payload_hash 确定性重放，D-11/D-15）。绝不发布——
+    确定性 publisher 在用户 Web 批准后原子校验 approval + payload + scope 才
+    创建 valid anchor。
+    """
+
+    branch: str | None = Field(
+        default=None, max_length=80, description="衍生分支；原始主线为 null"
+    )
+    fork: str | None = Field(
+        default=None, max_length=80, description="衍生 fork（仅 derivative mode；original 必须为 null）"
+    )
+    chapter_id: int = Field(gt=0, description="锚点目标章节 ID（服务端重验 owner/novel 血缘）")
+    chapter_number: int = Field(ge=1, description="锚点目标章节号")
+    proposal_key: str = Field(
+        min_length=1, max_length=160, description="幂等重放提案键（D-34-01）"
+    )
+    source_snapshot_id: str = Field(
+        min_length=1, max_length=160, description="source snapshot 血缘 ID"
+    )
+    source_snapshot_hash: str = Field(
+        min_length=64,
+        max_length=64,
+        pattern="^[0-9a-f]{64}$",
+        description="source snapshot 血缘 hash",
+    )
+    source_start: int = Field(ge=0, description="精确 source span 起点（含，code-point）")
+    source_end: int = Field(gt=0, description="精确 source span 终点（不含）")
+    paragraph_start: int | None = Field(
+        default=None, ge=1, description="可选段落起点（reader/export 布局坐标）"
+    )
+    paragraph_end: int | None = Field(
+        default=None, ge=1, description="可选段落终点（reader/export 布局坐标）"
+    )
+    excerpt: str = Field(
+        min_length=1, max_length=20000, description="锚点覆盖的精确原文摘录"
+    )
+    anchor_hash: str = Field(
+        min_length=64,
+        max_length=64,
+        pattern="^[0-9a-f]{64}$",
+        description="excerpt 的 SHA-256（D-34-01）；偏移/hash 不匹配即 stale，绝不静默移位",
+    )
+    chapter_content_hash: str = Field(
+        min_length=64,
+        max_length=64,
+        pattern="^[0-9a-f]{64}$",
+        description="锚点冻结时的章节正文 SHA-256",
+    )
+    asset_revision_id: int = Field(
+        gt=0, description="proposal-ready AssetRevision ID（Phase 33 handoff；服务端重验 proposal_ready + rights cleared）"
+    )
+    caption: str = Field(min_length=1, max_length=500, description="可访问 caption（D-34-02）")
+    alt_text: str = Field(min_length=1, max_length=500, description="可访问 alt 文本（D-34-02）")
+    citation: str = Field(min_length=1, max_length=1000, description="引用来源（D-34-02）")
+    # D-15 血缘绑定（可选）：agent 会话已知的 run/skill/artifact 血缘。
+    run_id: int | None = Field(default=None, gt=0, description="SkillRun ID 血缘")
+    skill_version_id: int | None = Field(default=None, gt=0, description="SkillVersion ID 血缘")
+    artifact_id: int | None = Field(default=None, gt=0, description="Artifact ID 血缘")
+    artifact_revision_id: int | None = Field(
+        default=None, gt=0, description="ArtifactRevision ID 血缘"
+    )
+
+
 # ────────────────────────── 统一错误信封 ──────────────────────────
 
 

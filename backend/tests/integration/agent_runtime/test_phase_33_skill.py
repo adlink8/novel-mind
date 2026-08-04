@@ -1069,12 +1069,12 @@ async def test_phase33_versioned_skill_registers(
 async def test_phase33_unknown_tool_registration_rejected(
     runtime_factory, migrated_postgres: str
 ):
-    """allowed_tools 含未知工具（publish_illustration）→ 注册拒绝，零 active 行。"""
+    """allowed_tools 含未知工具（publish_everything）→ 注册拒绝，零 active 行。"""
     seed = _seed_owner_novel(migrated_postgres, suffix=f"unk_{uuid.uuid4().hex[:6]}")
     contract = _skill_contract(
         novel_id=seed["novel_id"],
         name="illustrate-scene",
-        tools=list(DEFAULT_TOOLS) + ["publish_illustration"],
+        tools=list(DEFAULT_TOOLS) + ["publish_everything"],
     )
     with pytest.raises(SkillContractError):
         await _register_skill(

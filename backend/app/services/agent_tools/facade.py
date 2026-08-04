@@ -78,12 +78,15 @@ from app.services.world_model.knowledge_queries import KnowledgeQueries
 
 logger = logging.getLogger(__name__)
 
-# 冻结的 14 个域工具名（25.2-03 skill.yaml 的 allowed_tools 白名单镜像此表；
+# 冻结的 16 个域工具名（25.2-03 skill.yaml 的 allowed_tools 白名单镜像此表；
 # 27-05 起加入 Phase 27 世界模型工具 get_events / get_character_state /
 # get_character_knowledge / get_world_rules / get_evidence_span；31-04 起加入
 # Phase 30 Visual Bible 只读工具 get_visual_bible；33-05 起加入 Phase 33
 # 候选生成 action 工具 generate_image_candidate——它只创建候选生成作业，
-# 绝不写 Canon / 域表 / ApprovalRequest / published 状态（D-33-01..D-33-03）。
+# 绝不写 Canon / 域表 / ApprovalRequest / published 状态（D-33-01..D-33-03）；
+# 34-05 起加入 Phase 34 锚点提议 action 工具 publish_illustration /
+# attach_illustration_to_text——它们只创建候选 proposal + pending Web
+# ApprovalRequest（D-11/D-15），确定性 publisher 拥有 approved publication。
 TOOL_NAMES: tuple[str, ...] = (
     "get_novel",
     "get_chapter",
@@ -99,6 +102,8 @@ TOOL_NAMES: tuple[str, ...] = (
     "get_evidence_span",
     "get_visual_bible",
     "generate_image_candidate",
+    "publish_illustration",
+    "attach_illustration_to_text",
 )
 
 # per-tool 默认字节上限（agent-service 侧同样硬编码 64 KiB，见 RESEARCH Code Examples）。
@@ -608,6 +613,101 @@ async def _default_generate_image_candidate(
     return _job_view_for_tool(row)
 
 
+async def _default_publish_illustration(
+    db,
+    *,
+    owner_id: int,
+    novel_id: int,
+    params: dict[str, Any],
+) -> dict[str, Any]:
+    """Phase 34 action 工具默认服务：创建**一个**候选锚点 proposal（D-34-01）。
+
+    服务端 proposal gate 只接受 proposal-ready + rights cleared 的 AssetRevision
+    （Phase 33 handoff）与精确 source span（excerpt + anchor_hash +
+    chapter_content_hash + source snapshot）；创建候选 IllustrationAnchorProposal
+    + pending Web ApprovalRequest（action=publish_illustration，payload_hash
+    确定性重放，D-11/D-15）。绝不发布——确定性 publisher 在用户 Web 批准后原子
+    校验 approval + payload + scope 才创建 valid anchor；Agent/浏览器绝不发布。
+    """
+    from app.services.illustration_anchors.publish import (
+        AnchorProposalError,
+        create_anchor_proposal,
+    )
+
+    try:
+        result = await create_anchor_proposal(
+            db,
+            owner_id=owner_id,
+            novel_id=novel_id,
+            request=params,
+            action="publish_illustration",
+        )
+    except AnchorProposalError as exc:
+        raise InvalidInputError(str(exc)) from None
+    await db.flush()
+    return _anchor_proposal_view_for_tool(result)
+
+
+async def _default_attach_illustration_to_text(
+    db,
+    *,
+    owner_id: int,
+    novel_id: int,
+    params: dict[str, Any],
+) -> dict[str, Any]:
+    """Phase 34 action 工具默认服务：把锚点绑定到精确文本跨度（candidate-only）。
+
+    与 publish_illustration 同 gate（proposal-ready asset + 精确 source span），
+    但 ApprovalRequest action 为 attach_illustration_to_text。绝不发布。
+    """
+    from app.services.illustration_anchors.publish import (
+        AnchorProposalError,
+        create_anchor_proposal,
+    )
+
+    try:
+        result = await create_anchor_proposal(
+            db,
+            owner_id=owner_id,
+            novel_id=novel_id,
+            request=params,
+            action="attach_illustration_to_text",
+        )
+    except AnchorProposalError as exc:
+        raise InvalidInputError(str(exc)) from None
+    await db.flush()
+    return _anchor_proposal_view_for_tool(result)
+
+
+def _anchor_proposal_view_for_tool(result) -> dict[str, Any]:
+    """IllustrationAnchorProposal + ApprovalRequest ORM → JSON-safe 工具响应。
+
+    candidate-only：status 恒为 pending_approval/proposed，绝不 published；
+    approval_request_id / payload_hash 供 Web 审批轮询与确定性 publisher 引用。
+    """
+    proposal = result.proposal
+    approval = result.approval_request
+    return {
+        "proposal_id": proposal.id,
+        "owner_id": proposal.owner_id,
+        "novel_id": proposal.novel_id,
+        "chapter_id": proposal.chapter_id,
+        "chapter_number": proposal.chapter_number,
+        "proposal_key": proposal.proposal_key,
+        "source_start": proposal.source_start,
+        "source_end": proposal.source_end,
+        "anchor_hash": proposal.anchor_hash,
+        "proposal_asset_revision_id": proposal.proposal_asset_revision_id,
+        "approval_request_id": approval.id,
+        "approval_action": approval.action,
+        "approval_status": approval.status,
+        "approval_payload_hash": approval.payload_hash,
+        "status": proposal.status,
+        "candidate_only": True,
+        "replayed": bool(result.replayed),
+    }
+
+
 def _job_view_for_tool(job) -> dict[str, Any]:
     """IllustrationJob ORM → JSON-safe 工具响应（候选作业读信封，永不 published）。"""
     return {
@@ -695,6 +795,10 @@ class ToolFacade:
             "get_visual_bible": self._get_visual_bible,
             # Phase 33 候选生成 action 工具（33-05）：只创建候选作业。
             "generate_image_candidate": self._generate_image_candidate,
+            # Phase 34 锚点提议 action 工具（34-05）：只创建候选 proposal +
+            # pending Web ApprovalRequest；确定性 publisher 拥有 publication。
+            "publish_illustration": self._publish_illustration,
+            "attach_illustration_to_text": self._attach_illustration_to_text,
         }
 
     # ── 公共入口 ──
@@ -1042,6 +1146,28 @@ class ToolFacade:
     async def _generate_image_candidate(self, *, db, novel, owner_id, params):
         """创建候选生成作业（服务端 generation gate，candidate-only，D-33-01）。"""
         svc = self._svc("generate_image_candidate", _default_generate_image_candidate)
+        return await svc(
+            db,
+            owner_id=owner_id,
+            novel_id=novel.id,
+            params=params,
+        )
+
+    async def _publish_illustration(self, *, db, novel, owner_id, params):
+        """创建候选锚点 proposal + pending Web ApprovalRequest（candidate-only，D-34-01）。"""
+        svc = self._svc("publish_illustration", _default_publish_illustration)
+        return await svc(
+            db,
+            owner_id=owner_id,
+            novel_id=novel.id,
+            params=params,
+        )
+
+    async def _attach_illustration_to_text(self, *, db, novel, owner_id, params):
+        """把锚点绑定到精确文本跨度（candidate-only；attach action 也要求 Web Approval）。"""
+        svc = self._svc(
+            "attach_illustration_to_text", _default_attach_illustration_to_text
+        )
         return await svc(
             db,
             owner_id=owner_id,
