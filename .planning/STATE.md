@@ -81,6 +81,11 @@ No single aggregate completion percentage is authoritative.
     propose-illustration-anchor skill + deterministic publish (tool 14→16, 10 skills).
     Migration head `20260801_illustration_anchors`; backend 1607p, agent-service 776p,
     frontend 386p. **Completes v1.3 milestone (30–34).**
+15. `35`: **IMPLEMENTED & VERIFIED (2026-08-04)** — triple-space contract, Canon Fork
+    snapshot/cutoff, isolated retrieval/citations, negative contamination guards,
+    create-canon-fork skill + deterministic materializer (tool 16→17, 11 skills).
+    Migration head `20260801_canon_contamination04`; backend 1720p, agent-service 825p,
+    frontend 386p.
 
 ## Planning Portfolio
 
@@ -97,7 +102,8 @@ No single aggregate completion percentage is authoritative.
 | Phase 32 | VERIFIED | 5 | ✅ 2026-08-03 (user execution override) |
 | Phase 33 | VERIFIED | 5 | ✅ 2026-08-03/04 (user execution override) |
 | Phase 34 | VERIFIED | 5 | ✅ 2026-08-04 (user execution override) |
-| Phase 35–39 | PLANNED | 25 | BLOCKED by Phase 22 3/3 + upstream execution dependencies |
+| Phase 35 | VERIFIED | 5 | ✅ 2026-08-04 (user execution override) |
+| Phase 36–39 | PLANNED | 20 | BLOCKED by Phase 22 3/3 + upstream execution dependencies |
 
 The earlier 55-plan structural verdict did not prove Issue #29 Agent-consumption coverage.
 The corrected 86-plan portfolio must cover REQ-AGENT-01..08, AgentVN-derived candidate-only
@@ -168,6 +174,10 @@ created.
   integration 31 + export 24 + adversarial 251 + agent_runtime 202 + ci 37);
   agent-service vitest 776p, frontend vitest 386p, tsc 0, alembic single head
   `20260801_illustration_anchors`. **Completes v1.3 milestone (30–34).**
+- **2026-08-04 Phase 35 verification**: 35-01..35-05 delivered; `35-VERIFICATION.md`
+  passed (source_commit `5992c25`); backend 1720p (unit 1052 + canon_fork unit 50 +
+  integration 43 + adversarial 329 + agent_runtime 219 + ci 37); agent-service vitest 825p,
+  frontend vitest 386p, tsc 0, alembic single head `20260801_canon_contamination04`.
 - **2026-08-03 stub-SUT finding (recorded, deferred)**: current nightly benchmark scores
   with deterministic stubs (`default_stub_*`, no live model calls); Ollama is only a health
   gate. Full G2 deployment (runner+Ollama+Docker) is premature for the stub pipeline.
@@ -320,9 +330,9 @@ Phase 33 execution is authorized by the 2026-08-03 Phase 33 override, and Phase 
 verified (33-VERIFICATION passed at `1b8a658`).
 Phase 34 execution is authorized by the 2026-08-04 Phase 34 override, and Phase 34 is now
 verified (34-VERIFICATION passed at `68819ac`), completing the v1.3 milestone (30–34).
-Phase 35–39 execution is authorized by the 2026-08-04 Phase 35–39 override; Phase 35 may
-proceed on the passed Phase 34 VERIFICATION artifact. Phase 22 remains 0/3 (not satisfied,
-verdict unchanged).
+Phase 35 execution is authorized by the 2026-08-04 Phase 35–39 override, and Phase 35 is
+now verified (35-VERIFICATION passed at `5992c25`). Phases 36–39 continue under the same
+override. Phase 22 remains 0/3 (not satisfied, verdict unchanged).
 If Phase 22 is resumed, use `$gsd-resume-work`; do not mark it complete early.
 
 ## Roadmap
