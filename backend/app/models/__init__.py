@@ -192,6 +192,7 @@ from app.models.world_model_entity import (
 from app.models.canon_space import CanonSpaceArtifact
 from app.models.canon_fork import CanonFork
 from app.models.derivative_project import DerivativeProject
+from app.models.derivative_chapter import DerivativeChapter
 from app.models.canon_contamination import CanonContaminationBlock
 from app.models.fanfiction_revision import FanFictionRevision
 from app.models.fanfiction_override import FanFictionOverride
@@ -364,6 +365,7 @@ __all__ = [
     "CanonSpaceArtifact",
     "CanonFork",
     "DerivativeProject",
+    "DerivativeChapter",
     "CanonContaminationBlock",
     "FanFictionRevision",
     "FanFictionOverride",
