@@ -17,8 +17,13 @@
      - ``get_narrative_memory`` 响应带 ``release_status: "candidate"``（ADR-0002）。
   3. **``full_book`` 只从持久化的每本小说开关读取**
      （``novel.reading_progress["timeline_full_book"]``），绝不接受裸请求参数。
-  4. 门面**只读**（D-22）：不 import 任何领域写入/变异模块，也不构造 LLM 调用
-     （由 adversarial 静态 gate 强制）。
+  4. 门面对既有领域**只读**（D-22）：不 import 任何领域写入/变异模块。Phase 33
+     （33-05）新增唯一 action 工具 ``generate_image_candidate``——它只创建
+     **候选**生成作业（服务端 generation gate + 确定性 idempotency key，
+     D-33-01..D-33-03），绝不写 Canon / 域表 / ApprovalRequest / published
+     状态；候选资产由 durable worker 产出，审批/发布属于 Phase 34。
+     ``generate_image_candidate`` 的作业创建复用 illustrations 域确定性服务，
+     不越出候选边界。
 """
 
 from __future__ import annotations
@@ -26,8 +31,12 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import uuid
 from collections.abc import Awaitable, Callable
+from decimal import Decimal
 from typing import Any
+
+from sqlalchemy import select
 
 from app.models import Novel
 from app.schemas.novel import ChapterResponse, NovelResponse
@@ -69,10 +78,12 @@ from app.services.world_model.knowledge_queries import KnowledgeQueries
 
 logger = logging.getLogger(__name__)
 
-# 冻结的 13 个只读域工具名（25.2-03 skill.yaml 的 allowed_tools 白名单镜像此表；
+# 冻结的 14 个域工具名（25.2-03 skill.yaml 的 allowed_tools 白名单镜像此表；
 # 27-05 起加入 Phase 27 世界模型工具 get_events / get_character_state /
 # get_character_knowledge / get_world_rules / get_evidence_span；31-04 起加入
-# Phase 30 Visual Bible 只读工具 get_visual_bible）。
+# Phase 30 Visual Bible 只读工具 get_visual_bible；33-05 起加入 Phase 33
+# 候选生成 action 工具 generate_image_candidate——它只创建候选生成作业，
+# 绝不写 Canon / 域表 / ApprovalRequest / published 状态（D-33-01..D-33-03）。
 TOOL_NAMES: tuple[str, ...] = (
     "get_novel",
     "get_chapter",
@@ -87,6 +98,7 @@ TOOL_NAMES: tuple[str, ...] = (
     "get_world_rules",
     "get_evidence_span",
     "get_visual_bible",
+    "generate_image_candidate",
 )
 
 # per-tool 默认字节上限（agent-service 侧同样硬编码 64 KiB，见 RESEARCH Code Examples）。
@@ -462,6 +474,164 @@ async def _default_get_visual_bible(
     }
 
 
+async def _default_generate_image_candidate(
+    db,
+    *,
+    owner_id: int,
+    novel_id: int,
+    params: dict[str, Any],
+) -> dict[str, Any]:
+    """Phase 33 action 工具默认服务：创建**一个**候选生成作业（D-33-01..D-33-03）。
+
+    只创建 durable idempotent job（queued）——服务端 generation gate 只接受
+    **已批准且非 stale** 的 PromptRevision（``check_generation_prompt_gate``），
+    作业 idempotency key 从 owner/novel/SceneSpec/prompt/model/config 血缘
+    确定性重放。绝不写 Canon / 域表 / ApprovalRequest / published 状态；候选
+    资产由 durable worker 在作业成功时产出，审批/发布属于 Phase 34。
+    """
+    from app.models.illustration_job import (
+        ILLUSTRATION_JOB_NONTERMINAL_STATUSES,
+        IllustrationJob,
+    )
+    from app.schemas.illustration import (
+        IllustrationJobContract,
+        PriceSnapshot,
+        build_illustration_idempotency_key,
+        validate_illustration_job_contract,
+    )
+    from app.services.illustrations.gateway import (
+        GenerationGateError,
+        build_illustration_lineage,
+        check_generation_prompt_gate,
+    )
+    from app.services.illustrations.worker import (
+        DEFAULT_MAX_INPUT_TOKENS,
+        DEFAULT_MAX_OUTPUT_TOKENS,
+        MOCK_ILLUSTRATION_MODEL,
+        MOCK_ILLUSTRATION_PROVIDER,
+    )
+
+    provider = str(params.get("provider") or MOCK_ILLUSTRATION_PROVIDER)
+    model = str(params.get("model") or MOCK_ILLUSTRATION_MODEL)
+    if provider != MOCK_ILLUSTRATION_PROVIDER:
+        raise InvalidInputError(
+            f"illustration provider {provider!r} is not configured; supported: {MOCK_ILLUSTRATION_PROVIDER!r}"
+        )
+    prompt_revision_id = int(params["prompt_revision_id"])
+    try:
+        prompt_row = await check_generation_prompt_gate(
+            db,
+            owner_id=owner_id,
+            novel_id=novel_id,
+            prompt_revision_id=prompt_revision_id,
+        )
+    except GenerationGateError as exc:
+        if exc.reason_code == "prompt_revision_not_found":
+            raise NotFoundError(str(exc)) from None
+        raise InvalidInputError(str(exc)) from exc
+
+    lineage = build_illustration_lineage(
+        prompt_revision=prompt_row,
+        provider=provider,
+        model=model,
+        width=int(params.get("width", 1024)),
+        height=int(params.get("height", 1024)),
+        max_input_tokens=DEFAULT_MAX_INPUT_TOKENS,
+        max_output_tokens=DEFAULT_MAX_OUTPUT_TOKENS,
+    )
+    idempotency_key = build_illustration_idempotency_key(
+        owner_id, novel_id, lineage
+    )
+    price_snapshot = PriceSnapshot(
+        provider=provider,
+        model=model,
+        input_price_per_million=Decimal("0.10"),
+        output_price_per_million=Decimal("0.10"),
+        image_price_per_image=Decimal("0.04"),
+    )
+    job_contract = IllustrationJobContract(
+        schema_version="illustration.v1",
+        artifact_kind="illustration_job",
+        owner_id=owner_id,
+        novel_id=novel_id,
+        job_key=str(params.get("job_key") or f"agent-{uuid.uuid4().hex[:8]}"),
+        lineage=lineage,
+        price_snapshot=price_snapshot.model_dump(mode="json"),
+        idempotency_key=idempotency_key,
+    )
+    validate_illustration_job_contract(job_contract)
+
+    existing = await db.scalar(
+        select(IllustrationJob).where(
+            IllustrationJob.idempotency_key == idempotency_key
+        )
+    )
+    if existing is not None:
+        if (
+            existing.status in ILLUSTRATION_JOB_NONTERMINAL_STATUSES
+            or existing.status == "succeeded"
+        ):
+            return _job_view_for_tool(existing)
+        raise InvalidInputError(
+            "a terminal illustration job with this lineage already exists; retry it explicitly"
+        )
+
+    row = IllustrationJob(
+        owner_id=owner_id,
+        novel_id=novel_id,
+        job_key=job_contract.job_key,
+        idempotency_key=idempotency_key,
+        status="queued",
+        status_reason=None,
+        error_code=None,
+        lease_id=None,
+        lease_expires_at=None,
+        heartbeat_at=None,
+        cancel_requested=False,
+        retry_count=0,
+        scene_spec_hash=lineage.scene_spec_hash,
+        prompt_revision_id=lineage.prompt_revision_id,
+        prompt_revision_hash=lineage.prompt_revision_hash,
+        visual_bible_revision_id=lineage.visual_bible_revision_id,
+        visual_bible_revision_hash=lineage.visual_bible_revision_hash,
+        source_snapshot_id=lineage.source_snapshot_id,
+        source_snapshot_hash=lineage.source_snapshot_hash,
+        cutoff_chapter=lineage.cutoff_chapter,
+        model_lineage=dict(lineage.model_lineage),
+        config_hash=lineage.config_hash,
+        price_snapshot=job_contract.price_snapshot,
+        response_hash=None,
+        schema_version="illustration.v1",
+    )
+    db.add(row)
+    await db.flush()
+    return _job_view_for_tool(row)
+
+
+def _job_view_for_tool(job) -> dict[str, Any]:
+    """IllustrationJob ORM → JSON-safe 工具响应（候选作业读信封，永不 published）。"""
+    return {
+        "id": job.id,
+        "owner_id": job.owner_id,
+        "novel_id": job.novel_id,
+        "job_key": job.job_key,
+        "idempotency_key": job.idempotency_key,
+        "status": job.status,
+        "status_reason": job.status_reason,
+        "error_code": job.error_code,
+        "retry_count": job.retry_count,
+        "scene_spec_hash": job.scene_spec_hash,
+        "prompt_revision_id": job.prompt_revision_id,
+        "prompt_revision_hash": job.prompt_revision_hash,
+        "visual_bible_revision_hash": job.visual_bible_revision_hash,
+        "source_snapshot_id": job.source_snapshot_id,
+        "source_snapshot_hash": job.source_snapshot_hash,
+        "cutoff_chapter": job.cutoff_chapter,
+        "config_hash": job.config_hash,
+        "candidate_only": True,
+    }
+
+
 async def _resolve_world_model_version(
     db,
     *,
@@ -484,10 +654,11 @@ async def _resolve_world_model_version(
 
 
 class ToolFacade:
-    """7 个只读工具的统一执行门面。
+    """13 个只读工具 + 1 个候选 action 工具的统一执行门面。
 
     所有强制点（字节上限 / 超时 / budget hook / 错误码映射）都在
-    ``execute`` 内完成；owner / cutoff 逻辑复用现有服务。
+    ``execute`` 内完成；owner / cutoff 逻辑复用现有服务。Phase 33 的
+    ``generate_image_candidate`` 只创建候选作业（candidate-only）。
     """
 
     def __init__(
@@ -522,6 +693,8 @@ class ToolFacade:
             "get_evidence_span": self._get_evidence_span,
             # Phase 30 Visual Bible 只读工具（31-04）。
             "get_visual_bible": self._get_visual_bible,
+            # Phase 33 候选生成 action 工具（33-05）：只创建候选作业。
+            "generate_image_candidate": self._generate_image_candidate,
         }
 
     # ── 公共入口 ──
@@ -865,6 +1038,16 @@ class ToolFacade:
         if payload is None:
             raise NotFoundError("visual bible version not found in scope")
         return payload
+
+    async def _generate_image_candidate(self, *, db, novel, owner_id, params):
+        """创建候选生成作业（服务端 generation gate，candidate-only，D-33-01）。"""
+        svc = self._svc("generate_image_candidate", _default_generate_image_candidate)
+        return await svc(
+            db,
+            owner_id=owner_id,
+            novel_id=novel.id,
+            params=params,
+        )
 
 
 def _json_default(obj: Any) -> str:

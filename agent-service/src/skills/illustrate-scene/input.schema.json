@@ -1,0 +1,82 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "IllustrateSceneInput",
+  "description": "illustrate-scene Phase 33 运行输入：novel_id（必填）与确定性插图域按引用消费的输入锚——prompt_revision_id（已批准 PromptRevision，服务端重验 approved + 非 stale）、visual_bible_version_id（已批准 Visual Bible revision）、scene_spec_revision_id（SceneSpec 血缘）、source_snapshot_id（D-33-01 血缘）；可选 branch/fork（derivative mode）与 provider 能力（provider/model/width/height）。validated 域能力由服务端确定性插图服务读取（D-33-01..D-33-04），本技能只提供引用与候选作业请求，绝不自行物化事实。锚定字段仅声明意图范围，最终 scope/cutoff/evidence/VB revision 由服务端强制（fail closed）。",
+  "type": "object",
+  "required": [
+    "novel_id",
+    "prompt_revision_id",
+    "visual_bible_version_id",
+    "scene_spec_revision_id",
+    "source_snapshot_id",
+    "job_key"
+  ],
+  "properties": {
+    "novel_id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "目标小说 ID（必须与运行路径中的 novel_id 一致）"
+    },
+    "branch": {
+      "type": ["string", "null"],
+      "maxLength": 80,
+      "description": "衍生分支；原始主线为 null（owner/novel/branch 血缘绑定）"
+    },
+    "fork": {
+      "type": ["string", "null"],
+      "maxLength": 80,
+      "description": "衍生 fork（仅 derivative mode；original 模式必须为 null）"
+    },
+    "scene_spec_revision_id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "SceneSpec revision ID（服务端重验 owner/novel 血缘）"
+    },
+    "prompt_revision_id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "已批准 PromptRevision ID；服务端重验 approved + 非 stale（D-33-01）"
+    },
+    "visual_bible_version_id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "已批准 Visual Bible 版本 ID；服务端重验 owner/novel 血缘"
+    },
+    "source_snapshot_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "description": "source snapshot 血缘 ID（与 prompt 冻结时的快照一致）"
+    },
+    "job_key": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120,
+      "description": "候选生成作业键（幂等重放溯源，D-33-01）"
+    },
+    "provider": {
+      "type": ["string", "null"],
+      "enum": ["mock"],
+      "description": "提供商能力（当前仅配置 mock；服务端 fail closed 拒绝未配置提供商）"
+    },
+    "model": {
+      "type": ["string", "null"],
+      "minLength": 1,
+      "maxLength": 120,
+      "description": "生成模型（可选，默认 mock-img-v1）"
+    },
+    "width": {
+      "type": ["integer", "null"],
+      "minimum": 16,
+      "maximum": 4096,
+      "description": "图像宽度（可选，默认 1024）"
+    },
+    "height": {
+      "type": ["integer", "null"],
+      "minimum": 16,
+      "maximum": 4096,
+      "description": "图像高度（可选，默认 1024）"
+    }
+  },
+  "additionalProperties": false
+}

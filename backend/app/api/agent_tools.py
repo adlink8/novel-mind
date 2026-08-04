@@ -25,6 +25,7 @@ from app.core.database import get_db
 from app.core.security import require_user
 from app.models import Novel, User
 from app.schemas.agent_tools import (
+    GenerateImageCandidateRequest,
     GetChapterRequest,
     GetCharacterKnowledgeRequest,
     GetCharacterStateRequest,
@@ -279,6 +280,29 @@ async def tool_get_visual_bible(
     """Visual Bible 候选版本视图（31-04；owner 范围服务端强制，candidate-only）。"""
     return await _run_tool(
         "get_visual_bible",
+        db=db,
+        novel=novel,
+        owner_id=current_user.id,
+        params=_params(body),
+    )
+
+
+@router.post("/generate_image_candidate")
+async def tool_generate_image_candidate(
+    body: GenerateImageCandidateRequest | None = None,
+    novel: Novel = Depends(require_owned_novel),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """Phase 33 候选生成 action（33-05）：创建**一个**候选生成作业。
+
+    服务端 generation gate 只接受已批准且非 stale 的 PromptRevision；作业
+    idempotency key 从血缘确定性重放。只创建 candidate 作业（D-33-01..D-33-03），
+    绝不写 Canon / 域表 / ApprovalRequest / published 状态——审批与发布属于
+    Phase 34；候选资产由 durable worker 在作业成功时产出。
+    """
+    return await _run_tool(
+        "generate_image_candidate",
         db=db,
         novel=novel,
         owner_id=current_user.id,

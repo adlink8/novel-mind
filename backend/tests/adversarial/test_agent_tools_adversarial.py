@@ -35,7 +35,7 @@ ROOT = Path(__file__).resolve().parents[2]
 AGENT_TOOLS_SERVICE = ROOT / "app" / "services" / "agent_tools"
 AGENT_TOOLS_API = ROOT / "app" / "api" / "agent_tools.py"
 
-# 13 个只读工具名（与 facade.TOOL_NAMES 一致性由测试断言）。
+# 14 个域工具名（与 facade.TOOL_NAMES 一致性由测试断言）。
 ALL_TOOLS = (
     "get_novel",
     "get_chapter",
@@ -52,6 +52,8 @@ ALL_TOOLS = (
     "get_evidence_span",
     # Phase 30 Visual Bible 只读工具（31-04）。
     "get_visual_bible",
+    # Phase 33 候选生成 action 工具（33-05）：只创建候选作业。
+    "generate_image_candidate",
 )
 
 # 每个工具的 HTTP 路由（cross-owner 轴使用）。
@@ -69,6 +71,7 @@ TOOL_ROUTES = {
     "get_world_rules": "/api/agent-tools/get_world_rules",
     "get_evidence_span": "/api/agent-tools/get_evidence_span",
     "get_visual_bible": "/api/agent-tools/get_visual_bible",
+    "generate_image_candidate": "/api/agent-tools/generate_image_candidate",
 }
 
 # 受保护内容哨兵：断言任何响应体都不含它。
@@ -99,6 +102,7 @@ def _params(tool: str, **extra) -> dict:
             "content_hash": "a" * 64,
         },
         "get_visual_bible": {"version_id": 1},
+        "generate_image_candidate": {"prompt_revision_id": 1, "job_key": "adversarial-job"},
     }[tool]
     return {**base, **extra}
 
@@ -284,6 +288,15 @@ def _service_stub(tool: str, handler):
             approved_only=approved_only,
         )
 
+    async def stub_generate_image_candidate(db, *, owner_id, novel_id, params):
+        return await _call_handler(
+            handler,
+            db=db,
+            owner_id=owner_id,
+            novel_id=novel_id,
+            params=params,
+        )
+
     stubs = {
         "get_novel": stub_get_novel,
         "get_chapter": stub_get_chapter,
@@ -298,6 +311,7 @@ def _service_stub(tool: str, handler):
         "get_world_rules": stub_world_rules,
         "get_evidence_span": stub_evidence_span,
         "get_visual_bible": stub_visual_bible,
+        "generate_image_candidate": stub_generate_image_candidate,
     }
     return stubs[tool]
 
@@ -389,6 +403,11 @@ async def test_beyond_cutoff_no_content_leak(tool):
         },
         # get_visual_bible 无章节范围参数：底层读取本就候选/只读。
         "get_visual_bible": {},
+        # generate_image_candidate 无章节范围参数：只创建候选作业（服务端 gate）。
+        "generate_image_candidate": {
+            "prompt_revision_id": 1,
+            "job_key": "adversarial-job",
+        },
     }[tool]
 
     if tool == "get_chapter":
@@ -483,12 +502,35 @@ async def test_beyond_cutoff_no_content_leak(tool):
     async def safe_visual_bible(db, **kw):
         return {"items": [], "total": 0}
 
+    async def safe_generate_image_candidate(db, **kw):
+        return {
+            "id": 1,
+            "owner_id": 1,
+            "novel_id": 1,
+            "job_key": "safe-job",
+            "idempotency_key": "a" * 64,
+            "status": "queued",
+            "status_reason": None,
+            "error_code": None,
+            "retry_count": 0,
+            "scene_spec_hash": "a" * 64,
+            "prompt_revision_id": 1,
+            "prompt_revision_hash": "a" * 64,
+            "visual_bible_revision_hash": "a" * 64,
+            "source_snapshot_id": "ss-1",
+            "source_snapshot_hash": "a" * 64,
+            "cutoff_chapter": 1,
+            "config_hash": "a" * 64,
+            "candidate_only": True,
+        }
+
     safe = {
         "get_novel": safe_get_novel,
         "search_novel_text": safe_search,
         "get_clues": safe_clues,
         "get_evidence_span": safe_evidence_span,
         "get_visual_bible": safe_visual_bible,
+        "generate_image_candidate": safe_generate_image_candidate,
     }[tool]
     facade = ToolFacade(
         cutoff_resolver=_fake_cutoff,
@@ -617,6 +659,28 @@ async def test_oversized_response_returns_output_too_large(tool):
             "total": 1,
         }
 
+    async def huge_generate_image_candidate(db, **kw):
+        return {
+            "id": 1,
+            "owner_id": 1,
+            "novel_id": 1,
+            "job_key": "huge" + "子" * 70000,
+            "idempotency_key": "a" * 64,
+            "status": "queued",
+            "status_reason": None,
+            "error_code": None,
+            "retry_count": 0,
+            "scene_spec_hash": "a" * 64,
+            "prompt_revision_id": 1,
+            "prompt_revision_hash": "a" * 64,
+            "visual_bible_revision_hash": "a" * 64,
+            "source_snapshot_id": "ss-1",
+            "source_snapshot_hash": "a" * 64,
+            "cutoff_chapter": 1,
+            "config_hash": "a" * 64,
+            "candidate_only": True,
+        }
+
     huge = {
         "get_novel": huge_get_novel,
         "get_chapter": huge_get_chapter,
@@ -631,6 +695,7 @@ async def test_oversized_response_returns_output_too_large(tool):
         "get_world_rules": huge_world_rules,
         "get_evidence_span": huge_evidence_span,
         "get_visual_bible": huge_visual_bible,
+        "generate_image_candidate": huge_generate_image_candidate,
     }[tool]
     facade = ToolFacade(
         byte_cap=64 * 1024,
@@ -785,12 +850,35 @@ async def test_full_book_spoof_without_persisted_switch_is_cutoff_limited(tool):
     async def safe_visual_bible(db, **kw):
         return {"items": [], "total": 0}
 
+    async def safe_generate_image_candidate(db, **kw):
+        return {
+            "id": 1,
+            "owner_id": 1,
+            "novel_id": 1,
+            "job_key": "safe-job",
+            "idempotency_key": "a" * 64,
+            "status": "queued",
+            "status_reason": None,
+            "error_code": None,
+            "retry_count": 0,
+            "scene_spec_hash": "a" * 64,
+            "prompt_revision_id": 1,
+            "prompt_revision_hash": "a" * 64,
+            "visual_bible_revision_hash": "a" * 64,
+            "source_snapshot_id": "ss-1",
+            "source_snapshot_hash": "a" * 64,
+            "cutoff_chapter": 1,
+            "config_hash": "a" * 64,
+            "candidate_only": True,
+        }
+
     safe = {
         "get_novel": safe_novel,
         "search_novel_text": safe_search,
         "get_narrative_memory": safe_nm,
         "get_evidence_span": safe_evidence_span,
         "get_visual_bible": safe_visual_bible,
+        "generate_image_candidate": safe_generate_image_candidate,
     }[tool]
     facade = ToolFacade(
         cutoff_resolver=_fake_cutoff,

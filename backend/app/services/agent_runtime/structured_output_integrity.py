@@ -29,6 +29,7 @@ from app.schemas.agent_runtime import (
     ChapterAnalysisArtifact,
     CitedAnswerArtifact,
     ExternalEvidenceArtifact,
+    IllustrationRevisionArtifact,
     PromptArtifact,
     SceneCandidateArtifact,
     SceneSpecArtifact,
@@ -154,6 +155,20 @@ BLOCKED_PROMPT_APPROVAL_BYPASS = (
     "integrity: prompt approval bypass blocked — review_state must be candidate"
 )
 BLOCKED_PROMPT_EVIDENCE_MISMATCH = "integrity: prompt scene spec evidence keys must be a subset of envelope evidence_refs"
+# Phase 33 IllustrationRevision 确定性边界（D-33-01..D-33-04）。
+BLOCKED_ILLUSTRATION_PAYLOAD = (
+    "integrity: illustration revision payload failed domain validation"
+)
+BLOCKED_ILLUSTRATION_APPROVAL_BYPASS = (
+    "integrity: illustration approval bypass blocked — review_state must be candidate"
+)
+BLOCKED_ILLUSTRATION_SOURCE_DRIFT = (
+    "integrity: illustration revision source_snapshot_hash drifts from envelope source_versions"
+)
+BLOCKED_ILLUSTRATION_BRANCH = (
+    "integrity: illustration revision branch/authority_space mismatch — "
+    "derivative mode requires branch + fork, original mode forbids them"
+)
 
 
 @dataclass(frozen=True)
@@ -215,6 +230,8 @@ def evaluate_integrity(*, envelope: dict[str, Any], run: SkillRun) -> IntegrityD
         return _evaluate_scene_spec(envelope, run)
     if artifact_type == "prompt":
         return _evaluate_prompt(envelope, run)
+    if artifact_type == "illustration_revision":
+        return _evaluate_illustration_revision(envelope, run)
     return IntegrityDecision(False, BLOCKED_UNKNOWN_TYPE)
 
 
@@ -824,5 +841,79 @@ def _evaluate_prompt(envelope: dict[str, Any], run: SkillRun) -> IntegrityDecisi
     spec_keys = _spec_evidence_keys(spec)
     if not all(_evidence_prefix_matches(key, envelope_keys) for key in spec_keys):
         return IntegrityDecision(False, BLOCKED_PROMPT_EVIDENCE_MISMATCH)
+
+    return IntegrityDecision(True)
+
+
+def _evaluate_illustration_revision(
+    envelope: dict[str, Any], run: SkillRun
+) -> IntegrityDecision:
+    """Phase 33 IllustrationRevision 信封 integrity gate（D-33-01..D-33-04）。
+
+    与其余信封纪律一致（evidence/lineage/status/trail/protected），并在
+    ``illustration_revision`` 负载上做确定性域边界校验：
+      - ``illustration_revision`` 必须是严格 ``IllustrationRevisionPayload``
+        （revision/asset 血缘、SceneSpec/prompt/Visual Bible/source-snapshot
+        血缘、provider/model/generator 血缘、rights/consistency/budget 证据
+        全部必须、可重放）；
+      - ``review_state`` 恒为 ``candidate``——Agent 声称任何非 candidate
+        review_state（approval bypass / proposal_ready / published 伪造）→
+        blocked（只有 Phase 33 确定性 validator 才能推进状态；Phase 33 永不
+        创建 ApprovalRequest、不调用 publisher、不发 published 状态，
+        Phase 34 拥有 approval/publication）；
+      - 负载的 source_snapshot_hash 必须与信封 ``source_versions`` 血缘绑定；
+      - branch/authority_space 门：derivative 模式必须有 branch + fork，
+        original 模式禁止 branch/fork（wrong scope → blocked）；
+      - 信封 branch 必须与 run.branch 血缘一致（wrong branch/fork → blocked）。
+    任何失败 → 稳定 blocked，零写入；FastAPI 与 Phase 33 确定性 validator 保留
+    permission / evidence / state-transition / publication 权威。
+    """
+    # 0. heuristic candidate-only 无 EvidenceRef 资格 → 不能进插图网关。
+    if not envelope.get("evidence_refs"):
+        return IntegrityDecision(False, BLOCKED_NO_EVIDENCE)
+
+    # 1. 严格 wire schema。
+    try:
+        model = IllustrationRevisionArtifact.model_validate(envelope)
+    except ValidationError as exc:
+        return IntegrityDecision(
+            False, f"{BLOCKED_SCHEMA} ({_first_validation_error(exc)})"
+        )
+
+    # 2. 共享 lineage/status/trail/protected 门。
+    blocked = _check_common_lineage(envelope=envelope, run=run, wire=model)
+    if blocked is not None:
+        return blocked
+
+    # 3. illustration_revision 负载：严格域契约 + approval bypass 门。
+    payload = envelope.get("illustration_revision")
+    if not isinstance(payload, dict):
+        return IntegrityDecision(False, BLOCKED_ILLUSTRATION_PAYLOAD)
+    if payload.get("review_state") != "candidate":
+        return IntegrityDecision(False, BLOCKED_ILLUSTRATION_APPROVAL_BYPASS)
+    try:
+        revision = IllustrationRevisionArtifact.model_validate(envelope).illustration_revision
+    except ValidationError as exc:
+        return IntegrityDecision(
+            False,
+            f"{BLOCKED_ILLUSTRATION_PAYLOAD} ({_first_validation_error(exc)})",
+        )
+
+    # 4. source snapshot 血缘绑定（D-33-01）。
+    source_versions = envelope.get("source_versions") or {}
+    snapshot = source_versions.get("source_snapshot_hash")
+    if snapshot is not None and snapshot != revision.source_snapshot_hash:
+        return IntegrityDecision(False, BLOCKED_ILLUSTRATION_SOURCE_DRIFT)
+
+    # 5. branch/authority_space 门（wrong branch/fork → fail closed）。
+    branch = envelope.get("branch")
+    if branch != run.branch:
+        return IntegrityDecision(False, BLOCKED_ILLUSTRATION_BRANCH)
+    if revision.authority_space == "derivative":
+        if not branch or not revision.fork:
+            return IntegrityDecision(False, BLOCKED_ILLUSTRATION_BRANCH)
+    else:  # original authority space
+        if branch or revision.fork:
+            return IntegrityDecision(False, BLOCKED_ILLUSTRATION_BRANCH)
 
     return IntegrityDecision(True)

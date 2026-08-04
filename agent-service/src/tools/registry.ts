@@ -16,7 +16,7 @@ import { defineTool } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { fastapiToolCall } from "./fastapi-client.js";
 
-/** 13 个域工具名（固定顺序；唯一 allowlist 事实源）。 */
+/** 14 个域工具名（固定顺序；唯一 allowlist 事实源）。 */
 export const DOMAIN_TOOL_NAMES = [
   "get_novel",
   "get_chapter",
@@ -31,6 +31,7 @@ export const DOMAIN_TOOL_NAMES = [
   "get_world_rules",
   "get_evidence_span",
   "get_visual_bible",
+  "generate_image_candidate",
 ] as const;
 
 /** 工具注册时的运行级授权（端用户 JWT 或 per-run 内部令牌）。 */
@@ -247,6 +248,35 @@ export function buildDomainTools(auth: ToolAuth) {
       }),
       execute: (toolCallId, params, signal) =>
         fastapiToolCall("get_visual_bible", params as unknown, signal, auth),
+    }),
+    // ── Phase 33 候选生成 action 工具（33-05）──
+    defineTool({
+      name: "generate_image_candidate",
+      label: "Generate Image Candidate",
+      description:
+        "Phase 33 候选生成 action（REQ-VIS-04 / REQ-AGENT-02/03/04）：创建**一个**候选生成作业。服务端 generation gate 只接受已批准且非 stale 的 PromptRevision（D-33-01）；作业 idempotency key 从 owner/novel/SceneSpec/prompt/model/config 血缘确定性重放。绝不写 Canon / 域表 / ApprovalRequest / published 状态——审批与发布属于 Phase 34；候选资产由 durable worker 在作业成功时产出。",
+      parameters: Type.Object({
+        novel_id: Type.Integer({ minimum: 1, description: "小说 ID" }),
+        prompt_revision_id: Type.Integer({
+          minimum: 1,
+          description: "已批准 PromptRevision ID（服务端重验 approved + 非 stale）",
+        }),
+        job_key: Type.String({ minLength: 1, description: "幂等重放作业键" }),
+        provider: Type.Optional(
+          Type.String({ minLength: 1, description: "提供商（当前仅 mock 配置）" }),
+        ),
+        model: Type.Optional(
+          Type.String({ minLength: 1, description: "生成模型" }),
+        ),
+        width: Type.Optional(
+          Type.Integer({ minimum: 16, maximum: 4096, description: "图像宽度" }),
+        ),
+        height: Type.Optional(
+          Type.Integer({ minimum: 16, maximum: 4096, description: "图像高度" }),
+        ),
+      }),
+      execute: (toolCallId, params, signal) =>
+        fastapiToolCall("generate_image_candidate", params as unknown, signal, auth),
     }),
   ];
 }

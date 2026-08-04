@@ -658,5 +658,90 @@ class PromptArtifact(StrictAgentRuntimeModel):
         return value
 
 
+class IllustrationRevisionPayload(StrictAgentRuntimeModel):
+    """Phase 33 IllustrationRevision 负载（D-33-01..D-33-04 / REQ-VIS-04）。
+
+    携带完整 branch-aware 血缘：revision key/number、域 AssetRevision 引用、
+    SceneSpec/prompt/Visual Bible/source-snapshot 血缘、provider/model/generator
+    血缘、rights/provenance、一致性 review signal 与 budget 证据。``review_state``
+    是 Phase 33 唯一官方状态机（candidate → validated → proposal_ready），
+    **finalize 写入时恒为 candidate**——只有 Phase 33 确定性 validator 才能推进
+    状态；Phase 33 永不创建 ApprovalRequest、不调用 publisher、不发 published
+    状态（Phase 34 拥有 approval/publication）。
+    """
+
+    schema_version: Literal["illustration-revision.v1"] = "illustration-revision.v1"
+    artifact_kind: Literal["illustration_revision"] = "illustration_revision"
+    revision_key: str = Field(min_length=1, max_length=180)
+    revision_number: int = Field(ge=1)
+    asset_revision_id: int | None = Field(default=None, gt=0)
+    authority_space: Literal["original", "derivative"] = "original"
+    fork: str | None = Field(default=None, max_length=80)
+    scene_spec_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    prompt_revision_id: int | None = Field(default=None, gt=0)
+    prompt_revision_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    visual_bible_revision_id: int | None = Field(default=None, gt=0)
+    visual_bible_revision_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    source_snapshot_id: str = Field(min_length=1, max_length=160)
+    source_snapshot_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    cutoff_chapter: int = Field(ge=1)
+    provider: str = Field(min_length=1, max_length=64)
+    provider_model: str = Field(min_length=1, max_length=120)
+    provider_request_id: str | None = Field(default=None, max_length=160)
+    config_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    generator_version: str = Field(min_length=1, max_length=64)
+    rights_status: Literal["unreviewed", "cleared", "pending", "denied"]
+    consistency_verdict: Literal["pass", "concern", "fail", "unavailable"]
+    fixture_set_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    budget_settled_calls: int = Field(ge=0)
+    budget_settled_cost_usd: str | None = Field(
+        default=None, pattern=r"^\d+(\.\d+)?$"
+    )
+    review_state: Literal["candidate", "validated", "proposal_ready"] = "candidate"
+
+
+class IllustrationRevisionArtifact(StrictAgentRuntimeModel):
+    """智能体产物的 IllustrationRevision 信封（Phase 33 / D-33-01..D-33-04）。
+
+    Agent 产出的是 **candidate-only** 的 IllustrationRevision：``illustration_revision``
+    携带完整 branch-aware 血缘（SkillRun/ToolRun、owner/novel/branch、source/input
+    hashes、evidence refs、runtime/model/generator lineage 与域 AssetRevision
+    引用）。``review_state`` 恒为 ``candidate``（finalize 时）——只有 Phase 33
+    确定性 validator（budget/rights/fidelity/consistency gate）能推进
+    candidate → validated → proposal_ready；Phase 33 **绝不**创建
+    ApprovalRequest、调用 publisher 或发出 published 状态（Phase 34 拥有
+    approval/publication）。``tool_runs`` 携带 ToolRun 血缘。与 CitedAnswerArtifact
+    信封纪律一致：type / schema_version / owner / novel / branch / producing
+    skill+version / model lineage / source versions / input_hash / evidence_refs /
+    status / parent_revision / normalization（26-06 修复血缘 trail）。
+    """
+
+    type: Literal["illustration_revision"] = "illustration_revision"
+    schema_version: Literal["illustration-revision.v1"] = "illustration-revision.v1"
+    owner_id: int
+    novel_id: int
+    branch: str | None = None
+    producing_skill: str = Field(min_length=1, max_length=120)
+    producing_skill_version: str = Field(min_length=1, max_length=32)
+    skill_version_id: int = Field(gt=0)
+    model_lineage: dict[str, Any]
+    source_versions: dict[str, Any]
+    input_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    evidence_refs: list[str] = Field(min_length=1)
+    illustration_revision: IllustrationRevisionPayload
+    tool_runs: list[dict[str, Any]] = Field(min_length=1)
+    status: Literal["candidate", "validated", "approved", "published", "rejected"]
+    parent_revision: str | None = None
+    normalization: NormalizationTrail
+
+    @field_validator("tool_runs")
+    @classmethod
+    def _tool_runs_shape(cls, value: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        for item in value:
+            if not isinstance(item, dict) or not item.get("tool_name"):
+                raise ValueError("each tool run requires tool_name")
+        return value
+
+
 # 供 OpenAPI 引用，避免未使用告警。
 _ = (StrictReaderChatModel,)

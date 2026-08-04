@@ -1,0 +1,76 @@
+# illustrate-scene skill 契约（REQ-VIS-04 / REQ-AGENT-02/03/04 / Phase 33）
+# 字段镜像 backend 注册入口（app.schemas.agent_runtime.SkillVersionRegister）。
+#
+# Phase 33 版本化场景插图生成技能：
+#   - 本技能是 Phase 33 确定性插图域能力（illustrations/gateway+worker+
+#     consistency+review，D-33-01..D-33-04）的 Agent 消费边界；允许的工具
+#     allowlist 含 7 个只读域工具 + 1 个候选生成 action 工具
+#     （generate_image_candidate），编排绝不越出该 allowlist（未知工具/白名单
+#     外调用 → fail closed）。
+#   - 本技能消费已批准 PromptRevision（其 SceneSpec/Visual Bible/source-snapshot
+#     血缘非 stale）→ 创建候选生成作业 → durable worker 产出候选 AssetRevision →
+#     确定性 budget/rights/fidelity/consistency validator 推进
+#     candidate → validated → proposal_ready。唯一官方输出是血缘绑定的
+#     IllustrationRevision（candidate-only，见 output.schema.json）。
+#   - **无 ApprovalRequest / Publisher / published 状态**：
+#     approval_required_for 恒为空——Phase 33 永不创建 ApprovalRequest、不调用
+#     publisher、不发 published 状态；approval 与确定性 publication 由 Phase 34
+#     IllustrationAnchorProposal 拥有。Agent 只能创建候选 Artifact 并暂停；
+#     任何 ApprovalRequest / Publisher / promotion / 写回 Canon 或域表 →
+#     fail closed。
+#   - write_permissions 恒为空：Agent 不直接写任何域状态（不写 Canon、不写
+#     Visual Bible、不写 key-scene 集、不写 scene_spec/prompt 域表、不写
+#     illustration 域表、不写 ApprovalRequest 行、不写 published 状态）。
+#   - 版本由 `version` 钉住（当前 1.0.0）；每次 run 经 skill_version_id 绑定
+#     SkillVersion 血缘（run 绑定 owner/novel/branch、SkillRun、ToolRuns、
+#     input hash、source snapshot、model/runtime/generator lineage、Artifact
+#     revision）。
+#   - 模型结构化输出走共享 26-06 normalizer + 严格 post-repair validator；
+#     normalization_actions / raw_hash / repaired_hash / warnings 保留在官方
+#     IllustrationRevision 上。generation 只产出候选——绝不自动发布（D-33-03）。
+name: illustrate-scene
+version: 1.0.0
+description: >-
+  Phase 33 版本化场景插图生成技能（REQ-VIS-04 / REQ-AGENT-02/03/04）：给定
+  owner/novel/branch（可选 fork/derivative mode）+ 已批准 PromptRevision（其
+  SceneSpec/Visual Bible/source-snapshot 血缘非 stale）+ 提供商能力，通过 7 个
+  只读域工具 + `generate_image_candidate` 候选生成 action 消费 Phase 33 确定性
+  插图域能力，产出血缘绑定的 IllustrationRevision（candidate → validated →
+  proposal_ready 终态，D-33-01..D-33-04）。确定性 budget/rights/fidelity/
+  consistency validator 拥有 candidate qualification 权威；Phase 33 **绝不**
+  创建 ApprovalRequest、不调用 publisher、不发 published 状态——approval 与
+  确定性 publication 由 Phase 34 拥有。Agent 不直接写 Original Canon / 域表 /
+  ApprovalRequest 行 / published 状态；未知工具/权限/血缘/schema drift/错误
+  owner/branch/fork/approval bypass/stale revision/取消 → 一律 fail closed，
+  无官方 Artifact 或域写入。
+allowed_tools:
+  - get_novel
+  - get_chapter
+  - search_novel_text
+  - get_timeline
+  - get_relationships
+  - get_clues
+  - get_narrative_memory
+  - generate_image_candidate
+read_permissions:
+  - canon
+  - visual_bible
+  - key_scene
+  - scene_spec
+  - prompt_revision
+  - illustration
+write_permissions: []
+forbidden_spaces:
+  - canon:original
+  - illustration:write
+  - illustration:publish
+  - approval_request
+  - publisher
+budget:
+  max_calls: 40
+  max_input_tokens: 40000
+  max_output_tokens: 12000
+  max_cost_usd: "4.00"
+approval_required_for: []
+input_schema: ./input.schema.json
+output_schema: ./output.schema.json

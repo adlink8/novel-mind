@@ -186,6 +186,30 @@ class GetVisualBibleRequest(StrictAgentToolModel):
     )
 
 
+class GenerateImageCandidateRequest(StrictAgentToolModel):
+    """Phase 33 候选生成 action（33-05，REQ-VIS-04 / REQ-AGENT-02/03/04）。
+
+    只创建**一个候选生成作业**（D-33-01..D-33-03）：服务端 generation gate 只
+    接受已批准且非 stale 的 PromptRevision；作业 idempotency key 从
+    owner/novel/SceneSpec/prompt/model/config 血缘确定性重放。novel_id 由查询
+    参数注入（require_owned_novel），绝不放进请求体。本工具绝不写 Canon /
+    域表 / ApprovalRequest / published 状态——审批与发布属于 Phase 34。
+    """
+
+    prompt_revision_id: int = Field(
+        gt=0, description="已批准 PromptRevision ID（服务端重验 approved + 非 stale）"
+    )
+    job_key: str = Field(min_length=1, max_length=120, description="幂等重放作业键")
+    provider: str = Field(
+        default="mock", min_length=1, max_length=64, description="提供商（当前仅 mock 配置）"
+    )
+    model: str = Field(
+        default="mock-img-v1", min_length=1, max_length=120, description="生成模型"
+    )
+    width: int = Field(default=1024, ge=16, le=4096, description="图像宽度")
+    height: int = Field(default=1024, ge=16, le=4096, description="图像高度")
+
+
 # ────────────────────────── 统一错误信封 ──────────────────────────
 
 
