@@ -143,6 +143,12 @@ from app.schemas.clue import (
     replay_lifecycle,
     validate_lifecycle_event,
 )
+from app.schemas.canon_space import (
+    CANON_SPACE_SCHEMA_VERSION,
+    CanonSpaceArtifactCreate,
+    CanonSpaceArtifactView,
+    CanonSpaceQuery,
+)
 
 __all__ = [
     # 通用
@@ -238,4 +244,9 @@ __all__ = [
     "is_legal_transition",
     "replay_lifecycle",
     "validate_lifecycle_event",
+    # Canon fork spaces (Phase 35)
+    "CANON_SPACE_SCHEMA_VERSION",
+    "CanonSpaceArtifactCreate",
+    "CanonSpaceArtifactView",
+    "CanonSpaceQuery",
 ]
