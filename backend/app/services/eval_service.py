@@ -26,6 +26,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.eval import EvalDataset, EvalRun, EvalResult
+from app.services.canon_fork.contamination import (
+    ORIGINAL_CANON,
+    evaluation_corpus_guard,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -99,6 +103,7 @@ class EvalService:
         *,
         quality_mode: bool = False,
         raise_on_item_error: bool | None = None,
+        space: str = ORIGINAL_CANON,
     ) -> dict[str, Any]:
         """
         执行一次完整评测运行。
@@ -108,6 +113,11 @@ class EvalService:
           (06-04 D-07). Legacy default still records error_case with zeros for
           retrieval-only compatibility, but response marks quality_comparable=false.
         """
+        # Shared derivative-write guard: the evaluation corpus may only be fed
+        # by Original Canon content (REQ-CRE-02 / D-35-02).
+        evaluation_corpus_guard.assert_write_allowed(
+            space=space, novel_id=novel_id
+        )
         if strategy not in self.supported_strategies:
             raise EvalServiceError(
                 f"不支持的策略: {strategy}，有效值: {self.supported_strategies}"

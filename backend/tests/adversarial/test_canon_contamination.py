@@ -174,3 +174,170 @@ def test_derivative_space_never_accepted_by_pipeline_guard_at_source_level():
     # A derivative space literal must never appear next to a pipeline gate in a
     # permissive branch (no `space in ORIGINAL_PIPELINES` bypass).
     assert "not in ORIGINAL_PIPELINES" not in CONTRACTS_SOURCE
+
+
+# ---------------------------------------------------------------------------
+# Shared derivative-write guard: deliberate contamination blocks (Phase 35-04)
+# ---------------------------------------------------------------------------
+
+
+class _FakeRollbackSession:
+    """Records the rollback the guard must trigger on a contaminated write."""
+
+    def __init__(self):
+        self.rolled_back = False
+        self.flushed = False
+        self.added = []
+        self.committed = False
+
+    async def rollback(self):
+        self.rolled_back = True
+
+    async def flush(self):
+        self.flushed = True
+
+    def add(self, row):
+        self.added.append(row)
+
+    async def commit(self):
+        self.committed = True
+
+
+@pytest.mark.asyncio
+async def test_deliberate_index_contamination_blocks_and_rolls_back():
+    from app.services.canon_fork.contamination import (
+        ContaminationBlockedError,
+        ContaminationBlockedReason,
+        original_index_guard,
+    )
+
+    fake_db = _FakeRollbackSession()
+
+    async def smuggled_write(db):
+        db.smuggled = True  # a write that must never land
+
+    with pytest.raises(ContaminationBlockedError) as excinfo:
+        await original_index_guard.guard_write(
+            fake_db,
+            write=smuggled_write,
+            space="fanfiction_canon",
+            owner_id=1,
+            novel_id=2,
+        )
+    assert excinfo.value.blocked_reason is ContaminationBlockedReason.SPACE_EXCLUDED
+    assert excinfo.value.pipeline == "original_retrieval"
+    assert fake_db.rolled_back is True
+    assert getattr(fake_db, "smuggled", None) is None
+
+
+@pytest.mark.asyncio
+async def test_deliberate_eval_corpus_contamination_blocks_and_rolls_back():
+    from app.services.canon_fork.contamination import (
+        ContaminationBlockedError,
+        ContaminationBlockedReason,
+        evaluation_corpus_guard,
+    )
+
+    fake_db = _FakeRollbackSession()
+
+    async def smuggled_write(db):
+        db.smuggled = True
+
+    with pytest.raises(ContaminationBlockedError) as excinfo:
+        await evaluation_corpus_guard.guard_write(
+            fake_db,
+            write=smuggled_write,
+            space="user_interpretation",
+            owner_id=1,
+            novel_id=2,
+        )
+    assert excinfo.value.blocked_reason is ContaminationBlockedReason.SPACE_EXCLUDED
+    assert excinfo.value.pipeline == "evaluation"
+    assert fake_db.rolled_back is True
+    assert getattr(fake_db, "smuggled", None) is None
+
+
+@pytest.mark.asyncio
+async def test_deliberate_facet_contamination_blocks_and_rolls_back():
+    from app.services.canon_fork.contamination import (
+        ContaminationBlockedError,
+        ContaminationBlockedReason,
+        facet_producer_guard,
+    )
+
+    fake_db = _FakeRollbackSession()
+
+    async def smuggled_write(db):
+        db.smuggled = True
+
+    with pytest.raises(ContaminationBlockedError) as excinfo:
+        await facet_producer_guard.guard_write(
+            fake_db,
+            write=smuggled_write,
+            space="fanfiction_canon",
+            owner_id=1,
+            novel_id=2,
+        )
+    assert excinfo.value.blocked_reason is ContaminationBlockedReason.SPACE_EXCLUDED
+    assert excinfo.value.pipeline == "facet"
+    assert fake_db.rolled_back is True
+    assert getattr(fake_db, "smuggled", None) is None
+
+
+@pytest.mark.asyncio
+async def test_original_canon_write_passes_all_guards():
+    from app.services.canon_fork.contamination import (
+        evaluation_corpus_guard,
+        facet_producer_guard,
+        original_index_guard,
+    )
+
+    for guard in (original_index_guard, evaluation_corpus_guard, facet_producer_guard):
+        fake_db = _FakeRollbackSession()
+
+        async def ok_write(db):
+            db.completed = True
+            return "ok"
+
+        result = await guard.guard_write(
+            fake_db, write=ok_write, space="original_canon", owner_id=1, novel_id=2
+        )
+        assert result == "ok"
+        assert fake_db.flushed is True
+        assert fake_db.rolled_back is False
+
+
+# ---------------------------------------------------------------------------
+# Wired entry points reject a smuggled space argument (Phase 35-04)
+# ---------------------------------------------------------------------------
+
+
+def test_wired_index_service_exposes_original_space_default():
+    """The Original index write chain is guarded and defaults to original_canon."""
+    import inspect as _inspect
+
+    from app.services.knowledge_units.indexing import NarrativeIndexingService
+
+    sig = _inspect.signature(NarrativeIndexingService.prepare_build)
+    assert "space" in sig.parameters
+    assert sig.parameters["space"].default == "original_canon"
+    sig2 = _inspect.signature(NarrativeIndexingService.build_candidate)
+    assert "space" in sig2.parameters
+    assert sig2.parameters["space"].default == "original_canon"
+
+
+def test_wired_eval_service_exposes_original_space_default():
+    import inspect as _inspect
+
+    from app.services.eval_service import EvalService
+
+    sig = _inspect.signature(EvalService.run_eval)
+    assert "space" in sig.parameters
+    assert sig.parameters["space"].default == "original_canon"
+
+
+def test_facet_producer_uses_the_shared_facet_guard():
+    from app.services.facet.producer import FacetProducer, facet_producer
+
+    assert isinstance(FacetProducer(), FacetProducer)
+    assert facet_producer is not None

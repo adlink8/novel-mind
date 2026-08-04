@@ -19,7 +19,7 @@ from tests.integration.conftest import reset_public_schema, run_alembic
 
 pytestmark = pytest.mark.integration
 
-EXPECTED_HEAD = "20260801_2801"
+EXPECTED_HEAD = "20260801_canon_contamination04"
 # Intermediate revision after ownership + import jobs merge path, before eval/narrative.
 HISTORICAL_REVISION = "c2860beb647d"  # tsvector restore — mid-chain checkpoint
 

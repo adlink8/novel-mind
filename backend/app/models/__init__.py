@@ -191,6 +191,7 @@ from app.models.world_model_entity import (
 # （否则 alembic check 把四张既有表判为待删除的 drift）。
 from app.models.canon_space import CanonSpaceArtifact
 from app.models.canon_fork import CanonFork
+from app.models.canon_contamination import CanonContaminationBlock
 from app.models.fanfiction_revision import FanFictionRevision
 from app.models.fanfiction_override import FanFictionOverride
 from app.models.reader_bookmark import ReaderBookmark
@@ -361,6 +362,7 @@ __all__ = [
     "WorldModelAliasReview",
     "CanonSpaceArtifact",
     "CanonFork",
+    "CanonContaminationBlock",
     "FanFictionRevision",
     "FanFictionOverride",
     "ReaderBookmark",
