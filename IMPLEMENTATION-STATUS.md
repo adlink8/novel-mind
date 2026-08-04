@@ -294,3 +294,22 @@ Key metrics:
 | Alembic | 单 head `20260801_illustration_jobs` | `alembic heads` |
 | 已知环境限制 | 同前：e2e Next dev server 编译失败、openapi subprocess 挂起、live UAT 需 provider key、前端 29 typecheck 遗留 | 2026-08-04 本机 |
 | 仍阻塞 | Phase 22 Nightly 3/3 未达成（0/3）；Phase 34 执行需 Phase 22 3/3 + 33-VERIFICATION（已存在）或进一步 override | `.planning/STATE.md` |
+
+---
+
+## 2026-08-04 快照（Phase 34 实现并验证，v1.3 里程碑完成；snapshot: master @ 68819ac）
+
+以下事实覆盖上文旧节中的对应记录：
+
+| 项 | 当前值 | 证据 |
+|---|---|---|
+| Phase 34 In-Text Anchors, Reader and Export | **VERIFIED 2026-08-04** | `34-VERIFICATION.md` passed（source_commit `68819ac`） |
+| v1.3 里程碑（30–34） | **完成**（实现 + 验证） | 30/31/32/33/34 VERIFICATION 均 passed |
+| 后端测试 | **1607 passed**（unit 1002 + anchors 91 + export 24 + adversarial 251 + agent_runtime 202 + ci 37） | 独立测试子代理 2026-08-04 |
+| agent-service | **776 passed / 20 files**；tsc 0 errors | `cd agent-service && npx vitest run` |
+| 前端 | **386 passed / 44 files** | `cd frontend && npx vitest run` |
+| Illustration Anchors | hash-verified 锚点契约、响应式 reader 呈现、锚点修复、Markdown/HTML/EPUB 导出、propose-illustration-anchor skill + 确定性发布 | `backend/app/services/illustration_anchors/` + `backend/app/services/export/` + `frontend/src/components/reader/` |
+| Agent skills | 10 skills：+propose-illustration-anchor | `agent-service/src/skills/` |
+| Alembic | 单 head `20260801_illustration_anchors` | `alembic heads` |
+| 已知环境限制 | 同前：e2e Next dev server 编译失败、openapi subprocess 挂起、live UAT 需 provider key、前端 29 typecheck 遗留 | 2026-08-04 本机 |
+| 仍阻塞 | Phase 22 Nightly 3/3 未达成（0/3）；Phase 35 执行需 Phase 22 3/3 + 34-VERIFICATION（已存在）或进一步 override | `.planning/STATE.md` |
