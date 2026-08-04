@@ -93,6 +93,13 @@ logger = logging.getLogger(__name__)
 # 36-05 起加入 Phase 36 derivative 编辑提议 action 工具 apply_derivative_edit——
 # 它只创建候选 DerivativeEditProposal + pending Web ApprovalRequest（D-11/D-15），
 # 确定性 Revision Service（apply_agent_edit）拥有 approved proposal 应用。
+# 37-05 起加入 Phase 37 derivative generation action 工具 allow_divergence /
+# publish_derivative_revision——前者只为 blocked/needs_override 候选创建显式
+# divergence override + pending Web ApprovalRequest；后者只在 allow_divergence
+# approval 批准 + 完整 revalidation 通过后为同一候选创建**独立** publish
+# ApprovalRequest（绑定相同 draft_hash + canon_delta_hash）。两者都绝不发布——
+# 确定性 revision publisher（consume_publish_approval -> approve_override）拥有
+# approved Fanfiction Canon 物化，绝不写 Original Canon。
 TOOL_NAMES: tuple[str, ...] = (
     "get_novel",
     "get_chapter",
@@ -112,6 +119,8 @@ TOOL_NAMES: tuple[str, ...] = (
     "attach_illustration_to_text",
     "create_canon_fork",
     "apply_derivative_edit",
+    "allow_divergence",
+    "publish_derivative_revision",
 )
 
 # per-tool 默认字节上限（agent-service 侧同样硬编码 64 KiB，见 RESEARCH Code Examples）。
@@ -770,6 +779,93 @@ async def _default_apply_derivative_edit(
     return _agent_edit_proposal_view_for_tool(result)
 
 
+async def _default_allow_divergence(
+    db,
+    *,
+    owner_id: int,
+    novel_id: int,
+    params: dict[str, Any],
+) -> dict[str, Any]:
+    """Phase 37 action 工具默认服务：创建**一个**显式 divergence override（D-37-03）。
+
+    委托 `overrides.request_divergence_override`：只为 blocked / ``needs_override``
+    候选创建 pending ``DerivativeOverride`` + pending Web ApprovalRequest
+    （action=allow_divergence，payload_hash 绑定 exact draft_hash +
+    canon_delta_hash，D-11/D-15）。**绝不发布、绝不写 Original Canon**——只有独立
+    ``publish_derivative_revision`` approval 被批准后由确定性 revision
+    publisher 物化。
+    """
+    from app.services.derivative_generation.agent_boundary import (
+        OverrideError,
+        request_divergence_override,
+    )
+
+    try:
+        return await request_divergence_override(
+            db,
+            owner_id=owner_id,
+            novel_id=novel_id,
+            project_id=int(params["project_id"]),
+            chapter_id=int(params["chapter_id"]),
+            candidate_id=int(params["candidate_id"]),
+            reason=str(params["reason"]),
+            affected_evidence=list(params.get("affected_evidence") or []),
+            kind=params.get("kind"),
+            draft_hash=str(params["draft_hash"]),
+            canon_delta_hash=str(params["canon_delta_hash"]),
+            actor_id=owner_id,
+            branch=params.get("branch"),
+            fork=params.get("fork"),
+            run_id=params.get("run_id"),
+            skill_version_id=params.get("skill_version_id"),
+            artifact_id=params.get("artifact_id"),
+            artifact_revision_id=params.get("artifact_revision_id"),
+        )
+    except OverrideError as exc:
+        raise InvalidInputError(f"{exc.code}: {exc.detail}") from None
+
+
+async def _default_publish_derivative_revision(
+    db,
+    *,
+    owner_id: int,
+    novel_id: int,
+    params: dict[str, Any],
+) -> dict[str, Any]:
+    """Phase 37 action 工具默认服务：创建**一个**独立 publish ApprovalRequest。
+
+    委托 `overrides.request_publish_derivative_revision`：只在 **allow_divergence
+    approval 已批准 + 完整 revalidation 通过** 后才为同一候选创建独立 pending
+    Web ApprovalRequest（action=publish_derivative_revision），绑定**与
+    allow_divergence approval 完全相同**的 draft_hash / canon_delta_hash。
+    **绝不发布、绝不写 Original Canon**。
+    """
+    from app.services.derivative_generation.agent_boundary import (
+        OverrideError,
+        request_publish_derivative_revision,
+    )
+
+    try:
+        return await request_publish_derivative_revision(
+            db,
+            owner_id=owner_id,
+            novel_id=novel_id,
+            override_id=int(params["override_id"]),
+            draft_hash=str(params["draft_hash"]),
+            canon_delta_hash=str(params["canon_delta_hash"]),
+            approval_note=params.get("approval_note"),
+            actor_id=owner_id,
+            branch=params.get("branch"),
+            fork=params.get("fork"),
+            run_id=params.get("run_id"),
+            skill_version_id=params.get("skill_version_id"),
+            artifact_id=params.get("artifact_id"),
+            artifact_revision_id=params.get("artifact_revision_id"),
+        )
+    except OverrideError as exc:
+        raise InvalidInputError(f"{exc.code}: {exc.detail}") from None
+
+
 def _agent_edit_proposal_view_for_tool(result) -> dict[str, Any]:
     """DerivativeEditProposal approval ORM → JSON-safe 工具响应。
 
@@ -904,7 +1000,7 @@ async def _resolve_world_model_version(
 
 
 class ToolFacade:
-    """13 个只读工具 + 5 个候选 action 工具的统一执行门面。
+    """12 个只读工具 + 8 个候选 action 工具的统一执行门面。
 
     所有强制点（字节上限 / 超时 / budget hook / 错误码映射）都在
     ``execute`` 内完成；owner / cutoff 逻辑复用现有服务。Phase 33 的
@@ -914,6 +1010,10 @@ class ToolFacade:
     创建候选 fork + pending Web ApprovalRequest；Phase 36
     ``apply_derivative_edit`` 只创建候选 DerivativeEditProposal + pending Web
     ApprovalRequest——确定性 Revision Service 拥有 approved proposal 应用。
+    Phase 37 ``allow_divergence`` / ``publish_derivative_revision`` 只创建
+    divergence override / 独立 publish ApprovalRequest（相同 hash 绑定）——
+    确定性 revision publisher（``consume_publish_approval``）拥有 approved
+    Fanfiction Canon 物化。
     """
 
     def __init__(
@@ -962,6 +1062,11 @@ class ToolFacade:
             # proposal + pending Web ApprovalRequest；确定性 Revision Service
             # 拥有 approved proposal 应用。
             "apply_derivative_edit": self._apply_derivative_edit,
+            # Phase 37 derivative generation action 工具（37-05）：只创建
+            # divergence override / 独立 publish ApprovalRequest（相同 hash 绑定）；
+            # 确定性 revision publisher 拥有 approved Fanfiction Canon 物化。
+            "allow_divergence": self._allow_divergence,
+            "publish_derivative_revision": self._publish_derivative_revision,
         }
 
     # ── 公共入口 ──
@@ -1351,6 +1456,26 @@ class ToolFacade:
     async def _apply_derivative_edit(self, *, db, novel, owner_id, params):
         """创建候选 derivative edit + pending Web ApprovalRequest（candidate-only，D-36-02）。"""
         svc = self._svc("apply_derivative_edit", _default_apply_derivative_edit)
+        return await svc(
+            db,
+            owner_id=owner_id,
+            novel_id=novel.id,
+            params=params,
+        )
+
+    async def _allow_divergence(self, *, db, novel, owner_id, params):
+        """创建显式 divergence override + pending Web ApprovalRequest（candidate-only，D-37-03）。"""
+        svc = self._svc("allow_divergence", _default_allow_divergence)
+        return await svc(
+            db,
+            owner_id=owner_id,
+            novel_id=novel.id,
+            params=params,
+        )
+
+    async def _publish_derivative_revision(self, *, db, novel, owner_id, params):
+        """创建独立 publish ApprovalRequest（相同 hash 绑定；candidate-only，37-05）。"""
+        svc = self._svc("publish_derivative_revision", _default_publish_derivative_revision)
         return await svc(
             db,
             owner_id=owner_id,

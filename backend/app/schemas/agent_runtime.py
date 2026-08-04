@@ -1024,5 +1024,109 @@ class DerivativeEditProposalArtifact(StrictAgentRuntimeModel):
         return value
 
 
+# ────────────────────────── Phase 37 Derivative Draft Artifact 信封（REQ-FORK-03 / REQ-AGENT-03/04/07） ──────────────────────────
+
+
+class BranchSuggestionPayload(StrictAgentRuntimeModel):
+    """Phase 37 disabled-by-default candidate BranchSuggestion（D-37-05 / REQ-FORK-06）。
+
+    六字段契约：``choice_text`` / ``branch_summary`` / ``triggering_conflict`` /
+    ``canon_delta_hash`` / ``evidence_refs`` / ``enabled_by_default=false``。
+    只描述可供用户选择的分支选项——绝不自动 fork、不改变任何 Canon/branch
+    状态、不能复用 ``allow_divergence`` approval；发布仍需独立的
+    ``publish_derivative_revision`` approval。
+    """
+
+    choice_text: str = Field(min_length=1, max_length=2000)
+    branch_summary: str = Field(min_length=1, max_length=2000)
+    triggering_conflict: str = Field(min_length=1, max_length=2000)
+    canon_delta_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    evidence_refs: list[str] = Field(default_factory=list)
+    # D-37-05：默认禁用；任何 enabled 默认值都被 wire schema 拒绝。
+    enabled_by_default: Literal[False] = False
+
+
+class ContinuityReportPayload(StrictAgentRuntimeModel):
+    """Phase 37 确定性 gate 快照（candidate | blocked | needs_override）。"""
+
+    verdict: Literal["candidate", "blocked", "needs_override"]
+    reason: str | None = Field(default=None, max_length=160)
+    detail: str | None = Field(default=None, max_length=2000)
+    violations: list[dict[str, Any]] = Field(default_factory=list)
+    branch_suggestions: list[BranchSuggestionPayload] = Field(default_factory=list)
+
+
+class DraftPayload(StrictAgentRuntimeModel):
+    """Phase 37 DraftArtifact 负载（D-37-02/D-37-05 / REQ-FORK-03）。
+
+    携带完整 branch-aware 血缘：intent、候选草稿、citation keys、显式
+    CanonDelta、disabled-by-default BranchSuggestion[]、fork/source snapshot/
+    package/manifest hash 与 exact draft_hash + canon_delta_hash。``authority_space``
+    恒为 ``derivative``（Fanfiction Canon）——绝不写 Original Canon。suggestion 只
+    是候选输出：不自动 fork、不授予/复用任何 approval。
+    """
+
+    schema_version: Literal["derivative-candidate.v1"] = "derivative-candidate.v1"
+    artifact_kind: Literal["derivative_draft"] = "derivative_draft"
+    authority_space: Literal["derivative"] = "derivative"
+    intent: Literal["continuation", "rewrite"]
+    draft_text: str = Field(min_length=1, max_length=40000)
+    summary: str | None = Field(default=None, max_length=1000)
+    citation_keys: list[str] = Field(default_factory=list)
+    divergence: dict[str, Any] | None = None
+    branch_suggestions: list[BranchSuggestionPayload] = Field(default_factory=list)
+    fork: str | None = Field(default=None, max_length=80)
+    source_snapshot_id: str = Field(min_length=1, max_length=160)
+    source_snapshot_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    package_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    manifest_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    draft_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    canon_delta_hash: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+
+
+class DraftArtifact(StrictAgentRuntimeModel):
+    """智能体产物的 DraftArtifact 信封（Phase 37 / D-37-02/D-37-05）。
+
+    Agent 产出的是 **candidate-only** 的派生草稿：``draft``（完整候选负载）+
+    ``continuity_report``（确定性 gate 快照）+ 顶层 ``branch_suggestions``
+    （disabled-by-default，六字段契约）。``status`` 恒为 ``candidate``（finalize
+    时）——只有确定性 validator + 显式 approval（allow_divergence →
+    revalidation → 独立 publish_derivative_revision approval）能推进；Agent/
+    浏览器绝不直接写 Original Canon / 域表 / published 状态。``tool_runs`` 携带
+    ToolRun 血缘。与 CitedAnswerArtifact 信封纪律一致：type / schema_version /
+    owner / novel / branch / producing skill+version / model lineage /
+    source versions / input_hash / evidence_refs / status / parent_revision /
+    normalization（26-06 修复血缘 trail）。
+    """
+
+    type: Literal["derivative_draft"] = "derivative_draft"
+    schema_version: Literal["draft-artifact.v1"] = "draft-artifact.v1"
+    owner_id: int = Field(gt=0)
+    novel_id: int = Field(gt=0)
+    branch: str | None = None
+    producing_skill: str = Field(min_length=1, max_length=120)
+    producing_skill_version: str = Field(min_length=1, max_length=32)
+    skill_version_id: int = Field(gt=0)
+    model_lineage: dict[str, Any]
+    source_versions: dict[str, Any]
+    input_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    evidence_refs: list[str] = Field(min_length=1)
+    draft: DraftPayload
+    continuity_report: ContinuityReportPayload
+    branch_suggestions: list[BranchSuggestionPayload] = Field(default_factory=list)
+    tool_runs: list[dict[str, Any]] = Field(min_length=1)
+    status: Literal["candidate", "validated", "approved", "published", "rejected"]
+    parent_revision: str | None = None
+    normalization: NormalizationTrail
+
+    @field_validator("tool_runs")
+    @classmethod
+    def _tool_runs_shape(cls, value: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        for item in value:
+            if not isinstance(item, dict) or not item.get("tool_name"):
+                raise ValueError("each tool run requires tool_name")
+        return value
+
+
 # 供 OpenAPI 引用，避免未使用告警。
 _ = (StrictReaderChatModel,)

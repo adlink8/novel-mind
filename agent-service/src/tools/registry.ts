@@ -16,7 +16,7 @@ import { defineTool } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { fastapiToolCall } from "./fastapi-client.js";
 
-/** 18 个域工具名（固定顺序；唯一 allowlist 事实源）。 */
+/** 20 个域工具名（固定顺序；唯一 allowlist 事实源）。 */
 export const DOMAIN_TOOL_NAMES = [
   "get_novel",
   "get_chapter",
@@ -36,6 +36,8 @@ export const DOMAIN_TOOL_NAMES = [
   "attach_illustration_to_text",
   "create_canon_fork",
   "apply_derivative_edit",
+  "allow_divergence",
+  "publish_derivative_revision",
 ] as const;
 
 /** 工具注册时的运行级授权（端用户 JWT 或 per-run 内部令牌）。 */
@@ -321,6 +323,25 @@ export function buildDomainTools(auth: ToolAuth) {
       execute: (toolCallId, params, signal) =>
         fastapiToolCall("apply_derivative_edit", params as unknown, signal, auth),
     }),
+    // ── Phase 37 derivative generation action 工具（37-05）──
+    defineTool({
+      name: "allow_divergence",
+      label: "Allow Divergence (Proposal)",
+      description:
+        "Phase 37 action（REQ-FORK-03 / REQ-AGENT-03/04/07）：为 blocked / needs_override 生成候选提议**一个**显式 divergence override（candidate-only）。服务端 override gate 只接受理由 + 受影响 leaf 证据（或候选已声明的 CanonDelta），并校验 draft_hash / canon_delta_hash 从候选确定性血缘重放（drift → fail closed）；创建 pending DerivativeOverride + pending Web ApprovalRequest（action=allow_divergence，payload_hash 绑定 exact draft_hash + canon_delta_hash）。绝不发布——只有先确认本 approval 再经独立 publish_derivative_revision approval 后由确定性 revision publisher 物化；Agent 绝不写 Original Canon / 域表 / published 状态。",
+      parameters: allowDivergenceParams(),
+      execute: (toolCallId, params, signal) =>
+        fastapiToolCall("allow_divergence", params as unknown, signal, auth),
+    }),
+    defineTool({
+      name: "publish_derivative_revision",
+      label: "Publish Derivative Revision (Proposal)",
+      description:
+        "Phase 37 action（REQ-FORK-03 / REQ-AGENT-03/04/07）：只在 allow_divergence approval 已批准 + 完整 revalidation 通过后为同一候选提议**一个**独立 publish ApprovalRequest（candidate-only）。服务端绑定与 allow_divergence approval **完全相同**的 draft_hash + canon_delta_hash（相同 hash 绑定；跳过/漂移 → fail closed），绝不复用 allow_divergence approval——只有独立 publish approval 被用户批准后，确定性 revision publisher（consume_publish_approval）才能物化 Fanfiction Canon 修订；Agent 绝不写 Original Canon / 域表 / published 状态。",
+      parameters: publishDerivativeRevisionParams(),
+      execute: (toolCallId, params, signal) =>
+        fastapiToolCall("publish_derivative_revision", params as unknown, signal, auth),
+    }),
   ];
 }
 
@@ -383,6 +404,67 @@ function derivativeEditParams() {
       Type.String({ minLength: 1, maxLength: 64 }),
       { minItems: 1, description: "proposal 引用的 leaf 证据键（必须属于冻结 manifest 白名单）" },
     ),
+    run_id: Type.Optional(Type.Integer({ minimum: 1, description: "SkillRun ID 血缘" })),
+    skill_version_id: Type.Optional(Type.Integer({ minimum: 1, description: "SkillVersion ID 血缘" })),
+    artifact_id: Type.Optional(Type.Integer({ minimum: 1, description: "Artifact ID 血缘" })),
+    artifact_revision_id: Type.Optional(Type.Integer({ minimum: 1, description: "ArtifactRevision ID 血缘" })),
+  });
+}
+
+/** Phase 37 allow_divergence action 工具参数（镜像 backend schemas.agent_tools）。 */
+function allowDivergenceParams() {
+  return Type.Object({
+    novel_id: Type.Integer({ minimum: 1, description: "小说 ID" }),
+    branch: Type.Optional(Type.String({ maxLength: 80, description: "衍生分支；原始主线为 null" })),
+    fork: Type.Optional(Type.String({ maxLength: 80, description: "衍生 fork（仅 derivative mode）" })),
+    project_id: Type.Integer({ minimum: 1, description: "derivative project ID（服务端重验 owner/novel + fanfiction_canon 空间）" }),
+    chapter_id: Type.Integer({ minimum: 1, description: "派生 chapter ID（服务端重验 project 范围）" }),
+    candidate_id: Type.Integer({ minimum: 1, description: "generation candidate ID（服务端重验 owner/novel 血缘 + overridable verdict）" }),
+    reason: Type.String({ minLength: 1, maxLength: 4000, description: "显式 divergence 理由（空 → fail closed）" }),
+    affected_evidence: Type.Array(
+      Type.String({ minLength: 1, maxLength: 64 }),
+      { description: "受影响的 leaf 证据键（必须 ⊆ 冻结 package 白名单）" },
+    ),
+    kind: Type.Optional(Type.String({ maxLength: 32, description: "可选 CanonDelta 类型（候选未声明时必填）" })),
+    draft_hash: Type.String({
+      minLength: 64,
+      maxLength: 64,
+      pattern: "^[0-9a-f]{64}$",
+      description: "候选结构化输出的 canonical draft hash（服务端重放；drift → fail closed）",
+    }),
+    canon_delta_hash: Type.String({
+      minLength: 64,
+      maxLength: 64,
+      pattern: "^[0-9a-f]{64}$",
+      description: "候选 CanonDelta hash（服务端重放；与 approval payload 绑定）",
+    }),
+    run_id: Type.Optional(Type.Integer({ minimum: 1, description: "SkillRun ID 血缘" })),
+    skill_version_id: Type.Optional(Type.Integer({ minimum: 1, description: "SkillVersion ID 血缘" })),
+    artifact_id: Type.Optional(Type.Integer({ minimum: 1, description: "Artifact ID 血缘" })),
+    artifact_revision_id: Type.Optional(Type.Integer({ minimum: 1, description: "ArtifactRevision ID 血缘" })),
+  });
+}
+
+/** Phase 37 publish_derivative_revision action 工具参数（镜像 backend schemas.agent_tools）。 */
+function publishDerivativeRevisionParams() {
+  return Type.Object({
+    novel_id: Type.Integer({ minimum: 1, description: "小说 ID" }),
+    branch: Type.Optional(Type.String({ maxLength: 80, description: "衍生分支；原始主线为 null" })),
+    fork: Type.Optional(Type.String({ maxLength: 80, description: "衍生 fork（仅 derivative mode）" })),
+    override_id: Type.Integer({ minimum: 1, description: "已存在的 pending DerivativeOverride ID" }),
+    draft_hash: Type.String({
+      minLength: 64,
+      maxLength: 64,
+      pattern: "^[0-9a-f]{64}$",
+      description: "候选 canonical draft hash（必须与 allow_divergence approval 完全一致）",
+    }),
+    canon_delta_hash: Type.String({
+      minLength: 64,
+      maxLength: 64,
+      pattern: "^[0-9a-f]{64}$",
+      description: "候选 CanonDelta hash（必须与 allow_divergence approval 完全一致）",
+    }),
+    approval_note: Type.Optional(Type.String({ maxLength: 4000, description: "供发布 approval 展示的显式批准备注" })),
     run_id: Type.Optional(Type.Integer({ minimum: 1, description: "SkillRun ID 血缘" })),
     skill_version_id: Type.Optional(Type.Integer({ minimum: 1, description: "SkillVersion ID 血缘" })),
     artifact_id: Type.Optional(Type.Integer({ minimum: 1, description: "Artifact ID 血缘" })),

@@ -407,6 +407,116 @@ class ApplyDerivativeEditRequest(StrictAgentToolModel):
     )
 
 
+# ────────────────────────── Phase 37 derivative generation action 工具（37-05） ──────────────────────────
+
+
+class AllowDivergenceRequest(StrictAgentToolModel):
+    """Phase 37 显式 divergence action 请求（37-05，REQ-FORK-03 / REQ-AGENT-03/04/07）。
+
+    只为一个 blocked / ``needs_override`` 生成候选创建**一个显式 divergence
+    override**（D-37-03）：服务端 override gate 只接受理由 + 受影响的 leaf 证据
+    （或候选已声明的 CanonDelta），并校验调用方携带的 ``draft_hash`` /
+    ``canon_delta_hash`` 与候选确定性血缘重放一致（drift → fail closed）。
+    创建 pending ``DerivativeOverride`` + pending Web ApprovalRequest
+    （action=allow_divergence，payload_hash = canonical hash 绑定 exact
+    draft_hash + canon_delta_hash，D-11/D-15）。**绝不发布、绝不写 Original
+    Canon**——只有先确认本 approval 再经独立 ``publish_derivative_revision``
+    approval 后由确定性 revision publisher 物化。novel_id 由查询参数注入
+    （require_owned_novel），绝不放进请求体。
+    """
+
+    branch: str | None = Field(
+        default=None, max_length=80, description="衍生分支；原始主线为 null"
+    )
+    fork: str | None = Field(
+        default=None, max_length=80, description="衍生 fork（仅 derivative mode；original 必须为 null）"
+    )
+    project_id: int = Field(
+        gt=0, description="derivative project ID（服务端重验 owner/novel + fanfiction_canon 空间）"
+    )
+    chapter_id: int = Field(
+        gt=0, description="派生 chapter ID（服务端重验 project 范围）"
+    )
+    candidate_id: int = Field(
+        gt=0, description="generation candidate ID（服务端重验 owner/novel 血缘 + overridable verdict）"
+    )
+    reason: str = Field(
+        min_length=1, max_length=4000, description="显式 divergence 理由（空 → fail closed）"
+    )
+    affected_evidence: list[str] = Field(
+        default_factory=list,
+        description="受影响的 leaf 证据键（必须 ⊆ 冻结 package 白名单；候选已声明 CanonDelta 时可省略）",
+    )
+    kind: str | None = Field(
+        default=None, max_length=32, description="可选 CanonDelta 类型（候选未声明时必填）"
+    )
+    draft_hash: str = Field(
+        min_length=64,
+        max_length=64,
+        pattern="^[0-9a-f]{64}$",
+        description="候选结构化输出的 canonical draft hash（服务端重放；drift → fail closed）",
+    )
+    canon_delta_hash: str = Field(
+        min_length=64,
+        max_length=64,
+        pattern="^[0-9a-f]{64}$",
+        description="候选 CanonDelta hash（服务端重放；与 approval payload 绑定）",
+    )
+    # D-15 血缘绑定（可选）：agent 会话已知的 run/skill/artifact 血缘。
+    run_id: int | None = Field(default=None, gt=0, description="SkillRun ID 血缘")
+    skill_version_id: int | None = Field(default=None, gt=0, description="SkillVersion ID 血缘")
+    artifact_id: int | None = Field(default=None, gt=0, description="Artifact ID 血缘")
+    artifact_revision_id: int | None = Field(
+        default=None, gt=0, description="ArtifactRevision ID 血缘"
+    )
+
+
+class PublishDerivativeRevisionRequest(StrictAgentToolModel):
+    """Phase 37 独立 publish approval action 请求（37-05，REQ-FORK-03 / REQ-AGENT-03/04/07）。
+
+    只在 **allow_divergence approval 已批准 + 完整 revalidation 通过** 后才为同一
+    候选创建一个**独立** pending Web ApprovalRequest（action=
+    publish_derivative_revision），绑定**与 allow_divergence approval 完全相同的**
+    ``draft_hash`` / ``canon_delta_hash``（相同 hash 绑定；漂移/跳过前序步骤 →
+    fail closed）。绝不复用 allow_divergence approval——只有独立 publish approval
+    被用户批准后，确定性 revision publisher 才能物化 Fanfiction Canon 修订。
+    本工具**绝不发布、绝不写 Original Canon**。novel_id 由查询参数注入
+    （require_owned_novel），绝不放进请求体。
+    """
+
+    branch: str | None = Field(
+        default=None, max_length=80, description="衍生分支；原始主线为 null"
+    )
+    fork: str | None = Field(
+        default=None, max_length=80, description="衍生 fork（仅 derivative mode；original 必须为 null）"
+    )
+    override_id: int = Field(
+        gt=0, description="已存在的 pending DerivativeOverride ID（服务端重验 owner/novel 血缘）"
+    )
+    draft_hash: str = Field(
+        min_length=64,
+        max_length=64,
+        pattern="^[0-9a-f]{64}$",
+        description="候选 canonical draft hash（必须与 allow_divergence approval 完全一致）",
+    )
+    canon_delta_hash: str = Field(
+        min_length=64,
+        max_length=64,
+        pattern="^[0-9a-f]{64}$",
+        description="候选 CanonDelta hash（必须与 allow_divergence approval 完全一致）",
+    )
+    approval_note: str | None = Field(
+        default=None, max_length=4000, description="供发布 approval 展示的显式批准备注"
+    )
+    # D-15 血缘绑定（可选）：agent 会话已知的 run/skill/artifact 血缘。
+    run_id: int | None = Field(default=None, gt=0, description="SkillRun ID 血缘")
+    skill_version_id: int | None = Field(default=None, gt=0, description="SkillVersion ID 血缘")
+    artifact_id: int | None = Field(default=None, gt=0, description="Artifact ID 血缘")
+    artifact_revision_id: int | None = Field(
+        default=None, gt=0, description="ArtifactRevision ID 血缘"
+    )
+
+
 # ────────────────────────── 统一错误信封 ──────────────────────────
 
 

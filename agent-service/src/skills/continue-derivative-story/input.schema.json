@@ -1,0 +1,85 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ContinueDerivativeStoryInput",
+  "description": "continue-derivative-story Phase 37 运行输入：novel_id（必填）与确定性 derivative generation 域按引用消费的输入锚——project_id / chapter_id / chapter_number / intent（continuation|rewrite）/ context_package_id（冻结 package 血缘）/ source_snapshot_id / source_snapshot_hash / evidence_refs 与 requested_actions（allow_divergence / publish_derivative_revision，均要求独立 Web ApprovalRequest）。可选 branch / fork（derivative mode）。scope / source snapshot / fork 血缘由服务端强制（fail closed，D-37-02/D-37-05）。",
+  "type": "object",
+  "required": [
+    "novel_id",
+    "project_id",
+    "chapter_id",
+    "chapter_number",
+    "intent",
+    "context_package_id",
+    "evidence_refs",
+    "requested_actions"
+  ],
+  "properties": {
+    "novel_id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "目标小说 ID（必须与运行路径中的 novel_id 一致）"
+    },
+    "branch": {
+      "type": ["string", "null"],
+      "maxLength": 80,
+      "description": "衍生分支；原始主线为 null（owner/novel/branch 血缘绑定）"
+    },
+    "fork": {
+      "type": ["string", "null"],
+      "maxLength": 80,
+      "description": "衍生 fork（仅 derivative mode；original 模式必须为 null）"
+    },
+    "project_id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "derivative project ID（服务端重验 owner/novel + fanfiction_canon 空间）"
+    },
+    "chapter_id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "派生 chapter ID（服务端重验 project 范围）"
+    },
+    "chapter_number": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "派生 chapter 序号（血缘/审计标注）"
+    },
+    "intent": {
+      "type": "string",
+      "enum": ["continuation", "rewrite"],
+      "description": "生成意图（与冻结 context package 的 intent 一致；mismatch → fail closed）"
+    },
+    "context_package_id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "冻结 context package ID（服务端重验 owner/novel + fanfiction_canon 空间 + package hash 重放）"
+    },
+    "source_snapshot_id": {
+      "type": ["string", "null"],
+      "maxLength": 160,
+      "description": "source snapshot 血缘 ID（project 冻结 fork 血缘）"
+    },
+    "source_snapshot_hash": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "source snapshot 血缘 hash（服务端与 project 冻结 fork 血缘重放；drift → fail closed）"
+    },
+    "evidence_refs": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1, "maxLength": 64 },
+      "description": "run 引用的 leaf 证据键（必须属于冻结 manifest 白名单）"
+    },
+    "requested_actions": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": ["allow_divergence", "publish_derivative_revision"]
+      },
+      "description": "请求的 Phase 37 action；各自创建独立 pending Web ApprovalRequest（D-11），Agent/浏览器绝不发布"
+    }
+  },
+  "additionalProperties": false
+}

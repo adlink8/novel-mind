@@ -67,6 +67,11 @@ ACTION_TOOLS = (
     # Phase 36 derivative 编辑 action 工具（36-05）：创建候选 proposal + pending
     # ApprovalRequest；确定性 Revision Service 拥有 approved proposal 应用。
     "apply_derivative_edit",
+    # Phase 37 derivative generation action 工具（37-05）：创建 divergence
+    # override / 独立 publish ApprovalRequest；确定性 revision publisher 拥有
+    # approved Fanfiction Canon 物化。
+    "allow_divergence",
+    "publish_derivative_revision",
 )
 
 # 每个工具的 HTTP 路由（cross-owner 轴使用）。

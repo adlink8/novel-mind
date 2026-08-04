@@ -25,6 +25,7 @@ from app.core.database import get_db
 from app.core.security import require_user
 from app.models import Novel, User
 from app.schemas.agent_tools import (
+    AllowDivergenceRequest,
     AnchorProposalActionRequest,
     ApplyDerivativeEditRequest,
     CreateCanonForkRequest,
@@ -41,6 +42,7 @@ from app.schemas.agent_tools import (
     GetTimelineRequest,
     GetVisualBibleRequest,
     GetWorldRulesRequest,
+    PublishDerivativeRevisionRequest,
     SearchNovelTextRequest,
 )
 from app.services.agent_tools.errors import (
@@ -406,6 +408,59 @@ async def tool_apply_derivative_edit(
     """
     return await _run_tool(
         "apply_derivative_edit",
+        db=db,
+        novel=novel,
+        owner_id=current_user.id,
+        params=_params(body),
+    )
+
+
+@router.post("/allow_divergence")
+async def tool_allow_divergence(
+    body: AllowDivergenceRequest | None = None,
+    novel: Novel = Depends(require_owned_novel),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """Phase 37 显式 divergence action（37-05，REQ-FORK-03 / REQ-AGENT-03/04/07）：
+    为 blocked / ``needs_override`` 生成候选创建**一个**显式 divergence override
+    + pending Web ApprovalRequest（action=allow_divergence，payload_hash 绑定
+    exact draft_hash + canon_delta_hash，D-11/D-15）。
+
+    服务端 override gate 只接受理由 + 受影响 leaf 证据（或候选已声明的
+    CanonDelta），并校验调用方携带的 draft_hash / canon_delta_hash 从候选确定性
+    血缘重放（drift → fail closed）。**绝不发布、绝不写 Original Canon**——只有
+    先确认本 approval 再经独立 ``publish_derivative_revision`` approval 后由
+    确定性 revision publisher 物化。
+    """
+    return await _run_tool(
+        "allow_divergence",
+        db=db,
+        novel=novel,
+        owner_id=current_user.id,
+        params=_params(body),
+    )
+
+
+@router.post("/publish_derivative_revision")
+async def tool_publish_derivative_revision(
+    body: PublishDerivativeRevisionRequest | None = None,
+    novel: Novel = Depends(require_owned_novel),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """Phase 37 独立 publish approval action（37-05，REQ-FORK-03 / REQ-AGENT-03/04/07）：
+    只在 **allow_divergence approval 已批准 + 完整 revalidation 通过** 后才为同一
+    候选创建**独立** pending Web ApprovalRequest（action=
+    publish_derivative_revision），绑定**与 allow_divergence approval 完全相同**
+    的 draft_hash / canon_delta_hash（相同 hash 绑定；跳过/漂移 → fail closed）。
+
+    绝不复用 allow_divergence approval——只有独立 publish approval 被用户批准后，
+    确定性 revision publisher（``consume_publish_approval``）才能物化 Fanfiction
+    Canon 修订。**绝不发布、绝不写 Original Canon**。
+    """
+    return await _run_tool(
+        "publish_derivative_revision",
         db=db,
         novel=novel,
         owner_id=current_user.id,

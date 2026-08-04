@@ -81,15 +81,16 @@ describe("skill loader（fail-closed 矩阵）", () => {
     expect(skillInstructions(skill)).toContain("Question");
   });
 
-  it("loadAllowlistedSkills 加载恰为 allowlisted 技能集（26 + 27 + 28 + 29 + 30 + 31 + 32 + 33 + 34 + 35 + 36 十二个技能）", () => {
+  it("loadAllowlistedSkills 加载恰为 allowlisted 技能集（26 + 27 + 28 + 29 + 30 + 31 + 32 + 33 + 34 + 35 + 36 + 37 十三个技能）", () => {
     const skills = loadAllowlistedSkills();
-    expect(skills).toHaveLength(12);
+    expect(skills).toHaveLength(13);
     expect(skills.map((s) => s.name).sort()).toEqual([
       "analyze-chapter",
       "answer-reading-question",
       "build-story-arc",
       "build-visual-bible",
       "compile-scene-spec",
+      "continue-derivative-story",
       "create-canon-fork",
       "detect-key-scenes",
       "edit-derivative-story",

@@ -30,6 +30,7 @@ from app.schemas.agent_runtime import (
     ChapterAnalysisArtifact,
     CitedAnswerArtifact,
     DerivativeEditProposalArtifact,
+    DraftArtifact,
     ExternalEvidenceArtifact,
     IllustrationAnchorProposalArtifact,
     IllustrationRevisionArtifact,
@@ -230,6 +231,27 @@ BLOCKED_DERIVATIVE_EDIT_BRANCH = (
     "envelope branch must match the run branch and derivative mode requires "
     "branch + fork"
 )
+# Phase 37 Derivative Draft 确定性边界（D-37-02/D-37-05）。
+BLOCKED_DERIVATIVE_DRAFT_PAYLOAD = (
+    "integrity: derivative draft payload failed domain validation"
+)
+BLOCKED_DERIVATIVE_DRAFT_APPROVAL_BYPASS = (
+    "integrity: derivative draft approval bypass blocked — status must be "
+    "candidate at finalize"
+)
+BLOCKED_DERIVATIVE_DRAFT_BRANCH = (
+    "integrity: derivative draft branch/authority_space mismatch — envelope "
+    "branch must match the run branch and derivative mode requires branch + fork"
+)
+BLOCKED_DERIVATIVE_DRAFT_EVIDENCE_MISMATCH = (
+    "integrity: derivative draft citation/branch/divergence evidence keys must "
+    "be a subset of envelope evidence_refs"
+)
+BLOCKED_DERIVATIVE_DRAFT_SUGGESTION = (
+    "integrity: derivative draft BranchSuggestion must carry exactly the six "
+    "fields and enabled_by_default=false; an enabled default or a missing "
+    "conflict/delta/evidence field fails closed"
+)
 
 
 @dataclass(frozen=True)
@@ -299,6 +321,8 @@ def evaluate_integrity(*, envelope: dict[str, Any], run: SkillRun) -> IntegrityD
         return _evaluate_canon_fork_proposal(envelope, run)
     if artifact_type == "derivative_edit_proposal":
         return _evaluate_derivative_edit_proposal(envelope, run)
+    if artifact_type == "derivative_draft":
+        return _evaluate_derivative_draft(envelope, run)
     return IntegrityDecision(False, BLOCKED_UNKNOWN_TYPE)
 
 
@@ -1221,5 +1245,109 @@ def _evaluate_derivative_edit_proposal(
     else:
         if branch or payload.get("fork"):
             return IntegrityDecision(False, BLOCKED_DERIVATIVE_EDIT_BRANCH)
+
+    return IntegrityDecision(True)
+
+
+def _branch_suggestion_keys(suggestion: dict[str, Any]) -> set[str]:
+    """A BranchSuggestion must carry exactly the six frozen fields (D-37-05)."""
+    return set(suggestion.keys())
+
+
+def _evaluate_derivative_draft(
+    envelope: dict[str, Any], run: SkillRun
+) -> IntegrityDecision:
+    """Phase 37 DraftArtifact 信封 integrity gate（D-37-02/D-37-05）。
+
+    与其余信封纪律一致（evidence/lineage/status/trail/protected），并在
+    ``draft`` / ``continuity_report`` / ``branch_suggestions`` 负载上做确定性
+    域边界校验：
+      - ``status`` 恒为 ``candidate``——Agent 声称任何非 candidate 状态
+        （approval bypass / published 伪造）→ blocked（只有确定性 validator +
+        显式 allow_divergence → revalidation → 独立 publish_derivative_revision
+        approval 能推进状态；D-37-03/D-37-05）；
+      - draft 必须是严格 ``DraftPayload``（intent/draft_text/citation_keys/
+        divergence/branch_suggestions + fork/source snapshot/package/manifest/
+        draft/canon-delta hashes）；
+      - ``branch`` 门：信封 branch 必须与 run.branch 血缘一致；authority_space
+        恒为 ``derivative`` 且必须携带 fork（wrong branch/fork → blocked）；
+      - 每个 BranchSuggestion（draft 内 + 顶层）必须携带**恰好六字段**且
+        ``enabled_by_default=false``（D-37-05；suggestion 是 disabled-by-default
+        候选，不自动 fork、不授予/复用任何 approval）；
+      - draft 的 citation_keys ∪ suggestion evidence_refs ∪ divergence
+        affected_evidence 必须 ⊆ 信封顶层 ``evidence_refs``（leaf-evidence
+        资格门）。
+    任何失败 → 稳定 blocked，零写入；FastAPI 与确定性 validator / 确定性
+    revision publisher 保留 permission / evidence / state-transition /
+    publication 权威。
+    """
+    # 0. heuristic candidate-only 无 EvidenceRef 资格 → 不能进草稿网关。
+    if not envelope.get("evidence_refs"):
+        return IntegrityDecision(False, BLOCKED_NO_EVIDENCE)
+
+    # 1. 严格 wire schema。
+    try:
+        model = DraftArtifact.model_validate(envelope)
+    except ValidationError as exc:
+        return IntegrityDecision(
+            False, f"{BLOCKED_SCHEMA} ({_first_validation_error(exc)})"
+        )
+
+    # 2. 共享 lineage/status/trail/protected 门。
+    blocked = _check_common_lineage(envelope=envelope, run=run, wire=model)
+    if blocked is not None:
+        return blocked
+
+    # 3. branch/authority_space 门（wrong branch/fork → fail closed）。
+    branch = envelope.get("branch")
+    if branch != run.branch:
+        return IntegrityDecision(False, BLOCKED_DERIVATIVE_DRAFT_BRANCH)
+    draft = envelope.get("draft")
+    if not isinstance(draft, dict):
+        return IntegrityDecision(False, BLOCKED_DERIVATIVE_DRAFT_PAYLOAD)
+    if draft.get("authority_space") != "derivative":
+        return IntegrityDecision(False, BLOCKED_DERIVATIVE_DRAFT_BRANCH)
+    if not branch or not draft.get("fork"):
+        return IntegrityDecision(False, BLOCKED_DERIVATIVE_DRAFT_BRANCH)
+
+    # 4. BranchSuggestion 六字段 + enabled_by_default=false（D-37-05）。
+    expected_fields = {
+        "choice_text",
+        "branch_summary",
+        "triggering_conflict",
+        "canon_delta_hash",
+        "evidence_refs",
+        "enabled_by_default",
+    }
+    for source, items in (
+        ("draft.branch_suggestions", draft.get("branch_suggestions") or []),
+        ("branch_suggestions", envelope.get("branch_suggestions") or []),
+    ):
+        for index, suggestion in enumerate(items):
+            if not isinstance(suggestion, dict):
+                return IntegrityDecision(False, BLOCKED_DERIVATIVE_DRAFT_SUGGESTION)
+            if _branch_suggestion_keys(suggestion) != expected_fields:
+                return IntegrityDecision(False, BLOCKED_DERIVATIVE_DRAFT_SUGGESTION)
+            if suggestion.get("enabled_by_default") is not False:
+                return IntegrityDecision(False, BLOCKED_DERIVATIVE_DRAFT_SUGGESTION)
+
+    # 5. leaf evidence 资格门：citation/suggestion/divergence 必须 ⊆ 信封。
+    envelope_keys = set(envelope.get("evidence_refs") or [])
+    citation_keys = set(draft.get("citation_keys") or [])
+    suggestion_keys = {
+        ref
+        for items in (
+            draft.get("branch_suggestions") or [],
+            envelope.get("branch_suggestions") or [],
+        )
+        for suggestion in items
+        for ref in (suggestion.get("evidence_refs") or [])
+    }
+    divergence_keys = set(
+        (draft.get("divergence") or {}).get("affected_evidence") or []
+    )
+    all_keys = citation_keys | suggestion_keys | divergence_keys
+    if not all_keys.issubset(envelope_keys):
+        return IntegrityDecision(False, BLOCKED_DERIVATIVE_DRAFT_EVIDENCE_MISMATCH)
 
     return IntegrityDecision(True)

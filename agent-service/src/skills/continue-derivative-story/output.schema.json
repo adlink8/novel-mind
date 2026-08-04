@@ -1,0 +1,178 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ContinueDerivativeStoryOutput",
+  "description": "DraftArtifact 信封（D-37-02/D-37-05 / Phase 37）。镜像 backend app.schemas.agent_runtime.DraftArtifact：type / schema_version / owner / novel / branch / producing skill+version / model lineage / source versions / input_hash / evidence_refs / draft / continuity_report / branch_suggestions / tool_runs / status / parent_revision / normalization。`draft` 携带完整 branch-aware 血缘（intent、draft_text、citation_keys、显式 CanonDelta、disabled-by-default BranchSuggestion[]、fork、source snapshot/package/manifest hash、exact draft_hash + canon_delta_hash）且 authority_space 恒为 derivative；`continuity_report` 是确定性 gate 快照（candidate|blocked|needs_override）；`branch_suggestions` 每项恰好六字段且 enabled_by_default 恒为 false——候选输出，绝不自动 fork、绝不授予/复用任何 approval。status 恒为 candidate（finalize 时）——只有确定性 validator + 显式 allow_divergence → revalidation → 独立 publish_derivative_revision approval 能推进。artifact_id / revision_id / skill_run_id / approval_request_id 由后端确定性 finalizer/服务端在写入时分配，模型输出不含。",
+  "type": "object",
+  "required": [
+    "type",
+    "schema_version",
+    "owner_id",
+    "novel_id",
+    "producing_skill",
+    "producing_skill_version",
+    "skill_version_id",
+    "model_lineage",
+    "source_versions",
+    "input_hash",
+    "evidence_refs",
+    "draft",
+    "continuity_report",
+    "tool_runs",
+    "status",
+    "normalization"
+  ],
+  "properties": {
+    "type": { "const": "derivative_draft" },
+    "schema_version": { "const": "draft-artifact.v1" },
+    "owner_id": { "type": "integer", "minimum": 1 },
+    "novel_id": { "type": "integer", "minimum": 1 },
+    "branch": { "type": ["string", "null"], "description": "衍生分支；原始主线为 null（与 run.branch 血缘一致）" },
+    "producing_skill": { "type": "string", "minLength": 1 },
+    "producing_skill_version": { "type": "string", "minLength": 1 },
+    "skill_version_id": { "type": "integer", "minimum": 1 },
+    "model_lineage": { "type": "object", "description": "agent runtime + 模型血缘（provider/model/revision）" },
+    "source_versions": { "type": "object", "description": "数据源版本（novel/source snapshot 血缘）" },
+    "input_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$", "description": "运行输入规范化 JSON 的 SHA-256（重放追溯）" },
+    "evidence_refs": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1,
+      "description": "leaf 证据引用，必须 ⊆ 冻结 manifest 白名单"
+    },
+    "skill_run_id": { "type": ["integer", "null"], "minimum": 1, "description": "SkillRun ID（后端 run 创建时分配；模型输出不含）" },
+    "artifact_id": { "type": ["integer", "null"], "minimum": 1, "description": "Artifact ID（后端确定性 finalizer 写入时分配；模型输出不含）" },
+    "revision_id": { "type": ["integer", "null"], "minimum": 1, "description": "ArtifactRevision ID（后端确定性 finalizer 写入时分配；模型输出不含）" },
+    "draft": {
+      "type": "object",
+      "description": "完整候选草稿负载：branch-aware 血缘 + intent + draft_text + citation_keys + 显式 CanonDelta（可选）+ disabled-by-default BranchSuggestion[] + fork + source snapshot/package/manifest hash + exact draft_hash + canon_delta_hash。authority_space 恒为 derivative——绝不写 Original Canon。",
+      "required": [
+        "schema_version",
+        "artifact_kind",
+        "authority_space",
+        "intent",
+        "draft_text",
+        "source_snapshot_id",
+        "source_snapshot_hash",
+        "package_hash",
+        "manifest_hash",
+        "draft_hash"
+      ],
+      "properties": {
+        "schema_version": { "const": "derivative-candidate.v1" },
+        "artifact_kind": { "const": "derivative_draft" },
+        "authority_space": { "const": "derivative" },
+        "intent": { "enum": ["continuation", "rewrite"] },
+        "draft_text": { "type": "string", "minLength": 1, "maxLength": 40000 },
+        "summary": { "type": ["string", "null"], "maxLength": 1000 },
+        "citation_keys": { "type": "array", "items": { "type": "string" } },
+        "divergence": {
+          "type": ["object", "null"],
+          "description": "显式 CanonDelta（D-37-03）：divergence_type/reason/affected_evidence/scope='derivative'；绝不静默偏离"
+        },
+        "branch_suggestions": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/branch_suggestion" },
+          "description": "disabled-by-default 候选 BranchSuggestion[]（D-37-05）"
+        },
+        "fork": { "type": ["string", "null"], "maxLength": 80, "description": "衍生 fork（derivative mode 必须提供）" },
+        "source_snapshot_id": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "source_snapshot_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "package_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "manifest_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "draft_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$", "description": "候选结构化输出的 canonical hash（approval 绑定）" },
+        "canon_delta_hash": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$", "description": "候选 CanonDelta hash（approval 绑定）" }
+      },
+      "additionalProperties": false
+    },
+    "continuity_report": {
+      "type": "object",
+      "description": "确定性 gate 快照（candidate|blocked|needs_override）——validator 报告，绝不由此物化。",
+      "required": ["verdict"],
+      "properties": {
+        "verdict": { "enum": ["candidate", "blocked", "needs_override"] },
+        "reason": { "type": ["string", "null"], "maxLength": 160 },
+        "detail": { "type": ["string", "null"], "maxLength": 2000 },
+        "violations": { "type": "array", "items": { "type": "object" } },
+        "branch_suggestions": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/branch_suggestion" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "branch_suggestions": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/branch_suggestion" },
+      "description": "顶层 disabled-by-default 候选 BranchSuggestion[]（六字段 + enabled_by_default=false）"
+    },
+    "tool_runs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["tool_name", "calls"],
+        "properties": {
+          "tool_name": { "type": "string", "minLength": 1 },
+          "calls": { "type": "integer", "minimum": 0 }
+        }
+      },
+      "description": "ToolRun 血缘：本 run 使用的 allowlist 工具与调用次数"
+    },
+    "status": {
+      "enum": ["candidate", "validated", "approved", "published", "rejected"],
+      "description": "产物状态；finalize 写入时恒为 candidate（无自动 promotion）"
+    },
+    "parent_revision": { "type": ["string", "null"], "description": "父修订引用；首个修订为 null" },
+    "normalization": {
+      "type": "object",
+      "description": "26-06 修复血缘 trail：repaired_hash 是对不含本 trail 的 repaired payload 的 canonical SHA-256；raw_hash 是原始模型输出的 canonical SHA-256；normalization_actions 每项含 path/action/after。",
+      "required": ["raw_hash", "repaired_hash", "normalization_actions", "warnings"],
+      "properties": {
+        "raw_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "repaired_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "normalization_actions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path", "action", "after"],
+            "properties": {
+              "path": { "type": "string", "minLength": 1 },
+              "action": {
+                "type": "string",
+                "enum": ["alias", "alias_dedup", "enum_canonicalize", "container_shape", "lineage_merge"]
+              },
+              "before": {},
+              "after": {},
+              "reason": { "type": "string" }
+            }
+          }
+        },
+        "warnings": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  },
+  "definitions": {
+    "branch_suggestion": {
+      "type": "object",
+      "description": "disabled-by-default 候选 BranchSuggestion（D-37-05 / REQ-FORK-06）：恰好六字段，enabled_by_default 恒为 false——只描述可供用户选择的分支选项，绝不自动 fork、不改变任何 Canon/branch 状态、不能复用 allow_divergence approval；发布仍需独立 publish_derivative_revision approval。",
+      "required": [
+        "choice_text",
+        "branch_summary",
+        "triggering_conflict",
+        "canon_delta_hash",
+        "evidence_refs",
+        "enabled_by_default"
+      ],
+      "properties": {
+        "choice_text": { "type": "string", "minLength": 1, "maxLength": 2000 },
+        "branch_summary": { "type": "string", "minLength": 1, "maxLength": 2000 },
+        "triggering_conflict": { "type": "string", "minLength": 1, "maxLength": 2000 },
+        "canon_delta_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "evidence_refs": { "type": "array", "items": { "type": "string" } },
+        "enabled_by_default": { "const": false }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

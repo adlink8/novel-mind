@@ -13,8 +13,9 @@ import {
 /**
  * registry.test.ts（25.2-05 Task 1 + 27-05 Phase 27 世界模型工具 + 31-04 get_visual_bible
  * + 33-05 generate_image_candidate + 34-05 publish_illustration/attach_illustration_to_text
- * + 35-05 create_canon_fork + 36-05 apply_derivative_edit）：
- * - 18 个工具注册、TypeBox 参数拒绝错误类型
+ * + 35-05 create_canon_fork + 36-05 apply_derivative_edit + 37-05
+ * allow_divergence/publish_derivative_revision）：
+ * - 20 个工具注册、TypeBox 参数拒绝错误类型
  * - facade 错误信封 → 冻结 AGENT_TOOL_ERRORS 精确镜像
  * - 64 KiB+1 字节 → output_too_large
  * - 运行级 abort 取消 in-flight fetch
@@ -22,11 +23,12 @@ import {
  * 全部使用 mock fetch，不真连 backend。
  */
 
-/** 18 个域工具名（测试侧镜像，与 DOMAIN_TOOL_NAMES 断言一致；31-04 加入
+/** 20 个域工具名（测试侧镜像，与 DOMAIN_TOOL_NAMES 断言一致；31-04 加入
  * get_visual_bible，33-05 加入 generate_image_candidate，34-05 加入
  * publish_illustration / attach_illustration_to_text action，35-05 加入
- * create_canon_fork action，36-05 加入 apply_derivative_edit action）。 */
-const TOOL_NAMES_18 = [
+ * create_canon_fork action，36-05 加入 apply_derivative_edit action，37-05 加入
+ * allow_divergence / publish_derivative_revision action）。 */
+const TOOL_NAMES_20 = [
   "get_novel",
   "get_chapter",
   "search_novel_text",
@@ -45,18 +47,20 @@ const TOOL_NAMES_18 = [
   "attach_illustration_to_text",
   "create_canon_fork",
   "apply_derivative_edit",
+  "allow_divergence",
+  "publish_derivative_revision",
 ] as const;
 
 describe("domain tool registry", () => {
-  it("DOMAIN_TOOL_NAMES 恰为 18 个冻结工具名", () => {
-    expect([...DOMAIN_TOOL_NAMES]).toEqual([...TOOL_NAMES_18]);
+  it("DOMAIN_TOOL_NAMES 恰为 20 个冻结工具名", () => {
+    expect([...DOMAIN_TOOL_NAMES]).toEqual([...TOOL_NAMES_20]);
   });
 
-  it("buildDomainTools 返回 18 个 defineTool，名称与 DOMAIN_TOOL_NAMES 一致", () => {
+  it("buildDomainTools 返回 20 个 defineTool，名称与 DOMAIN_TOOL_NAMES 一致", () => {
     const tools = buildDomainTools("Bearer per-run-token");
-    expect(tools).toHaveLength(18);
+    expect(tools).toHaveLength(20);
     const names = tools.map((t) => t.name);
-    expect(names).toEqual([...TOOL_NAMES_18]);
+    expect(names).toEqual([...TOOL_NAMES_20]);
     // 每个工具都是 defineTool（含 execute 五参签名）
     for (const tool of tools) {
       expect(typeof tool.execute).toBe("function");

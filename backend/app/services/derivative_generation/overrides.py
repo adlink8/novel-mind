@@ -632,6 +632,25 @@ async def get_override(
     )
 
 
+async def load_candidate_for_agent(
+    db: AsyncSession, *, owner_id: int, novel_id: int, candidate_id: int
+) -> DerivativeGenerationCandidate:
+    """Owner-scoped candidate load (identical 404 on any foreign/missing id)."""
+    candidate, _ = await _load_scoped_candidate(
+        db, owner_id=owner_id, novel_id=novel_id, candidate_id=candidate_id
+    )
+    return candidate
+
+
+async def load_override_for_agent(
+    db: AsyncSession, *, owner_id: int, novel_id: int, override_id: int
+) -> DerivativeOverride:
+    """Owner-scoped override load (identical 404 on any foreign/missing id)."""
+    return await _load_scoped_override(
+        db, owner_id=owner_id, novel_id=novel_id, override_id=override_id
+    )
+
+
 __all__ = [
     "CODE_ALREADY_DECIDED",
     "CODE_CANDIDATE_NOT_FOUND",
@@ -656,6 +675,8 @@ __all__ = [
     "create_override",
     "get_override",
     "list_overrides",
+    "load_candidate_for_agent",
+    "load_override_for_agent",
     "override_hash",
     "reject_override",
 ]
