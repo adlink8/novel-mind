@@ -22,6 +22,15 @@ Candidate-only, durable-job, provider-neutral endpoints:
   read-only consistency evidence and candidate-vs-report compare.
 - ``GET  /api/novels/{novel_id}/illustrations/consistency-reports`` — list all
   reports for the novel.
+- ``GET  /api/novels/{novel_id}/illustrations/gallery`` — candidate gallery
+  for human review (job status/error/retry + consistency + approval gate).
+- ``GET  .../assets/{asset_id}/review`` — full review envelope: lineage
+  drawer (job/attempt/budget evidence) + compare + review history + gate.
+- ``POST .../assets/{asset_id}/review`` — append one explicit human approval
+  action (approve/reject/supersede/needs_relink). Approvals re-run the
+  fail-closed proposal gate (succeeded job, complete lineage, cleared rights,
+  settled budget, visible consistency report); a repeated event_key replays.
+  Nothing here publishes: Phase 33 ends at proposal_ready for Phase 34.
 
 Every route uses ``require_owned_novel``; a prompt/job/asset outside the
 caller's owner/novel scope is indistinguishable from "not found". No route
@@ -52,8 +61,12 @@ from app.models.illustration_job import (
 )
 from app.schemas.illustration import (
     AssetRevisionView,
+    IllustrationApprovalState,
     IllustrationJobContract,
     IllustrationJobView,
+    IllustrationReviewAction,
+    IllustrationReviewEventInput,
+    IllustrationActorSource,
     PriceSnapshot,
     StrictIllustrationModel,
     build_illustration_idempotency_key,
@@ -73,6 +86,16 @@ from app.services.illustrations.gateway import (
     GenerationGateError,
     build_illustration_lineage,
     check_generation_prompt_gate,
+)
+from app.services.illustrations.review import (
+    IllustrationGalleryResponse,
+    IllustrationReviewActionResponse,
+    IllustrationReviewEnvelope,
+    IllustrationReviewGateError,
+    IllustrationReviewNotFound,
+    IllustrationReviewService,
+    build_gallery,
+    build_review_envelope,
 )
 from app.services.illustrations.storage import AssetStorage, AssetNotFound
 from app.services.illustrations.worker import (
@@ -154,6 +177,22 @@ class ConsistencyReportListResponse(StrictWireModel):
 class ConsistencyCompareResponse(StrictWireModel):
     candidate: AssetRevisionView
     report: ConsistencyReportView | None = None
+
+
+class IllustrationReviewActionRequest(StrictWireModel):
+    """One explicit approval action; scope comes from the path, never the body.
+
+    Mirrors ``IllustrationReviewEventInput`` minus owner/novel/asset ids so the
+    client can never widen scope. The server derives the result approval state
+    from the legal transition map (D-33-03).
+    """
+
+    event_key: str = Field(min_length=1, max_length=160)
+    action: IllustrationReviewAction
+    actor_source: IllustrationActorSource
+    actor: str = Field(min_length=1, max_length=200)
+    reason: str = Field(min_length=1, max_length=1000)
+    from_approval_state: IllustrationApprovalState
 
 
 class IllustrationJobConflict(ValueError):
@@ -785,4 +824,101 @@ async def list_consistency_reports(
     ).list_reports(owner_id=current_user.id, novel_id=novel.id)
     return ConsistencyReportListResponse(
         items=[report_view(report) for report in reports], total=len(reports)
+    )
+
+
+# ---------------------------------------------------------------------------
+# Review / approval routes (Phase 33-04: explicit, append-only, candidate-only)
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/{novel_id}/illustrations/gallery",
+    response_model=IllustrationGalleryResponse,
+)
+async def get_illustration_review_gallery(
+    novel: Novel = Depends(require_owned_novel),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """Candidate gallery for human review (job status/error/retry visible).
+
+    Every item stays candidate-only: job status, consistency evidence and
+    approval-gate reason codes are review signals, never an automatic approval.
+    """
+    return await build_gallery(
+        db, owner_id=current_user.id, novel_id=novel.id
+    )
+
+
+@router.get(
+    "/{novel_id}/illustrations/assets/{asset_id}/review",
+    response_model=IllustrationReviewEnvelope,
+)
+async def get_illustration_review_envelope(
+    asset_id: int,
+    novel: Novel = Depends(require_owned_novel),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """Full review envelope: lineage drawer + compare + history + gate."""
+    try:
+        return await build_review_envelope(
+            db,
+            owner_id=current_user.id,
+            novel_id=novel.id,
+            asset_id=asset_id,
+        )
+    except IllustrationReviewNotFound:
+        raise _not_found() from None
+
+
+@router.post(
+    "/{novel_id}/illustrations/assets/{asset_id}/review",
+    response_model=IllustrationReviewActionResponse,
+)
+async def review_illustration_asset(
+    asset_id: int,
+    payload: IllustrationReviewActionRequest,
+    novel: Novel = Depends(require_owned_novel),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """Append one explicit human approval action (approve/reject/supersede).
+
+    The server re-verifies owner/novel/asset scope, the current approval state
+    and the legal transition, and (for approvals) the persisted proposal gate —
+    successful job, complete lineage, cleared rights, settled budget evidence
+    and a visible consistency report. A repeated ``event_key`` replays without a
+    second event. Nothing here publishes or becomes reader visible (Phase 33
+    ends at proposal_ready for Phase 34).
+    """
+    owner_id = current_user.id
+    novel_id = novel.id
+    event = IllustrationReviewEventInput(
+        owner_id=owner_id,
+        novel_id=novel_id,
+        asset_revision_id=asset_id,
+        event_key=payload.event_key,
+        action=payload.action,
+        actor_source=payload.actor_source,
+        actor=payload.actor,
+        reason=payload.reason,
+        from_approval_state=payload.from_approval_state,
+    )
+    service = IllustrationReviewService(db)
+    try:
+        asset = await service.append_event(
+            owner_id=owner_id, novel_id=novel_id, event=event
+        )
+    except IllustrationReviewNotFound:
+        raise _not_found() from None
+    except IllustrationReviewGateError as exc:
+        raise _conflict(str(exc)) from exc
+    await db.commit()
+    envelope = await build_review_envelope(
+        db, owner_id=owner_id, novel_id=novel_id, asset_id=asset.id
+    )
+    return IllustrationReviewActionResponse(
+        asset=_asset_view(asset), envelope=envelope
     )
