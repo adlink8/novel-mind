@@ -30,11 +30,15 @@ surface (Phase 39 owns release via the immutable revision service).
 from __future__ import annotations
 
 import difflib
+import json
+from dataclasses import dataclass
+from hashlib import sha256
 from typing import Any
 
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.agent_runtime import ApprovalRequest
 from app.models.derivative_chapter import DerivativeChapter
 from app.models.derivative_project import DerivativeProject
 from app.models.derivative_revision import (
@@ -467,6 +471,366 @@ async def autosave_revision(
 
 
 # ---------------------------------------------------------------------------
+# Agent-proposal path (36-05, D-36-02): candidate proposal gate + deterministic
+# Revision Service apply. This is the server-authoritative consumer of the
+# edit-derivative-story Skill. user_autosave and agent_proposal stay disjoint:
+# separate endpoints, event names, actor labels and CAS entry points; a user
+# autosave never satisfies an apply_derivative_edit ApprovalRequest and the
+# Agent/browser can never apply a proposal directly.
+# ---------------------------------------------------------------------------
+
+
+# The only approval action that may reach the deterministic Revision Service.
+DERIVATIVE_AGENT_EDIT_APPROVAL_ACTION = "apply_derivative_edit"
+DERIVATIVE_AGENT_EDIT_APPROVAL_PREFIX = "derivative-edit.v1:approval"
+DERIVATIVE_AGENT_EDIT_APPROVAL_SCHEMA_VERSION = "derivative-edit-proposal.v1"
+
+
+class DerivativeEditApplyError(ValueError):
+    """Agent-proposal gate violation (fail closed, no authoritative write)."""
+
+    def __init__(self, code: str, detail: str, status_code: int = 409):
+        self.code = code
+        self.detail = detail
+        self.status_code = status_code
+        super().__init__(f"{code}: {detail}")
+
+
+@dataclass(frozen=True)
+class AgentEditProposalResult:
+    """Proposal creation result: the pending approval (+ replay flag)."""
+
+    owner_id: int
+    novel_id: int
+    project_id: int
+    chapter_id: int
+    approval_request_id: int
+    approval_action: str
+    approval_status: str
+    approval_payload_hash: str
+    content_hash: str
+    proposal_key: str
+    base_revision: int
+    replayed: bool = False
+
+
+def derivative_edit_content_hash(content: str) -> str:
+    """Deterministic content hash of a candidate derivative edit (D-36-02).
+
+    The hash is the SHA-256 of the canonical Markdown — the same replay lineage
+    the revision row's ``content_checksum`` uses — so the apply endpoint can
+    verify the proposal content is byte-replayable before any write.
+    """
+    return markdown_checksum(content)
+
+
+def build_derivative_edit_approval_payload(
+    *,
+    owner_id: int,
+    novel_id: int,
+    branch: str | None,
+    fork: str | None,
+    proposal_key: str,
+    project_id: int,
+    chapter_id: int,
+    base_revision: int,
+    content_hash: str,
+    source_snapshot_hash: str,
+) -> dict[str, Any]:
+    """Frozen approval payload bound to one derivative edit proposal (D-15).
+
+    The ApprovalRequest ``payload_hash`` and the apply-time replay both compute
+    from this canonical snapshot, so a forged or drifted decision can never
+    apply a derivative edit. ``base_revision`` seals the exact CAS token and
+    ``content_hash`` seals the exact proposed Markdown.
+    """
+    return {
+        "artifact_kind": "derivative_edit_proposal",
+        "schema_version": DERIVATIVE_AGENT_EDIT_APPROVAL_SCHEMA_VERSION,
+        "owner_id": owner_id,
+        "novel_id": novel_id,
+        "branch": branch,
+        "fork": fork,
+        "proposal_key": proposal_key,
+        "project_id": project_id,
+        "chapter_id": chapter_id,
+        "base_revision": base_revision,
+        "content_hash": content_hash,
+        "source_snapshot_hash": source_snapshot_hash,
+    }
+
+
+def canonical_derivative_edit_approval_hash(payload: dict[str, Any]) -> str:
+    """Byte-replayable canonical hash of a frozen derivative-edit approval payload."""
+    encoded = json.dumps(
+        payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    )
+    return sha256(
+        f"{DERIVATIVE_AGENT_EDIT_APPROVAL_PREFIX}\n{encoded}".encode("utf-8")
+    ).hexdigest()
+
+
+async def create_agent_edit_proposal(
+    db: AsyncSession,
+    *,
+    owner_id: int,
+    novel_id: int,
+    project_id: int,
+    chapter_id: int,
+    content: str,
+    base_revision: int,
+    proposal_key: str,
+    branch: str | None,
+    fork: str | None,
+    source_snapshot_hash: str | None,
+    run_id: int | None = None,
+    skill_version_id: int | None = None,
+    artifact_id: int | None = None,
+    artifact_revision_id: int | None = None,
+) -> AgentEditProposalResult:
+    """Server-authoritative candidate proposal creation (D-36-02 / D-11 / D-15).
+
+    - Scope-checks the project (owner/novel + ``fanfiction_canon`` space) and
+      the chapter (project scope); a foreign/missing id is an identical 404.
+    - Verifies the supplied source snapshot hash replays the project's frozen
+      fork lineage (wrong branch/fork fails closed).
+    - Computes the deterministic content hash and creates the **pending** Web
+      ApprovalRequest (action = ``apply_derivative_edit``) bound to the frozen
+      approval payload hash.
+    Nothing here applies; the deterministic Revision Service
+    (``apply_agent_edit``) owns approved proposal application after the user
+    confirms the approval.
+    """
+    _require_scope(owner_id=owner_id, novel_id=novel_id)
+    if base_revision <= 0:
+        raise DerivativeEditApplyError(
+            "invalid_base_revision",
+            "base_revision must be a positive optimistic-concurrency token",
+        )
+    if not proposal_key.strip():
+        raise DerivativeEditApplyError(
+            "invalid_proposal_key", "proposal_key must be non-empty"
+        )
+    project = await _load_scoped_project(
+        db, owner_id=owner_id, novel_id=novel_id, project_id=project_id
+    )
+    _require_writable_project(project)
+    if project.space != "fanfiction_canon":
+        raise DerivativeEditApplyError(
+            "wrong_authority_space",
+            f"derivative project {project.id} is in space {project.space!r}; "
+            "only fanfiction_canon projects accept derivative edits",
+        )
+    chapter = await _load_scoped_chapter(
+        db,
+        owner_id=owner_id,
+        novel_id=novel_id,
+        project_id=project.id,
+        chapter_id=chapter_id,
+    )
+    if source_snapshot_hash is not None and source_snapshot_hash != project.source_snapshot_hash:
+        raise DerivativeEditApplyError(
+            "source_snapshot_mismatch",
+            "proposal source snapshot hash does not replay the project's frozen "
+            "fork lineage (wrong branch/fork fails closed)",
+        )
+
+    canonical = canonicalize_markdown(content)
+    checksum = markdown_checksum(canonical)
+    payload = build_derivative_edit_approval_payload(
+        owner_id=owner_id,
+        novel_id=novel_id,
+        branch=branch,
+        fork=fork,
+        proposal_key=proposal_key,
+        project_id=project.id,
+        chapter_id=chapter.id,
+        base_revision=base_revision,
+        content_hash=checksum,
+        source_snapshot_hash=project.source_snapshot_hash,
+    )
+    payload_hash = canonical_derivative_edit_approval_hash(payload)
+
+    existing = await db.scalar(
+        select(ApprovalRequest).where(
+            ApprovalRequest.action == DERIVATIVE_AGENT_EDIT_APPROVAL_ACTION,
+            ApprovalRequest.owner_id == owner_id,
+            ApprovalRequest.fork_id == project.fork_id,
+        )
+    )
+    if existing is not None:
+        if existing.payload_hash == payload_hash:
+            return AgentEditProposalResult(
+                owner_id=owner_id,
+                novel_id=novel_id,
+                project_id=project.id,
+                chapter_id=chapter.id,
+                approval_request_id=existing.id,
+                approval_action=existing.action,
+                approval_status=existing.status,
+                approval_payload_hash=existing.payload_hash,
+                content_hash=checksum,
+                proposal_key=proposal_key,
+                base_revision=base_revision,
+                replayed=True,
+            )
+        raise DerivativeEditApplyError(
+            "proposal_conflict",
+            "this project already has a different derivative-edit proposal "
+            "pending; replay the existing proposal instead of widening the scope",
+        )
+
+    approval = ApprovalRequest(
+        owner_id=owner_id,
+        run_id=run_id,
+        skill_version_id=skill_version_id,
+        artifact_id=artifact_id,
+        artifact_revision_id=artifact_revision_id,
+        novel_id=novel_id,
+        branch_id=None,
+        fork_id=project.fork_id,
+        action=DERIVATIVE_AGENT_EDIT_APPROVAL_ACTION,
+        payload_summary={
+            "proposal_key": proposal_key,
+            "project_id": project.id,
+            "chapter_id": chapter.id,
+            "base_revision": base_revision,
+            "content_hash": checksum,
+            "branch": branch,
+            "fork": fork,
+            "source_snapshot_hash": project.source_snapshot_hash,
+        },
+        payload_hash=payload_hash,
+        status="pending",
+        expires_at=None,
+    )
+    db.add(approval)
+    await db.flush()
+    return AgentEditProposalResult(
+        owner_id=owner_id,
+        novel_id=novel_id,
+        project_id=project.id,
+        chapter_id=chapter.id,
+        approval_request_id=approval.id,
+        approval_action=DERIVATIVE_AGENT_EDIT_APPROVAL_ACTION,
+        approval_status="pending",
+        approval_payload_hash=payload_hash,
+        content_hash=checksum,
+        proposal_key=proposal_key,
+        base_revision=base_revision,
+        replayed=False,
+    )
+
+
+async def apply_agent_edit(
+    db: AsyncSession,
+    *,
+    owner_id: int,
+    novel_id: int,
+    project_id: int,
+    chapter_id: int,
+    content: str,
+    base_revision: int,
+    actor_id: int,
+    reason: str | None = None,
+) -> tuple[DerivativeChapterView, DerivativeRevisionView, str]:
+    """Deterministic Revision Service apply of an approved agent proposal.
+
+    This is the **only** write path an approved ``apply_derivative_edit``
+    proposal may take: it reuses the same immutable ``base_revision`` CAS as the
+    user autosave (no last-write-wins) but appends a distinct immutable
+    ``agent_proposal`` revision row (``approval_state=approved``, the proposal
+    key journaled as ``reason``), so an agent proposal can never be mistaken for
+    a user draft and the two event/actor/CAS paths stay auditable.
+
+    Returns ``(chapter view, revision view, status)`` with status ``applied``
+    (a new row was appended) or ``noop`` (the approved content already equals
+    the head — an idempotent replay of the same approved proposal).
+    """
+    _require_scope(owner_id=owner_id, novel_id=novel_id)
+    project = await _load_scoped_project(
+        db, owner_id=owner_id, novel_id=novel_id, project_id=project_id
+    )
+    _require_writable_project(project)
+    chapter = await _load_scoped_chapter(
+        db,
+        owner_id=owner_id,
+        novel_id=novel_id,
+        project_id=project.id,
+        chapter_id=chapter_id,
+    )
+
+    canonical = canonicalize_markdown(content)
+    checksum = markdown_checksum(canonical)
+
+    # Idempotent replay: an identical approved proposal whose content already
+    # equals the head resolves without a new row (no duplicate history).
+    if checksum == chapter.markdown_checksum:
+        latest = await _latest_revision_row(
+            db, chapter_id=chapter.id, owner_id=owner_id
+        )
+        return to_chapter_view(chapter), to_revision_view(latest), "noop"
+
+    if base_revision != chapter.revision:
+        latest = await _latest_revision_row(
+            db, chapter_id=chapter.id, owner_id=owner_id
+        )
+        raise DerivativeRevisionError(
+            "revision_conflict",
+            f"stale write: chapter {chapter.id} is at revision {chapter.revision} "
+            f"with checksum {chapter.markdown_checksum}; the approved proposal "
+            f"targets base_revision {base_revision}",
+            status_code=409,
+            current_revision=latest,
+        )
+
+    # Atomic conditional update keyed on base_revision: a concurrent autosave
+    # or proposal can never be silently overwritten (no last-write-wins).
+    result = await db.execute(
+        update(DerivativeChapter)
+        .where(
+            DerivativeChapter.id == chapter.id,
+            DerivativeChapter.revision == base_revision,
+        )
+        .values(
+            markdown=canonical,
+            markdown_checksum=checksum,
+            revision=DerivativeChapter.revision + 1,
+            updated_at=func.now(),
+        )
+    )
+    if result.rowcount == 0:
+        await db.refresh(chapter)
+        latest = await _latest_revision_row(
+            db, chapter_id=chapter.id, owner_id=owner_id
+        )
+        if checksum == chapter.markdown_checksum:
+            return to_chapter_view(chapter), to_revision_view(latest), "noop"
+        raise DerivativeRevisionError(
+            "revision_conflict",
+            f"stale write: chapter {chapter.id} is at revision {chapter.revision} "
+            f"with checksum {chapter.markdown_checksum}; the approved proposal "
+            f"targets base_revision {base_revision}",
+            status_code=409,
+            current_revision=latest,
+        )
+
+    await db.refresh(chapter)
+    revision = await append_revision_row(
+        db,
+        chapter=chapter,
+        revision_number=chapter.revision,
+        kind="agent_proposal",
+        content=canonical,
+        checksum=checksum,
+        actor_id=actor_id,
+        reason=(reason or "").strip() or None,
+        approval_state="approved",
+    )
+    return to_chapter_view(chapter), to_revision_view(revision), "applied"
+
+
+# ---------------------------------------------------------------------------
 # History + single revision detail
 # ---------------------------------------------------------------------------
 
@@ -691,9 +1055,19 @@ async def rollback_revision(
 
 
 __all__ = [
+    "DERIVATIVE_AGENT_EDIT_APPROVAL_ACTION",
+    "DERIVATIVE_AGENT_EDIT_APPROVAL_PREFIX",
+    "DERIVATIVE_AGENT_EDIT_APPROVAL_SCHEMA_VERSION",
+    "AgentEditProposalResult",
+    "DerivativeEditApplyError",
     "DerivativeRevisionError",
     "append_revision_row",
+    "apply_agent_edit",
     "autosave_revision",
+    "build_derivative_edit_approval_payload",
+    "canonical_derivative_edit_approval_hash",
+    "create_agent_edit_proposal",
+    "derivative_edit_content_hash",
     "diff_markdown",
     "diff_revisions",
     "get_revision",
