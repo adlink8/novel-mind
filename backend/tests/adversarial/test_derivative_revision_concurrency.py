@@ -49,6 +49,12 @@ BACKEND_ROOT = Path(__file__).resolve().parents[2]
 API_SOURCE = (BACKEND_ROOT / "app" / "api" / "derivative_revisions.py").read_text(
     encoding="utf-8"
 )
+AGENT_API_SOURCE = (
+    BACKEND_ROOT / "app" / "api" / "agent_derivative_edits.py"
+).read_text(encoding="utf-8")
+EVENTS_SOURCE = (
+    BACKEND_ROOT / "app" / "services" / "derivative_editor" / "events.py"
+).read_text(encoding="utf-8")
 SERVICE_SOURCE = (
     BACKEND_ROOT / "app" / "services" / "derivative_editor" / "revisions.py"
 ).read_text(encoding="utf-8")
@@ -63,6 +69,9 @@ CHAPTER_SERVICE_SOURCE = (
 ).read_text(encoding="utf-8")
 MIGRATION_SOURCE = (
     BACKEND_ROOT / "migrations" / "versions" / "36_derivative_revision01.py"
+).read_text(encoding="utf-8")
+AGENT_MIGRATION_SOURCE = (
+    BACKEND_ROOT / "migrations" / "versions" / "36_derivative_agent_edit01.py"
 ).read_text(encoding="utf-8")
 
 
@@ -314,8 +323,79 @@ def test_no_publication_surface_in_revision_module():
     for source in (API_SOURCE, SERVICE_SOURCE, MODEL_SOURCE):
         assert "publish" not in source
     # Revision kinds seal the only write reasons; publication is never a kind.
-    assert "kind IN ('create','autosave','rollback')" in MODEL_SOURCE
+    # 36-05 adds ``agent_proposal`` (the deterministic Revision Service apply of
+    # an approved DerivativeEditProposal) as a distinct kind from autosave.
+    assert "kind IN ('create','autosave','rollback','agent_proposal')" in MODEL_SOURCE
     assert "ck_derivative_revisions_kind" in MIGRATION_SOURCE
+    assert "ck_derivative_revisions_kind" in AGENT_MIGRATION_SOURCE
+
+
+def test_agent_proposal_kind_is_distinct_from_autosave():
+    # 36-05: an agent proposal can never be treated as a user draft — the row
+    # kind, the event name and the actor label all differ.
+    assert "agent_proposal" in MODEL_SOURCE
+    assert "'agent_proposal'" in MODEL_SOURCE
+    assert "kind=\"agent_proposal\"" in SERVICE_SOURCE
+    assert "approval_state=\"approved\"" in SERVICE_SOURCE
+    # The deterministic Revision Service apply is CAS-guarded exactly like the
+    # user autosave (no last-write-wins, conflict carries the latest revision).
+    assert "DerivativeChapter.revision == base_revision" in SERVICE_SOURCE
+    assert "result.rowcount == 0" in SERVICE_SOURCE
+    assert "revision_conflict" in SERVICE_SOURCE
+
+
+def test_agent_edit_approval_gate_is_server_authoritative():
+    # The proposal gate only creates a pending Web ApprovalRequest bound to the
+    # apply_derivative_edit action and a replayable payload hash.
+    assert "DERIVATIVE_AGENT_EDIT_APPROVAL_ACTION" in SERVICE_SOURCE
+    assert "apply_derivative_edit" in SERVICE_SOURCE
+    assert "payload_hash" in SERVICE_SOURCE
+    assert "status=\"pending\"" in SERVICE_SOURCE
+
+
+def test_user_autosave_and_agent_proposal_events_are_disjoint():
+    # The event-name owner defines exactly four events, two per path, and the
+    # endpoints never reference the other path's events.
+    assert "derivative.user_autosave.accepted" in EVENTS_SOURCE
+    assert "derivative.user_autosave.conflict" in EVENTS_SOURCE
+    assert "derivative.agent_proposal.applied" in EVENTS_SOURCE
+    assert "derivative.agent_proposal.rejected" in EVENTS_SOURCE
+    assert "DERIVATIVE_USER_AUTOSAVE_EVENTS" in EVENTS_SOURCE
+    assert "DERIVATIVE_AGENT_PROPOSAL_EVENTS" in EVENTS_SOURCE
+    # user autosave endpoint references only its own events.
+    assert "DERIVATIVE_USER_AUTOSAVE_ACCEPTED" in API_SOURCE
+    assert "DERIVATIVE_USER_AUTOSAVE_CONFLICT" in API_SOURCE
+    assert "derivative.user_autosave.accepted" not in AGENT_API_SOURCE
+    assert "derivative.agent_proposal.applied" in AGENT_API_SOURCE
+    assert "derivative.agent_proposal.rejected" in AGENT_API_SOURCE
+    assert "DERIVATIVE_AGENT_PROPOSAL_APPLIED" in AGENT_API_SOURCE
+    assert "DERIVATIVE_AGENT_PROPOSAL_REJECTED" in AGENT_API_SOURCE
+    assert "DERIVATIVE_USER_AUTOSAVE_ACCEPTED" not in AGENT_API_SOURCE
+
+
+def test_agent_proposal_endpoint_is_separate_and_apply_only():
+    # The agent_proposal path has its own endpoint; it never serves the
+    # user autosave contract and the autosave endpoint never grants the Agent
+    # approval.
+    assert "/derivative-edit-proposals/{artifact_id}/apply" in AGENT_API_SOURCE
+    assert "apply_agent_edit" in AGENT_API_SOURCE
+    assert "approval_not_approved" in AGENT_API_SOURCE
+    assert "approval_payload_mismatch" in AGENT_API_SOURCE or "approval_not_found" in AGENT_API_SOURCE
+    assert "apply_derivative_edit" in AGENT_API_SOURCE
+    # The autosave route is distinct (not served by the agent endpoint module).
+    assert "/autosave" not in AGENT_API_SOURCE
+    # Agent cannot bypass approval by writing through the user path: the user
+    # autosave endpoint has no apply_derivative_edit approval lookup.
+    assert "apply_derivative_edit" not in API_SOURCE
+
+
+def test_agent_edit_migration_widens_kind_gate():
+    # The 36-05 migration chains from the 36-03 head and widens the kind gate.
+    assert 'down_revision = "20260801_derivative_revision01"' in AGENT_MIGRATION_SOURCE
+    assert "agent_proposal" in AGENT_MIGRATION_SOURCE
+    assert "ck_derivative_revisions_kind" in AGENT_MIGRATION_SOURCE
+    assert "drop_constraint" in AGENT_MIGRATION_SOURCE
+    assert "create_check_constraint" in AGENT_MIGRATION_SOURCE
 
 
 # ---------------------------------------------------------------------------

@@ -42,6 +42,10 @@ from app.main import app
 from app.models.derivative_revision import DerivativeRevision
 from app.models.novel import Chapter, Novel
 from app.models.user import User
+from app.services.derivative_editor.revisions import (
+    DerivativeRevisionError,
+    apply_agent_edit,
+)
 from tests.integration.conftest import reset_public_schema, run_alembic
 
 pytestmark = pytest.mark.integration
@@ -937,3 +941,140 @@ async def test_database_fk_and_constraint_gates(api_client):
         finally:
             conn.rollback()
     engine.dispose()
+
+
+# ---------------------------------------------------------------------------
+# 36-05 agent_proposal: the deterministic Revision Service apply is a distinct
+# kind, CAS-guarded like autosave, and shows up in the append-only history
+# ---------------------------------------------------------------------------
+
+
+async def test_agent_proposal_apply_appends_distinct_kind(api_client):
+    client, factory, sync_url = api_client
+    ids = _seed_owner(sync_url, suffix=f"ag_{uuid.uuid4().hex[:8]}")
+    headers = {"Authorization": f"Bearer {ids['token']}"}
+    novel_id = ids["novel_id"]
+    fork = await _create_fork(client, headers, novel_id, "ff-ag")
+    project = await _create_project(client, headers, novel_id, fork["id"], "AG")
+    chapter = await _create_chapter(client, headers, novel_id, project["id"], "T")
+    url = _chapter_url(novel_id, project["id"], chapter["id"])
+
+    # Deterministic Revision Service apply of an approved agent proposal.
+    async with factory() as session:
+        chapter_view, revision_view, status_str = await apply_agent_edit(
+            session,
+            owner_id=ids["owner_id"],
+            novel_id=novel_id,
+            project_id=project["id"],
+            chapter_id=chapter["id"],
+            content="Agent applied content",
+            base_revision=1,
+            actor_id=ids["owner_id"],
+            reason="agent_proposal:test-key:approval:0",
+        )
+        await session.commit()
+    assert status_str == "applied"
+    assert revision_view.kind == "agent_proposal"
+    assert revision_view.approval_state == "approved"
+    assert chapter_view.revision == 2
+
+    # History shows create + agent_proposal as distinct kinds.
+    history = await client.get(f"{url}/revisions", headers=headers)
+    assert history.status_code == 200, history.text
+    body = history.json()
+    assert body["total"] == 2
+    kinds = [item["kind"] for item in body["items"]]
+    assert kinds == ["agent_proposal", "create"]
+    assert body["items"][0]["approval_state"] == "approved"
+    assert body["items"][0]["reason"] == "agent_proposal:test-key:approval:0"
+
+    # The head holds the applied content and editing continues from the new base.
+    head = await client.get(url, headers=headers)
+    assert head.json()["markdown"] == "Agent applied content"
+    assert head.json()["revision"] == 2
+
+    cont = await _autosave(client, headers, novel_id, project["id"], chapter["id"], "user continues", 2)
+    assert cont.status_code == 200, cont.text
+    assert cont.json()["status"] == "saved"
+    assert cont.json()["chapter"]["revision"] == 3
+
+
+async def test_agent_proposal_apply_is_idempotent(api_client):
+    client, factory, sync_url = api_client
+    ids = _seed_owner(sync_url, suffix=f"agid_{uuid.uuid4().hex[:8]}")
+    headers = {"Authorization": f"Bearer {ids['token']}"}
+    novel_id = ids["novel_id"]
+    fork = await _create_fork(client, headers, novel_id, "ff-agid")
+    project = await _create_project(client, headers, novel_id, fork["id"], "AGID")
+    chapter = await _create_chapter(client, headers, novel_id, project["id"], "T")
+    url = _chapter_url(novel_id, project["id"], chapter["id"])
+
+    async with factory() as session:
+        _, first_rev, first_status = await apply_agent_edit(
+            session,
+            owner_id=ids["owner_id"],
+            novel_id=novel_id,
+            project_id=project["id"],
+            chapter_id=chapter["id"],
+            content="Same agent content",
+            base_revision=1,
+            actor_id=ids["owner_id"],
+            reason="agent_proposal:test-key:approval:0",
+        )
+        # Replaying the identical approved proposal resolves as a noop.
+        _, second_rev, second_status = await apply_agent_edit(
+            session,
+            owner_id=ids["owner_id"],
+            novel_id=novel_id,
+            project_id=project["id"],
+            chapter_id=chapter["id"],
+            content="Same agent content",
+            base_revision=1,
+            actor_id=ids["owner_id"],
+            reason="agent_proposal:test-key:approval:0",
+        )
+        await session.commit()
+    assert first_status == "applied"
+    assert second_status == "noop"
+    assert first_rev.id == second_rev.id
+
+    history = await client.get(f"{url}/revisions", headers=headers)
+    assert history.json()["total"] == 2  # create + one agent_proposal only
+
+
+async def test_agent_proposal_apply_stale_base_blocks(api_client):
+    client, factory, sync_url = api_client
+    ids = _seed_owner(sync_url, suffix=f"agst_{uuid.uuid4().hex[:8]}")
+    headers = {"Authorization": f"Bearer {ids['token']}"}
+    novel_id = ids["novel_id"]
+    fork = await _create_fork(client, headers, novel_id, "ff-agst")
+    project = await _create_project(client, headers, novel_id, fork["id"], "AGST")
+    chapter = await _create_chapter(client, headers, novel_id, project["id"], "T")
+    url = _chapter_url(novel_id, project["id"], chapter["id"])
+
+    # A user autosave advances the head first.
+    saved = await _autosave(client, headers, novel_id, project["id"], chapter["id"], "user head", 1)
+    assert saved.status_code == 200 and saved.json()["status"] == "saved"
+
+    # The approved proposal still targets base_revision 1 → stale → 409.
+    with pytest.raises(DerivativeRevisionError) as exc:
+        async with factory() as session:
+            await apply_agent_edit(
+                session,
+                owner_id=ids["owner_id"],
+                novel_id=novel_id,
+                project_id=project["id"],
+                chapter_id=chapter["id"],
+                content="Agent stale content",
+                base_revision=1,
+                actor_id=ids["owner_id"],
+                reason="agent_proposal:test-key:approval:0",
+            )
+    assert exc.value.code == "revision_conflict"
+    assert exc.value.current_revision is not None
+    assert exc.value.current_revision.revision_number == 2
+
+    # The newer user content is untouched (no last-write-wins).
+    head = await client.get(url, headers=headers)
+    assert head.json()["markdown"] == "user head"
+    assert head.json()["revision"] == 2

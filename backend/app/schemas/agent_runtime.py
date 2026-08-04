@@ -895,6 +895,7 @@ class CanonDeltaPayload(StrictAgentRuntimeModel):
 class CanonForkProposalArtifact(StrictAgentRuntimeModel):
     """智能体产物的 CanonForkProposal 信封（Phase 35 / D-35-01..D-35-04）。
 
+
     Agent 产出的是 **candidate-only** 的 fork 提议：``proposal``（完整冻结
     CanonForkProposal）与 ``delta``（候选 CanonDeltaArtifact）携带完整
     branch-aware 血缘（SkillRun/ToolRun、owner/novel/branch、source/input
@@ -922,6 +923,93 @@ class CanonForkProposalArtifact(StrictAgentRuntimeModel):
     evidence_refs: list[str] = Field(min_length=1)
     proposal: CanonForkProposalPayload
     delta: CanonDeltaPayload
+    tool_runs: list[dict[str, Any]] = Field(min_length=1)
+    status: Literal["candidate", "validated", "approved", "published", "rejected"]
+    parent_revision: str | None = None
+    normalization: NormalizationTrail
+
+    @field_validator("tool_runs")
+    @classmethod
+    def _tool_runs_shape(cls, value: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        for item in value:
+            if not isinstance(item, dict) or not item.get("tool_name"):
+                raise ValueError("each tool run requires tool_name")
+        return value
+
+
+# ────────────────────────── Phase 36 Derivative Edit Proposal Artifact 信封（REQ-FORK-02 / REQ-AGENT-03/04/07） ──────────────────────────
+
+
+class DerivativeEditProposalPayload(StrictAgentRuntimeModel):
+    """Phase 36 DerivativeEditProposal 负载（D-36-01..D-36-04 / REQ-FORK-02）。
+
+    携带完整 branch-aware 血缘：proposal_key、authority_space（恒为
+    ``derivative``，Fanfiction Canon）、project/chapter scope、base_revision
+    CAS 锚、候选 Markdown patch（content + content_hash）、source snapshot
+    血缘、evidence refs 与 validator_report。``proposal_status`` 是 Phase 36
+    唯一官方状态机（proposed → pending_approval → applied），**finalize 写入时
+    恒为 proposed**——只有服务端 proposal/approval/确定性 Revision Service 能
+    推进状态；Phase 36 绝不直接应用（D-36-02）。``authority_space`` 恒为
+    derivative——绝不写 Original Canon / User Interpretation / user draft
+    （autosave）revisions / published 状态。
+    """
+
+    schema_version: Literal["derivative-edit-proposal.v1"] = (
+        "derivative-edit-proposal.v1"
+    )
+    artifact_kind: Literal["derivative_edit_proposal"] = "derivative_edit_proposal"
+    proposal_key: str = Field(min_length=1, max_length=160)
+    authority_space: Literal["derivative"] = "derivative"
+    branch: str | None = Field(default=None, max_length=80)
+    fork: str | None = Field(default=None, max_length=80)
+    project_id: int = Field(gt=0)
+    chapter_id: int = Field(gt=0)
+    chapter_number: int = Field(ge=1)
+    base_revision: int = Field(ge=1)
+    content: str = Field(min_length=1, max_length=50000)
+    content_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    source_snapshot_id: str = Field(min_length=1, max_length=160)
+    source_snapshot_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    evidence_refs: list[str] = Field(default_factory=list)
+    proposal_status: Literal["proposed", "pending_approval", "applied"] = "proposed"
+    approval_request_id: int | None = Field(default=None, gt=0)
+    artifact_id: int | None = Field(default=None, gt=0)
+    validator_report: dict[str, Any] | None = Field(default=None)
+
+
+class DerivativeEditProposalArtifact(StrictAgentRuntimeModel):
+    """智能体产物的 DerivativeEditProposal 信封（Phase 36 / D-36-01..D-36-04）。
+
+    Agent 产出的是 **candidate-only** 的派生 chapter 编辑提议：``proposal``
+    携带完整 branch-aware 血缘（SkillRun/ToolRun、owner/novel/branch、
+    project/chapter scope、base_revision CAS 锚、source/input hashes、
+    content + content_hash、evidence refs、runtime/model lineage 与
+    validator_report）。``proposal_status`` 恒为 ``proposed``（finalize 时）——
+    只有服务端 proposal/approval/确定性 Revision Service（
+    ``app.services.derivative_editor.revisions.apply_agent_edit``）能推进状态；
+    Agent/浏览器绝不直接应用 proposal、绝不触碰 Original Canon / user draft
+    （autosave）revisions / published 状态（D-36-02）。``tool_runs`` 携带
+    ToolRun 血缘。与 CitedAnswerArtifact 信封纪律一致：type / schema_version /
+    owner / novel / branch / producing skill+version / model lineage /
+    source versions / input_hash / evidence_refs / status / parent_revision /
+    normalization（26-06 修复血缘 trail）。
+    """
+
+    type: Literal["derivative_edit_proposal"] = "derivative_edit_proposal"
+    schema_version: Literal["derivative-edit-proposal.v1"] = (
+        "derivative-edit-proposal.v1"
+    )
+    owner_id: int = Field(gt=0)
+    novel_id: int = Field(gt=0)
+    branch: str | None = None
+    producing_skill: str = Field(min_length=1, max_length=120)
+    producing_skill_version: str = Field(min_length=1, max_length=32)
+    skill_version_id: int = Field(gt=0)
+    model_lineage: dict[str, Any]
+    source_versions: dict[str, Any]
+    input_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    evidence_refs: list[str] = Field(min_length=1)
+    proposal: DerivativeEditProposalPayload
     tool_runs: list[dict[str, Any]] = Field(min_length=1)
     status: Literal["candidate", "validated", "approved", "published", "rejected"]
     parent_revision: str | None = None

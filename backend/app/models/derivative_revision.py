@@ -45,7 +45,11 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.models.base import Base, TimestampMixin
 
 # D-36-02: why a revision row exists; release is never a row kind here.
-DERIVATIVE_REVISION_KINDS = ("create", "autosave", "rollback")
+# 36-05 adds ``agent_proposal``: the deterministic Revision Service's
+# application of an approved DerivativeEditProposal (the Agent-proposal CAS
+# path). It is a distinct kind from ``autosave`` so an agent proposal can never
+# be mistaken for a user draft and the two paths stay auditable.
+DERIVATIVE_REVISION_KINDS = ("create", "autosave", "rollback", "agent_proposal")
 # Rollback journal: explicit owner actions are approved; draft writes are not.
 DERIVATIVE_REVISION_APPROVAL_STATES = ("not_required", "approved")
 
@@ -71,7 +75,7 @@ class DerivativeRevision(TimestampMixin, Base):
             name="ck_derivative_revisions_checksum",
         ),
         CheckConstraint(
-            "kind IN ('create','autosave','rollback')",
+            "kind IN ('create','autosave','rollback','agent_proposal')",
             name="ck_derivative_revisions_kind",
         ),
         CheckConstraint(

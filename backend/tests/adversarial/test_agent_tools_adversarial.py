@@ -64,6 +64,9 @@ ACTION_TOOLS = (
     "attach_illustration_to_text",
     # Phase 35 fork 创建 action 工具（35-05）：创建候选 proposal + pending ApprovalRequest。
     "create_canon_fork",
+    # Phase 36 derivative 编辑 action 工具（36-05）：创建候选 proposal + pending
+    # ApprovalRequest；确定性 Revision Service 拥有 approved proposal 应用。
+    "apply_derivative_edit",
 )
 
 # 每个工具的 HTTP 路由（cross-owner 轴使用）。

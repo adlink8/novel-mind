@@ -72,6 +72,17 @@ _PARAMS_BY_TOOL = {
         "content_hash": "a" * 64,
     },
     "get_visual_bible": {"version_id": 1},
+    # Phase 36 derivative 编辑提议 action 工具（36-05）。
+    "apply_derivative_edit": {
+        "project_id": 1,
+        "chapter_id": 1,
+        "chapter_number": 1,
+        "proposal_key": "p",
+        "base_revision": 1,
+        "content": "patch",
+        "source_snapshot_hash": "a" * 64,
+        "evidence_refs": ["chapter:1"],
+    },
 }
 
 
@@ -121,7 +132,7 @@ def test_every_error_class_code_is_in_frozen_table():
         ), AgentToolError)
 
 
-def test_tool_names_are_exactly_the_13_contract_tools():
+def test_tool_names_are_exactly_the_18_contract_tools():
     assert set(TOOL_NAMES) == {
         "get_novel",
         "get_chapter",
@@ -138,6 +149,12 @@ def test_tool_names_are_exactly_the_13_contract_tools():
         "get_evidence_span",
         # Phase 30 Visual Bible 只读工具（31-04）。
         "get_visual_bible",
+        # Phase 33/34/35/36 候选 action 工具。
+        "generate_image_candidate",
+        "publish_illustration",
+        "attach_illustration_to_text",
+        "create_canon_fork",
+        "apply_derivative_edit",
     }
 
 

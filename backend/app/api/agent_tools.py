@@ -26,6 +26,7 @@ from app.core.security import require_user
 from app.models import Novel, User
 from app.schemas.agent_tools import (
     AnchorProposalActionRequest,
+    ApplyDerivativeEditRequest,
     CreateCanonForkRequest,
     GenerateImageCandidateRequest,
     GetChapterRequest,
@@ -377,6 +378,34 @@ async def tool_create_canon_fork(
     """
     return await _run_tool(
         "create_canon_fork",
+        db=db,
+        novel=novel,
+        owner_id=current_user.id,
+        params=_params(body),
+    )
+
+
+@router.post("/apply_derivative_edit")
+async def tool_apply_derivative_edit(
+    body: ApplyDerivativeEditRequest | None = None,
+    novel: Novel = Depends(require_owned_novel),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """Phase 36 derivative 编辑提议 action（36-05，REQ-FORK-02 / REQ-AGENT-03/04/07）：
+    创建**一个**候选 DerivativeEditProposal（candidate-only，D-36-02）。
+
+    服务端 proposal gate 只接受冻结 source snapshot 血缘 + 有效 project/chapter
+    scope + base_revision CAS 锚；创建候选 proposal（proposal_status=proposed）+
+    pending Web ApprovalRequest（action=apply_derivative_edit，payload_hash 确定
+    性重放，D-11/D-15）。绝不直接应用——确定性 Revision Service（
+    apply_agent_edit）在用户 Web 批准后原子校验 approval + payload + 冻结
+    proposal artifact 血缘 + owner/novel/branch/fork scope + 同一 base_revision
+    CAS 才把 approved proposal 应用为 append-only agent_proposal 修订；Original
+    Canon / user draft（autosave）revisions / published 状态绝不被 Agent 触碰。
+    """
+    return await _run_tool(
+        "apply_derivative_edit",
         db=db,
         novel=novel,
         owner_id=current_user.id,

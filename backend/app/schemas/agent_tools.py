@@ -342,6 +342,71 @@ class CreateCanonForkRequest(StrictAgentToolModel):
     )
 
 
+# ────────────────────────── Phase 36 derivative 编辑提议 action 工具（36-05） ──────────────────────────
+
+
+class ApplyDerivativeEditRequest(StrictAgentToolModel):
+    """Phase 36 derivative 编辑提议 action 请求（36-05，REQ-FORK-02 / REQ-AGENT-03/04/07）。
+
+    只创建**一个候选 DerivativeEditProposal**（D-36-02）：服务端 proposal gate
+    只接受冻结 source snapshot 血缘 + 有效 project/chapter scope + base_revision
+    CAS 锚；创建候选 proposal（proposal_status=proposed）+ pending Web
+    ApprovalRequest（action=apply_derivative_edit，payload_hash 确定性重放，
+    D-11/D-15）。novel_id 由查询参数注入（require_owned_novel），绝不放进请求体。
+    绝不直接应用——确定性 Revision Service（
+    app.services.derivative_editor.revisions.apply_agent_edit）在用户 Web 批准后
+    原子校验 approval + payload + 冻结 proposal artifact 血缘 +
+    owner/novel/branch/fork scope + 同一 base_revision CAS 才把 approved proposal
+    应用为 append-only agent_proposal 修订；Original Canon / user draft
+    （autosave）revisions / published 状态绝不被 Agent 触碰。
+    """
+
+    branch: str | None = Field(
+        default=None, max_length=80, description="衍生分支；原始主线为 null"
+    )
+    fork: str | None = Field(
+        default=None, max_length=80, description="衍生 fork（仅 derivative mode；original 必须为 null）"
+    )
+    project_id: int = Field(
+        gt=0, description="derivative project ID（服务端重验 owner/novel + fanfiction_canon 空间）"
+    )
+    chapter_id: int = Field(
+        gt=0, description="派生 chapter ID（服务端重验 project 范围）"
+    )
+    chapter_number: int = Field(
+        ge=1, description="派生 chapter 序号（血缘/审计标注）"
+    )
+    proposal_key: str = Field(
+        min_length=1, max_length=160, description="幂等 proposal 键（approval payload 绑定，重放追溯）"
+    )
+    base_revision: int = Field(
+        gt=0, description="chapter 乐观并发 token（同一 base_revision CAS，D-36-02；绝不 last-write-wins）"
+    )
+    content: str = Field(
+        min_length=1, max_length=50000, description="候选 Markdown patch（Fanfiction Canon draft；服务端计算 content_hash 并绑定 approval payload）"
+    )
+    source_snapshot_id: str | None = Field(
+        default=None, max_length=160, description="source snapshot 血缘 ID（project 冻结 fork 血缘）"
+    )
+    source_snapshot_hash: str | None = Field(
+        default=None,
+        min_length=64,
+        max_length=64,
+        pattern="^[0-9a-f]{64}$",
+        description="source snapshot 血缘 hash（服务端与 project 冻结 fork 血缘重放；drift → fail closed）",
+    )
+    evidence_refs: list[str] = Field(
+        min_length=1, description="proposal 引用的 leaf 证据键（必须属于冻结 manifest 白名单）"
+    )
+    # D-15 血缘绑定（可选）：agent 会话已知的 run/skill/artifact 血缘。
+    run_id: int | None = Field(default=None, gt=0, description="SkillRun ID 血缘")
+    skill_version_id: int | None = Field(default=None, gt=0, description="SkillVersion ID 血缘")
+    artifact_id: int | None = Field(default=None, gt=0, description="Artifact ID 血缘")
+    artifact_revision_id: int | None = Field(
+        default=None, gt=0, description="ArtifactRevision ID 血缘"
+    )
+
+
 # ────────────────────────── 统一错误信封 ──────────────────────────
 
 

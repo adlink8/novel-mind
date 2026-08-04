@@ -90,6 +90,9 @@ logger = logging.getLogger(__name__)
 # 35-05 起加入 Phase 35 canon fork 提议 action 工具 create_canon_fork——它只
 # 创建候选 fork + pending Web ApprovalRequest（D-11/D-15），确定性 Fork
 # materializer 拥有 approved fork 物化。
+# 36-05 起加入 Phase 36 derivative 编辑提议 action 工具 apply_derivative_edit——
+# 它只创建候选 DerivativeEditProposal + pending Web ApprovalRequest（D-11/D-15），
+# 确定性 Revision Service（apply_agent_edit）拥有 approved proposal 应用。
 TOOL_NAMES: tuple[str, ...] = (
     "get_novel",
     "get_chapter",
@@ -108,6 +111,7 @@ TOOL_NAMES: tuple[str, ...] = (
     "publish_illustration",
     "attach_illustration_to_text",
     "create_canon_fork",
+    "apply_derivative_edit",
 )
 
 # per-tool 默认字节上限（agent-service 侧同样硬编码 64 KiB，见 RESEARCH Code Examples）。
@@ -718,6 +722,78 @@ async def _default_create_canon_fork(
     return _fork_proposal_view_for_tool(result)
 
 
+async def _default_apply_derivative_edit(
+    db,
+    *,
+    owner_id: int,
+    novel_id: int,
+    params: dict[str, Any],
+) -> dict[str, Any]:
+    """Phase 36 action 工具默认服务：创建**一个**候选 derivative edit（D-36-02）。
+
+    服务端 proposal gate 只接受冻结 source snapshot 血缘 + 有效 project/chapter
+    scope + base_revision CAS 锚；创建候选 DerivativeEditProposal
+    （proposal_status=proposed）+ pending Web ApprovalRequest
+    （action=apply_derivative_edit，payload_hash 确定性重放，D-11/D-15）。
+    绝不直接应用——确定性 Revision Service（apply_agent_edit）在用户 Web 批准后
+    原子校验 approval + payload + 冻结 proposal artifact 血缘 +
+    owner/novel/branch/fork scope + 同一 base_revision CAS 才把 approved proposal
+    应用为 append-only agent_proposal 修订；Original Canon / user draft
+    （autosave）revisions / published 状态绝不被 Agent 触碰。
+    """
+    from app.services.derivative_editor.revisions import (
+        DerivativeEditApplyError,
+        create_agent_edit_proposal,
+    )
+
+    try:
+        result = await create_agent_edit_proposal(
+            db,
+            owner_id=owner_id,
+            novel_id=novel_id,
+            project_id=int(params["project_id"]),
+            chapter_id=int(params["chapter_id"]),
+            content=str(params["content"]),
+            base_revision=int(params["base_revision"]),
+            proposal_key=str(params["proposal_key"]),
+            branch=params.get("branch"),
+            fork=params.get("fork"),
+            source_snapshot_hash=params.get("source_snapshot_hash"),
+            run_id=params.get("run_id"),
+            skill_version_id=params.get("skill_version_id"),
+            artifact_id=params.get("artifact_id"),
+            artifact_revision_id=params.get("artifact_revision_id"),
+        )
+    except DerivativeEditApplyError as exc:
+        raise InvalidInputError(f"{exc.code}: {exc.detail}") from None
+    await db.flush()
+    return _agent_edit_proposal_view_for_tool(result)
+
+
+def _agent_edit_proposal_view_for_tool(result) -> dict[str, Any]:
+    """DerivativeEditProposal approval ORM → JSON-safe 工具响应。
+
+    candidate-only：proposal_status 恒为 proposed、绝不 applied；approval_request_id /
+    payload_hash 供 Web 审批轮询与确定性 Revision Service 引用。
+    """
+    return {
+        "proposal_key": result.proposal_key,
+        "owner_id": result.owner_id,
+        "novel_id": result.novel_id,
+        "project_id": result.project_id,
+        "chapter_id": result.chapter_id,
+        "base_revision": result.base_revision,
+        "content_hash": result.content_hash,
+        "approval_request_id": result.approval_request_id,
+        "approval_action": result.approval_action,
+        "approval_status": result.approval_status,
+        "approval_payload_hash": result.approval_payload_hash,
+        "status": "candidate",
+        "candidate_only": True,
+        "replayed": bool(result.replayed),
+    }
+
+
 def _fork_proposal_view_for_tool(result) -> dict[str, Any]:
     """CanonFork + ApprovalRequest ORM → JSON-safe 工具响应。
 
@@ -828,11 +904,16 @@ async def _resolve_world_model_version(
 
 
 class ToolFacade:
-    """13 个只读工具 + 1 个候选 action 工具的统一执行门面。
+    """13 个只读工具 + 5 个候选 action 工具的统一执行门面。
 
     所有强制点（字节上限 / 超时 / budget hook / 错误码映射）都在
     ``execute`` 内完成；owner / cutoff 逻辑复用现有服务。Phase 33 的
-    ``generate_image_candidate`` 只创建候选作业（candidate-only）。
+    ``generate_image_candidate`` 只创建候选作业（candidate-only）；Phase 34
+    ``publish_illustration`` / ``attach_illustration_to_text`` 只创建候选
+    proposal + pending Web ApprovalRequest；Phase 35 ``create_canon_fork`` 只
+    创建候选 fork + pending Web ApprovalRequest；Phase 36
+    ``apply_derivative_edit`` 只创建候选 DerivativeEditProposal + pending Web
+    ApprovalRequest——确定性 Revision Service 拥有 approved proposal 应用。
     """
 
     def __init__(
@@ -877,6 +958,10 @@ class ToolFacade:
             # pending Web ApprovalRequest；确定性 Fork materializer 拥有 approved
             # fork 物化。
             "create_canon_fork": self._create_canon_fork,
+            # Phase 36 derivative 编辑提议 action 工具（36-05）：只创建候选
+            # proposal + pending Web ApprovalRequest；确定性 Revision Service
+            # 拥有 approved proposal 应用。
+            "apply_derivative_edit": self._apply_derivative_edit,
         }
 
     # ── 公共入口 ──
@@ -1256,6 +1341,16 @@ class ToolFacade:
     async def _create_canon_fork(self, *, db, novel, owner_id, params):
         """创建候选 canon fork + pending Web ApprovalRequest（candidate-only，D-35-03）。"""
         svc = self._svc("create_canon_fork", _default_create_canon_fork)
+        return await svc(
+            db,
+            owner_id=owner_id,
+            novel_id=novel.id,
+            params=params,
+        )
+
+    async def _apply_derivative_edit(self, *, db, novel, owner_id, params):
+        """创建候选 derivative edit + pending Web ApprovalRequest（candidate-only，D-36-02）。"""
+        svc = self._svc("apply_derivative_edit", _default_apply_derivative_edit)
         return await svc(
             db,
             owner_id=owner_id,

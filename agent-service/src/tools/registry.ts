@@ -16,7 +16,7 @@ import { defineTool } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { fastapiToolCall } from "./fastapi-client.js";
 
-/** 17 个域工具名（固定顺序；唯一 allowlist 事实源）。 */
+/** 18 个域工具名（固定顺序；唯一 allowlist 事实源）。 */
 export const DOMAIN_TOOL_NAMES = [
   "get_novel",
   "get_chapter",
@@ -35,6 +35,7 @@ export const DOMAIN_TOOL_NAMES = [
   "publish_illustration",
   "attach_illustration_to_text",
   "create_canon_fork",
+  "apply_derivative_edit",
 ] as const;
 
 /** 工具注册时的运行级授权（端用户 JWT 或 per-run 内部令牌）。 */
@@ -310,6 +311,16 @@ export function buildDomainTools(auth: ToolAuth) {
       execute: (toolCallId, params, signal) =>
         fastapiToolCall("create_canon_fork", params as unknown, signal, auth),
     }),
+    // ── Phase 36 derivative 编辑提议 action 工具（36-05）──
+    defineTool({
+      name: "apply_derivative_edit",
+      label: "Apply Derivative Edit (Proposal)",
+      description:
+        "Phase 36 action（REQ-FORK-02 / REQ-AGENT-03/04/07）：提议**一个**派生 chapter patch（candidate-only）。服务端 proposal gate 只接受冻结 source snapshot 血缘 + 有效 project/chapter scope + base_revision CAS 锚（D-36-02）；创建候选 DerivativeEditProposal（proposal_status=proposed）+ pending Web ApprovalRequest（action=apply_derivative_edit，payload_hash 确定性重放）。绝不直接应用——确定性 Revision Service（app.services.derivative_editor.revisions.apply_agent_edit）在用户 Web 批准后原子校验 approval + payload + 冻结 proposal artifact 血缘 + owner/novel/branch/fork scope + 同一 base_revision CAS 才把 approved proposal 应用为 append-only agent_proposal 修订；Agent 绝不写 Original Canon / user autosave / published 状态。",
+      parameters: derivativeEditParams(),
+      execute: (toolCallId, params, signal) =>
+        fastapiToolCall("apply_derivative_edit", params as unknown, signal, auth),
+    }),
   ];
 }
 
@@ -339,6 +350,38 @@ function canonForkParams() {
     delta_evidence_refs: Type.Array(
       Type.String({ minLength: 1, maxLength: 64 }),
       { minItems: 1, description: "delta 引用的 leaf 证据键（必须属于冻结 citation lineage 白名单）" },
+    ),
+    run_id: Type.Optional(Type.Integer({ minimum: 1, description: "SkillRun ID 血缘" })),
+    skill_version_id: Type.Optional(Type.Integer({ minimum: 1, description: "SkillVersion ID 血缘" })),
+    artifact_id: Type.Optional(Type.Integer({ minimum: 1, description: "Artifact ID 血缘" })),
+    artifact_revision_id: Type.Optional(Type.Integer({ minimum: 1, description: "ArtifactRevision ID 血缘" })),
+  });
+}
+
+/** Phase 36 derivative 编辑提议 action 工具参数（镜像 backend schemas.agent_tools）。 */
+function derivativeEditParams() {
+  return Type.Object({
+    novel_id: Type.Integer({ minimum: 1, description: "小说 ID" }),
+    branch: Type.Optional(Type.String({ maxLength: 80, description: "衍生分支；原始主线为 null" })),
+    fork: Type.Optional(Type.String({ maxLength: 80, description: "衍生 fork（仅 derivative mode）" })),
+    project_id: Type.Integer({ minimum: 1, description: "derivative project ID（服务端重验 owner/novel + fanfiction_canon 空间）" }),
+    chapter_id: Type.Integer({ minimum: 1, description: "派生 chapter ID（服务端重验 project 范围）" }),
+    chapter_number: Type.Integer({ minimum: 1, description: "派生 chapter 序号" }),
+    proposal_key: Type.String({ minLength: 1, maxLength: 160, description: "幂等 proposal 键（approval payload 绑定）" }),
+    base_revision: Type.Integer({ minimum: 1, description: "chapter 乐观并发 token（同一 base_revision CAS，D-36-02）" }),
+    content: Type.String({ minLength: 1, maxLength: 50000, description: "候选 Markdown patch（服务端计算 content_hash 并绑定 approval payload）" }),
+    source_snapshot_id: Type.Optional(Type.String({ maxLength: 160, description: "source snapshot 血缘 ID" })),
+    source_snapshot_hash: Type.Optional(
+      Type.String({
+        minLength: 64,
+        maxLength: 64,
+        pattern: "^[0-9a-f]{64}$",
+        description: "source snapshot 血缘 hash（服务端与 project 冻结 fork 血缘重放；drift → fail closed）",
+      }),
+    ),
+    evidence_refs: Type.Array(
+      Type.String({ minLength: 1, maxLength: 64 }),
+      { minItems: 1, description: "proposal 引用的 leaf 证据键（必须属于冻结 manifest 白名单）" },
     ),
     run_id: Type.Optional(Type.Integer({ minimum: 1, description: "SkillRun ID 血缘" })),
     skill_version_id: Type.Optional(Type.Integer({ minimum: 1, description: "SkillVersion ID 血缘" })),

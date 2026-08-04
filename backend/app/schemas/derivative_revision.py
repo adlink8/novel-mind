@@ -39,6 +39,7 @@ class DerivativeRevisionKind(StrEnum):
     CREATE = "create"
     AUTOSAVE = "autosave"
     ROLLBACK = "rollback"
+    AGENT_PROPOSAL = "agent_proposal"
 
 
 class DerivativeRevisionApproval(StrEnum):

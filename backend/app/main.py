@@ -59,6 +59,7 @@ from app.api.canon_retrieval import router as canon_retrieval_router
 from app.api.derivative_projects import router as derivative_projects_router
 from app.api.derivative_chapters import router as derivative_chapters_router
 from app.api.derivative_revisions import router as derivative_revisions_router
+from app.api.agent_derivative_edits import router as agent_derivative_edits_router
 from app.config import settings
 from app.core.logging import RequestLoggingMiddleware, setup_logging
 from app.services.agent_tools.errors import AgentToolError
@@ -330,6 +331,11 @@ app.include_router(
     derivative_revisions_router,
     prefix="/api/novels",
     tags=["Derivative Revisions"],
+)
+app.include_router(
+    agent_derivative_edits_router,
+    prefix="/api/agent",
+    tags=["Agent Derivative Edits"],
 )
 
 

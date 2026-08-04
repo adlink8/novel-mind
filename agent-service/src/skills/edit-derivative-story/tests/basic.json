@@ -1,0 +1,71 @@
+{
+  "input": {
+    "novel_id": 2,
+    "branch": "deriv-branch",
+    "fork": "fork-2",
+    "project_id": 20,
+    "chapter_id": 200,
+    "chapter_number": 1,
+    "proposal_key": "edit-deriv-01",
+    "base_revision": 1,
+    "content": "Mira pauses at the gate, listening to the wind carry the old bell's voice.",
+    "source_snapshot_id": "novel:2:fork-2",
+    "source_snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "evidence_refs": ["chapter:1"],
+    "requested_actions": ["apply_derivative_edit"]
+  },
+  "expected_output": {
+    "type": "derivative_edit_proposal",
+    "schema_version": "derivative-edit-proposal.v1",
+    "owner_id": 2,
+    "novel_id": 2,
+    "branch": "deriv-branch",
+    "producing_skill": "edit-derivative-story",
+    "producing_skill_version": "1.0.0",
+    "skill_version_id": 2,
+    "model_lineage": {
+      "provider": "fixture",
+      "model": "stub-model",
+      "revision": "stub-1"
+    },
+    "source_versions": {
+      "novel": "v1",
+      "source_snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "input_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "evidence_refs": ["chapter:1"],
+    "proposal": {
+      "schema_version": "derivative-edit-proposal.v1",
+      "artifact_kind": "derivative_edit_proposal",
+      "proposal_key": "edit-deriv-01",
+      "authority_space": "derivative",
+      "branch": "deriv-branch",
+      "fork": "fork-2",
+      "project_id": 20,
+      "chapter_id": 200,
+      "chapter_number": 1,
+      "base_revision": 1,
+      "content": "Mira pauses at the gate, listening to the wind carry the old bell's voice.",
+      "content_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "source_snapshot_id": "novel:2:fork-2",
+      "source_snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "evidence_refs": ["chapter:1"],
+      "proposal_status": "proposed",
+      "approval_request_id": null,
+      "artifact_id": null,
+      "validator_report": null
+    },
+    "tool_runs": [
+      { "tool_name": "get_chapter", "calls": 1 },
+      { "tool_name": "apply_derivative_edit", "calls": 1 }
+    ],
+    "status": "candidate",
+    "parent_revision": null,
+    "normalization": {
+      "raw_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "repaired_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "normalization_actions": [],
+      "warnings": []
+    }
+  }
+}

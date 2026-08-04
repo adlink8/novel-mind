@@ -1,0 +1,71 @@
+{
+  "input": {
+    "novel_id": 1,
+    "branch": "aurora-redemption",
+    "fork": "fork-aurora",
+    "project_id": 10,
+    "chapter_id": 100,
+    "chapter_number": 3,
+    "proposal_key": "edit-aurora-01",
+    "base_revision": 5,
+    "content": "Aurora wakes before dawn and walks the southern wall, tracing the light that Arin described.",
+    "source_snapshot_id": "novel:1:fork-aurora",
+    "source_snapshot_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+    "evidence_refs": ["chapter:1", "chapter:2"],
+    "requested_actions": ["apply_derivative_edit"]
+  },
+  "expected_output": {
+    "type": "derivative_edit_proposal",
+    "schema_version": "derivative-edit-proposal.v1",
+    "owner_id": 1,
+    "novel_id": 1,
+    "branch": "aurora-redemption",
+    "producing_skill": "edit-derivative-story",
+    "producing_skill_version": "1.0.0",
+    "skill_version_id": 1,
+    "model_lineage": {
+      "provider": "fixture",
+      "model": "stub-model",
+      "revision": "stub-1"
+    },
+    "source_versions": {
+      "novel": "v1",
+      "source_snapshot_hash": "1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    "input_hash": "2222222222222222222222222222222222222222222222222222222222222222",
+    "evidence_refs": ["chapter:1", "chapter:2"],
+    "proposal": {
+      "schema_version": "derivative-edit-proposal.v1",
+      "artifact_kind": "derivative_edit_proposal",
+      "proposal_key": "edit-aurora-01",
+      "authority_space": "derivative",
+      "branch": "aurora-redemption",
+      "fork": "fork-aurora",
+      "project_id": 10,
+      "chapter_id": 100,
+      "chapter_number": 3,
+      "base_revision": 5,
+      "content": "Aurora wakes before dawn and walks the southern wall, tracing the light that Arin described.",
+      "content_hash": "3333333333333333333333333333333333333333333333333333333333333333",
+      "source_snapshot_id": "novel:1:fork-aurora",
+      "source_snapshot_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+      "evidence_refs": ["chapter:1", "chapter:2"],
+      "proposal_status": "proposed",
+      "approval_request_id": null,
+      "artifact_id": null,
+      "validator_report": null
+    },
+    "tool_runs": [
+      { "tool_name": "get_novel", "calls": 1 },
+      { "tool_name": "apply_derivative_edit", "calls": 1 }
+    ],
+    "status": "candidate",
+    "parent_revision": null,
+    "normalization": {
+      "raw_hash": "4444444444444444444444444444444444444444444444444444444444444444",
+      "repaired_hash": "5555555555555555555555555555555555555555555555555555555555555555",
+      "normalization_actions": [],
+      "warnings": []
+    }
+  }
+}

@@ -39,6 +39,12 @@ from app.schemas.derivative_revision import (
     DerivativeRollbackRequest,
     DerivativeRollbackResponse,
 )
+from app.services.derivative_editor.events import (
+    DERIVATIVE_USER_AUTOSAVE_ACCEPTED,
+    DERIVATIVE_USER_AUTOSAVE_CONFLICT,
+    build_user_autosave_event,
+    emit_derivative_event,
+)
 from app.services.derivative_editor.revisions import (
     DerivativeRevisionError,
     autosave_revision,
@@ -94,7 +100,31 @@ async def autosave_derivative_chapter(
             actor_id=current_user.id,
         )
     except DerivativeRevisionError as exc:
+        # user_autosave path emits only the conflict event (never an agent
+        # proposal event); a stale/concurrent write fails closed recoverably.
+        emit_derivative_event(
+            build_user_autosave_event(
+                event=DERIVATIVE_USER_AUTOSAVE_CONFLICT,
+                owner_id=current_user.id,
+                novel_id=novel.id,
+                project_id=project_id,
+                chapter_id=chapter_id,
+                base_revision=body.base_revision,
+                status=exc.code,
+            )
+        )
         raise _map_error(exc) from exc
+    emit_derivative_event(
+        build_user_autosave_event(
+            event=DERIVATIVE_USER_AUTOSAVE_ACCEPTED,
+            owner_id=current_user.id,
+            novel_id=novel.id,
+            project_id=project_id,
+            chapter_id=chapter_id,
+            base_revision=body.base_revision,
+            status=status_str,
+        )
+    )
     return DerivativeAutosaveResponse(
         status=status_str,
         chapter=chapter,

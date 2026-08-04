@@ -29,6 +29,7 @@ from app.schemas.agent_runtime import (
     CanonForkProposalArtifact,
     ChapterAnalysisArtifact,
     CitedAnswerArtifact,
+    DerivativeEditProposalArtifact,
     ExternalEvidenceArtifact,
     IllustrationAnchorProposalArtifact,
     IllustrationRevisionArtifact,
@@ -208,6 +209,27 @@ BLOCKED_CANON_FORK_BRANCH = (
 BLOCKED_CANON_FORK_DELTA_HASH = (
     "integrity: canon delta content_hash does not replay from the delta content"
 )
+# Phase 36 DerivativeEditProposal 确定性边界（D-36-01..D-36-04）。
+BLOCKED_DERIVATIVE_EDIT_PAYLOAD = (
+    "integrity: derivative edit proposal payload failed domain validation"
+)
+BLOCKED_DERIVATIVE_EDIT_APPROVAL_BYPASS = (
+    "integrity: derivative edit proposal bypass blocked — proposal_status must "
+    "be proposed"
+)
+BLOCKED_DERIVATIVE_EDIT_SOURCE_DRIFT = (
+    "integrity: derivative edit proposal source_snapshot_hash drifts from "
+    "envelope source_versions"
+)
+BLOCKED_DERIVATIVE_EDIT_CONTENT_HASH = (
+    "integrity: derivative edit proposal content_hash does not replay from the "
+    "proposal content"
+)
+BLOCKED_DERIVATIVE_EDIT_BRANCH = (
+    "integrity: derivative edit proposal branch/authority_space mismatch — "
+    "envelope branch must match the run branch and derivative mode requires "
+    "branch + fork"
+)
 
 
 @dataclass(frozen=True)
@@ -275,6 +297,8 @@ def evaluate_integrity(*, envelope: dict[str, Any], run: SkillRun) -> IntegrityD
         return _evaluate_illustration_anchor_proposal(envelope, run)
     if artifact_type == "canon_fork_proposal":
         return _evaluate_canon_fork_proposal(envelope, run)
+    if artifact_type == "derivative_edit_proposal":
+        return _evaluate_derivative_edit_proposal(envelope, run)
     return IntegrityDecision(False, BLOCKED_UNKNOWN_TYPE)
 
 
@@ -1110,5 +1134,92 @@ def _evaluate_canon_fork_proposal(
         return IntegrityDecision(False, BLOCKED_CANON_FORK_BRANCH)
     if proposal.get("branch") != branch:
         return IntegrityDecision(False, BLOCKED_CANON_FORK_BRANCH)
+
+    return IntegrityDecision(True)
+
+
+def _evaluate_derivative_edit_proposal(
+    envelope: dict[str, Any], run: SkillRun
+) -> IntegrityDecision:
+    """Phase 36 DerivativeEditProposal 信封 integrity gate（D-36-01..D-36-04）。
+
+    与其余信封纪律一致（evidence/lineage/status/trail/protected），并在
+    ``proposal`` 负载上做确定性域边界校验：
+      - 负载必须是严格 ``DerivativeEditProposalPayload``（proposal_key、
+        authority_space、project/chapter scope、base_revision CAS 锚、content +
+        content_hash、source snapshot、evidence refs；approval_request_id /
+        artifact_id 由服务端分配）；
+      - ``proposal_status`` 恒为 ``proposed``——Agent 声称任何非 proposed 状态
+        （approval bypass / pending_approval / applied 伪造）→ blocked（只有服务端
+        proposal/approval/确定性 Revision Service 能推进状态；Phase 36 绝不直接
+        应用，D-36-02）；
+      - proposal 的 content_hash 必须从 content 重放（drift → blocked）；
+      - proposal 的 source_snapshot_hash 必须与信封 ``source_versions`` 血缘绑定；
+      - branch 门：信封 branch 必须与 run.branch 血缘一致；authority_space 恒为
+        derivative 且 branch/fork 绑定（derivative mode 必须有 branch + fork，
+        original 主线禁止 branch/fork）。
+    任何失败 → 稳定 blocked，零写入；FastAPI 与确定性 Revision Service 保留
+    permission / evidence / state-transition / apply 权威。
+    """
+    # 0. heuristic candidate-only 无 EvidenceRef 资格 → 不能进 derivative 编辑网关。
+    if not envelope.get("evidence_refs"):
+        return IntegrityDecision(False, BLOCKED_NO_EVIDENCE)
+
+    # 1. 严格 wire schema。
+    try:
+        model = DerivativeEditProposalArtifact.model_validate(envelope)
+    except ValidationError as exc:
+        return IntegrityDecision(
+            False, f"{BLOCKED_SCHEMA} ({_first_validation_error(exc)})"
+        )
+
+    # 2. 共享 lineage/status/trail/protected 门。
+    blocked = _check_common_lineage(envelope=envelope, run=run, wire=model)
+    if blocked is not None:
+        return blocked
+
+    # 3. proposal 负载：严格域契约 + approval bypass 门。
+    payload = envelope.get("proposal")
+    if not isinstance(payload, dict):
+        return IntegrityDecision(False, BLOCKED_DERIVATIVE_EDIT_PAYLOAD)
+    if payload.get("proposal_status") != "proposed":
+        return IntegrityDecision(False, BLOCKED_DERIVATIVE_EDIT_APPROVAL_BYPASS)
+    try:
+        DerivativeEditProposalArtifact.model_validate(envelope)
+    except ValidationError as exc:
+        return IntegrityDecision(
+            False,
+            f"{BLOCKED_DERIVATIVE_EDIT_PAYLOAD} ({_first_validation_error(exc)})",
+        )
+
+    # 4. content hash 重放（drift → blocked）。口径与 Revision Service 一致：
+    #    sha256 of canonical Markdown（markdown_checksum）。
+    from app.services.derivative_editor.chapters import markdown_checksum
+
+    content = payload.get("content")
+    content_hash = payload.get("content_hash")
+    if not isinstance(content, str) or not isinstance(content_hash, str):
+        return IntegrityDecision(False, BLOCKED_DERIVATIVE_EDIT_CONTENT_HASH)
+    if markdown_checksum(content) != content_hash:
+        return IntegrityDecision(False, BLOCKED_DERIVATIVE_EDIT_CONTENT_HASH)
+
+    # 5. source snapshot 血缘绑定（D-36-02）。
+    source_versions = envelope.get("source_versions") or {}
+    snapshot = source_versions.get("source_snapshot_hash")
+    if snapshot is not None and snapshot != payload.get("source_snapshot_hash"):
+        return IntegrityDecision(False, BLOCKED_DERIVATIVE_EDIT_SOURCE_DRIFT)
+
+    # 6. branch/authority_space 门（wrong branch/fork → fail closed）。
+    branch = envelope.get("branch")
+    if branch != run.branch:
+        return IntegrityDecision(False, BLOCKED_DERIVATIVE_EDIT_BRANCH)
+    if payload.get("branch") != branch:
+        return IntegrityDecision(False, BLOCKED_DERIVATIVE_EDIT_BRANCH)
+    if payload.get("authority_space") == "derivative":
+        if not branch or not payload.get("fork"):
+            return IntegrityDecision(False, BLOCKED_DERIVATIVE_EDIT_BRANCH)
+    else:
+        if branch or payload.get("fork"):
+            return IntegrityDecision(False, BLOCKED_DERIVATIVE_EDIT_BRANCH)
 
     return IntegrityDecision(True)
