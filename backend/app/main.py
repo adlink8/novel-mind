@@ -66,6 +66,7 @@ from app.api.derivative_visual import router as derivative_visual_router
 from app.api.derivative_visual_assets import router as derivative_visual_assets_router
 from app.api.derivative_visual_review import router as derivative_visual_review_router
 from app.api.agent_derivative_edits import router as agent_derivative_edits_router
+from app.api.derivative_export import router as derivative_export_router
 from app.config import settings
 from app.core.logging import RequestLoggingMiddleware, setup_logging
 from app.services.agent_tools.errors import AgentToolError
@@ -372,6 +373,11 @@ app.include_router(
     agent_derivative_edits_router,
     prefix="/api/agent",
     tags=["Agent Derivative Edits"],
+)
+app.include_router(
+    derivative_export_router,
+    prefix="/api/novels",
+    tags=["Derivative Export"],
 )
 
 
