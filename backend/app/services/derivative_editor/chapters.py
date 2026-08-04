@@ -34,6 +34,7 @@ from app.models.derivative_chapter import (
     DERIVATIVE_CHAPTER_STATUSES,
     DerivativeChapter,
 )
+from app.models.derivative_revision import DerivativeRevision
 from app.schemas.derivative_chapter import (
     DerivativeChapterPatch,
     DerivativeChapterReorderRequest,
@@ -252,6 +253,25 @@ async def create_chapter(
         )
 
     await db.refresh(chapter)
+    # Seed the append-only revision lineage with the immutable root row
+    # (D-36-02): the chapter's initial state is always recoverable and the
+    # client's base_revision=1 maps deterministically to this row.
+    db.add(
+        DerivativeRevision(
+            chapter_id=chapter.id,
+            owner_id=owner_id,
+            novel_id=novel_id,
+            project_id=project.id,
+            revision_number=1,
+            parent_revision_id=None,
+            kind="create",
+            content=canonical,
+            content_checksum=markdown_checksum(canonical),
+            actor_id=owner_id,
+            approval_state="not_required",
+        )
+    )
+    await db.flush()
     return _to_view(chapter), _to_scope(project)
 
 
@@ -348,6 +368,21 @@ async def update_chapter(
             row.markdown = canonical
             row.markdown_checksum = checksum
             row.revision += 1
+            # Every real Markdown change appends an immutable revision row
+            # (D-36-02/36-03) so the lineage stays complete across write paths.
+            # Lazy import avoids a module-level cycle (revisions imports the
+            # canonicalization helpers from this module).
+            from app.services.derivative_editor.revisions import append_revision_row
+
+            await append_revision_row(
+                db,
+                chapter=row,
+                revision_number=row.revision,
+                kind="autosave",
+                content=canonical,
+                checksum=checksum,
+                actor_id=owner_id,
+            )
     if patch.title is not None:
         new_title = patch.title.strip()
         if not new_title:

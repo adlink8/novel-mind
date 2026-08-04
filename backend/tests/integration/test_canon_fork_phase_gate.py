@@ -23,7 +23,6 @@ import uuid
 
 import pytest
 from sqlalchemy import create_engine, select, text
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import NullPool
@@ -52,8 +51,8 @@ pytestmark = pytest.mark.integration
 
 HEX64 = "a" * 64
 PREV_REVISION = "20260801_canon_fork01"
-# The head has advanced to Phase 36-01; the round trip must land there.
-NEW_REVISION = "20260801_derivative_project01"
+# The head has advanced to Phase 36-03; the round trip must land there.
+NEW_REVISION = "20260801_derivative_revision01"
 
 
 def async_url(sync_url: str) -> str:

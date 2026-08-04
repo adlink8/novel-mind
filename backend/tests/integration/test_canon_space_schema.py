@@ -395,7 +395,8 @@ async def test_migration_round_trip(pg_sync_url, pg_async_url, require_postgres)
     current = run_alembic("current", database_url=pg_sync_url)
     # Phase 35-02 adds the immutable canon_forks head on top of canon_space01;
     # Phase 35-04 adds the contamination block audit head on top of that;
-    # Phase 36-01 adds the owner-scoped derivative project head on top.
-    assert "20260801_derivative_project01" in current.stdout
+    # Phase 36-01 adds the owner-scoped derivative project head on top;
+    # Phase 36-03 adds the append-only derivative revision head on top.
+    assert "20260801_derivative_revision01" in current.stdout
     check = run_alembic("check", database_url=pg_sync_url)
     assert check.returncode == 0, f"alembic check failed:\n{check.stdout}\n{check.stderr}"
