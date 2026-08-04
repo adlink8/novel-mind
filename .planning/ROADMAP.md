@@ -28,7 +28,7 @@
 | v1.1 execution baseline | 21–25.1 | partial | partial | blocked by Phase 22 |
 | agent runtime foundation | 25.2–25.3 | **IMPLEMENTED & VERIFIED (2026-08-02)** | partial | blocked by Phase 22 3/3 |
 | v1.2 trusted novel understanding | 26–29 | **26/27/28/29 VERIFIED (2026-08-03)** | planned | blocked by Phase 22 3/3 |
-| v1.3 visual narrative | 30–34 | **30/31/32/33 VERIFIED (2026-08-04)** | planned | blocked by Phase 22 3/3 |
+| v1.3 visual narrative | 30–34 | **30/31/32/33/34 VERIFIED (2026-08-04)** | planned | blocked by Phase 22 3/3 |
 | v1.4 Canon Fork derivatives | 35–39 | planned | planned | planned |
 
 # Agent Runtime Foundation — Phase 25.2–25.3
@@ -139,12 +139,12 @@ Alembic chain continues `26agentrun01 → 27approval01`.
 | Phase 31 | 4/4 + shared Agent contract | 4 | **VERIFIED 2026-08-03** |
 | Phase 32 | 5/5 + shared Agent contract | 5 | **VERIFIED 2026-08-03** |
 | Phase 33 | 5/5 + shared Agent contract | 5 | **VERIFIED 2026-08-04** |
-| Phase 34 | 1/1 + shared Agent contract | 5 | PLANNED |
+| Phase 34 | 5/5 + shared Agent contract | 5 | **VERIFIED 2026-08-04** |
 | Phase 35–39 | 20/20 + shared Agent contract | 25 | PLANNED |
 
 The corrected portfolio contains 86 plans: 10 reused Kimi foundation plans, five corrective
 foundation slices, 57 deterministic/domain/shared-integrity plans and 14 Agent-integration plans.
-Phase 25.2–33 are implemented and verified; Phases 34–39 remain planning verdicts only.
+Phase 25.2–34 are implemented and verified; Phases 35–39 remain planning verdicts only.
 
 ## Baseline Reconciliation — Phase 21–25.1
 
@@ -166,13 +166,14 @@ Phase 25.2–33 are implemented and verified; Phases 34–39 remain planning ver
 | 31 Key Scene Detection | **VERIFIED 2026-08-03** | `31-VERIFICATION.md` passed; scene contract/boundaries, salience+diversity ranking, human review + frozen set, detect-key-scenes skill |
 | 32 Scene Spec and Prompt Compiler | **VERIFIED 2026-08-03** | `32-VERIFICATION.md` passed; SceneSpec contract, evidence-to-spec compiler, provider adapters, validation/preview, compile-scene-spec skill |
 | 33 Illustration Generation & Consistency | **VERIFIED 2026-08-04** | `33-VERIFICATION.md` passed; job/asset/budget contract, mock generation + storage, consistency scoring, review/compare/approval, illustrate-scene skill |
+| 34 In-Text Anchors, Reader and Export | **VERIFIED 2026-08-04** | `34-VERIFICATION.md` passed; anchor contract, responsive reader, anchor repair, Markdown/HTML/EPUB export, propose-illustration-anchor skill + publish |
 
 Phase 22 remains blocked and unverified. The user authorized the Phase 25.2, Phase 26,
-Phase 27, Phase 28, Phase 29, Phase 30, Phase 31, Phase 32 and Phase 33 execution overrides
-(2026-08-02/03/04); each phase proceeded on the passed upstream verification artifact. v1.2
-milestone (Phases 26–29), Phase 30, Phase 31, Phase 32 and Phase 33 are implemented and
-verified. Phase 34 still requires Phase 22 3/3 real scheduled green evidence plus a passed
-Phase 33 verification artifact (exists).
+Phase 27, Phase 28, Phase 29, Phase 30, Phase 31, Phase 32, Phase 33 and Phase 34 execution
+overrides (2026-08-02/03/04); each phase proceeded on the passed upstream verification
+artifact. v1.2 milestone (Phases 26–29) and v1.3 milestone (Phases 30–34) are implemented
+and verified. Phase 35 still requires Phase 22 3/3 real scheduled green evidence plus a
+passed Phase 34 verification artifact (exists).
 
 ---
 
@@ -418,6 +419,8 @@ human approval and provider-neutral API.
 
 ## Phase 34 — In-Text Anchors, Reader and Export
 
+**Status:** IMPLEMENTED & VERIFIED (2026-08-04, `34-VERIFICATION.md` passed at `68819ac`)
+
 **Goal:** place approved illustrations at stable text anchors and preserve them in reading and
 exports.
 
@@ -539,8 +542,8 @@ audit; **Test, Fix, and Confirm** every failed end-to-end checkpoint.
 ## Next
 
 Phase 22 (CI/Nightly authority) remains the last unverified gate — 0/3 scheduled green.
-Phase 25.2, 25.3, 26, 27, 28, 29, 30, 31, 32 and 33 are verified (2026-08-02/03/04),
-completing the v1.2 milestone (26–29) and Phases 30–33 of v1.3. Phase 34 (In-Text Anchors,
-Reader and Export) execution requires Phase 22 3/3 real scheduled green evidence plus a
-passed Phase 33 verification artifact (exists); until then, Phase 34 plans can be executed
-only under a further explicit override.
+Phase 25.2, 25.3, 26, 27, 28, 29, 30, 31, 32, 33 and 34 are verified
+(2026-08-02/03/04), completing the v1.2 milestone (26–29) and the v1.3 milestone
+(30–34). Phase 35 (Triple Knowledge Spaces and Canon Fork) execution requires Phase 22
+3/3 real scheduled green evidence plus a passed Phase 34 verification artifact (exists);
+until then, Phase 35 plans can be executed only under a further explicit override.
