@@ -349,3 +349,21 @@ Key metrics:
 | Alembic | 单 head `20260801_derivative_agent_edit01` | `alembic heads` |
 | 已知环境限制 | 同前：e2e Next dev server 编译失败、openapi subprocess 挂起、`test_agent_tools.py` contract 32 既有失败、前端 29 typecheck 遗留 | 2026-08-04 本机 |
 | 仍阻塞 | Phase 22 Nightly 3/3 未达成（0/3）；Phase 37 执行继续在 35-39 override 下 | `.planning/STATE.md` |
+
+---
+
+## 2026-08-04 快照（Phase 37 实现并验证；snapshot: master @ b8594e3）
+
+以下事实覆盖上文旧节中的对应记录：
+
+| 项 | 当前值 | 证据 |
+|---|---|---|
+| Phase 37 Constrained Generation | **VERIFIED 2026-08-04** | `37-VERIFICATION.md` passed（source_commit `b8594e3`） |
+| 后端测试 | **2059 passed**（unit 1171 + derivative_generation 108 + 集成 30 + adversarial 451 + agent_runtime 263 + ci 37） | 独立测试子代理 2026-08-04 |
+| agent-service | **927 passed / 23 files**；tsc 0 errors | `cd agent-service && npx vitest run` |
+| 前端 | **404 passed / 46 files** | `cd frontend && npx vitest run` |
+| Constrained Generation | context package 编译器、约束草稿生成 runner、一致性 gates + BranchSuggestion、显式分歧 override、continue-derivative-story skill | `backend/app/services/derivative_generation/` |
+| Agent skills | 13 skills：+continue-derivative-story | `agent-service/src/skills/` |
+| Alembic | 单 head `20260802_derivative_override01` | `alembic heads` |
+| 已知环境限制 | 同前：e2e Next dev server 编译失败、openapi subprocess 挂起、agent_runtime 需 `-o timeout=600`、前端 29 typecheck 遗留 | 2026-08-04 本机 |
+| 仍阻塞 | Phase 22 Nightly 3/3 未达成（0/3）；Phase 38 执行继续在 35-39 override 下 | `.planning/STATE.md` |
