@@ -45,7 +45,12 @@ from app.services.derivative_export.audit import (
     PHASE22_GREEN_REQUIRED,
     DerivativeExportAuditEvidence,
     DerivativeExportPhase22Evidence,
+    DerivativeExportShipmentEvidenceStatus,
+    DerivativeExportShipmentItem,
+    DerivativeExportShipmentRequirement,
     build_derivative_export_audit,
+    build_derivative_export_shipment_baseline,
+    run_derivative_export_lineage_audit,
 )
 from app.services.derivative_export.epub import render_epub
 from app.services.derivative_export.manifest import (
@@ -467,6 +472,60 @@ def _sample_data_evidence() -> tuple[tuple[DerivativeExportAuditEvidence, ...], 
     return evidence, fixture_present and integration_present
 
 
+def _shipment_baseline_evidence() -> tuple[DerivativeExportShipmentItem, ...]:
+    """Honest REQ-SHIP-01 production baseline evidence (D-39-04).
+
+    ``docs/DEPLOYMENT.md#Production-Blockers`` explicitly records no TLS
+    ingress, no secret manager, no backup/restore drill and no monitoring and
+    alerting; only provider-key encryption/rotation compatibility exists. Cost
+    budget only has per-skill-run budget contracts (``SkillRun.budget_snapshot``),
+    no global cost-budget evidence. Missing production baseline evidence fails
+    closed (blocked) — the audit never invents green evidence.
+    """
+    return (
+        DerivativeExportShipmentItem(
+            requirement=DerivativeExportShipmentRequirement.TLS,
+            status=DerivativeExportShipmentEvidenceStatus.BLOCKED,
+            raw_evidence_link="docs/DEPLOYMENT.md#Production-Blockers",
+            detail="no TLS ingress or repeatable TLS deployment evidence",
+        ),
+        DerivativeExportShipmentItem(
+            requirement=DerivativeExportShipmentRequirement.SECRET_SOURCING_ROTATION,
+            status=DerivativeExportShipmentEvidenceStatus.UNVERIFIED,
+            raw_evidence_link=(
+                "docs/DEPLOYMENT.md#Security-Baseline-Already-Implemented"
+            ),
+            detail=(
+                "provider key encryption/rotation compatible; no secret-manager "
+                "evidence"
+            ),
+        ),
+        DerivativeExportShipmentItem(
+            requirement=DerivativeExportShipmentRequirement.BACKUP_RESTORE_DRILL,
+            status=DerivativeExportShipmentEvidenceStatus.BLOCKED,
+            raw_evidence_link="docs/DEPLOYMENT.md#Production-Blockers",
+            detail="no backup/restore drill evidence",
+        ),
+        DerivativeExportShipmentItem(
+            requirement=DerivativeExportShipmentRequirement.MONITORING_ALERT,
+            status=DerivativeExportShipmentEvidenceStatus.BLOCKED,
+            raw_evidence_link="docs/DEPLOYMENT.md#Production-Blockers",
+            detail="no monitoring/alerting evidence",
+        ),
+        DerivativeExportShipmentItem(
+            requirement=DerivativeExportShipmentRequirement.COST_BUDGET,
+            status=DerivativeExportShipmentEvidenceStatus.UNVERIFIED,
+            raw_evidence_link=(
+                "backend/app/models/agent_runtime.py:SkillRun.budget_snapshot"
+            ),
+            detail=(
+                "only per-skill-run budget contracts; no global cost-budget "
+                "evidence"
+            ),
+        ),
+    )
+
+
 @router.get(DERIVATIVE_EXPORT_PATH + "/audit")
 async def audit_derivative_export(
     project_id: int,
@@ -474,12 +533,21 @@ async def audit_derivative_export(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_user),
 ):
-    """Three-dimension status report bound to the frozen export manifest.
+    """Three-dimension status report + independent lineage and REQ-SHIP-01 gate.
 
     ``implementation_readiness`` / ``sample_data_coverage`` /
     ``quality_qualification`` are independent; the quality dimension reflects
     the real Phase 22 state (blocked at 0/3 -> blocked verdict) and cannot be
     substituted by a Phase 39 pass (D-39-03 / D-39-04).
+
+    Phase 39-04 (T-39-04-01/02): the report also carries the independently
+    recomputed lineage audit (source snapshot -> preparation artifact ->
+    approve_export approval -> materialized bundle -> download/audit event) and
+    the honest REQ-SHIP-01 production baseline. Every verdict keeps raw
+    evidence links; any orphaned artifact, lineage/hash mismatch, contamination,
+    Original mutation, unauthorized export, unverified EPUB, missing production
+    baseline evidence or Phase 22 blocker fails closed into ``blocked`` — the
+    only other verdict is ``qualified_candidate`` (never promotion).
     """
     frozen = await _freeze(
         db,
@@ -491,6 +559,20 @@ async def audit_derivative_export(
     manifest = seal_derivative_export_manifest(snapshot)
     impl_evidence, package_buildable, package_parity = _implementation_evidence(frozen)
     sample_evidence, sample_present = _sample_data_evidence()
+    lineage = await run_derivative_export_lineage_audit(
+        db,
+        owner_id=current_user.id,
+        novel_id=novel.id,
+        project_id=project_id,
+        snapshot_hash=snapshot.snapshot_hash,
+        manifest_hash=manifest.manifest_hash,
+        storage=_storage(),
+        epub_validated=False,
+        download_manifest_hash=snapshot.snapshot_hash,
+    )
+    shipment = build_derivative_export_shipment_baseline(
+        _shipment_baseline_evidence()
+    )
     report = build_derivative_export_audit(
         manifest=manifest,
         phase22=_phase22_evidence(),
@@ -499,6 +581,8 @@ async def audit_derivative_export(
         package_buildable=package_buildable,
         package_manifest_hash_parity=package_parity,
         sample_data_present=sample_present,
+        lineage=lineage,
+        shipment=shipment,
     )
     return report
 

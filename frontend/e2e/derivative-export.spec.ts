@@ -165,8 +165,38 @@ const auditReport = {
     { dimension: "sample_data_coverage", status: "verified", blocked_reasons: [], evidence: [] },
     { dimension: "quality_qualification", status: "blocked", blocked_reasons: [H(11)], evidence: [] },
   ],
+  // Phase 39-04: the independent lineage audit (source snapshot -> preparation
+  // artifact -> approve_export approval -> materialized bundle -> download) and
+  // the honest REQ-SHIP-01 production baseline ride on the same report. The
+  // verdict stays blocked while any lineage check, shipment item or Phase 22
+  // evidence is non-verified — never promotion.
+  lineage: {
+    schema_version: "derivative-export-lineage-audit.v1",
+    checks: [
+      { kind: "source_snapshot", status: "verified", raw_evidence_link: "backend/app/services/derivative_export/snapshot.py", detail: "snapshot hash replays" },
+      { kind: "manifest", status: "verified", raw_evidence_link: "backend/app/services/derivative_export/manifest.py", detail: "manifest replays" },
+      { kind: "parity", status: "verified", raw_evidence_link: "backend/app/services/derivative_export/package.py", detail: "parity clean" },
+      { kind: "preparation_hash", status: "verified", raw_evidence_link: "backend/app/services/derivative_export/preparation.py", detail: "preparation hash replays" },
+      { kind: "preparation_payload", status: "verified", raw_evidence_link: "backend/app/services/derivative_export/preparation.py", detail: "payload replays" },
+      { kind: "artifact_binding", status: "verified", raw_evidence_link: "backend/app/models/agent_runtime.py:Artifact", detail: "approved artifact bound" },
+      { kind: "approval_binding", status: "verified", raw_evidence_link: "backend/app/models/agent_runtime.py:ApprovalRequest", detail: "approved approval bound" },
+      { kind: "materialization", status: "verified", raw_evidence_link: "backend/app/services/derivative_export/package.py", detail: "bundle replays" },
+      { kind: "download_audit", status: "verified", raw_evidence_link: "backend/app/api/derivative_export.py", detail: "download replays" },
+      { kind: "epub_validation", status: "blocked", raw_evidence_link: "backend/app/services/derivative_export/epub.py", detail: "EPUB 互操作性未验证", blocked_reasons: ["epub_interoperability_unverified"] },
+    ],
+  },
+  shipment: {
+    schema_version: "derivative-export-shipment-baseline.v1",
+    items: [
+      { requirement: "tls", status: "blocked", raw_evidence_link: "docs/DEPLOYMENT.md#Production-Blockers", detail: "no TLS ingress evidence" },
+      { requirement: "secret_sourcing_rotation", status: "unverified", raw_evidence_link: "docs/DEPLOYMENT.md", detail: "provider key rotation only" },
+      { requirement: "backup_restore_drill", status: "blocked", raw_evidence_link: "docs/DEPLOYMENT.md#Production-Blockers", detail: "no backup/restore drill evidence" },
+      { requirement: "monitoring_alert", status: "blocked", raw_evidence_link: "docs/DEPLOYMENT.md#Production-Blockers", detail: "no monitoring/alert evidence" },
+      { requirement: "cost_budget", status: "unverified", raw_evidence_link: "backend/app/models/agent_runtime.py:SkillRun", detail: "per-run budgets only" },
+    ],
+  },
   verdict: "blocked",
-  blocked_reasons: [H(11)],
+  blocked_reasons: [H(11), "lineage_blocked:epub_validation", "shipment_blocked:tls"],
   report_hash: H(12),
   phase22: {
     green_observed: 0,
@@ -450,6 +480,23 @@ test.describe("derivative export browser UAT", () => {
       { timeout: 20_000 }
     );
     await expect(page.getByTestId("derivative-export-done-markdown")).not.toContainText("质量通过");
+  });
+
+  test("lineage + REQ-SHIP-01 baseline: verdict stays blocked, never promotion", async ({ page }) => {
+    const state = freshState();
+    await mockApp(page, state);
+    await gotoWriting(page);
+    await readyPanel(page);
+
+    // Phase 39-04 release gate: the extended report carries an independent
+    // lineage audit and the REQ-SHIP-01 baseline; any blocked check (unverified
+    // EPUB, missing TLS/backup/monitoring evidence, Phase 22 0/3) keeps the
+    // verdict blocked — the UI never renders a promotion / green state.
+    await expect(page.getByTestId("derivative-export-audit")).toHaveAttribute("data-verdict", "blocked");
+    await expect(page.getByTestId("derivative-export-verdict")).toHaveTextContent("阻断（不可发布）");
+    await expect(page.getByTestId("derivative-export-phase22")).toHaveTextContent("0/3");
+    await expect(page.getByText("阻断（不可发布）")).toHaveCount(1);
+    await expect(page.getByText("合格候选")).toHaveCount(0);
   });
 
   test("epub download reports interoperability explicitly unverified (not green)", async ({ page }) => {
