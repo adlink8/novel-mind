@@ -57,6 +57,8 @@ export function toPiSkill(skill: LoadedSkill): Skill {
 export interface CreateSessionOptions {
   /** 运行级授权：FastAPI 铸造的 per-run 内部令牌（工具门面转发，绝不落日志）。 */
   auth: string;
+  /** run 绑定的 novel_id：工具调用 query 强绑定（不信任模型填的 novel_id）。 */
+  novelId: number;
   /** 已 fail-closed 校验的激活技能（loader 产出）。 */
   skill: LoadedSkill;
   /**
@@ -122,7 +124,7 @@ export async function createSession(opts: CreateSessionOptions): Promise<AgentSe
     sessionManager: SessionManager.inMemory(),
     noTools: "all",
     tools,
-    customTools: buildDomainTools(auth),
+    customTools: buildDomainTools(auth, opts.novelId),
     modelRuntime,
     model: buildGatewayModel(),
   });

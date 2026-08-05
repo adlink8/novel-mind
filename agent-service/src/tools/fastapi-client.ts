@@ -91,21 +91,27 @@ export async function fastapiToolCall(
   params: unknown,
   signal: AbortSignal | undefined,
   auth: string,
+  runNovelId: number,
 ): Promise<{ content: [{ type: "text"; text: string }]; details: Record<string, never> }> {
   const runSignal = signal ?? new AbortController().signal;
   // per-tool 硬超时与运行取消的并集：任一触发即中断 fetch。
   const ctrl = AbortSignal.any([runSignal, AbortSignal.timeout(TOOL_TIMEOUT_MS)]);
+  // novel_id 经查询参数注入（后端 require_owned_novel），且**始终使用 run 绑定的
+  // novel_id**（不信任模型在工具参数里填的 novel_id——模型可能猜测/填错，auth 校验
+  // 按 run.novel_id 强绑定）。body 只留工具自身参数。
+  const { novel_id: _ignored, ...toolParams } = (params ?? {}) as Record<string, unknown>;
+  const query = `?novel_id=${encodeURIComponent(String(runNovelId))}`;
 
   let res: Response;
   try {
-    res = await fetch(`${config.fastApiBaseUrl}/api/agent-tools/${name}`, {
+    res = await fetch(`${config.fastApiBaseUrl}/api/agent-tools/${name}${query}`, {
       method: "POST",
       headers: {
         "content-type": "application/json",
         // 原样透传：令牌只在请求头中流动，绝不写日志 / 错误信息。
         authorization: auth,
       },
-      body: JSON.stringify(params),
+      body: JSON.stringify(toolParams),
       signal: ctrl,
     });
   } catch (err) {

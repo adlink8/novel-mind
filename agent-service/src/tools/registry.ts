@@ -49,7 +49,7 @@ export type ToolAuth = string;
 /**
  * 构建 7 个域工具数组，携带给定的运行级授权（每次 run 分发时以 per-run 内部令牌调用）。
  */
-export function buildDomainTools(auth: ToolAuth) {
+export function buildDomainTools(auth: ToolAuth, runNovelId: number) {
   return [
     defineTool({
       name: "get_novel",
@@ -60,7 +60,7 @@ export function buildDomainTools(auth: ToolAuth) {
         novel_id: Type.Integer({ minimum: 1, description: "小说 ID" }),
       }),
       execute: (toolCallId, params, signal) =>
-        fastapiToolCall("get_novel", params as unknown, signal, auth),
+        fastapiToolCall("get_novel", params as unknown, signal, auth, runNovelId),
     }),
     defineTool({
       name: "get_chapter",
@@ -72,7 +72,7 @@ export function buildDomainTools(auth: ToolAuth) {
         chapter_id: Type.Integer({ minimum: 1, description: "章节 ID" }),
       }),
       execute: (toolCallId, params, signal) =>
-        fastapiToolCall("get_chapter", params as unknown, signal, auth),
+        fastapiToolCall("get_chapter", params as unknown, signal, auth, runNovelId),
     }),
     defineTool({
       name: "search_novel_text",
@@ -87,7 +87,7 @@ export function buildDomainTools(auth: ToolAuth) {
         ),
       }),
       execute: (toolCallId, params, signal) =>
-        fastapiToolCall("search_novel_text", params as unknown, signal, auth),
+        fastapiToolCall("search_novel_text", params as unknown, signal, auth, runNovelId),
     }),
     defineTool({
       name: "get_timeline",
@@ -101,7 +101,7 @@ export function buildDomainTools(auth: ToolAuth) {
         ),
       }),
       execute: (toolCallId, params, signal) =>
-        fastapiToolCall("get_timeline", params as unknown, signal, auth),
+        fastapiToolCall("get_timeline", params as unknown, signal, auth, runNovelId),
     }),
     defineTool({
       name: "get_relationships",
@@ -115,7 +115,7 @@ export function buildDomainTools(auth: ToolAuth) {
         ),
       }),
       execute: (toolCallId, params, signal) =>
-        fastapiToolCall("get_relationships", params as unknown, signal, auth),
+        fastapiToolCall("get_relationships", params as unknown, signal, auth, runNovelId),
     }),
     defineTool({
       name: "get_clues",
@@ -129,7 +129,7 @@ export function buildDomainTools(auth: ToolAuth) {
         ),
       }),
       execute: (toolCallId, params, signal) =>
-        fastapiToolCall("get_clues", params as unknown, signal, auth),
+        fastapiToolCall("get_clues", params as unknown, signal, auth, runNovelId),
     }),
     defineTool({
       name: "get_narrative_memory",
@@ -141,7 +141,7 @@ export function buildDomainTools(auth: ToolAuth) {
         query: Type.String({ minLength: 1, description: "结构化查询语句" }),
       }),
       execute: (toolCallId, params, signal) =>
-        fastapiToolCall("get_narrative_memory", params as unknown, signal, auth),
+        fastapiToolCall("get_narrative_memory", params as unknown, signal, auth, runNovelId),
     }),
     // ── Phase 27 世界模型只读工具（27-05）──
     defineTool({
@@ -159,7 +159,7 @@ export function buildDomainTools(auth: ToolAuth) {
         ),
       }),
       execute: (toolCallId, params, signal) =>
-        fastapiToolCall("get_events", params as unknown, signal, auth),
+        fastapiToolCall("get_events", params as unknown, signal, auth, runNovelId),
     }),
     defineTool({
       name: "get_character_state",
@@ -180,7 +180,7 @@ export function buildDomainTools(auth: ToolAuth) {
         ),
       }),
       execute: (toolCallId, params, signal) =>
-        fastapiToolCall("get_character_state", params as unknown, signal, auth),
+        fastapiToolCall("get_character_state", params as unknown, signal, auth, runNovelId),
     }),
     defineTool({
       name: "get_character_knowledge",
@@ -201,7 +201,7 @@ export function buildDomainTools(auth: ToolAuth) {
         ),
       }),
       execute: (toolCallId, params, signal) =>
-        fastapiToolCall("get_character_knowledge", params as unknown, signal, auth),
+        fastapiToolCall("get_character_knowledge", params as unknown, signal, auth, runNovelId),
     }),
     defineTool({
       name: "get_world_rules",
@@ -218,7 +218,7 @@ export function buildDomainTools(auth: ToolAuth) {
         ),
       }),
       execute: (toolCallId, params, signal) =>
-        fastapiToolCall("get_world_rules", params as unknown, signal, auth),
+        fastapiToolCall("get_world_rules", params as unknown, signal, auth, runNovelId),
     }),
     defineTool({
       name: "get_evidence_span",
@@ -238,7 +238,7 @@ export function buildDomainTools(auth: ToolAuth) {
         }),
       }),
       execute: (toolCallId, params, signal) =>
-        fastapiToolCall("get_evidence_span", params as unknown, signal, auth),
+        fastapiToolCall("get_evidence_span", params as unknown, signal, auth, runNovelId),
     }),
     // ── Phase 30 Visual Bible 只读工具（31-04）──
     defineTool({
@@ -256,7 +256,7 @@ export function buildDomainTools(auth: ToolAuth) {
         ),
       }),
       execute: (toolCallId, params, signal) =>
-        fastapiToolCall("get_visual_bible", params as unknown, signal, auth),
+        fastapiToolCall("get_visual_bible", params as unknown, signal, auth, runNovelId),
     }),
     // ── Phase 33 候选生成 action 工具（33-05）──
     defineTool({
@@ -285,7 +285,7 @@ export function buildDomainTools(auth: ToolAuth) {
         ),
       }),
       execute: (toolCallId, params, signal) =>
-        fastapiToolCall("generate_image_candidate", params as unknown, signal, auth),
+        fastapiToolCall("generate_image_candidate", params as unknown, signal, auth, runNovelId),
     }),
     // ── Phase 34 锚点提议 action 工具（34-05）──
     defineTool({
@@ -295,7 +295,7 @@ export function buildDomainTools(auth: ToolAuth) {
         "Phase 34 action（REQ-VIS-05 / REQ-AGENT-03/04/07）：提议发布**一个**锚点（candidate-only）。服务端 proposal gate 只接受 proposal-ready + rights cleared 的 AssetRevision（Phase 33 handoff）与精确 source span（excerpt + anchor_hash + chapter_content_hash + source snapshot，D-34-01）；创建候选 IllustrationAnchorProposal + pending Web ApprovalRequest（action=publish_illustration，payload_hash 确定性重放）。绝不发布——确定性 publisher 在用户 Web 批准后原子校验 approval + payload + scope 才创建 valid anchor；Agent/浏览器绝不发布。",
       parameters: anchorActionParams(),
       execute: (toolCallId, params, signal) =>
-        fastapiToolCall("publish_illustration", params as unknown, signal, auth),
+        fastapiToolCall("publish_illustration", params as unknown, signal, auth, runNovelId),
     }),
     defineTool({
       name: "attach_illustration_to_text",
@@ -304,7 +304,7 @@ export function buildDomainTools(auth: ToolAuth) {
         "Phase 34 action（REQ-VIS-05 / REQ-AGENT-03/04/07）：提议把锚点绑定到**精确文本跨度**（candidate-only）。服务端 proposal gate 只接受 proposal-ready + rights cleared 的 AssetRevision 与精确 source span/hash（D-34-01）；创建候选 IllustrationAnchorProposal + pending Web ApprovalRequest（action=attach_illustration_to_text，payload_hash 确定性重放）。绝不发布——确定性 publisher 在用户 Web 批准后原子校验 approval + payload + scope 才创建 valid anchor；Agent/浏览器绝不发布。",
       parameters: anchorActionParams(),
       execute: (toolCallId, params, signal) =>
-        fastapiToolCall("attach_illustration_to_text", params as unknown, signal, auth),
+        fastapiToolCall("attach_illustration_to_text", params as unknown, signal, auth, runNovelId),
     }),
     // ── Phase 35 canon fork 提议 action 工具（35-05）──
     defineTool({
@@ -314,7 +314,7 @@ export function buildDomainTools(auth: ToolAuth) {
         "Phase 35 action（REQ-FORK-01 / REQ-AGENT-03/04/07）：提议**一个** canon fork（candidate-only）。服务端 proposal gate 只接受冻结 fork manifest（server-derived cutoff + 精确 source snapshot，D-35-03）+ delta 意图（delta_key + delta_content）；创建候选 CanonFork（status=candidate）+ pending Web ApprovalRequest（action=create_canon_fork，payload_hash 确定性重放）。绝不物化 fork——确定性 Fork materializer（app.services.canon_fork.materializer）在用户 Web 批准后原子校验 approval + payload + fork manifest + snapshot 重放 + delta 血缘 + owner/novel/branch/fork scope 才把 fork 物化为 approved；Original Canon 不可变、active pointer 恒 false。",
       parameters: canonForkParams(),
       execute: (toolCallId, params, signal) =>
-        fastapiToolCall("create_canon_fork", params as unknown, signal, auth),
+        fastapiToolCall("create_canon_fork", params as unknown, signal, auth, runNovelId),
     }),
     // ── Phase 36 derivative 编辑提议 action 工具（36-05）──
     defineTool({
@@ -324,7 +324,7 @@ export function buildDomainTools(auth: ToolAuth) {
         "Phase 36 action（REQ-FORK-02 / REQ-AGENT-03/04/07）：提议**一个**派生 chapter patch（candidate-only）。服务端 proposal gate 只接受冻结 source snapshot 血缘 + 有效 project/chapter scope + base_revision CAS 锚（D-36-02）；创建候选 DerivativeEditProposal（proposal_status=proposed）+ pending Web ApprovalRequest（action=apply_derivative_edit，payload_hash 确定性重放）。绝不直接应用——确定性 Revision Service（app.services.derivative_editor.revisions.apply_agent_edit）在用户 Web 批准后原子校验 approval + payload + 冻结 proposal artifact 血缘 + owner/novel/branch/fork scope + 同一 base_revision CAS 才把 approved proposal 应用为 append-only agent_proposal 修订；Agent 绝不写 Original Canon / user autosave / published 状态。",
       parameters: derivativeEditParams(),
       execute: (toolCallId, params, signal) =>
-        fastapiToolCall("apply_derivative_edit", params as unknown, signal, auth),
+        fastapiToolCall("apply_derivative_edit", params as unknown, signal, auth, runNovelId),
     }),
     // ── Phase 37 derivative generation action 工具（37-05）──
     defineTool({
@@ -334,7 +334,7 @@ export function buildDomainTools(auth: ToolAuth) {
         "Phase 37 action（REQ-FORK-03 / REQ-AGENT-03/04/07）：为 blocked / needs_override 生成候选提议**一个**显式 divergence override（candidate-only）。服务端 override gate 只接受理由 + 受影响 leaf 证据（或候选已声明的 CanonDelta），并校验 draft_hash / canon_delta_hash 从候选确定性血缘重放（drift → fail closed）；创建 pending DerivativeOverride + pending Web ApprovalRequest（action=allow_divergence，payload_hash 绑定 exact draft_hash + canon_delta_hash）。绝不发布——只有先确认本 approval 再经独立 publish_derivative_revision approval 后由确定性 revision publisher 物化；Agent 绝不写 Original Canon / 域表 / published 状态。",
       parameters: allowDivergenceParams(),
       execute: (toolCallId, params, signal) =>
-        fastapiToolCall("allow_divergence", params as unknown, signal, auth),
+        fastapiToolCall("allow_divergence", params as unknown, signal, auth, runNovelId),
     }),
     defineTool({
       name: "publish_derivative_revision",
@@ -343,7 +343,7 @@ export function buildDomainTools(auth: ToolAuth) {
         "Phase 37 action（REQ-FORK-03 / REQ-AGENT-03/04/07）：只在 allow_divergence approval 已批准 + 完整 revalidation 通过后为同一候选提议**一个**独立 publish ApprovalRequest（candidate-only）。服务端绑定与 allow_divergence approval **完全相同**的 draft_hash + canon_delta_hash（相同 hash 绑定；跳过/漂移 → fail closed），绝不复用 allow_divergence approval——只有独立 publish approval 被用户批准后，确定性 revision publisher（consume_publish_approval）才能物化 Fanfiction Canon 修订；Agent 绝不写 Original Canon / 域表 / published 状态。",
       parameters: publishDerivativeRevisionParams(),
       execute: (toolCallId, params, signal) =>
-        fastapiToolCall("publish_derivative_revision", params as unknown, signal, auth),
+        fastapiToolCall("publish_derivative_revision", params as unknown, signal, auth, runNovelId),
     }),
     // ── Phase 38 branch-aware derivative visual action 工具（38-05）──
     defineTool({
@@ -353,7 +353,7 @@ export function buildDomainTools(auth: ToolAuth) {
         "Phase 38 action（REQ-FORK-04 / REQ-AGENT-03/04/07）：为已存储 derivative candidate asset 提议**一个**独立 publish ApprovalRequest（candidate-only）。服务端 action 只接受 owner/novel/fork scope 内可批准（candidate/needs_review）的候选，payload_hash 绑定候选冻结血缘（asset_id/content_hash/scene_spec_hash/divergence_manifest_hash/consistency_verdict/source_snapshot_hash/fork_id；blocked candidate / wrong owner/branch/fork → fail closed）。绝不发布——只有独立 publish_derivative_visual approval 被用户批准后，确定性 review seam（review_candidate_asset）才能把 candidate 物化为 approved published asset；Agent 绝不写 Original Canon / Visual Bible / domain 表 / published 状态。",
       parameters: publishDerivativeVisualParams(),
       execute: (toolCallId, params, signal) =>
-        fastapiToolCall("publish_derivative_visual", params as unknown, signal, auth),
+        fastapiToolCall("publish_derivative_visual", params as unknown, signal, auth, runNovelId),
     }),
     // ── Phase 39 derivative export action 工具（39-05）──
     defineTool({
@@ -363,7 +363,7 @@ export function buildDomainTools(auth: ToolAuth) {
         "Phase 39 action（REQ-FORK-05 / REQ-AGENT-03/04/07）：为已 finalize 候选 ExportPreparationArtifact 提议**一个**独立 approve_export ApprovalRequest（candidate-only）。服务端 action 只接受 owner/novel/branch/fork/project scope 内的 candidate artifact，payload_hash 绑定 artifact revision + 确定性 preparation_hash（服务端重放冻结 manifest；wrong owner/branch/fork/stale hash → fail closed）。绝不物化——只有独立 approve_export approval 被用户批准后，确定性 materializer（materialize_export）才能把候选 artifact 推进为 approved 并产出可复现 bundle；Agent 绝不写 Original Canon / 域表 / Artifact 状态 / bundle。",
       parameters: approveExportParams(),
       execute: (toolCallId, params, signal) =>
-        fastapiToolCall("approve_export", params as unknown, signal, auth),
+        fastapiToolCall("approve_export", params as unknown, signal, auth, runNovelId),
     }),
     defineTool({
       name: "materialize_export",
@@ -372,7 +372,7 @@ export function buildDomainTools(auth: ToolAuth) {
         "Phase 39 action（REQ-FORK-05 / REQ-AGENT-03/04/07）：确定性 materializer 消费一个已批准的 approve_export ApprovalRequest（candidate-only 边界）。只接受 owner/novel/branch/fork/project scope 内已 finalize 的候选 ExportPreparationArtifact + preparation_hash 匹配的 approve_export approval；服务端原子校验 approval action + 相同 preparation_hash 绑定 + artifact revision 血缘 + 冻结 manifest 重放，才把候选 artifact 推进为 approved 并产出可复现 bundle（Markdown/EPUB/package 由 frozen manifest 复算）。download 只读、永不改变 Artifact status / approval lineage。forged/expired/cancelled/rejected approval、stale hash、wrong scope、pending/rejected artifact → fail closed，无 bundle 或权威写入。",
       parameters: materializeExportParams(),
       execute: (toolCallId, params, signal) =>
-        fastapiToolCall("materialize_export", params as unknown, signal, auth),
+        fastapiToolCall("materialize_export", params as unknown, signal, auth, runNovelId),
     }),
   ];
 }

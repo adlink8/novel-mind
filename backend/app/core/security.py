@@ -5,6 +5,7 @@
 """
 
 from datetime import datetime, timedelta, timezone
+import hashlib
 import uuid
 from typing import Optional
 
@@ -251,3 +252,67 @@ async def require_gateway_token(
             detail="无效的网关令牌",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+
+class AgentActor:
+    """internal_token 场景下的轻量调用方身份（agent-service 工具门面）。
+
+    携带 owner_id（=id）与 novel_id（skill_run 绑定），兼容 User 的
+    `id`/`is_superuser` 访问面，供 agent_tools 路由复用现有 owner 校验。
+    """
+
+    def __init__(self, *, id: int, novel_id: int, is_superuser: bool = False) -> None:
+        self.id = id
+        self.novel_id = novel_id
+        self.is_superuser = is_superuser
+
+
+async def require_agent_actor(
+    novel_id: int,
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_scheme),
+    db: AsyncSession = Depends(get_db),
+) -> User | AgentActor:
+    """agent_tools 门面认证：接受用户 JWT 或 per-run 内部令牌。
+
+    - JWT：现有 `get_current_user` 语义（浏览器 / 直接 API 调用）；
+    - internal_token：25.2-03 per-run 短命令牌。按 sha256(token) 匹配
+      skill_runs.internal_token_hash，且 novel_id 必须与请求路径 novel_id 一致、
+      状态为 queued/running（活跃 run）。命中返回 AgentActor（owner_id 即
+      skill_run.owner_id，fail-closed：无活跃 run 一律 401）。
+    """
+    token = (
+        credentials.credentials
+        if credentials
+        else request.cookies.get(AUTH_COOKIE_NAME)
+    )
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="需要登录",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    # 1) 先试用户 JWT（浏览器/直接 API）。
+    if credentials is not None and token.startswith("ey"):
+        user = await get_current_user(request, credentials, db)
+        if user is not None:
+            return user
+    # 2) internal_token（agent-service 工具门面）。
+    token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    from app.models.agent_runtime import SkillRun
+
+    result = await db.execute(
+        select(SkillRun).where(
+            SkillRun.internal_token_hash == token_hash,
+            SkillRun.novel_id == novel_id,
+            SkillRun.status.in_(("queued", "running")),
+        )
+    )
+    run = result.scalars().first()
+    if run is not None:
+        return AgentActor(id=run.owner_id, novel_id=run.novel_id)
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="无效的认证凭证",
+        headers={"WWW-Authenticate": "Bearer"},
+    )

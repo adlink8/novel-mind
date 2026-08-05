@@ -629,6 +629,7 @@ describe("会话工厂从 manifest 派生 allowlist（drift-guard / T-25.3-02-04
   it("factory: allowlist 源自 manifest（缺省 = 域工具清单全启用）", async () => {
     const skill = fakeSkillOnDisk(["get_novel", "get_chapter"]);
     await createSession({
+      novelId: 1,
       auth: "Bearer t",
       skill,
       modelRuntime: {} as never,
@@ -645,6 +646,7 @@ describe("会话工厂从 manifest 派生 allowlist（drift-guard / T-25.3-02-04
     // 技能只声明启用条目；禁用条目（get_novel）绝不进入会话 tools
     const skill = fakeSkillOnDisk(["get_chapter"]);
     await createSession({
+      novelId: 1,
       auth: "Bearer t",
       skill,
       modelRuntime: {} as never,
@@ -663,7 +665,8 @@ describe("会话工厂从 manifest 派生 allowlist（drift-guard / T-25.3-02-04
     const skill = fakeSkillOnDisk(["get_novel", "get_chapter"]);
     await expect(
       createSession({
-        auth: "Bearer t",
+      novelId: 1,
+      auth: "Bearer t",
         skill,
         modelRuntime: {} as never,
         dirs: createControlledAgentDir(),
@@ -680,7 +683,8 @@ describe("会话工厂从 manifest 派生 allowlist（drift-guard / T-25.3-02-04
     const skill = fakeSkill(["get_novel", "get_secret_ext"]);
     await expect(
       createSession({
-        auth: "Bearer t",
+      novelId: 1,
+      auth: "Bearer t",
         skill,
         modelRuntime: {} as never,
         dirs: createControlledAgentDir(),

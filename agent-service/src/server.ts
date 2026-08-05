@@ -422,6 +422,7 @@ async function handleRun(
   try {
     session = await deps.createSessionImpl({
       auth: `Bearer ${internalToken}`,
+      novelId,
       skill,
       manifest,
     });

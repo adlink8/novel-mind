@@ -40,13 +40,15 @@ router = APIRouter(dependencies=[Depends(require_gateway_token)])
 
 class GatewayChatMessage(BaseModel):
     """OpenAI 消息子集；content 允许字符串或文本块数组。Pi 的 assistant 消息
-    可能携带 tool_calls（工具调用回传），显式允许但不消费。"""
+    可能携带 tool_calls，tool 消息携带 tool_call_id（工具结果回传）。"""
 
     model_config = ConfigDict(extra="forbid")
 
-    role: Literal["system", "user", "assistant"]
+    role: Literal["system", "user", "assistant", "tool"]
     content: Any
     tool_calls: list[dict[str, Any]] | None = Field(default=None)
+    tool_call_id: str | None = Field(default=None)
+    name: str | None = Field(default=None)
 
 
 class GatewayChatRequest(BaseModel):
@@ -121,8 +123,9 @@ def _normalize_messages(messages: list[GatewayChatMessage]) -> list[dict[str, An
     out: list[dict[str, Any]] = []
     for m in messages:
         content = m.content
+        normalized: dict[str, Any] = {"role": m.role}
         if isinstance(content, str):
-            out.append({"role": m.role, "content": content})
+            normalized["content"] = content
         elif isinstance(content, list):
             parts: list[str] = []
             for part in content:
@@ -132,9 +135,17 @@ def _normalize_messages(messages: list[GatewayChatMessage]) -> list[dict[str, An
                         parts.append(text)
                 elif isinstance(part, str):
                     parts.append(part)
-            out.append({"role": m.role, "content": "".join(parts)})
+            normalized["content"] = "".join(parts)
         elif content is not None:
-            out.append({"role": m.role, "content": str(content)})
+            normalized["content"] = str(content)
+        if m.tool_calls is not None:
+            normalized["tool_calls"] = m.tool_calls
+        if m.role == "tool":
+            # Pi 的 tool 消息经 content 之外的字段（tool_call_id）关联；模型层
+            # 需要 tool_call_id + name 才能映射到 Gemini functionResponse。
+            normalized["tool_call_id"] = getattr(m, "tool_call_id", None)
+            normalized["name"] = getattr(m, "name", None)
+        out.append(normalized)
     return out
 
 
@@ -148,6 +159,7 @@ async def _non_stream_completion(payload: GatewayChatRequest) -> dict[str, Any]:
             max_tokens=payload.max_tokens or 4096,
             stream=False,
             task_type="gateway",
+            tools=payload.tools,
         )
     except Exception as exc:  # noqa: BLE001 - 统一 OpenAI 错误形状
         logger.exception("网关非流式调用失败: %s", exc)
@@ -165,11 +177,19 @@ async def _non_stream_completion(payload: GatewayChatRequest) -> dict[str, Any]:
     if isinstance(response, dict):
         choices = response.get("choices") or []
         content = ""
+        tool_calls = None
         if choices and isinstance(choices[0], dict):
-            content = choices[0].get("message", {}).get("content", "") or ""
+            message = choices[0].get("message", {})
+            content = message.get("content", "") or ""
+            tool_calls = message.get("tool_calls")
     else:
-        content = response.choices[0].message.content or ""
+        message = response.choices[0].message
+        content = message.content or ""
+        tool_calls = getattr(message, "tool_calls", None)
 
+    msg: dict[str, Any] = {"role": "assistant", "content": content}
+    if tool_calls:
+        msg["tool_calls"] = tool_calls
     return {
         "id": _response_id(response),
         "object": "chat.completion",
@@ -178,8 +198,8 @@ async def _non_stream_completion(payload: GatewayChatRequest) -> dict[str, Any]:
         "choices": [
             {
                 "index": 0,
-                "message": {"role": "assistant", "content": content},
-                "finish_reason": "stop",
+                "message": msg,
+                "finish_reason": "tool_calls" if tool_calls else "stop",
             }
         ],
         "usage": _usage_dict(getattr(response, "usage", None)),
@@ -190,12 +210,47 @@ async def _stream_completion(payload: GatewayChatRequest):
     """流式：包装 AIService.stream_chat 为 OpenAI SSE chunk，以 [DONE] 收尾。"""
     stream_id = f"chatcmpl-{uuid.uuid4().hex[:24]}"
     created = int(time.time())
+    tool_calls_sent = False
     try:
         async for delta in ai_service.stream_chat(
             messages=_normalize_messages(payload.messages),
             model=await _resolve_gateway_model(payload.model),
             task_type="gateway",
+            tools=payload.tools,
         ):
+            if isinstance(delta, dict) and "__tool_calls__" in delta:
+                # 工具调用：yield delta.tool_calls chunk（Pi openai-completions 契约）。
+                chunk = {
+                    "id": stream_id,
+                    "object": "chat.completion.chunk",
+                    "created": created,
+                    "model": payload.model,
+                    "choices": [
+                        {
+                            "index": 0,
+                            "delta": {
+                                "tool_calls": [
+                                    {
+                                        "index": i,
+                                        "id": tc.get("id"),
+                                        "type": "function",
+                                        "function": {
+                                            "name": tc.get("function", {}).get("name"),
+                                            "arguments": tc.get("function", {}).get(
+                                                "arguments", "{}"
+                                            ),
+                                        },
+                                    }
+                                    for i, tc in enumerate(delta["__tool_calls__"])
+                                ]
+                            },
+                            "finish_reason": None,
+                        }
+                    ],
+                }
+                yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
+                tool_calls_sent = True
+                continue
             chunk = {
                 "id": stream_id,
                 "object": "chat.completion.chunk",
@@ -210,7 +265,7 @@ async def _stream_completion(payload: GatewayChatRequest):
                 ],
             }
             yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
-        # OpenAI SSE 契约：内容结束后必须有一个带 finish_reason:"stop" 的终止 chunk，
+        # OpenAI SSE 契约：内容结束后必须有一个带 finish_reason 的终止 chunk，
         # 之后才是 [DONE]。Pi openai-completions 客户端依赖它结束流。
         yield (
             "data: "
@@ -220,7 +275,13 @@ async def _stream_completion(payload: GatewayChatRequest):
                     "object": "chat.completion.chunk",
                     "created": created,
                     "model": payload.model,
-                    "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
+                    "choices": [
+                        {
+                            "index": 0,
+                            "delta": {},
+                            "finish_reason": "tool_calls" if tool_calls_sent else "stop",
+                        }
+                    ],
                 },
                 ensure_ascii=False,
             )

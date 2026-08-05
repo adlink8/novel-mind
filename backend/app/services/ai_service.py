@@ -183,6 +183,7 @@ class AIService:
                     model=model,
                     temperature=temperature,
                     max_tokens=max_tokens,
+                    tools=_extra.get("tools"),
                 )
             else:
                 kwargs: dict = {
@@ -329,6 +330,7 @@ class AIService:
         api_key: str | None = None,
         api_base: str | None = None,
         task_type: str = "analysis",
+        **_extra: object,
     ):
         """
         流式聊天接口（异步生成器）。
@@ -360,7 +362,15 @@ class AIService:
             start = time.perf_counter()
             status = "success"
             try:
-                response = await vertex_acomplete(messages, model=model)
+                response = await vertex_acomplete(
+                    messages, model=model, tools=_extra.get("tools")
+                )
+                tool_calls = getattr(
+                    response.choices[0].message, "tool_calls", None
+                )
+                if tool_calls:
+                    # 工具调用：yield 结构化 dict，gateway 转成 SSE delta.tool_calls。
+                    yield {"__tool_calls__": tool_calls}
                 text = response.choices[0].message.content or ""
                 for i in range(0, len(text), 16):
                     yield text[i : i + 16]

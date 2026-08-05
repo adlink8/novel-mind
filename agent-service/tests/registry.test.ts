@@ -62,7 +62,7 @@ describe("domain tool registry", () => {
   });
 
   it("buildDomainTools 返回 23 个 defineTool，名称与 DOMAIN_TOOL_NAMES 一致", () => {
-    const tools = buildDomainTools("Bearer per-run-token");
+    const tools = buildDomainTools("Bearer per-run-token", 1);
     expect(tools).toHaveLength(23);
     const names = tools.map((t) => t.name);
     expect(names).toEqual([...TOOL_NAMES_23]);
@@ -74,7 +74,7 @@ describe("domain tool registry", () => {
   });
 
   it("每个工具的参数 schema 拒绝错误类型（TypeBox/value）", () => {
-    const tools = buildDomainTools("Bearer t");
+    const tools = buildDomainTools("Bearer t", 1);
     const byName = new Map(tools.map((t) => [t.name, t.parameters]));
 
     // 正整数域：传字符串/小数/负数均拒绝
@@ -121,14 +121,16 @@ describe("fastapi client (facade forwarding)", () => {
     fetchMock.mockResolvedValue(
       new Response('{"data":"ok"}', { status: 200, headers: { "content-type": "application/json" } }),
     );
-    const result = await fastapiToolCall("get_chapter", { novel_id: 1, chapter_id: 2 }, undefined, AUTH);
+    const result = await fastapiToolCall("get_chapter", { novel_id: 1, chapter_id: 2 }, undefined, AUTH, 1);
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("http://127.0.0.1:8000/api/agent-tools/get_chapter");
+    expect(url).toBe(
+      "http://127.0.0.1:8000/api/agent-tools/get_chapter?novel_id=1"
+    );
     expect(init.method).toBe("POST");
     expect(init.headers).toMatchObject({ authorization: AUTH });
-    expect(JSON.parse(String(init.body))).toEqual({ novel_id: 1, chapter_id: 2 });
+    expect(JSON.parse(String(init.body))).toEqual({ chapter_id: 2 });
     expect(result.content[0].text).toBe('{"data":"ok"}');
   });
 
@@ -137,7 +139,7 @@ describe("fastapi client (facade forwarding)", () => {
       new Response(JSON.stringify({ error: { code: "beyond_cutoff" } }), { status: 422 }),
     );
     await expect(
-      fastapiToolCall("get_chapter", { novel_id: 1, chapter_id: 99 }, undefined, AUTH),
+      fastapiToolCall("get_chapter", { novel_id: 1, chapter_id: 99 }, undefined, AUTH, 1),
     ).rejects.toMatchObject({ code: "beyond_cutoff" });
   });
 
@@ -148,7 +150,7 @@ describe("fastapi client (facade forwarding)", () => {
         new Response(JSON.stringify({ error: { code } }), { status: 400 }),
       );
       await expect(
-        fastapiToolCall("get_novel", { novel_id: 1 }, undefined, AUTH),
+        fastapiToolCall("get_novel", { novel_id: 1 }, undefined, AUTH, 1),
       ).rejects.toMatchObject({ code });
     }
   });
@@ -158,7 +160,7 @@ describe("fastapi client (facade forwarding)", () => {
       new Response(JSON.stringify({ error: { code: "mystery_code" } }), { status: 418 }),
     );
     await expect(
-      fastapiToolCall("get_novel", { novel_id: 1 }, undefined, AUTH),
+      fastapiToolCall("get_novel", { novel_id: 1 }, undefined, AUTH, 1),
     ).rejects.toMatchObject({ code: "upstream_error" });
   });
 
@@ -166,7 +168,7 @@ describe("fastapi client (facade forwarding)", () => {
     const oversized = "x".repeat(TOOL_OUTPUT_BYTE_LIMIT + 1);
     fetchMock.mockResolvedValue(new Response(oversized, { status: 200 }));
     await expect(
-      fastapiToolCall("get_novel", { novel_id: 1 }, undefined, AUTH),
+      fastapiToolCall("get_novel", { novel_id: 1 }, undefined, AUTH, 1),
     ).rejects.toMatchObject({ code: "output_too_large" });
   });
 
@@ -182,7 +184,7 @@ describe("fastapi client (facade forwarding)", () => {
       });
     });
 
-    const promise = fastapiToolCall("get_novel", { novel_id: 1 }, ctrl.signal, AUTH);
+    const promise = fastapiToolCall("get_novel", { novel_id: 1 }, ctrl.signal, AUTH, 1);
     ctrl.abort();
     await expect(promise).rejects.toThrow();
   });
@@ -192,7 +194,7 @@ describe("fastapi client (facade forwarding)", () => {
       new DOMException("The operation was aborted due to timeout", "TimeoutError"),
     );
     await expect(
-      fastapiToolCall("get_novel", { novel_id: 1 }, undefined, AUTH),
+      fastapiToolCall("get_novel", { novel_id: 1 }, undefined, AUTH, 1),
     ).rejects.toMatchObject({ code: "timeout" });
   });
 });

@@ -177,29 +177,147 @@ def is_vertex_model(model: str | None) -> bool:
     return False
 
 
+def _convert_openai_tools(tools: list[dict] | None) -> list[dict] | None:
+    """OpenAI 工具定义 → Gemini functionDeclarations。
+
+    每个 OpenAI tool 形如 {"type":"function","function":{"name","description",
+    "parameters"}}，转为 Gemini {"functionDeclarations":[{"name","description",
+    "parameters"}]}。无工具或空列表返回 None（不携带 tools 字段）。
+    """
+    if not tools:
+        return None
+    decls = []
+    for tool in tools:
+        fn = (tool or {}).get("function") or {}
+        name = fn.get("name")
+        if not name:
+            continue
+        decl = {"name": name, "description": fn.get("description") or ""}
+        params = fn.get("parameters")
+        if params:
+            decl["parameters"] = params
+        decls.append(decl)
+    if not decls:
+        return None
+    return [{"functionDeclarations": decls}]
+
+
+# 进程内缓存：Gemini functionCall `id` → `thoughtSignature`（回传时需附带）。
+# 有界（dict 天然去重；会话级 tool 调用量小）。
+_thought_signatures: dict[str, str] = {}
+
+
 def _messages_to_vertex_contents(
     messages: list[dict],
 ) -> tuple[str | None, list[dict]]:
-    """OpenAI-style messages → (system_instruction, contents)。"""
+    """OpenAI-style messages → (system_instruction, contents)。
+
+    支持 tool 调用回传（Gemini 规则）：
+      - assistant 消息带 `tool_calls` → 独立 model turn，只含 functionCall parts；
+      - `role:"tool"` 消息 → 独立 function role turn，只含 functionResponse part。
+      Gemini 禁止 function_call 与 function_response 混在同一 turn，也要求
+      functionResponse 的 name 与先前 functionCall 一致。
+    """
     system_parts: list[str] = []
     contents: list[dict] = []
+    # tool_call_id → function name 映射（assistant tool_calls 在前，tool 结果在后）。
+    pending_calls: dict[str, str] = {}
     for msg in messages:
         role = (msg.get("role") or "user").lower()
         content = msg.get("content") or ""
         if isinstance(content, list):
-            # multimodal 简化：只拼 text
             content = "".join(
                 p.get("text", "") if isinstance(p, dict) else str(p) for p in content
             )
         if role == "system":
             system_parts.append(str(content))
             continue
+        if role == "tool":
+            # 独立 function role turn，只含 functionResponse。
+            name = (
+                msg.get("name")
+                or pending_calls.get(msg.get("tool_call_id"))
+                or "unknown_tool"
+            )
+            contents.append(
+                {
+                    "role": "function",
+                    "parts": [
+                        {
+                            "functionResponse": {
+                                "name": name,
+                                "response": {"result": str(content)},
+                            }
+                        }
+                    ],
+                }
+            )
+            continue
         vrole = "model" if role == "assistant" else "user"
-        contents.append({"role": vrole, "parts": [{"text": str(content)}]})
+        parts: list[dict[str, Any]] = []
+        if role == "assistant":
+            # 独立 model turn，只含 functionCall（不与文本混）。
+            for tc in msg.get("tool_calls") or []:
+                fn = tc.get("function") or {}
+                name = fn.get("name") or ""
+                args_raw = fn.get("arguments") or "{}"
+                try:
+                    args = json.loads(args_raw) if isinstance(args_raw, str) else args_raw
+                except json.JSONDecodeError:
+                    args = {}
+                fc_part: dict[str, Any] = {"functionCall": {"name": name, "args": args}}
+                # Gemini 新要求：functionCall part 必须带 thought_signature。
+                # tool_call_id 即首次响应的 Gemini functionCall.id，查缓存附加。
+                sig = _thought_signatures.get(tc.get("id"))
+                if sig:
+                    fc_part["thoughtSignature"] = sig
+                parts.append(fc_part)
+                if tc.get("id"):
+                    pending_calls[tc["id"]] = name
+            if not parts:
+                parts.append({"text": str(content)})
+        else:
+            parts.append({"text": str(content)})
+        if parts:
+            contents.append({"role": vrole, "parts": parts})
     system = "\n\n".join(system_parts) if system_parts else None
     if not contents:
         contents = [{"role": "user", "parts": [{"text": ""}]}]
     return system, contents
+
+
+def _extract_function_calls(candidate: dict) -> list[dict] | None:
+    """从 Gemini candidate parts 提取 functionCall → OpenAI tool_calls 格式。
+
+    OpenAI 格式：{"id","type":"function","function":{"name","arguments(JSON str)"}}。
+    无 functionCall 返回 None。
+    同时把 Gemini 返回的 functionCall `id` + `thoughtSignature` 记入进程内缓存，
+    供后续 tool 结果回传时给 functionCall part 附加 thoughtSignature
+    （Gemini 新要求，见 `_messages_to_vertex_contents`）。
+    """
+    parts = candidate.get("content", {}).get("parts", []) or []
+    calls = []
+    for i, p in enumerate(parts):
+        if not isinstance(p, dict):
+            continue
+        fc = p.get("functionCall")
+        if not isinstance(fc, dict):
+            continue
+        call_id = fc.get("id") or f"call_{i}"
+        sig = p.get("thoughtSignature")
+        if sig:
+            _thought_signatures[call_id] = sig
+        calls.append(
+            {
+                "id": call_id,
+                "type": "function",
+                "function": {
+                    "name": fc.get("name") or "",
+                    "arguments": json.dumps(fc.get("args") or {}, ensure_ascii=False),
+                },
+            }
+        )
+    return calls or None
 
 
 def _extract_text(candidate: dict) -> str:
@@ -216,8 +334,17 @@ def _extract_text(candidate: dict) -> str:
     return c if isinstance(c, str) else ""
 
 
-def _to_openai_like_response(text: str, usage: dict[str, Any], model: str) -> Any:
-    """构造与 LiteLLM 兼容的响应对象（choices/message/usage）。"""
+def _to_openai_like_response(
+    text: str,
+    usage: dict[str, Any],
+    model: str,
+    tool_calls: list[dict] | None = None,
+) -> Any:
+    """构造与 LiteLLM 兼容的响应对象（choices/message/usage）。
+
+    tool_calls 非空时 message.tool_calls 携带 OpenAI 格式工具调用
+    （Pi openai-completions 契约）。
+    """
     prompt_tokens = usage.get("promptTokenCount") or usage.get("prompt_tokens")
     completion_tokens = usage.get("candidatesTokenCount") or usage.get(
         "completion_tokens"
@@ -226,8 +353,12 @@ def _to_openai_like_response(text: str, usage: dict[str, Any], model: str) -> An
     return SimpleNamespace(
         choices=[
             SimpleNamespace(
-                message=SimpleNamespace(content=text or "", role="assistant"),
-                finish_reason="stop",
+                message=SimpleNamespace(
+                    content=text or "",
+                    role="assistant",
+                    tool_calls=tool_calls,
+                ),
+                finish_reason="tool_calls" if tool_calls else "stop",
             )
         ],
         usage=SimpleNamespace(
@@ -368,11 +499,14 @@ async def acomplete(
     location: str | None = None,
     timeout: float = 120.0,
     response_json_schema: dict[str, Any] | None = None,
+    tools: list[dict] | None = None,
 ) -> Any:
     """异步调用 Vertex generateContent，返回 OpenAI-like 响应。
 
     response_json_schema: 可选 JSON Schema，启用 application/json 结构化输出
     （供时间线 Timeline gateway 使用）。
+    tools: OpenAI 风格工具定义列表；转成 Gemini functionDeclarations，响应中
+    的 functionCall 以 OpenAI tool_calls 形式返回。
     """
     project = project or settings.gcp_project
     location = location or settings.gcp_location
@@ -411,6 +545,9 @@ async def acomplete(
     }
     if system:
         body["systemInstruction"] = {"parts": [{"text": system}]}
+    vertex_tools = _convert_openai_tools(tools)
+    if vertex_tools:
+        body["tools"] = vertex_tools
 
     last_err: Exception | None = None
     for attempt in range(3):
@@ -438,8 +575,11 @@ async def acomplete(
             if not candidates:
                 raise VertexAPIError(f"Vertex 无 candidates: {str(data)[:300]}")
             text = _extract_text(candidates[0])
+            tool_calls = _extract_function_calls(candidates[0])
             usage = data.get("usageMetadata") or {}
-            return _to_openai_like_response(text, usage, model_id)
+            return _to_openai_like_response(
+                text, usage, model_id, tool_calls=tool_calls
+            )
         except VertexAPIError as e:
             last_err = e
             if e.status_code in (429, 500, 502, 503) and attempt < 2:

@@ -22,8 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import require_owned_novel
 from app.core.database import get_db
-from app.core.security import require_user
-from app.models import Novel, User
+from app.models import Novel
 from app.schemas.agent_tools import (
     AllowDivergenceRequest,
     AnchorProposalActionRequest,
@@ -56,7 +55,7 @@ from app.services.agent_tools.facade import tool_facade
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(dependencies=[Depends(require_user)])
+router = APIRouter()
 
 
 async def _run_tool(
@@ -84,11 +83,11 @@ async def tool_get_novel(
     body: GetNovelRequest | None = None,
     novel: Novel = Depends(require_owned_novel),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_user),
+
 ):
     """获取小说元信息（含章节摘要列表，不含正文）。"""
     return await _run_tool(
-        "get_novel", db=db, novel=novel, owner_id=current_user.id, params=_params(body)
+        "get_novel", db=db, novel=novel, owner_id=novel.owner_id, params=_params(body)
     )
 
 
@@ -97,14 +96,14 @@ async def tool_get_chapter(
     body: GetChapterRequest | None = None,
     novel: Novel = Depends(require_owned_novel),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_user),
+
 ):
     """获取章节全文（受 spoiler cutoff 与 64 KiB 字节上限约束）。"""
     return await _run_tool(
         "get_chapter",
         db=db,
         novel=novel,
-        owner_id=current_user.id,
+        owner_id=novel.owner_id,
         params=_params(body),
     )
 
@@ -114,14 +113,14 @@ async def tool_search_novel_text(
     body: SearchNovelTextRequest | None = None,
     novel: Novel = Depends(require_owned_novel),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_user),
+
 ):
     """小说内全文检索（raw chunks + 知识单元融合）。"""
     return await _run_tool(
         "search_novel_text",
         db=db,
         novel=novel,
-        owner_id=current_user.id,
+        owner_id=novel.owner_id,
         params=_params(body),
     )
 
@@ -131,14 +130,14 @@ async def tool_get_timeline(
     body: GetTimelineRequest | None = None,
     novel: Novel = Depends(require_owned_novel),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_user),
+
 ):
     """时间线事件信封（spoiler cutoff 服务端强制）。"""
     return await _run_tool(
         "get_timeline",
         db=db,
         novel=novel,
-        owner_id=current_user.id,
+        owner_id=novel.owner_id,
         params=_params(body),
     )
 
@@ -148,14 +147,14 @@ async def tool_get_relationships(
     body: GetRelationshipsRequest | None = None,
     novel: Novel = Depends(require_owned_novel),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_user),
+
 ):
     """人物关系图信封（spoiler cutoff 服务端强制）。"""
     return await _run_tool(
         "get_relationships",
         db=db,
         novel=novel,
-        owner_id=current_user.id,
+        owner_id=novel.owner_id,
         params=_params(body),
     )
 
@@ -165,11 +164,11 @@ async def tool_get_clues(
     body: GetCluesRequest | None = None,
     novel: Novel = Depends(require_owned_novel),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_user),
+
 ):
     """线索与伏笔信封（spoiler cutoff 服务端强制）。"""
     return await _run_tool(
-        "get_clues", db=db, novel=novel, owner_id=current_user.id, params=_params(body)
+        "get_clues", db=db, novel=novel, owner_id=novel.owner_id, params=_params(body)
     )
 
 
@@ -178,14 +177,14 @@ async def tool_get_narrative_memory(
     body: GetNarrativeMemoryRequest | None = None,
     novel: Novel = Depends(require_owned_novel),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_user),
+
 ):
     """叙事记忆结构（候选-only，ADR-0002，响应带 release_status="candidate"）。"""
     return await _run_tool(
         "get_narrative_memory",
         db=db,
         novel=novel,
-        owner_id=current_user.id,
+        owner_id=novel.owner_id,
         params=_params(body),
     )
 
@@ -198,14 +197,14 @@ async def tool_get_events(
     body: GetEventsRequest | None = None,
     novel: Novel = Depends(require_owned_novel),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_user),
+
 ):
     """世界模型事件/因果候选投影（D-05 cutoff 服务端强制）。"""
     return await _run_tool(
         "get_events",
         db=db,
         novel=novel,
-        owner_id=current_user.id,
+        owner_id=novel.owner_id,
         params=_params(body),
     )
 
@@ -215,14 +214,14 @@ async def tool_get_character_state(
     body: GetCharacterStateRequest | None = None,
     novel: Novel = Depends(require_owned_novel),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_user),
+
 ):
     """角色状态/目标/动机（REQ-WM-02，D-05 cutoff/POV 服务端强制）。"""
     return await _run_tool(
         "get_character_state",
         db=db,
         novel=novel,
-        owner_id=current_user.id,
+        owner_id=novel.owner_id,
         params=_params(body),
     )
 
@@ -232,14 +231,14 @@ async def tool_get_character_knowledge(
     body: GetCharacterKnowledgeRequest | None = None,
     novel: Novel = Depends(require_owned_novel),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_user),
+
 ):
     """角色知识（REQ-WM-02，D-05 cutoff/POV 服务端强制）。"""
     return await _run_tool(
         "get_character_knowledge",
         db=db,
         novel=novel,
-        owner_id=current_user.id,
+        owner_id=novel.owner_id,
         params=_params(body),
     )
 
@@ -249,14 +248,14 @@ async def tool_get_world_rules(
     body: GetWorldRulesRequest | None = None,
     novel: Novel = Depends(require_owned_novel),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_user),
+
 ):
     """世界规则与规则例外（REQ-WM-03，D-04 例外 first-class，D-05 cutoff 强制）。"""
     return await _run_tool(
         "get_world_rules",
         db=db,
         novel=novel,
-        owner_id=current_user.id,
+        owner_id=novel.owner_id,
         params=_params(body),
     )
 
@@ -266,14 +265,14 @@ async def tool_get_evidence_span(
     body: GetEvidenceSpanRequest | None = None,
     novel: Novel = Depends(require_owned_novel),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_user),
+
 ):
     """leaf 证据跨度（D-07/D-08）：按 chapter+offsets+content_hash 物化原文。"""
     return await _run_tool(
         "get_evidence_span",
         db=db,
         novel=novel,
-        owner_id=current_user.id,
+        owner_id=novel.owner_id,
         params=_params(body),
     )
 
@@ -283,14 +282,14 @@ async def tool_get_visual_bible(
     body: GetVisualBibleRequest | None = None,
     novel: Novel = Depends(require_owned_novel),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_user),
+
 ):
     """Visual Bible 候选版本视图（31-04；owner 范围服务端强制，candidate-only）。"""
     return await _run_tool(
         "get_visual_bible",
         db=db,
         novel=novel,
-        owner_id=current_user.id,
+        owner_id=novel.owner_id,
         params=_params(body),
     )
 
@@ -300,7 +299,7 @@ async def tool_generate_image_candidate(
     body: GenerateImageCandidateRequest | None = None,
     novel: Novel = Depends(require_owned_novel),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_user),
+
 ):
     """Phase 33 候选生成 action（33-05）：创建**一个**候选生成作业。
 
@@ -313,7 +312,7 @@ async def tool_generate_image_candidate(
         "generate_image_candidate",
         db=db,
         novel=novel,
-        owner_id=current_user.id,
+        owner_id=novel.owner_id,
         params=_params(body),
     )
 
@@ -323,7 +322,7 @@ async def tool_publish_illustration(
     body: AnchorProposalActionRequest | None = None,
     novel: Novel = Depends(require_owned_novel),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_user),
+
 ):
     """Phase 34 锚点提议 action（34-05）：创建**一个**候选 proposal + pending
     Web ApprovalRequest（action=publish_illustration，D-11/D-15）。
@@ -338,7 +337,7 @@ async def tool_publish_illustration(
         "publish_illustration",
         db=db,
         novel=novel,
-        owner_id=current_user.id,
+        owner_id=novel.owner_id,
         params=_params(body),
     )
 
@@ -348,7 +347,7 @@ async def tool_attach_illustration_to_text(
     body: AnchorProposalActionRequest | None = None,
     novel: Novel = Depends(require_owned_novel),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_user),
+
 ):
     """Phase 34 锚点提议 action（34-05）：把锚点绑定到**精确文本跨度**（candidate
     -only）。与 publish_illustration 同 gate，但 ApprovalRequest action 为
@@ -358,7 +357,7 @@ async def tool_attach_illustration_to_text(
         "attach_illustration_to_text",
         db=db,
         novel=novel,
-        owner_id=current_user.id,
+        owner_id=novel.owner_id,
         params=_params(body),
     )
 
@@ -368,7 +367,7 @@ async def tool_create_canon_fork(
     body: CreateCanonForkRequest | None = None,
     novel: Novel = Depends(require_owned_novel),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_user),
+
 ):
     """Phase 35 canon fork 提议 action（35-05，REQ-FORK-01 / REQ-AGENT-03/04/07）：
     创建**一个**候选 fork（candidate-only，D-35-03）。
@@ -385,7 +384,7 @@ async def tool_create_canon_fork(
         "create_canon_fork",
         db=db,
         novel=novel,
-        owner_id=current_user.id,
+        owner_id=novel.owner_id,
         params=_params(body),
     )
 
@@ -395,7 +394,7 @@ async def tool_apply_derivative_edit(
     body: ApplyDerivativeEditRequest | None = None,
     novel: Novel = Depends(require_owned_novel),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_user),
+
 ):
     """Phase 36 derivative 编辑提议 action（36-05，REQ-FORK-02 / REQ-AGENT-03/04/07）：
     创建**一个**候选 DerivativeEditProposal（candidate-only，D-36-02）。
@@ -413,7 +412,7 @@ async def tool_apply_derivative_edit(
         "apply_derivative_edit",
         db=db,
         novel=novel,
-        owner_id=current_user.id,
+        owner_id=novel.owner_id,
         params=_params(body),
     )
 
@@ -423,7 +422,7 @@ async def tool_allow_divergence(
     body: AllowDivergenceRequest | None = None,
     novel: Novel = Depends(require_owned_novel),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_user),
+
 ):
     """Phase 37 显式 divergence action（37-05，REQ-FORK-03 / REQ-AGENT-03/04/07）：
     为 blocked / ``needs_override`` 生成候选创建**一个**显式 divergence override
@@ -440,7 +439,7 @@ async def tool_allow_divergence(
         "allow_divergence",
         db=db,
         novel=novel,
-        owner_id=current_user.id,
+        owner_id=novel.owner_id,
         params=_params(body),
     )
 
@@ -450,7 +449,7 @@ async def tool_publish_derivative_revision(
     body: PublishDerivativeRevisionRequest | None = None,
     novel: Novel = Depends(require_owned_novel),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_user),
+
 ):
     """Phase 37 独立 publish approval action（37-05，REQ-FORK-03 / REQ-AGENT-03/04/07）：
     只在 **allow_divergence approval 已批准 + 完整 revalidation 通过** 后才为同一
@@ -466,7 +465,7 @@ async def tool_publish_derivative_revision(
         "publish_derivative_revision",
         db=db,
         novel=novel,
-        owner_id=current_user.id,
+        owner_id=novel.owner_id,
         params=_params(body),
     )
 
@@ -476,7 +475,7 @@ async def tool_publish_derivative_visual(
     body: PublishDerivativeVisualRequest | None = None,
     novel: Novel = Depends(require_owned_novel),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_user),
+
 ):
     """Phase 38 branch-aware derivative visual action（38-05，REQ-FORK-04 /
     REQ-AGENT-03/04/07）：为**一个**已存储 derivative candidate asset 创建
@@ -498,7 +497,7 @@ async def tool_publish_derivative_visual(
         "publish_derivative_visual",
         db=db,
         novel=novel,
-        owner_id=current_user.id,
+        owner_id=novel.owner_id,
         params=_params(body),
     )
 
@@ -508,7 +507,7 @@ async def tool_approve_export(
     body: ApproveExportRequest | None = None,
     novel: Novel = Depends(require_owned_novel),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_user),
+
 ):
     """Phase 39 approve_export action（39-05，REQ-FORK-05 / REQ-AGENT-03/04/07）：
     为**一个**已 finalize 候选 ExportPreparationArtifact 创建**一个** pending
@@ -526,7 +525,7 @@ async def tool_approve_export(
         "approve_export",
         db=db,
         novel=novel,
-        owner_id=current_user.id,
+        owner_id=novel.owner_id,
         params=_params(body),
     )
 
@@ -536,7 +535,7 @@ async def tool_materialize_export(
     body: MaterializeExportRequest | None = None,
     novel: Novel = Depends(require_owned_novel),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_user),
+
 ):
     """Phase 39 materialize_export action（39-05，REQ-FORK-05 / REQ-AGENT-03/04/07）：
     确定性 materializer 消费**一个**已批准的 approve_export ApprovalRequest。
@@ -554,6 +553,6 @@ async def tool_materialize_export(
         "materialize_export",
         db=db,
         novel=novel,
-        owner_id=current_user.id,
+        owner_id=novel.owner_id,
         params=_params(body),
     )

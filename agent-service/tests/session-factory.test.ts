@@ -79,7 +79,9 @@ describe("session factory", () => {
   it("恒定传 noTools:\"all\" + 非空 tools allowlist + customTools（真实 skill）", async () => {
     const skill = loadSkill("answer-reading-question");
     const dirs = createControlledAgentDir();
-    await createSession({ auth: "Bearer per-run-token", skill, modelRuntime: {} as never, dirs });
+    await createSession({
+      novelId: 1,
+      auth: "Bearer per-run-token", skill, modelRuntime: {} as never, dirs });
 
     expect(mocks.createAgentSession).toHaveBeenCalledTimes(1);
     const options = mocks.createAgentSession.mock.calls[0][0] as Record<string, unknown>;
@@ -108,7 +110,9 @@ describe("session factory", () => {
   it("ResourceLoader override 返回 exactly allowlist（A2：零 ambient）", async () => {
     const skill = loadSkill("answer-reading-question");
     const dirs = createControlledAgentDir();
-    await createSession({ auth: "Bearer t", skill, modelRuntime: {} as never, dirs });
+    await createSession({
+      novelId: 1,
+      auth: "Bearer t", skill, modelRuntime: {} as never, dirs });
 
     const options = mocks.createAgentSession.mock.calls[0][0] as Record<string, unknown>;
     const loader = options.resourceLoader as {
@@ -130,7 +134,9 @@ describe("session factory", () => {
   it("技能指令确定性注入 systemPrompt（含 NOVEL_AGENT 基础提示 + SKILL.md）", async () => {
     const skill = loadSkill("answer-reading-question");
     const dirs = createControlledAgentDir();
-    await createSession({ auth: "Bearer t", skill, modelRuntime: {} as never, dirs });
+    await createSession({
+      novelId: 1,
+      auth: "Bearer t", skill, modelRuntime: {} as never, dirs });
 
     const options = mocks.createAgentSession.mock.calls[0][0] as Record<string, unknown>;
     const loader = options.resourceLoader as {
@@ -146,7 +152,8 @@ describe("session factory", () => {
     const dirs = createControlledAgentDir();
     await expect(
       createSession({
-        auth: "Bearer t",
+      novelId: 1,
+      auth: "Bearer t",
         skill: fakeSkill(["get_novel", "bash"]),
         modelRuntime: {} as never,
         dirs,
@@ -158,7 +165,9 @@ describe("session factory", () => {
   it("空 allowed_tools → fail-closed 拒绝（tools allowlist 永不空）", async () => {
     const dirs = createControlledAgentDir();
     await expect(
-      createSession({ auth: "Bearer t", skill: fakeSkill([]), modelRuntime: {} as never, dirs }),
+      createSession({
+      novelId: 1,
+      auth: "Bearer t", skill: fakeSkill([]), modelRuntime: {} as never, dirs }),
     ).rejects.toThrow(/为空/);
     expect(mocks.createAgentSession).not.toHaveBeenCalled();
   });
