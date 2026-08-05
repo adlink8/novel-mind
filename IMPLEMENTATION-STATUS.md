@@ -406,3 +406,23 @@ Key metrics:
 | audit gate 诚实状态 | Phase 39 milestone 已交付并验证；Phase 22 0/3 + REQ-SHIP-01 基线（TLS/secret/backup/monitoring/cost budget）缺证据 → 最终 verdict 恒 blocked，永不 promotion | `39-VERIFICATION.md` |
 | 里程碑 | **v1.4 (35–39) 完成**；v1.2 (26–29) + v1.3 (30–34) + v1.4 (35–39) 全 roadmap 交付 | `.planning/STATE.md` |
 | 仍阻塞 | Phase 22 Nightly 3/3 未达成（0/3，最终发布门唯一未验证项） | `.planning/STATE.md` |
+
+## 2026-08-05 快照（Phase 40 chat_backfill 按需分析；snapshot: master @ 8ba59d3）
+
+以下事实覆盖上文旧节中的对应记录：
+
+| 项 | 当前值 | 证据 |
+|---|---|---|
+| Phase 40 问答按需分析（chat_backfill） | **已实现 2026-08-05**（用户扩展决策：问答证据不足→后台按需触发分析 skill→物化域表 candidate） | 本轮实现 + 测试 |
+| 触发链路 | reader_chat worker 产出 abstain（`uncertainty.reason_code=no_evidence`）后按 QueryDimension 映射触发对应 skill（world_projection/character_state→propose-world-model-candidates、raw_text→detect-key-scenes、relations→build-visual-bible、events/timeline→build-story-arc），每次最多 2 个；SkillRun 增 `origin=chat_backfill` + `backfill_dimension` + `user_message_id` + 部分唯一索引防在途重复 | `backend/app/services/agent_runtime/backfill.py` + `worker.py` |
+| poller 端点 | `GET /api/agent/queued-runs` + `POST /api/agent/queued-runs/{id}/claim`（gateway token 认证、原子 queued→running + lease reclaim + 铸造 internal_token）；finalize/cancel 放宽为 `require_agent_actor` | `backend/app/api/agent.py` |
+| agent-service poller | `poller.ts`：轮询 + claim + 复用 session.prompt + finalize（internal token 认证），并发上限、lease reclaim、conflict 静默；`startServer` 启停 | `agent-service/src/poller.ts` |
+| 物化 | `materialize.py`：finalize 成功后 background task 按 artifact.type 记录物化结果；digest 类型（chapter_analysis/story_arc）诚实 skipped，不自动 promotion（域表 candidate 写入依赖既有 gate 前提） | `backend/app/services/agent_runtime/materialize.py` |
+| 前端 | MessageView 增 `backfill_runs`，analysis-chat-panel 渲染「后台分析中/完成」chip | `conversations.py` + `analysis-chat-panel.tsx` |
+| Alembic | 单 head `085fffd58ee9`（down=当前 head `20260802_derivative_asset01`） | `alembic heads` |
+| 后端测试 | 新增 11p unit（backfill 映射/去重）+ 6p integration（poller 端点/claim/materializer，CI PG）；既有 agent 回归 295p + agent_runtime 37p 无回归 | `pytest` |
+| agent-service | **1028 passed**；tsc 0 errors（新增 poller 2p） | `cd agent-service && npx vitest run` |
+| 前端 | **428 passed / 47 files**；tsc 干净 | `cd frontend && npm test` |
+| 端到端验证 | poller 自动发现 queued run → claim（queued→running）→ 执行（Gemini 分析，耗时 >3min 因模型调用，链路本身正常） | 本机实测 |
+| 边界诚实说明 | 本轮交付「候选进域表 + 前端可见 backfill 状态」；**candidate → available/published 仍需现有用户审批**（key_scene:approve / VisualBibleReview / EpistemicGate approval），符合「无自动 promotion」契约 | 本轮设计 |
+| 仍阻塞 | Phase 22 Nightly 3/3 未达成（0/3，最终发布门唯一未验证项） | `.planning/STATE.md` |

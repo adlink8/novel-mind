@@ -390,3 +390,22 @@ If Phase 22 is resumed, use `$gsd-resume-work`; do not mark it complete early.
 - v1.4 Canon Fork and constrained derivatives: Phase 35–39 (**COMPLETE 2026-08-05**).
 
 See `.planning/ROADMAP.md`.
+
+## 2026-08-05 追加：Phase 40 chat_backfill（用户扩展，非 roadmap 规划阶段）
+
+用户确认扩展（2026-08-05）：问答证据不足时后台按需触发分析 skill，结果物化到
+域表 candidate，下一轮检索可见。原 D-13（v1 无子代理）与 D-15（证据不足
+fail-closed）被显式放宽为「单 Agent 按需执行 skill（不引入子代理）+ 物化只写
+candidate（不自动 promotion）」。
+
+已实现（snapshot: master @ 8ba59d3 + 8b23786）：
+- 触发：worker abstain 后按 QueryDimension 映射触发（每次最多 2 skill），
+  SkillRun 增 origin/backfill_dimension/user_message_id + 部分唯一索引
+- poller 端点：GET /queued-runs + POST /claim（gateway token 认证）
+- agent-service poller.ts：轮询/claim/执行/finalize（并发上限 + lease reclaim）
+- materialize.py：finalize 后 background task 记录物化（digest 类型诚实 skipped）
+- 前端：MessageView.backfill_runs + analysis-chat-panel「后台分析中」chip
+
+边界：candidate → available/published 仍需现有用户审批（无自动 promotion）；
+timeline/clues/relationships 自动可见属另一条确定性 worker 链路，未纳入本轮。
+Phase 22 仍 0/3（verdict 不变）。
