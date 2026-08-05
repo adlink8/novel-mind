@@ -192,6 +192,17 @@ class SkillRun(TimestampMixin, Base):
             "skill_version_id",
         ),
         Index("idx_skill_runs_status", "status"),
+        # 问答按需分析（chat_backfill）：同一 owner+novel+维度在途只允许一个。
+        Index(
+            "uq_skill_runs_backfill_inflight",
+            "owner_id",
+            "novel_id",
+            "backfill_dimension",
+            unique=True,
+            postgresql_where=text(
+                "origin = 'chat_backfill' AND status IN ('queued', 'running')"
+            ),
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -241,6 +252,19 @@ class SkillRun(TimestampMixin, Base):
         Integer, nullable=False, default=0, server_default="0"
     )
     error_code: Mapped[str | None] = mapped_column(String(80))
+    # ── 问答按需分析（chat_backfill）──
+    # origin：user_sse=前端 SSE 直连 run；chat_backfill=问答证据不足时按需触发。
+    origin: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="user_sse", server_default="user_sse"
+    )
+    # 触发维度（QueryDimension 词汇，如 world_projection/raw_text），用于去重与展示。
+    backfill_dimension: Mapped[str | None] = mapped_column(String(40))
+    # 触发来源用户消息（abstain 的那条），供前端 MessageView 展示 backfill 状态。
+    user_message_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("reader_messages.id", ondelete="SET NULL"),
+        nullable=True,
+    )
 
 
 class ArtifactRevision(Base):

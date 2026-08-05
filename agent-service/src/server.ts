@@ -46,6 +46,7 @@ import {
   type RunLineageContext,
   type ToolEvidence,
 } from "./structured-output/cited-answer-builder.js";
+import { createPoller } from "./poller.js";
 
 /** 依赖注入点（测试用 mock；生产用默认实现）。 */
 export interface ServerDeps {
@@ -684,6 +685,14 @@ export function startServer(deps: ServerDeps = {}): Promise<ReturnType<typeof cr
     throw err; // 不可达（process.exit 恒不返回）；满足严格类型下 manifest 的 definite assignment
   }
   const server = createApp(deps, manifest);
+  // 问答按需分析（chat_backfill）：启动 queued-run poller（无 SSE 客户端场景）。
+  if (config.pollEnabled) {
+    const stopPoller = createPoller(
+      { fetchImpl: resolveDeps(deps).fetchImpl },
+      manifest,
+    ).start();
+    server.on("close", stopPoller);
+  }
   return new Promise((resolve) => {
     server.listen(config.port, () => resolve(server));
   });

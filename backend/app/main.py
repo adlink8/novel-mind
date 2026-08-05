@@ -37,6 +37,7 @@ from app.api import (
 )
 from app.api.agent_tools import router as agent_tools_router
 from app.api.agent import router as agent_router
+from app.api.agent import service_router as agent_service_router
 from app.api.clues import router as clues_router
 from app.api.asset_audit import router as asset_audit_router
 from app.api.eval import router as eval_router
@@ -278,6 +279,11 @@ app.include_router(
     agent_router,
     prefix="/api/agent",
     tags=["智能体运行时"],
+)
+app.include_router(
+    agent_service_router,
+    prefix="/api/agent",
+    tags=["智能体运行时（service）"],
 )
 app.include_router(
     visual_bible_router,

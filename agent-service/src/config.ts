@@ -20,6 +20,11 @@ export const config = Object.freeze({
   novelmindGatewayToken: requireEnv("NOVELMIND_GATEWAY_TOKEN"),
   /** HTTP listen port for the agent service. */
   port: Number(process.env.PORT ?? 3100),
+  /** 问答按需分析（chat_backfill）queued-run poller 配置。 */
+  pollEnabled: process.env.POLL_ENABLED !== "0",
+  pollIntervalMs: Number(process.env.POLL_INTERVAL_MS ?? 2000),
+  pollConcurrency: Number(process.env.POLL_CONCURRENCY ?? 3),
+  pollTimeoutMs: Number(process.env.POLL_TIMEOUT_MS ?? 600_000),
 });
 
 export type AppConfig = typeof config;

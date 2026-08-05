@@ -424,6 +424,8 @@ async def run_reader_chat_worker(
             conversation_id=context["conversation_id"],
             owner_id=context["owner_id"],
             novel_id=context["novel_id"],
+            question=str(context.get("user_body") or ""),
+            source_status=(context.get("prompt_inputs") or {}).get("source_status"),
         )
         _SAFE_LOG.info(
             "reader_chat job completed job_id=%s response_hash=%s blocks=%s",
@@ -723,6 +725,8 @@ async def _try_exact_recovery(
                 conversation_id=context["conversation_id"],
                 owner_id=context["owner_id"],
                 novel_id=context["novel_id"],
+                question=str(context.get("user_body") or ""),
+                source_status=(context.get("prompt_inputs") or {}).get("source_status"),
             )
             return True
     return False
@@ -739,6 +743,8 @@ async def _publish_assistant(
     conversation_id: int,
     owner_id: int,
     novel_id: int,
+    question: str = "",
+    source_status: dict[str, str] | None = None,
 ) -> None:
     # Final cancel check immediately before publication.
     if await _is_cancel_requested(sessions, job_id):
@@ -825,6 +831,29 @@ async def _publish_assistant(
         job.status_reason = "published"
         job.response_hash = response_hash
         job.error_code = None
+
+        # ── 问答按需分析（Phase 40 / chat_backfill）──
+        # abstain（证据不足：无 answer_blocks 且带 uncertainty）时，按不足维度
+        # 触发对应分析 skill run（origin='chat_backfill'）。异步后台分析，不阻塞
+        # 当前 abstain 答案返回；下一轮检索经物化后的域表可见候选证据。
+        # 受控扩展：本函数额外写 origin='chat_backfill' 的 skill_runs（幂等/去重）。
+        if not envelope.answer_blocks and envelope.uncertainty is not None:
+            unavailable = [
+                dim
+                for dim, st in (source_status or {}).items()
+                if st in ("unavailable", "absent")
+            ]
+            if unavailable and question:
+                from app.services.agent_runtime.backfill import create_backfill_runs
+
+                await create_backfill_runs(
+                    session,
+                    owner_id=owner_id,
+                    novel_id=novel_id,
+                    user_message_id=user_message_id,
+                    question=question,
+                    unavailable_dimensions=unavailable,
+                )
 
 
 async def _finish_job(
