@@ -24,7 +24,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.novel import Novel
 from app.services.queryplan.adapters import SourceSnapshot
-from app.services.queryplan.schemas import ChapterRangeAnchor, QueryPlanIntent
+from app.services.queryplan.schemas import (
+    ChapterRangeAnchor,
+    QueryDimension,
+    QueryPlanIntent,
+)
 from app.services.queryplan.service import (
     ConsumerManifestResult,
     ConsumerPlanBlocked,
@@ -55,6 +59,7 @@ def build_analysis_consumer_request(
     full_book_authorized: bool = False,
     whole_book: bool = False,
     source: str = "analysis_chat",
+    dimensions: Sequence[QueryDimension] | None = None,
 ) -> dict[str, Any]:
     """Analysis-consumer plan payload (inclusive chapter_range anchor; D-10)."""
     return QueryPlanService.build_consumer_request(
@@ -73,6 +78,7 @@ def build_analysis_consumer_request(
             chapter_end=chapter_end,
         ),
         source=source,
+        dimensions=dimensions,
     )
 
 
@@ -93,6 +99,7 @@ class AnalysisQueryPlanAdapter:
         chapter_start: int,
         chapter_end: int,
         whole_book: bool = False,
+        dimensions: Sequence[QueryDimension] | None = None,
     ) -> tuple[dict[str, Any], SourceSnapshot, ProgressSnapshot]:
         """Re-validate scope and freeze the shared payload + snapshot.
 
@@ -124,6 +131,7 @@ class AnalysisQueryPlanAdapter:
             chapter_end=int(effective_end),
             full_book_authorized=progress.full_book,
             whole_book=whole_book,
+            dimensions=dimensions,
         )
         return payload, snapshot, progress
 
@@ -149,10 +157,30 @@ class AnalysisQueryPlanAdapter:
             chapter_start=chapter_start,
             chapter_end=chapter_end,
             whole_book=whole_book,
+            dimensions=(QueryDimension.WORLD_PROJECTION,),
         )
+        # Phase 40：问答按需分析物化的 world_model_knowledge 候选 →
+        # world_projection 维度（resolver 从域表读 claims）。
+        from app.services.queryplan.adapters import (
+            DEFAULT_ADAPTERS,
+            run_world_projection_adapter,
+        )
+        from app.services.queryplan.evidence import effective_through_chapter
+        from app.services.reader_chat.context import _build_world_projection_resolver
+
         try:
+            plan = QueryPlanService.parse_consumer_request(payload)
+            wp_result = await run_world_projection_adapter(
+                DEFAULT_ADAPTERS[QueryDimension.WORLD_PROJECTION],
+                source=snapshot,
+                through_chapter=effective_through_chapter(plan, snapshot),
+                resolver=_build_world_projection_resolver(session),
+                question=question,
+            )
             return await self._service.execute_consumer_manifest(
-                payload, source=snapshot
+                payload,
+                source=snapshot,
+                dimension_results=(wp_result,),
             )
         except ConsumerPlanBlocked as exc:
             raise SelectionValidationError(

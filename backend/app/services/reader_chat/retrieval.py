@@ -16,6 +16,7 @@ from typing import Any, Protocol, runtime_checkable
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import undefer
 
 from app.models.analysis import AnalysisVersion
 from app.models.chunk_build import ChunkActivePointer, ChunkBuild, ChunkHierarchyNode
@@ -574,6 +575,184 @@ class Phase09RelationshipObservationReader:
         return items
 
 
+async def fetch_knowledge_evidence(
+    session: AsyncSession,
+    *,
+    owner_id: int,
+    novel_id: int,
+    version_id: int | None,
+    cutoff_chapter: int | None,
+    full_book: bool,
+    chapters_by_number: dict[int, Chapter],
+    max_items: int = DEFAULT_MAX_PER_SOURCE,
+) -> tuple[list[RetrievedEvidence], int, str]:
+    """问答按需分析（chat_backfill）物化的域表 candidate 证据检索（Phase 40）。
+
+    读三个域表的 candidate 行（world_model_knowledge / key_scene_evidence_ranges /
+    visual_bible_evidence_refs），转 RetrievedEvidence 进上下文。全部带
+    ``candidate: True`` 标记——候选证据，不是正式批准事实（D-05 诚实呈现）。
+
+    仅当有候选行时返回 ``ok``（维度从 ABSENT 转 OK，worker 的 abstain 判定随之
+    转向可回答/partial）；无行则 ABSENT（不虚造）。
+    """
+    if version_id is None:
+        return [], 0, SourceStatus.ABSENT
+
+    items: list[RetrievedEvidence] = []
+
+    # 1) world_model_knowledge：gate_status='passed' + disclosure 过滤的 claims
+    from app.models.world_model_knowledge import WorldModelKnowledge
+    from app.services.world_model.knowledge import EpistemicClaim
+
+    wm_rows = (
+        (
+            await session.scalars(
+                select(WorldModelKnowledge).where(
+                    WorldModelKnowledge.owner_id == owner_id,
+                    WorldModelKnowledge.novel_id == novel_id,
+                    WorldModelKnowledge.version_id == version_id,
+                    WorldModelKnowledge.gate_status == "passed",
+                ).order_by(WorldModelKnowledge.known_at.asc())
+            )
+        )
+        .all()
+    )
+    for row in wm_rows:
+        if not full_book and row.disclosure_cutoff > (cutoff_chapter or 0):
+            continue
+        try:
+            claim = EpistemicClaim.model_validate(dict(row.canonical_payload or {}))
+        except Exception:  # noqa: BLE001 - 坏行诚实跳过，不阻断检索
+            continue
+        for ref in claim.source_refs:
+            ch = chapters_by_number.get(ref.chapter_number)
+            excerpt = ""
+            if ch is not None:
+                excerpt = bound_excerpt(
+                    (ch.content or "")[ref.source_start : ref.source_end]
+                )
+            items.append(
+                RetrievedEvidence(
+                    evidence_key=f"knowledge:wm:{claim.knowledge_key}:{ref.evidence_id}",
+                    source_type="knowledge",
+                    source_id=f"wm:{claim.knowledge_key}",
+                    chapter_id=ref.chapter_id,
+                    chapter_number=ref.chapter_number,
+                    source_start=ref.source_start,
+                    source_end=ref.source_end,
+                    content_hash=ref.content_hash,
+                    excerpt=excerpt,
+                    version_lineage={
+                        "candidate": True,
+                        "authority": claim.authority.value,
+                        "epistemic_status": claim.epistemic_status.value,
+                        "gate_status": row.gate_status,
+                        "source_kind": claim.source_kind.value,
+                    },
+                    priority=SOURCE_PRIORITY["knowledge"],
+                    rank_key=(ref.chapter_number, ref.source_start, ref.evidence_id),
+                )
+            )
+
+    # 2) key_scene_evidence_ranges：候选集的 leaf 证据行
+    from app.models.key_scene import SceneCandidateSet, SceneEvidenceRange
+
+    ks_rows = (
+        (
+            await session.scalars(
+                select(SceneEvidenceRange)
+                .join(
+                    SceneCandidateSet,
+                    SceneCandidateSet.id == SceneEvidenceRange.set_id,
+                )
+                .where(
+                    SceneEvidenceRange.owner_id == owner_id,
+                    SceneEvidenceRange.novel_id == novel_id,
+                )
+                .order_by(SceneEvidenceRange.chapter_number.asc())
+            )
+        )
+        .all()
+    )
+    for row in ks_rows:
+        if not full_book and row.cutoff_chapter > (cutoff_chapter or 0):
+            continue
+        ch = chapters_by_number.get(row.chapter_number)
+        excerpt = bound_excerpt(row.excerpt or "") if ch else ""
+        items.append(
+            RetrievedEvidence(
+                evidence_key=f"knowledge:ks:{row.evidence_key}",
+                source_type="knowledge",
+                source_id=f"ks:{row.set_id}",
+                chapter_id=row.chapter_id,
+                chapter_number=row.chapter_number,
+                source_start=row.source_start,
+                source_end=row.source_end,
+                content_hash=row.content_hash,
+                excerpt=excerpt,
+                version_lineage={
+                    "candidate": True,
+                    "review_state": "candidate",
+                    "source": "key_scene",
+                },
+                priority=SOURCE_PRIORITY["knowledge"],
+                rank_key=(row.chapter_number, row.source_start, row.evidence_key),
+            )
+        )
+
+    # 3) visual_bible_evidence_refs：候选版本的 leaf 证据行
+    from app.models.visual_bible import VisualBibleVersion, VisualEvidenceRef
+
+    vb_rows = (
+        (
+            await session.scalars(
+                select(VisualEvidenceRef)
+                .join(
+                    VisualBibleVersion,
+                    VisualBibleVersion.id == VisualEvidenceRef.version_id,
+                )
+                .where(
+                    VisualEvidenceRef.owner_id == owner_id,
+                    VisualEvidenceRef.novel_id == novel_id,
+                )
+                .order_by(VisualEvidenceRef.chapter_number.asc())
+            )
+        )
+        .all()
+    )
+    for row in vb_rows:
+        if not full_book and row.cutoff_chapter > (cutoff_chapter or 0):
+            continue
+        ch = chapters_by_number.get(row.chapter_number)
+        excerpt = bound_excerpt(row.excerpt or "") if ch else ""
+        items.append(
+            RetrievedEvidence(
+                evidence_key=f"knowledge:vb:{row.evidence_key}",
+                source_type="knowledge",
+                source_id=f"vb:{row.version_id}",
+                chapter_id=row.chapter_id,
+                chapter_number=row.chapter_number,
+                source_start=row.source_start,
+                source_end=row.source_end,
+                content_hash=row.content_hash,
+                excerpt=excerpt,
+                version_lineage={
+                    "candidate": True,
+                    "review_state": "candidate",
+                    "source": "visual_bible",
+                },
+                priority=SOURCE_PRIORITY["knowledge"],
+                rank_key=(row.chapter_number, row.source_start, row.evidence_key),
+            )
+        )
+
+    if not items:
+        return [], 0, SourceStatus.ABSENT
+    items.sort(key=lambda i: i.rank_key)
+    omitted = max(0, len(items) - max_items)
+    return items[:max_items], omitted, SourceStatus.OK
+
+
 async def retrieve_visible_evidence(
     session: AsyncSession,
     *,
@@ -651,9 +830,22 @@ async def retrieve_visible_evidence(
         max_items=max_per_source,
     )
 
-    # Knowledge units are optional; absence is explicit and never invented.
-    source_status["knowledge"] = SourceStatus.ABSENT
-    knowledge_items: list[RetrievedEvidence] = []
+    # 问答按需分析（chat_backfill）物化的域表 candidate 证据（Phase 40）。
+    # 有候选行 → OK（带 candidate:True 标记）；无 → ABSENT（不虚造）。
+    (
+        knowledge_items,
+        omitted["knowledge"],
+        source_status["knowledge"],
+    ) = await fetch_knowledge_evidence(
+        session,
+        owner_id=owner_id,
+        novel_id=novel.id,
+        version_id=version_id,
+        cutoff_chapter=cutoff_chapter,
+        full_book=full_book,
+        chapters_by_number=chapters_by_number,
+        max_items=max_per_source,
+    )
 
     (
         rel_items,
@@ -743,6 +935,9 @@ async def build_source_snapshot(
         (
             await session.scalars(
                 select(Chapter)
+                # content 是 deferred 大文本列：快照必须含正文，强制加载避免
+                # async 上下文触发 lazy IO（MissingGreenlet）。
+                .options(undefer(Chapter.content))
                 .where(Chapter.novel_id == novel.id)
                 .order_by(Chapter.chapter_number.asc())
             )

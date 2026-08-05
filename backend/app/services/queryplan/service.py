@@ -284,12 +284,17 @@ class QueryPlanService:
         chapter_range: ChapterRangeAnchor | None = None,
         source: str = "reader_chat",
         dataset_lineage: str = QUERYPLAN_DATASET_VERSION,
+        dimensions: Sequence[QueryDimension] | None = None,
     ) -> dict[str, Any]:
         """Build the parser payload both consumers share (distinct anchors only).
 
         Reader Chat passes a ``selection`` anchor; Analysis Chat passes a
         ``chapter_range`` anchor. Default cutoff is reading-progress; whole-book
         requires the explicit per-novel switch (D-12), enforced by the parser.
+
+        ``dimensions``（opt-in，Phase 40）：显式包含 WORLD_PROJECTION 时，
+        reader/analysis seam 补跑 world_projection adapter（resolver 注入）。
+        None → 沿用 parser 默认维度集合。
         """
         request = QueryPlanRequest(
             intent=intent,
@@ -307,6 +312,11 @@ class QueryPlanService:
             chapter_range=chapter_range,
             source=source,
             dataset_lineage=dataset_lineage,
+            dimensions=(
+                tuple(dict.fromkeys(dimensions))
+                if dimensions is not None
+                else None
+            ),
         )
         return request.model_dump(mode="json")
 

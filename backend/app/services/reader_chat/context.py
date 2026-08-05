@@ -18,7 +18,11 @@ from sqlalchemy.orm import undefer
 
 from app.models.novel import Chapter, Novel
 from app.schemas.reader_chat import SelectionCoordinate
-from app.services.queryplan.schemas import QueryPlanIntent, SelectionAnchor
+from app.services.queryplan.schemas import (
+    QueryDimension,
+    QueryPlanIntent,
+    SelectionAnchor,
+)
 from app.services.queryplan.service import (
     ConsumerManifestResult,
     ConsumerPlanBlocked,
@@ -325,6 +329,7 @@ def build_reader_consumer_request(
     whole_book: bool = False,
     selection: ValidatedSelection,
     source: str = "reader_chat",
+    dimensions: Sequence[QueryDimension] | None = None,
 ) -> dict[str, Any]:
     """Reader-consumer plan payload (selection anchor; D-10).
 
@@ -353,7 +358,51 @@ def build_reader_consumer_request(
             chapter_content_hash=selection.chapter_content_hash,
         ),
         source=source,
+        dimensions=dimensions,
     )
+
+
+def _build_world_projection_resolver(
+    session: AsyncSession,
+):
+    """Phase 40：从 world_model_knowledge 域表读 claims，构造 world_projection
+    reader resolver（closure 捕获 session，作用域仅限当前请求）。
+
+    reader 内部 fail-closed：无 claims → None（unavailable）；快照不匹配 →
+    WorldProjectionUnavailableError → adapter 转 unavailable；有 passed
+    candidate → candidate_only（partial）；有 approved → available。
+    """
+    from app.models.world_model_knowledge import WorldModelKnowledge
+    from app.services.queryplan.adapters import READER_WORLD_PROJECTION
+    from app.services.world_model.knowledge import EpistemicClaim
+    from app.services.world_model.queries import world_projection_reader
+
+    async def resolver(reader_id: str):
+        if reader_id != READER_WORLD_PROJECTION:
+            return None
+
+        async def reader(context):
+            rows = (
+                (
+                    await session.scalars(
+                        select(WorldModelKnowledge).where(
+                            WorldModelKnowledge.owner_id == context.owner_id,
+                            WorldModelKnowledge.novel_id == context.novel_id,
+                            WorldModelKnowledge.version_id == context.version_id,
+                        )
+                    )
+                )
+                .all()
+            )
+            claims = [
+                EpistemicClaim.model_validate(dict(r.canonical_payload or {}))
+                for r in rows
+            ]
+            return await world_projection_reader(claims, context=context)
+
+        return reader
+
+    return resolver
 
 
 async def run_reader_queryplan(
@@ -392,6 +441,7 @@ async def run_reader_queryplan(
         full_book_authorized=progress.full_book,
         whole_book=whole_book,
         selection=selection,
+        dimensions=(QueryDimension.WORLD_PROJECTION,),
     )
     cutoff = None if progress.full_book else progress.cutoff_chapter_number
     retrieval = await retrieve_visible_evidence(
@@ -407,7 +457,24 @@ async def run_reader_queryplan(
         max_evidence=24,
     )
     dimension_results = chat_retrieval_dimension_results(retrieval, snapshot)
+    # Phase 40：问答按需分析物化的 world_model_knowledge 候选 → world_projection
+    # 维度（resolver 从域表读 claims）。无 claims 时 adapter 诚实报 unavailable。
+    from app.services.queryplan.adapters import (
+        DEFAULT_ADAPTERS,
+        run_world_projection_adapter,
+    )
+    from app.services.queryplan.evidence import effective_through_chapter
+
     try:
+        plan = QueryPlanService.parse_consumer_request(payload)
+        wp_result = await run_world_projection_adapter(
+            DEFAULT_ADAPTERS[QueryDimension.WORLD_PROJECTION],
+            source=snapshot,
+            through_chapter=effective_through_chapter(plan, snapshot),
+            resolver=_build_world_projection_resolver(session),
+            question=question,
+        )
+        dimension_results = tuple(dimension_results) + (wp_result,)
         return await QueryPlanService().execute_consumer_manifest(
             payload, source=snapshot, dimension_results=dimension_results
         )

@@ -488,9 +488,19 @@ def _mock_chat_session(*, cutoff: int, chapters: list):
         return cutoff
 
     session.scalar = _scalar
-    session.scalars = AsyncMock(
-        return_value=SimpleNamespace(all=lambda: list(chapters))
-    )
+
+    async def _scalars(query, *args, **kwargs):
+        text_query = str(query)
+        # 问答按需分析物化的域表查询：无候选行（空），避免污染 chapter 路由。
+        if (
+            "world_model_knowledge" in text_query
+            or "key_scene_evidence_ranges" in text_query
+            or "visual_bible_evidence_refs" in text_query
+        ):
+            return SimpleNamespace(all=lambda: [])
+        return SimpleNamespace(all=lambda: list(chapters))
+
+    session.scalars = _scalars
     session.get = AsyncMock(return_value=None)
     return session, SimpleNamespace(id=1, owner_id=1, reading_progress={})
 

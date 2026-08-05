@@ -363,6 +363,56 @@ class CandidateService:
             set_contract=set_contract,
         )
 
+    # ----------------------------------------------------------------- import
+
+    async def import_set(
+        self,
+        *,
+        owner_id: int,
+        novel_id: int,
+        set_contract: SceneCandidateSetContract,
+    ) -> PersistedCandidateSet:
+        """backfill 物化入口：导入已由 finalize 校验的候选集契约（candidate-only）。
+
+        与 ``generate`` 的区别：不重跑确定性 pipeline，直接把产物契约持久化为
+        candidate 行。仍执行 scope / visual-bible approval / 契约 / manifest
+        hash 校验（fail closed），并复用 ``_persist`` 的幂等 replay。
+        """
+        boundaries_service = SceneBoundaryService(self._session)
+        novel = await boundaries_service.verify_novel_scope(
+            owner_id=owner_id, novel_id=novel_id
+        )
+        if novel is None:
+            raise KeySceneCandidateNotFound(
+                "novel is not in the explicit owner/novel scope"
+            )
+        if (
+            set_contract.owner_id != owner_id
+            or set_contract.novel_id != novel_id
+        ):
+            raise KeySceneGateError("set scope does not match request scope")
+
+        approval = await boundaries_service.verify_visual_bible_approval(
+            owner_id=owner_id,
+            novel_id=novel_id,
+            approved_visual_bible_revision_id=set_contract.approved_visual_bible_revision_id,
+            approved_visual_bible_revision_hash=set_contract.approved_visual_bible_revision_hash,
+        )
+        if not approval.ok:
+            raise KeySceneGateError(f"{approval.reason_code}: {approval.detail}")
+
+        if recompute_manifest_hash(set_contract) != set_contract.manifest_hash:
+            raise KeySceneGateError("manifest_hash_mismatch")
+        try:
+            validate_candidate_set_contract(set_contract)
+        except KeySceneGateError as exc:
+            raise KeySceneGateError(str(exc)) from exc
+        return await self._persist(
+            owner_id=owner_id,
+            novel_id=novel_id,
+            set_contract=set_contract,
+        )
+
     # ----------------------------------------------------------------- persist
 
     async def _persist(
