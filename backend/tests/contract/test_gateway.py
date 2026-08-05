@@ -165,10 +165,19 @@ async def test_gateway_stream_openai_sse_shape(gateway_client):
     lines = resp.text.split("\n")
     chunks = [l for l in lines if l.startswith("data: ")]
     assert chunks[-1] == "data: [DONE]"  # SSE 终止标记
+    # OpenAI SSE 契约：内容块带 delta.content；末尾有 finish_reason:"stop" 的
+    # 终止块（delta 为空），之后才是 [DONE]。
+    stop_chunk = None
     for raw in chunks[:-1]:
         payload = json.loads(raw[len("data: ") :])
         assert payload["object"] == "chat.completion.chunk"
-        assert "choices" in payload and payload["choices"][0]["delta"]["content"]
+        assert "choices" in payload
+        if payload["choices"][0]["finish_reason"] == "stop":
+            stop_chunk = payload
+            continue
+        # 内容块必须携带非空 delta.content。
+        assert payload["choices"][0]["delta"]["content"]
+    assert stop_chunk is not None, "流式响应必须包含 finish_reason:'stop' 终止块"
     # 流式同样委托 AIService.stream_chat。
     assert fake.stream_calls, "gateway 必须委托 AIService.stream_chat"
 

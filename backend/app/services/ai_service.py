@@ -349,6 +349,34 @@ class AIService:
         """
         _sync_provider_env_keys()
         model = model or self.default_model
+
+        from app.services.vertex_gemini import acomplete as vertex_acomplete
+        from app.services.vertex_gemini import is_vertex_model
+
+        # Vertex 模型：复用自研 GCP SDK 客户端（非流式），按增量块 yield 保持
+        # 流式契约。litellm 不识别 `vertex_google/` 前缀（stream 路径会抛
+        # "LLM Provider NOT provided"），故不走 litellm 流式。
+        if is_vertex_model(model):
+            start = time.perf_counter()
+            status = "success"
+            try:
+                response = await vertex_acomplete(messages, model=model)
+                text = response.choices[0].message.content or ""
+                for i in range(0, len(text), 16):
+                    yield text[i : i + 16]
+            except Exception:
+                status = "failed"
+                raise
+            finally:
+                await _log_usage(
+                    model_name=model,
+                    provider=_provider_of(model),
+                    task_type=task_type,
+                    latency_ms=int((time.perf_counter() - start) * 1000),
+                    status=status,
+                )
+            return
+
         kwargs: dict = {
             "model": model,
             "messages": messages,

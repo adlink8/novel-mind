@@ -10,7 +10,7 @@
       ...
 """
 
-from pydantic import model_validator
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings
 
 
@@ -109,7 +109,12 @@ class Settings(BaseSettings):
     # 服务到服务共享令牌：agent-service 调 POST /api/gateway/v1/chat/completions
     # 时须携带 `Authorization: Bearer <NOVELMIND_GATEWAY_TOKEN>`。为空时网关
     # fail-closed（401）。令牌绝不写日志、绝不下发浏览器（V6/T-25.2-02-04）。
-    novelmind_gateway_token: str = ""
+    # 注意：字段名保留 `novelmind_gateway_token`（security.py 引用），但显式
+    # 绑定环境变量 `NOVELMIND_GATEWAY_TOKEN`——否则 prefix 会让它变成
+    # `NOVELMIND_NOVELMIND_GATEWAY_TOKEN` 而永远读不到。
+    novelmind_gateway_token: str = Field(
+        default="", validation_alias="NOVELMIND_GATEWAY_TOKEN"
+    )
 
     # pydantic-settings 配置：从 .env 文件加载，环境变量前缀为 NOVELMIND_
     model_config = {"env_file": ".env", "env_prefix": "NOVELMIND_"}

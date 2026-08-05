@@ -39,16 +39,24 @@ router = APIRouter(dependencies=[Depends(require_gateway_token)])
 
 
 class GatewayChatMessage(BaseModel):
-    """OpenAI 消息子集；content 允许字符串。"""
+    """OpenAI 消息子集；content 允许字符串或文本块数组。Pi 的 assistant 消息
+    可能携带 tool_calls（工具调用回传），显式允许但不消费。"""
 
     model_config = ConfigDict(extra="forbid")
 
     role: Literal["system", "user", "assistant"]
-    content: str
+    content: Any
+    tool_calls: list[dict[str, Any]] | None = Field(default=None)
 
 
 class GatewayChatRequest(BaseModel):
-    """OpenAI chat/completions 请求子集（D-15：不接受客户端自定义上游地址）。"""
+    """OpenAI chat/completions 请求子集（D-15：不接受客户端自定义上游地址）。
+
+    Pi openai-completions 客户端携带 OpenAI 标准补充字段（tools/tool_choice/
+    stream_options/store/max_completion_tokens）。这些字段允许出现但不转发给
+    上游——工具由 agent-service 侧执行，gateway 仅完成纯文本补全。
+    其余字段（含 base_url/api_base，防 SSRF V10）一律 `extra="forbid"` 拒绝。
+    """
 
     model_config = ConfigDict(extra="forbid")
 
@@ -57,6 +65,11 @@ class GatewayChatRequest(BaseModel):
     stream: bool = False
     max_tokens: int | None = Field(default=None, ge=1, le=32768)
     temperature: float | None = Field(default=None, ge=0, le=2)
+    tools: list[dict[str, Any]] | None = Field(default=None)
+    tool_choice: Any = Field(default=None)
+    stream_options: dict[str, Any] | None = Field(default=None)
+    store: bool | None = Field(default=None)
+    max_completion_tokens: int | None = Field(default=None, ge=1, le=32768)
 
 
 def _usage_dict(usage: Any) -> dict[str, int]:
@@ -85,12 +98,52 @@ def _response_id(response: Any) -> str:
     return rid or f"chatcmpl-{uuid.uuid4().hex[:24]}"
 
 
+async def _resolve_gateway_model(requested: str) -> str:
+    """把 agent-service 传来的逻辑模型 id 映射到真实部署模型。
+
+    agent-service（provider.ts）用逻辑 id `reader-chat-default` 调用网关；
+    真实模型名（如 vertex_google/gemini-3.5-flash-lite）由 FastAPI 侧权威决定
+    （D-15：模型路由/价目表 authority 留在 FastAPI，agent-service 零路由表）。
+    若请求已带真实模型名则原样放行；`reader-chat-default` 及空值回退到
+    settings.default_chat_model。解析失败时由调用方走统一 upstream_error。
+    """
+    if requested and requested != "reader-chat-default":
+        return requested
+    return ai_service.default_model
+
+
+def _normalize_messages(messages: list[GatewayChatMessage]) -> list[dict[str, Any]]:
+    """把 Pi 消息规范化为 ai_service 期望的 {role, content(str)} 形状。
+
+    Pi openai-completions 可能发 content 为文本块数组或带 tool_calls 的
+    assistant 消息；gateway 只消费纯文本 content（数组拼字符串）。
+    """
+    out: list[dict[str, Any]] = []
+    for m in messages:
+        content = m.content
+        if isinstance(content, str):
+            out.append({"role": m.role, "content": content})
+        elif isinstance(content, list):
+            parts: list[str] = []
+            for part in content:
+                if isinstance(part, dict):
+                    text = part.get("text")
+                    if isinstance(text, str):
+                        parts.append(text)
+                elif isinstance(part, str):
+                    parts.append(part)
+            out.append({"role": m.role, "content": "".join(parts)})
+        elif content is not None:
+            out.append({"role": m.role, "content": str(content)})
+    return out
+
+
 async def _non_stream_completion(payload: GatewayChatRequest) -> dict[str, Any]:
     """非流式：委托 AIService.chat，组装 OpenAI completion JSON。"""
     try:
         response = await ai_service.chat(
-            messages=[m.model_dump() for m in payload.messages],
-            model=payload.model,
+            messages=_normalize_messages(payload.messages),
+            model=await _resolve_gateway_model(payload.model),
             temperature=payload.temperature if payload.temperature is not None else 0.7,
             max_tokens=payload.max_tokens or 4096,
             stream=False,
@@ -139,8 +192,8 @@ async def _stream_completion(payload: GatewayChatRequest):
     created = int(time.time())
     try:
         async for delta in ai_service.stream_chat(
-            messages=[m.model_dump() for m in payload.messages],
-            model=payload.model,
+            messages=_normalize_messages(payload.messages),
+            model=await _resolve_gateway_model(payload.model),
             task_type="gateway",
         ):
             chunk = {
@@ -157,6 +210,22 @@ async def _stream_completion(payload: GatewayChatRequest):
                 ],
             }
             yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
+        # OpenAI SSE 契约：内容结束后必须有一个带 finish_reason:"stop" 的终止 chunk，
+        # 之后才是 [DONE]。Pi openai-completions 客户端依赖它结束流。
+        yield (
+            "data: "
+            + json.dumps(
+                {
+                    "id": stream_id,
+                    "object": "chat.completion.chunk",
+                    "created": created,
+                    "model": payload.model,
+                    "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
+                },
+                ensure_ascii=False,
+            )
+            + "\n\n"
+        )
     except Exception as exc:  # noqa: BLE001 - 流中途失败也要以 OpenAI 错误 chunk 收尾
         logger.exception("网关流式调用失败: %s", exc)
         yield (
