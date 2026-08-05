@@ -193,6 +193,19 @@ class GenerationJobView(StrictReaderChatModel):
     updated_at: datetime
 
 
+class BackfillRunView(StrictReaderChatModel):
+    """问答按需分析（chat_backfill）触发的 skill run 摘要（Phase 40）。
+
+    只暴露前端需要的字段；run 详情经 agent API 查询。仅用于展示
+    「后台分析中/已完成」状态。
+    """
+
+    run_id: int
+    skill_name: str
+    status: Literal["queued", "running", "cancelled", "completed", "failed"]
+    backfill_dimension: str | None = None
+
+
 class MessageView(StrictReaderChatModel):
     id: int
     conversation_id: int
@@ -206,6 +219,7 @@ class MessageView(StrictReaderChatModel):
     citations: list[CitationView] = Field(default_factory=list)
     generation_job: GenerationJobView | None = None
     queryplan: QueryPlanTraceView | None = None
+    backfill_runs: list[BackfillRunView] = Field(default_factory=list)
     created_at: datetime
 
 

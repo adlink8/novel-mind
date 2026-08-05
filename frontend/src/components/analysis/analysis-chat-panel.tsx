@@ -564,6 +564,43 @@ export function AnalysisChatPanel({
                 />
               </div>
             ) : null}
+            {m.backfill_runs && m.backfill_runs.length > 0 ? (
+              <div
+                data-testid={`analysis-chat-backfill-${m.id}`}
+                className="px-1 pt-1"
+              >
+                {m.backfill_runs.map((br) => {
+                  const active =
+                    br.status === "queued" || br.status === "running";
+                  const skillLabel =
+                    br.skill_name === "detect-key-scenes"
+                      ? "关键场景"
+                      : br.skill_name === "propose-world-model-candidates"
+                        ? "世界模型"
+                        : br.skill_name === "build-visual-bible"
+                          ? "视觉圣经"
+                          : br.skill_name === "build-story-arc"
+                            ? "故事弧"
+                            : br.skill_name === "analyze-chapter"
+                              ? "章节分析"
+                              : br.skill_name;
+                  return (
+                    <span
+                      key={br.run_id}
+                      className="mr-2 inline-flex items-center gap-1 rounded-md border border-muted bg-muted/40 px-2 py-0.5 text-[10px] text-muted-foreground"
+                    >
+                      {active ? (
+                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-400" />
+                      ) : null}
+                      {active ? "后台分析中" : "后台分析完成"} · {skillLabel}
+                      {br.backfill_dimension
+                        ? `（${br.backfill_dimension}）`
+                        : ""}
+                    </span>
+                  );
+                })}
+              </div>
+            ) : null}
           </div>
         ))}
         {activeJob && jobStatusLabel(activeJob) ? (

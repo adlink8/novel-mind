@@ -1140,6 +1140,41 @@ class ConversationService:
                     )
                 )
 
+        # 问答按需分析（chat_backfill）：该 user message 触发的后台分析 run。
+        backfill_runs: list = []
+        if message.role == MessageRole.USER.value:
+            from app.models.agent_runtime import SkillRun, SkillVersion
+            from app.schemas.reader_chat import BackfillRunView
+
+            backfill_rows = (
+                (
+                    await db.execute(
+                        select(SkillRun)
+                        .where(
+                            SkillRun.user_message_id == message.id,
+                            SkillRun.origin == "chat_backfill",
+                        )
+                        .order_by(SkillRun.id.asc())
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            for run in backfill_rows:
+                skill_name = "answer-reading-question"
+                if run.skill_version_id is not None:
+                    sv = await db.get(SkillVersion, run.skill_version_id)
+                    if sv is not None:
+                        skill_name = sv.name
+                backfill_runs.append(
+                    BackfillRunView(
+                        run_id=run.id,
+                        skill_name=skill_name,
+                        status=run.status,
+                        backfill_dimension=run.backfill_dimension,
+                    )
+                )
+
         return MessageView(
             id=message.id,
             conversation_id=message.conversation_id,
@@ -1153,6 +1188,7 @@ class ConversationService:
             citations=citations,
             generation_job=job_view,
             queryplan=queryplan,
+            backfill_runs=backfill_runs,
             created_at=message.created_at,
         )
 

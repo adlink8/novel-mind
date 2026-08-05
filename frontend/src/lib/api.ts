@@ -718,7 +718,15 @@ export interface MessageView {
   citations: CitationView[];
   generation_job: GenerationJobView | null;
   queryplan?: QueryPlanTraceView | null;
+  backfill_runs?: BackfillRunView[];
   created_at: string;
+}
+
+export interface BackfillRunView {
+  run_id: number;
+  skill_name: string;
+  status: "queued" | "running" | "cancelled" | "completed" | "failed";
+  backfill_dimension?: string | null;
 }
 
 export interface MessageAccepted {
