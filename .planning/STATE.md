@@ -409,3 +409,20 @@ candidate（不自动 promotion）」。
 边界：candidate → available/published 仍需现有用户审批（无自动 promotion）；
 timeline/clues/relationships 自动可见属另一条确定性 worker 链路，未纳入本轮。
 Phase 22 仍 0/3（verdict 不变）。
+
+## 2026-08-05 追加：Phase 40 第二层物化闭环完成（master @ 4b1adb5）
+
+用户确认扩展「物化+检索接线（完整闭环）+ 尽力物化诚实 skip」。已实现：
+- 物化升级：materializers.py dispatcher → 三域函数（key_scenes via
+  CandidateService.import_set / world_model via EpistemicGate+append_projection /
+  visual_bible via EvidenceService+create_revision），全部 candidate-only
+- version_id/snapshot_hash 从 chat 同源权威解析（materialize_helpers +
+  build_source_snapshot undefer content）
+- 检索接线：reader_chat.fetch_knowledge_evidence（三域 candidate 行 →
+  RetrievedEvidence，candidate:True 标记）+ queryplan world_projection
+  resolver（opt-in dimensions 参数，run_reader_queryplan /
+  AnalysisQueryPlanAdapter 补跑 adapter）
+
+边界：物化只写域表 candidate；candidate → available/published 仍需现有
+用户审批（无自动 promotion）；digest 类型诚实 skipped。测试：backend 101p +
+agent_runtime 61p + agent-service 1028p 全绿；alembic check clean。

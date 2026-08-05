@@ -424,5 +424,6 @@ Key metrics:
 | agent-service | **1028 passed**；tsc 0 errors（新增 poller 2p） | `cd agent-service && npx vitest run` |
 | 前端 | **428 passed / 47 files**；tsc 干净 | `cd frontend && npm test` |
 | 端到端验证 | poller 自动发现 queued run → claim（queued→running）→ 执行（Gemini 分析，耗时 >3min 因模型调用，链路本身正常） | 本机实测 |
-| 边界诚实说明 | 本轮交付「候选进域表 + 前端可见 backfill 状态」；**candidate → available/published 仍需现有用户审批**（key_scene:approve / VisualBibleReview / EpistemicGate approval），符合「无自动 promotion」契约 | 本轮设计 |
+| 物化闭环（第二层） | **已实现 2026-08-05**：skill 产物真正写进域表 candidate 行（key_scene_sets/candidates/evidence_ranges、world_model_knowledge、visual_bible_versions），并接线检索（reader_chat.fetch_knowledge_evidence + queryplan world_projection resolver）让下一轮问答可见 candidate 证据（带 candidate:True 标记） | materializers.py + retrieval.py + context.py |
+| 边界诚实说明 | 物化只写域表 candidate（review_state/epistemic_status=candidate，gate_status=passed 仅表示确定性 gate 通过）；**candidate → available/published 仍需现有用户审批**（key_scene:approve / VisualBibleReview / EpistemicGate approval），符合「无自动 promotion」契约；digest 类型（analyze-chapter/story-arc）诚实 skipped 不写域表 | 本轮设计 |
 | 仍阻塞 | Phase 22 Nightly 3/3 未达成（0/3，最终发布门唯一未验证项） | `.planning/STATE.md` |
