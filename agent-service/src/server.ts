@@ -41,6 +41,11 @@ import {
 import { PolicyDenied, evaluate, loadSkillRules, type DomainActionRule } from "./policy/engine.js";
 import { SessionApprovals } from "./policy/session-approvals.js";
 import type { SseFrame } from "./transport/sse.js";
+import {
+  buildCitedAnswerEnvelope,
+  type RunLineageContext,
+  type ToolEvidence,
+} from "./structured-output/cited-answer-builder.js";
 
 /** 依赖注入点（测试用 mock；生产用默认实现）。 */
 export interface ServerDeps {
@@ -278,6 +283,33 @@ function lastAssistantMessage(messages: readonly unknown[]): {
   return undefined;
 }
 
+/**
+ * 从会话消息提取成功只读工具调用的证据（answer-reading-question 物化
+ * evidence_refs）。只收 toolResult 且 isError=false 的调用；文本内容截取
+ * 前 2000 字符作为证据正文。
+ */
+function extractToolEvidences(messages: readonly unknown[]): ToolEvidence[] {
+  const out: ToolEvidence[] = [];
+  for (const m of messages) {
+    const msg = m as {
+      role?: string;
+      toolName?: string;
+      isError?: boolean;
+      content?: unknown[];
+    } | undefined;
+    if (msg?.role !== "toolResult" || msg.isError) continue;
+    const text = (msg.content ?? [])
+      .filter((b) => (b as { type?: string }).type === "text")
+      .map((b) => (b as { text?: string }).text ?? "")
+      .join("")
+      .slice(0, 2000);
+    if (msg.toolName && text) {
+      out.push({ toolName: msg.toolName, content: text });
+    }
+  }
+  return out;
+}
+
 /** 构造依赖（默认 + 注入覆盖）。 */
 function resolveDeps(deps: ServerDeps = {}) {
   return {
@@ -381,6 +413,7 @@ async function handleRun(
   // 2) FastAPI run-create：owner 校验 + commit-before-dispatch + per-run 内部令牌。
   let runId: string;
   let internalToken: string;
+  let runLineage: RunLineageContext | undefined;
   try {
     const runRes = await deps.fetchImpl(`${base}/api/agent/novels/${novelId}/skill-runs`, {
       method: "POST",
@@ -405,11 +438,24 @@ async function handleRun(
       return;
     }
     const accepted = (await runRes.json()) as {
-      run: { id: number | string };
+      run: {
+        id: number | string;
+        owner_id: number;
+        novel_id: number;
+        skill_version_id: number;
+        input_hash: string;
+      };
       internal_token: string;
     };
     runId = String(accepted.run.id);
     internalToken = accepted.internal_token;
+    runLineage = {
+      runId: String(accepted.run.id),
+      ownerId: accepted.run.owner_id,
+      novelId: accepted.run.novel_id,
+      skillVersionId: accepted.run.skill_version_id,
+      inputHash: accepted.run.input_hash,
+    };
   } catch {
     res.writeHead(502, { "content-type": "application/json" });
     res.end(JSON.stringify({ error: { code: "upstream_error", message: "run 创建失败" } }));
@@ -516,6 +562,33 @@ async function handleRun(
         // 输出不合规仍走 finalize（FastAPI 有权威校验与错误码）。
       }
       try {
+        // 从会话工具调用提取成功证据（get_chapter/get_novel 等只读工具结果），
+        // 构造带 evidence_refs + normalization trail 的完整信封。
+        const evidences = extractToolEvidences(session.messages as unknown[]);
+        let envelopePayload: Record<string, unknown> | undefined;
+        let frozenManifest: Record<string, unknown> | undefined;
+        if (runLineage && skill.name === "answer-reading-question") {
+          try {
+            const built = buildCitedAnswerEnvelope(
+              last?.text ?? "",
+              runLineage,
+              skill,
+              evidences,
+            );
+            envelopePayload = built.envelope;
+            frozenManifest = built.frozenManifest;
+          } catch {
+            // 证据不足（如 stub/测试会话无工具调用）：回退简化信封，由后端
+            // integrity 门最终裁决（fail closed）。
+            envelopePayload = last?.text
+              ? { type: "cited_answer", answer: { answer_blocks: [{ text: last.text }] } }
+              : {};
+          }
+        } else {
+          envelopePayload = last?.text
+            ? { type: "cited_answer", answer: { answer_blocks: [{ text: last.text }] } }
+            : {};
+        }
         const finalizeRes = await deps.fetchImpl(
           `${base}/api/agent/novels/${novelId}/skill-runs/${runId}/finalize`,
           {
@@ -523,12 +596,11 @@ async function handleRun(
             headers: jsonHeaders,
             body: JSON.stringify({
               stop_reason: "stop",
-              envelope: last?.text
-                ? { type: "cited_answer", answer: { answer_blocks: [{ text: last.text }] } }
-                : {},
+              envelope: envelopePayload,
               model_lineage: last?.provider && last?.model ? { provider: last.provider, model: last.model } : {},
               source_versions: {},
               usage: last?.usage ?? {},
+              ...(frozenManifest ? { frozen_manifest: frozenManifest } : {}),
             }),
           },
         );
