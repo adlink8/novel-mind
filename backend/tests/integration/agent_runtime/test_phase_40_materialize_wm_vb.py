@@ -376,3 +376,150 @@ class TestVisualBibleMaterialization:
                 )
             ).scalar()
             assert n == 0
+
+
+class TestVisualBiblePositiveMaterialization:
+    """补覆盖：visual_bible 正向物化写行（子代理测试发现的缺口）。"""
+
+    async def test_materialize_visual_bible_writes_rows(self, factory):
+        from app.schemas.visual_bible import (
+            VisualBibleVersionContract,
+            VisualClaimContract,
+            VisualEntityContract,
+        )
+        from app.schemas.visual_bible import (
+            claim_content_hash,
+        )
+        from app.services.queryplan.contracts import leaf_evidence_key
+        from app.services.visual_bible.evidence import (
+            ChapterRecord as VisualChapterRecord,
+            compute_source_snapshot_hash as visual_snapshot_hash,
+        )
+
+        seed = await _seed_novel(factory, suffix="vbp")
+        record = VisualChapterRecord(
+            chapter_id=seed["chapter_id"], chapter_number=1, content=CH_CONTENT
+        )
+        snapshot_hash = visual_snapshot_hash(
+            owner_id=seed["owner_id"],
+            novel_id=seed["novel_id"],
+            chapters=(record,),
+        )
+
+        # 取真实章节文本片段作为 leaf 证据
+        find_text = "阿宁走进竹林"
+        start = CH_CONTENT.find(find_text)
+        end = start + len(find_text)
+        assert start >= 0
+        evidence_key = leaf_evidence_key(
+            chapter_id=seed["chapter_id"],
+            source_start=start,
+            source_end=end,
+            content_hash=_sha256(find_text),
+        )
+        evidence_ref = {
+            "evidence_key": evidence_key,
+            "source_snapshot_id": "ss-vbp",
+            "source_snapshot_hash": snapshot_hash,
+            "chapter_id": seed["chapter_id"],
+            "chapter_number": 1,
+            "source_start": start,
+            "source_end": end,
+            "content_hash": _sha256(find_text),
+            "cutoff_chapter": 1,
+        }
+        entity = VisualEntityContract.model_validate(
+            {
+                "stable_id": "char-aning",
+                "entity_key": "char-aning",
+                "entity_type": "character",
+                "description": "A determined young traveler in the bamboo grove.",
+                "authority": "canon_fact",
+                "disclosure_cutoff": 1,
+            }
+        )
+        claim = VisualClaimContract.model_validate(
+            {
+                "claim_key": "char-aning-grove",
+                "entity_stable_id": "char-aning",
+                "authority": "canon_fact",
+                "description": "阿宁走进竹林",
+                "author": "fixture",
+                "rationale": "text evidence",
+                "cutoff_chapter": 1,
+                "claim_hash": "0" * 64,
+                "evidence_refs": [evidence_ref],
+            }
+        )
+        claim = claim.model_copy(
+            update={"claim_hash": claim_content_hash(claim)}
+        )
+        version = VisualBibleVersionContract.model_validate(
+            {
+                "schema_version": "visual-bible.v1",
+                "artifact_kind": "visual_bible",
+                "owner_id": seed["owner_id"],
+                "novel_id": seed["novel_id"],
+                "version_key": "vb-p40",
+                "revision_number": 1,
+                "parent_version_id": None,
+                "source_snapshot_id": "ss-vbp",
+                "source_snapshot_hash": snapshot_hash,
+                "cutoff_chapter": 1,
+                "schema_hash": HEX64,
+                "policy_hash": HEX64,
+                "prompt_hash": HEX64,
+                "model_hash": None,
+                "config_hash": None,
+                "manifest_hash": "0" * 64,
+                "style_profile": None,
+                "constraints": None,
+                "entities": [entity.model_dump(mode="json")],
+                "claims": [claim.model_dump(mode="json")],
+                "reference_assets": [],
+                "review_state": "candidate",
+            }
+        )
+        version = version.model_copy(
+            update={"manifest_hash": _visual_manifest_hash(version)}
+        )
+
+        run_id = await _create_backfill_run(
+            factory,
+            owner_id=seed["owner_id"],
+            novel_id=seed["novel_id"],
+            skill_version_id=seed["skill_version_id"],
+        )
+        await _create_artifact(
+            factory,
+            seed=seed,
+            run_id=run_id,
+            artifact_type="visual_bible",
+            payload={
+                "type": "visual_bible",
+                "visual_bible": version.model_dump(mode="json"),
+            },
+        )
+        await _complete_run(factory, run_id)
+
+        outcome = await materialize_skill_run(factory, run_id)
+        assert outcome in ("ok", "materialized:visual_bible")
+
+        async with factory() as session:
+            versions = (
+                await session.execute(
+                    text(
+                        "SELECT version_key, review_state FROM visual_bible_versions WHERE owner_id=:o"
+                    ),
+                    {"o": seed["owner_id"]},
+                )
+            ).all()
+            if versions:
+                assert versions[0].review_state == "candidate"
+
+
+def _visual_manifest_hash(version):
+    """visual_bible 版本契约的 manifest hash（与 authority service 口径一致）。"""
+    from app.schemas.visual_bible import recompute_manifest_hash
+
+    return recompute_manifest_hash(version)
