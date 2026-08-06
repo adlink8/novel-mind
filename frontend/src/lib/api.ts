@@ -164,6 +164,28 @@ export interface ImportStatus {
   message: string;
 }
 
+/** 阅读器书签（reader_bookmarks 表，owner-scoped 章节书签） */
+export interface ReaderBookmark {
+  id: number;
+  owner_id: number;
+  novel_id: number;
+  chapter_id: number;
+  /** 章内阅读位置百分比 0-100 */
+  position_percent: number;
+  label: string | null;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** 创建书签请求体 */
+export interface ReaderBookmarkCreate {
+  chapter_id: number;
+  position_percent: number;
+  label?: string | null;
+  note?: string | null;
+}
+
 export const novelsApi = {
   list: () => api.get<NovelListResponse>("/novels"),
   get: (id: string) => api.get<Novel>(`/novels/${id}`),
@@ -188,6 +210,12 @@ export const novelsApi = {
     api.get<Chapter>(`/novels/${novelId}/chapters/${chapterId}`),
   updateProgress: (novelId: string, chapterId: number, progressPercent: number) =>
     api.patch(`/novels/${novelId}/progress`, { chapter_id: chapterId, progress_percent: progressPercent }),
+  listBookmarks: (novelId: string | number) =>
+    api.get<ReaderBookmark[]>(`/novels/${novelId}/bookmarks`),
+  createBookmark: (novelId: string | number, data: ReaderBookmarkCreate) =>
+    api.post<ReaderBookmark>(`/novels/${novelId}/bookmarks`, data),
+  deleteBookmark: (novelId: string | number, bookmarkId: number) =>
+    api.delete(`/novels/${novelId}/bookmarks/${bookmarkId}`),
   /** @deprecated 上传后应使用 getImportJobStatus(job_id) */
   getImportStatus: (novelId: string) => api.get<ImportStatus>(`/novels/${novelId}/import-status`),
   getImportJobStatus: (jobId: string | number) =>

@@ -55,6 +55,7 @@ from app.api.prompt_revisions import router as prompt_revisions_router
 from app.api.illustrations import router as illustrations_router
 from app.api.illustration_anchors import router as illustration_anchors_router
 from app.api.export import router as export_router
+from app.api.bookmarks import router as bookmarks_router
 from app.api.canon_fork import router as canon_fork_router
 from app.api.canon_retrieval import router as canon_retrieval_router
 from app.api.derivative_projects import router as derivative_projects_router
@@ -319,6 +320,11 @@ app.include_router(
     export_router,
     prefix="/api/novels",
     tags=["小说导出"],
+)
+app.include_router(
+    bookmarks_router,
+    prefix="/api/novels",
+    tags=["书签"],
 )
 app.include_router(
     canon_fork_router,

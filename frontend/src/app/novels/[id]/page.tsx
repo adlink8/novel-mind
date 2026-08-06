@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ChapterSidebar } from "@/components/reader/chapter-sidebar";
 import { ReaderContent } from "@/components/reader/reader-content";
 import { ReaderChatPanel } from "@/components/reader/reader-chat-panel";
+import { ReaderBookmarks } from "@/components/reader/reader-bookmarks";
 import { ProgressBar } from "@/components/reader/progress-bar";
 import { SearchPanel } from "@/components/reader/search-panel";
 import {
@@ -19,6 +20,7 @@ import {
   novelsApi,
   type Novel,
   type Chapter,
+  type ReaderBookmark,
   type SelectionCoordinate,
 } from "@/lib/api";
 import {
@@ -120,6 +122,7 @@ function NovelReaderInner() {
     return window.innerWidth >= 1280;
   });
   const [searchOpen, setSearchOpen] = useState(false);
+  const [bookmarksOpen, setBookmarksOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [chapterPercent, setChapterPercent] = useState(0);
@@ -138,6 +141,8 @@ function NovelReaderInner() {
   /** 时间线定位模式：不写入阅读进度，避免污染「上次读到」 */
   const [progressWritable, setProgressWritable] = useState(!fromTimeline);
   const jumpedChapterIdRef = useRef<number | null>(null);
+  /** 书签跳转：跨章时在 loadChapter 中恢复到的章内百分比（一次性） */
+  const bookmarkJumpRef = useRef<number | null>(null);
 
   // Phase 10 reader chat — presentation only in localStorage; truth is PostgreSQL
   const [chatOpen, setChatOpen] = useState(() => {
@@ -357,12 +362,20 @@ function NovelReaderInner() {
         const saved = loadProgress(novelId);
         const sameChapter = saved?.chapterId === currentChapterId;
         const pct = sameChapter ? (saved.chapterPercent ?? 0) : 0;
+        // 书签跳转优先于存档：一次性恢复书签所在章内位置
+        const jumpPct = bookmarkJumpRef.current;
+        const targetPercent =
+          jumpPct != null ? Math.min(100, Math.max(0, jumpPct)) : pct;
         const shouldRestore =
-          sameChapter &&
-          pct > 0 &&
-          (progressWritable || jumpedChapterIdRef.current !== currentChapterId);
-        setChapterPercent(pct);
-        setRestorePercent(shouldRestore ? pct : 0);
+          jumpPct != null
+            ? targetPercent > 0
+            : sameChapter &&
+              pct > 0 &&
+              (progressWritable ||
+                jumpedChapterIdRef.current !== currentChapterId);
+        if (jumpPct != null) bookmarkJumpRef.current = null;
+        setChapterPercent(targetPercent);
+        setRestorePercent(shouldRestore ? targetPercent : 0);
 
         // 不恢复时换章立刻顶到开头（instant）；布局后再顶一次，避免沿用上一章滚位
         if (!shouldRestore) {
@@ -450,6 +463,25 @@ function NovelReaderInner() {
       handleSelectChapter(list[idx + 1].id);
     }
   }, [currentChapterId, handleSelectChapter]);
+
+  /** 书签跳转：跨章则切章并在加载后恢复到书签位置；同章直接滚动 */
+  const handleNavigateBookmark = useCallback(
+    (bookmark: ReaderBookmark) => {
+      if (bookmark.chapter_id === currentChapterId) {
+        const el = scrollRef.current;
+        if (el) {
+          const max = el.scrollHeight - el.clientHeight;
+          if (max > 0) {
+            el.scrollTop = (Math.min(100, Math.max(0, bookmark.position_percent)) / 100) * max;
+          }
+        }
+        return;
+      }
+      bookmarkJumpRef.current = bookmark.position_percent;
+      handleSelectChapter(bookmark.chapter_id);
+    },
+    [currentChapterId, handleSelectChapter]
+  );
 
   const handleAskSelection = useCallback((payload: SelectionCoordinate) => {
     setPendingSelection(payload);
@@ -627,6 +659,15 @@ function NovelReaderInner() {
           </div>
 
           <div className="flex items-center gap-2">
+            <ReaderBookmarks
+              novelId={novelId}
+              chapters={chapters}
+              open={bookmarksOpen}
+              onOpenChange={setBookmarksOpen}
+              onNavigate={handleNavigateBookmark}
+              currentChapterId={currentChapterId}
+              currentPercent={chapterPercent}
+            />
             <ReaderPreferencesPanel
               preferences={preferences}
               onChange={handlePreferencesChange}
