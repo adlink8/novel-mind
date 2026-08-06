@@ -321,7 +321,9 @@ export function AgentWorkspacePanel({
 
     void streamAgentRun(
       `/agent/novels/${novelId}/runs`,
-      { question: q, skill: "answer-reading-question", input: {}, branch: null },
+      // 不携带 skill：由服务端按问题意图自动路由（AGENT-RUNTIME-CONTRACT，
+      // Agent 选 skill）；高级调用方需要时仍可显式传 skill。
+      { question: q, input: {}, branch: null },
       {
         signal: ac.signal,
         onEvent: handleFrame,

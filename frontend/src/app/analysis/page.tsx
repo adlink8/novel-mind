@@ -12,10 +12,9 @@ import { BookOpen, RefreshCw } from "lucide-react";
 import { NovelPickerStrip } from "@/components/bookshelf/novel-picker-strip";
 
 import {
-  AnalysisChatPanel,
   type AnalysisChapterRef,
 } from "@/components/analysis/analysis-chat-panel";
-import { AgentWorkspacePanel } from "@/components/analysis/agent-workspace-panel";
+import { AnalysisUnifiedChat } from "@/components/analysis/analysis-unified-chat";
 import { ClueWorkspace } from "@/components/clues/clue-workspace";
 import { clueApi } from "@/lib/clue-api";
 import { RelationshipWorkspace } from "@/components/relationships/relationship-workspace";
@@ -62,8 +61,8 @@ const MULTI_CHAPTER_TIMELINE_CAP = 120;
 
 type AnalysisWorkspaceMode = "timeline" | "relationships" | "clues";
 
-/** Phase 25.1-02：页面顶层视图 —— 对话（默认）| 分析可视化；25.2-04 新增 agent */
-type AnalysisPageView = "chat" | "analysis" | "agent";
+/** Phase 25.1-02：页面顶层视图 —— 对话（默认，含智能体融合）| 分析可视化 */
+type AnalysisPageView = "chat" | "analysis";
 
 function eventsSignature(
   envelope: TimelineEnvelope,
@@ -968,7 +967,6 @@ function AnalysisWorkspace() {
                   [
                     ["chat", "对话"],
                     ["analysis", "分析"],
-                    ["agent", "智能体"],
                   ] as const
                 ).map(([id, label]) => (
                   <button
@@ -990,21 +988,9 @@ function AnalysisWorkspace() {
               </div>
             </div>
 
-            {/* 对话视图（默认）：与阅读器聊天共享同一会话底座 */}
-            <AnalysisChatPanel
+            {/* 统一对话视图（默认）：读者对话 + 智能体回合（AI 自动路由）混排 */}
+            <AnalysisUnifiedChat
               className={cn("min-h-0 flex-1", pageView !== "chat" && "hidden")}
-              novelId={novelId}
-              chapters={chapterList}
-              fullBook={fullBook}
-              progressChapterId={
-                selectedNovel?.reading_progress?.chapter_id ?? null
-              }
-              selection={selectedNode}
-            />
-
-            {/* Agent Workspace（25.2-04）：SSE 流式技能运行；CSS-hide 保住流与产物状态 */}
-            <AgentWorkspacePanel
-              className={cn("min-h-0 flex-1", pageView !== "agent" && "hidden")}
               novelId={novelId}
               chapters={chapterList}
               fullBook={fullBook}

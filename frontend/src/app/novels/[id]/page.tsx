@@ -489,6 +489,19 @@ function NovelReaderInner() {
     setChatCollapsed(false);
   }, []);
 
+  /** 智能体回合结束后刷新当前章节已发布插图锚点（可能有新发布）。 */
+  const refreshChapterAnchors = useCallback(async () => {
+    if (!currentChapterId) return;
+    try {
+      const anchorsRes = await illustrationAnchorApi.list(novelId);
+      setChapterAnchors(
+        anchorsRes.data.items.filter((a) => a.chapter_id === currentChapterId)
+      );
+    } catch {
+      setChapterAnchors([]);
+    }
+  }, [novelId, currentChapterId]);
+
   /** 沉浸模式：点按正文切换控制层；选中文本或点击交互控件时不触发 */
   const handleImmersiveSurfaceTap = useCallback(
     (event: React.MouseEvent) => {
@@ -796,6 +809,7 @@ function NovelReaderInner() {
                 pendingSelection={pendingSelection}
                 onClearSelection={() => setPendingSelection(null)}
                 onCitationNavigate={handleCitationNavigate}
+                onAnchorRefresh={() => void refreshChapterAnchors()}
               />
             </div>
           ) : null}
@@ -915,6 +929,7 @@ function NovelReaderInner() {
           pendingSelection={pendingSelection}
           onClearSelection={() => setPendingSelection(null)}
           onCitationNavigate={handleCitationNavigate}
+          onAnchorRefresh={() => void refreshChapterAnchors()}
         />
       ) : null}
 

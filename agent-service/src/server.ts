@@ -122,6 +122,35 @@ function readJsonBody(req: IncomingMessage): Promise<unknown> {
 /** ask 轮询返回的决策 verdict。 */
 export type ApprovalVerdict = "approved" | "approved_for_session" | "denied";
 
+/**
+ * 意图→skill 自动路由（AGENT-RUNTIME-CONTRACT：The Agent selects versioned Skills）。
+ *
+ * body.skill 缺省时调用 FastAPI `POST /api/agent/novels/{novel_id}/route-skill`
+ * 按问题文本自动选 skill（服务端决策）。端点不可用/失败 → 保守回退
+ * answer-reading-question（不破坏既有默认行为）。
+ */
+async function routeSkillByIntent(
+  deps: ReturnType<typeof resolveDeps>,
+  base: string,
+  novelId: number,
+  question: string,
+  authHeader: string,
+): Promise<string> {
+  try {
+    const res = await deps.fetchImpl(`${base}/api/agent/novels/${novelId}/route-skill`, {
+      method: "POST",
+      headers: { authorization: authHeader, "content-type": "application/json" },
+      body: JSON.stringify({ question }),
+    });
+    if (!res.ok) return "answer-reading-question";
+    const body = (await res.json()) as { skills?: string[] };
+    const skill = body.skills?.[0];
+    return typeof skill === "string" && skill ? skill : "answer-reading-question";
+  } catch {
+    return "answer-reading-question";
+  }
+}
+
 /** waitForApproval 短轮询选项。 */
 export interface WaitForApprovalOptions {
   fetchImpl: typeof fetch;
@@ -354,8 +383,16 @@ async function handleRun(
   }
   const body = (rawBody ?? {}) as Partial<RunRequest>;
   const question = typeof body.question === "string" ? body.question.trim() : "";
+  const base = config.fastApiBaseUrl;
 
-  const skillName = typeof body.skill === "string" && body.skill ? body.skill : "answer-reading-question";
+  // 技能选择（AGENT-RUNTIME-CONTRACT）：客户端显式 body.skill 是高级覆盖；
+  // 缺省 → 服务端按问题意图自动路由（Agent 选 skill，用户不选）。
+  let skillName: string;
+  if (typeof body.skill === "string" && body.skill) {
+    skillName = body.skill;
+  } else {
+    skillName = await routeSkillByIntent(deps, base, novelId, question, authHeader);
+  }
   let skill: LoadedSkill;
   try {
     skill = deps.loadSkillImpl(skillName);
@@ -389,7 +426,6 @@ async function handleRun(
     return;
   }
 
-  const base = config.fastApiBaseUrl;
   const jsonHeaders: Record<string, string> = {
     authorization: authHeader,
     "content-type": "application/json",

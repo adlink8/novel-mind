@@ -145,6 +145,17 @@ class SkillRunFinalize(StrictAgentRuntimeModel):
     frozen_manifest: dict[str, Any] | None = None
 
 
+class RouteSkillRequest(StrictAgentRuntimeModel):
+    """意图→skill 自动路由请求（AGENT-RUNTIME-CONTRACT：Agent 选 skill）。
+
+    ``question`` 必填（非空）；``source_status`` 可选，携带查询维度可用性，
+    供显式意图未命中时回退到不足维度（与 chat_backfill 同语义）。
+    """
+
+    question: str = Field(min_length=1, max_length=1000)
+    source_status: dict[str, str] | None = Field(default=None)
+
+
 # ────────────────────────── 产物与修订 ──────────────────────────
 
 

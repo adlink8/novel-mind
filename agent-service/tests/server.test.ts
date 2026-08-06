@@ -425,4 +425,102 @@ describe("agent-service run API (POST /agent/novels/{novel_id}/runs)", () => {
     const firstArg = (promptCalls[0] as [unknown])[0];
     expect(String(firstArg ?? "").length).toBeGreaterThan(0);
   });
+
+  it("body.skill 缺省 → 服务端按意图自动路由（route-skill 返回的主 skill 生效，Agent 选 skill）", async () => {
+    fetchMock.mockClear();
+    fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+      if (String(url).endsWith("/route-skill") && init?.method === "POST") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({ skills: ["detect-key-scenes"], primary: "detect-key-scenes" }),
+            { status: 200, headers: { "content-type": "application/json" } },
+          ),
+        );
+      }
+      if (String(url).endsWith("/versions") && init?.method === "GET") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ items: [{ id: 9, status: "active" }], total: 1 }), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          }),
+        );
+      }
+      if (String(url).endsWith("/skill-runs") && init?.method === "POST") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ run: { id: 43 }, internal_token: "tok-43" }), {
+            status: 202,
+            headers: { "content-type": "application/json" },
+          }),
+        );
+      }
+      if (String(url).endsWith("/finalize") && init?.method === "POST") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ artifact: { id: 8 } }), { status: 200 }),
+        );
+      }
+      return Promise.resolve(
+        new Response(JSON.stringify({ error: { code: "upstream_error" } }), { status: 502 }),
+      );
+    });
+
+    const session = fakeSession();
+    createSessionMock.mockReset();
+    createSessionMock.mockResolvedValue(session);
+    server = createApp({
+      fetchImpl: fetchMock as unknown as typeof fetch,
+      createSessionImpl: createSessionMock as unknown as (opts: unknown) => Promise<never>,
+    });
+    await new Promise<void>((resolve) => server.listen(0, () => resolve()));
+    const addr = server.address();
+    const routePort = typeof addr === "object" && addr ? addr.port : 0;
+
+    const res = await fetch(`http://127.0.0.1:${routePort}/agent/novels/1/runs`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: AUTH },
+      body: JSON.stringify({ question: "第1章有哪些关键场景" }),
+    });
+    expect(res.status).toBe(200);
+
+    const createOpts = createSessionMock.mock.calls[0]?.[0] as { skill?: { name?: string } };
+    expect(createOpts.skill?.name).toBe("detect-key-scenes");
+    // 技能版本查询指向自动路由的 skill。
+    const versionCalls = fetchMock.mock.calls.filter((c) => String(c[0]).endsWith("/versions"));
+    expect(String(versionCalls[0][0])).toContain("detect-key-scenes");
+    await res.body?.cancel();
+  });
+
+  it("route-skill 不可用/失败 → 保守回退 answer-reading-question（默认行为保留）", async () => {
+    // 默认 mock 对 route-skill 返回 502 → 回退问答 skill。
+    installDefaultBackendMock();
+    const session = fakeSession();
+    await startServer(session);
+
+    const res = await fetch(`http://127.0.0.1:${port}/agent/novels/1/runs`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: AUTH },
+      body: JSON.stringify({ question: "阿宁在竹林里看见了谁？" }),
+    });
+    expect(res.status).toBe(200);
+    const createOpts = createSessionMock.mock.calls[0]?.[0] as { skill?: { name?: string } };
+    expect(createOpts.skill?.name).toBe("answer-reading-question");
+    const versionCalls = fetchMock.mock.calls.filter((c) => String(c[0]).endsWith("/versions"));
+    expect(String(versionCalls[0][0])).toContain("answer-reading-question");
+    await res.body?.cancel();
+  });
+
+  it("显式 body.skill 覆盖自动路由（不调用 route-skill）", async () => {
+    installDefaultBackendMock();
+    const session = fakeSession();
+    await startServer(session);
+
+    const res = await fetch(`http://127.0.0.1:${port}/agent/novels/1/runs`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: AUTH },
+      body: JSON.stringify({ question: "q", skill: "answer-reading-question" }),
+    });
+    expect(res.status).toBe(200);
+    const routeCalls = fetchMock.mock.calls.filter((c) => String(c[0]).endsWith("/route-skill"));
+    expect(routeCalls).toHaveLength(0);
+    await res.body?.cancel();
+  });
 });

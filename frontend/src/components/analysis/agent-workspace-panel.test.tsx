@@ -175,12 +175,12 @@ describe("AgentWorkspacePanel", () => {
     renderPanel();
     await submitQuestion("阿宁在竹林里看见了谁？");
 
-    // streamAgentRun 调用约定：SSE 端点 + Bearer 由 sse.ts 注入，body 带固定技能。
+    // streamAgentRun 调用约定：SSE 端点 + Bearer 由 sse.ts 注入，body 不带 skill
+    // （Agent 按问题意图自动选 skill，AGENT-RUNTIME-CONTRACT）。
     expect(mocks.streamAgentRun).toHaveBeenCalledWith(
       "/agent/novels/11/runs",
       {
         question: "阿宁在竹林里看见了谁？",
-        skill: "answer-reading-question",
         input: {},
         branch: null,
       },

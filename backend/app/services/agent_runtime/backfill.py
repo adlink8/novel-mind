@@ -27,6 +27,8 @@ MAX_BACKFILL_SKILLS = 2
 
 # 维度→skill 映射（QueryDimension 词汇，queryplan/schemas.py）。
 # 值：(skill_name, materializes_domain_table)
+# 虚拟维度 "illustration"/"continuation" 是 skill_router 启发式路由的专有词表，
+# 不入 QueryDimension 枚举；它们只服务意图→skill 自动路由，不被 queryplan 使用。
 DIMENSION_TO_SKILL: dict[str, tuple[str, bool]] = {
     # character_state / world_projection 主补足：世界模型候选（EpistemicGate→candidate）
     "character_state": ("propose-world-model-candidates", True),
@@ -38,6 +40,9 @@ DIMENSION_TO_SKILL: dict[str, tuple[str, bool]] = {
     # events/timeline：story arc 摘要（非 leaf，artifact-only，不写域表）
     "events_causality": ("build-story-arc", False),
     "timeline": ("build-story-arc", False),
+    # 生图/续写意图（虚拟维度；skill_router 自动路由用，不进 queryplan）
+    "illustration": ("illustrate-scene", False),
+    "continuation": ("continue-derivative-story", False),
 }
 
 # 优先级：主补足维度优先；同一维度映射到同一 skill 时去重。

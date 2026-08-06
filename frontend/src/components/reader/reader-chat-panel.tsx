@@ -6,8 +6,10 @@ import {
   ArchiveRestore,
   ChevronDown,
   ChevronUp,
+  ImagePlus,
   LoaderCircle,
   MessageSquarePlus,
+  PenLine,
   Pencil,
   Send,
   Trash2,
@@ -27,6 +29,7 @@ import {
   type MessageView,
   type SelectionCoordinate,
 } from "@/lib/api";
+import { AgentTurnInline, type AgentTurnItem } from "@/components/analysis/agent-turn-inline";
 import {
   loadReaderChatPresentation,
   saveReaderChatPresentation,
@@ -41,6 +44,9 @@ export type CitationNavigateTarget = {
   evidence_key: string;
 };
 
+/** 智能体回合 id 计数器（模块级；换会话/关闭面板不重置）。 */
+let nextTurnId = 1;
+
 type Props = {
   novelId: string;
   currentChapterId: number;
@@ -54,6 +60,8 @@ type Props = {
   pendingSelection: SelectionCoordinate | null;
   onClearSelection: () => void;
   onCitationNavigate: (target: CitationNavigateTarget) => void;
+  /** 智能体回合终态后回调（插图锚点发布后阅读页刷新章节插图）。 */
+  onAnchorRefresh?: () => void;
   className?: string;
 };
 
@@ -101,6 +109,7 @@ export function ReaderChatPanel({
   pendingSelection,
   onClearSelection,
   onCitationNavigate,
+  onAnchorRefresh,
   className,
 }: Props) {
   const [conversations, setConversations] = useState<ConversationListItem[]>([]);
@@ -113,6 +122,8 @@ export function ReaderChatPanel({
   const [activeJob, setActiveJob] = useState<GenerationJobView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState<string | null>(null);
+  /** 已触发的智能体回合（session-local，不落 reader_chat 会话库）。 */
+  const [agentTurns, setAgentTurns] = useState<AgentTurnItem[]>([]);
   const pollAbortRef = useRef<AbortController | null>(null);
   const listRequestRef = useRef(0);
   const msgRequestRef = useRef(0);
@@ -147,6 +158,7 @@ export function ReaderChatPanel({
   const [hydratedNovel, setHydratedNovel] = useState<string | null>(null);
   if (hydratedNovel !== novelId) {
     setHydratedNovel(novelId);
+    setAgentTurns([]);
     const saved = loadReaderChatPresentation(novelId);
     if (saved.activeConversationId != null) {
       setActiveId(saved.activeConversationId);
@@ -246,7 +258,10 @@ export function ReaderChatPanel({
   // When panel closes or conversation cleared, drop local message buffer.
   useEffect(() => {
     if (!open || activeId == null) {
-      queueMicrotask(() => setMessages([]));
+      queueMicrotask(() => {
+        setMessages([]);
+        setAgentTurns([]);
+      });
     }
   }, [open, activeId]);
 
@@ -438,6 +453,36 @@ export function ReaderChatPanel({
     } catch {
       setError("重试失败");
     }
+  };
+
+  /** 选中段落 → 生成插图（智能体回合；skill 缺省 = 后端自动路由）。 */
+  const handleGenerateIllustration = () => {
+    if (!pendingSelection) return;
+    const text = pendingSelection.selection_text.trim();
+    const excerpt = text.slice(0, 60) + (text.length > 60 ? "…" : "");
+    setError(null);
+    setAgentTurns((prev) => [
+      ...prev,
+      {
+        id: nextTurnId++,
+        question: `为选中的段落「${excerpt}」生成一幅插图`,
+        // 生图/锚点流程由后端自动路由决定；前端不选择 skill。
+      },
+    ]);
+  };
+
+  /** 续写入口：把续写意图交给智能体（路由决定具体技能）。 */
+  const handleContinue = () => {
+    const text = pendingSelection?.selection_text.trim() ?? "";
+    const excerpt = text ? `「${text.slice(0, 60)}${text.length > 60 ? "…" : ""}」` : "";
+    setError(null);
+    setAgentTurns((prev) => [
+      ...prev,
+      {
+        id: nextTurnId++,
+        question: excerpt ? `请接着这段故事续写：${excerpt}` : "请接着当前章节的剧情续写",
+      },
+    ]);
   };
 
   if (!open && !present) return null;
@@ -736,6 +781,20 @@ export function ReaderChatPanel({
                 </div>
               </div>
             ) : null}
+
+            {/* 智能体回合（SSE 流式；skill 缺省 = 后端自动路由） */}
+            {agentTurns.map((turn) => (
+              <AgentTurnInline
+                key={turn.id}
+                novelId={novelId}
+                initialQuestion={turn.question}
+                skill={turn.skill}
+                input={turn.input}
+                onCitationNavigate={onCitationNavigate}
+                onDone={() => onAnchorRefresh?.()}
+                onError={(message) => setError(message)}
+              />
+            ))}
           </div>
 
           {pendingSelection ? (
@@ -743,11 +802,41 @@ export function ReaderChatPanel({
               data-testid="reader-chat-selection-preview"
               className="shrink-0 border-t border-border/50 bg-amber-50/80 px-3 py-1.5 text-xs text-amber-950"
             >
-              选区 [{pendingSelection.source_start}, {pendingSelection.source_end})：
-              <span className="ml-1 font-medium">
-                {pendingSelection.selection_text.slice(0, 48)}
-                {pendingSelection.selection_text.length > 48 ? "…" : ""}
-              </span>
+              <div className="flex items-start justify-between gap-2">
+                <p className="min-w-0">
+                  选区 [{pendingSelection.source_start}, {pendingSelection.source_end})：
+                  <span className="ml-1 font-medium">
+                    {pendingSelection.selection_text.slice(0, 48)}
+                    {pendingSelection.selection_text.length > 48 ? "…" : ""}
+                  </span>
+                </p>
+                <span className="flex shrink-0 gap-1">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-6 px-2 text-[10px]"
+                    data-testid="reader-chat-generate-image"
+                    aria-label="为选中段落生成插图"
+                    onClick={handleGenerateIllustration}
+                  >
+                    <ImagePlus className="size-3" />
+                    插图
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-6 px-2 text-[10px]"
+                    data-testid="reader-chat-continue"
+                    aria-label="续写"
+                    onClick={handleContinue}
+                  >
+                    <PenLine className="size-3" />
+                    续写
+                  </Button>
+                </span>
+              </div>
             </div>
           ) : (
             <div className="shrink-0 border-t border-border/50 px-3 py-1.5 text-xs text-muted-foreground">

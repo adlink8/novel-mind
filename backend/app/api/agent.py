@@ -24,7 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.dependencies import require_owned_novel
 from app.core.database import get_db
 from app.core.security import require_agent_actor, require_gateway_token, require_user
-from app.models import Novel, SkillRun, SkillVersion, User
+from app.models import Novel, SkillRegistry, SkillRun, SkillVersion, User
 from app.schemas.agent_approvals import (
     ApprovalDecision,
     ApprovalRequestCreate,
@@ -33,6 +33,7 @@ from app.schemas.agent_approvals import (
 from app.schemas.agent_runtime import (
     ArtifactRevisionView,
     ArtifactView,
+    RouteSkillRequest,
     SkillRegistryView,
     SkillRunAccepted,
     SkillRunCreate,
@@ -152,6 +153,54 @@ async def list_skill_versions(
         "total": total,
         "skip": skip,
         "limit": limit,
+    }
+
+
+@router.post("/novels/{novel_id}/route-skill", response_model=dict)
+async def route_skill(
+    novel_id: int,
+    data: RouteSkillRequest,
+    novel: Novel = Depends(require_owned_novel),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+) -> dict:
+    """意图→skill 自动路由（AGENT-RUNTIME-CONTRACT：Agent 选 skill，用户不选）。
+
+    agent-service 在 body.skill 缺省时调用本端点：按问题文本（+ 可选维度可用性）
+    启发式选 skill。只返回该 owner+novel 已注册 active 的 skill，其余诚实剔除；
+    无 active 命中回退 answer-reading-question。路由是**服务端决策**——本响应
+    只服务 agent-service/未来前端的自动分发，不作为对用户的技能建议。
+    """
+    from app.services.agent_runtime.skill_router import (
+        DEFAULT_ROUTED_SKILL,
+        route_question_to_skill,
+    )
+
+    candidates = route_question_to_skill(data.question, data.source_status)
+    active: list[str] = []
+    seen: set[str] = set()
+    for name in candidates:
+        if name in seen:
+            continue
+        seen.add(name)
+        registry = await db.scalar(
+            select(SkillRegistry).where(
+                SkillRegistry.owner_id == current_user.id,
+                SkillRegistry.novel_id == novel.id,
+                SkillRegistry.name == name,
+                SkillRegistry.status == "active",
+            )
+        )
+        if registry is not None:
+            active.append(name)
+    if not active:
+        active = [DEFAULT_ROUTED_SKILL]
+    return {
+        "skills": active,
+        "primary": active[0],
+        "question_hash": hashlib.sha256(
+            data.question.encode("utf-8")
+        ).hexdigest(),
     }
 
 

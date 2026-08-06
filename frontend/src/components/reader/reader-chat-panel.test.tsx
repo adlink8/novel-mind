@@ -20,6 +20,12 @@ const mocks = vi.hoisted(() => ({
   getJob: vi.fn(),
   cancelJob: vi.fn(),
   retryJob: vi.fn(),
+  streamAgentRun: vi.fn(),
+  getLatestRun: vi.fn(),
+  getLatestArtifact: vi.fn(),
+  getArtifact: vi.fn(),
+  getArtifactContent: vi.fn(),
+  cancelRun: vi.fn(),
 }));
 
 vi.mock("@/lib/api", async () => {
@@ -36,6 +42,15 @@ vi.mock("@/lib/api", async () => {
       getJob: mocks.getJob,
       cancelJob: mocks.cancelJob,
       retryJob: mocks.retryJob,
+    },
+    agentApi: {
+      getLatestRun: mocks.getLatestRun,
+      getLatestArtifact: mocks.getLatestArtifact,
+      getArtifact: mocks.getArtifact,
+      getArtifactContent: mocks.getArtifactContent,
+      cancelRun: mocks.cancelRun,
+      approveArtifact: vi.fn(),
+      rejectArtifact: vi.fn(),
     },
     pollReaderChatJob: vi.fn(async (_n, _c, _j, opts?: { onUpdate?: (j: unknown) => void }) => {
       const job = {
@@ -54,6 +69,10 @@ vi.mock("@/lib/api", async () => {
     }),
   };
 });
+
+vi.mock("@/lib/sse", () => ({
+  streamAgentRun: mocks.streamAgentRun,
+}));
 
 const selection: SelectionCoordinate = {
   chapter_id: 1,
@@ -87,6 +106,14 @@ beforeEach(() => {
     data: { items: [], total: 0, skip: 0, limit: 200, after_sequence: 0 },
   });
   mocks.createConversation.mockResolvedValue({ data: conv(2, "新会话") });
+  mocks.streamAgentRun.mockImplementation(async () => {
+    await new Promise<void>(() => {
+      /* hang until test-driven dispatch or abort */
+    });
+  });
+  mocks.getLatestRun.mockResolvedValue(null);
+  mocks.getLatestArtifact.mockResolvedValue(null);
+  mocks.getArtifactContent.mockResolvedValue(null);
   mocks.patchConversation.mockImplementation(async (_n, id, body) => ({
     data: { ...conv(id), ...body },
   }));
@@ -438,5 +465,41 @@ describe("ReaderChatPanel", () => {
     );
     expect(screen.queryByText(/应用建议|确认写入|线索/)).not.toBeInTheDocument();
     expect(screen.getByLabelText("重试生成")).toBeInTheDocument();
+  });
+
+  it("mounts an inline agent turn when 生成插图 is clicked on a selection", async () => {
+    const onAnchorRefresh = vi.fn();
+    renderPanel({ onAnchorRefresh });
+    await waitFor(() =>
+      expect(screen.getByTestId("reader-chat-generate-image")).toBeInTheDocument()
+    );
+    fireEvent.click(screen.getByTestId("reader-chat-generate-image"));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("agent-turn-inline")).toBeInTheDocument()
+    );
+    expect(mocks.streamAgentRun).toHaveBeenCalledTimes(1);
+    const [url, body] = mocks.streamAgentRun.mock.calls[0];
+    expect(url).toBe("/agent/novels/11/runs");
+    // 引用选中片段，但不带 skill（后端自动路由）
+    expect(body.question).toContain("阿宁走进");
+    expect("skill" in (body as Record<string, unknown>)).toBe(false);
+    // 普通对话发送未被触发（这是独立动作按钮，不写 reader_chat）
+    expect(mocks.createMessage).not.toHaveBeenCalled();
+  });
+
+  it("mounts an inline agent turn when 续写 is clicked", async () => {
+    renderPanel();
+    await waitFor(() =>
+      expect(screen.getByTestId("reader-chat-continue")).toBeInTheDocument()
+    );
+    fireEvent.click(screen.getByTestId("reader-chat-continue"));
+    await waitFor(() =>
+      expect(screen.getByTestId("agent-turn-inline")).toBeInTheDocument()
+    );
+    expect(mocks.streamAgentRun).toHaveBeenCalledTimes(1);
+    const body = mocks.streamAgentRun.mock.calls[0][1] as Record<string, unknown>;
+    expect(body.question).toContain("续写");
+    expect("skill" in body).toBe(false);
   });
 });
