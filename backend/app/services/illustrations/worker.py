@@ -324,15 +324,44 @@ def illustration_job_contract_from_row(job: IllustrationJob) -> IllustrationJobC
 def production_runtime() -> IllustrationWorkerRuntime:
     import os
 
+    from app.config import settings
+
     root = AssetStorage.default_storage_root()
-    transport_mode = "success"
+    # 测试模式优先：NOVELMIND_ILLUSTRATION_CONTROLLED_TRANSPORT=1 永远走 mock
+    # （只切 mock 故障模式，用于确定性测试）。
     if os.environ.get("NOVELMIND_ILLUSTRATION_CONTROLLED_TRANSPORT") == "1":
         transport_mode = os.environ.get("NOVELMIND_ILLUSTRATION_MOCK_MODE", "success")
+        from app.services.illustrations.gateway import MockIllustrationTransport
+
+        return IllustrationWorkerRuntime(
+            sessions=async_session_factory,
+            gateway=IllustrationGateway(
+                MockIllustrationTransport(mode=transport_mode)
+            ),
+            storage=AssetStorage(root),
+        )
+    if settings.illustration_provider == "hunyuan":
+        from app.services.illustrations.hunyuan_transport import (
+            HunyuanIllustrationTransport,
+        )
+
+        return IllustrationWorkerRuntime(
+            sessions=async_session_factory,
+            gateway=IllustrationGateway(
+                HunyuanIllustrationTransport(
+                    base_url=settings.illustration_base_url,
+                    model=settings.illustration_model,
+                    proxy=settings.https_proxy or None,
+                    timeout=settings.illustration_timeout,
+                )
+            ),
+            storage=AssetStorage(root),
+        )
     from app.services.illustrations.gateway import MockIllustrationTransport
 
     return IllustrationWorkerRuntime(
         sessions=async_session_factory,
-        gateway=IllustrationGateway(MockIllustrationTransport(mode=transport_mode)),
+        gateway=IllustrationGateway(MockIllustrationTransport(mode="success")),
         storage=AssetStorage(root),
     )
 

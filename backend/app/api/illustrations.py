@@ -113,7 +113,9 @@ router = APIRouter(dependencies=[Depends(require_user)])
 # Only the deterministic mock provider is configured in this slice. A
 # provider-neutral API means the request surface is provider-independent; a
 # non-configured provider fails closed before any job is created.
-SUPPORTED_ILLUSTRATION_PROVIDERS = frozenset({MOCK_ILLUSTRATION_PROVIDER})
+SUPPORTED_ILLUSTRATION_PROVIDERS = frozenset(
+    {MOCK_ILLUSTRATION_PROVIDER, "hunyuan"}
+)
 
 
 class StrictWireModel(StrictIllustrationModel):
@@ -411,7 +413,16 @@ class IllustrationJobService:
 
 
 def _price_snapshot_for(provider: str, model: str) -> PriceSnapshot:
-    """Frozen mock pricing; cost is always settled against this snapshot."""
+    """Frozen pricing; cost is always settled against this snapshot."""
+    if provider == "hunyuan":
+        # 腾讯混元生图（ZCodeProxy）：按图计费 + token 估算价。
+        return PriceSnapshot(
+            provider=provider,
+            model=model,
+            input_price_per_million=Decimal("0.10"),
+            output_price_per_million=Decimal("0.10"),
+            image_price_per_image=Decimal("0.04"),
+        )
     return PriceSnapshot(
         provider=provider,
         model=model,

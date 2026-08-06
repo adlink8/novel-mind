@@ -428,6 +428,21 @@ class IllustrationGateway:
             latency_ms = int((time.perf_counter() - started) * 1000)
             error_code = type(exc).__name__
             await budget.settle_unknown(key=reservation_key, error_code=error_code)
+            # transport 显式拒绝（4xx 坏请求等）→ ProviderRejected（已决失败，
+            # 不留空资产、不重试）；其余 → ProviderOutcomeUnknown（可对账）。
+            if getattr(exc, "provider_rejected", False):
+                raise ProviderRejected(
+                    f"provider rejected request ({redact_provider_error(exc)})",
+                    GatewayAttempt(
+                        attempt_number=attempt_number,
+                        status="failed",
+                        reservation_key=reservation_key,
+                        request_hash=request_hash,
+                        reservation_id=reservation_id,
+                        error_code=error_code,
+                        latency_ms=latency_ms,
+                    ),
+                ) from exc
             raise ProviderOutcomeUnknown(
                 f"provider outcome is unknown ({redact_provider_error(exc)})",
                 GatewayAttempt(

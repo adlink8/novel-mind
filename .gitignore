@@ -53,6 +53,8 @@ agent-service/tests/fixtures/.tmp-gov-*
 
 # --- 后端上传的测试数据 ---
 backend/uploads/
+# 插图资产运行时存储（生图产物，非源码）
+backend/storage/
 test_novel.txt
 
 # --- Local agent state and imported novel sources ---

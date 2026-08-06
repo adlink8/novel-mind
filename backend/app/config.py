@@ -69,6 +69,12 @@ class Settings(BaseSettings):
     https_proxy: str = ""
     ollama_base_url: str = "http://localhost:11434"  # 本地 Ollama 服务地址
 
+    # ── 插图生成（Phase 33-02 provider seam）──
+    illustration_provider: str = "mock"  # mock | hunyuan；默认 mock 保证不破坏现有测试
+    illustration_model: str = "hunyuan-image"  # 腾讯混元生图模型（ZCodeProxy 代理）
+    illustration_base_url: str = "http://127.0.0.1:3001"  # ZCodeProxy 本地代理
+    illustration_timeout: float = 120.0  # 生图 10-60s，比文本默认放宽
+
     # ── 文件存储 ──
     upload_dir: str = "./uploads"  # 小说上传文件存储目录
     max_upload_size: int = 50 * 1024 * 1024  # 最大上传大小: 50MB
