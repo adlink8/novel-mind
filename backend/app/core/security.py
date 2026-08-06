@@ -293,10 +293,17 @@ async def require_agent_actor(
             headers={"WWW-Authenticate": "Bearer"},
         )
     # 1) 先试用户 JWT（浏览器/直接 API）。
+    # 注意：token 以 "ey" 开头不代表是有效 JWT——random internal_token 偶发
+    # 以 "ey" 开头（~0.02%）。get_current_user 对无效/过期 JWT 抛 401，这里
+    # 捕获后继续尝试 internal-token 兜底，避免把内部令牌误判为坏 JWT。
     if credentials is not None and token.startswith("ey"):
-        user = await get_current_user(request, credentials, db)
-        if user is not None:
-            return user
+        try:
+            user = await get_current_user(request, credentials, db)
+            if user is not None:
+                return user
+        except HTTPException:
+            # 无效/过期 JWT → 落到 internal_token 分支再判一次。
+            pass
     # 2) internal_token（agent-service 工具门面）。
     token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
     from app.models.agent_runtime import SkillRun

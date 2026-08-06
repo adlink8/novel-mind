@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import require_owned_novel
@@ -299,7 +299,7 @@ async def tool_generate_image_candidate(
     body: GenerateImageCandidateRequest | None = None,
     novel: Novel = Depends(require_owned_novel),
     db: AsyncSession = Depends(get_db),
-
+    background_tasks: BackgroundTasks = BackgroundTasks,
 ):
     """Phase 33 候选生成 action（33-05）：创建**一个**候选生成作业。
 
@@ -307,14 +307,26 @@ async def tool_generate_image_candidate(
     idempotency key 从血缘确定性重放。只创建 candidate 作业（D-33-01..D-33-03），
     绝不写 Canon / 域表 / ApprovalRequest / published 状态——审批与发布属于
     Phase 34；候选资产由 durable worker 在作业成功时产出。
+
+    创建后立即后台 dispatch（与 illustrations API 同源），否则 agent 工具
+    路径建的作业永远卡 queued。
     """
-    return await _run_tool(
+    from app.services.illustrations.worker import dispatch_illustration_job
+
+    view = await _run_tool(
         "generate_image_candidate",
         db=db,
         novel=novel,
         owner_id=novel.owner_id,
         params=_params(body),
     )
+    job_id = view.get("id") if isinstance(view, dict) else None
+    if job_id is not None:
+        # Commit before BackgroundTasks so the worker session can see the job
+        # （与 illustrations API 同模式）。
+        await db.commit()
+        background_tasks.add_task(dispatch_illustration_job, job_id)
+    return view
 
 
 @router.post("/publish_illustration")

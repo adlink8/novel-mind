@@ -46,6 +46,10 @@ import {
   type RunLineageContext,
   type ToolEvidence,
 } from "./structured-output/cited-answer-builder.js";
+import {
+  buildAnalysisEnvelope,
+  isAnalysisSkill,
+} from "./structured-output/analysis-envelope-builder.js";
 import { createPoller } from "./poller.js";
 
 /** 依赖注入点（测试用 mock；生产用默认实现）。 */
@@ -593,10 +597,25 @@ async function handleRun(
               ? { type: "cited_answer", answer: { answer_blocks: [{ text: last.text }] } }
               : {};
           }
+        } else if (runLineage && isAnalysisSkill(skill.name)) {
+          // 分析/生图 skill：模型输出是结构化 JSON，按 skill 构造对应
+          // envelope.type（scene_candidate / world_model_candidate /
+          // visual_bible）。解析失败或无 leaf 证据 → 抛错（诚实失败，
+          // 绝不伪造 cited_answer 信封导致假 artifact）。
+          if (!last?.text) {
+            throw new Error(`SSE run: skill ${skill.name} returned no model output`);
+          }
+          const built = buildAnalysisEnvelope(
+            last.text,
+            runLineage,
+            skill,
+            null,
+          );
+          envelopePayload = built.envelope;
+          frozenManifest = built.frozenManifest;
         } else {
-          envelopePayload = last?.text
-            ? { type: "cited_answer", answer: { answer_blocks: [{ text: last.text }] } }
-            : {};
+          // 未接线的 skill：诚实失败（不伪造 cited_answer envelope）。
+          throw new Error(`SSE run: no envelope builder for skill ${skill.name}`);
         }
         const finalizeRes = await deps.fetchImpl(
           `${base}/api/agent/novels/${novelId}/skill-runs/${runId}/finalize`,
