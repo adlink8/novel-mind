@@ -1,12 +1,26 @@
-.PHONY: help dev-backend dev-frontend dev test test-backend test-frontend lint lint-backend lint-frontend clean install-backend install-frontend
+.PHONY: help dev-backend dev-frontend dev-agent dev-all dev test test-backend test-frontend lint lint-backend lint-frontend clean install-backend install-frontend
 
 help:  ## 显示帮助信息
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
 # ─────────── 开发 ───────────
 
-dev-backend:  ## 启动后端开发服务器
-	cd backend && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+# 端口固化：后端 8010（避开 rag-api 的 8000）、前端 3005、agent-service 3100、
+# ZCodeProxy 生图代理 3001。启动脚本见 scripts/keep-alive.ps1（一键保活全部服务）。
+
+dev-backend:  ## 启动后端开发服务器（固定 8010）
+	cd backend && uvicorn app.main:app --reload --host 127.0.0.1 --port 8010
+
+dev-frontend:  ## 启动前端开发服务器（固定 3005）
+	cd frontend && BACKEND_URL=http://127.0.0.1:8010 npx next dev --port 3005 --hostname 127.0.0.1
+
+dev-agent:  ## 启动 agent-service（固定 3100）
+	cd agent-service && NOVELMIND_GATEWAY_TOKEN=dev-agent-gateway-token-local FASTAPI_BASE_URL=http://127.0.0.1:8010 PORT=3100 node start.mjs
+
+dev-all:  ## 一键保活全部服务（后端/前端/agent；ZCodeProxy 需手动启动）
+	@echo "使用 scripts/keep-alive.ps1 保活后端 8010 + 前端 3005 + agent 3100"
+	@echo "ZCodeProxy（生图代理 3001）为独立程序，请手动启动"
+	@powershell -ExecutionPolicy Bypass -File scripts/keep-alive.ps1
 
 dev-frontend:  ## 启动前端开发服务器
 	cd frontend && npm run dev
