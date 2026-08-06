@@ -519,6 +519,7 @@ def classify_failure(
     from app.services.narrative_memory.builder_gateway import (
         CancelledBeforePersist,
         GatewayError,
+        SchemaValidationExhausted,
     )
     from app.services.narrative_memory.builder_packages import PackageBuildError
     from app.services.narrative_memory.builder_repository import (
@@ -533,6 +534,8 @@ def classify_failure(
     if isinstance(exc, BudgetExceeded):
         return ReasonCode.BUDGET_EXCEEDED, FailureClass.BUDGET
     if isinstance(exc, PackageBuildError):
+        return ReasonCode.SCHEMA_INVALID, FailureClass.SCHEMA
+    if isinstance(exc, SchemaValidationExhausted):
         return ReasonCode.SCHEMA_INVALID, FailureClass.SCHEMA
     if isinstance(exc, GatewayError):
         return ReasonCode.PROVIDER_TRANSPORT_ERROR, FailureClass.PROVIDER

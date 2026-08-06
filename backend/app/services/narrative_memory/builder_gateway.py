@@ -40,6 +40,14 @@ class CancelledBeforePersist(GatewayError):
     pass
 
 
+class SchemaValidationExhausted(GatewayError):
+    """Model output stayed schema/business-invalid after all repair attempts.
+
+    Raised only when repair attempts are exhausted, so failure classification
+    can map it to SCHEMA_INVALID instead of a provider transport error.
+    """
+
+
 @dataclass
 class GatewayAttemptResult:
     attempt_id: int
@@ -205,7 +213,7 @@ class BuilderModelGateway:
                         cost_usd=cost,
                         latency_ms=int((time.perf_counter() - started) * 1000),
                     )
-                    raise GatewayError(str(exc)) from exc
+                    raise SchemaValidationExhausted(str(exc)) from exc
                 # Record failed attempt, settle, then reserve a repair attempt.
                 await self._budget.settle(
                     reservation_id=current_reservation.reservation_id,

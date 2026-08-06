@@ -22,6 +22,7 @@ from app.services.narrative_memory.builder_contracts import (
 from app.services.narrative_memory.builder_gateway import (
     CancelledBeforePersist,
     GatewayError,
+    SchemaValidationExhausted,
 )
 from app.services.narrative_memory.builder_packages import PackageBuildError
 from app.services.narrative_memory.builder_repository import BuilderRepositoryError
@@ -97,6 +98,15 @@ def test_classify_provider() -> None:
     code, cls = classify_failure(GatewayError("transport down"))
     assert code == ReasonCode.PROVIDER_TRANSPORT_ERROR
     assert cls.value == "provider"
+
+
+def test_classify_schema_exhausted_gateway() -> None:
+    """Schema-invalid GatewayError (repair exhausted) must not read as transport."""
+    code, cls = classify_failure(
+        SchemaValidationExhausted("schema_or_business_invalid after repair exhausted")
+    )
+    assert code == ReasonCode.SCHEMA_INVALID
+    assert cls.value == "schema"
 
 
 def test_classify_source_drift_and_owner() -> None:

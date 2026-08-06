@@ -468,10 +468,50 @@ def _build_messages(
     ]
 
 
+# Closed TypedValue value_kinds from the chapter-state contract. Gemini
+# occasionally emits out-of-contract values (entity_kind="person",
+# change="shift", value_kind="string"); downstream strict MemoryClaim
+# validation rejects those, so _normalize_model_output clamps them back into
+# the closed sets instead of failing schema/business-invalid after repairs.
+_VALUE_KINDS = frozenset({"text", "number", "boolean", "reference", "unknown"})
+
+
+def _clamp_enum(value: Any, enum_cls: type, default: str) -> str:
+    """Return ``value`` when it names a member of ``enum_cls``, else ``default``."""
+    text = str(value).strip() if value is not None else ""
+    return text if text in {member.value for member in enum_cls} else default
+
+
+def _clamp_typed_value(value: dict[str, Any]) -> dict[str, Any]:
+    """Clamp a raw TypedValue dict into a strict-valid TypedValue dict.
+
+    Out-of-contract value_kinds (e.g. ``"string"``) fall back to ``text``;
+    ``number``/``boolean`` are stringified by this CLI for durability, which
+    strict Number/Boolean validation rejects, so they clamp to ``text`` too.
+    """
+    vk = str(value.get("value_kind") or "text").strip().lower()
+    raw = value.get("value")
+    if raw is None or str(raw).strip() == "":
+        return {"value_kind": "unknown"}
+    if vk not in _VALUE_KINDS or vk in {"number", "boolean"}:
+        vk = "text"
+    if vk == "unknown":
+        return {"value_kind": "unknown"}
+    max_len = 180 if vk == "reference" else 500
+    return {"value_kind": vk, "value": str(raw)[:max_len]}
+
+
 def _normalize_model_output(
     parsed: dict[str, Any], *, payload: dict[str, Any], stage_key: str
 ) -> dict[str, Any]:
     """Ensure min-viable fields so rebind/validate can succeed or repair once."""
+    from app.services.narrative_memory.contracts import (
+        EntityKind,
+        EntityStateDimension,
+        EventKind,
+        StateChange,
+    )
+
     usage = parsed.get("usage") if isinstance(parsed.get("usage"), dict) else {}
     if stage_key.startswith("chapter_state:"):
         ch_num = int(payload.get("chapter_number") or 1)
@@ -542,10 +582,7 @@ def _normalize_model_output(
                 elif prior.get("value_kind") == "text" and not prior.get("value"):
                     prior = {"value_kind": "unknown"}
                 else:
-                    prior = {
-                        "value_kind": str(prior.get("value_kind") or "text"),
-                        "value": str(prior.get("value") or "未知")[:500],
-                    }
+                    prior = _clamp_typed_value(prior)
                 current = payload_obj.get("current")
                 if not isinstance(current, dict) or not current.get("value"):
                     current = {
@@ -553,20 +590,26 @@ def _normalize_model_output(
                         "value": str(parsed.get("display_label") or f"状态{idx}")[:500],
                     }
                 else:
-                    current = {
-                        "value_kind": str(current.get("value_kind") or "text"),
-                        "value": str(current.get("value"))[:500],
-                    }
+                    current = _clamp_typed_value(current)
                 ek = str(payload_obj.get("entity_key") or "").strip() or f"character:entity-{idx}"
-                # Rebuild closed set only — drop model extras (prior on event etc.).
+                # Rebuild closed set only — drop model extras (prior on event etc.),
+                # and clamp enums so strict MemoryClaim validation can succeed.
                 payload_obj = {
                     "claim_kind": "entity_state",
-                    "entity_kind": str(payload_obj.get("entity_kind") or "character"),
+                    "entity_kind": _clamp_enum(
+                        payload_obj.get("entity_kind"), EntityKind, "character"
+                    ),
                     "entity_key": ek[:180],
-                    "dimension": str(payload_obj.get("dimension") or "condition"),
+                    "dimension": _clamp_enum(
+                        payload_obj.get("dimension"),
+                        EntityStateDimension,
+                        "condition",
+                    ),
                     "prior": prior,
                     "current": current,
-                    "change": str(payload_obj.get("change") or "establish"),
+                    "change": _clamp_enum(
+                        payload_obj.get("change"), StateChange, "establish"
+                    ),
                 }
             elif kind == "event_fact":
                 actors = payload_obj.get("actor_keys")
@@ -579,13 +622,12 @@ def _normalize_model_output(
                         "value": str(parsed.get("display_label") or f"事件{idx}")[:500],
                     }
                 else:
-                    outcome = {
-                        "value_kind": str(outcome.get("value_kind") or "text"),
-                        "value": str(outcome.get("value"))[:500],
-                    }
+                    outcome = _clamp_typed_value(outcome)
                 payload_obj = {
                     "claim_kind": "event_fact",
-                    "event_kind": str(payload_obj.get("event_kind") or "action"),
+                    "event_kind": _clamp_enum(
+                        payload_obj.get("event_kind"), EventKind, "action"
+                    ),
                     "actor_keys": [str(a)[:180] for a in actors if a][:20],
                     "object_keys": [
                         str(a)[:180]
