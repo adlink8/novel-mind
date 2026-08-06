@@ -13,6 +13,13 @@
 
 from __future__ import annotations
 
+import uuid
+from typing import Any
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.prompt_revision import PromptRevision
 from app.services.agent_runtime.backfill import (
     DIMENSION_TO_SKILL,
     MAX_BACKFILL_SKILLS,
@@ -99,3 +106,70 @@ def route_question_to_skill(
         if len(chosen) >= MAX_ROUTED_SKILLS:
             break
     return chosen or [DEFAULT_ROUTED_SKILL]
+
+
+# 需要自动锚定的 skill → 其 input.schema 必需的锚定字段（服务端自动补全）。
+# 锚 = 该 novel 最新**已批准** PromptRevision 的血缘（scene_spec / visual bible /
+# source snapshot）+ 幂等 job_key。字段名与各 skill 的 input.schema.json 对齐，
+# 只包含 schema 允许的字段（additionalProperties:false 防 422）。
+SKILL_INPUT_ANCHOR_FIELDS: dict[str, tuple[str, ...]] = {
+    "illustrate-scene": (
+        "prompt_revision_id",
+        "visual_bible_version_id",
+        "scene_spec_revision_id",
+        "source_snapshot_id",
+        "job_key",
+    ),
+}
+
+# 从 PromptRevision 血缘提取锚的字段映射（锚字段名 → PromptRevision 属性）。
+_ANCHOR_FROM_PROMPT_REVISION: dict[str, str] = {
+    "prompt_revision_id": "id",
+    "visual_bible_version_id": "visual_bible_revision_id",
+    "scene_spec_revision_id": "scene_spec_id",
+    "source_snapshot_id": "source_snapshot_id",
+}
+
+
+async def resolve_skill_input_anchors(
+    db: AsyncSession,
+    skill_name: str,
+    owner_id: int,
+    novel_id: int,
+) -> dict[str, Any] | None:
+    """服务端自动解析 skill 运行必需的锚定字段（Agent 选锚，不暴露给用户）。
+
+    - 需要锚的 skill（illustrate-scene 等）：查该 novel 最新**已批准** PromptRevision
+      （review_state='approved'），从其血缘提取 prompt_revision_id /
+      visual_bible_version_id / scene_spec_revision_id / source_snapshot_id，
+      并生成幂等 job_key（``auto-<uuid>``）。无已批准 PromptRevision 或血缘不完整
+      → None（诚实失败，不伪造锚——宁缺毋滥）。
+    - 不需要锚的 skill（answer-reading-question 等）→ {}（原样，调用方用 body.input）。
+    """
+    anchor_fields = SKILL_INPUT_ANCHOR_FIELDS.get(skill_name)
+    if anchor_fields is None:
+        return {}
+    row = await db.scalar(
+        select(PromptRevision)
+        .where(
+            PromptRevision.owner_id == owner_id,
+            PromptRevision.novel_id == novel_id,
+            PromptRevision.review_state == "approved",
+        )
+        .order_by(PromptRevision.id.desc())
+        .limit(1)
+    )
+    if row is None:
+        return None
+    anchors: dict[str, Any] = {}
+    for field in anchor_fields:
+        if field == "job_key":
+            anchors[field] = f"auto-{uuid.uuid4().hex}"
+            continue
+        attr = _ANCHOR_FROM_PROMPT_REVISION[field]
+        value = getattr(row, attr)
+        if value is None:
+            # 血缘不完整（如 visual bible / scene spec 未批准）→ 诚实失败。
+            return None
+        anchors[field] = value
+    return anchors

@@ -173,6 +173,7 @@ async def route_skill(
     """
     from app.services.agent_runtime.skill_router import (
         DEFAULT_ROUTED_SKILL,
+        resolve_skill_input_anchors,
         route_question_to_skill,
     )
 
@@ -195,12 +196,18 @@ async def route_skill(
             active.append(name)
     if not active:
         active = [DEFAULT_ROUTED_SKILL]
+    # 自动锚解析：主 skill 需要的锚定字段（服务端从已批准 PromptRevision 血缘
+    # 自动选锚，不暴露给用户）。无锚（非锚 skill / 无已批准 PromptRevision）→ null。
+    anchors = await resolve_skill_input_anchors(
+        db, active[0], current_user.id, novel.id
+    )
     return {
         "skills": active,
         "primary": active[0],
         "question_hash": hashlib.sha256(
             data.question.encode("utf-8")
         ).hexdigest(),
+        "input_anchor": anchors if anchors else None,
     }
 
 

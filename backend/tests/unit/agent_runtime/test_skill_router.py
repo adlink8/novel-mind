@@ -7,9 +7,14 @@
 - 无意图命中回退 answer-reading-question
 - source_status 不足维度回退（与 chat_backfill 语义一致）
 - DIMENSION_TO_SKILL 已扩展生图/续写虚拟维度
+- 自动锚解析：illustrate-scene 从已批准 PromptRevision 血缘提取锚；
+  无已批准 PromptRevision → None；非锚 skill → {}
 """
 
 from __future__ import annotations
+
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -19,7 +24,9 @@ from app.services.agent_runtime.backfill import DIMENSION_TO_SKILL
 from app.services.agent_runtime.skill_router import (
     DEFAULT_ROUTED_SKILL,
     MAX_ROUTED_SKILLS,
+    SKILL_INPUT_ANCHOR_FIELDS,
     classify_question_dimensions,
+    resolve_skill_input_anchors,
     route_question_to_skill,
 )
 
@@ -121,3 +128,76 @@ class TestDimensionVocabulary:
         dims = classify_question_dimensions("画一幅图，分析人物性格")
         assert dims[0] == "illustration"
         assert dims[1] == "character_state"
+
+
+class TestAnchorResolution:
+    """自动锚解析：illustrate-scene 从已批准 PromptRevision 血缘提取锚。"""
+
+    @staticmethod
+    def _fake_db(row) -> SimpleNamespace:
+        return SimpleNamespace(scalar=AsyncMock(return_value=row))
+
+    @staticmethod
+    def _approved_row(**overrides):
+        values = {
+            "id": 7,
+            "scene_spec_id": 3,
+            "visual_bible_revision_id": 2,
+            "source_snapshot_id": "ss-real",
+        }
+        values.update(overrides)
+        return SimpleNamespace(**values)
+
+    async def test_illustrate_scene_returns_anchors_from_approved_prompt(self):
+        anchors = await resolve_skill_input_anchors(
+            self._fake_db(self._approved_row()),
+            "illustrate-scene",
+            owner_id=1,
+            novel_id=6,
+        )
+        assert anchors is not None
+        assert anchors["prompt_revision_id"] == 7
+        assert anchors["visual_bible_version_id"] == 2
+        assert anchors["scene_spec_revision_id"] == 3
+        assert anchors["source_snapshot_id"] == "ss-real"
+        assert anchors["job_key"].startswith("auto-")
+        assert len(anchors["job_key"]) > len("auto-")
+
+    async def test_no_approved_prompt_returns_none(self):
+        anchors = await resolve_skill_input_anchors(
+            self._fake_db(None),
+            "illustrate-scene",
+            owner_id=1,
+            novel_id=6,
+        )
+        assert anchors is None
+
+    async def test_incomplete_lineage_returns_none(self):
+        # 血缘不完整（scene_spec_id 为 NULL）→ 诚实失败，不注入 null 锚。
+        anchors = await resolve_skill_input_anchors(
+            self._fake_db(self._approved_row(scene_spec_id=None)),
+            "illustrate-scene",
+            owner_id=1,
+            novel_id=6,
+        )
+        assert anchors is None
+
+    async def test_non_anchor_skill_returns_empty(self):
+        anchors = await resolve_skill_input_anchors(
+            self._fake_db(None),
+            "answer-reading-question",
+            owner_id=1,
+            novel_id=6,
+        )
+        assert anchors == {}
+
+    def test_illustrate_scene_anchor_fields_declared(self):
+        assert "illustrate-scene" in SKILL_INPUT_ANCHOR_FIELDS
+        assert set(SKILL_INPUT_ANCHOR_FIELDS["illustrate-scene"]) == {
+            "prompt_revision_id",
+            "visual_bible_version_id",
+            "scene_spec_revision_id",
+            "source_snapshot_id",
+            "job_key",
+        }
+

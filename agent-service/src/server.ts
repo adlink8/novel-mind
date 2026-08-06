@@ -128,6 +128,9 @@ export type ApprovalVerdict = "approved" | "approved_for_session" | "denied";
  * body.skill 缺省时调用 FastAPI `POST /api/agent/novels/{novel_id}/route-skill`
  * 按问题文本自动选 skill（服务端决策）。端点不可用/失败 → 保守回退
  * answer-reading-question（不破坏既有默认行为）。
+ *
+ * 返回主 skill 及其锚定字段（input_anchor，服务端从已批准 PromptRevision 血缘
+ * 自动选锚；无锚 → null）。锚注入是**服务端决策**，不暴露给用户。
  */
 async function routeSkillByIntent(
   deps: ReturnType<typeof resolveDeps>,
@@ -135,20 +138,54 @@ async function routeSkillByIntent(
   novelId: number,
   question: string,
   authHeader: string,
-): Promise<string> {
+): Promise<{ skill: string; inputAnchor: Record<string, unknown> | null }> {
   try {
     const res = await deps.fetchImpl(`${base}/api/agent/novels/${novelId}/route-skill`, {
       method: "POST",
       headers: { authorization: authHeader, "content-type": "application/json" },
       body: JSON.stringify({ question }),
     });
-    if (!res.ok) return "answer-reading-question";
-    const body = (await res.json()) as { skills?: string[] };
+    if (!res.ok) return { skill: "answer-reading-question", inputAnchor: null };
+    const body = (await res.json()) as {
+      skills?: string[];
+      input_anchor?: Record<string, unknown> | null;
+    };
     const skill = body.skills?.[0];
-    return typeof skill === "string" && skill ? skill : "answer-reading-question";
+    return {
+      skill: typeof skill === "string" && skill ? skill : "answer-reading-question",
+      inputAnchor:
+        body.input_anchor && typeof body.input_anchor === "object"
+          ? body.input_anchor
+          : null,
+    };
   } catch {
-    return "answer-reading-question";
+    return { skill: "answer-reading-question", inputAnchor: null };
   }
+}
+
+/**
+ * 自动路由可注入的锚定字段白名单（与 backend ``SKILL_INPUT_ANCHOR_FIELDS`` 对齐）。
+ *
+ * 防御 additionalProperties:false：只注入已知锚，绝不注入 question/novel_id 等
+ * 由 server 自己装配的字段，避免对生图/分析 skill 造成 schema 422。
+ */
+const AUTO_ANCHOR_KEYS = new Set([
+  "prompt_revision_id",
+  "visual_bible_version_id",
+  "scene_spec_revision_id",
+  "source_snapshot_id",
+  "job_key",
+]);
+
+/** 从服务端返回的锚定字段中挑选 schema 允许的锚（白名单 + 非空过滤）。 */
+function pickAnchorFields(anchor: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(anchor)) {
+    if (AUTO_ANCHOR_KEYS.has(key) && value !== null && value !== undefined) {
+      out[key] = value;
+    }
+  }
+  return out;
 }
 
 /** waitForApproval 短轮询选项。 */
@@ -388,10 +425,13 @@ async function handleRun(
   // 技能选择（AGENT-RUNTIME-CONTRACT）：客户端显式 body.skill 是高级覆盖；
   // 缺省 → 服务端按问题意图自动路由（Agent 选 skill，用户不选）。
   let skillName: string;
+  let inputAnchor: Record<string, unknown> | null = null;
   if (typeof body.skill === "string" && body.skill) {
     skillName = body.skill;
   } else {
-    skillName = await routeSkillByIntent(deps, base, novelId, question, authHeader);
+    const routed = await routeSkillByIntent(deps, base, novelId, question, authHeader);
+    skillName = routed.skill;
+    inputAnchor = routed.inputAnchor;
   }
   let skill: LoadedSkill;
   try {
@@ -417,6 +457,9 @@ async function handleRun(
     novel_id: novelId,
     ...(isQaSkill ? { question } : {}),
     ...(typeof body.input === "object" && body.input !== null ? body.input : {}),
+    // 自动路由时注入服务端解析的锚（Agent 选锚，覆盖 body.input 冲突项）。
+    // 只注入 schema 允许的锚字段；body.skill 显式覆盖时不注入（尊重调用方）。
+    ...(inputAnchor ? pickAnchorFields(inputAnchor) : {}),
   };
   try {
     deps.validateRunInputImpl(skill, input);

@@ -489,6 +489,92 @@ describe("agent-service run API (POST /agent/novels/{novel_id}/runs)", () => {
     await res.body?.cancel();
   });
 
+  it("自动路由到 illustrate-scene → run-create input 合并服务端 input_anchor（不再 422）", async () => {
+    fetchMock.mockClear();
+    fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+      if (String(url).endsWith("/route-skill") && init?.method === "POST") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              skills: ["illustrate-scene"],
+              primary: "illustrate-scene",
+              input_anchor: {
+                prompt_revision_id: 1,
+                visual_bible_version_id: 1,
+                scene_spec_revision_id: 1,
+                source_snapshot_id: "ss-real",
+                job_key: "auto-test",
+              },
+            }),
+            { status: 200, headers: { "content-type": "application/json" } },
+          ),
+        );
+      }
+      if (String(url).endsWith("/versions") && init?.method === "GET") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ items: [{ id: 33, status: "active" }], total: 1 }), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          }),
+        );
+      }
+      if (String(url).endsWith("/skill-runs") && init?.method === "POST") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ run: { id: 44 }, internal_token: "tok-44" }), {
+            status: 202,
+            headers: { "content-type": "application/json" },
+          }),
+        );
+      }
+      if (String(url).endsWith("/finalize") && init?.method === "POST") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ artifact: { id: 9 } }), { status: 200 }),
+        );
+      }
+      return Promise.resolve(
+        new Response(JSON.stringify({ error: { code: "upstream_error" } }), { status: 502 }),
+      );
+    });
+
+    const session = fakeSession();
+    createSessionMock.mockReset();
+    createSessionMock.mockResolvedValue(session);
+    server = createApp({
+      fetchImpl: fetchMock as unknown as typeof fetch,
+      createSessionImpl: createSessionMock as unknown as (opts: unknown) => Promise<never>,
+    });
+    await new Promise<void>((resolve) => server.listen(0, () => resolve()));
+    const addr = server.address();
+    const routePort = typeof addr === "object" && addr ? addr.port : 0;
+
+    const res = await fetch(`http://127.0.0.1:${routePort}/agent/novels/6/runs`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: AUTH },
+      body: JSON.stringify({ question: "帮我画第1章的竹林场景" }),
+    });
+    // 不再 422：input 合并了服务端解析的锚，illustrate-scene schema 校验通过。
+    expect(res.status).toBe(200);
+
+    // run-create 请求体携带全部 5 个锚 + novel_id，且不注入 question。
+    const runCreateCalls = fetchMock.mock.calls.filter(
+      (c) => String(c[0]).endsWith("/skill-runs") && (c[1] as RequestInit)?.method === "POST",
+    );
+    expect(runCreateCalls).toHaveLength(1);
+    const runCreateBody = JSON.parse((runCreateCalls[0][1] as RequestInit).body as string) as {
+      input?: Record<string, unknown>;
+    };
+    expect(runCreateBody.input).toMatchObject({
+      novel_id: 6,
+      prompt_revision_id: 1,
+      visual_bible_version_id: 1,
+      scene_spec_revision_id: 1,
+      source_snapshot_id: "ss-real",
+      job_key: "auto-test",
+    });
+    expect(runCreateBody.input?.["question"]).toBeUndefined();
+    await res.body?.cancel();
+  });
+
   it("route-skill 不可用/失败 → 保守回退 answer-reading-question（默认行为保留）", async () => {
     // 默认 mock 对 route-skill 返回 502 → 回退问答 skill。
     installDefaultBackendMock();
