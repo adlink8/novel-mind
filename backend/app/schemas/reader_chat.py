@@ -245,6 +245,7 @@ class QueryPlanTraceView(StrictReaderChatModel):
     allowed_evidence_ids: list[str] = Field(default_factory=list)
     citation_jump: list[dict[str, Any]] = Field(default_factory=list)
     abstained: bool = False
+    world_projection: dict[str, Any] | None = None
 
 
 class MessageAccepted(StrictReaderChatModel):

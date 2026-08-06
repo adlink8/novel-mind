@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import pytest
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.novel import Novel
-from app.services.analysis_service import SUPPORTED_TYPES, build_structural_result
+from app.models.novel import Chapter, Novel
+from app.models.text_chunk import TextChunk
+from app.models.user import User
+from app.services.analysis_service import SUPPORTED_TYPES, build_structural_result, ensure_hierarchy
 
 pytestmark = pytest.mark.unit
 
@@ -63,3 +66,71 @@ def test_hierarchy_map_lists_scenes():
         build_id="cb_x",
     )
     assert data["scenes"][0]["scene_id"] == "s0"
+
+
+@pytest.mark.asyncio
+async def test_ensure_hierarchy_raises_when_no_text_chunks(db_session: AsyncSession):
+    """Fail-closed (Bug 4): never promote a committed hierarchy build with 0 text_chunks."""
+    user = User(username="fc_user", email="fc@test.com", hashed_password="x")
+    db_session.add(user)
+    await db_session.flush()
+    novel = Novel(owner_id=user.id, title="无 chunk 小说", status="ready")
+    db_session.add(novel)
+    await db_session.flush()
+    db_session.add(
+        Chapter(
+            novel_id=novel.id,
+            chapter_number=1,
+            title="第一章",
+            content="开场内容。" * 30,
+            word_count=120,
+        )
+    )
+    await db_session.commit()
+
+    with pytest.raises(ValueError, match="text_chunks"):
+        await ensure_hierarchy(db_session, novel, force=True)
+
+
+@pytest.mark.asyncio
+async def test_ensure_hierarchy_returns_existing_active_without_chunks(
+    db_session: AsyncSession,
+):
+    """Existing active build fast-path stays permissive: no promote, no raise."""
+    user = User(username="fc_user2", email="fc2@test.com", hashed_password="x")
+    db_session.add(user)
+    await db_session.flush()
+    novel = Novel(owner_id=user.id, title="无 chunk 但有 active", status="ready")
+    db_session.add(novel)
+    await db_session.flush()
+
+    from datetime import datetime, timezone
+
+    from app.models.chunk_build import ChunkActivePointer, ChunkBuild
+
+    db_session.add(
+        ChunkBuild(
+            build_id="cb_existing",
+            novel_id=novel.id,
+            status="committed",
+            source_snapshot_hash="a" * 64,
+            manifest_checksum="b" * 64,
+            chunker_name="t",
+            chunker_version="1",
+            chunker_config_hash="c" * 64,
+            collection_name="t",
+            is_candidate=False,
+            immutable=True,
+        )
+    )
+    db_session.add(
+        ChunkActivePointer(
+            novel_id=novel.id,
+            build_id="cb_existing",
+            committed_at=datetime.now(timezone.utc),
+        )
+    )
+    await db_session.commit()
+
+    build_id = await ensure_hierarchy(db_session, novel, force=False)
+    assert build_id == "cb_existing"

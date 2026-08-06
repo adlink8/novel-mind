@@ -158,12 +158,14 @@ class ProductionContextBuilder:
             SelectionValidationError,
             assemble_context_manifest,
             assemble_range_context_manifest,
+            run_reader_queryplan,
             validate_chapter_context,
             validate_chapter_range_context,
             validate_selection,
         )
         from app.services.reader_chat.retrieval import (
             Phase09RelationshipObservationReader,
+            resolve_active_analysis_version,
         )
 
         try:
@@ -175,6 +177,24 @@ class ProductionContextBuilder:
                     chapter_start=chapter_range.chapter_start,
                     chapter_end=chapter_range.chapter_end,
                 )
+                queryplan_view = None
+                version_id = await resolve_active_analysis_version(
+                    db, owner_id=owner_id, novel_id=novel.id
+                )
+                if version_id is not None:
+                    from app.services.analysis_chat.query_adapter import (
+                        AnalysisQueryPlanAdapter,
+                    )
+
+                    _, queryplan_view = await AnalysisQueryPlanAdapter().execute_manifest(
+                        db,
+                        novel=novel,
+                        owner_id=owner_id,
+                        version_id=version_id,
+                        question=body,
+                        chapter_start=chapter_range.chapter_start,
+                        chapter_end=chapter_range.chapter_end,
+                    )
                 manifest = await assemble_range_context_manifest(
                     db,
                     novel=novel,
@@ -182,6 +202,7 @@ class ProductionContextBuilder:
                     chapter_range=validated_range,
                     question=body,
                     relationship_reader=Phase09RelationshipObservationReader(),
+                    queryplan_view=queryplan_view,
                 )
             else:
                 if selection is not None:
@@ -202,6 +223,20 @@ class ProductionContextBuilder:
                         owner_id=owner_id,
                         chapter_id=chapter_id,
                     )
+                queryplan_view = None
+                version_id = await resolve_active_analysis_version(
+                    db, owner_id=owner_id, novel_id=novel.id
+                )
+                if version_id is not None:
+                    _, queryplan_view = await run_reader_queryplan(
+                        db,
+                        novel=novel,
+                        owner_id=owner_id,
+                        version_id=version_id,
+                        question=body,
+                        selection=validated,
+                        relationship_reader=Phase09RelationshipObservationReader(),
+                    )
                 manifest = await assemble_context_manifest(
                     db,
                     novel=novel,
@@ -210,6 +245,7 @@ class ProductionContextBuilder:
                     question=body,
                     relationship_reader=Phase09RelationshipObservationReader(),
                     selection_bound=selection is not None,
+                    queryplan_view=queryplan_view,
                 )
         except SelectionValidationError as exc:
             raise HTTPException(

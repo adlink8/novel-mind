@@ -641,6 +641,249 @@ async def test_analysis_adapter_blocks_range_starting_beyond_cutoff():
     assert exc.value.code == "chapter_beyond_cutoff"
 
 
+def _mock_build_session(*, cutoff: int, chapters: list):
+    """AsyncMock session sufficient for ProductionContextBuilder.build with the
+    queryplan seam active (patched resolve_active_analysis_version): timeline /
+    domain rows are empty so the version_id path stays deterministic."""
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+
+    session = AsyncMock()
+
+    async def _scalar(query, *args, **kwargs):
+        text = str(query)
+        if "chunk_active_pointer" in text or "timeline_active_pointer" in text:
+            return None
+        return cutoff
+
+    session.scalar = _scalar
+
+    async def _scalars(query, *args, **kwargs):
+        text_query = str(query)
+        if any(
+            token in text_query
+            for token in (
+                "world_model_knowledge",
+                "key_scene_evidence_ranges",
+                "visual_bible_evidence_refs",
+                "timeline_events",
+                "timeline_evidence_ref",
+            )
+        ):
+            return SimpleNamespace(all=lambda: [])
+        return SimpleNamespace(all=lambda: list(chapters))
+
+    session.scalars = _scalars
+    session.get = AsyncMock(return_value=None)
+    return session, SimpleNamespace(id=1, owner_id=1, reading_progress={})
+
+
+def _validated_selection(content: str) -> "ValidatedSelection":
+    from app.services.reader_chat.context import ValidatedSelection
+
+    return ValidatedSelection(
+        chapter_id=1,
+        chapter_number=1,
+        source_start=0,
+        source_end=4,
+        selection_text=content[0:4],
+        selection_text_hash="0" * 64,
+        chapter_content_hash=chapter_content_hash(content),
+        hierarchy_build_id="none",
+        hierarchy_checksum="0" * 64,
+    )
+
+
+async def test_queryplan_trace_view_roundtrip_accepts_world_projection():
+    """Bug B: canonical_dict() always carries world_projection; the strict
+    QueryPlanTraceView (extra=forbid) must accept it — including a dict value."""
+    from app.schemas.reader_chat import QueryPlanTraceView
+    from app.services.reader_chat.context import run_reader_queryplan
+
+    content = CHAPTER_1_TEXT
+    session, novel = _mock_chat_session(
+        cutoff=1,
+        chapters=[_chapter_row(1, 1, content)],
+    )
+    _, view = await run_reader_queryplan(
+        session,
+        novel=novel,
+        owner_id=1,
+        version_id=1,
+        question="林安走进哪里？",
+        selection=_validated_selection(content),
+    )
+    raw = view.canonical_dict()
+    assert "world_projection" in raw
+    traced = QueryPlanTraceView.model_validate(raw)
+    assert traced.trace_id == view.trace_id
+
+    # A non-None world_projection dict survives the strict-model roundtrip too.
+    raw["world_projection"] = {"status": "available", "claims": ["林安"]}
+    traced = QueryPlanTraceView.model_validate(raw)
+    assert traced.world_projection == raw["world_projection"]
+
+
+async def test_production_builder_embeds_queryplan_view():
+    """Bug A (selection path): ProductionContextBuilder.build runs the shared
+    reader queryplan seam and embeds the consumer view into prompt_inputs."""
+    from unittest.mock import AsyncMock, patch
+
+    from app.schemas.reader_chat import SelectionCoordinate
+    from app.services.reader_chat.conversations import ProductionContextBuilder
+
+    content = CHAPTER_1_TEXT
+    session, novel = _mock_build_session(
+        cutoff=1,
+        chapters=[_chapter_row(1, 1, content)],
+    )
+    validated = _validated_selection(content)
+    coord = SelectionCoordinate(
+        chapter_id=1,
+        source_start=0,
+        source_end=4,
+        selection_text=content[0:4],
+        selection_text_hash="0" * 64,
+        chapter_content_hash=chapter_content_hash(content),
+    )
+    with (
+        patch(
+            "app.services.reader_chat.retrieval.resolve_active_analysis_version",
+            new=AsyncMock(return_value=1),
+        ),
+        patch(
+            "app.services.reader_chat.context.validate_selection",
+            new=AsyncMock(return_value=validated),
+        ),
+    ):
+        graph = await ProductionContextBuilder().build(
+            session,
+            novel=novel,
+            owner_id=1,
+            conversation_id=7,
+            selection=coord,
+            body="林安走进哪里？",
+        )
+
+    qp = graph.prompt_inputs["queryplan"]
+    assert isinstance(qp, dict)
+    assert len(qp["trace_id"]) >= 32
+    assert qp["intent"] == "reader"
+    assert qp["anchor_kind"] == "selection"
+    assert "world_projection" in qp
+
+
+async def test_production_builder_embeds_queryplan_view_for_chapter_range():
+    """Bug A (chapter_range path): the analysis adapter produces the range view
+    and ProductionContextBuilder embeds it into prompt_inputs."""
+    from unittest.mock import AsyncMock, patch
+
+    from app.schemas.reader_chat import ChapterRange
+    from app.services.reader_chat.conversations import ProductionContextBuilder
+    from app.services.reader_chat.context import (
+        ProgressSnapshot,
+        ValidatedChapterRange,
+        ValidatedChapterSegment,
+    )
+
+    content = CHAPTER_1_TEXT
+    session, novel = _mock_build_session(
+        cutoff=1,
+        chapters=[_chapter_row(1, 1, content)],
+    )
+    progress = ProgressSnapshot(
+        chapter_id=1,
+        cutoff_chapter_number=1,
+        timeline_full_book=False,
+        full_book=False,
+    )
+    segment = ValidatedChapterSegment(
+        chapter_id=1,
+        chapter_number=1,
+        excerpt=content[:4],
+        excerpt_hash="0" * 64,
+        chapter_content_hash=chapter_content_hash(content),
+    )
+    validated_range = ValidatedChapterRange(
+        chapter_start=1,
+        chapter_end=1,
+        requested_chapter_end=1,
+        segments=(segment,),
+        hierarchy_build_id="none",
+        hierarchy_checksum="0" * 64,
+        progress=progress,
+    )
+    with (
+        patch(
+            "app.services.reader_chat.retrieval.resolve_active_analysis_version",
+            new=AsyncMock(return_value=1),
+        ),
+        patch(
+            "app.services.reader_chat.context.validate_chapter_range_context",
+            new=AsyncMock(return_value=validated_range),
+        ),
+    ):
+        graph = await ProductionContextBuilder().build(
+            session,
+            novel=novel,
+            owner_id=1,
+            conversation_id=7,
+            selection=None,
+            body="前两章里主角的性格如何变化？",
+            chapter_range=ChapterRange(chapter_start=1, chapter_end=1),
+        )
+
+    qp = graph.prompt_inputs["queryplan"]
+    assert isinstance(qp, dict)
+    assert qp["intent"] == "analysis"
+    assert qp["anchor_kind"] == "chapter_range"
+    assert "world_projection" in qp
+
+
+async def test_queryplan_view_rehydrates_from_stored_manifest():
+    """_queryplan_view roundtrip: a frozen manifest whose prompt_inputs carries
+    the queryplan trace rehydrates into QueryPlanTraceView without raising."""
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+
+    from app.services.reader_chat.conversations import ConversationService
+    from app.services.reader_chat.context import run_reader_queryplan
+
+    content = CHAPTER_1_TEXT
+    session, novel = _mock_chat_session(
+        cutoff=1,
+        chapters=[_chapter_row(1, 1, content)],
+    )
+    _, view = await run_reader_queryplan(
+        session,
+        novel=novel,
+        owner_id=1,
+        version_id=1,
+        question="林安走进哪里？",
+        selection=_validated_selection(content),
+    )
+    raw = view.canonical_dict()
+
+    manifest_row = SimpleNamespace(prompt_inputs={"queryplan": raw})
+    db = AsyncMock()
+    db.execute = AsyncMock(
+        return_value=SimpleNamespace(scalar_one_or_none=lambda: manifest_row)
+    )
+    service = ConversationService()
+    traced = await service._queryplan_view(db, user_message_id=42)
+    assert traced is not None
+    assert traced.trace_id == view.trace_id
+    assert traced.world_projection == raw["world_projection"]
+
+    # A manifest without a queryplan block stays a clean None.
+    db.execute = AsyncMock(
+        return_value=SimpleNamespace(
+            scalar_one_or_none=lambda: SimpleNamespace(prompt_inputs={})
+        )
+    )
+    assert await service._queryplan_view(db, user_message_id=42) is None
+
+
 def _fixture() -> dict:
     path = Path(__file__).resolve().parents[3] / "tests" / "fixtures" / "queryplan" / "questions_v1.json"
     return json.loads(path.read_text(encoding="utf-8"))
