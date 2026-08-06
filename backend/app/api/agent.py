@@ -186,7 +186,9 @@ async def accept_skill_run(
     # 输入规范化：novel_id 以路径为准，不能被请求体伪造到其它小说。
     input_payload = dict(data.input)
     input_payload["novel_id"] = novel.id
-    if (
+    # SSE 端点是问答驱动：只有 answer-reading-question 强制 input.question。
+    # 分析/生图类 skill（illustrate-scene 等）用锚定字段，question 可缺省。
+    if version.name == "answer-reading-question" and (
         not isinstance(input_payload.get("question"), str)
         or not input_payload["question"].strip()
     ):

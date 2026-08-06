@@ -350,11 +350,6 @@ async function handleRun(
   }
   const body = (rawBody ?? {}) as Partial<RunRequest>;
   const question = typeof body.question === "string" ? body.question.trim() : "";
-  if (!question) {
-    res.writeHead(422, { "content-type": "application/json" });
-    res.end(JSON.stringify({ error: { code: "invalid_input", message: "input.question 必须为非空字符串" } }));
-    return;
-  }
 
   const skillName = typeof body.skill === "string" && body.skill ? body.skill : "answer-reading-question";
   let skill: LoadedSkill;
@@ -366,9 +361,20 @@ async function handleRun(
     return;
   }
 
+  // SSE 端点是问答驱动（默认 answer-reading-question）：只有它把 question
+  // 注入 input 并强制非空。分析/生图类 skill（illustrate-scene 等）的
+  // input.schema 不含 question 且 additionalProperties:false——注入会 422，
+  // 它们用 body.input 原样 + question 作模型 prompt（可选）。
+  const isQaSkill = skillName === "answer-reading-question";
+  if (isQaSkill && !question) {
+    res.writeHead(422, { "content-type": "application/json" });
+    res.end(JSON.stringify({ error: { code: "invalid_input", message: "input.question 必须为非空字符串" } }));
+    return;
+  }
+
   const input: Record<string, unknown> = {
     novel_id: novelId,
-    question,
+    ...(isQaSkill ? { question } : {}),
     ...(typeof body.input === "object" && body.input !== null ? body.input : {}),
   };
   try {
@@ -551,7 +557,9 @@ async function handleRun(
       });
     }
 
-    await session.prompt(question);
+    await session.prompt(
+      question || `使用 ${skillName} 技能执行任务，按技能描述完成分析/生成。`,
+    );
     const last = lastAssistantMessage(session.messages as unknown[]);
     const stopReason = last?.stopReason ?? "error";
 

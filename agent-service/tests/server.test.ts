@@ -93,7 +93,7 @@ describe("agent-service run API (POST /agent/novels/{novel_id}/runs)", () => {
   function installDefaultBackendMock() {
     fetchMock.mockClear(); // 清调用记录，避免跨测试累积干扰计数断言
     fetchMock.mockImplementation((url: string, init?: RequestInit) => {
-      if (url === `${baseUrl}/api/agent/skills/answer-reading-question/versions`) {
+      if (url.endsWith("/versions") && init?.method === "GET") {
         return Promise.resolve(
           new Response(JSON.stringify({ items: [{ id: 5, status: "active" }], total: 1 }), {
             status: 200,
@@ -395,5 +395,34 @@ describe("agent-service run API (POST /agent/novels/{novel_id}/runs)", () => {
     const skill = loadSkill("answer-reading-question");
     expect(skill.allowedTools).toContain("get_chapter");
     expect(skill.allowedTools).not.toContain("get_narrative_memory");
+  });
+
+  it("P1: 分析/生图 skill 经 SSE 不再被 question 注入 422（input 原样校验）", async () => {
+    installDefaultBackendMock();
+    const session = fakeSession();
+    await startServer(session);
+    const res = await fetch(`http://127.0.0.1:${port}/agent/novels/6/runs`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: AUTH },
+      body: JSON.stringify({
+        question: "为第1章生成插图",
+        skill: "illustrate-scene",
+        input: {
+          prompt_revision_id: 1,
+          visual_bible_version_id: 1,
+          scene_spec_revision_id: 1,
+          source_snapshot_id: "ss-1",
+          job_key: "p1-test",
+        },
+      }),
+    });
+    // 不再 422（question 不再注入 → schema additionalProperties:false 通过）。
+    expect(res.status).toBe(200);
+    // prompt 收到非空占位（question 缺省时用 skill 名兜底）。
+    expect(session.prompt).toHaveBeenCalled();
+    const promptCalls = session.prompt.mock.calls as unknown[];
+    expect(promptCalls.length).toBeGreaterThan(0);
+    const firstArg = (promptCalls[0] as [unknown])[0];
+    expect(String(firstArg ?? "").length).toBeGreaterThan(0);
   });
 });
