@@ -59,8 +59,8 @@ def test_migration_is_revision_frozen_and_single_head(empty_postgres: str) -> No
                 .scalars()
                 .all()
             )
-        # Single live head after full upgrade (Phase 28-01 is tip; Phases 14/17 mid-chain).
-        assert heads == ["20260801_2801"]
+        # Single live head after full upgrade (Phase 28-01 is mid-chain now; Phase 40 tip).
+        assert heads == ["085fffd58ee9"]
     finally:
         engine.dispose()
 

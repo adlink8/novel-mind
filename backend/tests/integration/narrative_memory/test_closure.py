@@ -288,7 +288,7 @@ async def test_analysis_api_smoke(closure_env) -> None:
     from httpx import ASGITransport, AsyncClient
 
     from app.core.database import get_db
-    from app.core.security import require_user
+    from app.core.security import require_agent_actor, require_user
     from app.main import app
 
     run_id, _result = await _build_run(closure_env)
@@ -308,6 +308,8 @@ async def test_analysis_api_smoke(closure_env) -> None:
 
     app.dependency_overrides[get_db] = _override_db
     app.dependency_overrides[require_user] = _current_user
+    # require_owned_novel resolves auth via require_agent_actor, not require_user.
+    app.dependency_overrides[require_agent_actor] = _current_user
     transport = ASGITransport(app=app)
     try:
         async with AsyncClient(

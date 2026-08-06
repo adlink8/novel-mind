@@ -58,7 +58,7 @@ def test_migration_round_trip_and_single_head(empty_postgres: str) -> None:
                 .scalars()
                 .all()
             )
-        assert heads == ["20260801_2801"]
+        assert heads == ["085fffd58ee9"]
     finally:
         engine.dispose()
 
