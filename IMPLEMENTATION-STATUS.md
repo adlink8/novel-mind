@@ -427,3 +427,28 @@ Key metrics:
 | 物化闭环（第二层） | **已实现 2026-08-05**：skill 产物真正写进域表 candidate 行（key_scene_sets/candidates/evidence_ranges、world_model_knowledge、visual_bible_versions），并接线检索（reader_chat.fetch_knowledge_evidence + queryplan world_projection resolver）让下一轮问答可见 candidate 证据（带 candidate:True 标记） | materializers.py + retrieval.py + context.py |
 | 边界诚实说明 | 物化只写域表 candidate（review_state/epistemic_status=candidate，gate_status=passed 仅表示确定性 gate 通过）；**candidate → available/published 仍需现有用户审批**（key_scene:approve / VisualBibleReview / EpistemicGate approval），符合「无自动 promotion」契约；digest 类型（analyze-chapter/story-arc）诚实 skipped 不写域表 | 本轮设计 |
 | 仍阻塞 | Phase 22 Nightly 3/3 未达成（0/3，最终发布门唯一未验证项） | `.planning/STATE.md` |
+
+---
+
+## 2026-08-06 快照（Agent 自动路由闭环 + 统一 AI 助手；snapshot: master @ 8c21c5c）
+
+以下事实覆盖上文旧节中的对应记录：
+
+| 项 | 当前值 | 证据 |
+|---|---|---|
+| Agent 自动路由闭环 | **已实现 2026-08-06**：question→intent→skill 启发式路由，无命中回退 answer-reading-question；**契约恢复**：AGENT-RUNTIME-CONTRACT「The Agent selects versioned Skills」——用户不选 skill，AI 自动路由 | commit `e9f4acd` + `8c21c5c` |
+| 意图路由服务 | `backend/app/services/agent_runtime/skill_router.py`：5 类意图（画图/关系/性格/关键场景/续写）+ 维度可用性补充信号；`route_question_to_skill` 最多 2 skill，同一 skill 去重；无任何命中回退 `answer-reading-question` | `skill_router.py` |
+| route-skill 端点 | `POST /api/agent/novels/{id}/route-skill`：按 owner+novel 过滤 active skill，返回 `{skills, primary, question_hash, input_anchor}`；无 active 命中回退 answer-reading-question；路由是服务端决策，不作为对用户的技能建议 | `backend/app/api/agent.py:159` |
+| 锚点自动补全 | `resolve_skill_input_anchors`：生图 skill（illustrate-scene）自动从最新**已批准** PromptRevision 血缘解析 prompt_revision_id/visual_bible_version_id/scene_spec_revision_id/source_snapshot_id + 幂等 job_key（`auto-<uuid>`）；无已批准 PromptRevision 或血缘不完整→诚实失败不伪造锚 | `skill_router.py:134` |
+| SSE 自动路由 | agent-service `server.ts`：SSE run body.skill 缺省→调 route-skill 自动路由；显式 body.skill 仅高级覆盖；锚字段只注入 schema 允许的字段（additionalProperties:false 防 422） | `agent-service/src/server.ts:425` |
+| 统一 AI 助手 | 分析页 `AnalysisUnifiedChat`（统一对话窗口，取代 chat/agent 双 tab）+ 阅读页侧边栏 AI 助手（reader-chat-panel 扩展：对话/选区画图/续写快捷入口）；**前端不暴露 skill**，Agent 自动路由 | `frontend/src/components/analysis/analysis-unified-chat.tsx` + `frontend/src/components/reader/reader-chat-panel.tsx` |
+| 真实生图 | 腾讯混元 hunyuan-image via ZCodeProxy（illustration_provider=mock\|hunyuan）；asset 281KB JPEG 端到端验证通过 | commit `8f54bae` + `backend/.env` |
+| 书签 | reader_bookmarks 模型基础上移植 | commit `32cac91` |
+| 插图 URL 修复 | 插图 asset bytes URL 双重 `/api` 前缀 → 404 修复 | commit `200a152` |
+| 端口固化 | 后端 8010 / 前端 3005 / agent 3100 / ZCodeProxy 3001（Makefile + `scripts/keep-alive.ps1`） | commit `7175168` |
+| 端到端验证 | 自动路由 5 意图 + SSE 自动执行 + 真实生图 + 锚点 + 前端 200 | 本机实测 2026-08-06 |
+| 部署注意 | agent-service 启动必须注入 `NOVELMIND_GATEWAY_TOKEN=dev-agent-gateway-token-local`（backend/.env:39 定义；Makefile `dev-agent` 已注入） | `backend/.env` + `Makefile` |
+| 后端测试 | **1305 passed** | 独立测试子代理 2026-08-06 |
+| agent-service | **1039 passed**；tsc 0 errors | `cd agent-service && npx vitest run` |
+| 前端 | **460 passed** | `cd frontend && npm test` |
+| 仍阻塞 | Phase 22 Nightly 3/3 未达成（0/3，最终发布门唯一未验证项） | `.planning/STATE.md` |

@@ -70,16 +70,30 @@ py -3.11 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt -r requirements-dev.txt
 Copy-Item .env.example .env
 .\.venv\Scripts\python.exe -m alembic upgrade head
-.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8010
 
 cd ..\frontend
 npm install
-npm run dev
+$env:BACKEND_URL = "http://127.0.0.1:8010"
+npm run dev -- --port 3005 --hostname 127.0.0.1
+
+cd ..\agent-service
+npm install
+# agent-service 调 FastAPI /api/gateway 必须注入网关令牌（backend/.env:39 定义）
+$env:NOVELMIND_GATEWAY_TOKEN = "dev-agent-gateway-token-local"
+$env:FASTAPI_BASE_URL = "http://127.0.0.1:8010"
+$env:PORT = 3100
+node start.mjs
 ```
 
-- 前端：`http://localhost:3000`
-- 后端：`http://localhost:8000`
-- OpenAPI：`http://localhost:8000/docs`
+- 前端：`http://localhost:3005`
+- 后端：`http://localhost:8010`
+- OpenAPI：`http://localhost:8010/docs`
+- agent-service：`http://localhost:3100`（SSE agent run；AI 自动路由 skill，不暴露给用户）
+- ZCodeProxy（真实生图代理）：`http://localhost:3001`（可选；未启动时用 `illustration_provider=mock`）
+
+> 端口固化：后端 8010（避开 rag-api 的 8000）、前端 3005、agent-service 3100、ZCodeProxy 3001。
+> 一键保活全部服务可用 `scripts/keep-alive.ps1`（已注入网关令牌）。
 
 首次注册的活跃账户成为引导管理员，并接管迁移前的历史小说和模型记录。生产环境必须替换 `.env.example` 中的 JWT 与数据加密密钥，并启用 Secure Cookie。
 

@@ -426,3 +426,33 @@ Phase 22 仍 0/3（verdict 不变）。
 边界：物化只写域表 candidate；candidate → available/published 仍需现有
 用户审批（无自动 promotion）；digest 类型诚实 skipped。测试：backend 101p +
 agent_runtime 61p + agent-service 1028p 全绿；alembic check clean。
+
+## 2026-08-06 追加：Agent 自动路由闭环 + 统一 AI 助手（master @ 8c21c5c）
+
+用户确认产品形态（2026-08-06）：**小说主导 + 阅读侧边栏 / 分析页双入口 AI 助手**；
+交互路径不暴露 skill 选择——用户提问，Agent 自动按 intent 路由到对应 skill
+（第二步「记忆 / 自定义 skill」暂缓）。
+
+已实现（snapshot: master @ 8c21c5c）：
+- **契约恢复**：AGENT-RUNTIME-CONTRACT「The Agent selects versioned Skills」——
+  用户不再选 skill；SSE run body.skill 缺省 → 服务端 `skill_router.py` 按问题关键词
+  启发式路由（画图/关系/性格/关键场景/续写 5 类意图，无命中回退
+  answer-reading-question），显式 body.skill 仅高级覆盖
+- `POST /api/agent/novels/{id}/route-skill`：按 owner+novel 过滤 active skill，
+  返回 `{skills, primary, question_hash, input_anchor}`
+- 锚点自动补全：生图 skill 从最新**已批准** PromptRevision 血缘自动解析
+  prompt_revision_id / visual_bible_version_id / scene_spec_revision_id /
+  source_snapshot_id / job_key（血缘不完整诚实失败，不伪造锚）
+- 前端统一 AI 助手：分析页 AnalysisUnifiedChat（取代 chat/agent 双 tab）
+  + 阅读页侧边栏 AI 助手（对话 / 选区画图 / 续写入口）；前端不暴露 skill
+- 真实生图：腾讯混元 hunyuan-image via ZCodeProxy（illustration_provider=mock|hunyuan）
+- 书签（reader_bookmarks 移植）+ 插图 asset URL 双重 /api 前缀修复 + 端口固化
+  （后端 8010 / 前端 3005 / agent 3100 / ZCodeProxy 3001）
+- 端到端验证通过：自动路由 5 意图 + SSE 自动执行 + 真实生图（asset 281KB JPEG）
+  + 锚点 + 前端 200
+
+部署注意：agent-service 启动必须注入
+`NOVELMIND_GATEWAY_TOKEN=dev-agent-gateway-token-local`（backend/.env:39 定义；
+Makefile `dev-agent` / `scripts/keep-alive.ps1` 已注入）。
+测试：backend 1305p + agent-service 1039p + frontend 460p 全绿。
+Phase 22 仍 0/3（verdict 不变）。

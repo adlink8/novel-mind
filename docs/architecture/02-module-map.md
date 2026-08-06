@@ -130,7 +130,7 @@
 
 | 属性 | 内容 |
 |---|---|
-| **职责** | Novel Agent Runtime：Pi SDK 会话编排、域工具代理、Skill 指令注入、MCP 外部工具隔离、审批策略引擎；通过 `/api/gateway` 服务到服务调用 FastAPI |
+| **职责** | Novel Agent Runtime：Pi SDK 会话编排、域工具代理、Skill 指令注入、MCP 外部工具隔离、审批策略引擎；通过 `/api/gateway` 服务到服务调用 FastAPI。2026-08-06 起 SSE run 支持**意图→skill 自动路由**（body.skill 缺省时调 FastAPI `route-skill`，Agent 自动选 skill，用户不暴露选择） |
 | **主要文件** | `agent-service/src/`（`config.ts`、`server.ts`、`agent/`、`tools/`、`skills/`、`governance/`、`policy/`、`mcp/`、`transport/`） |
 | **状态** | VERIFIED（223 vitest passed，tsc clean，2026-08-02） |
 | **上游** | FastAPI `/api/gateway`（Bearer 令牌，fail-closed 401） |
