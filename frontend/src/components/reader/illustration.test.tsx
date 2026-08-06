@@ -12,6 +12,7 @@ import { ReaderContent } from "./reader-content";
 import { IllustrationBlock } from "./illustration-block";
 import { buildPageBlocks } from "./reader-content";
 import {
+  illustrationAssetBytesUrl,
   verifyAnchorAgainstChapter,
   type IllustrationAnchorView,
 } from "@/lib/illustration-anchor";
@@ -96,6 +97,17 @@ async function makeValidAnchor(
     ...over,
   };
 }
+
+describe("illustrationAssetBytesUrl", () => {
+  it("returns a bare owner-scoped path (axios baseURL supplies the /api prefix)", () => {
+    expect(illustrationAssetBytesUrl(6, 3)).toBe(
+      "/novels/6/illustrations/assets/3/bytes"
+    );
+    // Regression guard: a `/api`-prefixed path would double the shared axios
+    // baseURL and 404 through the Next proxy.
+    expect(illustrationAssetBytesUrl(6, 3)).not.toMatch(/^\/api\//);
+  });
+});
 
 describe("verifyAnchorAgainstChapter", () => {
   it("accepts a valid published anchor that replays hash/range/content", async () => {
@@ -245,6 +257,59 @@ describe("IllustrationBlock", () => {
     // Caption/alt are plain React text — never dangerouslySetInnerHTML.
     const figure = screen.getByTestId("illustration-block");
     expect(figure.innerHTML).not.toContain("__html");
+  });
+
+  it("fetches the approved bytes via the shared axios client at the bare path", async () => {
+    const content = "第二段包含插图位置。";
+    const anchor = await makeValidAnchor(content, 0, content.length);
+    const getMock = vi.mocked(api.get);
+    // jsdom does not implement URL.createObjectURL/revokeObjectURL; stub them
+    // so the happy path can reach a rendered image.
+    const originalCreate = URL.createObjectURL;
+    const originalRevoke = URL.revokeObjectURL;
+    const createStub = vi.fn(() => "blob:mock-object-url");
+    const revokeStub = vi.fn();
+    Object.defineProperty(URL, "createObjectURL", {
+      configurable: true,
+      writable: true,
+      value: createStub,
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      configurable: true,
+      writable: true,
+      value: revokeStub,
+    });
+    try {
+      getMock.mockResolvedValueOnce({
+        data: new Blob(["jpg-bytes"], { type: "image/jpeg" }),
+      });
+      render(
+        <IllustrationBlock
+          anchor={anchor}
+          novelId={11}
+          chapterContent={content}
+        />
+      );
+      await waitFor(() => {
+        expect(getMock).toHaveBeenCalledWith(
+          "/novels/11/illustrations/assets/101/bytes",
+          { responseType: "blob" }
+        );
+      });
+      const img = await screen.findByTestId("illustration-image");
+      expect(img).toHaveAttribute("src", "blob:mock-object-url");
+    } finally {
+      Object.defineProperty(URL, "createObjectURL", {
+        configurable: true,
+        writable: true,
+        value: originalCreate,
+      });
+      Object.defineProperty(URL, "revokeObjectURL", {
+        configurable: true,
+        writable: true,
+        value: originalRevoke,
+      });
+    }
   });
 
   it("shows an explicit placeholder when the anchor is stale, never an image", async () => {

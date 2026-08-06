@@ -79,8 +79,6 @@ export const ILLUSTRATION_ANCHOR_STATUSES: readonly IllustrationAnchorStatus[] =
   "invalid",
 ] as const;
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "/api";
-
 // ---------------------------------------------------------------------------
 // Owner-scoped read API (published anchors are the only reader-visible surface)
 // ---------------------------------------------------------------------------
@@ -100,12 +98,17 @@ export const illustrationAnchorApi = {
 /**
  * Owner-scoped asset bytes URL for an approved published AssetRevision.
  * Raw storage paths are never exposed; the backend serves owner-scoped bytes.
+ *
+ * Returns a bare path (no `/api` prefix): callers resolve it through the shared
+ * axios client (`frontend/src/lib/api.ts`), whose baseURL already carries the
+ * `/api` (or `NEXT_PUBLIC_API_URL`) prefix. Prefixed paths here would double the
+ * prefix and 404.
  */
 export function illustrationAssetBytesUrl(
   novelId: string | number,
   assetRevisionId: number
 ): string {
-  return `${API_BASE}/novels/${novelId}/illustrations/assets/${assetRevisionId}/bytes`;
+  return `/novels/${novelId}/illustrations/assets/${assetRevisionId}/bytes`;
 }
 
 // ---------------------------------------------------------------------------
