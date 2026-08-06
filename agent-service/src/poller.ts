@@ -21,6 +21,10 @@ import {
   type RunLineageContext,
   type ToolEvidence,
 } from "./structured-output/cited-answer-builder.js";
+import {
+  buildAnalysisEnvelope,
+  isAnalysisSkill,
+} from "./structured-output/analysis-envelope-builder.js";
 
 /** poller 依赖（与 server.ts resolveDeps 对齐）。 */
 export interface PollerDeps {
@@ -200,10 +204,24 @@ async function executeRun(
       const built = buildCitedAnswerEnvelope(last?.text ?? "", runLineage, skill, evidences);
       envelopePayload = built.envelope;
       frozenManifest = built.frozenManifest;
+    } else if (isAnalysisSkill(skillName)) {
+      // 分析 skill：模型输出是结构化 JSON，按 skill 构造对应 envelope.type
+      // （scene_candidate / world_model_candidate / visual_bible）。解析失败或
+      // 无 leaf 证据 → 抛错（诚实失败，绝不伪造 cited_answer 信封）。
+      if (!last?.text) {
+        throw new Error(`backfill run: skill ${skillName} returned no model output`);
+      }
+      const built = buildAnalysisEnvelope(
+        last.text,
+        runLineage,
+        skill,
+        claimed.branch ?? null,
+      );
+      envelopePayload = built.envelope;
+      frozenManifest = built.frozenManifest;
     } else {
-      envelopePayload = last?.text
-        ? { type: "cited_answer", answer: { answer_blocks: [{ text: last.text }] } }
-        : {};
+      // 未接线的 skill：诚实失败（不伪造 cited_answer envelope 导致假 artifact）。
+      throw new Error(`backfill run: no envelope builder for skill ${skillName}`);
     }
 
     const finalizeRes = await deps.fetchImpl(
