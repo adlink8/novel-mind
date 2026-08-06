@@ -53,6 +53,7 @@ from app.schemas.agent_runtime import SkillVersionRegister
 from app.services.agent_runtime.finalize import (
     ERROR_CODE_FAILED_VALIDATION,
     ERROR_CODE_INVALID_STOP_REASON,
+    ERROR_CODE_UPSTREAM_ERROR,
     finalize_skill_run,
 )
 from app.services.agent_runtime.registry import (
@@ -891,7 +892,7 @@ async def test_phase28_cancellation_no_write(runtime_factory, migrated_postgres:
 async def test_phase28_timeout_nonstop_reason_fails(
     runtime_factory, migrated_postgres: str
 ):
-    """timeout 语义（非 stop reason）→ failed(invalid_stop_reason)，零官方写入。"""
+    """timeout 语义（非 stop reason）→ failed(upstream_error)，零官方写入。"""
     ctx = await _set_up(
         runtime_factory, migrated_postgres, suffix=f"to_{uuid.uuid4().hex[:6]}"
     )
@@ -912,7 +913,7 @@ async def test_phase28_timeout_nonstop_reason_fails(
         frozen_manifest={"evidence_refs": [evidence_key_for(1)]},
     )
     assert outcome.status == "failed"
-    assert outcome.error_code == ERROR_CODE_INVALID_STOP_REASON
+    assert outcome.error_code == ERROR_CODE_UPSTREAM_ERROR
     await _assert_zero_writes(runtime_factory, run_id=ctx["run_id"])
 
 

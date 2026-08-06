@@ -621,6 +621,31 @@ async function handleRun(
       await postCancel();
       stream.send({ type: "run_end", runId, status: "cancelled" });
     } else {
+      // 上游/运行异常（stopReason 非 stop/aborted，如 "error"/"max_tokens"/"other"）：
+      // 必须调后端 finalize 落库（failed + 0 artifact），否则 run 会永久卡 queued。
+      // 不用 cancel——queued→cancelled 语义错误；finalize 对非 stop reason 写 failed。
+      // done=true（客户端断开）时跳过：onClose 已 postCancel（cancel-no-write），
+      // 再 finalize 会造成 cancel/finalize 双重状态迁移。
+      if (!done) {
+        try {
+          await deps.fetchImpl(
+            `${base}/api/agent/novels/${novelId}/skill-runs/${runId}/finalize`,
+            {
+              method: "POST",
+              headers: jsonHeaders,
+              body: JSON.stringify({
+                stop_reason: "error",
+                envelope: {},
+                model_lineage: last?.provider && last?.model ? { provider: last.provider, model: last.model } : {},
+                source_versions: {},
+                usage: last?.usage ?? {},
+              }),
+            },
+          );
+        } catch {
+          // finalize 网络失败：run 状态以后端为准（尽力而为，不阻塞终帧）。
+        }
+      }
       stream.send({ type: "run_end", runId, status: "failed", error_code: "upstream_error" });
     }
   } catch (err) {

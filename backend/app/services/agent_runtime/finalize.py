@@ -36,6 +36,7 @@ CANCEL_STOP_REASONS: frozenset[str] = frozenset({"aborted", "cancel", "cancelled
 ERROR_CODE_FAILED_VALIDATION = "failed_validation"
 ERROR_CODE_BUDGET_EXCEEDED = "budget_exceeded"
 ERROR_CODE_INVALID_STOP_REASON = "invalid_stop_reason"
+ERROR_CODE_UPSTREAM_ERROR = "upstream_error"
 ERROR_CODE_UNKNOWN = "failed"
 
 
@@ -131,10 +132,15 @@ async def finalize_skill_run(
             run.status = "failed"
             run.stop_reason = stop_reason
             run.status_reason = f"unexpected stop reason {stop_reason!r}"
-            run.error_code = ERROR_CODE_INVALID_STOP_REASON
+            # 已知上游停止语义（provider error / 超长截断 / 其它）→ upstream_error；
+            # 只有真正协议外的值才映射 invalid_stop_reason。
+            if stop_reason in {"error", "max_tokens", "other"}:
+                run.error_code = ERROR_CODE_UPSTREAM_ERROR
+            else:
+                run.error_code = ERROR_CODE_INVALID_STOP_REASON
             return FinalizeOutcome(
                 status="failed",
-                error_code=ERROR_CODE_INVALID_STOP_REASON,
+                error_code=run.error_code,
                 status_reason=run.status_reason,
             )
 

@@ -23,6 +23,7 @@ from app.models.analysis import (
     AnalysisVersion,
 )
 from app.models.chunk_build import ChunkActivePointer, ChunkBuild, ChunkHierarchyNode
+from app.models.character import Character
 from app.models.novel import Chapter, Novel
 from app.models.timeline import (
     MachineTimelineEvent,
@@ -453,6 +454,7 @@ async def _extract_and_persist(runtime, budget, run, version, build, chapter) ->
     if not nodes:
         raise DependencyPaused(f"chapter {chapter.id} has no Phase 07 evidence")
     await _raise_if_cancel_requested(runtime.sessions, run.id)
+    character_registry = await _load_character_registry(runtime.sessions, run.novel_id)
     package = EvidencePackage.create(
         owner_id=run.owner_id,
         novel_id=run.novel_id,
@@ -520,6 +522,7 @@ async def _extract_and_persist(runtime, budget, run, version, build, chapter) ->
                                 "hierarchy_checksum": package.hierarchy_checksum,
                                 "evidence_package_hash": package.package_hash,
                             },
+                            "characters": character_registry,
                             "evidence": [unit.__dict__ for unit in package.units],
                         },
                         sort_keys=True,
@@ -550,9 +553,59 @@ async def _extract_and_persist(runtime, budget, run, version, build, chapter) ->
     await _persist_chapter(runtime.sessions, run, version, chapter, stage_key, output)
 
 
+async def _load_character_ids(
+    sessions: async_sessionmaker[AsyncSession], novel_id: int
+) -> set[int]:
+    """该 novel 已注册的 characters 主键集合（用于 TimelineParticipant FK 校验）。"""
+    async with sessions() as session:
+        rows = await session.scalars(
+            select(Character.id).where(Character.novel_id == novel_id)
+        )
+        return set(rows.all())
+
+
+def _sanitize_participant_entity_ids(
+    extraction: TimelineExtraction, known_ids: set[int]
+) -> None:
+    """FK fail-soft：把 LLM 臆造的 entity_id（novel 无对应 characters 行）置 None。
+
+    对齐 relationships/candidates 的 fail-soft 模式：永不信任 LLM 给出的角色 id。
+    只校验 id 存在性（本 novel scope）；mention 文本始终保留。
+    """
+    for event in extraction.events:
+        for item in event.participants:
+            if item.entity_id is not None and item.entity_id not in known_ids:
+                item.entity_id = None
+
+
+async def _load_character_registry(
+    sessions: async_sessionmaker[AsyncSession], novel_id: int
+) -> list[dict[str, Any]]:
+    """该 novel 的 characters 注册表（id + name + aliases），随证据一起喂给抽取模型。"""
+    async with sessions() as session:
+        rows = (
+            await session.execute(
+                select(Character.id, Character.name, Character.aliases).where(
+                    Character.novel_id == novel_id
+                )
+            )
+        ).all()
+    registry = []
+    for row in rows:
+        aliases = [
+            alias.strip()
+            for alias in (row.aliases or "").split(",")
+            if alias.strip()
+        ]
+        registry.append({"id": row.id, "name": row.name, "aliases": aliases})
+    return registry
+
+
 async def _persist_chapter(
     sessions, run, version, chapter, stage_key, extraction
 ) -> None:
+    known_character_ids = await _load_character_ids(sessions, run.novel_id)
+    _sanitize_participant_entity_ids(extraction, known_character_ids)
     artifact = extraction.model_dump_json(exclude_none=False)
     checksum = hashlib.sha256(artifact.encode()).hexdigest()
     async with sessions.begin() as session:

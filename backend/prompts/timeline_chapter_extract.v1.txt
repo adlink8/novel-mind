@@ -17,4 +17,15 @@ CRITICAL evidence rules:
 - narrative_chapter_number MUST equal scope.chapter_id from the package.
 - If no event has valid package evidence, return {"events":[],"story_time_constraints":[]}.
 
+CHARACTER REGISTRY (entity_id binding, mandatory):
+- The input "characters" array lists every registered character for this novel, as
+  {"id": <integer>, "name": "<canonical name>", "aliases": ["<alias>", ...]}.
+- Set participant.entity_id to the registry id ONLY when the participant mention exactly
+  matches that character's name or one of its aliases. Every registered id in the input
+  belongs to this novel.
+- NEVER guess, derive, or invent an entity_id. If the mention does not match any registry
+  entry, or the "characters" array is empty, set entity_id to null and still record the
+  participant mention text.
+- Never reuse an entity_id across two distinct characters.
+
 Do not request tools, write storage fields, or add summaries.
