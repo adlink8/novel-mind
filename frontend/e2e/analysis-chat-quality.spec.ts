@@ -102,7 +102,9 @@ async function mockAuthAndNovel(page: Page) {
     word_count: CHAPTER_1.length + CHAPTER_2.length,
     chapter_count: 2,
     status: "ready",
-    reading_progress: { chapter_id: 101, progress_percent: 10 },
+    // 进度指向第 2 章（chapter_id 102 → chapter_number 2），
+    // 让 analysis-chat-boundary 渲染「基于你已读至第 2 章」。
+    reading_progress: { chapter_id: 102, progress_percent: 10 },
     created_at: "",
     updated_at: "",
   };
@@ -274,6 +276,19 @@ async function mockAll(page: Page, messages: unknown[]) {
     route.fulfill({ status: 500, json: { detail: "unmocked e2e endpoint" } })
   );
   await mockAuthAndNovel(page);
+  // narrative-memory 空 versions：让 loadStructure 走 chapterFallback 并填充
+  // chapterList（来自 novelsApi.getChapters），从而 cutoffChapterNumber 由
+  // 阅读进度推导（而不是回落到「第 1 章」）；同时阻断 catch-all 500 让
+  // Promise.all 拒绝导致 chapterList 留空。
+  await page.route(/\/api\/narrative-memory\/11\/versions(?:\?.*)?$/, (route) =>
+    route.fulfill({
+      json: {
+        novel_id: 11,
+        versions: [],
+        publication_status: "candidate_preview",
+      },
+    })
+  );
   await mockConversations(page, messages);
 }
 
@@ -326,9 +341,14 @@ test("analysis no-answer abstains and keeps the trace visible", async ({ page })
   await expect(page.getByTestId("analysis-chat-queryplan-11")).toContainText(
     "已弃权（证据不足）"
   );
-  await expect(page.getByTestId("analysis-chat-queryplan-11")).toContainText(
-    "引用 0"
+  // 已弃权时统一对话窗口省略「引用 N」计数（替代为弃权提示）—— 断言零计数出现。
+  await expect(page.getByTestId("analysis-chat-queryplan-11")).not.toContainText(
+    "引用"
   );
+  // 且不渲染任何引证芯片（citations=[]）。
+  await expect(
+    page.getByTestId("analysis-chat-panel").getByTestId("reader-chat-citation")
+  ).toHaveCount(0);
 });
 
 test("analysis chat is spoiler-safe and shows the reading-cutoff boundary", async ({

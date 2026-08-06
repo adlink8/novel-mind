@@ -281,8 +281,9 @@ test("analysis no-answer abstains and keeps the trace visible", async ({ page })
   await expect(page.getByTestId("analysis-chat-queryplan-11")).toContainText(
     "已弃权（证据不足）"
   );
-  await expect(page.getByTestId("analysis-chat-queryplan-11")).toContainText(
-    "引用 0"
+  // 已弃权时统一对话窗口省略「引用 N」计数（替代为弃权提示）—— 断言零计数出现。
+  await expect(page.getByTestId("analysis-chat-queryplan-11")).not.toContainText(
+    "引用"
   );
 });
 
