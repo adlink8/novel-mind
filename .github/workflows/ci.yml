@@ -299,21 +299,21 @@ jobs:
         run: |
           python -m pip install pyyaml
           mkdir -p artifacts
-          CHANGED_LINES_ARGS=""
+          CHANGED_LINES_ARGS=()
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             git fetch --depth=1 origin "${{ github.event.pull_request.base.sha }}" || true
             if git diff --name-only HEAD "${{ github.event.pull_request.base.sha }}" >/dev/null 2>&1; then
               git diff --unified=0 "${{ github.event.pull_request.base.sha }}"...HEAD > artifacts/changed.diff || \
                 git diff --unified=0 "${{ github.event.pull_request.base.sha }}" HEAD > artifacts/changed.diff || true
               if [ -s artifacts/changed.diff ]; then
-                CHANGED_LINES_ARGS="--changed-lines artifacts/changed.diff"
+                CHANGED_LINES_ARGS=(--changed-lines artifacts/changed.diff)
               fi
             fi
           fi
           python scripts/ci/coverage_policy.py \
             --backend-xml backend/artifacts/backend-coverage.xml \
             --frontend-lcov frontend/coverage/lcov.info \
-            --report-only $CHANGED_LINES_ARGS
+            --report-only "${CHANGED_LINES_ARGS[@]}"
 
       - name: CI policy scripts (repo-root)
         run: |
