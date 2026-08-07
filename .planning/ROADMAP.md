@@ -1,6 +1,6 @@
 # NovelMind GSD Roadmap
 
-> Execution authority: `master`. Snapshot: `912ca6b`, 2026-08-01.
+> Execution authority: `master`. Snapshot: `29be2fa`, 2026-08-07.
 > Progress is reported in three independent dimensions:
 > `implementation_readiness`, `sample_data_coverage`, `quality_qualification`.
 

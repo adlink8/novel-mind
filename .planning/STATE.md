@@ -1,8 +1,8 @@
 ---
 gsd_state_version: 2
-updated_at: 2026-08-03
+updated_at: 2026-08-07
 baseline_branch: master
-baseline_commit: 912ca6b423d6c2309bc2972cbfc083c4eaa280e1
+baseline_commit: 29be2fa3928ada9e9211ffa08f3af0eec734bb95
 active_milestone: v1.1
 active_phase: 22-ci-nightly-gap-closure
 active_plan: 22-G2
