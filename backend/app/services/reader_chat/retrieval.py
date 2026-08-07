@@ -21,6 +21,7 @@ from sqlalchemy.orm import undefer
 from app.models.analysis import AnalysisVersion
 from app.models.chunk_build import ChunkActivePointer, ChunkBuild, ChunkHierarchyNode
 from app.models.novel import Chapter, Novel
+from app.services.canon_space_policy import ORIGINAL_CANON, assert_pipeline_input
 from app.models.timeline import (
     MachineTimelineEvent,
     TimelineActivePointer,
@@ -759,8 +760,12 @@ async def retrieve_visible_evidence(
     relationship_reader: RelationshipObservationReader | None = None,
     max_evidence: int = DEFAULT_MAX_EVIDENCE,
     max_per_source: int = DEFAULT_MAX_PER_SOURCE,
+    space: str = ORIGINAL_CANON,
 ) -> RetrievalResult:
     """Owner/novel/cutoff filtered retrieval; never trusts client evidence IDs."""
+    # Canon-space boundary: original retrieval consumers must not read a
+    # non-original space (Phase 35 three-space isolation).
+    assert_pipeline_input(space, "original_retrieval")
 
     source_status: dict[str, str] = {
         "hierarchy": SourceStatus.ABSENT,
