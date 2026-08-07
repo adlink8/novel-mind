@@ -122,6 +122,18 @@ class Settings(BaseSettings):
         default="", validation_alias="NOVELMIND_GATEWAY_TOKEN"
     )
 
+    # ── 引导管理员（bootstrap admin）──
+    # 首次部署时，公开注册端点在 debug=False（生产）模式下默认 fail-closed，
+    # 防止第一个外部注册者抢占 superuser。运维必须在部署前：
+    #   1) 通过环境变量 NOVELMIND_BOOTSTRAP_ADMIN_TOKEN 提供一次性 token，或
+    #   2) 通过离线脚本预置初始管理员。
+    # 首个携带匹配 bootstrap_token 注册的用户成为 superuser；此后该 token
+    # 不再生效（bootstrap 关闭）。debug=True（本地开发）时未配置 token 仍允许
+    # 首个注册成为 admin，以保持开发便利。
+    bootstrap_admin_token: str = Field(
+        default="", validation_alias="NOVELMIND_BOOTSTRAP_ADMIN_TOKEN"
+    )
+
     # pydantic-settings 配置：从 .env 文件加载，环境变量前缀为 NOVELMIND_
     model_config = {"env_file": ".env", "env_prefix": "NOVELMIND_"}
 

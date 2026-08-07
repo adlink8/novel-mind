@@ -2,6 +2,8 @@
 认证 API — 用户注册、登录、Token 管理
 """
 
+import secrets
+
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -30,6 +32,10 @@ class RegisterRequest(BaseModel):
         ..., min_length=3, max_length=100, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$"
     )
     password: str = Field(..., min_length=8, max_length=100, description="密码")
+    # 仅当服务为「引导管理员」状态时使用：首次部署时配置了
+    # NOVELMIND_BOOTSTRAP_ADMIN_TOKEN 的情况下，首个注册用户必须携带匹配的
+    # 一次性 bootstrap token 才能成为 superuser。普通注册可省略。
+    bootstrap_token: str = Field(default="", max_length=200, description="引导 token")
 
     @field_validator("password")
     @classmethod
@@ -93,6 +99,24 @@ async def register(data: RegisterRequest, db: AsyncSession = Depends(get_db)):
     is_bootstrap_admin = (
         await db.scalar(select(func.count(User.id)).where(User.is_active.is_(True)))
     ) == 0
+    if is_bootstrap_admin:
+        configured = settings.bootstrap_admin_token
+        if configured:
+            # 配置了一次性 bootstrap token：首个注册用户必须携带匹配 token，
+            # 否则拒绝。常量时间比较避免时序侧信道。
+            if not data.bootstrap_token or not secrets.compare_digest(
+                data.bootstrap_token.encode("utf-8"), configured.encode("utf-8")
+            ):
+                raise HTTPException(
+                    status_code=403, detail="bootstrap token 缺失或不匹配"
+                )
+        elif not settings.debug:
+            # 生产模式（debug=False）且未配置 bootstrap token：fail-closed，
+            # 禁止公开注册抢占超级管理员；运维必须先配置 token 或离线预置管理员。
+            raise HTTPException(
+                status_code=403,
+                detail="bootstrap admin 未初始化：需配置 NOVELMIND_BOOTSTRAP_ADMIN_TOKEN 或离线预置管理员",
+            )
     user = User(
         username=username,
         email=email,
