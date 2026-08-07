@@ -177,6 +177,11 @@ class NarrativeMemoryBuildStage(TimestampMixin, Base):
             f"status IN ({_quoted(BUILD_STAGE_STATUSES)})",
             name="ck_memory_build_stages_status",
         ),
+        CheckConstraint(
+            "terminal_state IS NULL OR terminal_state IN"
+            " ('completed','isolated','blocked')",
+            name="ck_memory_build_stages_terminal",
+        ),
         Index("idx_memory_build_stages_run", "run_id"),
         Index("idx_memory_build_stages_status", "run_id", "status"),
     )

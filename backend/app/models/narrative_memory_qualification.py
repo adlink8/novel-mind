@@ -73,6 +73,8 @@ class NarrativeMemoryQualificationRun(TimestampMixin, Base):
         CheckConstraint(
             "length(pointer_before_digest) = 64", name="ck_nm_qual_runs_ptr"
         ),
+        CheckConstraint("length(pricing_checksum) = 64", name="ck_nm_qual_runs_price"),
+        CheckConstraint("length(budget_checksum) = 64", name="ck_nm_qual_runs_budget"),
         Index("idx_nm_qual_runs_scope", "owner_id", "novel_id", "version_id"),
     )
 
@@ -135,6 +137,7 @@ class NarrativeMemoryQualificationCaseResult(TimestampMixin, Base):
             name="ck_nm_qual_cases_strategy",
         ),
         CheckConstraint("length(artifact_checksum) = 64", name="ck_nm_qual_cases_art"),
+        CheckConstraint("length(usage_checksum) = 64", name="ck_nm_qual_cases_usage"),
         Index("idx_nm_qual_cases_run", "run_id"),
     )
 
@@ -190,6 +193,9 @@ class NarrativeMemoryQualificationReport(TimestampMixin, Base):
         ),
         CheckConstraint(
             "length(pointer_after_digest) = 64", name="ck_nm_qual_reports_ptr"
+        ),
+        CheckConstraint(
+            "length(command_payload_checksum) = 64", name="ck_nm_qual_reports_cmd"
         ),
         CheckConstraint("length(output_digest) = 64", name="ck_nm_qual_reports_out"),
         Index("idx_nm_qual_reports_run", "run_id"),
