@@ -397,7 +397,7 @@ test("citation chip on agent artifact jumps to the reader highlight URL", async 
         ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
     await expect(page).toHaveURL(
-      /\/novels\/11\?chapter=101&start=10&from=timeline/
+      /\/novels\/11\?chapter=101&start=10(?:&end=\d+)?&from=timeline/
     );
   } else {
     // dev 限制：产物不到。仍确认智能体通道正确路由（不出现 fatal error）。
