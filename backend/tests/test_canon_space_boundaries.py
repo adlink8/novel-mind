@@ -1,7 +1,5 @@
 """Phase31-02 negative boundary tests."""
 
-from types import SimpleNamespace
-
 import pytest
 
 from app.services.canon_space_policy import (
@@ -43,23 +41,19 @@ def test_fanfiction_citations_stay_in_fanfiction_space():
 
 @pytest.mark.asyncio
 async def test_retrieval_entry_points_reject_non_original_space_before_io():
+    # Phase 35-01 contract: original retrieval entry points carry NO `space`
+    # parameter — a derivative space can never be smuggled into the raw IO
+    # path. Space is bound exclusively through the CanonScope contract layer.
+    import inspect as _inspect
+
+    search_sig = _inspect.signature(NarrativeSearchService.search_units)
+    assert "space" not in search_sig.parameters
+    evidence_sig = _inspect.signature(retrieve_visible_evidence)
+    assert "space" not in evidence_sig.parameters
+
+    # The deterministic policy gate rejects every derivative space before any
+    # original-fact consumer runs.
     with pytest.raises(CanonSpacePolicyError, match="space_excluded"):
-        await NarrativeSearchService().search_units(
-            None,
-            owner_id=1,
-            novel_id=2,
-            query="q",
-            space="fanfiction_canon",
-        )
+        assert_pipeline_input("fanfiction_canon", "original_retrieval")
     with pytest.raises(CanonSpacePolicyError, match="space_excluded"):
-        await retrieve_visible_evidence(
-            None,
-            novel=SimpleNamespace(id=2),
-            owner_id=1,
-            selection_chapter_id=1,
-            selection_start=0,
-            selection_end=1,
-            cutoff_chapter=1,
-            full_book=False,
-            space="user_interpretation",
-        )
+        assert_pipeline_input("user_interpretation", "original_retrieval")

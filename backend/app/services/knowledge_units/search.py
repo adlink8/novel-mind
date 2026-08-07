@@ -20,7 +20,6 @@ from app.models.knowledge_unit import (
 )
 from app.models.novel import Novel
 from app.services.ai_service import ai_service
-from app.services.canon_space_policy import ORIGINAL_CANON, assert_pipeline_input
 from app.services.vector_store import vector_store
 
 
@@ -161,11 +160,7 @@ class NarrativeSearchService:
         top_k: int = 5,
         domain_profile: str = "fiction",
         build_selector: BuildSelector = select_active_build,
-        space: str = ORIGINAL_CANON,
     ) -> list[dict[str, Any]]:
-        # Canon-space boundary: original retrieval consumers must not read a
-        # non-original space (Phase 35 three-space isolation).
-        assert_pipeline_input(space, "original_retrieval")
         owned = await db.scalar(
             select(Novel.id).where(Novel.id == novel_id, Novel.owner_id == owner_id)
         )
