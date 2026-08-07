@@ -37,6 +37,22 @@ test.describe.configure({ mode: "serial" });
 
 test.beforeEach(async ({ page }) => {
   await login(page, "e2e_login_test", "pass12345");
+  // This spec drives the real backend and real AI against a hand-seeded
+  // fixture (owner 2 / novel 6 / e2e_login_test). On a fresh/CI database the
+  // seeded novel does not exist; skip the whole serial group instead of
+  // failing selectOption on the novel picker.
+  const hasNovel6 = await page
+    .evaluate(async () => {
+      const res = await fetch("/api/novels");
+      if (!res.ok) return false;
+      const data = (await res.json()) as { items?: Array<{ id: number }> };
+      return Array.isArray(data.items) && data.items.some((n) => n.id === 6);
+    })
+    .catch(() => false);
+  test.skip(
+    !hasNovel6,
+    "requires hand-seeded owner 2 / novel 6 / e2e_login_test on the real backend"
+  );
 });
 
 test("unified chat window exists — single message area, single input, no agent tab", async ({
