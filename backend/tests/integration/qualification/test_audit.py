@@ -63,7 +63,7 @@ STATE_PATH = REPO_ROOT / ".planning" / "STATE.md"
 ROADMAP_PATH = REPO_ROOT / ".planning" / "ROADMAP.md"
 E2E_DIR = REPO_ROOT / "frontend" / "e2e"
 
-EXPECTED_MIGRATION_HEAD = "20260801_2801"
+EXPECTED_MIGRATION_HEAD = "085fffd58ee9"  # current single head (chat_backfill)
 
 REQUIRED_FILES = (
     "backend/app/services/qualification/__init__.py",

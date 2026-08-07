@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 
 import { PageContainer } from "@/components/page-header";
@@ -20,23 +20,25 @@ export default function NovelVisualBiblePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    if (novelId == null) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await visualBibleApi.listVersions(novelId);
-      setVersions(res.data.items ?? []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "加载 Visual Bible 失败");
-    } finally {
-      setLoading(false);
-    }
-  }, [novelId]);
-
   useEffect(() => {
-    void load();
-  }, [load]);
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await visualBibleApi.listVersions(novelId);
+        if (cancelled) return;
+        setVersions(res.data.items ?? []);
+        setError(null);
+      } catch (err) {
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : "加载 Visual Bible 失败");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [novelId]);
 
   if (novelId == null) {
     return null;

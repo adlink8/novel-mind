@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 
 import { PageContainer } from "@/components/page-header";
@@ -24,23 +24,25 @@ export default function NovelSceneSpecPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    if (novelId == null) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await sceneSpecsApi.listSpecs(novelId);
-      setSpecs(res.data.items ?? []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "加载 Scene Spec 失败");
-    } finally {
-      setLoading(false);
-    }
-  }, [novelId]);
-
   useEffect(() => {
-    void load();
-  }, [load]);
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await sceneSpecsApi.listSpecs(novelId);
+        if (cancelled) return;
+        setSpecs(res.data.items ?? []);
+        setError(null);
+      } catch (err) {
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : "加载 Scene Spec 失败");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [novelId]);
 
   if (novelId == null) {
     return null;
