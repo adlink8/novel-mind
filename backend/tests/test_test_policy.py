@@ -3,17 +3,19 @@ Contract tests for automated quality policy (Phase 06-01).
 
 Locks D-09 coverage gates, D-10 flake policy, D-16 timeouts, and tool versions.
 Fail closed on missing policy fields, critical glob zero hits, and low coverage.
+
+Implementation lives in `scripts/ci/coverage_policy.py` (shared with the real
+CI coverage gate); these tests pin the policy contract against it so the
+synthetic fail-closed cases and the executed CI gate cannot drift apart.
 """
 
 from __future__ import annotations
 
-import json
+import importlib.util
+import sys
 from pathlib import Path
-from typing import Any
 
 import pytest
-import yaml
-from jsonschema import Draft202012Validator
 
 pytestmark = pytest.mark.contract
 
@@ -21,6 +23,24 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 POLICY_PATH = REPO_ROOT / ".quality" / "coverage-policy.yml"
 SCHEMA_PATH = REPO_ROOT / ".quality" / "coverage-policy.schema.json"
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
+
+# Load the shared evaluator implementation (single source of truth for D-09).
+_SCRIPT = REPO_ROOT / "scripts" / "ci" / "coverage_policy.py"
+_spec = importlib.util.spec_from_file_location("coverage_policy_impl", _SCRIPT)
+assert _spec and _spec.loader
+_impl = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_impl)
+sys.modules["coverage_policy_impl"] = _impl
+
+PolicyError = _impl.PolicyError
+load_yaml = _impl.load_yaml
+load_schema = _impl.load_schema
+validate_schema = _impl.validate_schema
+resolve_side_globs = _impl.resolve_side_globs
+assert_critical_globs_hit = _impl.assert_critical_globs_hit
+evaluate_line_branch = _impl.evaluate_line_branch
+evaluate_coverage_report = _impl.evaluate_coverage_report
+evaluate_flake = _impl.evaluate_flake
 
 # Locked tool versions (06-RESEARCH)
 LOCKED_TOOLS = {
@@ -45,141 +65,6 @@ LOCKED_TIMEOUTS = {
     "browser": 60,
     "live": 180,
 }
-
-
-class PolicyError(Exception):
-    """Fail-closed quality policy violation."""
-
-
-def load_yaml(path: Path) -> dict[str, Any]:
-    with path.open(encoding="utf-8") as fh:
-        data = yaml.safe_load(fh)
-    if not isinstance(data, dict):
-        raise PolicyError(f"Policy must be a mapping: {path}")
-    return data
-
-
-def load_schema() -> dict[str, Any]:
-    with SCHEMA_PATH.open(encoding="utf-8") as fh:
-        return json.load(fh)
-
-
-def validate_schema(
-    policy: dict[str, Any], schema: dict[str, Any] | None = None
-) -> None:
-    schema = schema or load_schema()
-    validator = Draft202012Validator(schema)
-    errors = sorted(validator.iter_errors(policy), key=lambda e: list(e.path))
-    if errors:
-        messages = "; ".join(e.message for e in errors[:5])
-        raise PolicyError(f"Policy schema validation failed: {messages}")
-
-
-def resolve_side_globs(side_root: Path, globs: list[str]) -> list[Path]:
-    """Resolve coverage globs relative to backend/ or frontend/ package root."""
-    hits: list[Path] = []
-    for pattern in globs:
-        direct = side_root / pattern
-        if direct.is_file():
-            hits.append(direct)
-            continue
-        hits.extend(p for p in side_root.glob(pattern) if p.is_file())
-    return sorted({p.resolve() for p in hits})
-
-
-def assert_critical_globs_hit(
-    policy: dict[str, Any], repo_root: Path = REPO_ROOT
-) -> None:
-    """Critical coverage globs must resolve to at least one file (zero hits → fail)."""
-    for side in ("backend", "frontend"):
-        globs = policy["coverage"][side]["critical"]["globs"]
-        hits = resolve_side_globs(repo_root / side, globs)
-        if not hits:
-            raise PolicyError(
-                f"Critical coverage globs for {side} matched zero files: {globs}"
-            )
-
-
-def evaluate_line_branch(
-    label: str,
-    measured: dict[str, float],
-    required: dict[str, float],
-) -> list[str]:
-    failures: list[str] = []
-    for key in ("line", "branch"):
-        if measured.get(key, 0) < required[key]:
-            failures.append(
-                f"{label} {key} coverage {measured.get(key, 0)} < required {required[key]}"
-            )
-    return failures
-
-
-def evaluate_coverage_report(
-    policy: dict[str, Any],
-    report: dict[str, Any],
-) -> None:
-    """
-    Evaluate a coverage summary report against policy.
-
-    report shape:
-      {
-        "backend": {"overall": {"line": n, "branch": n},
-                    "critical": {"line": n, "branch": n},
-                    "critical_files_hit": int},
-        "frontend": {...},
-        "diff_coverage": n
-      }
-    """
-    failures: list[str] = []
-    cov = policy["coverage"]
-
-    for side in ("backend", "frontend"):
-        measured_side = report.get(side) or {}
-        overall_req = cov[side]["overall"]
-        critical_req = {
-            "line": cov[side]["critical"]["line"],
-            "branch": cov[side]["critical"]["branch"],
-        }
-        failures.extend(
-            evaluate_line_branch(
-                f"{side}.overall",
-                measured_side.get("overall") or {},
-                overall_req,
-            )
-        )
-        failures.extend(
-            evaluate_line_branch(
-                f"{side}.critical",
-                measured_side.get("critical") or {},
-                critical_req,
-            )
-        )
-        if int(measured_side.get("critical_files_hit", 0)) <= 0:
-            failures.append(f"{side}.critical globs produced zero file hits")
-
-    diff_req = cov["diff_coverage"]["minimum"]
-    diff_val = float(report.get("diff_coverage", 0))
-    if diff_val < diff_req:
-        failures.append(f"diff_coverage {diff_val} < required {diff_req}")
-
-    if failures:
-        raise PolicyError("Coverage policy failed:\n  - " + "\n  - ".join(failures))
-
-
-def evaluate_flake(
-    policy: dict[str, Any], pr_flake_count: int, infra_retries: int
-) -> None:
-    if pr_flake_count > policy["flake"]["pr_max"]:
-        raise PolicyError(
-            f"PR flake count {pr_flake_count} exceeds pr_max={policy['flake']['pr_max']}"
-        )
-    max_retry = policy["flake"]["external_infra"]["max_retry"]
-    if infra_retries > max_retry:
-        raise PolicyError(
-            f"external infra retries {infra_retries} exceed max_retry={max_retry}"
-        )
-    if not policy["flake"]["external_infra"]["save_first_failure_evidence"]:
-        raise PolicyError("external_infra.save_first_failure_evidence must be true")
 
 
 # ── Tests ──

@@ -295,6 +295,26 @@ jobs:
         working-directory: frontend
         run: npm run test:coverage
 
+      - name: Coverage policy evaluation (report-only until thresholds met)
+        run: |
+          python -m pip install pyyaml
+          mkdir -p artifacts
+          CHANGED_LINES_ARGS=""
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git fetch --depth=1 origin "${{ github.event.pull_request.base.sha }}" || true
+            if git diff --name-only HEAD "${{ github.event.pull_request.base.sha }}" >/dev/null 2>&1; then
+              git diff --unified=0 "${{ github.event.pull_request.base.sha }}"...HEAD > artifacts/changed.diff || \
+                git diff --unified=0 "${{ github.event.pull_request.base.sha }}" HEAD > artifacts/changed.diff || true
+              if [ -s artifacts/changed.diff ]; then
+                CHANGED_LINES_ARGS="--changed-lines artifacts/changed.diff"
+              fi
+            fi
+          fi
+          python scripts/ci/coverage_policy.py \
+            --backend-xml backend/artifacts/backend-coverage.xml \
+            --frontend-lcov frontend/coverage/lcov.info \
+            --report-only $CHANGED_LINES_ARGS
+
       - name: CI policy scripts (repo-root)
         run: |
           python -m pip install pyyaml
@@ -512,6 +532,48 @@ jobs:
       - name: Tear down services
         if: always()
         run: docker compose -f docker-compose.ci.yml down -v || true
+
+  # ---------------------------------------------------------------------------
+  # Agent service: install, test, typecheck, lockfile + package governance
+  # ---------------------------------------------------------------------------
+  agent:
+    name: Agent service
+    needs: [guard]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.benchmark_commit || github.sha }}
+
+      # agent-service requires Node >=22.19 (package.json engines); it cannot
+      # use the repo-wide Node 20 baseline.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: agent-service/package-lock.json
+
+      - name: Install agent-service
+        working-directory: agent-service
+        run: npm ci
+
+      - name: Typecheck
+        working-directory: agent-service
+        run: npx tsc --noEmit
+
+      - name: Unit tests
+        working-directory: agent-service
+        run: npm test
+
+      - name: Lockfile governance
+        working-directory: agent-service
+        run: npm run verify:lockfile
+
+      - name: Package scan
+        working-directory: agent-service
+        run: npm run scan:packages
 
   # ---------------------------------------------------------------------------
   # Browser: Playwright desktop + 390px (job timeout 15m — D-16)
@@ -1139,6 +1201,7 @@ jobs:
       - unit
       - openapi
       - integration
+      - agent
       - browser
       - codeql
       - workflow-lint
@@ -1168,6 +1231,7 @@ jobs:
           RESULT_UNIT: ${{ needs.unit.result }}
           RESULT_OPENAPI: ${{ needs.openapi.result }}
           RESULT_INTEGRATION: ${{ needs.integration.result }}
+          RESULT_AGENT: ${{ needs.agent.result }}
           RESULT_BROWSER: ${{ needs.browser.result }}
           RESULT_CODEQL: ${{ needs.codeql.result }}
           RESULT_WORKFLOW_LINT: ${{ needs.workflow-lint.result }}
@@ -1197,6 +1261,7 @@ jobs:
                   "unit": {"result": r("RESULT_UNIT")},
                   "openapi": {"result": r("RESULT_OPENAPI")},
                   "integration": {"result": r("RESULT_INTEGRATION")},
+                  "agent": {"result": r("RESULT_AGENT")},
                   "browser": {"result": r("RESULT_BROWSER")},
                   "codeql": {"result": r("RESULT_CODEQL")},
                   "workflow-lint": {"result": r("RESULT_WORKFLOW_LINT")},
