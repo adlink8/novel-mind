@@ -515,11 +515,22 @@ async def seed_browser_review(username: str) -> dict:
             ),
         ]
         rows = []
-        for index, spec in enumerate(specs, start=1):
+        # Store ch-2/ch-3 first so ch-1's cross-chapter consistency check (run
+        # at store time) sees two siblings and scores "pass". Storing ch-1
+        # first would freeze verdict=unavailable (no siblings exist yet).
+        store_order = [
+            (specs[1], "ch-2", 2),
+            (specs[2], "ch-3", 3),
+            (specs[0], "ch-1", 1),
+        ]
+        for spec, asset_key, chapter in store_order:
             row, _, _ = await _store_candidate(
-                session, storage, ids, version, spec, f"ch-{index}", index
+                session, storage, ids, version, spec, asset_key, chapter
             )
             rows.append(row)
+        # Reorder rows to chapter order so the review events below bind the
+        # right candidate (queue is chapter_number-ordered).
+        rows.sort(key=lambda r: r.chapter_number)
         # Deterministic states: ch-1 needs_review, ch-2/3 candidate (pass).
         # ch-1 approved, ch-2 rejected, ch-3 approved.
         await _apply_candidate_review(session, ids, rows[0], "approve", "ev-b-approve-1")
