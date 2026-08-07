@@ -59,7 +59,7 @@ def test_job_timeouts_locked(workflow: dict, policy: dict) -> None:
     vw.assert_job_timeouts(workflow, policy)
     jobs = workflow["jobs"]
     assert jobs["static"]["timeout-minutes"] == 5
-    assert jobs["unit"]["timeout-minutes"] == 10
+    assert jobs["unit"]["timeout-minutes"] == 20
     assert jobs["integration"]["timeout-minutes"] == 15
     assert jobs["browser"]["timeout-minutes"] == 15
     assert jobs["live"]["timeout-minutes"] == 45

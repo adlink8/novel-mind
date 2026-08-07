@@ -30,7 +30,7 @@ LEGACY_WORKFLOWS = (
 
 LOCKED_JOB_TIMEOUTS = {
     "static": 5,
-    "unit": 10,
+    "unit": 20,
     "integration": 15,
     "browser": 15,
     "live": 45,

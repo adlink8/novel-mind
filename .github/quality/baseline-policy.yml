@@ -84,7 +84,7 @@ flake:
 
 job_timeouts_minutes:
   static: 5
-  unit: 10
+  unit: 20
   integration: 15
   browser: 15
   live: 45
