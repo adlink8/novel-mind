@@ -207,7 +207,10 @@ export function ReaderChatPanel({
         });
         if (req !== msgRequestRef.current) return;
         setMessages(res.data.items);
-        setError(null);
+        // Do NOT clear the error here: a failed conversations-list load may
+        // have set error, and a later successful message replay would silently
+        // erase the fail-closed state (reader-chat-quality UAT). The error is
+        // cleared only by a successful conversations-list load.
         // Surface non-terminal job from latest user message
         const lastUser = [...res.data.items]
           .reverse()

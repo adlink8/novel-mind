@@ -227,13 +227,20 @@ async function mockAll(page: Page, messages: unknown[]) {
 async function openReaderChat(page: Page) {
   await page.goto("/novels/11");
   await expect(page.getByTestId("reader-page-text")).toBeVisible();
-  await page.getByTestId("reader-chat-open").click();
-  // Opening always expands the panel; on narrow desktop the rail may appear first.
-  const rail = page.getByTestId("reader-chat-rail");
-  if (await rail.isVisible().catch(() => false)) {
-    await page.getByTestId("reader-chat-expand").click();
+  // The reader chat panel is a toggle. In a fresh context chatOpen is false,
+  // but a second page in the same context inherits localStorage where a
+  // previous test may have left open:true — clicking then would CLOSE the
+  // panel. Open idempotently: only click when the panel is not yet visible.
+  const panel = page.getByTestId("reader-chat-panel");
+  if (!(await panel.isVisible().catch(() => false))) {
+    await page.getByTestId("reader-chat-open").click();
+    // Opening always expands the panel; on narrow desktop the rail may appear first.
+    const rail = page.getByTestId("reader-chat-rail");
+    if (await rail.isVisible().catch(() => false)) {
+      await page.getByTestId("reader-chat-expand").click();
+    }
   }
-  await expect(page.getByTestId("reader-chat-panel")).toBeVisible();
+  await expect(panel).toBeVisible();
 }
 
 test("reader chat citation jumps to the exact source text and stays spoiler-safe", async ({
@@ -310,10 +317,16 @@ test("reader chat running job exposes cancel and failure exposes retry", async (
   await mockAll(failedPage, [failed]);
   await failedPage.goto("/novels/11");
   await expect(failedPage.getByTestId("reader-page-text")).toBeVisible();
-  await failedPage.getByTestId("reader-chat-open").click();
-  const rail = failedPage.getByTestId("reader-chat-rail");
-  if (await rail.isVisible().catch(() => false)) {
-    await failedPage.getByTestId("reader-chat-expand").click();
+  // Idempotent open: this page shares localStorage with `page`, where the
+  // running scenario above left chatOpen:true, so the panel may already be
+  // open and a blind click would close it.
+  const failedPanel = failedPage.getByTestId("reader-chat-panel");
+  if (!(await failedPanel.isVisible().catch(() => false))) {
+    await failedPage.getByTestId("reader-chat-open").click();
+    const rail = failedPage.getByTestId("reader-chat-rail");
+    if (await rail.isVisible().catch(() => false)) {
+      await failedPage.getByTestId("reader-chat-expand").click();
+    }
   }
   await expect(failedPage.getByTestId("reader-chat-job-status")).toHaveAttribute(
     "data-status",
@@ -360,7 +373,11 @@ test("reader chat loading/error states are understandable and focusable", async 
   );
   await errorPage.goto("/novels/11");
   await expect(errorPage.getByTestId("reader-page-text")).toBeVisible();
-  await errorPage.getByTestId("reader-chat-open").click();
+  // Idempotent open (shared localStorage may already have open:true).
+  const errorPanel = errorPage.getByTestId("reader-chat-panel");
+  if (!(await errorPanel.isVisible().catch(() => false))) {
+    await errorPage.getByTestId("reader-chat-open").click();
+  }
   await expect(errorPage.getByTestId("reader-chat-error")).toBeVisible();
   await expect(errorPage.getByTestId("reader-chat-error")).toContainText(
     "加载会话列表失败"

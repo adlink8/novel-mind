@@ -198,7 +198,23 @@ async function mockApp(page: Page, store: MockStore) {
           ? { ...c, review_state: body.action === "approve" ? "approved" : "rejected" }
           : c
     );
-    store.set = { ...store.set, candidates };
+    store.set = {
+      ...store.set,
+      candidates,
+      review_decisions: [
+        ...((store.set.review_decisions as Array<Record<string, unknown>> | undefined) ?? []),
+        {
+          decision_key: `ds-${body.action}-${Date.now()}`,
+          action: body.action,
+          actor_source: "human",
+          actor: "owner",
+          from_review_state: "candidate",
+          to_review_state: body.action === "approve" ? "approved" : "rejected",
+          candidate_key: candidateKey,
+          reason: `人工审查：${body.action}`,
+        },
+      ],
+    };
     return route.fulfill({ json: { set: store.set } });
   });
   await page.route("**/api/novels/11/key-scenes/1/freeze", async (route) => {
@@ -258,7 +274,7 @@ test("desktop: candidate review shows evidence, reasons, coordinates and gates",
     "截止第 2 章"
   );
   await expect(workspace.getByText("剧情转折")).toBeVisible();
-  await expect(workspace.getByText("安静情感")).toBeVisible();
+  await expect(workspace.getByText("安静情感").first()).toBeVisible();
   // Freeze stays gated until a candidate is approved.
   await expect(workspace.getByTestId("key-scene-freeze")).toBeDisabled();
 });
@@ -355,10 +371,12 @@ test("failed review fails closed with a visible error, never empty-success", asy
   const workspace = await openWorkspace(page);
 
   await workspace.getByTestId("key-scene-review-approve").first().click();
-  await expect(workspace.getByTestId("key-scene-error")).toBeVisible({
+  // On review failure the workspace renders its error state in place of the
+  // workspace, so the error lives at page level, not inside the workspace.
+  await expect(page.getByTestId("key-scene-error")).toBeVisible({
     timeout: 15_000,
   });
-  await expect(workspace.getByTestId("key-scene-error")).toContainText(
+  await expect(page.getByTestId("key-scene-error")).toContainText(
     "illegal review action"
   );
 });
