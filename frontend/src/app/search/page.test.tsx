@@ -43,7 +43,7 @@ const result: SearchResult = {
   novel_title: "雾城",
   chapter_id: null,
   chapter_title: null,
-  chunk_id: "c1",
+  chunk_id: 1,
   chunk_index: 0,
   content_snippet: "雾中铃铛",
   score: 0.9,

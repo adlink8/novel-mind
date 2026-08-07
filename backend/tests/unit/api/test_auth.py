@@ -21,10 +21,9 @@ def _payload(username: str, password: str = VALID_PASSWORD, **extra) -> dict:
     data.update(extra)
     return data
 
+
 async def test_register_success(client: AsyncClient):
-    resp = await client.post(
-        "/api/auth/register", json=_payload("freshuser")
-    )
+    resp = await client.post("/api/auth/register", json=_payload("freshuser"))
     assert resp.status_code == 201, resp.text
     body = resp.json()
     assert body["username"] == "freshuser"
@@ -433,7 +432,9 @@ async def test_register_direct_second_user_skips_bootstrap(db_session):
 
     await register(
         RegisterRequest(
-            username="firstadmin", email="firstadmin@example.com", password=VALID_PASSWORD
+            username="firstadmin",
+            email="firstadmin@example.com",
+            password=VALID_PASSWORD,
         ),
         db_session,
     )
@@ -448,5 +449,3 @@ async def test_register_direct_second_user_skips_bootstrap(db_session):
     row = await db_session.scalar(select(User).where(User.username == "seconduser"))
     assert row.is_superuser is False
     assert user.username == "seconduser"
-
-

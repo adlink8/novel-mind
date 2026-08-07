@@ -55,9 +55,7 @@ def test_checksum_is_deterministic_sha256():
 
 
 async def _seed_scope(db_session: AsyncSession, *, with_events=True):
-    owner = User(
-        username="promo-owner", email="promo@example.com", hashed_password="x"
-    )
+    owner = User(username="promo-owner", email="promo@example.com", hashed_password="x")
     db_session.add(owner)
     await db_session.flush()
     novel = Novel(owner_id=owner.id, title="时间线书", status="ready")
@@ -109,7 +107,9 @@ async def _seed_scope(db_session: AsyncSession, *, with_events=True):
         )
         db_session.add(event)
         await db_session.flush()
-        db_session.add(TimelineParticipant(event_id=event.id, entity_id=None, mention="阿宁"))
+        db_session.add(
+            TimelineParticipant(event_id=event.id, entity_id=None, mention="阿宁")
+        )
         db_session.add(
             TimelineEvidenceRef(
                 event_id=event.id,
@@ -149,7 +149,12 @@ async def test_snapshot_manifest_builds_all_component_checksums(db_session):
     _, _, _, version, event = await _seed_scope(db_session)
     manifest, checksum = await snapshot_manifest(db_session, version.id)
     assert manifest["schema"] == "timeline-manifest.v1"
-    assert set(manifest["components"]) == {"events", "participants", "evidence", "edges"}
+    assert set(manifest["components"]) == {
+        "events",
+        "participants",
+        "evidence",
+        "edges",
+    }
     assert manifest["events"][0]["logical_event_id"] == "1:e1"
     assert manifest["participants"][0]["mention"] == "阿宁"
     assert manifest["evidence"][0]["evidence_id"] == "ev-1"
@@ -326,7 +331,14 @@ async def test_promote_version_with_bad_status_fails(db_session):
 @pytest.mark.asyncio
 async def test_promote_version_with_stale_manifest_fails(db_session):
     owner, novel, _, version, event = await _seed_scope(db_session)
-    version.manifest = {"schema": "timeline-manifest.v1", "components": {}, "events": [], "participants": [], "evidence": [], "edges": []}
+    version.manifest = {
+        "schema": "timeline-manifest.v1",
+        "components": {},
+        "events": [],
+        "participants": [],
+        "evidence": [],
+        "edges": [],
+    }
     version.manifest_checksum = "0" * 64
     await db_session.commit()
     with pytest.raises(ManifestValidationError, match="does not match immutable"):
@@ -365,7 +377,11 @@ async def test_rollback_version_moves_pointer_back_and_journals(db_session):
     assert pointer.revision == 2
     db_session.expire_all()
     journals = list(
-        (await db_session.scalars(select(TimelinePointerJournal).order_by(TimelinePointerJournal.id))).all()
+        (
+            await db_session.scalars(
+                select(TimelinePointerJournal).order_by(TimelinePointerJournal.id)
+            )
+        ).all()
     )
     assert [j.action for j in journals] == ["promotion", "rollback"]
 

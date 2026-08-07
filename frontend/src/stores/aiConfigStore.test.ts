@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { AIModelConfig } from "@/lib/api";
 
 const { aiModelsApi, settingsApi } = vi.hoisted(() => ({
   aiModelsApi: {
@@ -21,7 +22,7 @@ vi.mock("@/lib/api", () => ({
 
 import { useAIConfigStore } from "./aiConfigStore";
 
-const modelA = {
+const modelA: AIModelConfig = {
   id: 1,
   name: "GPT-4o",
   provider: "openai",
@@ -35,7 +36,7 @@ const modelA = {
   updated_at: "2026-01-01T00:00:00Z",
 };
 
-const modelB = {
+const modelB: AIModelConfig = {
   id: 2,
   name: "Claude",
   provider: "anthropic",

@@ -42,7 +42,10 @@ def package(units=None) -> EvidencePackage:
 def test_evidence_unit_create_hashes_text():
     unit = EvidenceUnit.create("ev-1", 0, len(TEXT), TEXT)
     assert unit.evidence_id == "ev-1"
-    assert unit.content_hash == EvidenceUnit.create("ev-1", 0, len(TEXT), TEXT).content_hash
+    assert (
+        unit.content_hash
+        == EvidenceUnit.create("ev-1", 0, len(TEXT), TEXT).content_hash
+    )
 
 
 def test_evidence_unit_create_rejects_negative_start():
@@ -190,18 +193,18 @@ def _extraction(
                 "narrative_index": 1,
                 "participants": [],
                 "story_time": {"precision": "unknown", "expression": None},
-            "evidence": [
-                {
-                    "chapter_id": 5,
-                    "evidence_id": "ev-1",
-                    "source_start": VALID_START,
-                    "source_end": VALID_END,
-                    "content_hash": VALID_HASH,
-                }
-            ],
-            "confidence": 0.7,
-        }
-    )
+                "evidence": [
+                    {
+                        "chapter_id": 5,
+                        "evidence_id": "ev-1",
+                        "source_start": VALID_START,
+                        "source_end": VALID_END,
+                        "content_hash": VALID_HASH,
+                    }
+                ],
+                "confidence": 0.7,
+            }
+        )
     return TimelineExtraction.model_validate(
         {
             "events": events,

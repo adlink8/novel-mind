@@ -26,7 +26,9 @@ def test_stable_stage_key_variants():
     assert stable_stage_key("extract", chapter_id=3, attempt=1) == "extract:3:1"
 
 
-async def _seed_run(db_session, *, status="pending", lease_id=None, lease_expires_at=None):
+async def _seed_run(
+    db_session, *, status="pending", lease_id=None, lease_expires_at=None
+):
     from app.models.novel import Chapter
 
     owner = User(username="pg-jobs", email="pg-jobs@example.com", hashed_password="x")
@@ -55,7 +57,9 @@ async def _seed_run(db_session, *, status="pending", lease_id=None, lease_expire
 
 
 def _store(db_session):
-    return PostgresTimelineJobStore(async_sessionmaker(db_session.bind, expire_on_commit=False))
+    return PostgresTimelineJobStore(
+        async_sessionmaker(db_session.bind, expire_on_commit=False)
+    )
 
 
 @pytest.mark.asyncio
@@ -94,15 +98,22 @@ async def test_acquire_lease_cas_semantics(db_session):
     now = datetime.now(UTC)
     owner, novel, run, chapter = await _seed_run(db_session)
     store = _store(db_session)
-    assert await store.acquire_lease(run.id, "lease-1", now, now + timedelta(minutes=5)) is True
+    assert (
+        await store.acquire_lease(run.id, "lease-1", now, now + timedelta(minutes=5))
+        is True
+    )
     # a second lease while the first is still valid must fail
     assert (
-        await store.acquire_lease(run.id, "lease-2", now, now + timedelta(minutes=5)) is False
+        await store.acquire_lease(run.id, "lease-2", now, now + timedelta(minutes=5))
+        is False
     )
     # expired lease can be re-acquired
     later = now + timedelta(minutes=10)
     assert (
-        await store.acquire_lease(run.id, "lease-3", later, later + timedelta(minutes=5)) is True
+        await store.acquire_lease(
+            run.id, "lease-3", later, later + timedelta(minutes=5)
+        )
+        is True
     )
 
 
@@ -130,9 +141,9 @@ async def test_complete_stage_inserts_and_updates(db_session):
     await db_session.commit()
     await store.complete_stage(run.id, "extract:2", "cs-b")
     await db_session.commit()
-    stage2 = (
-        await db_session.scalar(
-            select(AnalysisChapterStage).where(AnalysisChapterStage.stage_key == "extract:2")
+    stage2 = await db_session.scalar(
+        select(AnalysisChapterStage).where(
+            AnalysisChapterStage.stage_key == "extract:2"
         )
     )
     assert stage2.status == "completed"
@@ -182,5 +193,7 @@ async def test_coordinator_acquire_lease_and_pending_stages(db_session):
 
     await store.complete_stage(run.id, "extract:1", "cs")
     await db_session.commit()
-    pending = await coordinator.pending_stages(run.id, ["extract:1", "extract:2", "reconcile"])
+    pending = await coordinator.pending_stages(
+        run.id, ["extract:1", "extract:2", "reconcile"]
+    )
     assert pending == ["extract:2", "reconcile"]

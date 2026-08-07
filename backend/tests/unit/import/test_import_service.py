@@ -37,7 +37,9 @@ async def _user(db: AsyncSession) -> User:
     return user
 
 
-async def _job(db: AsyncSession, *, status="pending", novel_id=None, **kwargs) -> ImportJob:
+async def _job(
+    db: AsyncSession, *, status="pending", novel_id=None, **kwargs
+) -> ImportJob:
     job = ImportJob(
         novel_id=novel_id,
         status=status,
@@ -67,6 +69,7 @@ class _Novel:
     def __init__(self, id: int):
         self.id = id
 
+
 # ── pipeline success path ──
 
 
@@ -85,7 +88,9 @@ async def test_process_import_file_success(db_session, monkeypatch):
         AsyncMock(return_value=("/tmp/a.txt", "正文")),
     )
     monkeypatch.setattr(
-        import_service_module.novel_service, "parse_novel", Mock(return_value=_chapters())
+        import_service_module.novel_service,
+        "parse_novel",
+        Mock(return_value=_chapters()),
     )
     monkeypatch.setattr(
         import_service_module.novel_service,
@@ -133,7 +138,9 @@ async def test_process_import_file_error_marks_failed_and_raises(
         AsyncMock(side_effect=RuntimeError("boom")),
     )
     remove = Mock()
-    monkeypatch.setattr(import_service_module.novel_service, "remove_uploaded_file", remove)
+    monkeypatch.setattr(
+        import_service_module.novel_service, "remove_uploaded_file", remove
+    )
 
     with pytest.raises(RuntimeError):
         await service.process_import_file(db_session, job.id, _upload_file(), user.id)
@@ -148,9 +155,16 @@ async def test_process_import_file_fails_closed_when_lease_unavailable(
 ):
     """acquire_lease returns False → job untouched."""
     user = await _user(db_session)
-    job = await _job(db_session, status="uploading", lease_id="held", lease_expires_at=datetime.now(timezone.utc) + timedelta(minutes=5))
+    job = await _job(
+        db_session,
+        status="uploading",
+        lease_id="held",
+        lease_expires_at=datetime.now(timezone.utc) + timedelta(minutes=5),
+    )
     service = ImportService()
-    monkeypatch.setattr(import_service_module.novel_service, "upload_novel", AsyncMock())
+    monkeypatch.setattr(
+        import_service_module.novel_service, "upload_novel", AsyncMock()
+    )
     await service.process_import_file(db_session, job.id, _upload_file(), user.id)
     assert (await db_session.get(ImportJob, job.id)).status == "uploading"
 
@@ -168,9 +182,13 @@ async def test_process_import_file_cancelled_after_upload_cleans_up(
         await db_session.flush()
         return "/tmp/uploaded.txt", "正文"
 
-    monkeypatch.setattr(import_service_module.novel_service, "upload_novel", fake_upload)
+    monkeypatch.setattr(
+        import_service_module.novel_service, "upload_novel", fake_upload
+    )
     remove = Mock()
-    monkeypatch.setattr(import_service_module.novel_service, "remove_uploaded_file", remove)
+    monkeypatch.setattr(
+        import_service_module.novel_service, "remove_uploaded_file", remove
+    )
 
     await service.process_import_file(db_session, job.id, _upload_file(), user.id)
     remove.assert_called_once_with("/tmp/uploaded.txt")
@@ -195,7 +213,9 @@ async def test_process_import_file_cancelled_after_parse_cleans_up(
 
     monkeypatch.setattr(import_service_module.novel_service, "parse_novel", fake_parse)
     remove = Mock()
-    monkeypatch.setattr(import_service_module.novel_service, "remove_uploaded_file", remove)
+    monkeypatch.setattr(
+        import_service_module.novel_service, "remove_uploaded_file", remove
+    )
 
     await service.process_import_file(db_session, job.id, _upload_file(), user.id)
     remove.assert_called_once_with("/tmp/p.txt")
@@ -217,7 +237,9 @@ async def test_process_import_file_cancelled_after_create_cleans_up(
         AsyncMock(return_value=("/tmp/c.txt", "正文")),
     )
     monkeypatch.setattr(
-        import_service_module.novel_service, "parse_novel", Mock(return_value=_chapters())
+        import_service_module.novel_service,
+        "parse_novel",
+        Mock(return_value=_chapters()),
     )
 
     async def fake_create(db, **kwargs):
@@ -229,7 +251,9 @@ async def test_process_import_file_cancelled_after_create_cleans_up(
         import_service_module.novel_service, "create_novel_record", fake_create
     )
     remove = Mock()
-    monkeypatch.setattr(import_service_module.novel_service, "remove_uploaded_file", remove)
+    monkeypatch.setattr(
+        import_service_module.novel_service, "remove_uploaded_file", remove
+    )
 
     await service.process_import_file(db_session, job.id, _upload_file(), user.id)
     remove.assert_called_once_with("/tmp/c.txt")
@@ -251,7 +275,9 @@ async def test_process_import_file_indexing_success_path(db_session, monkeypatch
         AsyncMock(return_value=("/tmp/i.txt", "正文")),
     )
     monkeypatch.setattr(
-        import_service_module.novel_service, "parse_novel", Mock(return_value=_chapters())
+        import_service_module.novel_service,
+        "parse_novel",
+        Mock(return_value=_chapters()),
     )
     monkeypatch.setattr(
         import_service_module.novel_service,
@@ -286,7 +312,9 @@ async def test_process_import_file_indexing_failure_path(db_session, monkeypatch
         AsyncMock(return_value=("/tmp/f.txt", "正文")),
     )
     monkeypatch.setattr(
-        import_service_module.novel_service, "parse_novel", Mock(return_value=_chapters())
+        import_service_module.novel_service,
+        "parse_novel",
+        Mock(return_value=_chapters()),
     )
     monkeypatch.setattr(
         import_service_module.novel_service,
@@ -382,7 +410,9 @@ async def test_process_import_reads_file_and_forwards(db_session, monkeypatch):
         AsyncMock(return_value=("/tmp/a.txt", "正文")),
     )
     monkeypatch.setattr(
-        import_service_module.novel_service, "parse_novel", Mock(return_value=_chapters())
+        import_service_module.novel_service,
+        "parse_novel",
+        Mock(return_value=_chapters()),
     )
     monkeypatch.setattr(
         import_service_module.novel_service,
@@ -392,9 +422,7 @@ async def test_process_import_reads_file_and_forwards(db_session, monkeypatch):
     forwarded = AsyncMock()
     monkeypatch.setattr(service, "process_import_file", forwarded)
 
-    await service.process_import(
-        db_session, job.id, None, _upload_file(), user.id
-    )
+    await service.process_import(db_session, job.id, None, _upload_file(), user.id)
     assert forwarded.await_count == 1
     _, _, forwarded_file, forwarded_owner = forwarded.await_args.args
     assert forwarded_file.filename == "test_novel.txt"
@@ -416,14 +444,14 @@ async def test_process_import_defaults_filename(db_session, monkeypatch):
 
 
 async def test_get_job_returns_existing_job(db_session):
-    user = await _user(db_session)
+    await _user(db_session)
     job = await _job(db_session, novel_id=None)
     service = ImportService()
     assert (await service.get_job(db_session, job.id)).id == job.id
 
 
 async def test_update_job_status_with_error_detail(db_session):
-    user = await _user(db_session)
+    await _user(db_session)
     job = await _job(db_session, status="uploading")
     service = ImportService()
     ok = await service.update_job_status(
@@ -435,7 +463,7 @@ async def test_update_job_status_with_error_detail(db_session):
 
 
 async def test_update_job_status_clamps_progress(db_session):
-    user = await _user(db_session)
+    await _user(db_session)
     job = await _job(db_session, status="uploading")
     service = ImportService()
     assert await service.update_job_status(db_session, job.id, "detecting", 150) is True
@@ -445,7 +473,7 @@ async def test_update_job_status_clamps_progress(db_session):
 
 
 async def test_update_job_status_message_defaults_to_status(db_session):
-    user = await _user(db_session)
+    await _user(db_session)
     job = await _job(db_session, status="pending")
     service = ImportService()
     assert await service.update_job_status(db_session, job.id, "uploading", 10) is True
@@ -463,7 +491,7 @@ async def test_release_lease_missing_job_false(db_session):
 
 
 async def test_release_lease_id_mismatch_false(db_session):
-    user = await _user(db_session)
+    await _user(db_session)
     job = await _job(db_session, status="uploading")
     service = ImportService()
     await service.acquire_lease(db_session, job.id)
@@ -483,9 +511,9 @@ async def test_cancel_job_missing_job_false(db_session):
 
 
 async def test_compute_content_hash_str_and_bytes_consistent():
-    assert ImportService.compute_content_hash("abc") == ImportService.compute_content_hash(
-        b"abc"
-    )
+    assert ImportService.compute_content_hash(
+        "abc"
+    ) == ImportService.compute_content_hash(b"abc")
 
 
 async def test_create_import_job_with_default_retries(db_session):
@@ -510,7 +538,7 @@ async def test_update_job_status_missing_job_returns_false(db_session):
 
 
 async def test_update_job_status_illegal_transition_returns_false(db_session):
-    user = await _user(db_session)
+    await _user(db_session)
     job = await _job(db_session, status="ready")  # ready 是终态
     service = ImportService()
     assert await service.update_job_status(db_session, job.id, "uploading", 10) is False
@@ -540,7 +568,7 @@ async def test_get_job_by_novel_missing_returns_none(db_session):
 
 
 async def test_retry_job_non_failed_raises(db_session):
-    user = await _user(db_session)
+    await _user(db_session)
     job = await _job(db_session, status="pending")
     service = ImportService()
     with pytest.raises(ValueError, match="只能重试失败"):
@@ -548,7 +576,7 @@ async def test_retry_job_non_failed_raises(db_session):
 
 
 async def test_retry_job_max_retries_raises(db_session):
-    user = await _user(db_session)
+    await _user(db_session)
     job = await _job(db_session, status="failed", retry_count=3, max_retries=3)
     service = ImportService()
     with pytest.raises(ValueError, match="已达到最大重试次数"):
@@ -556,7 +584,7 @@ async def test_retry_job_max_retries_raises(db_session):
 
 
 async def test_retry_job_success_resets_state(db_session):
-    user = await _user(db_session)
+    await _user(db_session)
     job = await _job(
         db_session, status="failed", retry_count=1, max_retries=3, error_detail="boom"
     )
@@ -570,7 +598,7 @@ async def test_retry_job_success_resets_state(db_session):
 
 
 async def test_cancel_job_terminal_state_returns_false(db_session):
-    user = await _user(db_session)
+    await _user(db_session)
     job = await _job(db_session, status="ready")
     service = ImportService()
     assert await service.cancel_job(db_session, job.id) is False
@@ -578,7 +606,7 @@ async def test_cancel_job_terminal_state_returns_false(db_session):
 
 
 async def test_cancel_job_success(db_session):
-    user = await _user(db_session)
+    await _user(db_session)
     job = await _job(db_session, status="uploading", lease_id="L1")
     service = ImportService()
     assert await service.cancel_job(db_session, job.id) is True
@@ -589,7 +617,7 @@ async def test_cancel_job_success(db_session):
 
 
 async def test_recover_stale_jobs_reclaims_expired(db_session):
-    user = await _user(db_session)
+    await _user(db_session)
     stale = await _job(
         db_session,
         status="uploading",
@@ -613,7 +641,7 @@ async def test_recover_stale_jobs_reclaims_expired(db_session):
 
 
 async def test_recover_stale_jobs_none_returns_empty(db_session):
-    user = await _user(db_session)
+    await _user(db_session)
     await _job(
         db_session,
         status="pending",
@@ -659,7 +687,9 @@ async def test_find_duplicate_job_excludes_failed_and_other_owner(db_session):
     other_novel = Novel(title="dup3", owner_id=other.id, status="importing")
     db_session.add(other_novel)
     await db_session.flush()
-    await _job(db_session, novel_id=other_novel.id, status="pending", content_hash="abc123")
+    await _job(
+        db_session, novel_id=other_novel.id, status="pending", content_hash="abc123"
+    )
     service = ImportService()
     assert await service.find_duplicate_job(db_session, "abc123", user.id) is None
 
@@ -710,9 +740,7 @@ async def test_process_import_file_error_update_failure_logged(db_session, monke
 
     # 只让第二次 commit（except 内写 failed）失败；setup 已提前 commit。
     monkeypatch.setattr(db_session, "commit", failing_commit)
-    monkeypatch.setattr(
-        service, "release_lease", AsyncMock(return_value=True)
-    )
+    monkeypatch.setattr(service, "release_lease", AsyncMock(return_value=True))
     with pytest.raises(RuntimeError):
         await service.process_import_file(db_session, job.id, _upload_file(), user.id)
 
@@ -736,7 +764,9 @@ async def test_process_import_file_upload_ok_parse_fails_cleans_path(
         Mock(side_effect=RuntimeError("parse boom")),
     )
     remove = Mock()
-    monkeypatch.setattr(import_service_module.novel_service, "remove_uploaded_file", remove)
+    monkeypatch.setattr(
+        import_service_module.novel_service, "remove_uploaded_file", remove
+    )
     with pytest.raises(RuntimeError):
         await service.process_import_file(db_session, job.id, _upload_file(), user.id)
     remove.assert_called_once_with("/tmp/parsed.txt")

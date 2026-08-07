@@ -24,7 +24,6 @@ from app.models.knowledge_unit import (
 )
 from app.services.knowledge_units.eval import sign_run
 from app.services.knowledge_units.promotion import (
-    PROMOTION_EVIDENCE_VERSION,
     PromotionError,
     _verify_promotion_envelope,
     narrative_promotion_service,
@@ -616,4 +615,6 @@ async def test_commit_updates_existing_pointer_and_deprecates_previous(db_sessio
     assert result.active_manifest_checksum == "c" * 64
     assert build.status == "active"
     assert journal.status == "committed"
-    assert (await db_session.get(NarrativeIndexBuild, previous.id)).status == "deprecated"
+    assert (
+        await db_session.get(NarrativeIndexBuild, previous.id)
+    ).status == "deprecated"

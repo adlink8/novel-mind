@@ -27,7 +27,9 @@ SS_HASH = "a" * 64
 HIERARCHY_CHECKSUM = "b" * 64
 
 
-def unit(evidence_id: str, start: int = 0, end: int = 5, text: str = "阿宁推开门") -> EvidenceUnit:
+def unit(
+    evidence_id: str, start: int = 0, end: int = 5, text: str = "阿宁推开门"
+) -> EvidenceUnit:
     return EvidenceUnit.create(evidence_id, start, end, text)
 
 
@@ -282,7 +284,9 @@ def test_validate_extraction_rejects_offset_hash_mismatch():
         }
     )
     with pytest.raises(EvidenceScopeError, match="offset or content hash mismatch"):
-        validate_extraction(pkg, TimelineExtraction(events=[event], story_time_constraints=[]))
+        validate_extraction(
+            pkg, TimelineExtraction(events=[event], story_time_constraints=[])
+        )
 
 
 def test_validate_extraction_rejects_bad_constraint_refs():

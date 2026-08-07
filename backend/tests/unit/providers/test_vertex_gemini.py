@@ -8,10 +8,8 @@ network or gcloud is ever touched.
 from __future__ import annotations
 
 import json
-from types import SimpleNamespace
 from unittest import mock
 
-import httpx
 import pytest
 
 import app.services.vertex_gemini as vg
@@ -87,9 +85,10 @@ def test_gcloud_token_provider_cache_and_refresh():
     provider = vg.GcloudTokenProvider(
         sdk_py="/nonexistent/gcloud.py", cloud_sdk_root=None
     )
-    with mock.patch.object(
-        provider, "_fetch", return_value="tok-1"
-    ) as fetch, mock.patch.object(vg.time, "time", return_value=1_000.0):
+    with (
+        mock.patch.object(provider, "_fetch", return_value="tok-1") as fetch,
+        mock.patch.object(vg.time, "time", return_value=1_000.0),
+    ):
         assert provider.get() == "tok-1"
         assert provider.get() == "tok-1"  # cached
         assert fetch.call_count == 1
@@ -109,10 +108,9 @@ def test_token_provider_uses_sdk_py_first(monkeypatch):
     gcloud = mock.Mock()
     gcloud.returncode = 0
     gcloud.stdout = "cli-token\n"
-    with mock.patch.object(
-        vg.subprocess, "run", side_effect=[sdk, gcloud]
-    ) as run, mock.patch.object(
-        vg.os.path, "exists", return_value=True
+    with (
+        mock.patch.object(vg.subprocess, "run", side_effect=[sdk, gcloud]) as run,
+        mock.patch.object(vg.os.path, "exists", return_value=True),
     ):
         token = provider._fetch()
     assert token == "sdk-token"
@@ -130,9 +128,10 @@ def test_token_provider_falls_back_to_cli_when_sdk_fails():
     gcloud = mock.Mock()
     gcloud.returncode = 0
     gcloud.stdout = "cli-token\n"
-    with mock.patch.object(
-        vg.subprocess, "run", side_effect=[sdk, gcloud]
-    ), mock.patch.object(vg.os.path, "exists", return_value=True):
+    with (
+        mock.patch.object(vg.subprocess, "run", side_effect=[sdk, gcloud]),
+        mock.patch.object(vg.os.path, "exists", return_value=True),
+    ):
         token = provider._fetch()
     assert token == "cli-token"
 
@@ -153,9 +152,10 @@ def test_token_provider_sets_cloud_sdk_root_env():
     cli = mock.Mock()
     cli.returncode = 0
     cli.stdout = "tok\n"
-    with mock.patch.object(
-        vg.subprocess, "run", return_value=cli
-    ) as run, mock.patch.object(vg.os.path, "exists", return_value=False):
+    with (
+        mock.patch.object(vg.subprocess, "run", return_value=cli) as run,
+        mock.patch.object(vg.os.path, "exists", return_value=False),
+    ):
         provider._fetch()
     env = run.call_args.kwargs["env"]
     assert env["CLOUDSDK_ROOT_DIR"] == "/opt/gcloud"
@@ -218,7 +218,11 @@ def test_convert_openai_tools():
     tools = [
         {
             "type": "function",
-            "function": {"name": "lookup", "description": "d", "parameters": {"type": "object"}},
+            "function": {
+                "name": "lookup",
+                "description": "d",
+                "parameters": {"type": "object"},
+            },
         },
         {"type": "function", "function": {"name": "no_params"}},
         {"type": "function", "function": {}},  # skipped: no name
@@ -318,7 +322,15 @@ def test_messages_to_vertex_contents_bad_tool_args_and_unknown_name():
 
 def test_messages_to_vertex_contents_list_content_and_empty():
     system, contents = vg._messages_to_vertex_contents(
-        [{"role": "user", "content": [{"type": "text", "text": "a"}, {"type": "text", "text": "b"}]}]
+        [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "a"},
+                    {"type": "text", "text": "b"},
+                ],
+            }
+        ]
     )
     assert contents[0]["parts"][0]["text"] == "ab"
     system, contents = vg._messages_to_vertex_contents([])
@@ -395,9 +407,7 @@ def test_to_openai_like_response_with_and_without_tools():
     assert resp.model == "model-x"
     assert resp._vertex is True
 
-    resp2 = vg._to_openai_like_response(
-        "", {}, "m", tool_calls=[{"id": "1"}]
-    )
+    resp2 = vg._to_openai_like_response("", {}, "m", tool_calls=[{"id": "1"}])
     assert resp2.choices[0].finish_reason == "tool_calls"
     assert resp2.choices[0].message.tool_calls == [{"id": "1"}]
 
@@ -428,7 +438,10 @@ def test_vertex_json_schema_handles_refs_and_unions():
         "title": "Root",
         "properties": {
             "point": {"$ref": "#/$defs/Point"},
-            "opt": {"anyOf": [{"type": "string"}, {"type": "null"}], "description": "d"},
+            "opt": {
+                "anyOf": [{"type": "string"}, {"type": "null"}],
+                "description": "d",
+            },
             "nums": {"type": "array", "items": {"type": "number"}},
         },
     }
@@ -511,9 +524,11 @@ async def _run_acomplete(
         "model": "vertex_google/gemini-test",
     }
     call_kwargs.update(kwargs)
-    with mock.patch.object(vg, "_httpx_client", fake_client), mock.patch.object(
-        vg, "_token_provider", provider
-    ), mock.patch.object(vg.asyncio, "sleep", new=mock.AsyncMock()):
+    with (
+        mock.patch.object(vg, "_httpx_client", fake_client),
+        mock.patch.object(vg, "_token_provider", provider),
+        mock.patch.object(vg.asyncio, "sleep", new=mock.AsyncMock()),
+    ):
         if raises is not None:
             with pytest.raises(raises):
                 await vg.acomplete(**call_kwargs)
@@ -525,9 +540,7 @@ def _success_response():
     return FakeResponse(
         200,
         json_data={
-            "candidates": [
-                {"content": {"parts": [{"text": "ok"}]}}
-            ],
+            "candidates": [{"content": {"parts": [{"text": "ok"}]}}],
             "usageMetadata": {"promptTokenCount": 5, "candidatesTokenCount": 3},
         },
     )
@@ -602,7 +615,7 @@ async def test_acomplete_raises_when_model_missing(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_acomplete_max_retries_wrapped_in_api_error():
-    err = await _run_acomplete(
+    await _run_acomplete(
         [RuntimeError("network down")] * 3,
         token_returns=("tok-a",) * 3,
         raises=vg.VertexAPIError,
@@ -647,9 +660,11 @@ async def test_acomplete_response_json_schema_and_tools():
     provider = mock.Mock()
     provider.get.return_value = "tok"
 
-    with mock.patch.object(vg, "_httpx_client", lambda timeout: client), mock.patch.object(
-        vg, "_token_provider", provider
-    ), mock.patch.object(vg.asyncio, "sleep", new=mock.AsyncMock()):
+    with (
+        mock.patch.object(vg, "_httpx_client", lambda timeout: client),
+        mock.patch.object(vg, "_token_provider", provider),
+        mock.patch.object(vg.asyncio, "sleep", new=mock.AsyncMock()),
+    ):
         resp = await vg.acomplete(
             [{"role": "user", "content": "hi"}],
             model="gemini-test",
@@ -657,16 +672,14 @@ async def test_acomplete_response_json_schema_and_tools():
                 "type": "object",
                 "properties": {"a": {"type": "string"}},
             },
-            tools=[
-                {"type": "function", "function": {"name": "lookup"}}
-            ],
+            tools=[{"type": "function", "function": {"name": "lookup"}}],
         )
     assert resp.choices[0].message.tool_calls[0]["id"] == "fc-x"
 
 
 @pytest.mark.asyncio
 async def test_acomplete_retryable_status_raises_after_attempts():
-    err = await _run_acomplete(
+    await _run_acomplete(
         [FakeResponse(503, text="unavailable")] * 3,
         token_returns=("tok-a",) * 3,
         raises=vg.VertexAPIError,

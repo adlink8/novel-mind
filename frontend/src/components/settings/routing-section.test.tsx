@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RoutingSection } from "./routing-section";
 
 const mocks = vi.hoisted(() => ({
+  routingPreference: "balanced",
   fetchRoutingPreference: vi.fn().mockResolvedValue(undefined),
   setRoutingPreference: vi.fn().mockResolvedValue(undefined),
 }));

@@ -135,8 +135,9 @@ const chapter1: Chapter = {
   chapter_number: 1,
   title: "第一章",
   content: "雾城第一章内容",
-  chunk_count: 0,
+  word_count: 1200,
   created_at: "2026-01-01T00:00:00Z",
+  updated_at: "2026-01-01T00:00:00Z",
 };
 
 const chapter2: Chapter = {
@@ -145,8 +146,9 @@ const chapter2: Chapter = {
   chapter_number: 2,
   title: "第二章",
   content: "雾城第二章内容",
-  chunk_count: 0,
+  word_count: 900,
   created_at: "2026-01-01T00:00:00Z",
+  updated_at: "2026-01-01T00:00:00Z",
 };
 
 declare global {

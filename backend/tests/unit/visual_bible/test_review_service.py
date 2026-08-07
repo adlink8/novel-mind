@@ -110,7 +110,9 @@ def _version(*, owner_id, novel_id, claims=None, assets=(), version_key="vb-revi
         reference_assets=list(assets),
         review_state=VisualReviewState.CANDIDATE,
     )
-    return version.model_copy(update={"manifest_hash": recompute_manifest_hash(version)})
+    return version.model_copy(
+        update={"manifest_hash": recompute_manifest_hash(version)}
+    )
 
 
 def _verified(version: VisualBibleVersionContract) -> dict:
@@ -136,7 +138,9 @@ async def _seed(db_session: AsyncSession):
     return owner, novel
 
 
-async def _created_version(db_session, owner_id, novel_id, **version_kwargs) -> VisualBibleVersion:
+async def _created_version(
+    db_session, owner_id, novel_id, **version_kwargs
+) -> VisualBibleVersion:
     version = _version(owner_id=owner_id, novel_id=novel_id, **version_kwargs)
     await VisualBibleAuthorityService(db_session).create_revision(
         owner_id=owner_id,
@@ -178,9 +182,7 @@ async def test_append_event_approve_passes_gate(db_session):
     # approval is recorded as an append-only event with audit details
     from app.models.visual_bible import VisualBibleReviewEvent
 
-    event_rows = list(
-        (await db_session.scalars(select(VisualBibleReviewEvent))).all()
-    )
+    event_rows = list((await db_session.scalars(select(VisualBibleReviewEvent))).all())
     assert len(event_rows) == 1
     assert event_rows[0].details["budget"]["status"] == "not_applicable"
     assert event_rows[0].details["approval_gate"]["ok"] is True
@@ -196,7 +198,9 @@ async def test_append_event_approval_blocked_by_unresolved_evidence(db_session):
     await db_session.execute(VbEvidenceRow.__table__.delete())
     await db_session.commit()
 
-    with pytest.raises(GateViolationError, match="approval blocked by evidence_unresolved"):
+    with pytest.raises(
+        GateViolationError, match="approval blocked by evidence_unresolved"
+    ):
         await VisualBibleReviewService(db_session).append_event(
             owner_id=owner.id,
             novel_id=novel.id,
@@ -208,9 +212,14 @@ async def test_append_event_approval_blocked_by_unresolved_evidence(db_session):
 async def test_append_event_approval_blocked_by_rights(db_session):
     owner, novel = await _seed(db_session)
     row = await _created_version(
-        db_session, owner.id, novel.id, assets=[_asset(rights=VisualRightsStatus.UNREVIEWED)]
+        db_session,
+        owner.id,
+        novel.id,
+        assets=[_asset(rights=VisualRightsStatus.UNREVIEWED)],
     )
-    with pytest.raises(GateViolationError, match="approval blocked by rights_unresolved"):
+    with pytest.raises(
+        GateViolationError, match="approval blocked by rights_unresolved"
+    ):
         await VisualBibleReviewService(db_session).append_event(
             owner_id=owner.id,
             novel_id=novel.id,
@@ -224,7 +233,9 @@ async def test_append_event_reject_and_replay_idempotent(db_session):
     row = await _created_version(db_session, owner.id, novel.id)
     service = VisualBibleReviewService(db_session)
     event = _event(owner.id, novel.id, row.id, action=VisualReviewAction.REJECT)
-    updated = await service.append_event(owner_id=owner.id, novel_id=novel.id, event=event)
+    updated = await service.append_event(
+        owner_id=owner.id, novel_id=novel.id, event=event
+    )
     assert updated.review_state == VisualReviewState.REJECTED.value
     # same event_key replays without error even though the state moved on
     await service.append_event(owner_id=owner.id, novel_id=novel.id, event=event)
@@ -285,7 +296,9 @@ async def test_build_review_envelope_approved_omits_gate(db_session):
 async def test_build_review_envelope_with_parent_ref(db_session):
     owner, novel = await _seed(db_session)
     parent = await _created_version(db_session, owner.id, novel.id)
-    child_version = _version(owner_id=owner.id, novel_id=novel.id, version_key="vb-review-v2")
+    child_version = _version(
+        owner_id=owner.id, novel_id=novel.id, version_key="vb-review-v2"
+    )
     child_version = child_version.model_copy(
         update={
             "revision_number": 2,
@@ -304,7 +317,9 @@ async def test_build_review_envelope_with_parent_ref(db_session):
     )
     child_row = (
         await db_session.scalars(
-            select(VisualBibleVersion).where(VisualBibleVersion.version_key == "vb-review-v2")
+            select(VisualBibleVersion).where(
+                VisualBibleVersion.version_key == "vb-review-v2"
+            )
         )
     ).one()
     envelope = await build_review_envelope(

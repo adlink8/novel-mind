@@ -5,7 +5,7 @@ import NovelSceneSpecPage from "./page";
 
 const mocks = vi.hoisted(() => ({
   listSpecs: vi.fn(),
-  getParams: vi.fn(() => ({ id: "7" })),
+  getParams: vi.fn<() => { id?: string }>(() => ({ id: "7" })),
   getSearchParams: vi.fn(() => new URLSearchParams()),
 }));
 

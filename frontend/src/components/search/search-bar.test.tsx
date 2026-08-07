@@ -49,7 +49,7 @@ const result: SearchResult = {
   novel_title: "雾城",
   chapter_id: 3,
   chapter_title: "第三章",
-  chunk_id: "c3",
+  chunk_id: 3,
   chunk_index: 2,
   content_snippet: "雾中传来<mark>铃铛</mark>声",
   score: 0.85,

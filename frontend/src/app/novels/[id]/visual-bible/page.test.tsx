@@ -5,7 +5,7 @@ import NovelVisualBiblePage from "./page";
 
 const mocks = vi.hoisted(() => ({
   listVersions: vi.fn(),
-  getParams: vi.fn(() => ({ id: "7" })),
+  getParams: vi.fn<() => { id?: string }>(() => ({ id: "7" })),
 }));
 
 vi.mock("next/navigation", () => ({

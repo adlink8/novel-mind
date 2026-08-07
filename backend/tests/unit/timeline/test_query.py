@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.analysis import AnalysisRun, AnalysisVersion
@@ -435,7 +434,9 @@ async def test_build_version_view_person_filter_and_override(db_session):
         title="路人事件",
     )
     await db_session.flush()
-    db_session.add(TimelineParticipant(event_id=ev_a.id, entity_id=None, mention="阿宁"))
+    db_session.add(
+        TimelineParticipant(event_id=ev_a.id, entity_id=None, mention="阿宁")
+    )
     db_session.add(
         TimelineOverride(
             owner_id=owner.id,

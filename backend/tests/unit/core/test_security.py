@@ -73,8 +73,7 @@ def test_validate_password_length_multibyte_boundary_ok():
 
 def _request(method: str = "GET", headers: dict[str, str] | None = None) -> Request:
     hdrs = [
-        (key.lower().encode(), value.encode())
-        for key, value in (headers or {}).items()
+        (key.lower().encode(), value.encode()) for key, value in (headers or {}).items()
     ]
     return Request({"type": "http", "method": method, "headers": hdrs})
 
@@ -185,7 +184,7 @@ async def _make_user(db, *, username="alice", is_active=True, is_superuser=False
 
 
 async def test_get_current_user_no_token_returns_none(db_session):
-    user = await _make_user(db_session)
+    await _make_user(db_session)
     request = _request()
     assert await get_current_user(request, None, db_session) is None
 
@@ -334,7 +333,9 @@ async def test_require_agent_actor_valid_jwt_returns_user(db_session, monkeypatc
     assert called
 
 
-async def test_require_agent_actor_invalid_jwt_falls_back_to_internal_token(monkeypatch):
+async def test_require_agent_actor_invalid_jwt_falls_back_to_internal_token(
+    monkeypatch,
+):
     # Token starts with "ey" but is not a valid JWT → get_current_user raises 401
     # → falls through to the internal-token lookup.
     token = create_access_token({"sub": "1"})  # begins with "ey"
@@ -358,7 +359,9 @@ async def test_require_agent_actor_invalid_jwt_falls_back_to_internal_token(monk
     assert actor.novel_id == 3
 
 
-async def test_require_agent_actor_jwt_returns_none_falls_to_internal_token(monkeypatch):
+async def test_require_agent_actor_jwt_returns_none_falls_to_internal_token(
+    monkeypatch,
+):
     """get_current_user 返回 None（而非抛异常）时继续走 internal-token 分支。"""
     token = create_access_token({"sub": "1"})  # begins with "ey"
     creds = HTTPAuthorizationCredentials(scheme="Bearer", credentials=token)

@@ -126,7 +126,9 @@ def _version(
         reference_assets=list(assets),
         review_state=VisualReviewState.CANDIDATE,
     )
-    return version.model_copy(update={"manifest_hash": recompute_manifest_hash(version)})
+    return version.model_copy(
+        update={"manifest_hash": recompute_manifest_hash(version)}
+    )
 
 
 async def _seed_owner_novel(db_session: AsyncSession):
@@ -269,9 +271,7 @@ async def test_create_revision_requires_candidate_state(db_session):
 @pytest.mark.asyncio
 async def test_create_revision_missing_parent_scope_fails(db_session):
     owner, novel, _ = await _seed_owner_novel(db_session)
-    version = _version(
-        owner_id=owner.id, novel_id=novel.id, parent_version_id=999
-    )
+    version = _version(owner_id=owner.id, novel_id=novel.id, parent_version_id=999)
     with pytest.raises(ScopeMismatchError, match="parent version"):
         await VisualBibleAuthorityService(db_session).create_revision(
             owner_id=owner.id,
@@ -293,9 +293,9 @@ async def test_create_revision_duplicate_stable_id_gate(db_session):
         disclosure_cutoff=1,
     )
     dup = entity.model_copy(update={"entity_key": "e-ayla-2"})
-    version = _version(
-        owner_id=owner.id, novel_id=novel.id
-    ).model_copy(update={"entities": [entity, dup]})
+    version = _version(owner_id=owner.id, novel_id=novel.id).model_copy(
+        update={"entities": [entity, dup]}
+    )
     with pytest.raises(GateViolationError, match="duplicate entity stable_id"):
         await VisualBibleAuthorityService(db_session).create_revision(
             owner_id=owner.id,
@@ -397,7 +397,10 @@ async def test_apply_review_from_state_mismatch_raises(db_session):
         owner.id, novel.id, row.id, action=VisualReviewAction.SUPERSEDE
     )
     stale = stale.model_copy(
-        update={"event_key": "ev-supersede-2", "from_review_state": VisualReviewState.CANDIDATE}
+        update={
+            "event_key": "ev-supersede-2",
+            "from_review_state": VisualReviewState.CANDIDATE,
+        }
     )
     with pytest.raises(GateViolationError, match="from_review_state"):
         await VisualBibleAuthorityService(db_session).apply_review(
@@ -462,9 +465,7 @@ async def test_load_version_view_and_list_versions(db_session):
     assert claim.claim_key == "claim-ayla-hair"
     assert claim.evidence_refs[0].evidence_key == "ev-ayla-hair"
 
-    versions = await list_versions(
-        db_session, owner_id=owner.id, novel_id=novel.id
-    )
+    versions = await list_versions(db_session, owner_id=owner.id, novel_id=novel.id)
     assert [v.version_key for v in versions] == ["vb-v1"]
 
 

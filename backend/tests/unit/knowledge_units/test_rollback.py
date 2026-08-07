@@ -233,19 +233,31 @@ async def test_probe_rejects_empty_or_mismatched_payload(db_session):
 
     # Wrong build_id in metadata → False.
     probe = collection_checkpoint_probe(
-        _Store(_Collection(["u1"], [{"build_id": 999, "manifest_checksum": build.manifest_checksum}]))
+        _Store(
+            _Collection(
+                ["u1"],
+                [{"build_id": 999, "manifest_checksum": build.manifest_checksum}],
+            )
+        )
     )
     assert await probe(cp) is False
 
     # Wrong manifest → False.
     probe = collection_checkpoint_probe(
-        _Store(_Collection(["u1"], [{"build_id": build.id, "manifest_checksum": "bad"}]))
+        _Store(
+            _Collection(["u1"], [{"build_id": build.id, "manifest_checksum": "bad"}])
+        )
     )
     assert await probe(cp) is False
 
     # All match → True.
     probe = collection_checkpoint_probe(
-        _Store(_Collection(["u1"], [{"build_id": build.id, "manifest_checksum": build.manifest_checksum}]))
+        _Store(
+            _Collection(
+                ["u1"],
+                [{"build_id": build.id, "manifest_checksum": build.manifest_checksum}],
+            )
+        )
     )
     assert await probe(cp) is True
 
@@ -283,6 +295,7 @@ async def test_require_checkpoint_rejects_unrecoverable(db_session):
         checksum="c" * 64,
         collection="req_col",
     )
+
     async def failing_probe(checkpoint):
         return False
 
@@ -499,7 +512,9 @@ async def test_rollback_restores_previous_pointer_and_restore_is_reversible(db_s
     assert restored.pointer_version == 3
     assert candidate.status == "active"
     assert journal.status == "committed"
-    assert (await db_session.get(NarrativeIndexBuild, previous.id)).status == "deprecated"
+    assert (
+        await db_session.get(NarrativeIndexBuild, previous.id)
+    ).status == "deprecated"
 
 
 # ── restore_journal rejections ──
@@ -587,7 +602,9 @@ async def test_restore_rejects_pointer_changed_during_rollback(db_session):
 # ── _restore_watermark ──
 
 
-async def _watermark_journal(db, *, candidate, previous=None, side="before", checkpoint):
+async def _watermark_journal(
+    db, *, candidate, previous=None, side="before", checkpoint
+):
     journal = await _mk_journal(
         db,
         candidate=candidate,
@@ -625,9 +642,7 @@ async def test_restore_watermark_deletes_row_when_checkpoint_none(db_session):
     )
     db_session.add(watermark)
     await db_session.flush()
-    journal = await _watermark_journal(
-        db_session, candidate=candidate, checkpoint=None
-    )
+    journal = await _watermark_journal(db_session, candidate=candidate, checkpoint=None)
     await _restore_watermark(db_session, journal, "before")
     assert (
         await db_session.scalar(
@@ -650,14 +665,9 @@ async def test_restore_watermark_noop_when_no_checkpoint_no_row(db_session):
         checksum="c" * 64,
         collection="wm_col",
     )
-    journal = await _watermark_journal(
-        db_session, candidate=candidate, checkpoint=None
-    )
+    journal = await _watermark_journal(db_session, candidate=candidate, checkpoint=None)
     await _restore_watermark(db_session, journal, "before")
-    assert (
-        await db_session.scalar(select(NarrativeSourceWatermark))
-        is None
-    )
+    assert await db_session.scalar(select(NarrativeSourceWatermark)) is None
 
 
 @pytest.mark.asyncio
@@ -848,9 +858,7 @@ async def test_advance_watermark_rejects_pointer_checksum_mismatch(db_session):
         checksum="c" * 64,
         collection="aw_col",
     )
-    await _mk_pointer(
-        db_session, build=build, snapshot=snapshot, checksum="wrong" * 16
-    )
+    await _mk_pointer(db_session, build=build, snapshot=snapshot, checksum="wrong" * 16)
     with pytest.raises(RollbackError, match="active pointer is not reconciled"):
         await advance_watermark(
             db_session,

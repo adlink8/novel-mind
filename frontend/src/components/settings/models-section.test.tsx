@@ -10,7 +10,9 @@ const mocks = vi.hoisted(() => ({
   removeModel: vi.fn().mockResolvedValue(undefined),
   setDefaultModel: vi.fn().mockResolvedValue(undefined),
   testConnection: vi.fn().mockResolvedValue(undefined),
-  getTestResult: vi.fn(() => null),
+  getTestResult: vi.fn<(id: number) => { success: boolean; message: string } | null>(
+    () => null
+  ),
   models: [] as AIModelConfig[],
   loading: false,
 }));
@@ -33,9 +35,11 @@ const model: AIModelConfig = {
   name: "主模型",
   model_id: "gpt-4o",
   provider: "openai",
-  base_url: null,
-  api_key: null,
+  tier: "quality",
+  max_tokens: 8000,
+  temperature: 0.7,
   is_default: true,
+  is_active: true,
   created_at: "2026-01-01T00:00:00Z",
   updated_at: "2026-01-01T00:00:00Z",
 };

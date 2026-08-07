@@ -12,13 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.novel import Novel
 from app.models.user import User
 from app.models.world_model_entity import (
-    WorldModelAliasReview,
     WorldModelEntity,
-    WorldModelEntityLink,
-    WorldModelRule,
-    WorldModelRuleException,
 )
-from app.services.world_model.contracts import GateStatus
 from app.services.world_model.entities import (
     EntityCandidateProjection,
     EntityClaim,
@@ -27,12 +22,9 @@ from app.services.world_model.entities import (
     EntityType,
     LinkKind,
     build_entity_candidate,
-    build_entity_projection,
-    entity_projection_checksum,
 )
 from app.services.world_model.entity_queries import (
     WorldEntityQueries,
-    WorldEntityQueryError,
 )
 from app.services.world_model.entity_repository import (
     WorldEntityRepository,
@@ -56,7 +48,9 @@ def scenario(name: str) -> dict:
     return FIXTURE["scenarios"][name]
 
 
-def build_valid(name: str = "valid", *, version_id: int = 1) -> EntityCandidateProjection:
+def build_valid(
+    name: str = "valid", *, version_id: int = 1
+) -> EntityCandidateProjection:
     """Run one fixture scenario through the gates into an immutable candidate."""
     sc = scenario(name)
     scope = sc["scope"]

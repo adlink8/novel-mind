@@ -21,11 +21,9 @@ from app.services.world_model.knowledge import (
     KnowledgeCandidateProjection,
     build_knowledge_projection,
     claim_checksum,
-    projection_checksum,
 )
 from app.services.world_model.knowledge_queries import (
     KnowledgeQueries,
-    KnowledgeQueryError,
 )
 from app.services.world_model.knowledge_repository import (
     KnowledgeRepository,
@@ -180,9 +178,7 @@ async def test_replay_rejects_non_gate_passed_claim(db_session):
     payload = dict(row.canonical_payload)
     payload["gate_status"] = GateStatus.REJECTED.value
     row.canonical_payload = payload
-    row.canonical_payload_hash = claim_checksum(
-        EpistemicClaim.model_validate(payload)
-    )
+    row.canonical_payload_hash = claim_checksum(EpistemicClaim.model_validate(payload))
     await db_session.commit()
     with pytest.raises(KnowledgeRepositoryError, match="not a gate-passed"):
         await repo.replay_projection(
@@ -271,9 +267,7 @@ async def test_query_character_history_author_view(db_session):
         version_id=1,
         status=EpistemicStatus.MISTAKEN_BELIEF,
     )
-    assert all(
-        c.epistemic_status == EpistemicStatus.MISTAKEN_BELIEF for c in by_status
-    )
+    assert all(c.epistemic_status == EpistemicStatus.MISTAKEN_BELIEF for c in by_status)
 
 
 @pytest.mark.asyncio

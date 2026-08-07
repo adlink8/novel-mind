@@ -160,6 +160,8 @@ const dataset: EvalDataset = {
   question: "主角在第几章第一次登场？",
   gold_chunks: [1, 2],
   expected_points: ["登场章"],
+  must_not_say: [],
+  created_by: null,
   created_at: "2026-01-01T00:00:00Z",
   updated_at: "2026-01-01T00:00:00Z",
 };
@@ -168,20 +170,16 @@ const run: EvalRun = {
   id: 10,
   run_name: "BM25 第一轮",
   strategy: "bm25",
+  novel_id: 1,
   total_questions: 2,
   recall_at_k: 0.5,
   precision_at_k: 0.3,
   mrr: 0.4,
   ndcg_at_k: 0.35,
   latency_ms: 120,
+  cost_usd: null,
+  config_snapshot: {},
   created_at: "2026-01-01T00:00:00Z",
-  error_cases: [
-    {
-      id: 1,
-      dataset_id: 1,
-      recalled_chunks: [],
-    },
-  ],
 };
 
 describe("EvalPage main", () => {

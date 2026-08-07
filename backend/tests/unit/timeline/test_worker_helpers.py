@@ -7,8 +7,6 @@ from types import SimpleNamespace
 from unittest import mock
 
 import pytest
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from app.models.analysis import AnalysisVersion
 from app.models.novel import Novel
@@ -18,7 +16,6 @@ from app.models.timeline import (
     TimelineParticipant,
 )
 from app.models.user import User
-from app.schemas.timeline import EventCandidate, EvidenceRef, StoryTime, TimelineExtraction
 from app.services.timeline.model_gateway import ModelDeployment
 from app.services.timeline.worker import (
     _LiteLLMTransport,
@@ -91,7 +88,9 @@ async def test_vertex_transport_strips_markdown_fence():
             model="vertex_google/gemini-x",
             messages=[{"role": "user", "content": "hi"}],
             timeout=30,
-            response_format=SimpleNamespace(model_json_schema=lambda: {"type": "object"}),
+            response_format=SimpleNamespace(
+                model_json_schema=lambda: {"type": "object"}
+            ),
             max_tokens=64,
         )
     assert out["content"] == "ok"
@@ -128,7 +127,9 @@ async def test_litellm_transport_normalizes_usage():
     usage = SimpleNamespace(
         model_dump=lambda: {"prompt_tokens": 5, "completion_tokens": 2}
     )
-    response = SimpleNamespace(id="ll-1", usage=usage, choices=[SimpleNamespace(message=message)])
+    response = SimpleNamespace(
+        id="ll-1", usage=usage, choices=[SimpleNamespace(message=message)]
+    )
     with mock.patch(
         "litellm.acompletion", new=mock.AsyncMock(return_value=response)
     ) as acompl:
@@ -143,10 +144,10 @@ async def test_litellm_transport_plain_usage_namespace():
     transport = _LiteLLMTransport()
     message = SimpleNamespace(content="x")
     usage = SimpleNamespace(prompt_tokens=1, completion_tokens=1)
-    response = SimpleNamespace(id="ll-2", usage=usage, choices=[SimpleNamespace(message=message)])
-    with mock.patch(
-        "litellm.acompletion", new=mock.AsyncMock(return_value=response)
-    ):
+    response = SimpleNamespace(
+        id="ll-2", usage=usage, choices=[SimpleNamespace(message=message)]
+    )
+    with mock.patch("litellm.acompletion", new=mock.AsyncMock(return_value=response)):
         out = await transport.complete(model="gpt-x", messages=[])
     # usage without model_dump is passed through as-is (SimpleNamespace)
     assert out["usage"].prompt_tokens == 1
@@ -177,7 +178,9 @@ def test_production_runtime_vertex_by_default(monkeypatch):
 async def test_load_persisted_candidates_rebuilds_events(db_session):
     from app.models.novel import Chapter
 
-    owner = User(username="wm-worker", email="wm-worker@example.com", hashed_password="x")
+    owner = User(
+        username="wm-worker", email="wm-worker@example.com", hashed_password="x"
+    )
     db_session.add(owner)
     await db_session.flush()
     novel = Novel(owner_id=owner.id, title="工人书", status="ready")
@@ -228,7 +231,9 @@ async def test_load_persisted_candidates_rebuilds_events(db_session):
     )
     db_session.add(event)
     await db_session.flush()
-    db_session.add(TimelineParticipant(event_id=event.id, entity_id=None, mention="阿宁"))
+    db_session.add(
+        TimelineParticipant(event_id=event.id, entity_id=None, mention="阿宁")
+    )
     db_session.add(
         TimelineEvidenceRef(
             event_id=event.id,
@@ -241,7 +246,6 @@ async def test_load_persisted_candidates_rebuilds_events(db_session):
     )
     await db_session.commit()
 
-    sessions = async_sessionmaker(db_session.bind, expire_on_commit=False)
     candidates = await _load_persisted_candidates(db_session, version.id)
     assert len(candidates) == 1
     assert candidates[0].candidate_id == "1:e1"

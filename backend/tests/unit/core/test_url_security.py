@@ -113,7 +113,9 @@ async def test_private_host_plain_http_allowed():
     with patch.object(
         socket,
         "getaddrinfo",
-        return_value=[(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("127.0.0.1", 11434))],
+        return_value=[
+            (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("127.0.0.1", 11434))
+        ],
     ):
         result = await validate_ai_base_url("http://localhost:11434/v1/")
         assert result == "http://localhost:11434/v1"
@@ -123,7 +125,9 @@ async def test_https_public_host_normalized():
     with patch.object(
         socket,
         "getaddrinfo",
-        return_value=[(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 443))],
+        return_value=[
+            (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 443))
+        ],
     ):
         result = await validate_ai_base_url("https://api.example.com/v1/")
         assert result == "https://api.example.com/v1"
@@ -133,7 +137,9 @@ async def test_https_public_host_with_query_preserved():
     with patch.object(
         socket,
         "getaddrinfo",
-        return_value=[(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 443))],
+        return_value=[
+            (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 443))
+        ],
     ):
         result = await validate_ai_base_url("https://api.example.com/v1/?a=1&b=2")
         assert result == "https://api.example.com/v1?a=1&b=2"
@@ -143,7 +149,9 @@ async def test_port_preserved_in_netloc():
     with patch.object(
         socket,
         "getaddrinfo",
-        return_value=[(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 8443))],
+        return_value=[
+            (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 8443))
+        ],
     ):
         result = await validate_ai_base_url("https://api.example.com:8443/v1/")
         assert result == "https://api.example.com:8443/v1"
@@ -151,8 +159,6 @@ async def test_port_preserved_in_netloc():
 
 async def test_literal_global_ip_accepted(monkeypatch):
     # Literal public IP in the allowed list passes without DNS.
-    monkeypatch.setattr(
-        settings, "ai_allowed_hosts", "api.example.com,93.184.216.34"
-    )
+    monkeypatch.setattr(settings, "ai_allowed_hosts", "api.example.com,93.184.216.34")
     result = await validate_ai_base_url("https://93.184.216.34/v1/")
     assert result == "https://93.184.216.34/v1"

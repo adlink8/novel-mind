@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import KeySceneSetPage from "./page";
 
 const mocks = vi.hoisted(() => ({
-  getParams: vi.fn(() => ({ id: "7", setId: "5" })),
+  getParams: vi.fn<() => { id?: string; setId?: string }>(() => ({ id: "7", setId: "5" })),
 }));
 
 vi.mock("next/navigation", () => ({
