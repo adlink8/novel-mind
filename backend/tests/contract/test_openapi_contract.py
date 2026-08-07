@@ -89,6 +89,7 @@ def test_baseline_exists_and_is_valid_openapi():
     assert "/api/eval/quality/runs/{job_id}/resume" in paths
 
 
+@pytest.mark.timeout(90)
 def test_export_is_deterministic():
     a = ARTIFACTS / "openapi-export-a.json"
     b = ARTIFACTS / "openapi-export-b.json"
@@ -97,6 +98,7 @@ def test_export_is_deterministic():
     assert a.read_text(encoding="utf-8") == b.read_text(encoding="utf-8")
 
 
+@pytest.mark.timeout(90)
 def test_live_schema_has_no_breaking_changes_vs_baseline():
     live = ARTIFACTS / "openapi.json"
     _export_live_schema(live)
