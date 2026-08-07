@@ -22,6 +22,7 @@
  * error/partial/empty states without a backend.
  */
 
+import axios from "axios";
 import { useEffect, useState } from "react";
 
 import type {
@@ -145,7 +146,13 @@ export function IllustrationGallery({
       setExpanded(null);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "审查操作失败");
+      setError(
+        axios.isAxiosError(err) && typeof err.response?.data?.detail === "string"
+          ? err.response.data.detail
+          : err instanceof Error
+            ? err.message
+            : "审查操作失败"
+      );
     } finally {
       setSubmitting(false);
     }

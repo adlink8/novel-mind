@@ -20,6 +20,7 @@
  * can drive error/partial/empty states without a backend.
  */
 
+import axios from "axios";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -269,7 +270,17 @@ export function VisualBibleEntitySheet({
   const handleReview = async (action: VisualReviewAction, reason?: string) => {
     if (!version || submitting) return;
     if (onReview) {
-      await onReview(action, reason);
+      try {
+        await onReview(action, reason);
+      } catch (err) {
+        setError(
+          axios.isAxiosError(err) && typeof err.response?.data?.detail === "string"
+            ? err.response.data.detail
+            : err instanceof Error
+              ? err.message
+              : "审查操作失败"
+        );
+      }
       return;
     }
     setSubmitting(true);
@@ -285,6 +296,14 @@ export function VisualBibleEntitySheet({
         from_review_state: version.review_state,
       });
       await load();
+    } catch (err) {
+      setError(
+        axios.isAxiosError(err) && typeof err.response?.data?.detail === "string"
+          ? err.response.data.detail
+          : err instanceof Error
+            ? err.message
+            : "审查操作失败"
+      );
     } finally {
       setSubmitting(false);
     }

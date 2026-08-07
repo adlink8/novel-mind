@@ -21,6 +21,7 @@
  * states without a backend.
  */
 
+import axios from "axios";
 import { useEffect, useState } from "react";
 
 import type {
@@ -160,7 +161,11 @@ export function PromptDiff({
       await load();
     } catch (err) {
       setValidationError(
-        err instanceof Error ? err.message : "编辑被服务端拒绝"
+        axios.isAxiosError(err) && typeof err.response?.data?.detail === "string"
+          ? err.response.data.detail
+          : err instanceof Error
+            ? err.message
+            : "编辑被服务端拒绝"
       );
     } finally {
       setSubmitting(false);

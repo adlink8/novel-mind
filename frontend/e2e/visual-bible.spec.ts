@@ -185,7 +185,7 @@ test("desktop: candidate review shows authority, evidence and rights gates", asy
   await expect(sheet).toHaveAttribute("data-review-state", "candidate");
   await expect(sheet.getByTestId("visual-bible-candidate-only")).toBeVisible();
   await expect(sheet.getByTestId("visual-bible-entity")).toContainText("林安");
-  await expect(sheet.getByTestId("visual-bible-authority-badge")).toContainText(
+  await expect(sheet.getByTestId("visual-bible-authority-badge").first()).toContainText(
     "正典事实"
   );
   await expect(sheet.getByTestId("visual-bible-evidence-panel")).toContainText(
@@ -251,8 +251,10 @@ test("failed review fails closed with a visible error, never empty-success", asy
   const sheet = await openWorkspace(page);
 
   await sheet.getByTestId("visual-bible-review-action-approve").click();
-  await expect(sheet.getByTestId("visual-bible-error")).toBeVisible({ timeout: 15_000 });
-  await expect(sheet.getByTestId("visual-bible-error")).toContainText(
+  // On review failure the sheet renders its error state in place of the
+  // entity sheet, so the error lives at page level, not inside the sheet.
+  await expect(page.getByTestId("visual-bible-error")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId("visual-bible-error")).toContainText(
     "illegal review action"
   );
 });

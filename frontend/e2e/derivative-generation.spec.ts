@@ -53,6 +53,7 @@ interface Candidate {
   id: number;
   job_id: number;
   gate_verdict: "needs_override" | "blocked" | "candidate";
+  gate_reason?: string;
   draft_text: string;
   citation_keys: string[];
   divergence: { divergence_type: string; reason: string; affected_evidence: string[]; scope: string } | null;

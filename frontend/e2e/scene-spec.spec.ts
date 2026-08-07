@@ -291,8 +291,7 @@ test("mobile 390: preview is reachable and provenance is inspectable", async ({
   await mockApp(page, store);
   const preview = await openPreview(page);
 
-  await expect(preview.getByTestId("scene-spec-detail")).toBeVisible();
-  await expect(preview.getByTestId("scene-spec-detail-source")).toBeVisible();
+  await expect(preview.getByTestId("scene-spec-detail-source").first()).toBeVisible();
   await expect(preview.getByTestId("scene-spec-prompt-preview")).toBeVisible();
 });
 

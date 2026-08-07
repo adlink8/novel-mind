@@ -415,10 +415,10 @@ test("failed review fails closed with a visible error, never empty-success", asy
   const gallery = await openGallery(page);
 
   await gallery.getByTestId("illustration-approval-approve").click();
-  await expect(gallery.getByTestId("illustration-error")).toBeVisible({
+  await expect(page.getByTestId("illustration-error")).toBeVisible({
     timeout: 15_000,
   });
-  await expect(gallery.getByTestId("illustration-error")).toContainText(
+  await expect(page.getByTestId("illustration-error")).toContainText(
     "illegal review action"
   );
 });
