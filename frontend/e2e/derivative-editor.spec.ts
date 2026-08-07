@@ -254,7 +254,7 @@ async function mockApp(page: Page, state: EditorState) {
       })
   );
   await page.route(
-    `**/api/novels/${NOVEL_ID}/derivative-projects/${PROJECT_ID}/chapters/${CHAPTER_ID}/diff`,
+    `**/api/novels/${NOVEL_ID}/derivative-projects/${PROJECT_ID}/chapters/${CHAPTER_ID}/diff**`,
     (route) =>
       route.fulfill({
         json: {
@@ -315,6 +315,29 @@ async function mockApp(page: Page, state: EditorState) {
       }
       route.fulfill({ status: 405, json: { detail: "method not allowed" } });
     }
+  );
+
+  // ---- Quiet the writing-page side panels (visual review + export) ----
+  // These panels mount on /writing; leaving their endpoints unmocked falls
+  // into the 500 catch-all and raises error alerts that pollute assertions
+  // like getByRole('alert').
+  await page.route(`**/api/novels/${NOVEL_ID}/derivative-visual/review`, (route) =>
+    route.fulfill({ json: { items: [], total: 0 } })
+  );
+  await page.route(`**/api/novels/${NOVEL_ID}/derivative-visual/review/*`, (route) =>
+    route.fulfill({ status: 404, json: { detail: "no candidate" } })
+  );
+  await page.route("**/api/agent/approval-requests**", (route) =>
+    route.fulfill({ json: { items: [], total: 0, skip: 0, limit: 100 } })
+  );
+  await page.route(
+    `**/api/agent/novels/${NOVEL_ID}/artifacts/**`,
+    (route) => route.fulfill({ status: 404, json: { detail: "no artifact" } })
+  );
+  await page.route(
+    `**/api/novels/${NOVEL_ID}/derivative-projects/${PROJECT_ID}/export/audit**`,
+    (route) =>
+      route.fulfill({ json: { overall: "blocked", dimensions: [] } })
   );
 }
 
@@ -416,10 +439,17 @@ test("conflict: a stale 409 is surfaced with a reload path, not overwritten", as
   await expect(page.getByTestId("editor-save-state")).toContainText("conflict", {
     timeout: 15_000,
   });
-  await expect(page.getByRole("alert")).toContainText(/revision 1/);
+  await expect(page.getByText(/检测到更新版本.*revision 1/)).toBeVisible({
+    timeout: 15_000,
+  });
 
   // Reloading fetches the server snapshot and clears the conflict.
-  await page.getByRole("button", { name: "重新加载" }).click();
+  // Scope to the editor: the writing page also renders review/export panels
+  // that each carry a persistent "重新加载" header button.
+  await page
+    .getByLabel(/Markdown 编辑器/)
+    .getByRole("button", { name: "重新加载" })
+    .click();
   await expect(page.getByTestId("editor-save-state")).toContainText("idle", {
     timeout: 15_000,
   });

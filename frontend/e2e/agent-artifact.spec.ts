@@ -310,7 +310,7 @@ test("cited-answer artifact route wiring — agent turn mounts and reaches termi
         ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
     await expect(page).toHaveURL(
-      /\/novels\/11\?chapter=101&start=10&from=timeline/
+      /\/novels\/11\?chapter=101&start=10(&end=\d+)?&from=timeline/
     );
   }
 });
