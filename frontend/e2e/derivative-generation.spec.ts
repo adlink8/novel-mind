@@ -29,6 +29,10 @@
 import { createHash } from "crypto";
 import { expect, test, type Page, type Route } from "@playwright/test";
 
+// This spec drives the API directly from page.evaluate without navigating,
+// so relative URLs never resolve. Match playwright.config.ts BASE_URL.
+const BASE_URL = "http://127.0.0.1:3005";
+
 const H = (n: number) => String(n).repeat(64);
 const sha = (s: string) => createHash("sha256").update(s, "utf8").digest("hex");
 
@@ -92,6 +96,7 @@ function candidateFor(jobId: number): Candidate {
     id: 100 + jobId,
     job_id: jobId,
     gate_verdict: "needs_override",
+    gate_reason: "divergence_requires_override",
     draft_text: "阿宁在竹林入口站定，深吸一口气，终究没有说出秘密。",
     citation_keys: [CANDIDATE_EVIDENCE],
     divergence: {
@@ -250,7 +255,13 @@ async function mockApp(page: Page, state: GenState) {
   });
 
   await page.route("**/api/novels/**/derivative-overrides", async (route) => {
-    if (route.request().method() !== "POST") return;
+    if (route.request().method() !== "POST") {
+      // Let the GET list handler below serve it (route.fallback continues to
+      // the next matching route); without this the handler returns without
+      // fulfilling and the request hangs.
+      await route.fallback();
+      return;
+    }
     const body = route.request().postDataJSON();
     if (!(body?.reason ?? "").trim()) {
       await json(route, { detail: "missing_reason: an explicit divergence override requires a reason" }, { status: 400 });
@@ -303,7 +314,13 @@ async function mockApp(page: Page, state: GenState) {
     json(route, { override: { ...row }, message: "override rejected; no derivative revision was materialized" });
   });
 
-  await page.route("**/api/novels/**/derivative-overrides", (route) => {
+  await page.route("**/api/novels/**/derivative-overrides", async (route) => {
+    if (route.request().method() !== "GET") {
+      // Let the POST creation handler above serve it (fallback continues to
+      // the previously registered route in LIFO order).
+      await route.fallback();
+      return;
+    }
     json(route, {
       novel_id: NOVEL_ID,
       total: state.override ? 1 : 0,
@@ -345,9 +362,12 @@ async function api(
   path: string,
   body?: unknown
 ): Promise<{ status: number; data: any }> {
+  // This spec never navigates (the page stays about:blank), so a relative
+  // fetch inside page.evaluate fails to parse. Resolve against the app origin.
+  const url = new URL(path, BASE_URL).toString();
   return page.evaluate(
-    async ({ method, path, body }) => {
-      const res = await fetch(path, {
+    async ({ method, url, body }) => {
+      const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
         body: body === undefined ? undefined : JSON.stringify(body),
@@ -360,7 +380,7 @@ async function api(
       }
       return { status: res.status, data };
     },
-    { method, path, body }
+    { method, url, body }
   );
 }
 

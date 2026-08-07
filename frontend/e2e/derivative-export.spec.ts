@@ -317,7 +317,10 @@ async function mockApp(page: Page, state: ExportState) {
   );
 
   // ---- Export agent + audit surface (the panel consumes these) ----
-  await page.route("**/api/agent/approval-requests", (route) =>
+  // Patterns end with `**` because the frontend sends query strings
+  // (?skip=0&limit=100, ?format=markdown); Playwright globs match the whole
+  // URL, so without a trailing ** these requests fall into the 500 catch-all.
+  await page.route("**/api/agent/approval-requests**", (route) =>
     json(route, {
       items: state.approvalsVisible
         ? [approvalFor(state)]
@@ -327,11 +330,11 @@ async function mockApp(page: Page, state: ExportState) {
       limit: 100,
     })
   );
-  await page.route(`**/api/agent/novels/${NOVEL_ID}/artifacts/${ARTIFACT_ID}`, (route) =>
+  await page.route(`**/api/agent/novels/${NOVEL_ID}/artifacts/${ARTIFACT_ID}**`, (route) =>
     json(route, artifactFor(state))
   );
   await page.route(
-    `**/api/agent/novels/${NOVEL_ID}/artifacts/${ARTIFACT_ID}/revisions`,
+    `**/api/agent/novels/${NOVEL_ID}/artifacts/${ARTIFACT_ID}/revisions**`,
     (route) =>
       json(route, {
         items: [
@@ -413,7 +416,7 @@ async function mockApp(page: Page, state: ExportState) {
       materialized: true,
     });
   });
-  await page.route(`**/api/novels/${NOVEL_ID}/derivative-projects/${PROJECT_ID}/export/download`, (route) => {
+  await page.route(`**/api/novels/${NOVEL_ID}/derivative-projects/${PROJECT_ID}/export/download**`, (route) => {
     const format = String(route.request().url()).split("format=")[1] ?? "markdown";
     route.fulfill({
       status: 200,
@@ -561,14 +564,16 @@ test.describe("derivative export browser UAT", () => {
     state.approvalsVisible = false; // other owner's approval surface is empty
     await mockApp(page, state);
     await page.route("**/api/auth/me", (route) => json(route, OTHER_OWNER));
+    // The other owner owns no derivative project: the projects list is empty so
+    // the export panel never sees a project and the project name never leaks.
+    await page.route(`**/api/novels/${NOVEL_ID}/derivative-projects`, (route) =>
+      json(route, { novel_id: NOVEL_ID, total: 0, items: [] })
+    );
 
     await gotoWriting(page);
-    // No content leak: the panel reports the explicit empty state, no export actions.
-    await expect(page.getByTestId("derivative-export-empty")).toContainText(
-      "没有已批准的导出准备",
-      { timeout: 20_000 }
-    );
-    await expect(page.getByTestId("derivative-export-actions")).toHaveCount(0);
+    // No content leak: with no derivative project the export panel is not
+    // mounted at all and the project name never appears.
+    await expect(page.getByTestId("derivative-export-panel")).toHaveCount(0);
     await expect(page.getByText("Deriv Project uat")).toHaveCount(0);
   });
 
