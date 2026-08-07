@@ -295,7 +295,7 @@ jobs:
         working-directory: frontend
         run: npm run test:coverage
 
-      - name: Coverage policy evaluation (report-only until thresholds met)
+      - name: Coverage policy evaluation (critical hard gate)
         run: |
           python -m pip install pyyaml
           mkdir -p artifacts
@@ -313,7 +313,7 @@ jobs:
           python scripts/ci/coverage_policy.py \
             --backend-xml backend/artifacts/backend-coverage.xml \
             --frontend-lcov frontend/coverage/lcov.info \
-            --report-only "${CHANGED_LINES_ARGS[@]}"
+            --critical-gate "${CHANGED_LINES_ARGS[@]}"
 
       - name: CI policy scripts (repo-root)
         run: |

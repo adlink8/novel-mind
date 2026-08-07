@@ -330,4 +330,143 @@ describe("AnalysisUnifiedChat", () => {
       expect(mocks.cancelJob).toHaveBeenCalledWith("11", 1, 9)
     );
   });
+
+  it("空输入回车提示请输入问题", async () => {
+    renderChat();
+    await waitReady();
+    fireEvent.keyDown(screen.getByTestId("analysis-chat-input"), { key: "Enter" });
+    await waitFor(() =>
+      expect(screen.getByTestId("analysis-chat-error")).toHaveTextContent(
+        "请输入问题"
+      )
+    );
+  });
+
+  it("章节未加载时禁发并提示", async () => {
+    renderChat({ chapters: [], progressChapterId: null, selection: null });
+    await waitFor(() =>
+      expect(screen.getByTestId("analysis-chat-anchor-note")).toHaveTextContent(
+        "章节数据尚未加载"
+      )
+    );
+    expect(screen.getByTestId("analysis-chat-send")).toBeDisabled();
+  });
+
+  it("起始章超出阅读进度时禁发", async () => {
+    // selection 起始章 5 > 已读章 1
+    const farSelection: StructureNodeSelection = {
+      id: "ch5",
+      kind: "chapter",
+      chapterStart: 5,
+      chapterEnd: 5,
+      label: "第五章",
+    };
+    renderChat({ selection: farSelection });
+    await waitFor(() =>
+      expect(screen.getByTestId("analysis-chat-anchor-note")).toHaveTextContent(
+        "起始章超出阅读进度"
+      )
+    );
+    expect(screen.getByTestId("analysis-chat-send")).toBeDisabled();
+  });
+
+  it("已归档会话禁发并提示", async () => {
+    mocks.listConversations.mockResolvedValue({
+      data: {
+        items: [
+          {
+            id: 3,
+            novel_id: 11,
+            title: "已归档",
+            status: "archived",
+            next_sequence: 1,
+            last_opened_at: null,
+            created_at: "2026-07-15T00:00:00Z",
+            updated_at: "2026-07-15T00:00:00Z",
+            last_message_sequence: null,
+            last_message_role: null,
+            last_message_at: null,
+          },
+        ],
+        total: 1,
+        skip: 0,
+        limit: 50,
+      },
+    });
+    renderChat();
+    await waitFor(() =>
+      expect(screen.getByPlaceholderText(/已归档，无法发送/)).toBeInTheDocument()
+    );
+    // 已归档会话输入与发送均禁用（与输入框提示一致）
+    expect(screen.getByTestId("analysis-chat-input")).toBeDisabled();
+    expect(screen.getByTestId("analysis-chat-send")).toBeDisabled();
+    expect(screen.getByText(/已归档/)).toBeInTheDocument();
+  });
+
+  it("加载消息失败展示错误", async () => {
+    mocks.listMessages.mockRejectedValue(new Error("boom"));
+    renderChat();
+    await waitFor(() =>
+      expect(screen.getByTestId("analysis-chat-error")).toHaveTextContent(
+        "加载消息失败"
+      )
+    );
+  });
+
+  it("新建会话按钮触发 createConversation", async () => {
+    renderChat();
+    await waitReady();
+    fireEvent.click(screen.getByLabelText("新建会话"));
+    await waitFor(() => expect(mocks.createConversation).toHaveBeenCalled());
+  });
+
+  it("切换会话触发消息加载", async () => {
+    mocks.listConversations.mockResolvedValue({
+      data: {
+        items: [
+          {
+            id: 1,
+            novel_id: 11,
+            title: "会话 1",
+            status: "active",
+            next_sequence: 1,
+            last_opened_at: null,
+            created_at: "2026-07-15T00:00:00Z",
+            updated_at: "2026-07-15T00:00:00Z",
+            last_message_sequence: null,
+            last_message_role: null,
+            last_message_at: null,
+          },
+          {
+            id: 2,
+            novel_id: 11,
+            title: "会话 2",
+            status: "active",
+            next_sequence: 1,
+            last_opened_at: null,
+            created_at: "2026-07-15T00:00:00Z",
+            updated_at: "2026-07-15T00:00:00Z",
+            last_message_sequence: null,
+            last_message_role: null,
+            last_message_at: null,
+          },
+        ],
+        total: 2,
+        skip: 0,
+        limit: 50,
+      },
+    });
+    renderChat();
+    await waitFor(() =>
+      expect(screen.getByTestId("analysis-chat-conv-2")).toBeInTheDocument()
+    );
+    fireEvent.click(screen.getByTestId("analysis-chat-conv-2"));
+    await waitFor(() =>
+      expect(mocks.listMessages).toHaveBeenCalledWith(
+        "11",
+        2,
+        expect.objectContaining({ limit: 200 })
+      )
+    );
+  });
 });

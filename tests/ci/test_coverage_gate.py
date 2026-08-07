@@ -240,3 +240,64 @@ def test_cli_fails_when_report_missing(tmp_path: Path):
         ]
     )
     assert code == 1
+
+
+def test_cli_critical_gate_passes_with_low_overall(tmp_path: Path):
+    # Critical subsets fully covered, overall trails → --critical-gate exits 0.
+    xml = _cobertura_xml(
+        tmp_path,
+        [
+            ("app/a.py", [0, 0, 0]),
+            ("app/core/security.py", [1] * 20),
+        ],
+        branches={
+            "app/a.py": (0, 3),
+            "app/core/security.py": (18, 20),
+        },
+    )
+    lcov = _lcov(
+        tmp_path,
+        [("src/x.ts", [0, 0, 0]), ("src/lib/api.ts", [1] * 10)],
+        branches={
+            "src/x.ts": (0, 3),
+            "src/lib/api.ts": (9, 10),
+        },
+    )
+    code = cp.main(
+        [
+            "--policy",
+            str(POLICY_PATH),
+            "--backend-xml",
+            str(xml),
+            "--frontend-lcov",
+            str(lcov),
+            "--critical-gate",
+        ]
+    )
+    assert code == 0
+
+
+def test_cli_critical_gate_fails_when_critical_low(tmp_path: Path):
+    # Critical subset below threshold even though overall is high → exit 1.
+    xml = _cobertura_xml(
+        tmp_path,
+        [("app/a.py", [1] * 50), ("app/core/security.py", [0] * 20)],
+        branches={"app/a.py": (40, 40)},
+    )
+    lcov = _lcov(
+        tmp_path,
+        [("src/x.ts", [1] * 50), ("src/lib/api.ts", [0] * 10)],
+        branches={"src/x.ts": (40, 40)},
+    )
+    code = cp.main(
+        [
+            "--policy",
+            str(POLICY_PATH),
+            "--backend-xml",
+            str(xml),
+            "--frontend-lcov",
+            str(lcov),
+            "--critical-gate",
+        ]
+    )
+    assert code == 1

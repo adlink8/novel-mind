@@ -101,12 +101,57 @@ def evaluate_line_branch(
     return failures
 
 
+def _critical_failures(policy: dict[str, Any], report: dict[str, Any]) -> list[str]:
+    """Return critical-subset violations (auth/security/import paths)."""
+    failures: list[str] = []
+    cov = policy["coverage"]
+    for side in ("backend", "frontend"):
+        measured_side = report.get(side) or {}
+        critical_req = {
+            "line": cov[side]["critical"]["line"],
+            "branch": cov[side]["critical"]["branch"],
+        }
+        failures.extend(
+            evaluate_line_branch(
+                f"{side}.critical",
+                measured_side.get("critical") or {},
+                critical_req,
+            )
+        )
+        if int(measured_side.get("critical_files_hit", 0)) <= 0:
+            failures.append(f"{side}.critical globs produced zero file hits")
+    return failures
+
+
+def _overall_failures(policy: dict[str, Any], report: dict[str, Any]) -> list[str]:
+    """Return overall + diff violations."""
+    failures: list[str] = []
+    cov = policy["coverage"]
+    for side in ("backend", "frontend"):
+        measured_side = report.get(side) or {}
+        failures.extend(
+            evaluate_line_branch(
+                f"{side}.overall",
+                measured_side.get("overall") or {},
+                cov[side]["overall"],
+            )
+        )
+
+    diff_req = cov["diff_coverage"]["minimum"]
+    diff_val = report.get("diff_coverage")
+    # diff coverage is only evaluable when a change baseline is provided
+    # (PR/push against a base); otherwise it is skipped, not treated as 0.
+    if diff_val is not None and float(diff_val) < diff_req:
+        failures.append(f"diff_coverage {diff_val} < required {diff_req}")
+    return failures
+
+
 def evaluate_coverage_report(
     policy: dict[str, Any],
     report: dict[str, Any],
 ) -> None:
     """
-    Evaluate a coverage summary report against policy.
+    Evaluate a coverage summary report against policy (fail-closed on all axes).
 
     report shape:
       {
@@ -117,40 +162,7 @@ def evaluate_coverage_report(
         "diff_coverage": n
       }
     """
-    failures: list[str] = []
-    cov = policy["coverage"]
-
-    for side in ("backend", "frontend"):
-        measured_side = report.get(side) or {}
-        overall_req = cov[side]["overall"]
-        critical_req = {
-            "line": cov[side]["critical"]["line"],
-            "branch": cov[side]["critical"]["branch"],
-        }
-        failures.extend(
-            evaluate_line_branch(
-                f"{side}.overall",
-                measured_side.get("overall") or {},
-                overall_req,
-            )
-        )
-        failures.extend(
-            evaluate_line_branch(
-                f"{side}.critical",
-                measured_side.get("critical") or {},
-                critical_req,
-            )
-        )
-        if int(measured_side.get("critical_files_hit", 0)) <= 0:
-            failures.append(f"{side}.critical globs produced zero file hits")
-
-    diff_req = cov["diff_coverage"]["minimum"]
-    diff_val = report.get("diff_coverage")
-    # diff coverage is only evaluable when a change baseline is provided
-    # (PR/push against a base); otherwise it is skipped, not treated as 0.
-    if diff_val is not None and float(diff_val) < diff_req:
-        failures.append(f"diff_coverage {diff_val} < required {diff_req}")
-
+    failures = _critical_failures(policy, report) + _overall_failures(policy, report)
     if failures:
         raise PolicyError("Coverage policy failed:\n  - " + "\n  - ".join(failures))
 
@@ -408,6 +420,13 @@ def main(argv: list[str] | None = None) -> int:
         "real coverage while thresholds are not yet met; switch to hard-gate "
         "mode by removing this flag once coverage reaches policy levels.",
     )
+    parser.add_argument(
+        "--critical-gate",
+        action="store_true",
+        help="Fail closed on the critical subset (auth/security/import paths); "
+        "overall coverage is reported as advisory only. Use once critical "
+        "thresholds are met but overall still trails policy levels.",
+    )
     args = parser.parse_args(argv)
 
     try:
@@ -433,14 +452,36 @@ def main(argv: list[str] | None = None) -> int:
                 )
 
         report = build_report(policy, backend_files, frontend_files, changed)
-        try:
-            evaluate_coverage_report(policy, report)
-            status = "PASS"
-        except PolicyError as exc:
-            status = "FAIL (report-only)" if args.report_only else "FAIL"
-            print(f"Coverage gaps: {exc}", file=sys.stderr)
-            if not args.report_only:
-                return 1
+        critical_failures = _critical_failures(policy, report)
+        overall_failures = _overall_failures(policy, report)
+
+        if args.report_only:
+            # Advisory: surface everything, never block.
+            hard_failures: list[str] = []
+            advisory = critical_failures + overall_failures
+        elif args.critical_gate:
+            # Hard on critical (security/auth/import); overall stays advisory.
+            hard_failures = critical_failures
+            advisory = overall_failures
+        else:
+            hard_failures = critical_failures + overall_failures
+            advisory = []
+
+        status = "PASS"
+        if hard_failures:
+            status = "FAIL"
+            print(
+                "Coverage gaps: Coverage policy failed:\n  - "
+                + "\n  - ".join(hard_failures),
+                file=sys.stderr,
+            )
+            return 1
+        if advisory:
+            print(
+                "Coverage advisory (not gated in this mode):\n  - "
+                + "\n  - ".join(advisory),
+                file=sys.stderr,
+            )
 
         print(
             f"Coverage gate {status}: "
