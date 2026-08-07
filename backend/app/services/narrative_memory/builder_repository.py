@@ -368,9 +368,13 @@ class BuilderRepository:
     ) -> NarrativeMemoryBuildStage:
         """Classify a failure and write an explicit isolated terminal state."""
         if reason_code is None:
-            code, _ = classify_failure(exc) if exc is not None else (
-                ReasonCode.INTERNAL_ERROR,
-                None,
+            code, _ = (
+                classify_failure(exc)
+                if exc is not None
+                else (
+                    ReasonCode.INTERNAL_ERROR,
+                    None,
+                )
             )
             reason_code = code
         attempt = (
@@ -382,7 +386,9 @@ class BuilderRepository:
             stage,
             status="failed",
             reason=(
-                reason_code.value if isinstance(reason_code, ReasonCode) else reason_code
+                reason_code.value
+                if isinstance(reason_code, ReasonCode)
+                else reason_code
             ),
             reason_code=reason_code,
             checkpoint={

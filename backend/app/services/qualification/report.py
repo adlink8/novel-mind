@@ -61,9 +61,7 @@ class QualificationHeader(FrozenReportModel):
         if not isinstance(self.budget, dict) or not self.budget:
             raise ValueError("header budget must be a non-empty dict")
         if not any(key in self.budget for key in BUDGET_KEYS):
-            raise ValueError(
-                f"header budget must carry at least one of {BUDGET_KEYS}"
-            )
+            raise ValueError(f"header budget must carry at least one of {BUDGET_KEYS}")
         return self
 
 
@@ -178,9 +176,9 @@ class QualificationReport(FrozenReportModel):
 
     @property
     def checksum_valid(self) -> bool:
-        return self.checksum == sha256(
-            self.checksum_payload().encode("utf-8")
-        ).hexdigest()
+        return (
+            self.checksum == sha256(self.checksum_payload().encode("utf-8")).hexdigest()
+        )
 
 
 def report_checksum(report: QualificationReport) -> str:
@@ -207,9 +205,7 @@ def build_report(
         verdict=verdict,  # type: ignore[arg-type]
         checksum="0" * 64,
     )
-    return report.model_copy(
-        update={"checksum": report_checksum(report)}
-    )
+    return report.model_copy(update={"checksum": report_checksum(report)})
 
 
 def report_has_promotion_capability() -> bool:

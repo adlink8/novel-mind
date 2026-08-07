@@ -25,13 +25,7 @@ pytestmark = pytest.mark.unit
 
 ROOT = Path(__file__).resolve().parents[2]
 NM = ROOT / "app" / "services" / "narrative_memory"
-FIXTURE = (
-    ROOT
-    / "tests"
-    / "fixtures"
-    / "narrative_memory"
-    / "failure_matrix_v1.json"
-)
+FIXTURE = ROOT / "tests" / "fixtures" / "narrative_memory" / "failure_matrix_v1.json"
 
 FORBIDDEN_POINTER_FRAGMENTS = frozenset(
     {
@@ -108,9 +102,7 @@ def _stripped_source(name: str) -> str:
     skip_next_until_empty = False
     for line in source.splitlines():
         stripped = line.strip()
-        if stripped.startswith("FORBIDDEN_") or (
-            skip_next_until_empty and stripped
-        ):
+        if stripped.startswith("FORBIDDEN_") or (skip_next_until_empty and stripped):
             if stripped.startswith("FORBIDDEN_") and "=" in stripped:
                 skip_next_until_empty = True
             continue
@@ -210,7 +202,9 @@ def test_failure_matrix_is_consistent() -> None:
     data = json.loads(FIXTURE.read_text(encoding="utf-8"))
     assert data["schema_version"] == "1"
     matrix = data["matrix"]
-    assert len(matrix) >= 8  # crash/retry/cancel/provider/budget/stale-cache/owner/isolation
+    assert (
+        len(matrix) >= 8
+    )  # crash/retry/cancel/provider/budget/stale-cache/owner/isolation
     for case in matrix:
         assert "id" in case and "class" in case and "inject_at" in case
         assert case["expected_terminal"] in {t.value for t in TerminalState}
@@ -252,9 +246,7 @@ def test_no_silent_pending_after_terminal_run() -> None:
                 "status_reason": (
                     ReasonCode.INTERNAL_ERROR.value if i == 2 else "done"
                 ),
-                "reason_code": (
-                    ReasonCode.INTERNAL_ERROR.value if i == 2 else None
-                ),
+                "reason_code": (ReasonCode.INTERNAL_ERROR.value if i == 2 else None),
                 "terminal_state": terminal_state_for_status(
                     "failed" if i == 2 else "completed"
                 ),

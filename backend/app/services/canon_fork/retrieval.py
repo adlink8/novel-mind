@@ -145,7 +145,11 @@ class CanonRetrievalResult:
 
 def within_cutoff(scope: CanonScope, chapter_number: int) -> bool:
     """Cutoff predicate: a future leaf can never pass (T-35-03-01)."""
-    return isinstance(chapter_number, int) and chapter_number >= 1 and chapter_number <= scope.through_chapter
+    return (
+        isinstance(chapter_number, int)
+        and chapter_number >= 1
+        and chapter_number <= scope.through_chapter
+    )
 
 
 def snapshot_replays(scope: CanonScope, source_snapshot_hash: str) -> bool:
@@ -257,11 +261,11 @@ class UserInterpretationIndexAdapter:
         rows = list(
             (
                 await session.scalars(
-                    select(CanonSpaceArtifact)
-                    .where(
+                    select(CanonSpaceArtifact).where(
                         CanonSpaceArtifact.owner_id == scope.owner_id,
                         CanonSpaceArtifact.novel_id == scope.novel_id,
-                        CanonSpaceArtifact.space == CanonSpace.USER_INTERPRETATION.value,
+                        CanonSpaceArtifact.space
+                        == CanonSpace.USER_INTERPRETATION.value,
                         CanonSpaceArtifact.namespace == scope.namespace,
                         CanonSpaceArtifact.version_key == scope.version_key,
                         CanonSpaceArtifact.status == "accepted",
@@ -333,7 +337,9 @@ def index_adapter_for(space: CanonSpace) -> CanonSpaceIndexAdapter:
         return UserInterpretationIndexAdapter()
     if space is CanonSpace.FANFICTION_CANON:
         return FanfictionCanonIndexAdapter()
-    raise CanonForkContractError("unknown_space", f"unsupported knowledge space: {space}")
+    raise CanonForkContractError(
+        "unknown_space", f"unsupported knowledge space: {space}"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -638,9 +644,7 @@ async def resolve_canon_scope(
             full_book_authorized=artifact.full_book_authorized,
         )
 
-    raise CanonForkScopeError(
-        "unknown_space", f"unsupported knowledge space: {space}"
-    )
+    raise CanonForkScopeError("unknown_space", f"unsupported knowledge space: {space}")
 
 
 __all__ = [

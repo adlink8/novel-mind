@@ -29,11 +29,9 @@ from app.services.narrative_memory.arc_planner import (
     EvidenceSummary,
     TerminalState,
     Uncertainty,
-    plan_outline_arcs,
     validate_outline_candidate,
 )
 from app.services.narrative_memory.global_builder import (
-    project_mainline_candidate,
     validate_mainline_candidate,
 )
 from app.services.narrative_memory.hierarchy import (
@@ -169,9 +167,7 @@ def test_boundary_uncertainty_adjacent_gap() -> None:
         _chapter(4),
     ]
     hierarchy = build_hierarchy_candidate(chapters=chapters, window_size=5)
-    arc_12 = next(
-        arc for arc in hierarchy.outline.arcs if arc.chapter_start == 1
-    )
+    arc_12 = next(arc for arc in hierarchy.outline.arcs if arc.chapter_start == 1)
     arc_4 = next(arc for arc in hierarchy.outline.arcs if arc.chapter_start == 4)
     end_bounds = [b for b in arc_12.boundary_uncertainties if b.side == "end"]
     assert end_bounds and end_bounds[0].reason == "adjacent_gap"
@@ -496,14 +492,10 @@ async def test_db_hierarchy_consistent_with_frozen_manifest(builder_env) -> None
 
     # Manifests are DB-recomputable (D-05): frozen == recomputed while clean.
     async with builder_env["factory"]() as session:
-        version = await session.get(
-            NarrativeMemoryVersion, builder_env["version_id"]
-        )
+        version = await session.get(NarrativeMemoryVersion, builder_env["version_id"])
         assert version is not None
         run = await session.scalar(
-            select(NarrativeMemoryBuildRun).where(
-                NarrativeMemoryBuildRun.id == run_id
-            )
+            select(NarrativeMemoryBuildRun).where(NarrativeMemoryBuildRun.id == run_id)
         )
         frozen = frozen_manifest_from_progress(run.progress)
         assert frozen is not None

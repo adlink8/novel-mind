@@ -104,9 +104,7 @@ class CanonFork(TimestampMixin, Base):
     )
     fork_key: Mapped[str] = mapped_column(String(128), nullable=False)
     space: Mapped[str] = mapped_column(String(32), nullable=False)
-    status: Mapped[str] = mapped_column(
-        String(16), nullable=False, default="candidate"
-    )
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="candidate")
     # Frozen Original Canon version the fork derives from (server-derived).
     source_version_key: Mapped[str] = mapped_column(String(128), nullable=False)
     # Deterministic source snapshot identity the fork is sealed to.

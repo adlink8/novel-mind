@@ -254,15 +254,11 @@ def _volume_boundary_uncertainties(
         )
     if end == chapter_max:
         boundaries.append(
-            BoundaryUncertainty(
-                side="end", chapter_number=end, reason="snapshot_edge"
-            )
+            BoundaryUncertainty(side="end", chapter_number=end, reason="snapshot_edge")
         )
     elif any(g.chapter_start == end + 1 for g in gaps):
         boundaries.append(
-            BoundaryUncertainty(
-                side="end", chapter_number=end, reason="adjacent_gap"
-            )
+            BoundaryUncertainty(side="end", chapter_number=end, reason="adjacent_gap")
         )
     return tuple(boundaries)
 
@@ -378,9 +374,7 @@ def project_mainline_candidate(
             sum(volume.confidence for volume in volumes) / len(volumes), 4
         )
         global_coverage = (
-            "complete"
-            if not outline.gaps
-            else ("partial" if arc_chapters else "empty")
+            "complete" if not outline.gaps else ("partial" if arc_chapters else "empty")
         )
         global_children = tuple(volume.stage_key for volume in volumes)
         global_boundaries = _volume_boundary_uncertainties(

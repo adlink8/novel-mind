@@ -705,9 +705,7 @@ class IllustrationRevisionPayload(StrictAgentRuntimeModel):
     consistency_verdict: Literal["pass", "concern", "fail", "unavailable"]
     fixture_set_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
     budget_settled_calls: int = Field(ge=0)
-    budget_settled_cost_usd: str | None = Field(
-        default=None, pattern=r"^\d+(\.\d+)?$"
-    )
+    budget_settled_cost_usd: str | None = Field(default=None, pattern=r"^\d+(\.\d+)?$")
     review_state: Literal["candidate", "validated", "proposal_ready"] = "candidate"
 
 

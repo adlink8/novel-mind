@@ -24,7 +24,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.pool import NullPool
 
 from app.models.novel import Chapter
-from app.models.visual_bible import VisualBibleReviewEvent, VisualBibleVersion
+from app.models.visual_bible import VisualBibleReviewEvent
 from app.schemas.visual_bible import (
     VisualBibleVersionContract,
     recompute_manifest_hash,
@@ -95,9 +95,9 @@ async def test_review_envelope_exposes_immutable_revision_ref(api_client):
     assert ref["version_key"] == "vb-main"
     assert ref["revision_number"] == 1
     assert ref["manifest_hash"] == created.json()["version"]["manifest_hash"]
-    assert ref["source_snapshot_hash"] == created.json()["version"][
-        "source_snapshot_hash"
-    ]
+    assert (
+        ref["source_snapshot_hash"] == created.json()["version"]["source_snapshot_hash"]
+    )
     assert ref["cutoff_chapter"] == created.json()["version"]["cutoff_chapter"]
 
     # Default fixture assets are rights-cleared, so the candidate is gate-clean.
@@ -134,9 +134,7 @@ async def test_approval_blocked_until_rights_cleared(api_client):
     assert "rights_unresolved" in blocked.json()["detail"]
 
     # The envelope surfaces the exact reason code and the offending asset.
-    env = await client.get(
-        f"{base}/{pending_id}/review-envelope", headers=headers
-    )
+    env = await client.get(f"{base}/{pending_id}/review-envelope", headers=headers)
     gate = env.json()["approval_gate"]
     assert gate["ok"] is False
     assert gate["reason_code"] == "rights_unresolved"
@@ -209,9 +207,10 @@ async def test_approval_is_auditable_and_never_promotes_asset_or_chapter(api_cli
         # Phase 30 has no provider calls: budget is explicitly not_applicable,
         # lineage hashes are frozen, and the rights snapshot is visible.
         assert stored.details["budget"]["status"] == "not_applicable"
-        assert stored.details["lineage"]["manifest_hash"] == created.json()["version"][
-            "manifest_hash"
-        ]
+        assert (
+            stored.details["lineage"]["manifest_hash"]
+            == created.json()["version"]["manifest_hash"]
+        )
         assert stored.details["rights"][0]["asset_key"] == "ref-ayla-sketch"
         assert stored.details["approval_gate"]["ok"] is True
 
@@ -233,17 +232,13 @@ async def test_repeated_approval_event_key_is_idempotent(api_client):
     version_id = created.json()["version"]["id"]
     review_url = f"{base}/{version_id}/review"
 
-    first = await client.post(
-        review_url, json=_review_payload(), headers=headers
-    )
+    first = await client.post(review_url, json=_review_payload(), headers=headers)
     assert first.status_code == 200
     assert first.json()["review_state"] == "approved"
     assert len(first.json()["review_events"]) == 1
 
     # The same event_key (a retried approval) replays the state, never appends.
-    retry = await client.post(
-        review_url, json=_review_payload(), headers=headers
-    )
+    retry = await client.post(review_url, json=_review_payload(), headers=headers)
     assert retry.status_code == 200
     assert retry.json()["review_state"] == "approved"
     assert len(retry.json()["review_events"]) == 1
@@ -294,16 +289,15 @@ async def test_edit_records_intent_and_child_lineage_keeps_old_revision(api_clie
     assert approved.json()["review_state"] == "approved"
 
     # The approved child envelope links back to the parent revision ref.
-    env = await client.get(
-        f"{base}/{child_id}/review-envelope", headers=headers
-    )
+    env = await client.get(f"{base}/{child_id}/review-envelope", headers=headers)
     body = env.json()
     assert body["revision_ref"]["parent_version_id"] == v1_id
     assert body["parent_revision_ref"]["version_id"] == v1_id
     assert body["revision_ref"]["manifest_hash"] == child_ref["manifest_hash"]
-    assert body["revision_ref"]["source_snapshot_hash"] == child_ref[
-        "source_snapshot_hash"
-    ]
+    assert (
+        body["revision_ref"]["source_snapshot_hash"]
+        == child_ref["source_snapshot_hash"]
+    )
 
     # The old revision is permanently readable with its original content and
     # lineage, even after the child is approved.
@@ -366,9 +360,7 @@ async def test_review_service_append_event_gates_and_persists(api_client):
     from app.services.visual_bible.review import VisualBibleReviewService
 
     async with factory() as session:
-        version = VisualBibleVersionContract.model_validate(
-            basic_version_payload(ids)
-        )
+        version = VisualBibleVersionContract.model_validate(basic_version_payload(ids))
         # Persist the candidate directly through the authority seam.
         from app.services.visual_bible.authority import (
             VisualBibleAuthorityService,
@@ -442,8 +434,7 @@ async def test_review_service_append_event_gates_and_persists(api_client):
         )
         assert not blocked_outcome.blocked
         blocked_verified = {
-            m.claim.claim_key: m.verified_evidence
-            for m in blocked_outcome.resolved
+            m.claim.claim_key: m.verified_evidence for m in blocked_outcome.resolved
         }
         blocked_persisted = await VisualBibleAuthorityService(session).create_revision(
             owner_id=gate_ids["owner_id"],

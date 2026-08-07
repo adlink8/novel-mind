@@ -31,8 +31,12 @@ from app.services.world_model.gates import (
 pytestmark = pytest.mark.unit
 
 FIXTURE = json.loads(
-    (Path(__file__).resolve().parents[2] / "fixtures" / "world_model" / "events_v1.json")
-    .read_text(encoding="utf-8")
+    (
+        Path(__file__).resolve().parents[2]
+        / "fixtures"
+        / "world_model"
+        / "events_v1.json"
+    ).read_text(encoding="utf-8")
 )
 
 
@@ -60,9 +64,7 @@ def gate_all(gate: WorldModelGate, scenario: dict) -> tuple[list, list]:
     events_by_key = {fact.event_key: fact for fact in facts}
     edges: list = []
     for raw in scenario["edges"]:
-        result = gate.validate_edge(
-            CausalEdgeClaim.model_validate(raw), events_by_key
-        )
+        result = gate.validate_edge(CausalEdgeClaim.model_validate(raw), events_by_key)
         if result.edge is not None:
             edges.append(result.edge)
     return facts, edges
@@ -216,9 +218,7 @@ def test_authority_label_survives_gate_unchanged():
     assert by_key["e-treaty-reading"].authority == Authority.USER_INTERPRETATION
     assert by_key["e-arrival"].authority == Authority.PROBABLE_INFERENCE
     # No probable_inference was silently upgraded to canon_fact.
-    assert all(
-        event.authority != Authority.CANON_FACT for event in facts
-    )
+    assert all(event.authority != Authority.CANON_FACT for event in facts)
     assert all(edge.authority != Authority.CANON_FACT for edge in edges)
 
 
@@ -238,9 +238,7 @@ def test_approved_canon_fact_is_allowed_only_with_approval():
     )
     rejected = unapproved_gate.validate_event(claim)
     assert rejected.fact is None
-    assert {v.reason_code for v in rejected.verdicts} == {
-        GateReason.AUTHORITY_UPGRADE
-    }
+    assert {v.reason_code for v in rejected.verdicts} == {GateReason.AUTHORITY_UPGRADE}
     # With explicit approval the same claim passes without relabeling.
     approved_gate = WorldModelGate(
         owner_id=1,
@@ -280,7 +278,12 @@ def test_projection_rejects_cross_scope_rows():
     hijack = facts[0].model_copy(update={"owner_id": 2})
     with pytest.raises(ValueError):
         build_projection(
-            owner_id=1, novel_id=1, version_id=1, events=[hijack], edges=[], conflicts=[]
+            owner_id=1,
+            novel_id=1,
+            version_id=1,
+            events=[hijack],
+            edges=[],
+            conflicts=[],
         )
 
 

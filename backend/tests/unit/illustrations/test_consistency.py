@@ -121,8 +121,7 @@ def test_fixture_set_hash_is_hash_sensitive():
     mutated = {
         "arin": base["arin"].model_copy(
             update={
-                "identity_attributes": base["arin"].identity_attributes
-                + ("grey_hair",)
+                "identity_attributes": base["arin"].identity_attributes + ("grey_hair",)
             }
         )
     }
@@ -238,12 +237,20 @@ def test_idempotency_key_changes_on_evidence_report_key_or_scope():
     evaluator = ConsistencyEvaluator(mock_consistency_fixture_registry())
     base = _evaluate(evaluator)
     assert (
-        _evaluate(evaluator, evidence=_evidence(identity_attributes=("black_hair",))).idempotency_key
+        _evaluate(
+            evaluator, evidence=_evidence(identity_attributes=("black_hair",))
+        ).idempotency_key
         != base.idempotency_key
     )
-    assert _evaluate(evaluator, report_key="arin:ch2").idempotency_key != base.idempotency_key
+    assert (
+        _evaluate(evaluator, report_key="arin:ch2").idempotency_key
+        != base.idempotency_key
+    )
     assert _evaluate(evaluator, owner_id=12).idempotency_key != base.idempotency_key
-    assert _evaluate(evaluator, asset_revision_id=2).idempotency_key != base.idempotency_key
+    assert (
+        _evaluate(evaluator, asset_revision_id=2).idempotency_key
+        != base.idempotency_key
+    )
 
 
 # ---------------------------------------------------------------------------

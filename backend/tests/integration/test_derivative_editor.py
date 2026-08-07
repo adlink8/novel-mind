@@ -107,7 +107,9 @@ def _seed_owner(sync_url: str, *, suffix: str, chapter_count: int = 3) -> dict:
             status="ready",
             reading_progress={"chapter_id": 1, "progress_percent": 10},
             chapter_count=chapter_count,
-            word_count=sum(len(f"chapter {i} body") for i in range(1, chapter_count + 1)),
+            word_count=sum(
+                len(f"chapter {i} body") for i in range(1, chapter_count + 1)
+            ),
         )
         session.add(novel)
         session.flush()
@@ -136,7 +138,9 @@ async def _create_fork(client, headers, novel_id, fork_key, cutoff=None) -> dict
     body: dict = {"fork_key": fork_key}
     if cutoff is not None:
         body["requested_cutoff_chapter"] = cutoff
-    resp = await client.post(FORK_BASE.format(novel_id=novel_id), json=body, headers=headers)
+    resp = await client.post(
+        FORK_BASE.format(novel_id=novel_id), json=body, headers=headers
+    )
     assert resp.status_code == 201, resp.text
     return resp.json()["fork"]
 
@@ -333,7 +337,9 @@ async def test_cross_owner_project_routes_return_404(wave0_editor_fixture):
     pid_a = fx["project_a1"]["id"]
 
     # Owner B probing owner A's project under A's novel: identical 404.
-    assert (await fx["client"].get(f"{base_a}/{pid_a}", headers=fx["headers_b"])).status_code == 404
+    assert (
+        await fx["client"].get(f"{base_a}/{pid_a}", headers=fx["headers_b"])
+    ).status_code == 404
     assert (
         await fx["client"].patch(
             f"{base_a}/{pid_a}", json={"name": "Hijack"}, headers=fx["headers_b"]
@@ -344,11 +350,17 @@ async def test_cross_owner_project_routes_return_404(wave0_editor_fixture):
     ).status_code == 404
 
     # B asking for A's project_id under B's own novel: identical 404.
-    assert (await fx["client"].get(f"{base_b}/{pid_a}", headers=fx["headers_b"])).status_code == 404
+    assert (
+        await fx["client"].get(f"{base_b}/{pid_a}", headers=fx["headers_b"])
+    ).status_code == 404
 
     # A still reads its own project; B reads its own.
-    assert (await fx["client"].get(f"{base_a}/{pid_a}", headers=fx["headers_a"])).status_code == 200
-    assert (await fx["client"].get(base_b, headers=fx["headers_b"])).json()["total"] == 1
+    assert (
+        await fx["client"].get(f"{base_a}/{pid_a}", headers=fx["headers_a"])
+    ).status_code == 200
+    assert (await fx["client"].get(base_b, headers=fx["headers_b"])).json()[
+        "total"
+    ] == 1
 
 
 async def test_missing_project_is_404(api_client):
@@ -366,7 +378,9 @@ async def test_unauthenticated_project_routes_reject(api_client):
     ids = _seed_owner(sync_url, suffix=f"anon_{uuid.uuid4().hex[:8]}")
     base = PROJECT_BASE.format(novel_id=ids["novel_id"])
     assert (await client.get(base)).status_code == 401
-    assert (await client.post(base, json={"fork_id": 1, "name": "x"})).status_code == 401
+    assert (
+        await client.post(base, json={"fork_id": 1, "name": "x"})
+    ).status_code == 401
 
 
 # ---------------------------------------------------------------------------
@@ -408,11 +422,16 @@ async def test_derivative_project_migration_replays(pg_sync_url, require_postgre
     with engine.connect() as conn:
         insp = sa.inspect(conn)
         assert "derivative_projects" in insp.get_table_names()
-        fks = {(tuple(f["constrained_columns"]), f["referred_table"]) for f in insp.get_foreign_keys("derivative_projects")}
+        fks = {
+            (tuple(f["constrained_columns"]), f["referred_table"])
+            for f in insp.get_foreign_keys("derivative_projects")
+        }
         assert (("fork_id",), "canon_forks") in fks
         assert (("owner_id",), "users") in fks
         assert (("novel_id",), "novels") in fks
-        uniques = {c["name"] for c in insp.get_unique_constraints("derivative_projects")}
+        uniques = {
+            c["name"] for c in insp.get_unique_constraints("derivative_projects")
+        }
         assert "uq_derivative_projects_key" in uniques
         checks = {c["name"] for c in insp.get_check_constraints("derivative_projects")}
         assert "ck_derivative_projects_space" in checks

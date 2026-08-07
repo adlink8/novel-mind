@@ -220,9 +220,18 @@ def _require(
 def _gate_candidate_lineage(input_: SceneSpecCompileInput) -> None:
     """Fail closed on candidate/snapshot/cutoff/spoiler lineage drift."""
     candidate = input_.candidate
-    _require(candidate.chapter_number <= input_.cutoff_chapter, "candidate chapter_number exceeds the spoiler cutoff")
-    _require(candidate.spoiler_cutoff == input_.cutoff_chapter, "candidate spoiler_cutoff does not match the compile cutoff")
-    _require(candidate_content_hash(candidate) == input_.scene_candidate_hash, "candidate content hash does not replay")
+    _require(
+        candidate.chapter_number <= input_.cutoff_chapter,
+        "candidate chapter_number exceeds the spoiler cutoff",
+    )
+    _require(
+        candidate.spoiler_cutoff == input_.cutoff_chapter,
+        "candidate spoiler_cutoff does not match the compile cutoff",
+    )
+    _require(
+        candidate_content_hash(candidate) == input_.scene_candidate_hash,
+        "candidate content hash does not replay",
+    )
     for ref in candidate.evidence_ranges:
         _require(
             ref.source_snapshot_id == input_.source_snapshot_id,
@@ -252,17 +261,23 @@ def _gate_visual_bible_lineage(input_: SceneSpecCompileInput) -> None:
     its own evidence lineage to the candidate's key-scene snapshot.
     """
     vb = input_.visual_bible
-    _require(vb.manifest_hash == input_.visual_bible_revision_hash, "visual bible manifest hash does not match the revision hash")
-    _require(vb.cutoff_chapter >= input_.cutoff_chapter, "visual bible cutoff_chapter is below the compile cutoff")
+    _require(
+        vb.manifest_hash == input_.visual_bible_revision_hash,
+        "visual bible manifest hash does not match the revision hash",
+    )
+    _require(
+        vb.cutoff_chapter >= input_.cutoff_chapter,
+        "visual bible cutoff_chapter is below the compile cutoff",
+    )
     try:
         validate_version_contract(vb)
     except ValueError as exc:
-        raise SceneSpecCompileError(f"visual bible revision failed revalidation: {exc}") from exc
+        raise SceneSpecCompileError(
+            f"visual bible revision failed revalidation: {exc}"
+        ) from exc
 
 
-def _find_entity(
-    vb: VisualBibleVersionContract, name: str
-) -> Any | None:
+def _find_entity(vb: VisualBibleVersionContract, name: str) -> Any | None:
     """Deterministic entity match by stable_id or entity_key (exact, ordered)."""
     for entity in vb.entities:
         if entity.stable_id == name or entity.entity_key == name:
@@ -330,7 +345,11 @@ def _render_style_profile(style_profile: Mapping[str, Any]) -> str:
     lines: list[str] = []
     for key in sorted(style_profile):
         value = style_profile[key]
-        rendered = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False, sort_keys=True)
+        rendered = (
+            value
+            if isinstance(value, str)
+            else json.dumps(value, ensure_ascii=False, sort_keys=True)
+        )
         lines.append(f"{key}: {rendered}")
     return "\n".join(lines)
 
@@ -348,17 +367,30 @@ def _compile_constraint(
     rendered fail closed (no unsupported constraint can be disguised as canon).
     """
     constraint_key = entry.get("constraint_key") or entry.get("key")
-    _require(isinstance(constraint_key, str) and constraint_key, f"constraint[{index}] has no constraint_key")
+    _require(
+        isinstance(constraint_key, str) and constraint_key,
+        f"constraint[{index}] has no constraint_key",
+    )
     scope_raw = entry.get("scope")
-    _require(isinstance(scope_raw, str) and scope_raw in ConstraintScope._value2member_map_, f"constraint {constraint_key!r} has unsupported scope")
+    _require(
+        isinstance(scope_raw, str) and scope_raw in ConstraintScope._value2member_map_,
+        f"constraint {constraint_key!r} has unsupported scope",
+    )
     text = entry.get("text")
-    _require(isinstance(text, str) and text, f"constraint {constraint_key!r} has no text")
+    _require(
+        isinstance(text, str) and text, f"constraint {constraint_key!r} has no text"
+    )
     source_raw = entry.get("source") or SpecSource.VISUAL_BIBLE.value
-    _require(source_raw in SpecSource._value2member_map_, f"constraint {constraint_key!r} has unsupported source")
+    _require(
+        source_raw in SpecSource._value2member_map_,
+        f"constraint {constraint_key!r} has unsupported source",
+    )
     source = SpecSource(source_raw)
 
     author = entry.get("author") if isinstance(entry.get("author"), str) else None
-    rationale = entry.get("rationale") if isinstance(entry.get("rationale"), str) else None
+    rationale = (
+        entry.get("rationale") if isinstance(entry.get("rationale"), str) else None
+    )
     evidence_raw = entry.get("evidence")
     primary = (
         input_.candidate.evidence_ranges[0]
@@ -369,7 +401,9 @@ def _compile_constraint(
     if isinstance(evidence_raw, list):
         for i, item in enumerate(evidence_raw):
             if not isinstance(item, Mapping):
-                raise SceneSpecCompileError(f"constraint {constraint_key!r} evidence[{i}] is not an object")
+                raise SceneSpecCompileError(
+                    f"constraint {constraint_key!r} evidence[{i}] is not an object"
+                )
             ref = SpecEvidenceRef.model_validate(dict(item))
             evidence.append(
                 SpecEvidenceRef(
@@ -386,7 +420,11 @@ def _compile_constraint(
                 )
             )
     elif primary is not None and source is SpecSource.EVIDENCE:
-        evidence = [_evidence_ref_from_range(primary, input_, namespace=f"constraint:{constraint_key}")]
+        evidence = [
+            _evidence_ref_from_range(
+                primary, input_, namespace=f"constraint:{constraint_key}"
+            )
+        ]
 
     vb_refs: list[VisualBibleRef] = []
     if source is SpecSource.VISUAL_BIBLE:
@@ -480,7 +518,11 @@ def compile_scene_spec(input_: SceneSpecCompileInput) -> CompiledSceneSpec:
 
         if entity.authority is VisualAuthority.USER_INTERPRETATION:
             interp = next(
-                (c for c in claims if c.authority is VisualAuthority.USER_INTERPRETATION),
+                (
+                    c
+                    for c in claims
+                    if c.authority is VisualAuthority.USER_INTERPRETATION
+                ),
                 None,
             )
             if interp is None or not interp.author or not interp.rationale:
@@ -567,7 +609,11 @@ def compile_scene_spec(input_: SceneSpecCompileInput) -> CompiledSceneSpec:
                         f"place entity {entity.stable_id!r} disclosure_cutoff exceeds the spec cutoff",
                     )
                 )
-            primary = input_.candidate.evidence_ranges[0] if input_.candidate.evidence_ranges else None
+            primary = (
+                input_.candidate.evidence_ranges[0]
+                if input_.candidate.evidence_ranges
+                else None
+            )
             if primary is not None:
                 details.append(
                     SceneDetail(
@@ -576,7 +622,9 @@ def compile_scene_spec(input_: SceneSpecCompileInput) -> CompiledSceneSpec:
                         source=SpecSource.EVIDENCE,
                         text=f"地点：{place}",
                         evidence_refs=[
-                            _evidence_ref_from_range(primary, input_, namespace=f"setting:place:{place}")
+                            _evidence_ref_from_range(
+                                primary, input_, namespace=f"setting:place:{place}"
+                            )
                         ],
                         spoiler_cutoff=cutoff,
                     )
@@ -592,7 +640,11 @@ def compile_scene_spec(input_: SceneSpecCompileInput) -> CompiledSceneSpec:
 
     time = input_.candidate.coordinates.time
     if time:
-        primary = input_.candidate.evidence_ranges[0] if input_.candidate.evidence_ranges else None
+        primary = (
+            input_.candidate.evidence_ranges[0]
+            if input_.candidate.evidence_ranges
+            else None
+        )
         if primary is not None:
             details.append(
                 SceneDetail(
@@ -601,14 +653,20 @@ def compile_scene_spec(input_: SceneSpecCompileInput) -> CompiledSceneSpec:
                     source=SpecSource.EVIDENCE,
                     text=f"时间：{time}",
                     evidence_refs=[
-                        _evidence_ref_from_range(primary, input_, namespace=f"setting:time:{time}")
+                        _evidence_ref_from_range(
+                            primary, input_, namespace=f"setting:time:{time}"
+                        )
                     ],
                     spoiler_cutoff=cutoff,
                 )
             )
 
     # ---- action: the candidate's primary evidence excerpt (evidence authority)
-    primary = input_.candidate.evidence_ranges[0] if input_.candidate.evidence_ranges else None
+    primary = (
+        input_.candidate.evidence_ranges[0]
+        if input_.candidate.evidence_ranges
+        else None
+    )
     if primary is not None and primary.excerpt:
         details.append(
             SceneDetail(
@@ -709,7 +767,9 @@ def compile_scene_spec(input_: SceneSpecCompileInput) -> CompiledSceneSpec:
     try:
         validate_scene_spec_contract(spec)
     except ValueError as exc:
-        raise SceneSpecCompileError(f"compiled spec failed its own contract gate: {exc}") from exc
+        raise SceneSpecCompileError(
+            f"compiled spec failed its own contract gate: {exc}"
+        ) from exc
 
     return CompiledSceneSpec(spec=spec, unresolved=tuple(unresolved))
 
@@ -786,7 +846,9 @@ def build_prompt_revision_from_spec(
     try:
         validate_prompt_revision_contract(revision, spec)
     except ValueError as exc:
-        raise SceneSpecCompileError(f"derived prompt failed its own contract gate: {exc}") from exc
+        raise SceneSpecCompileError(
+            f"derived prompt failed its own contract gate: {exc}"
+        ) from exc
     return revision
 
 
@@ -1042,7 +1104,9 @@ class SceneSpecService:
         compiled = compile_scene_spec(compile_input)
         spec = compiled.spec
 
-        existing = await self._spec(owner_id=owner_id, novel_id=novel_id, spec_key=spec.spec_key)
+        existing = await self._spec(
+            owner_id=owner_id, novel_id=novel_id, spec_key=spec.spec_key
+        )
         if existing is not None:
             if existing.content_hash == spec.content_hash:
                 return PersistedSceneSpec(
@@ -1088,7 +1152,9 @@ class SceneSpecService:
             await self._session.flush()
         except IntegrityError:
             await self._session.rollback()
-            existing = await self._spec(owner_id=owner_id, novel_id=novel_id, spec_key=spec.spec_key)
+            existing = await self._spec(
+                owner_id=owner_id, novel_id=novel_id, spec_key=spec.spec_key
+            )
             if existing is None:
                 raise SceneSpecConflict(
                     "scene spec race: existing row not found after rollback"
@@ -1106,7 +1172,9 @@ class SceneSpecService:
                 replayed=True,
             )
 
-        await self._persist_content(owner_id=owner_id, novel_id=novel_id, spec=spec, version_row=version_row)
+        await self._persist_content(
+            owner_id=owner_id, novel_id=novel_id, spec=spec, version_row=version_row
+        )
         await self._session.flush()
         return PersistedSceneSpec(
             version=version_row,
@@ -1118,9 +1186,7 @@ class SceneSpecService:
 
     # ------------------------------------------------------------ read seams
 
-    async def list(
-        self, *, owner_id: int, novel_id: int
-    ) -> list[SceneSpecView]:
+    async def list(self, *, owner_id: int, novel_id: int) -> list[SceneSpecView]:
         rows = (
             await self._session.scalars(
                 select(SceneSpecVersionRow)
@@ -1142,12 +1208,16 @@ class SceneSpecService:
         """Return (view, stale). ``stale`` means the Visual Bible revision or the
         source snapshot the spec was compiled against no longer matches the
         novel's current approved revision / snapshot (D-32-03)."""
-        spec = await self._spec_by_id(owner_id=owner_id, novel_id=novel_id, spec_id=spec_id)
+        spec = await self._spec_by_id(
+            owner_id=owner_id, novel_id=novel_id, spec_id=spec_id
+        )
         if spec is None:
             raise SceneSpecNotFound(
                 "scene spec not found in the explicit owner/novel scope"
             )
-        view = await self._view_from_rows(owner_id=owner_id, novel_id=novel_id, spec=spec)
+        view = await self._view_from_rows(
+            owner_id=owner_id, novel_id=novel_id, spec=spec
+        )
         stale = await self._is_stale(owner_id=owner_id, novel_id=novel_id, spec=spec)
         return view, stale
 
@@ -1157,13 +1227,17 @@ class SceneSpecService:
         """Recompile the same candidate against the current approved revision and
         diff the deterministic canonical sections. A changed Visual Bible or
         source snapshot marks the stored spec stale and shows the drift."""
-        spec = await self._spec_by_id(owner_id=owner_id, novel_id=novel_id, spec_id=spec_id)
+        spec = await self._spec_by_id(
+            owner_id=owner_id, novel_id=novel_id, spec_id=spec_id
+        )
         if spec is None:
             raise SceneSpecNotFound(
                 "scene spec not found in the explicit owner/novel scope"
             )
 
-        current_hash, _ = await self._current_snapshot(owner_id=owner_id, novel_id=novel_id)
+        current_hash, _ = await self._current_snapshot(
+            owner_id=owner_id, novel_id=novel_id
+        )
         latest_vb = await self._latest_approved_version(
             owner_id=owner_id, novel_id=novel_id
         )
@@ -1173,7 +1247,10 @@ class SceneSpecService:
         )
         original_sections = self._sections_from_payload(spec.canonical_payload)
 
-        if latest_vb.id == spec.visual_bible_revision_id and current_hash == spec.source_snapshot_hash:
+        if (
+            latest_vb.id == spec.visual_bible_revision_id
+            and current_hash == spec.source_snapshot_hash
+        ):
             return SceneSpecDiffResult(
                 original_spec_hash=spec.content_hash,
                 current_spec_hash=spec.content_hash,
@@ -1499,7 +1576,8 @@ class SceneSpecService:
                     spoiler_cutoff=item["spoiler_cutoff"],
                     evidence_keys=list(item.get("evidence_keys") or []),
                     visual_bible_stable_ids=[
-                        ref["stable_id"] for ref in (item.get("visual_bible_refs") or [])
+                        ref["stable_id"]
+                        for ref in (item.get("visual_bible_refs") or [])
                     ],
                 )
                 for item in details
@@ -1689,7 +1767,9 @@ class SceneSpecService:
         novel_id: int,
         spec: SceneSpecVersionRow,
     ) -> bool:
-        current_hash, _ = await self._current_snapshot(owner_id=owner_id, novel_id=novel_id)
+        current_hash, _ = await self._current_snapshot(
+            owner_id=owner_id, novel_id=novel_id
+        )
         latest_vb = await self._latest_approved_version(
             owner_id=owner_id, novel_id=novel_id
         )

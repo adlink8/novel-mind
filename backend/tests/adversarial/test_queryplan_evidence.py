@@ -141,13 +141,13 @@ def make_manifest(*, with_evidence: bool = True) -> FrozenManifest:
     return freeze_manifest(plan=plan, source=source, evidence=evidence, omitted=())
 
 
-def envelope_with_refs(refs: list[str], *, text: str = "林安走进竹林。") -> ReaderAnswerEnvelope:
+def envelope_with_refs(
+    refs: list[str], *, text: str = "林安走进竹林。"
+) -> ReaderAnswerEnvelope:
     return ReaderAnswerEnvelope.model_validate(
         {
             "schema_version": "reader-answer.v1",
-            "answer_blocks": [
-                {"block_id": "b1", "text": text, "evidence_refs": refs}
-            ],
+            "answer_blocks": [{"block_id": "b1", "text": text, "evidence_refs": refs}],
             "clarifying_question": None,
             "uncertainty": None,
             "suggestion_candidates": [],
@@ -277,9 +277,7 @@ def test_heuristic_candidate_can_never_be_cited():
     assert manifest.allowed_evidence_ids() == set()
     service = QueryPlanService()
     with pytest.raises(ValueError):
-        service.gate_answer(
-            manifest, envelope_with_refs(["qp:1:0:8:" + "0" * 64])
-        )
+        service.gate_answer(manifest, envelope_with_refs(["qp:1:0:8:" + "0" * 64]))
 
 
 # ---------------------------------------------------------------------------
@@ -326,8 +324,7 @@ def test_queryplan_evidence_package_imports_no_domain_mutation_services():
                 f"{path.name} imports domain mutation module {forbidden}"
             )
             assert not any(
-                mod == forbidden or mod.startswith(forbidden + ".")
-                for mod in imports
+                mod == forbidden or mod.startswith(forbidden + ".") for mod in imports
             )
 
 

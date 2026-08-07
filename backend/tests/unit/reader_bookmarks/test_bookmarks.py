@@ -9,9 +9,7 @@ from app.models import Chapter, Novel, User
 pytestmark = pytest.mark.unit
 
 
-async def _seed_novel_with_chapter(
-    db_session, owner_id: int
-) -> tuple[Novel, Chapter]:
+async def _seed_novel_with_chapter(db_session, owner_id: int) -> tuple[Novel, Chapter]:
     novel = Novel(
         title="书签测试小说",
         author="作者",
@@ -75,9 +73,7 @@ async def test_bookmarks_crud_roundtrip(auth_client: AsyncClient, db_session):
     assert items[0]["id"] == bookmark_id
 
     # 删除
-    resp = await auth_client.delete(
-        f"/api/novels/{novel.id}/bookmarks/{bookmark_id}"
-    )
+    resp = await auth_client.delete(f"/api/novels/{novel.id}/bookmarks/{bookmark_id}")
     assert resp.status_code == 204
     resp = await auth_client.get(f"/api/novels/{novel.id}/bookmarks")
     assert resp.status_code == 200
@@ -102,9 +98,7 @@ async def test_bookmark_create_rejects_foreign_chapter(
 
 
 @pytest.mark.asyncio
-async def test_bookmark_delete_owner_scoped(
-    auth_client: AsyncClient, db_session
-):
+async def test_bookmark_delete_owner_scoped(auth_client: AsyncClient, db_session):
     """删除其他用户/其他小说的书签必须 404（owner + novel 双重作用域）。"""
     user = await _current_user(db_session)
     novel, chapter = await _seed_novel_with_chapter(db_session, user.id)
@@ -118,7 +112,9 @@ async def test_bookmark_delete_owner_scoped(
     bookmark_id = resp.json()["id"]
 
     # 错误的小说作用域
-    resp = await auth_client.delete(f"/api/novels/{novel.id + 999}/bookmarks/{bookmark_id}")
+    resp = await auth_client.delete(
+        f"/api/novels/{novel.id + 999}/bookmarks/{bookmark_id}"
+    )
     assert resp.status_code == 404
 
     # 错误的书签 ID

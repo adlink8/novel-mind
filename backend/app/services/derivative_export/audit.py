@@ -251,9 +251,14 @@ class DerivativeExportAuditReport(_StrictAuditModel):
             )
         # The quality dimension MUST reflect the real Phase 22 state — a
         # falsely-green claim fails closed here.
-        derived_status, _ = derive_quality_qualification(self.phase22, self.snapshot_hash)
+        derived_status, _ = derive_quality_qualification(
+            self.phase22, self.snapshot_hash
+        )
         quality = self.dimensions[2]
-        if quality.dimension != DerivativeExportAuditDimensionKind.QUALITY_QUALIFICATION:
+        if (
+            quality.dimension
+            != DerivativeExportAuditDimensionKind.QUALITY_QUALIFICATION
+        ):
             raise ValueError("quality dimension must be the third dimension")
         if quality.status != derived_status:
             raise ValueError(
@@ -261,7 +266,10 @@ class DerivativeExportAuditReport(_StrictAuditModel):
                 f"claimed {quality.status!r} but the evidence derives "
                 f"{derived_status!r}"
             )
-        if quality.status == DerivativeExportAuditStatus.BLOCKED and not quality.blocked_reasons:
+        if (
+            quality.status == DerivativeExportAuditStatus.BLOCKED
+            and not quality.blocked_reasons
+        ):
             raise ValueError("a blocked quality dimension requires blocked reasons")
         banned = FORBIDDEN_AUDIT_WORDS.intersection(self.blocked_reasons)
         if banned:
@@ -280,9 +288,7 @@ class DerivativeExportAuditReport(_StrictAuditModel):
             and self.lineage.status != DerivativeExportAuditStatus.VERIFIED
             and self.verdict != "blocked"
         ):
-            raise ValueError(
-                "a non-verified lineage audit requires a blocked verdict"
-            )
+            raise ValueError("a non-verified lineage audit requires a blocked verdict")
         if (
             self.shipment is not None
             and self.shipment.status != DerivativeExportAuditStatus.VERIFIED
@@ -300,7 +306,9 @@ class DerivativeExportAuditReport(_StrictAuditModel):
         return "completion_percentage" in self.model_dump(mode="json")
 
     @property
-    def dimensions_by_kind(self) -> dict[DerivativeExportAuditDimensionKind, DerivativeExportAuditDimension]:
+    def dimensions_by_kind(
+        self,
+    ) -> dict[DerivativeExportAuditDimensionKind, DerivativeExportAuditDimension]:
         return {dimension.dimension: dimension for dimension in self.dimensions}
 
 
@@ -489,8 +497,7 @@ LINEAGE_RAW_EVIDENCE_LINKS: dict[str, str] = {
         "backend/app/services/derivative_export/package.py:validate_package_inputs"
     ),
     DerivativeExportLineageCheckKind.PREPARATION_HASH.value: (
-        "backend/app/services/derivative_export/preparation.py:"
-        "export_preparation_hash"
+        "backend/app/services/derivative_export/preparation.py:export_preparation_hash"
     ),
     DerivativeExportLineageCheckKind.PREPARATION_PAYLOAD.value: (
         "backend/app/services/derivative_export/preparation.py:"
@@ -579,7 +586,10 @@ class DerivativeExportLineageAudit(_StrictAuditModel):
                 f"lineage_{check.status.value}:{check.kind.value}"
                 for check in self.checks
                 if check.status
-                in (DerivativeExportAuditStatus.BLOCKED, DerivativeExportAuditStatus.PARTIAL)
+                in (
+                    DerivativeExportAuditStatus.BLOCKED,
+                    DerivativeExportAuditStatus.PARTIAL,
+                )
             )
         )
 
@@ -842,8 +852,7 @@ def audit_derivative_export_lineage(
             _check(
                 DerivativeExportLineageCheckKind.ARTIFACT_BINDING,
                 DerivativeExportAuditStatus.BLOCKED,
-                "orphaned / pending / rejected / divergent export preparation "
-                "artifact",
+                "orphaned / pending / rejected / divergent export preparation artifact",
                 artifact_reasons,
             )
         )
@@ -865,10 +874,7 @@ def audit_derivative_export_lineage(
         approval_reasons.append("approval_action_denied")
     if approval_status != "approved":
         approval_reasons.append("approval_not_approved")
-    if (
-        approval_payload_hash is not None
-        and approval_payload_hash != preparation_hash
-    ):
+    if approval_payload_hash is not None and approval_payload_hash != preparation_hash:
         approval_reasons.append("approval_hash_mismatch")
     if (
         artifact_revision_id is not None
@@ -901,10 +907,7 @@ def audit_derivative_export_lineage(
         materialization_reasons.append("bundle_evidence_missing")
     elif not _is_hex64(package_hash):
         materialization_reasons.append("package_hash_malformed")
-    if (
-        replayed_package_hash is not None
-        and replayed_package_hash != package_hash
-    ):
+    if replayed_package_hash is not None and replayed_package_hash != package_hash:
         materialization_reasons.append("package_hash_mismatch")
     if materialization_reasons:
         checks.append(
@@ -1068,9 +1071,7 @@ async def run_derivative_export_lineage_audit(
         )
         snapshot = frozen.snapshot
         snapshot_hash_observed = snapshot.snapshot_hash
-        manifest_hash_observed = seal_derivative_export_manifest(
-            snapshot
-        ).manifest_hash
+        manifest_hash_observed = seal_derivative_export_manifest(snapshot).manifest_hash
     except ExportSnapshotError:
         # Recompute impossible -> the pure lineage audit fails these checks
         # closed (no snapshot evidence), never a silent pass.
@@ -1262,9 +1263,7 @@ def build_derivative_export_shipment_baseline(
         )
         present.add(obj.requirement.value)
         normalized.append(obj)
-    missing = [
-        req for req in REQ_SHIP01_REQUIREMENTS if req.value not in present
-    ]
+    missing = [req for req in REQ_SHIP01_REQUIREMENTS if req.value not in present]
     for req in missing:
         normalized.append(
             DerivativeExportShipmentItem(
@@ -1285,17 +1284,14 @@ def build_derivative_export_shipment_baseline(
         for item in normalized
         if item.status == DerivativeExportShipmentEvidenceStatus.UNVERIFIED
     ]
-    reasons: list[str] = [
-        f"shipment_evidence_missing:{req.value}" for req in missing
-    ]
+    reasons: list[str] = [f"shipment_evidence_missing:{req.value}" for req in missing]
     reasons.extend(
         f"shipment_blocked:{item.requirement.value}"
         for item in blocked_items
         if item.requirement.value not in {req.value for req in missing}
     )
     reasons.extend(
-        f"shipment_unverified:{item.requirement.value}"
-        for item in unverified_items
+        f"shipment_unverified:{item.requirement.value}" for item in unverified_items
     )
     reasons = tuple(sorted(set(reasons)))
 

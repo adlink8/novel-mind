@@ -98,9 +98,7 @@ def test_three_spaces_have_complete_closed_enum():
     }
     assert set(SPACE_RULES) == CANON_SPACE_VALUES
     assert CanonArtifactStatus.DRAFT.value == "draft"
-    assert set(CANON_ARTIFACT_STATUSES) == {
-        s.value for s in CanonArtifactStatus
-    }
+    assert set(CANON_ARTIFACT_STATUSES) == {s.value for s in CanonArtifactStatus}
 
 
 def test_each_space_has_exactly_one_authority_and_citation_policy():
@@ -390,8 +388,7 @@ def test_scope_hash_binds_version_and_space_together():
     )
     same_space_other_version = _scope(version_key="v2")
     assert (
-        same_version_other_space.scope_hash()
-        != same_space_other_version.scope_hash()
+        same_version_other_space.scope_hash() != same_space_other_version.scope_hash()
     )
 
 
@@ -409,9 +406,7 @@ def test_content_hash_is_stable_sha256():
 def test_derivative_spaces_rejected_from_all_original_pipelines():
     for space in (CanonSpace.USER_INTERPRETATION, CanonSpace.FANFICTION_CANON):
         for pipeline in sorted(ORIGINAL_PIPELINES):
-            with pytest.raises(
-                CanonForkContractError, match="space_excluded"
-            ):
+            with pytest.raises(CanonForkContractError, match="space_excluded"):
                 assert_original_pipeline_input(space, pipeline)
 
 

@@ -69,9 +69,9 @@ def _map_error(exc: DerivativeRevisionError) -> HTTPException:
     if exc.current_revision is not None:
         detail["current_revision_number"] = exc.current_revision.revision_number
         detail["current_checksum"] = exc.current_revision.content_checksum
-        detail["current_revision"] = to_revision_view(
-            exc.current_revision
-        ).model_dump(mode="json")
+        detail["current_revision"] = to_revision_view(exc.current_revision).model_dump(
+            mode="json"
+        )
     return HTTPException(status_code=exc.status_code, detail=detail)
 
 
@@ -222,16 +222,10 @@ async def diff_derivative_chapter_revisions(
     except DerivativeRevisionError as exc:
         raise _map_error(exc) from exc
     additions = sum(
-        1
-        for hunk in hunks
-        for line in hunk["lines"]
-        if line["op"] == "add"
+        1 for hunk in hunks for line in hunk["lines"] if line["op"] == "add"
     )
     deletions = sum(
-        1
-        for hunk in hunks
-        for line in hunk["lines"]
-        if line["op"] == "delete"
+        1 for hunk in hunks for line in hunk["lines"] if line["op"] == "delete"
     )
     return DerivativeDiffResponse(
         base_revision_id=base.id,

@@ -21,7 +21,6 @@ import pytest
 from app.services.derivative_export.epub import render_epub
 from app.services.derivative_export.manifest import (
     derivative_export_manifest_hash,
-    seal_derivative_export_manifest,
 )
 from app.services.derivative_export.markdown import render_markdown
 from app.services.derivative_export.snapshot import (
@@ -31,7 +30,6 @@ from app.services.derivative_export.snapshot import (
     seal_export_snapshot,
 )
 from tests.fixtures.derivative_export_roundtrip_fixtures import (
-    HEX64_A,
     build_fixture_snapshot,
     fixture_export_asset,
     fixture_asset,
@@ -93,9 +91,7 @@ def test_asset_reader_returns_none_for_missing_bytes():
     frozen = FrozenDerivativeExport(snapshot=snapshot, storage=None)
     assert frozen.asset_reader()(snapshot.assets[0]) is None
 
-    missing = FrozenDerivativeExport(
-        snapshot=snapshot, storage=_FakeStorage(None)
-    )
+    missing = FrozenDerivativeExport(snapshot=snapshot, storage=_FakeStorage(None))
     assert missing.asset_reader()(snapshot.assets[0]) is None
 
 

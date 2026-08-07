@@ -150,9 +150,7 @@ def test_dimension_snapshot_cutoff_owner_version_mismatch_fails_closed(
 ):
     base = _consistent_manifest()
     dims = list(base.dimensions)
-    tampered = dims[0].model_copy(
-        update={field: tamper, "checksum": "0" * 64}
-    )
+    tampered = dims[0].model_copy(update={field: tamper, "checksum": "0" * 64})
     tampered = tampered.model_copy(
         update={"checksum": dimension_result_checksum(tampered)}
     )
@@ -167,9 +165,7 @@ def test_budget_mismatch_fails_closed():
     base = _consistent_manifest()
     dims = list(base.dimensions)
     other_budget = _budget(calls=9)
-    tampered = dims[0].model_copy(
-        update={"budget": other_budget, "checksum": "0" * 64}
-    )
+    tampered = dims[0].model_copy(update={"budget": other_budget, "checksum": "0" * 64})
     tampered = tampered.model_copy(
         update={"checksum": dimension_result_checksum(tampered)}
     )

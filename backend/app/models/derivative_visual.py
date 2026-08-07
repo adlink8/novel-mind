@@ -231,7 +231,9 @@ class DerivativeVisualVersion(TimestampMixin, Base):
         Integer, ForeignKey("novels.id", ondelete="CASCADE"), nullable=False
     )
     project_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("derivative_projects.id", ondelete="CASCADE"), nullable=False
+        Integer,
+        ForeignKey("derivative_projects.id", ondelete="CASCADE"),
+        nullable=False,
     )
     fork_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("canon_forks.id", ondelete="CASCADE"), nullable=False
@@ -274,9 +276,7 @@ class DerivativeVisualVersion(TimestampMixin, Base):
     manifest_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     style_profile: Mapped[dict | None] = mapped_column(JSONB)
     constraints: Mapped[list | None] = mapped_column(JSONB)
-    canonical_payload: Mapped[dict] = mapped_column(
-        JSONB, nullable=False, default=dict
-    )
+    canonical_payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     canonical_payload_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     idempotency_key: Mapped[str] = mapped_column(String(64), nullable=False)
     projection_hash: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -362,9 +362,7 @@ class DerivativeVisualEntity(TimestampMixin, Base):
     # Exact Original Visual Bible entity this row derives from (REQ-FORK-04).
     source_entity_ref: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     description: Mapped[str] = mapped_column(Text, nullable=False)
-    canonical_payload: Mapped[dict] = mapped_column(
-        JSONB, nullable=False, default=dict
-    )
+    canonical_payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     canonical_payload_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     idempotency_key: Mapped[str] = mapped_column(String(64), nullable=False)
     projection_hash: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -444,9 +442,7 @@ class DerivativeVisualAsset(TimestampMixin, Base):
     approved: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default="false"
     )
-    canonical_payload: Mapped[dict] = mapped_column(
-        JSONB, nullable=False, default=dict
-    )
+    canonical_payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     canonical_payload_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     idempotency_key: Mapped[str] = mapped_column(String(64), nullable=False)
     projection_hash: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -592,8 +588,12 @@ class DerivativeVisualCandidateAsset(TimestampMixin, Base):
             name="ck_derivative_visual_candidates_verdict",
         ),
         CheckConstraint("size_bytes > 0", name="ck_derivative_visual_candidates_size"),
-        CheckConstraint("chapter_number >= 1", name="ck_derivative_visual_candidates_chapter"),
-        CheckConstraint("cutoff_chapter >= 1", name="ck_derivative_visual_candidates_cutoff"),
+        CheckConstraint(
+            "chapter_number >= 1", name="ck_derivative_visual_candidates_chapter"
+        ),
+        CheckConstraint(
+            "cutoff_chapter >= 1", name="ck_derivative_visual_candidates_cutoff"
+        ),
         CheckConstraint(
             "length(content_hash) = 64",
             name="ck_derivative_visual_candidates_content_hash",
@@ -660,15 +660,17 @@ class DerivativeVisualCandidateAsset(TimestampMixin, Base):
     generator_lineage: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     divergence_manifest_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     # Deterministic cross-chapter consistency review signal (D-38-03).
-    consistency_evidence: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
-    consistency_report: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    consistency_evidence: Mapped[dict] = mapped_column(
+        JSONB, nullable=False, default=dict
+    )
+    consistency_report: Mapped[dict] = mapped_column(
+        JSONB, nullable=False, default=dict
+    )
     consistency_verdict: Mapped[str] = mapped_column(String(24), nullable=False)
     review_state: Mapped[str] = mapped_column(
         String(16), nullable=False, default="candidate", server_default="candidate"
     )
-    canonical_payload: Mapped[dict] = mapped_column(
-        JSONB, nullable=False, default=dict
-    )
+    canonical_payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     canonical_payload_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     idempotency_key: Mapped[str] = mapped_column(String(64), nullable=False)
     projection_hash: Mapped[str] = mapped_column(String(64), nullable=False)

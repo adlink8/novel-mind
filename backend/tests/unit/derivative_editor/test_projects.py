@@ -112,7 +112,10 @@ class TestModelContract:
         from pathlib import Path
 
         source = (
-            Path(__file__).resolve().parents[3] / "app" / "models" / "derivative_project.py"
+            Path(__file__).resolve().parents[3]
+            / "app"
+            / "models"
+            / "derivative_project.py"
         ).read_text(encoding="utf-8")
         assert "space = 'fanfiction_canon'" in source
         assert "status IN ('active','archived')" in source

@@ -60,7 +60,16 @@ def _iter_source_files(root: Path, skip_parts: frozenset[str]) -> list[Path]:
             dirs[:] = [d for d in dirs if d not in skip_dirs]
             for name in names:
                 path = base / name
-                if path.suffix in {".ts", ".mjs", ".json", ".md", ".py", ".tsx", ".yaml", ".yml"}:
+                if path.suffix in {
+                    ".ts",
+                    ".mjs",
+                    ".json",
+                    ".md",
+                    ".py",
+                    ".tsx",
+                    ".yaml",
+                    ".yml",
+                }:
                     files.append(path)
     return files
 
@@ -92,7 +101,9 @@ def test_no_dynamic_pi_install_update_in_sources() -> None:
     """agent-service 源码禁止动态 pi install / pi update；仅注释中带否决语气的行可豁免。"""
     hits: list[str] = []
     for path in _iter_source_files(AGENT_SERVICE, frozenset()):
-        for lineno, line in enumerate(path.read_text(encoding="utf-8", errors="ignore").splitlines(), 1):
+        for lineno, line in enumerate(
+            path.read_text(encoding="utf-8", errors="ignore").splitlines(), 1
+        ):
             lowered = line.lower()
             if not any(frag in lowered for frag in FORBIDDEN_PI_INVOCATIONS):
                 continue
@@ -105,7 +116,16 @@ def test_no_dynamic_pi_install_update_in_sources() -> None:
 def test_pattern_only_packages_not_in_any_package_json() -> None:
     """pattern-only 裁决的包（D-03）不得出现在仓库任何 package.json 的依赖中。"""
     offenders: list[str] = []
-    skip_dirs = {"node_modules", ".git", "venv", "__pycache__", ".claude", ".venv", ".pytest_cache", "coverage"}
+    skip_dirs = {
+        "node_modules",
+        ".git",
+        "venv",
+        "__pycache__",
+        ".claude",
+        ".venv",
+        ".pytest_cache",
+        "coverage",
+    }
     for base, dirs, names in REPO.walk(on_error=lambda e: None):
         dirs[:] = [d for d in dirs if d not in skip_dirs]
         if "package.json" not in names:
@@ -113,7 +133,9 @@ def test_pattern_only_packages_not_in_any_package_json() -> None:
         text = (base / "package.json").read_text(encoding="utf-8", errors="ignore")
         for pkg in PATTERN_ONLY_PACKAGES:
             if pkg in text:
-                offenders.append(f"{(base / 'package.json').relative_to(REPO)} 引用 {pkg}")
+                offenders.append(
+                    f"{(base / 'package.json').relative_to(REPO)} 引用 {pkg}"
+                )
     assert not offenders, "\n".join(offenders)
 
 
@@ -136,7 +158,12 @@ def test_prohibited_from_canon_false_forbidden() -> None:
     offenders: list[str] = []
     # 仅扫描源树；排除本测试文件自身（其源码含该正则字面量）、venv/node_modules 等
     self_file = Path(__file__).resolve()
-    for root in (AGENT_SERVICE, REPO / "backend" / "app", REPO / "backend" / "tests", REPO / "backend" / "scripts"):
+    for root in (
+        AGENT_SERVICE,
+        REPO / "backend" / "app",
+        REPO / "backend" / "tests",
+        REPO / "backend" / "scripts",
+    ):
         for path in _iter_source_files(root, frozenset({"tests"})):
             if path.resolve() == self_file:
                 continue

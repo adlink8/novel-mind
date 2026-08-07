@@ -65,7 +65,9 @@ def make_verification(
         "---\n\n"
     )
     path = directory / "25.2-VERIFICATION.md"
-    path.write_text(front_matter + (body if body is not None else GOOD_BODY), encoding="utf-8")
+    path.write_text(
+        front_matter + (body if body is not None else GOOD_BODY), encoding="utf-8"
+    )
     return path
 
 
@@ -91,9 +93,12 @@ def test_synthetic_complete_evidence_passes(tmp_path: Path) -> None:
     """合成完整证据（phase/slug/status/commit/段落齐全）→ 返回 0。"""
     path = make_verification(tmp_path, source_commit="f00b4a1")
     result = run_gate(
-        "--verification", str(path),
-        "--repo-root", str(tmp_path),
-        "--expected-commit", "f00b4a1",
+        "--verification",
+        str(path),
+        "--repo-root",
+        str(tmp_path),
+        "--expected-commit",
+        "f00b4a1",
     )
     assert result.returncode == 0, result.stderr
 
@@ -101,8 +106,10 @@ def test_synthetic_complete_evidence_passes(tmp_path: Path) -> None:
 def test_missing_verification_fails(tmp_path: Path) -> None:
     """VERIFICATION 缺失 → 稳定非零。"""
     result = run_gate(
-        "--verification", str(tmp_path / "25.2-VERIFICATION.md"),
-        "--repo-root", str(tmp_path),
+        "--verification",
+        str(tmp_path / "25.2-VERIFICATION.md"),
+        "--repo-root",
+        str(tmp_path),
     )
     assert result.returncode != 0
     assert "不存在" in result.stderr
@@ -113,9 +120,12 @@ def test_malformed_front_matter_fails(tmp_path: Path) -> None:
     path = tmp_path / "25.2-VERIFICATION.md"
     path.write_text("status: passed\nphase: 25.2\n" + GOOD_BODY, encoding="utf-8")
     result = run_gate(
-        "--verification", str(path),
-        "--repo-root", str(tmp_path),
-        "--expected-commit", "abc1234",
+        "--verification",
+        str(path),
+        "--repo-root",
+        str(tmp_path),
+        "--expected-commit",
+        "abc1234",
     )
     assert result.returncode != 0
     assert "front-matter" in result.stderr
@@ -125,9 +135,12 @@ def test_non_passed_status_fails(tmp_path: Path) -> None:
     """status 非 passed → 非零。"""
     path = make_verification(tmp_path, status="blocked")
     result = run_gate(
-        "--verification", str(path),
-        "--repo-root", str(tmp_path),
-        "--expected-commit", "abc1234",
+        "--verification",
+        str(path),
+        "--repo-root",
+        str(tmp_path),
+        "--expected-commit",
+        "abc1234",
     )
     assert result.returncode != 0
     assert "非 passed" in result.stderr
@@ -137,9 +150,12 @@ def test_wrong_phase_fails(tmp_path: Path) -> None:
     """phase id 不匹配（25.1）→ 非零。"""
     path = make_verification(tmp_path, phase="25.1", slug="analysis-chat-workspace")
     result = run_gate(
-        "--verification", str(path),
-        "--repo-root", str(tmp_path),
-        "--expected-commit", "abc1234",
+        "--verification",
+        str(path),
+        "--repo-root",
+        str(tmp_path),
+        "--expected-commit",
+        "abc1234",
     )
     assert result.returncode != 0
     assert "phase id 不匹配" in result.stderr
@@ -149,9 +165,12 @@ def test_stale_commit_fails(tmp_path: Path) -> None:
     """source_commit 与期望提交不一致（过期证据）→ 非零并点名。"""
     path = make_verification(tmp_path, source_commit="deadbee")
     result = run_gate(
-        "--verification", str(path),
-        "--repo-root", str(tmp_path),
-        "--expected-commit", "f00b4a1",
+        "--verification",
+        str(path),
+        "--repo-root",
+        str(tmp_path),
+        "--expected-commit",
+        "f00b4a1",
     )
     assert result.returncode != 0
     assert "deadbee" in result.stderr and "f00b4a1" in result.stderr
@@ -161,9 +180,12 @@ def test_missing_required_sections_fails(tmp_path: Path) -> None:
     """必填 validation 段落缺失（无 Verification Results/Conclusion）→ 非零。"""
     path = make_verification(tmp_path, body="# 只有标题\n没有表格也没有结论。\n")
     result = run_gate(
-        "--verification", str(path),
-        "--repo-root", str(tmp_path),
-        "--expected-commit", "abc1234",
+        "--verification",
+        str(path),
+        "--repo-root",
+        str(tmp_path),
+        "--expected-commit",
+        "abc1234",
     )
     assert result.returncode != 0
     assert "必填段落" in result.stderr
@@ -184,8 +206,10 @@ def test_planning_override_and_summary_cannot_substitute(tmp_path: Path) -> None
     )
     # 只有 override 与 SUMMARY，没有 VERIFICATION 工件
     result = run_gate(
-        "--verification", str(phases / "25.2-VERIFICATION.md"),
-        "--repo-root", str(tmp_path),
+        "--verification",
+        str(phases / "25.2-VERIFICATION.md"),
+        "--repo-root",
+        str(tmp_path),
     )
     assert result.returncode != 0
     assert "不存在" in result.stderr

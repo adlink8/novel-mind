@@ -83,7 +83,6 @@ async def tool_get_novel(
     body: GetNovelRequest | None = None,
     novel: Novel = Depends(require_owned_novel),
     db: AsyncSession = Depends(get_db),
-
 ):
     """获取小说元信息（含章节摘要列表，不含正文）。"""
     return await _run_tool(
@@ -96,7 +95,6 @@ async def tool_get_chapter(
     body: GetChapterRequest | None = None,
     novel: Novel = Depends(require_owned_novel),
     db: AsyncSession = Depends(get_db),
-
 ):
     """获取章节全文（受 spoiler cutoff 与 64 KiB 字节上限约束）。"""
     return await _run_tool(
@@ -113,7 +111,6 @@ async def tool_search_novel_text(
     body: SearchNovelTextRequest | None = None,
     novel: Novel = Depends(require_owned_novel),
     db: AsyncSession = Depends(get_db),
-
 ):
     """小说内全文检索（raw chunks + 知识单元融合）。"""
     return await _run_tool(
@@ -130,7 +127,6 @@ async def tool_get_timeline(
     body: GetTimelineRequest | None = None,
     novel: Novel = Depends(require_owned_novel),
     db: AsyncSession = Depends(get_db),
-
 ):
     """时间线事件信封（spoiler cutoff 服务端强制）。"""
     return await _run_tool(
@@ -147,7 +143,6 @@ async def tool_get_relationships(
     body: GetRelationshipsRequest | None = None,
     novel: Novel = Depends(require_owned_novel),
     db: AsyncSession = Depends(get_db),
-
 ):
     """人物关系图信封（spoiler cutoff 服务端强制）。"""
     return await _run_tool(
@@ -164,7 +159,6 @@ async def tool_get_clues(
     body: GetCluesRequest | None = None,
     novel: Novel = Depends(require_owned_novel),
     db: AsyncSession = Depends(get_db),
-
 ):
     """线索与伏笔信封（spoiler cutoff 服务端强制）。"""
     return await _run_tool(
@@ -177,7 +171,6 @@ async def tool_get_narrative_memory(
     body: GetNarrativeMemoryRequest | None = None,
     novel: Novel = Depends(require_owned_novel),
     db: AsyncSession = Depends(get_db),
-
 ):
     """叙事记忆结构（候选-only，ADR-0002，响应带 release_status="candidate"）。"""
     return await _run_tool(
@@ -197,7 +190,6 @@ async def tool_get_events(
     body: GetEventsRequest | None = None,
     novel: Novel = Depends(require_owned_novel),
     db: AsyncSession = Depends(get_db),
-
 ):
     """世界模型事件/因果候选投影（D-05 cutoff 服务端强制）。"""
     return await _run_tool(
@@ -214,7 +206,6 @@ async def tool_get_character_state(
     body: GetCharacterStateRequest | None = None,
     novel: Novel = Depends(require_owned_novel),
     db: AsyncSession = Depends(get_db),
-
 ):
     """角色状态/目标/动机（REQ-WM-02，D-05 cutoff/POV 服务端强制）。"""
     return await _run_tool(
@@ -231,7 +222,6 @@ async def tool_get_character_knowledge(
     body: GetCharacterKnowledgeRequest | None = None,
     novel: Novel = Depends(require_owned_novel),
     db: AsyncSession = Depends(get_db),
-
 ):
     """角色知识（REQ-WM-02，D-05 cutoff/POV 服务端强制）。"""
     return await _run_tool(
@@ -248,7 +238,6 @@ async def tool_get_world_rules(
     body: GetWorldRulesRequest | None = None,
     novel: Novel = Depends(require_owned_novel),
     db: AsyncSession = Depends(get_db),
-
 ):
     """世界规则与规则例外（REQ-WM-03，D-04 例外 first-class，D-05 cutoff 强制）。"""
     return await _run_tool(
@@ -265,7 +254,6 @@ async def tool_get_evidence_span(
     body: GetEvidenceSpanRequest | None = None,
     novel: Novel = Depends(require_owned_novel),
     db: AsyncSession = Depends(get_db),
-
 ):
     """leaf 证据跨度（D-07/D-08）：按 chapter+offsets+content_hash 物化原文。"""
     return await _run_tool(
@@ -282,7 +270,6 @@ async def tool_get_visual_bible(
     body: GetVisualBibleRequest | None = None,
     novel: Novel = Depends(require_owned_novel),
     db: AsyncSession = Depends(get_db),
-
 ):
     """Visual Bible 候选版本视图（31-04；owner 范围服务端强制，candidate-only）。"""
     return await _run_tool(
@@ -334,7 +321,6 @@ async def tool_publish_illustration(
     body: AnchorProposalActionRequest | None = None,
     novel: Novel = Depends(require_owned_novel),
     db: AsyncSession = Depends(get_db),
-
 ):
     """Phase 34 锚点提议 action（34-05）：创建**一个**候选 proposal + pending
     Web ApprovalRequest（action=publish_illustration，D-11/D-15）。
@@ -359,7 +345,6 @@ async def tool_attach_illustration_to_text(
     body: AnchorProposalActionRequest | None = None,
     novel: Novel = Depends(require_owned_novel),
     db: AsyncSession = Depends(get_db),
-
 ):
     """Phase 34 锚点提议 action（34-05）：把锚点绑定到**精确文本跨度**（candidate
     -only）。与 publish_illustration 同 gate，但 ApprovalRequest action 为
@@ -379,7 +364,6 @@ async def tool_create_canon_fork(
     body: CreateCanonForkRequest | None = None,
     novel: Novel = Depends(require_owned_novel),
     db: AsyncSession = Depends(get_db),
-
 ):
     """Phase 35 canon fork 提议 action（35-05，REQ-FORK-01 / REQ-AGENT-03/04/07）：
     创建**一个**候选 fork（candidate-only，D-35-03）。
@@ -406,7 +390,6 @@ async def tool_apply_derivative_edit(
     body: ApplyDerivativeEditRequest | None = None,
     novel: Novel = Depends(require_owned_novel),
     db: AsyncSession = Depends(get_db),
-
 ):
     """Phase 36 derivative 编辑提议 action（36-05，REQ-FORK-02 / REQ-AGENT-03/04/07）：
     创建**一个**候选 DerivativeEditProposal（candidate-only，D-36-02）。
@@ -434,7 +417,6 @@ async def tool_allow_divergence(
     body: AllowDivergenceRequest | None = None,
     novel: Novel = Depends(require_owned_novel),
     db: AsyncSession = Depends(get_db),
-
 ):
     """Phase 37 显式 divergence action（37-05，REQ-FORK-03 / REQ-AGENT-03/04/07）：
     为 blocked / ``needs_override`` 生成候选创建**一个**显式 divergence override
@@ -461,7 +443,6 @@ async def tool_publish_derivative_revision(
     body: PublishDerivativeRevisionRequest | None = None,
     novel: Novel = Depends(require_owned_novel),
     db: AsyncSession = Depends(get_db),
-
 ):
     """Phase 37 独立 publish approval action（37-05，REQ-FORK-03 / REQ-AGENT-03/04/07）：
     只在 **allow_divergence approval 已批准 + 完整 revalidation 通过** 后才为同一
@@ -487,7 +468,6 @@ async def tool_publish_derivative_visual(
     body: PublishDerivativeVisualRequest | None = None,
     novel: Novel = Depends(require_owned_novel),
     db: AsyncSession = Depends(get_db),
-
 ):
     """Phase 38 branch-aware derivative visual action（38-05，REQ-FORK-04 /
     REQ-AGENT-03/04/07）：为**一个**已存储 derivative candidate asset 创建
@@ -519,7 +499,6 @@ async def tool_approve_export(
     body: ApproveExportRequest | None = None,
     novel: Novel = Depends(require_owned_novel),
     db: AsyncSession = Depends(get_db),
-
 ):
     """Phase 39 approve_export action（39-05，REQ-FORK-05 / REQ-AGENT-03/04/07）：
     为**一个**已 finalize 候选 ExportPreparationArtifact 创建**一个** pending
@@ -547,7 +526,6 @@ async def tool_materialize_export(
     body: MaterializeExportRequest | None = None,
     novel: Novel = Depends(require_owned_novel),
     db: AsyncSession = Depends(get_db),
-
 ):
     """Phase 39 materialize_export action（39-05，REQ-FORK-05 / REQ-AGENT-03/04/07）：
     确定性 materializer 消费**一个**已批准的 approve_export ApprovalRequest。

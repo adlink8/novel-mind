@@ -221,7 +221,9 @@ async def agent_tool_error_handler(request: Request, exc: AgentToolError):
 # 请求校验失败（FastAPI 422）: agent-tools / gateway 路径包装为冻结的
 # invalid_input 错误码；其余路径保持 FastAPI 默认 422 形状，避免回归。
 @app.exception_handler(RequestValidationError)
-async def request_validation_error_handler(request: Request, exc: RequestValidationError):
+async def request_validation_error_handler(
+    request: Request, exc: RequestValidationError
+):
     if request.url.path.startswith("/api/agent-tools") or request.url.path.startswith(
         "/api/gateway"
     ):
@@ -231,7 +233,9 @@ async def request_validation_error_handler(request: Request, exc: RequestValidat
         )
     from fastapi.encoders import jsonable_encoder
 
-    return JSONResponse(status_code=422, content={"detail": jsonable_encoder(exc.errors())})
+    return JSONResponse(
+        status_code=422, content={"detail": jsonable_encoder(exc.errors())}
+    )
 
 
 # ── 注册 API 路由 ──

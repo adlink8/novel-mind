@@ -204,9 +204,7 @@ async def route_skill(
     return {
         "skills": active,
         "primary": active[0],
-        "question_hash": hashlib.sha256(
-            data.question.encode("utf-8")
-        ).hexdigest(),
+        "question_hash": hashlib.sha256(data.question.encode("utf-8")).hexdigest(),
         "input_anchor": anchors if anchors else None,
     }
 
@@ -407,7 +405,9 @@ async def finalize_skill_run_endpoint(
                     materialize_skill_run,
                 )
 
-                background_tasks.add_task(materialize_skill_run, request_factory, run_id)
+                background_tasks.add_task(
+                    materialize_skill_run, request_factory, run_id
+                )
     except Exception as exc:  # noqa: BLE001 — 冻结码映射到 HTTP
         raise HTTPException(
             status_code=502,
@@ -787,7 +787,9 @@ async def claim_queued_run(
     claimed = row.mappings().first()
     if claimed is None:
         await db.rollback()
-        raise HTTPException(status_code=409, detail="运行不可 claim（非 queued 或已在途）")
+        raise HTTPException(
+            status_code=409, detail="运行不可 claim（非 queued 或已在途）"
+        )
 
     internal_token = secrets.token_urlsafe(32)
     token_hash = hashlib.sha256(internal_token.encode("utf-8")).hexdigest()
@@ -795,12 +797,8 @@ async def claim_queued_run(
         text("UPDATE skill_runs SET internal_token_hash = :h WHERE id = :id"),
         {"h": token_hash, "id": run_id},
     )
-    skill_name = (
-        await db.scalar(
-            select(SkillVersion).where(
-                SkillVersion.id == claimed["skill_version_id"]
-            )
-        )
+    skill_name = await db.scalar(
+        select(SkillVersion).where(SkillVersion.id == claimed["skill_version_id"])
     )
     skill_name_value = skill_name.name if skill_name is not None else None
     await db.commit()

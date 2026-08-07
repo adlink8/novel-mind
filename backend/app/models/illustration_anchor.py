@@ -236,9 +236,7 @@ class IllustrationAnchorProposal(TimestampMixin, Base):
     citation: Mapped[str] = mapped_column(String(1000), nullable=False)
     approved_by: Mapped[str | None] = mapped_column(String(200))
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    canonical_payload: Mapped[dict] = mapped_column(
-        JSONB, nullable=False, default=dict
-    )
+    canonical_payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     canonical_payload_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     idempotency_key: Mapped[str] = mapped_column(String(64), nullable=False)
     projection_hash: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -387,9 +385,7 @@ class IllustrationAnchor(TimestampMixin, Base):
     citation: Mapped[str] = mapped_column(String(1000), nullable=False)
     approved_by: Mapped[str | None] = mapped_column(String(200))
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    canonical_payload: Mapped[dict] = mapped_column(
-        JSONB, nullable=False, default=dict
-    )
+    canonical_payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     canonical_payload_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     idempotency_key: Mapped[str] = mapped_column(String(64), nullable=False)
     projection_hash: Mapped[str] = mapped_column(String(64), nullable=False)

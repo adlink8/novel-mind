@@ -70,7 +70,6 @@ from app.schemas.key_scene import (
 )
 from app.services.agent_runtime.finalize import (
     ERROR_CODE_FAILED_VALIDATION,
-    ERROR_CODE_INVALID_STOP_REASON,
     ERROR_CODE_UPSTREAM_ERROR,
     finalize_skill_run,
 )
@@ -600,9 +599,7 @@ async def _assert_zero_writes(factory, *, run_id: int) -> None:
     assert await _count_approvals(factory, run_id=run_id) == 0
 
 
-async def _set_up(
-    factory, sync_url: str, *, suffix: str
-) -> dict[str, Any]:
+async def _set_up(factory, sync_url: str, *, suffix: str) -> dict[str, Any]:
     """seed owner/novel + 注册 detect-key-scenes + 构建候选集契约 + 创建 run。"""
     seed = _seed_owner_novel(sync_url, suffix=suffix)
     svid = await _register_skill(
@@ -614,9 +611,7 @@ async def _set_up(
         ),
     )
     snapshot_hash = _snapshot_hash(seed)
-    set_contract, evidence_key = _build_set_contract(
-        seed, snapshot_hash=snapshot_hash
-    )
+    set_contract, evidence_key = _build_set_contract(seed, snapshot_hash=snapshot_hash)
     run_input = {
         "novel_id": seed["novel_id"],
         "branch": None,
@@ -718,9 +713,7 @@ async def test_phase31_happy_path_scene_candidate_artifact_and_freeze(
     持久化候选集 → `key_scene:approve` 用户选择/审查（review/freeze）→ frozen；
     Chapter 零变更。"""
     client, factory, sync_url = api_client
-    ctx = await _set_up(
-        runtime_factory, sync_url, suffix=f"ok_{uuid.uuid4().hex[:6]}"
-    )
+    ctx = await _set_up(runtime_factory, sync_url, suffix=f"ok_{uuid.uuid4().hex[:6]}")
     svid, run_id = ctx["skill_version_id"], ctx["run_id"]
     evidence_key = ctx["evidence_key"]
 
@@ -797,9 +790,10 @@ async def test_phase31_happy_path_scene_candidate_artifact_and_freeze(
 
     content = revision.content
     # 服务器重放：剥离 trail 后重算 repaired_hash 必须一致。
-    assert canonical_content_hash(_strip_trail(content)) == content["normalization"][
-        "repaired_hash"
-    ]
+    assert (
+        canonical_content_hash(_strip_trail(content))
+        == content["normalization"]["repaired_hash"]
+    )
     # 血缘绑定。
     assert content["owner_id"] == ctx["owner_id"]
     assert content["novel_id"] == ctx["novel_id"]
@@ -871,9 +865,9 @@ async def test_phase31_happy_path_scene_candidate_artifact_and_freeze(
     # Original Canon 零变更（D-31-01）：chapter 内容未被触碰。
     async with runtime_factory() as session:
         chapter_row = await session.scalar(
-            select(Chapter).options(undefer(Chapter.content)).where(
-                Chapter.id == ctx["chapter1_id"]
-            )
+            select(Chapter)
+            .options(undefer(Chapter.content))
+            .where(Chapter.id == ctx["chapter1_id"])
         )
     assert chapter_row is not None and chapter_row.content == CH_ACTION
 
@@ -983,7 +977,9 @@ async def test_phase31_timeout_nonstop_reason_fails(
     await _assert_zero_writes(runtime_factory, run_id=ctx["run_id"])
 
 
-async def test_phase31_wrong_owner_lineage_blocks(runtime_factory, migrated_postgres: str):
+async def test_phase31_wrong_owner_lineage_blocks(
+    runtime_factory, migrated_postgres: str
+):
     """envelope owner 血缘与 run 不符 → blocked，零写入（不补默认值）。"""
     ctx = await _set_up(
         runtime_factory, migrated_postgres, suffix=f"own_{uuid.uuid4().hex[:6]}"
@@ -1214,8 +1210,7 @@ async def test_phase31_approval_bypass_review_state_blocks(
     )
     assert outcome.status == "failed"
     assert (
-        outcome.status_reason is not None
-        and "approval bypass" in outcome.status_reason
+        outcome.status_reason is not None and "approval bypass" in outcome.status_reason
     )
     await _assert_zero_writes(runtime_factory, run_id=ctx["run_id"])
 
@@ -1251,10 +1246,7 @@ async def test_phase31_candidate_evidence_mismatch_blocks(
         frozen_manifest={"evidence_refs": [ctx["evidence_key"], "0" * 64]},
     )
     assert outcome.status == "failed"
-    assert (
-        outcome.status_reason is not None
-        and "evidence" in outcome.status_reason
-    )
+    assert outcome.status_reason is not None and "evidence" in outcome.status_reason
     await _assert_zero_writes(runtime_factory, run_id=ctx["run_id"])
 
 
@@ -1276,7 +1268,9 @@ async def test_phase31_unknown_evidence_ref_blocks(
         tool_runs=[{"tool_name": "get_evidence_span", "calls": 1}],
     )
     # 白名单只含真实候选证据；信封额外声明一个不在 manifest 的未知 ref。
-    unknown = "qp:1:0:10:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    unknown = (
+        "qp:1:0:10:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    )
     envelope["evidence_refs"] = [ctx["evidence_key"], unknown]
     envelope["normalization"]["repaired_hash"] = canonical_content_hash(
         _strip_trail(envelope)
@@ -1313,9 +1307,7 @@ async def test_phase31_heuristic_signal_isolation_enforced(
             "heuristic_signal": SpeakerDialogueHeuristicSignal(
                 availability=HeuristicSignalAvailability.AVAILABLE,
                 speaker_offsets=[
-                    SpeakerOffset(
-                        offset_start=100, offset_end=110, speaker_key="arin"
-                    )
+                    SpeakerOffset(offset_start=100, offset_end=110, speaker_key="arin")
                 ],
                 dialogue_offsets=[],
                 confidence=0.9,
@@ -1381,9 +1373,7 @@ async def test_phase31_http_end_to_end_candidate_artifact_no_agent_approval(
     svid = resp.json()["id"]
 
     snapshot_hash = _snapshot_hash(seed)
-    set_contract, evidence_key = _build_set_contract(
-        seed, snapshot_hash=snapshot_hash
-    )
+    set_contract, evidence_key = _build_set_contract(seed, snapshot_hash=snapshot_hash)
     run_input = {
         "novel_id": seed["novel_id"],
         "question": "请为这本小说检测关键场景候选。",

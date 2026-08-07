@@ -58,7 +58,9 @@ pytestmark = [pytest.mark.unit, pytest.mark.adversarial]
 
 HEX64 = "a" * 64
 
-SERVICE_DIR = Path(__file__).resolve().parents[2] / "app" / "services" / "derivative_generation"
+SERVICE_DIR = (
+    Path(__file__).resolve().parents[2] / "app" / "services" / "derivative_generation"
+)
 GATES_SOURCE = (SERVICE_DIR / "gates.py").read_text(encoding="utf-8")
 FIXTURES_SOURCE = (SERVICE_DIR / "fixtures.py").read_text(encoding="utf-8")
 
@@ -103,7 +105,9 @@ def test_wrong_character_knowledge_fails_closed_and_locatable():
     )
     assert result.verdict is GateVerdict.BLOCKED
     assert result.has_code(CODE_CHARACTER_CONTRADICTION)
-    violation = next(v for v in result.violations if v.code == CODE_CHARACTER_CONTRADICTION)
+    violation = next(
+        v for v in result.violations if v.code == CODE_CHARACTER_CONTRADICTION
+    )
     assert "world_state" in violation.field
     assert "hero" in violation.detail or violation.claim_key == "hero-knows-secret"
 
@@ -173,7 +177,9 @@ def test_violation_never_repairs_package_or_candidate():
     package = build_package()
     before = copy.deepcopy(package)
     result = _run(
-        build_candidate_json(draft="阿宁宣告他知道秘密。", citations=[OUTSIDE_EVIDENCE]),
+        build_candidate_json(
+            draft="阿宁宣告他知道秘密。", citations=[OUTSIDE_EVIDENCE]
+        ),
         package,
     )
     assert result.verdict is GateVerdict.BLOCKED
@@ -263,7 +269,9 @@ def test_evidence_outside_package_is_never_silently_dropped():
     assert result.verdict is GateVerdict.BLOCKED
     assert result.has_code(CODE_EVIDENCE_OUTSIDE_PACKAGE)
     # The forged ref is retained in the violation, never silently dropped.
-    violation = next(v for v in result.violations if v.code == CODE_EVIDENCE_OUTSIDE_PACKAGE)
+    violation = next(
+        v for v in result.violations if v.code == CODE_EVIDENCE_OUTSIDE_PACKAGE
+    )
     assert violation.evidence_keys == [OUTSIDE_EVIDENCE]
 
 
@@ -298,7 +306,9 @@ def test_frozen_qualification_set_never_silently_publishes_a_violation():
     for fixture_key in FIXTURE_KEYS:
         payload = build_fixture(fixture_key)
         ok, result, missing = qualify_fixture(payload)
-        assert ok, f"{fixture_key} diverged: verdict={result.verdict.value} missing={missing}"
+        assert ok, (
+            f"{fixture_key} diverged: verdict={result.verdict.value} missing={missing}"
+        )
         if payload["expected_verdict"] == "blocked":
             assert result.verdict is GateVerdict.BLOCKED
             assert result.reason is not None
@@ -308,8 +318,14 @@ def test_frozen_qualification_set_never_silently_publishes_a_violation():
 
 
 def test_frozen_fixture_hash_is_deterministic_across_builds():
-    hashes = {fixture_key: build_fixture(fixture_key)["fixture_hash"] for fixture_key in FIXTURE_KEYS}
-    again = {fixture_key: build_fixture(fixture_key)["fixture_hash"] for fixture_key in FIXTURE_KEYS}
+    hashes = {
+        fixture_key: build_fixture(fixture_key)["fixture_hash"]
+        for fixture_key in FIXTURE_KEYS
+    }
+    again = {
+        fixture_key: build_fixture(fixture_key)["fixture_hash"]
+        for fixture_key in FIXTURE_KEYS
+    }
     assert hashes == again
     assert len(set(hashes.values())) == len(FIXTURE_KEYS)
 
@@ -406,7 +422,9 @@ def test_gate_never_reuses_divergence_or_publish_approval():
         "PublicationApproval",
     ):
         assert identifier not in GATES_SOURCE, f"gates must not touch {identifier!r}"
-        assert identifier not in FIXTURES_SOURCE, f"fixtures must not touch {identifier!r}"
+        assert identifier not in FIXTURES_SOURCE, (
+            f"fixtures must not touch {identifier!r}"
+        )
 
 
 def test_branch_suggestions_are_candidate_only_outputs():
@@ -462,7 +480,11 @@ def test_gates_module_is_provider_and_db_free():
 def test_gates_and_fixtures_never_write_original_or_interpretation():
     """No Original Canon / User Interpretation write model is reachable."""
     for source in (GATES_SOURCE, FIXTURES_SOURCE):
-        for forbidden in ("CanonSpaceArtifact", "original_canon", "user_interpretation"):
+        for forbidden in (
+            "CanonSpaceArtifact",
+            "original_canon",
+            "user_interpretation",
+        ):
             assert forbidden not in source, f"{forbidden!r} must not appear"
 
 

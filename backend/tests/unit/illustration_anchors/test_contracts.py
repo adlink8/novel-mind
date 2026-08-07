@@ -36,7 +36,6 @@ from app.models.agent_runtime import ApprovalRequest
 from app.models.illustration_job import IllustrationJob
 from app.models.illustration import AssetRevision
 from app.models.illustration_anchor import (
-    AnchorRange,
     IllustrationAnchor,
     IllustrationAnchorProposal,
 )
@@ -198,9 +197,7 @@ def _proposal(**overrides):
     proposal = IllustrationAnchorProposalContract.model_validate(payload)
     if "idempotency_key" not in overrides:
         proposal = proposal.model_copy(
-            update={
-                "idempotency_key": build_anchor_proposal_idempotency_key(proposal)
-            }
+            update={"idempotency_key": build_anchor_proposal_idempotency_key(proposal)}
         )
     return proposal
 
@@ -284,8 +281,14 @@ def test_anchor_vocabulary_is_closed_and_pinned():
     assert set(ILLUSTRATION_ANCHOR_PUBLISHED_STATUSES) <= set(
         ILLUSTRATION_ANCHOR_STATUSES
     )
-    assert STATUSES_HASH == "4a2faf4f17d71414638695ddc11cc8f7478886250b88d542848cc8c58a15f50e"
-    assert PUBLISHED_STATUSES_HASH == "c2b7ea392a01410bfee652b4b86e97105fc6149f5b31ddf4a08170b2094d6b26"
+    assert (
+        STATUSES_HASH
+        == "4a2faf4f17d71414638695ddc11cc8f7478886250b88d542848cc8c58a15f50e"
+    )
+    assert (
+        PUBLISHED_STATUSES_HASH
+        == "c2b7ea392a01410bfee652b4b86e97105fc6149f5b31ddf4a08170b2094d6b26"
+    )
 
 
 def test_published_anchor_statuses_exclude_candidate_states():
@@ -516,9 +519,7 @@ def test_proposal_gate_accepts_exact_span_only():
     assert result.status is AnchorStatus.PROPOSED
 
     wrong_hash = _proposal(anchor_hash=HEX64_C)
-    result = validate_anchor_proposal_contract(
-        wrong_hash, chapter_content=CHAPTER_TEXT
-    )
+    result = validate_anchor_proposal_contract(wrong_hash, chapter_content=CHAPTER_TEXT)
     assert result.ok is False
     assert result.reason_code == "anchor_hash_mismatch"
 
@@ -594,22 +595,14 @@ async def test_validation_service_scope_and_persisted_asset(
 ):
     service = AnchorValidationService(db_session)
     with pytest.raises(ValueError):
-        await service.validate_exact(
-            owner_id=0, novel_id=22, proposal=_proposal()
-        )
+        await service.validate_exact(owner_id=0, novel_id=22, proposal=_proposal())
     with pytest.raises(ValueError):
-        await service.validate_exact(
-            owner_id=11, novel_id=-1, proposal=_proposal()
-        )
+        await service.validate_exact(owner_id=11, novel_id=-1, proposal=_proposal())
     with pytest.raises(ValueError):
-        await service.validate_exact(
-            owner_id=12, novel_id=22, proposal=_proposal()
-        )
+        await service.validate_exact(owner_id=12, novel_id=22, proposal=_proposal())
     # No persisted asset in this scope -> gate error (not silently accepted).
     with pytest.raises(ValueError):
-        await service.validate_exact(
-            owner_id=11, novel_id=22, proposal=_proposal()
-        )
+        await service.validate_exact(owner_id=11, novel_id=22, proposal=_proposal())
 
 
 # ---------------------------------------------------------------------------
@@ -759,9 +752,7 @@ def test_proposal_orm_carries_contract_columns_and_constraints():
 
 def test_anchor_orm_carries_published_shape_constraint():
     check_names = {
-        c.name
-        for c in IllustrationAnchor.__table__.constraints
-        if hasattr(c, "name")
+        c.name for c in IllustrationAnchor.__table__.constraints if hasattr(c, "name")
     }
     assert "ck_illustration_anchors_status" in check_names
     assert "ck_illustration_anchors_publish_shape" in check_names

@@ -63,7 +63,6 @@ from app.services.agent_runtime.structured_output_integrity import (
 from app.services.agent_tools.facade import ToolFacade
 from app.services.canon_fork.materializer import (
     ForkMaterializeError,
-    create_fork_proposal,
     materialize_approved_fork,
 )
 from app.services.canon_fork.snapshot import (
@@ -334,9 +333,7 @@ async def _count(
             )
         return int(
             await session.scalar(
-                select(func.count())
-                .select_from(model)
-                .where(model.run_id == run_id)  # type: ignore[attr-defined]
+                select(func.count()).select_from(model).where(model.run_id == run_id)  # type: ignore[attr-defined]
             )
             or 0
         )
@@ -442,7 +439,8 @@ def _build_envelope(
         "fork": "fork-1" if ctx.get("branch") else None,
         "source_version_key": ctx.get("source_version_key", "original:1"),
         "source_snapshot_id": ctx.get(
-            "source_snapshot_id", f"novel:{ctx['novel_id']}:{ctx['source_snapshot_hash'][:16]}"
+            "source_snapshot_id",
+            f"novel:{ctx['novel_id']}:{ctx['source_snapshot_hash'][:16]}",
         ),
         "source_snapshot_hash": ctx["source_snapshot_hash"],
         "through_chapter": ctx.get("through_chapter", 2),
@@ -702,7 +700,10 @@ async def test_phase35_happy_path_proposal_to_materialize(
     }
     envelope = _build_envelope(ctx)
     outcome = await _finalize(
-        runtime_factory, run_id=run_id, envelope=envelope, frozen_manifest=frozen_manifest
+        runtime_factory,
+        run_id=run_id,
+        envelope=envelope,
+        frozen_manifest=frozen_manifest,
     )
     assert outcome.status == "completed", outcome.status_reason
     assert outcome.artifact_id is not None
@@ -746,7 +747,9 @@ async def test_phase35_happy_path_proposal_to_materialize(
 
     # 用户 Web 确认 → 确定性 Fork materializer → approved fork。
     async with runtime_factory() as session:
-        await confirm(session, request_id=approval_id, owner_id=ctx["owner_id"], mode="once")
+        await confirm(
+            session, request_id=approval_id, owner_id=ctx["owner_id"], mode="once"
+        )
         await session.commit()
         outcome = await materialize_approved_fork(
             session,
@@ -785,9 +788,7 @@ async def test_phase35_happy_path_proposal_to_materialize(
 # ────────────────────────── 对抗路径（fail closed，零权威写入） ──────────────────────────
 
 
-async def test_phase35_cancellation_no_write(
-    runtime_factory, migrated_postgres: str
-):
+async def test_phase35_cancellation_no_write(runtime_factory, migrated_postgres: str):
     """取消 → cancelled，0 artifact/revision/ApprovalRequest（cancel-without-write）。"""
     ctx = await _set_up(
         runtime_factory,
@@ -855,13 +856,14 @@ async def test_phase35_wrong_skill_version_lineage_blocks(
         frozen_manifest={"evidence_refs": ["chapter:1", "chapter:2"]},
     )
     assert outcome.status == "failed"
-    assert outcome.status_reason is not None and "skill_version_id" in outcome.status_reason
+    assert (
+        outcome.status_reason is not None
+        and "skill_version_id" in outcome.status_reason
+    )
     await _assert_zero_writes(runtime_factory, run_id=ctx["run_id"])
 
 
-async def test_phase35_stale_input_hash_blocks(
-    runtime_factory, migrated_postgres: str
-):
+async def test_phase35_stale_input_hash_blocks(runtime_factory, migrated_postgres: str):
     """envelope input_hash 与 run 不符（stale）→ blocked，零写入。"""
     ctx = await _set_up(
         runtime_factory,
@@ -880,9 +882,7 @@ async def test_phase35_stale_input_hash_blocks(
     await _assert_zero_writes(runtime_factory, run_id=ctx["run_id"])
 
 
-async def test_phase35_schema_drift_blocks(
-    runtime_factory, migrated_postgres: str
-):
+async def test_phase35_schema_drift_blocks(runtime_factory, migrated_postgres: str):
     """schema drift：proposal_status / delta_status 非 proposed（approval bypass /
     物化伪造）→ blocked，零写入。"""
     ctx = await _set_up(
@@ -900,8 +900,7 @@ async def test_phase35_schema_drift_blocks(
     assert outcome.status == "failed"
     assert outcome.error_code == ERROR_CODE_FAILED_VALIDATION
     assert (
-        outcome.status_reason is not None
-        and "proposal_status" in outcome.status_reason
+        outcome.status_reason is not None and "proposal_status" in outcome.status_reason
     )
     await _assert_zero_writes(runtime_factory, run_id=ctx["run_id"])
 
@@ -919,13 +918,13 @@ async def test_phase35_schema_drift_blocks(
     )
     assert outcome2.status == "failed"
     assert outcome2.error_code == ERROR_CODE_FAILED_VALIDATION
-    assert outcome2.status_reason is not None and "delta_status" in outcome2.status_reason
+    assert (
+        outcome2.status_reason is not None and "delta_status" in outcome2.status_reason
+    )
     await _assert_zero_writes(runtime_factory, run_id=ctx2["run_id"])
 
 
-async def test_phase35_delta_hash_drift_blocks(
-    runtime_factory, migrated_postgres: str
-):
+async def test_phase35_delta_hash_drift_blocks(runtime_factory, migrated_postgres: str):
     """delta content_hash 不从内容重放（schema drift）→ blocked，零写入。"""
     ctx = await _set_up(
         runtime_factory,
@@ -945,9 +944,7 @@ async def test_phase35_delta_hash_drift_blocks(
     await _assert_zero_writes(runtime_factory, run_id=ctx["run_id"])
 
 
-async def test_phase35_wrong_branch_blocks(
-    runtime_factory, migrated_postgres: str
-):
+async def test_phase35_wrong_branch_blocks(runtime_factory, migrated_postgres: str):
     """wrong branch：run 绑定 original 主线（branch=None），envelope 声称 derivative
     分支（branch + fork）→ blocked，零写入。"""
     ctx = await _set_up(
@@ -1046,7 +1043,9 @@ async def test_phase35_approval_payload_hash_drift_blocks_materialize(
     )
     assert outcome.status == "completed"
     async with runtime_factory() as session:
-        await confirm(session, request_id=approval_id, owner_id=ctx["owner_id"], mode="once")
+        await confirm(
+            session, request_id=approval_id, owner_id=ctx["owner_id"], mode="once"
+        )
         approval = await session.get(ApprovalRequest, approval_id)
         approval.payload_hash = "c" * 64  # 篡改重放哈希
         await session.commit()
@@ -1097,7 +1096,9 @@ async def test_phase35_stale_base_revision_blocks_materialize(
     )
     assert outcome.status == "completed"
     async with runtime_factory() as session:
-        await confirm(session, request_id=approval_id, owner_id=ctx["owner_id"], mode="once")
+        await confirm(
+            session, request_id=approval_id, owner_id=ctx["owner_id"], mode="once"
+        )
         await session.commit()
     with pytest.raises(ForkMaterializeError) as exc:
         async with runtime_factory() as session:
@@ -1188,9 +1189,7 @@ async def test_phase35_forbidden_tool_action_never_materializes(
     assert [ch.content for ch in chapters] == list(CHAPTER_TEXTS.values())
 
 
-async def test_phase35_tool_idempotent_replay(
-    runtime_factory, migrated_postgres: str
-):
+async def test_phase35_tool_idempotent_replay(runtime_factory, migrated_postgres: str):
     """create_canon_fork 幂等：重复 fork_key + delta → 重放既有候选 fork + approval
     （一个 fork、一个 approval）。"""
     ctx = await _set_up(
@@ -1267,7 +1266,9 @@ async def test_phase35_materializer_replays_approved_fork(
     )
     assert outcome.status == "completed"
     async with runtime_factory() as session:
-        await confirm(session, request_id=approval_id, owner_id=ctx["owner_id"], mode="once")
+        await confirm(
+            session, request_id=approval_id, owner_id=ctx["owner_id"], mode="once"
+        )
         await session.commit()
         first = await materialize_approved_fork(
             session,

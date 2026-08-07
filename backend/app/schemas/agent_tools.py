@@ -179,7 +179,9 @@ class GetVisualBibleRequest(StrictAgentToolModel):
     approval 权威仍只在 FastAPI review API，本工具只读。
     """
 
-    version_id: int | None = Field(default=None, gt=0, description="Visual Bible 版本 ID")
+    version_id: int | None = Field(
+        default=None, gt=0, description="Visual Bible 版本 ID"
+    )
     approved_only: bool = Field(
         default=False,
         description="只返回已批准（review_state=approved）的候选版本",
@@ -201,7 +203,10 @@ class GenerateImageCandidateRequest(StrictAgentToolModel):
     )
     job_key: str = Field(min_length=1, max_length=120, description="幂等重放作业键")
     provider: str = Field(
-        default="mock", min_length=1, max_length=64, description="提供商（当前仅 mock 配置）"
+        default="mock",
+        min_length=1,
+        max_length=64,
+        description="提供商（当前仅 mock 配置）",
     )
     model: str = Field(
         default="mock-img-v1", min_length=1, max_length=120, description="生成模型"
@@ -231,9 +236,13 @@ class AnchorProposalActionRequest(StrictAgentToolModel):
         default=None, max_length=80, description="衍生分支；原始主线为 null"
     )
     fork: str | None = Field(
-        default=None, max_length=80, description="衍生 fork（仅 derivative mode；original 必须为 null）"
+        default=None,
+        max_length=80,
+        description="衍生 fork（仅 derivative mode；original 必须为 null）",
     )
-    chapter_id: int = Field(gt=0, description="锚点目标章节 ID（服务端重验 owner/novel 血缘）")
+    chapter_id: int = Field(
+        gt=0, description="锚点目标章节 ID（服务端重验 owner/novel 血缘）"
+    )
     chapter_number: int = Field(ge=1, description="锚点目标章节号")
     proposal_key: str = Field(
         min_length=1, max_length=160, description="幂等重放提案键（D-34-01）"
@@ -247,7 +256,9 @@ class AnchorProposalActionRequest(StrictAgentToolModel):
         pattern="^[0-9a-f]{64}$",
         description="source snapshot 血缘 hash",
     )
-    source_start: int = Field(ge=0, description="精确 source span 起点（含，code-point）")
+    source_start: int = Field(
+        ge=0, description="精确 source span 起点（含，code-point）"
+    )
     source_end: int = Field(gt=0, description="精确 source span 终点（不含）")
     paragraph_start: int | None = Field(
         default=None, ge=1, description="可选段落起点（reader/export 布局坐标）"
@@ -271,14 +282,23 @@ class AnchorProposalActionRequest(StrictAgentToolModel):
         description="锚点冻结时的章节正文 SHA-256",
     )
     asset_revision_id: int = Field(
-        gt=0, description="proposal-ready AssetRevision ID（Phase 33 handoff；服务端重验 proposal_ready + rights cleared）"
+        gt=0,
+        description="proposal-ready AssetRevision ID（Phase 33 handoff；服务端重验 proposal_ready + rights cleared）",
     )
-    caption: str = Field(min_length=1, max_length=500, description="可访问 caption（D-34-02）")
-    alt_text: str = Field(min_length=1, max_length=500, description="可访问 alt 文本（D-34-02）")
-    citation: str = Field(min_length=1, max_length=1000, description="引用来源（D-34-02）")
+    caption: str = Field(
+        min_length=1, max_length=500, description="可访问 caption（D-34-02）"
+    )
+    alt_text: str = Field(
+        min_length=1, max_length=500, description="可访问 alt 文本（D-34-02）"
+    )
+    citation: str = Field(
+        min_length=1, max_length=1000, description="引用来源（D-34-02）"
+    )
     # D-15 血缘绑定（可选）：agent 会话已知的 run/skill/artifact 血缘。
     run_id: int | None = Field(default=None, gt=0, description="SkillRun ID 血缘")
-    skill_version_id: int | None = Field(default=None, gt=0, description="SkillVersion ID 血缘")
+    skill_version_id: int | None = Field(
+        default=None, gt=0, description="SkillVersion ID 血缘"
+    )
     artifact_id: int | None = Field(default=None, gt=0, description="Artifact ID 血缘")
     artifact_revision_id: int | None = Field(
         default=None, gt=0, description="ArtifactRevision ID 血缘"
@@ -306,16 +326,23 @@ class CreateCanonForkRequest(StrictAgentToolModel):
         default=None, max_length=80, description="衍生分支；原始主线为 null"
     )
     fork: str | None = Field(
-        default=None, max_length=80, description="衍生 fork（仅 derivative mode；original 必须为 null）"
+        default=None,
+        max_length=80,
+        description="衍生 fork（仅 derivative mode；original 必须为 null）",
     )
     fork_key: str = Field(
-        min_length=1, max_length=128, description="幂等 fork 标识（owner/novel 范围内唯一且不可变，D-35-03）"
+        min_length=1,
+        max_length=128,
+        description="幂等 fork 标识（owner/novel 范围内唯一且不可变，D-35-03）",
     )
     requested_cutoff_chapter: int | None = Field(
-        default=None, ge=1, description="请求的 spoiler cutoff 章节（最终 cutoff 由服务端派生）"
+        default=None,
+        ge=1,
+        description="请求的 spoiler cutoff 章节（最终 cutoff 由服务端派生）",
     )
     full_book_requested: bool = Field(
-        default=False, description="请求全本 cutoff（无显式服务端授权时 fail closed，403）"
+        default=False,
+        description="请求全本 cutoff（无显式服务端授权时 fail closed，403）",
     )
     expected_source_snapshot_hash: str | None = Field(
         default=None,
@@ -325,17 +352,24 @@ class CreateCanonForkRequest(StrictAgentToolModel):
         description="预期的 source snapshot 血缘 hash（服务端重放；stale → 409 拒绝）",
     )
     delta_key: str = Field(
-        min_length=1, max_length=160, description="幂等 delta 提案键（approval payload 绑定）"
+        min_length=1,
+        max_length=160,
+        description="幂等 delta 提案键（approval payload 绑定）",
     )
     delta_content: str = Field(
-        min_length=1, max_length=50000, description="候选 derivative 内容（服务端计算 content_hash 并绑定 approval payload）"
+        min_length=1,
+        max_length=50000,
+        description="候选 derivative 内容（服务端计算 content_hash 并绑定 approval payload）",
     )
     delta_evidence_refs: list[str] = Field(
-        min_length=1, description="delta 引用的 leaf 证据键（必须属于冻结 citation lineage 白名单）"
+        min_length=1,
+        description="delta 引用的 leaf 证据键（必须属于冻结 citation lineage 白名单）",
     )
     # D-15 血缘绑定（可选）：agent 会话已知的 run/skill/artifact 血缘。
     run_id: int | None = Field(default=None, gt=0, description="SkillRun ID 血缘")
-    skill_version_id: int | None = Field(default=None, gt=0, description="SkillVersion ID 血缘")
+    skill_version_id: int | None = Field(
+        default=None, gt=0, description="SkillVersion ID 血缘"
+    )
     artifact_id: int | None = Field(default=None, gt=0, description="Artifact ID 血缘")
     artifact_revision_id: int | None = Field(
         default=None, gt=0, description="ArtifactRevision ID 血缘"
@@ -365,28 +399,36 @@ class ApplyDerivativeEditRequest(StrictAgentToolModel):
         default=None, max_length=80, description="衍生分支；原始主线为 null"
     )
     fork: str | None = Field(
-        default=None, max_length=80, description="衍生 fork（仅 derivative mode；original 必须为 null）"
+        default=None,
+        max_length=80,
+        description="衍生 fork（仅 derivative mode；original 必须为 null）",
     )
     project_id: int = Field(
-        gt=0, description="derivative project ID（服务端重验 owner/novel + fanfiction_canon 空间）"
+        gt=0,
+        description="derivative project ID（服务端重验 owner/novel + fanfiction_canon 空间）",
     )
     chapter_id: int = Field(
         gt=0, description="派生 chapter ID（服务端重验 project 范围）"
     )
-    chapter_number: int = Field(
-        ge=1, description="派生 chapter 序号（血缘/审计标注）"
-    )
+    chapter_number: int = Field(ge=1, description="派生 chapter 序号（血缘/审计标注）")
     proposal_key: str = Field(
-        min_length=1, max_length=160, description="幂等 proposal 键（approval payload 绑定，重放追溯）"
+        min_length=1,
+        max_length=160,
+        description="幂等 proposal 键（approval payload 绑定，重放追溯）",
     )
     base_revision: int = Field(
-        gt=0, description="chapter 乐观并发 token（同一 base_revision CAS，D-36-02；绝不 last-write-wins）"
+        gt=0,
+        description="chapter 乐观并发 token（同一 base_revision CAS，D-36-02；绝不 last-write-wins）",
     )
     content: str = Field(
-        min_length=1, max_length=50000, description="候选 Markdown patch（Fanfiction Canon draft；服务端计算 content_hash 并绑定 approval payload）"
+        min_length=1,
+        max_length=50000,
+        description="候选 Markdown patch（Fanfiction Canon draft；服务端计算 content_hash 并绑定 approval payload）",
     )
     source_snapshot_id: str | None = Field(
-        default=None, max_length=160, description="source snapshot 血缘 ID（project 冻结 fork 血缘）"
+        default=None,
+        max_length=160,
+        description="source snapshot 血缘 ID（project 冻结 fork 血缘）",
     )
     source_snapshot_hash: str | None = Field(
         default=None,
@@ -396,11 +438,14 @@ class ApplyDerivativeEditRequest(StrictAgentToolModel):
         description="source snapshot 血缘 hash（服务端与 project 冻结 fork 血缘重放；drift → fail closed）",
     )
     evidence_refs: list[str] = Field(
-        min_length=1, description="proposal 引用的 leaf 证据键（必须属于冻结 manifest 白名单）"
+        min_length=1,
+        description="proposal 引用的 leaf 证据键（必须属于冻结 manifest 白名单）",
     )
     # D-15 血缘绑定（可选）：agent 会话已知的 run/skill/artifact 血缘。
     run_id: int | None = Field(default=None, gt=0, description="SkillRun ID 血缘")
-    skill_version_id: int | None = Field(default=None, gt=0, description="SkillVersion ID 血缘")
+    skill_version_id: int | None = Field(
+        default=None, gt=0, description="SkillVersion ID 血缘"
+    )
     artifact_id: int | None = Field(default=None, gt=0, description="Artifact ID 血缘")
     artifact_revision_id: int | None = Field(
         default=None, gt=0, description="ArtifactRevision ID 血缘"
@@ -429,26 +474,34 @@ class AllowDivergenceRequest(StrictAgentToolModel):
         default=None, max_length=80, description="衍生分支；原始主线为 null"
     )
     fork: str | None = Field(
-        default=None, max_length=80, description="衍生 fork（仅 derivative mode；original 必须为 null）"
+        default=None,
+        max_length=80,
+        description="衍生 fork（仅 derivative mode；original 必须为 null）",
     )
     project_id: int = Field(
-        gt=0, description="derivative project ID（服务端重验 owner/novel + fanfiction_canon 空间）"
+        gt=0,
+        description="derivative project ID（服务端重验 owner/novel + fanfiction_canon 空间）",
     )
     chapter_id: int = Field(
         gt=0, description="派生 chapter ID（服务端重验 project 范围）"
     )
     candidate_id: int = Field(
-        gt=0, description="generation candidate ID（服务端重验 owner/novel 血缘 + overridable verdict）"
+        gt=0,
+        description="generation candidate ID（服务端重验 owner/novel 血缘 + overridable verdict）",
     )
     reason: str = Field(
-        min_length=1, max_length=4000, description="显式 divergence 理由（空 → fail closed）"
+        min_length=1,
+        max_length=4000,
+        description="显式 divergence 理由（空 → fail closed）",
     )
     affected_evidence: list[str] = Field(
         default_factory=list,
         description="受影响的 leaf 证据键（必须 ⊆ 冻结 package 白名单；候选已声明 CanonDelta 时可省略）",
     )
     kind: str | None = Field(
-        default=None, max_length=32, description="可选 CanonDelta 类型（候选未声明时必填）"
+        default=None,
+        max_length=32,
+        description="可选 CanonDelta 类型（候选未声明时必填）",
     )
     draft_hash: str = Field(
         min_length=64,
@@ -464,7 +517,9 @@ class AllowDivergenceRequest(StrictAgentToolModel):
     )
     # D-15 血缘绑定（可选）：agent 会话已知的 run/skill/artifact 血缘。
     run_id: int | None = Field(default=None, gt=0, description="SkillRun ID 血缘")
-    skill_version_id: int | None = Field(default=None, gt=0, description="SkillVersion ID 血缘")
+    skill_version_id: int | None = Field(
+        default=None, gt=0, description="SkillVersion ID 血缘"
+    )
     artifact_id: int | None = Field(default=None, gt=0, description="Artifact ID 血缘")
     artifact_revision_id: int | None = Field(
         default=None, gt=0, description="ArtifactRevision ID 血缘"
@@ -488,10 +543,13 @@ class PublishDerivativeRevisionRequest(StrictAgentToolModel):
         default=None, max_length=80, description="衍生分支；原始主线为 null"
     )
     fork: str | None = Field(
-        default=None, max_length=80, description="衍生 fork（仅 derivative mode；original 必须为 null）"
+        default=None,
+        max_length=80,
+        description="衍生 fork（仅 derivative mode；original 必须为 null）",
     )
     override_id: int = Field(
-        gt=0, description="已存在的 pending DerivativeOverride ID（服务端重验 owner/novel 血缘）"
+        gt=0,
+        description="已存在的 pending DerivativeOverride ID（服务端重验 owner/novel 血缘）",
     )
     draft_hash: str = Field(
         min_length=64,
@@ -510,7 +568,9 @@ class PublishDerivativeRevisionRequest(StrictAgentToolModel):
     )
     # D-15 血缘绑定（可选）：agent 会话已知的 run/skill/artifact 血缘。
     run_id: int | None = Field(default=None, gt=0, description="SkillRun ID 血缘")
-    skill_version_id: int | None = Field(default=None, gt=0, description="SkillVersion ID 血缘")
+    skill_version_id: int | None = Field(
+        default=None, gt=0, description="SkillVersion ID 血缘"
+    )
     artifact_id: int | None = Field(default=None, gt=0, description="Artifact ID 血缘")
     artifact_revision_id: int | None = Field(
         default=None, gt=0, description="ArtifactRevision ID 血缘"
@@ -541,10 +601,13 @@ class PublishDerivativeVisualRequest(StrictAgentToolModel):
         default=None, max_length=80, description="衍生分支；原始主线为 null"
     )
     fork: str | None = Field(
-        default=None, max_length=80, description="衍生 fork（仅 derivative mode；original 必须为 null）"
+        default=None,
+        max_length=80,
+        description="衍生 fork（仅 derivative mode；original 必须为 null）",
     )
     candidate_asset_id: int = Field(
-        gt=0, description="已存储 derivative candidate asset ID（服务端重验 owner/novel/fork 血缘 + approvable review_state）"
+        gt=0,
+        description="已存储 derivative candidate asset ID（服务端重验 owner/novel/fork 血缘 + approvable review_state）",
     )
     scene_spec_hash: str = Field(
         min_length=64,
@@ -557,7 +620,9 @@ class PublishDerivativeVisualRequest(StrictAgentToolModel):
     )
     # D-15 血缘绑定（可选）：agent 会话已知的 run/skill/artifact 血缘。
     run_id: int | None = Field(default=None, gt=0, description="SkillRun ID 血缘")
-    skill_version_id: int | None = Field(default=None, gt=0, description="SkillVersion ID 血缘")
+    skill_version_id: int | None = Field(
+        default=None, gt=0, description="SkillVersion ID 血缘"
+    )
     artifact_id: int | None = Field(default=None, gt=0, description="Artifact ID 血缘")
     artifact_revision_id: int | None = Field(
         default=None, gt=0, description="ArtifactRevision ID 血缘"
@@ -586,16 +651,21 @@ class ApproveExportRequest(StrictAgentToolModel):
         default=None, max_length=80, description="衍生分支；原始主线为 null"
     )
     fork: str | None = Field(
-        default=None, max_length=80, description="衍生 fork（仅 derivative mode；original 必须为 null）"
+        default=None,
+        max_length=80,
+        description="衍生 fork（仅 derivative mode；original 必须为 null）",
     )
     project_id: int = Field(
-        gt=0, description="derivative project ID（服务端重验 owner/novel + fanfiction_canon 空间）"
+        gt=0,
+        description="derivative project ID（服务端重验 owner/novel + fanfiction_canon 空间）",
     )
     artifact_id: int = Field(
-        gt=0, description="候选 ExportPreparationArtifact ID（服务端重验 owner/novel + candidate status）"
+        gt=0,
+        description="候选 ExportPreparationArtifact ID（服务端重验 owner/novel + candidate status）",
     )
     artifact_revision_id: int = Field(
-        gt=0, description="候选 ArtifactRevision ID（approval payload 绑定；必须是当前修订）"
+        gt=0,
+        description="候选 ArtifactRevision ID（approval payload 绑定；必须是当前修订）",
     )
     preparation_hash: str = Field(
         min_length=64,
@@ -608,7 +678,9 @@ class ApproveExportRequest(StrictAgentToolModel):
     )
     # D-15 血缘绑定（可选）：agent 会话已知的 run/skill 血缘。
     run_id: int | None = Field(default=None, gt=0, description="SkillRun ID 血缘")
-    skill_version_id: int | None = Field(default=None, gt=0, description="SkillVersion ID 血缘")
+    skill_version_id: int | None = Field(
+        default=None, gt=0, description="SkillVersion ID 血缘"
+    )
 
 
 class MaterializeExportRequest(StrictAgentToolModel):
@@ -630,19 +702,25 @@ class MaterializeExportRequest(StrictAgentToolModel):
         default=None, max_length=80, description="衍生分支；原始主线为 null"
     )
     fork: str | None = Field(
-        default=None, max_length=80, description="衍生 fork（仅 derivative mode；original 必须为 null）"
+        default=None,
+        max_length=80,
+        description="衍生 fork（仅 derivative mode；original 必须为 null）",
     )
     project_id: int = Field(
-        gt=0, description="derivative project ID（服务端重验 owner/novel + fanfiction_canon 空间）"
+        gt=0,
+        description="derivative project ID（服务端重验 owner/novel + fanfiction_canon 空间）",
     )
     artifact_id: int = Field(
-        gt=0, description="候选 ExportPreparationArtifact ID（只接受 approved artifact）"
+        gt=0,
+        description="候选 ExportPreparationArtifact ID（只接受 approved artifact）",
     )
     artifact_revision_id: int = Field(
-        gt=0, description="候选 ArtifactRevision ID（approval payload 绑定；必须是当前修订）"
+        gt=0,
+        description="候选 ArtifactRevision ID（approval payload 绑定；必须是当前修订）",
     )
     approval_id: int = Field(
-        gt=0, description="已批准的 approve_export ApprovalRequest ID（服务端重验 action + status + preparation_hash）"
+        gt=0,
+        description="已批准的 approve_export ApprovalRequest ID（服务端重验 action + status + preparation_hash）",
     )
     preparation_hash: str = Field(
         min_length=64,
@@ -651,11 +729,15 @@ class MaterializeExportRequest(StrictAgentToolModel):
         description="候选冻结 preparation hash（必须与 approve_export approval payload_hash 一致）",
     )
     reason: str | None = Field(
-        default=None, max_length=4000, description="确定性 materialize 理由（展示/审计）"
+        default=None,
+        max_length=4000,
+        description="确定性 materialize 理由（展示/审计）",
     )
     # D-15 血缘绑定（可选）：agent 会话已知的 run/skill 血缘。
     run_id: int | None = Field(default=None, gt=0, description="SkillRun ID 血缘")
-    skill_version_id: int | None = Field(default=None, gt=0, description="SkillVersion ID 血缘")
+    skill_version_id: int | None = Field(
+        default=None, gt=0, description="SkillVersion ID 血缘"
+    )
 
 
 # ────────────────────────── 统一错误信封 ──────────────────────────

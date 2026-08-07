@@ -132,9 +132,7 @@ def _chapter_progress(stages: list[NarrativeMemoryBuildStage], total: int) -> fl
     if not total:
         return 0.0
     completed = sum(
-        1
-        for s in stages
-        if s.stage_kind == "chapter_state" and s.status == "completed"
+        1 for s in stages if s.stage_kind == "chapter_state" and s.status == "completed"
     )
     return round(min(completed / total, 1.0), 4)
 
@@ -201,16 +199,21 @@ async def load_durable_progress(
         ).all()
         checkpoint_counts = dict(
             Counter(
-                checkpoint.terminal_state or "unknown"
-                for checkpoint in checkpoint_rows
+                checkpoint.terminal_state or "unknown" for checkpoint in checkpoint_rows
             )
         )
 
-    chapter_numbers = list((run.progress or {}).get("chapter_numbers") or []) if run else []
+    chapter_numbers = (
+        list((run.progress or {}).get("chapter_numbers") or []) if run else []
+    )
     progress, resumable, stage_counts = _stage_progress(stages, len(chapter_numbers))
 
-    stored_dimensions = dict((run.progress or {}).get("dimension_statuses") or {}) if run else {}
-    dimensions = dimension_statuses if dimension_statuses is not None else stored_dimensions
+    stored_dimensions = (
+        dict((run.progress or {}).get("dimension_statuses") or {}) if run else {}
+    )
+    dimensions = (
+        dimension_statuses if dimension_statuses is not None else stored_dimensions
+    )
 
     snapshot = DurableProgressSnapshot(
         run_id=int(run.id) if run else None,

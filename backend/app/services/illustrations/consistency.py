@@ -77,9 +77,7 @@ class ConsistencyPolicy(StrictIllustrationModel):
     @model_validator(mode="after")
     def thresholds_are_monotone(self) -> "ConsistencyPolicy":
         if self.identity_fail_below > self.identity_concern_below:
-            raise ValueError(
-                "identity_fail_below must be <= identity_concern_below"
-            )
+            raise ValueError("identity_fail_below must be <= identity_concern_below")
         if self.style_fail_below > self.style_concern_below:
             raise ValueError("style_fail_below must be <= style_concern_below")
         return self
@@ -190,7 +188,9 @@ def _report_idempotency_key(
             "scene_key": evidence.scene_key,
             "identity_attributes": sorted(evidence.identity_attributes),
             "style_attributes": sorted(evidence.style_attributes),
-            "negative_constraints_present": sorted(evidence.negative_constraints_present),
+            "negative_constraints_present": sorted(
+                evidence.negative_constraints_present
+            ),
             "policy": _policy_dict(fixture.policy),
         }
     )
@@ -219,7 +219,9 @@ def _unavailable_idempotency_key(
             "scene_key": evidence.scene_key,
             "identity_attributes": sorted(evidence.identity_attributes),
             "style_attributes": sorted(evidence.style_attributes),
-            "negative_constraints_present": sorted(evidence.negative_constraints_present),
+            "negative_constraints_present": sorted(
+                evidence.negative_constraints_present
+            ),
         }
     )
 
@@ -298,8 +300,7 @@ class ConsistencyEvaluator:
         style_score = _overlap_score(candidate_style, fixture_style)
         violated = sorted(candidate_negative & fixture_negative)
         unsupported = sorted(
-            (candidate_identity | candidate_style)
-            - (fixture_identity | fixture_style)
+            (candidate_identity | candidate_style) - (fixture_identity | fixture_style)
         )
 
         policy = fixture.policy
@@ -553,7 +554,9 @@ def _row_from_contract(contract: ConsistencyReportContract) -> ConsistencyReport
 class ConsistencyReportService:
     """Owner-scoped durability for versioned consistency evidence."""
 
-    def __init__(self, session: AsyncSession, *, evaluator: ConsistencyEvaluator) -> None:
+    def __init__(
+        self, session: AsyncSession, *, evaluator: ConsistencyEvaluator
+    ) -> None:
         self._session = session
         self._evaluator = evaluator
 
@@ -605,7 +608,9 @@ class ConsistencyReportService:
             await self._session.flush()
         except IntegrityError:
             await self._session.rollback()
-            existing = await self._report_by_key(owner_id, novel_id, asset.id, report_key)
+            existing = await self._report_by_key(
+                owner_id, novel_id, asset.id, report_key
+            )
             if existing is None:
                 raise ConsistencyReportServiceError(
                     "report create race; existing row not found after rollback"

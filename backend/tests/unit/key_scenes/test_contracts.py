@@ -195,9 +195,7 @@ def _set(**overrides):
     payload.update(overrides)
     set_ = SceneCandidateSetContract.model_validate(payload)
     if "manifest_hash" not in overrides:
-        set_ = set_.model_copy(
-            update={"manifest_hash": recompute_manifest_hash(set_)}
-        )
+        set_ = set_.model_copy(update={"manifest_hash": recompute_manifest_hash(set_)})
     return set_
 
 
@@ -226,7 +224,8 @@ def _review_decision(**overrides):
 def test_reason_code_vocabulary_is_closed_and_pinned():
     assert [code.value for code in KeySceneReasonCode] == list(KEY_SCENE_REASON_CODES)
     assert (
-        REASON_CODES_HASH == "9e4f47d4cf811ea69b6ca54f7f92939fc9760bfcc248129f663db9302556e314"
+        REASON_CODES_HASH
+        == "9e4f47d4cf811ea69b6ca54f7f92939fc9760bfcc248129f663db9302556e314"
     )
 
 
@@ -281,9 +280,7 @@ def test_strict_schema_rejects_spoiler_ranges():
     # evidence chapter_number beyond cutoff
     with pytest.raises(ValidationError):
         _candidate(
-            evidence_ranges=[
-                _evidence(chapter_number=9, cutoff_chapter=8).model_dump()
-            ]
+            evidence_ranges=[_evidence(chapter_number=9, cutoff_chapter=8).model_dump()]
         )
     ok = _candidate(chapter_number=8, spoiler_cutoff=8)
     assert ok.chapter_number == ok.spoiler_cutoff
@@ -386,9 +383,7 @@ def test_evidence_lineage_must_match_set_snapshot_and_cutoff():
     bad_snapshot_id = _set(
         candidates=[
             _candidate(
-                evidence_ranges=[
-                    _evidence(source_snapshot_id="other-ss").model_dump()
-                ]
+                evidence_ranges=[_evidence(source_snapshot_id="other-ss").model_dump()]
             ).model_dump()
         ]
     )
@@ -398,9 +393,7 @@ def test_evidence_lineage_must_match_set_snapshot_and_cutoff():
     bad_snapshot_hash = _set(
         candidates=[
             _candidate(
-                evidence_ranges=[
-                    _evidence(source_snapshot_hash=HEX64_B).model_dump()
-                ]
+                evidence_ranges=[_evidence(source_snapshot_hash=HEX64_B).model_dump()]
             ).model_dump()
         ]
     )
@@ -410,9 +403,7 @@ def test_evidence_lineage_must_match_set_snapshot_and_cutoff():
     bad_cutoff = _set(
         candidates=[
             _candidate(
-                evidence_ranges=[
-                    _evidence(cutoff_chapter=3).model_dump()
-                ]
+                evidence_ranges=[_evidence(cutoff_chapter=3).model_dump()]
             ).model_dump()
         ]
     )
@@ -431,12 +422,17 @@ def test_heuristic_signal_never_populates_evidence_ranges():
     # Structural separation: the signal is a sibling of evidence_ranges.
     assert candidate.heuristic_signal is not None
     assert candidate.evidence_ranges  # evidence is independently present
-    assert set(candidate.evidence_ranges[0].model_dump()) >= {"content_hash", "source_start"}
+    assert set(candidate.evidence_ranges[0].model_dump()) >= {
+        "content_hash",
+        "source_start",
+    }
 
     # An offset that escapes the candidate slice fails closed.
     escaped = _candidate(
         heuristic_signal=_heuristic(
-            speaker_offsets=[{"offset_start": 0, "offset_end": 200, "speaker_key": "arin"}]
+            speaker_offsets=[
+                {"offset_start": 0, "offset_end": 200, "speaker_key": "arin"}
+            ]
         ).model_dump()
     )
     with pytest.raises(KeySceneGateError):
@@ -486,13 +482,19 @@ def test_review_decision_transition_map_is_closed():
     for state, actions in LEGAL_SCENE_REVIEW_TRANSITIONS.items():
         for action in actions:
             assert action in SCENE_REVIEW_ACTION_TO_STATE
-            assert review_state_after(state, action) == SCENE_REVIEW_ACTION_TO_STATE[action]
+            assert (
+                review_state_after(state, action)
+                == SCENE_REVIEW_ACTION_TO_STATE[action]
+            )
 
 
 def test_review_decision_chain():
     assert review_state_after("candidate", "approve") is KeySceneReviewState.APPROVED
     assert review_state_after("candidate", "reject") is KeySceneReviewState.REJECTED
-    assert review_state_after("candidate", "needs_relink") is KeySceneReviewState.NEEDS_RELINK
+    assert (
+        review_state_after("candidate", "needs_relink")
+        is KeySceneReviewState.NEEDS_RELINK
+    )
     assert review_state_after("approved", "supersede") is KeySceneReviewState.SUPERSEDED
     with pytest.raises(KeySceneGateError):
         review_state_after("approved", "approve")  # double approval impossible
@@ -552,7 +554,10 @@ def test_boundary_detection_is_deterministic_and_evidence_located():
 
     for boundary in first.boundaries:
         # The candidate locates to a replayable evidence slice.
-        assert ACTION_CHAPTER[boundary.source_start : boundary.source_end] == boundary.content
+        assert (
+            ACTION_CHAPTER[boundary.source_start : boundary.source_end]
+            == boundary.content
+        )
         assert boundary.source_hash == content_hash(boundary.content)
 
 
@@ -701,8 +706,13 @@ async def _user_and_novel(db_session: AsyncSession, username: str):
 async def test_owner_scope_denies_foreign_novel(db_session: AsyncSession):
     owner, novel = await _user_and_novel(db_session, "ks_owner")
     service = SceneBoundaryService(db_session)
-    assert await service.verify_novel_scope(owner_id=owner.id, novel_id=novel.id) is novel
-    assert await service.verify_novel_scope(owner_id=owner.id + 99, novel_id=novel.id) is None
+    assert (
+        await service.verify_novel_scope(owner_id=owner.id, novel_id=novel.id) is novel
+    )
+    assert (
+        await service.verify_novel_scope(owner_id=owner.id + 99, novel_id=novel.id)
+        is None
+    )
 
 
 async def test_source_snapshot_hash_detects_chapter_drift(db_session: AsyncSession):
@@ -728,9 +738,7 @@ async def test_source_snapshot_hash_detects_chapter_drift(db_session: AsyncSessi
     # Chapter drift must fail closed (stale snapshot lineage).
     chapter.content = "The rewritten chapter body changes everything."
     await db_session.flush()
-    hash_b, _ = await service.load_source_snapshot(
-        owner_id=owner.id, novel_id=novel.id
-    )
+    hash_b, _ = await service.load_source_snapshot(owner_id=owner.id, novel_id=novel.id)
     assert hash_b != hash_a
 
 
@@ -898,9 +906,7 @@ def test_set_orm_carries_owner_novel_snapshot_and_visual_bible_lineage():
     }
     assert ("owner_id", "novel_id", "version_key") in unique
     check_names = {
-        c.name
-        for c in SceneCandidateSet.__table__.constraints
-        if hasattr(c, "name")
+        c.name for c in SceneCandidateSet.__table__.constraints if hasattr(c, "name")
     }
     assert "ck_key_scene_sets_review_state" in check_names
     assert "ck_key_scene_sets_visual_bible_approval" in check_names
@@ -908,9 +914,7 @@ def test_set_orm_carries_owner_novel_snapshot_and_visual_bible_lineage():
 
 def test_candidate_orm_enforces_spoiler_cutoff_and_offsets_checks():
     check_names = {
-        c.name
-        for c in SceneCandidate.__table__.constraints
-        if hasattr(c, "name")
+        c.name for c in SceneCandidate.__table__.constraints if hasattr(c, "name")
     }
     assert "ck_key_scene_candidates_spoiler_cutoff" in check_names
     assert "ck_key_scene_candidates_offsets" in check_names
@@ -926,9 +930,7 @@ def test_candidate_orm_enforces_spoiler_cutoff_and_offsets_checks():
 
 def test_evidence_orm_enforces_spoiler_gate():
     check_names = {
-        c.name
-        for c in SceneEvidenceRange.__table__.constraints
-        if hasattr(c, "name")
+        c.name for c in SceneEvidenceRange.__table__.constraints if hasattr(c, "name")
     }
     assert "ck_key_scene_evidence_spoiler_cutoff" in check_names
     assert "ck_key_scene_evidence_offsets" in check_names

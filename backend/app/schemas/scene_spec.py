@@ -150,7 +150,9 @@ class SceneSpecGateError(ValueError):
 
 def canonical_scene_spec_hash(payload: dict[str, Any]) -> str:
     """SHA-256 over stable, sorted JSON (canonical ordering convention)."""
-    encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    encoded = json.dumps(
+        payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    )
     return sha256(encoded.encode("utf-8")).hexdigest()
 
 
@@ -697,9 +699,13 @@ def validate_prompt_revision_contract(
             "prompt visual_bible_revision_hash does not match the SceneSpec"
         )
     if revision.source_snapshot_id != spec.source_snapshot_id:
-        raise SceneSpecGateError("prompt source_snapshot_id does not match the SceneSpec")
+        raise SceneSpecGateError(
+            "prompt source_snapshot_id does not match the SceneSpec"
+        )
     if revision.source_snapshot_hash != spec.source_snapshot_hash:
-        raise SceneSpecGateError("prompt source_snapshot_hash does not match the SceneSpec")
+        raise SceneSpecGateError(
+            "prompt source_snapshot_hash does not match the SceneSpec"
+        )
     if revision.cutoff_chapter != spec.cutoff_chapter:
         raise SceneSpecGateError("prompt cutoff_chapter does not match the SceneSpec")
     if revision.schema_hash != spec.schema_hash:
@@ -722,7 +728,9 @@ def validate_prompt_revision_contract(
         if revision.uncertainties != spec_uncertainty_texts(spec):
             raise SceneSpecGateError("prompt did not surface all uncertainties")
     elif revision.uncertainties:
-        raise SceneSpecGateError("prompt invented uncertainties not present in the spec")
+        raise SceneSpecGateError(
+            "prompt invented uncertainties not present in the spec"
+        )
 
     if recompute_prompt_input_hash(revision, spec) != revision.input_hash:
         raise SceneSpecGateError("prompt input_hash does not replay from the spec")
@@ -764,9 +772,7 @@ SPEC_REVIEW_ACTION_TO_STATE: dict[SpecReviewAction, SpecReviewState] = {
     SpecReviewAction.SUPERSEDE: SpecReviewState.SUPERSEDED,
 }
 
-LEGAL_SPEC_REVIEW_TRANSITIONS: dict[
-    SpecReviewState, frozenset[SpecReviewAction]
-] = {
+LEGAL_SPEC_REVIEW_TRANSITIONS: dict[SpecReviewState, frozenset[SpecReviewAction]] = {
     SpecReviewState.CANDIDATE: frozenset(
         {
             SpecReviewAction.APPROVE,
@@ -935,8 +941,7 @@ class FrozenSceneSpecView(StrictSceneSpecModel):
     def approved_only(self) -> "FrozenSceneSpecView":
         if self.review_state is not SpecReviewState.APPROVED:
             raise SceneSpecGateError(
-                "unapproved or unresolved SceneSpec cannot enter downstream "
-                "consumption"
+                "unapproved or unresolved SceneSpec cannot enter downstream consumption"
             )
         return self
 

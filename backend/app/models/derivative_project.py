@@ -115,14 +115,15 @@ class DerivativeProject(TimestampMixin, Base):
     )
     # D-36-01: a project cannot exist without its explicit Canon Fork.
     fork_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("canon_forks.id", ondelete="CASCADE"), nullable=False, index=True
+        Integer,
+        ForeignKey("canon_forks.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
     project_key: Mapped[str] = mapped_column(String(128), nullable=False)
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
-    status: Mapped[str] = mapped_column(
-        String(16), nullable=False, default="active"
-    )
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="active")
     # ---- D-36-03 / D-36-01 frozen fork lineage (copied from the fork at create) ----
     space: Mapped[str] = mapped_column(
         String(32), nullable=False, default="fanfiction_canon"

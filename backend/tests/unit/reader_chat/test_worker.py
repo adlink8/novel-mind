@@ -30,7 +30,8 @@ def test_build_messages_keeps_recent_dialogue_as_non_evidence_framing() -> None:
     )
 
     payload = json.loads(
-        messages[1]["content"].split("UNTRUSTED_DATA_BEGIN\n", 1)[1]
+        messages[1]["content"]
+        .split("UNTRUSTED_DATA_BEGIN\n", 1)[1]
         .split("\nUNTRUSTED_DATA_END", 1)[0]
     )
     assert payload["conversational_framing_not_evidence"][0]["body"] == (

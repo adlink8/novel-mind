@@ -307,7 +307,9 @@ class ConsistencyReportContract(StrictIllustrationModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    schema_version: Literal["illustration-consistency.v1"] = "illustration-consistency.v1"
+    schema_version: Literal["illustration-consistency.v1"] = (
+        "illustration-consistency.v1"
+    )
     artifact_kind: Literal["illustration_consistency_report"] = (
         "illustration_consistency_report"
     )
@@ -346,9 +348,7 @@ def validate_illustration_job_contract(job: IllustrationJobContract) -> None:
         )
 
 
-def validate_asset_bytes(
-    asset: AssetRevisionContract, payload: bytes
-) -> None:
+def validate_asset_bytes(asset: AssetRevisionContract, payload: bytes) -> None:
     """Server-side bytes gate: hash, size and MIME must match the contract."""
     actual_hash = sha256(payload).hexdigest()
     if actual_hash != asset.bytes_hash:
@@ -416,9 +416,7 @@ def validate_asset_revision_contract(
             "asset model_lineage does not match the job lineage"
         )
     if asset.lineage.config_hash != job.lineage.config_hash:
-        raise IllustrationGateError(
-            "asset config_hash does not match the job lineage"
-        )
+        raise IllustrationGateError("asset config_hash does not match the job lineage")
     if asset.approval_state is not IllustrationApprovalState.CANDIDATE:
         raise IllustrationGateError(
             "a new AssetRevision must be created as a candidate (D-33-03)"
@@ -616,8 +614,7 @@ class FrozenAssetRevisionView(StrictIllustrationModel):
     def proposal_ready_only(self) -> "FrozenAssetRevisionView":
         if self.approval_state is not IllustrationApprovalState.PROPOSAL_READY:
             raise IllustrationGateError(
-                "unapproved or unresolved asset revision cannot enter Phase 34 "
-                "publish"
+                "unapproved or unresolved asset revision cannot enter Phase 34 publish"
             )
         if self.rights_status is not IllustrationRightsStatus.CLEARED:
             raise IllustrationGateError(

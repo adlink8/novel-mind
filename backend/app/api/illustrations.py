@@ -44,7 +44,14 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    HTTPException,
+    Request,
+    Response,
+)
 from pydantic import ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -113,9 +120,7 @@ router = APIRouter(dependencies=[Depends(require_user)])
 # Only the deterministic mock provider is configured in this slice. A
 # provider-neutral API means the request surface is provider-independent; a
 # non-configured provider fails closed before any job is created.
-SUPPORTED_ILLUSTRATION_PROVIDERS = frozenset(
-    {MOCK_ILLUSTRATION_PROVIDER, "hunyuan"}
-)
+SUPPORTED_ILLUSTRATION_PROVIDERS = frozenset({MOCK_ILLUSTRATION_PROVIDER, "hunyuan"})
 
 
 class StrictWireModel(StrictIllustrationModel):
@@ -127,7 +132,9 @@ class IllustrationGenerationRequest(StrictWireModel):
 
     prompt_revision_id: int = Field(gt=0)
     job_key: str = Field(min_length=1, max_length=120)
-    provider: str = Field(default=MOCK_ILLUSTRATION_PROVIDER, min_length=1, max_length=64)
+    provider: str = Field(
+        default=MOCK_ILLUSTRATION_PROVIDER, min_length=1, max_length=64
+    )
     model: str = Field(default=MOCK_ILLUSTRATION_MODEL, min_length=1, max_length=120)
     width: int = Field(default=MOCK_IMAGE_WIDTH, ge=16, le=4096)
     height: int = Field(default=MOCK_IMAGE_HEIGHT, ge=16, le=4096)
@@ -161,9 +168,7 @@ class ConsistencyEvaluateRequest(StrictWireModel):
     report_key: str | None = Field(default=None, min_length=1, max_length=180)
     identity_attributes: list[str] = Field(default_factory=list, max_length=64)
     style_attributes: list[str] = Field(default_factory=list, max_length=64)
-    negative_constraints_present: list[str] = Field(
-        default_factory=list, max_length=64
-    )
+    negative_constraints_present: list[str] = Field(default_factory=list, max_length=64)
 
 
 class ConsistencyEvaluateResponse(StrictWireModel):
@@ -327,22 +332,22 @@ class IllustrationJobService:
     async def get_job(
         self, *, owner_id: int, novel_id: int, job_id: int
     ) -> IllustrationJob:
-        job = await self._job_by_id(
-            owner_id=owner_id, novel_id=novel_id, job_id=job_id
-        )
+        job = await self._job_by_id(owner_id=owner_id, novel_id=novel_id, job_id=job_id)
         if job is None:
-            raise IllustrationJobNotFound("illustration job not found in the owner/novel scope")
+            raise IllustrationJobNotFound(
+                "illustration job not found in the owner/novel scope"
+            )
         return job
 
     async def retry_job(
         self, *, owner_id: int, novel_id: int, job_id: int
     ) -> IllustrationJob:
         """Re-queue an eligible terminal/paused job with the frozen lineage."""
-        job = await self._job_by_id(
-            owner_id=owner_id, novel_id=novel_id, job_id=job_id
-        )
+        job = await self._job_by_id(owner_id=owner_id, novel_id=novel_id, job_id=job_id)
         if job is None:
-            raise IllustrationJobNotFound("illustration job not found in the owner/novel scope")
+            raise IllustrationJobNotFound(
+                "illustration job not found in the owner/novel scope"
+            )
         eligible = {
             "failed",
             "cancelled",
@@ -360,9 +365,7 @@ class IllustrationJobService:
         await self._session.flush()
         return job
 
-    async def list_assets(
-        self, *, owner_id: int, novel_id: int
-    ) -> list[AssetRevision]:
+    async def list_assets(self, *, owner_id: int, novel_id: int) -> list[AssetRevision]:
         rows = (
             await self._session.scalars(
                 select(AssetRevision)
@@ -593,7 +596,9 @@ async def list_illustration_assets(
     assets = await IllustrationJobService(db).list_assets(
         owner_id=current_user.id, novel_id=novel.id
     )
-    return AssetListResponse(items=[_asset_view(asset) for asset in assets], total=len(assets))
+    return AssetListResponse(
+        items=[_asset_view(asset) for asset in assets], total=len(assets)
+    )
 
 
 @router.get(
@@ -787,7 +792,9 @@ async def get_asset_consistency_report(
         owner_id=current_user.id, novel_id=novel.id, asset_revision_id=asset_id
     )
     if report is None:
-        raise HTTPException(status_code=404, detail="no consistency report for this asset")
+        raise HTTPException(
+            status_code=404, detail="no consistency report for this asset"
+        )
     return report_view(report)
 
 
@@ -857,9 +864,7 @@ async def get_illustration_review_gallery(
     Every item stays candidate-only: job status, consistency evidence and
     approval-gate reason codes are review signals, never an automatic approval.
     """
-    return await build_gallery(
-        db, owner_id=current_user.id, novel_id=novel.id
-    )
+    return await build_gallery(db, owner_id=current_user.id, novel_id=novel.id)
 
 
 @router.get(
@@ -930,6 +935,4 @@ async def review_illustration_asset(
     envelope = await build_review_envelope(
         db, owner_id=owner_id, novel_id=novel_id, asset_id=asset.id
     )
-    return IllustrationReviewActionResponse(
-        asset=_asset_view(asset), envelope=envelope
-    )
+    return IllustrationReviewActionResponse(asset=_asset_view(asset), envelope=envelope)

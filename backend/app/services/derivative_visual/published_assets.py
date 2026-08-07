@@ -70,9 +70,18 @@ def _candidate_query(
         select(DerivativeVisualCandidateAsset)
         .join(
             DerivativeVisualVersion,
-            (DerivativeVisualVersion.owner_id == DerivativeVisualCandidateAsset.owner_id)
-            & (DerivativeVisualVersion.novel_id == DerivativeVisualCandidateAsset.novel_id)
-            & (DerivativeVisualVersion.id == DerivativeVisualCandidateAsset.visual_version_id),
+            (
+                DerivativeVisualVersion.owner_id
+                == DerivativeVisualCandidateAsset.owner_id
+            )
+            & (
+                DerivativeVisualVersion.novel_id
+                == DerivativeVisualCandidateAsset.novel_id
+            )
+            & (
+                DerivativeVisualVersion.id
+                == DerivativeVisualCandidateAsset.visual_version_id
+            ),
         )
         .where(
             DerivativeVisualCandidateAsset.owner_id == owner_id,

@@ -20,7 +20,6 @@ deterministic pure functions and AST source checks (no PostgreSQL):
 from __future__ import annotations
 
 import ast
-import copy
 from pathlib import Path
 
 import pytest
@@ -38,10 +37,7 @@ from app.services.derivative_generation.published_revision import (
 pytestmark = [pytest.mark.unit, pytest.mark.adversarial]
 
 SERVICE_DIR = (
-    Path(__file__).resolve().parents[2]
-    / "app"
-    / "services"
-    / "derivative_generation"
+    Path(__file__).resolve().parents[2] / "app" / "services" / "derivative_generation"
 )
 MODELS_DIR = Path(__file__).resolve().parents[2] / "app" / "models"
 OVERRIDES_SOURCE = (SERVICE_DIR / "overrides.py").read_text(encoding="utf-8")
@@ -70,9 +66,10 @@ def _imported_modules(source: str) -> set[str]:
 
 def test_published_revision_dto_field_set_is_frozen():
     """Cross-plan contract: the DTO field set never silently changes."""
-    actual = {field.name for field in __import__(
-        "dataclasses"
-    ).fields(PublishedDerivativeRevision)}
+    actual = {
+        field.name
+        for field in __import__("dataclasses").fields(PublishedDerivativeRevision)
+    }
     assert actual == set(PUBLISHED_DERIVATIVE_REVISION_FIELDS), (
         "PublishedDerivativeRevision DTO fields drifted from the frozen contract"
     )
@@ -100,7 +97,11 @@ def test_published_revision_dto_is_immutable():
 
 def test_published_revision_status_is_derivative_only_never_promoted():
     assert DERIVATIVE_REVISION_PUBLICATION_STATUS == "derivative_revision"
-    assert DERIVATIVE_REVISION_PUBLICATION_STATUS not in ("original", "promoted", "published")
+    assert DERIVATIVE_REVISION_PUBLICATION_STATUS not in (
+        "original",
+        "promoted",
+        "published",
+    )
 
 
 def test_citation_hash_is_deterministic_and_order_independent():
@@ -112,12 +113,27 @@ def test_citation_hash_is_deterministic_and_order_independent():
 
 
 def test_override_hash_is_deterministic_and_64_hex():
-    h1 = override_hash(kind="character", reason="twist", affected_evidence=["fork:1"], package_hash=HEX64)
-    h2 = override_hash(kind="character", reason="twist", affected_evidence=["fork:1"], package_hash=HEX64)
+    h1 = override_hash(
+        kind="character",
+        reason="twist",
+        affected_evidence=["fork:1"],
+        package_hash=HEX64,
+    )
+    h2 = override_hash(
+        kind="character",
+        reason="twist",
+        affected_evidence=["fork:1"],
+        package_hash=HEX64,
+    )
     assert h1 == h2
     assert len(h1) == 64
     assert all(c in "0123456789abcdef" for c in h1)
-    h3 = override_hash(kind="character", reason="twist", affected_evidence=["fork:1", "fork:2"], package_hash=HEX64)
+    h3 = override_hash(
+        kind="character",
+        reason="twist",
+        affected_evidence=["fork:1", "fork:2"],
+        package_hash=HEX64,
+    )
     assert h1 != h3
 
 

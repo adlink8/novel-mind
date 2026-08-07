@@ -136,7 +136,9 @@ class ExportSnapshot(_StrictSnapshotModel):
     snapshot_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
 
 
-def export_snapshot_payload(snapshot: ExportSnapshot | dict[str, Any]) -> dict[str, Any]:
+def export_snapshot_payload(
+    snapshot: ExportSnapshot | dict[str, Any],
+) -> dict[str, Any]:
     """Canonical payload of a snapshot (the hash input, excluding the hash)."""
     if isinstance(snapshot, ExportSnapshot):
         payload = snapshot.model_dump(mode="json", exclude={"snapshot_hash"})
@@ -278,7 +280,9 @@ def validate_asset_membership(
 ) -> list[str]:
     """Every revision asset hash must be a member of the published asset set."""
     missing = sorted(
-        hash_ for hash_ in (revision.asset_hashes or []) if hash_ not in available_content_hashes
+        hash_
+        for hash_ in (revision.asset_hashes or [])
+        if hash_ not in available_content_hashes
     )
     if missing:
         return ["asset_hash_not_member"]
@@ -404,7 +408,9 @@ class ExportSnapshotService:
                     )
                 revision_by_chapter[chapter.id] = revision
                 export_revisions.append(
-                    _to_export_revision(revision, chapter, chapter_number=chapter.position + 1)
+                    _to_export_revision(
+                        revision, chapter, chapter_number=chapter.position + 1
+                    )
                 )
                 evidence = dict(override.evidence_snapshot or {})
                 for key in [str(k) for k in (evidence.get("citation_keys") or [])]:
@@ -531,9 +537,7 @@ class ExportSnapshotService:
 
     # ------------------------------------------------------- asset presence
 
-    def _asset_bytes_present(
-        self, asset: PublishedDerivativeVisualAsset
-    ) -> bool:
+    def _asset_bytes_present(self, asset: PublishedDerivativeVisualAsset) -> bool:
         if self._storage is None:
             return False
         try:

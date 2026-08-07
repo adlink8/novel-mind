@@ -13,7 +13,10 @@ import dataclasses
 
 import pytest
 
-from app.schemas.reader_chat import ReaderAnswerEnvelope, validate_answer_against_manifest
+from app.schemas.reader_chat import (
+    ReaderAnswerEnvelope,
+    validate_answer_against_manifest,
+)
 from app.services.queryplan.adapters import (
     ChapterRecord,
     DimensionResult,
@@ -49,9 +52,7 @@ CHAPTER_2_TEXT = "第二章：剑客没有回答。林安握紧剑柄。"
 CHAPTER_3_TEXT = "第三章：两人并肩走出竹林。"
 
 
-def make_chapter(
-    chapter_id: int, chapter_number: int, content: str
-) -> ChapterRecord:
+def make_chapter(chapter_id: int, chapter_number: int, content: str) -> ChapterRecord:
     return ChapterRecord(
         chapter_id=chapter_id,
         chapter_number=chapter_number,
@@ -247,8 +248,7 @@ async def test_deterministic_replay_same_inputs_same_checksum():
     _, _, second = await run_pipeline(plan=plan, refs=(ref,))
     assert first.manifest.manifest_checksum == second.manifest.manifest_checksum
     assert (
-        first.manifest.allowed_evidence_ids()
-        == second.manifest.allowed_evidence_ids()
+        first.manifest.allowed_evidence_ids() == second.manifest.allowed_evidence_ids()
     )
 
 
@@ -260,9 +260,7 @@ async def test_deterministic_replay_same_inputs_same_checksum():
 def test_stale_content_hash_rejected():
     ref = leaf_ref().model_copy(update={"content_hash": "0" * 64})
     with pytest.raises(EvidenceError) as exc:
-        materialize_evidence_ref(
-            ref, source=make_source(), through_chapter=3
-        )
+        materialize_evidence_ref(ref, source=make_source(), through_chapter=3)
     assert exc.value.code == "stale_content_hash"
 
 
@@ -270,36 +268,28 @@ def test_shifted_offset_rejected():
     # Claimed offsets no longer match the hash the ref was built with.
     ref = leaf_ref().model_copy(update={"source_start": 1})
     with pytest.raises(EvidenceError) as exc:
-        materialize_evidence_ref(
-            ref, source=make_source(), through_chapter=3
-        )
+        materialize_evidence_ref(ref, source=make_source(), through_chapter=3)
     assert exc.value.code == "stale_content_hash"
 
 
 def test_out_of_bounds_offsets_rejected():
     ref = leaf_ref(start=0, end=len(CHAPTER_1_TEXT) + 5)
     with pytest.raises(EvidenceError) as exc:
-        materialize_evidence_ref(
-            ref, source=make_source(), through_chapter=3
-        )
+        materialize_evidence_ref(ref, source=make_source(), through_chapter=3)
     assert exc.value.code == "invalid_offsets"
 
 
 def test_stale_snapshot_lineage_rejected():
     ref = leaf_ref(snapshot_hash=HEX_OTHER)
     with pytest.raises(EvidenceError) as exc:
-        materialize_evidence_ref(
-            ref, source=make_source(), through_chapter=3
-        )
+        materialize_evidence_ref(ref, source=make_source(), through_chapter=3)
     assert exc.value.code == "stale_snapshot_lineage"
 
 
 def test_chapter_number_mismatch_rejected():
     ref = leaf_ref(chapter_number=2)
     with pytest.raises(EvidenceError) as exc:
-        materialize_evidence_ref(
-            ref, source=make_source(), through_chapter=3
-        )
+        materialize_evidence_ref(ref, source=make_source(), through_chapter=3)
     assert exc.value.code == "chapter_number_mismatch"
 
 
@@ -311,9 +301,7 @@ def test_beyond_cutoff_rejected():
         end=len(CHAPTER_3_TEXT[:10]),
     )
     with pytest.raises(EvidenceError) as exc:
-        materialize_evidence_ref(
-            ref, source=make_source(), through_chapter=2
-        )
+        materialize_evidence_ref(ref, source=make_source(), through_chapter=2)
     assert exc.value.code == "beyond_cutoff"
 
 
@@ -356,12 +344,8 @@ def test_unicode_astral_offsets_are_code_point_based():
 def test_frozen_manifest_is_immutable():
     plan = make_plan()
     source = make_source()
-    entry = materialize_evidence_ref(
-        leaf_ref(), source=source, through_chapter=3
-    )
-    manifest = freeze_manifest(
-        plan=plan, source=source, evidence=(entry,), omitted=()
-    )
+    entry = materialize_evidence_ref(leaf_ref(), source=source, through_chapter=3)
+    manifest = freeze_manifest(plan=plan, source=source, evidence=(entry,), omitted=())
     with pytest.raises(dataclasses.FrozenInstanceError):
         manifest.manifest_checksum = "0" * 64  # type: ignore[misc]
 
@@ -382,12 +366,8 @@ def test_frozen_manifest_is_immutable():
 def test_manifest_mutation_fails_closed(mutation: str):
     plan = make_plan()
     source = make_source()
-    entry = materialize_evidence_ref(
-        leaf_ref(), source=source, through_chapter=3
-    )
-    manifest = freeze_manifest(
-        plan=plan, source=source, evidence=(entry,), omitted=()
-    )
+    entry = materialize_evidence_ref(leaf_ref(), source=source, through_chapter=3)
+    manifest = freeze_manifest(plan=plan, source=source, evidence=(entry,), omitted=())
     tampered = _tamper(manifest, entry, mutation)
     with pytest.raises(EvidenceError) as exc:
         verify_manifest(tampered)
@@ -472,9 +452,7 @@ async def test_manifest_only_allows_materialized_leaf_keys():
     ok = ReaderAnswerEnvelope.model_validate(
         {
             "schema_version": "reader-answer.v1",
-            "answer_blocks": [
-                {"block_id": "b1", "text": "x", "evidence_refs": [key]}
-            ],
+            "answer_blocks": [{"block_id": "b1", "text": "x", "evidence_refs": [key]}],
         }
     )
     validate_answer_against_manifest(ok, allowed)

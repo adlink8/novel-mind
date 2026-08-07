@@ -52,7 +52,6 @@ from app.models.agent_runtime import (
 from app.schemas.agent_runtime import SkillVersionRegister
 from app.services.agent_runtime.finalize import (
     ERROR_CODE_FAILED_VALIDATION,
-    ERROR_CODE_INVALID_STOP_REASON,
     ERROR_CODE_UPSTREAM_ERROR,
     finalize_skill_run,
 )
@@ -125,7 +124,9 @@ def _async_url(sync_url: str) -> str:
     return sync_url
 
 
-def _skill_contract(*, novel_id: int, name: str, **overrides: Any) -> SkillVersionRegister:
+def _skill_contract(
+    *, novel_id: int, name: str, **overrides: Any
+) -> SkillVersionRegister:
     base: dict[str, Any] = {
         "novel_id": novel_id,
         "name": name,
@@ -143,7 +144,10 @@ def _skill_contract(*, novel_id: int, name: str, **overrides: Any) -> SkillVersi
         "approval_required_for": [],
         "input_schema": {
             "type": "object",
-            "properties": {"novel_id": {"type": "integer"}, "chapter_id": {"type": "integer"}},
+            "properties": {
+                "novel_id": {"type": "integer"},
+                "chapter_id": {"type": "integer"},
+            },
             "required": ["novel_id"],
         },
         "output_schema": {
@@ -265,7 +269,9 @@ def _domain_analysis_payload(*, chapter_id: int) -> dict[str, Any]:
         chapter_id=chapter_id,
         chapter_number=1,
         source_snapshot_hash=SOURCE_SNAPSHOT_HASH,
-        input_hash=canonical_input_hash({"chapter_id": chapter_id, "source": "fixture"}),
+        input_hash=canonical_input_hash(
+            {"chapter_id": chapter_id, "source": "fixture"}
+        ),
         spoiler_policy_version=SPOILER_POLICY,
         max_length=max(
             CONTEXT_SUMMARY_MAX_LENGTH,
@@ -281,7 +287,9 @@ def _domain_analysis_payload(*, chapter_id: int) -> dict[str, Any]:
     return artifact.model_dump(mode="json")
 
 
-def _domain_outline_mainline(*, owner_id: int, novel_id: int) -> tuple[dict[str, Any], dict[str, Any]]:
+def _domain_outline_mainline(
+    *, owner_id: int, novel_id: int
+) -> tuple[dict[str, Any], dict[str, Any]]:
     """用领域规划器生成合法的 Outline/Mainline 候选（candidate-only）。"""
     terminal = (
         ChapterTerminalState(
@@ -312,7 +320,9 @@ def _domain_outline_mainline(*, owner_id: int, novel_id: int) -> tuple[dict[str,
     return outline.model_dump(mode="json"), mainline.model_dump(mode="json")
 
 
-def _raw_model_output(*, artifact_type: str, with_evidence: bool = True) -> dict[str, Any]:
+def _raw_model_output(
+    *, artifact_type: str, with_evidence: bool = True
+) -> dict[str, Any]:
     """模拟模型原始结构化输出（含需声明的 alias 偏差；不带 lineage）。"""
     raw: dict[str, Any] = {
         "type": artifact_type,
@@ -328,7 +338,9 @@ def _raw_model_output(*, artifact_type: str, with_evidence: bool = True) -> dict
     return raw
 
 
-def _repair(raw: dict[str, Any], lineage: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
+def _repair(
+    raw: dict[str, Any], lineage: dict[str, Any], payload: dict[str, Any]
+) -> dict[str, Any]:
     """按共享 26-06 契约做 alias 修复 + lineage 合并 + 领域 payload 物化（确定性）。"""
     repaired: dict[str, Any] = dict(raw)
     repaired["producing_skill"] = repaired.pop("skill_name")
@@ -529,7 +541,9 @@ async def _assert_zero_writes(factory, *, run_id: int) -> None:
     assert await _count_approvals(factory, run_id=run_id) == 0
 
 
-async def _set_up(factory, sync_url: str, *, suffix: str, skill: str = "analyze-chapter") -> dict[str, Any]:
+async def _set_up(
+    factory, sync_url: str, *, suffix: str, skill: str = "analyze-chapter"
+) -> dict[str, Any]:
     """seed owner/novel + 注册 Phase 28 技能 + 创建 running run。"""
     seed = _seed_owner_novel(sync_url, suffix=suffix)
     svid = await _register_skill(
@@ -667,7 +681,9 @@ async def test_phase28_happy_path_analyze_chapter_artifact(
 
     analysis = _domain_analysis_payload(chapter_id=ctx["chapter1_id"])
     # 与冻结切片一致的 leaf 证据（D-07/D-08）。
-    analysis["chunk_digests"] = [canonical_content_hash({"leaf": evidence_key_for(ctx["chapter1_id"])})]
+    analysis["chunk_digests"] = [
+        canonical_content_hash({"leaf": evidence_key_for(ctx["chapter1_id"])})
+    ]
     analysis["chapter_digest"] = canonical_content_hash({"chapter": ctx["chapter1_id"]})
 
     payload = {"analysis": analysis}
@@ -720,9 +736,10 @@ async def test_phase28_happy_path_analyze_chapter_artifact(
 
     content = revision.content
     # 服务器重放：剥离 trail 后重算 repaired_hash 必须一致。
-    assert canonical_content_hash(_strip_trail(content)) == content["normalization"][
-        "repaired_hash"
-    ]
+    assert (
+        canonical_content_hash(_strip_trail(content))
+        == content["normalization"]["repaired_hash"]
+    )
     # 血缘绑定。
     assert content["owner_id"] == ctx["owner_id"]
     assert content["novel_id"] == ctx["novel_id"]
@@ -746,7 +763,14 @@ async def test_phase28_happy_path_analyze_chapter_artifact(
     assert content["analysis"]["source_snapshot_hash"] == SOURCE_SNAPSHOT_HASH
     assert content["analysis"]["spoiler_policy_version"] == SPOILER_POLICY
     # official 信封未携带受保护合成字段 / 情绪记忆字段。
-    for forbidden in ("authority", "cutoff", "fork", "approval", "approval_state", "emotional_memory"):
+    for forbidden in (
+        "authority",
+        "cutoff",
+        "fork",
+        "approval",
+        "approval_state",
+        "emotional_memory",
+    ):
         assert forbidden not in content
 
 
@@ -756,7 +780,9 @@ async def test_phase28_happy_path_build_story_arc_artifact(
     """正向链 build-story-arc：Outline/Mainline 候选（candidate-only）→ StoryArcArtifact
     信封 → finalize → candidate 产物；绝不进入 Canon。"""
     ctx = await _set_up(
-        runtime_factory, migrated_postgres, suffix=f"sa_{uuid.uuid4().hex[:6]}",
+        runtime_factory,
+        migrated_postgres,
+        suffix=f"sa_{uuid.uuid4().hex[:6]}",
         skill="build-story-arc",
     )
     svid, run_id = ctx["skill_version_id"], ctx["run_id"]
@@ -865,7 +891,9 @@ async def test_phase28_cancellation_no_write(runtime_factory, migrated_postgres:
         owner_id=seed["owner_id"],
         novel_id=seed["novel_id"],
         skill_version_id=svid,
-        input_hash=canonical_input_hash({"novel_id": seed["novel_id"], "chapter_id": 1}),
+        input_hash=canonical_input_hash(
+            {"novel_id": seed["novel_id"], "chapter_id": 1}
+        ),
         cancel_requested=True,
     )
     envelope = _build_envelope(
@@ -873,7 +901,9 @@ async def test_phase28_cancellation_no_write(runtime_factory, migrated_postgres:
         owner_id=seed["owner_id"],
         novel_id=seed["novel_id"],
         skill_version_id=svid,
-        input_hash=canonical_input_hash({"novel_id": seed["novel_id"], "chapter_id": 1}),
+        input_hash=canonical_input_hash(
+            {"novel_id": seed["novel_id"], "chapter_id": 1}
+        ),
         payload={"analysis": _domain_analysis_payload(chapter_id=seed["chapter1_id"])},
         tool_runs=[{"tool_name": "get_chapter", "calls": 1}],
     )
@@ -1109,7 +1139,9 @@ async def test_phase28_unknown_evidence_ref_blocks(
         payload={"analysis": _domain_analysis_payload(chapter_id=ctx["chapter1_id"])},
         tool_runs=[{"tool_name": "get_chapter", "calls": 1}],
     )
-    envelope["evidence_refs"] = ["qp:1:0:10:forgednot64hexhash000000000000000000000000000000000000000000000000"]
+    envelope["evidence_refs"] = [
+        "qp:1:0:10:forgednot64hexhash000000000000000000000000000000000000000000000000"
+    ]
     envelope["normalization"]["repaired_hash"] = canonical_content_hash(
         _strip_trail(envelope)
     )
@@ -1244,7 +1276,9 @@ async def test_phase28_outline_mainline_canon_attempt_blocks(
 ):
     """Outline/Mainline Canon 提升尝试（candidate_status != candidate）→ blocked，零写入。"""
     ctx = await _set_up(
-        runtime_factory, migrated_postgres, suffix=f"canon_{uuid.uuid4().hex[:6]}",
+        runtime_factory,
+        migrated_postgres,
+        suffix=f"canon_{uuid.uuid4().hex[:6]}",
         skill="build-story-arc",
     )
     outline, mainline = _domain_outline_mainline(
@@ -1381,7 +1415,9 @@ async def test_phase28_http_end_to_end_no_approval_no_publisher(
     run_hash = body["run"]["input_hash"]
 
     analysis = _domain_analysis_payload(chapter_id=seed["chapter1_id"])
-    analysis["chapter_digest"] = canonical_content_hash({"chapter": seed["chapter1_id"]})
+    analysis["chapter_digest"] = canonical_content_hash(
+        {"chapter": seed["chapter1_id"]}
+    )
     analysis["chunk_digests"] = [
         canonical_content_hash({"leaf": evidence_key_for(seed["chapter1_id"])})
     ]

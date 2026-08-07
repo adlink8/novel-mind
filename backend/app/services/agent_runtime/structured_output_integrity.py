@@ -168,9 +168,7 @@ BLOCKED_ILLUSTRATION_PAYLOAD = (
 BLOCKED_ILLUSTRATION_APPROVAL_BYPASS = (
     "integrity: illustration approval bypass blocked — review_state must be candidate"
 )
-BLOCKED_ILLUSTRATION_SOURCE_DRIFT = (
-    "integrity: illustration revision source_snapshot_hash drifts from envelope source_versions"
-)
+BLOCKED_ILLUSTRATION_SOURCE_DRIFT = "integrity: illustration revision source_snapshot_hash drifts from envelope source_versions"
 BLOCKED_ILLUSTRATION_BRANCH = (
     "integrity: illustration revision branch/authority_space mismatch — "
     "derivative mode requires branch + fork, original mode forbids them"
@@ -1025,7 +1023,9 @@ def _evaluate_illustration_revision(
     if payload.get("review_state") != "candidate":
         return IntegrityDecision(False, BLOCKED_ILLUSTRATION_APPROVAL_BYPASS)
     try:
-        revision = IllustrationRevisionArtifact.model_validate(envelope).illustration_revision
+        revision = IllustrationRevisionArtifact.model_validate(
+            envelope
+        ).illustration_revision
     except ValidationError as exc:
         return IntegrityDecision(
             False,
@@ -1097,7 +1097,9 @@ def _evaluate_illustration_anchor_proposal(
     if payload.get("proposal_status") != "proposed":
         return IntegrityDecision(False, BLOCKED_ANCHOR_PROPOSAL_APPROVAL_BYPASS)
     try:
-        IllustrationAnchorProposalArtifact.model_validate(envelope).illustration_anchor_proposal
+        IllustrationAnchorProposalArtifact.model_validate(
+            envelope
+        ).illustration_anchor_proposal
     except ValidationError as exc:
         return IntegrityDecision(
             False,
@@ -1452,7 +1454,10 @@ def _evaluate_branch_visual_bible(
     # 4. source snapshot 血缘绑定（D-38-01）。
     source_versions = envelope.get("source_versions") or {}
     snapshot = source_versions.get("source_snapshot_hash")
-    if snapshot is not None and snapshot != revision.source_snapshot.source_snapshot_hash:
+    if (
+        snapshot is not None
+        and snapshot != revision.source_snapshot.source_snapshot_hash
+    ):
         return IntegrityDecision(False, BLOCKED_BRANCH_VISUAL_BIBLE_SOURCE_DRIFT)
 
     # 5. branch/authority_space 门（wrong branch/fork → fail closed）。
@@ -1523,14 +1528,21 @@ def _evaluate_export_preparation(
     # 4. source snapshot 血缘绑定（D-39-01）。
     source_versions = envelope.get("source_versions") or {}
     snapshot = source_versions.get("source_snapshot_hash")
-    if snapshot is not None and snapshot != preparation.source_snapshot.source_snapshot_hash:
+    if (
+        snapshot is not None
+        and snapshot != preparation.source_snapshot.source_snapshot_hash
+    ):
         return IntegrityDecision(False, BLOCKED_EXPORT_PREPARATION_SOURCE_DRIFT)
 
     # 5. branch/authority_space 门（wrong branch/fork → fail closed）。
     branch = envelope.get("branch")
     if branch != run.branch:
         return IntegrityDecision(False, BLOCKED_EXPORT_PREPARATION_BRANCH)
-    if preparation.authority_space != "derivative" or not branch or not preparation.fork:
+    if (
+        preparation.authority_space != "derivative"
+        or not branch
+        or not preparation.fork
+    ):
         return IntegrityDecision(False, BLOCKED_EXPORT_PREPARATION_BRANCH)
 
     # 6. leaf evidence 资格门：preparation.evidence_refs ⊆ 信封 evidence_refs。

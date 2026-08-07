@@ -57,8 +57,6 @@ from app.services.derivative_editor.revisions import (
     build_derivative_edit_approval_payload,
     canonical_derivative_edit_approval_hash,
     derivative_edit_content_hash,
-    to_chapter_view,
-    to_revision_view,
 )
 
 router = APIRouter(dependencies=[Depends(require_user)])
@@ -118,7 +116,9 @@ async def _load_artifact_revision(
     )
     if artifact is None:
         raise _fail(404, "artifact_not_found", "artifact not found in the owner scope")
-    revision = await db.get(ArtifactRevision, revision_id or artifact.current_revision_id)
+    revision = await db.get(
+        ArtifactRevision, revision_id or artifact.current_revision_id
+    )
     if revision is None or revision.artifact_id != artifact.id:
         raise _fail(
             404, "artifact_revision_not_found", "artifact revision not found in scope"
@@ -126,7 +126,9 @@ async def _load_artifact_revision(
     return artifact, revision
 
 
-def _validate_envelope(revision) -> tuple[DerivativeEditProposalArtifact, dict[str, Any]]:
+def _validate_envelope(
+    revision,
+) -> tuple[DerivativeEditProposalArtifact, dict[str, Any]]:
     try:
         model = DerivativeEditProposalArtifact.model_validate(revision.content)
     except pydantic.ValidationError as exc:
@@ -267,8 +269,12 @@ async def apply_derivative_edit_proposal(
         model, _raw = _validate_envelope(revision)
         run = await db.get(SkillRun, artifact.run_id)
         if run is None:
-            raise _fail(409, "run_not_found", "the SkillRun bound to the artifact is missing")
-        _replay_lineage(model=model, run=run, owner_id=owner_id, novel_id=artifact.novel_id)
+            raise _fail(
+                409, "run_not_found", "the SkillRun bound to the artifact is missing"
+            )
+        _replay_lineage(
+            model=model, run=run, owner_id=owner_id, novel_id=artifact.novel_id
+        )
 
         payload = model.proposal
         if derivative_edit_content_hash(payload.content) != payload.content_hash:

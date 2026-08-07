@@ -139,7 +139,9 @@ class CandidateGateResult:
 
     __slots__ = ("verdict", "reason", "detail")
 
-    def __init__(self, verdict: GateVerdict, reason: str | None = None, detail: str | None = None):
+    def __init__(
+        self, verdict: GateVerdict, reason: str | None = None, detail: str | None = None
+    ):
         self.verdict = verdict
         self.reason = reason
         self.detail = detail
@@ -166,7 +168,9 @@ def schema_hash() -> str:
         separators=(",", ":"),
         ensure_ascii=False,
     ).encode("utf-8")
-    return sha256(f"{CANDIDATE_SCHEMA_HASH_PREFIX}\n".encode("utf-8") + encoded).hexdigest()
+    return sha256(
+        f"{CANDIDATE_SCHEMA_HASH_PREFIX}\n".encode("utf-8") + encoded
+    ).hexdigest()
 
 
 def _strip_code_fence(text: str) -> str:
@@ -240,7 +244,9 @@ def apply_deterministic_gates(
     """
     if package_intent not in DERIVATIVE_CONTEXT_INTENTS:
         return CandidateGateResult(
-            GateVerdict.BLOCKED, "intent_mismatch", f"unsupported intent {package_intent!r}"
+            GateVerdict.BLOCKED,
+            "intent_mismatch",
+            f"unsupported intent {package_intent!r}",
         )
     if draft.intent.value != package_intent:
         return CandidateGateResult(

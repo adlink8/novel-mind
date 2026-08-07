@@ -669,14 +669,11 @@ class CandidateManifest(StrictFrozenModel):
 
 
 def _component_dict_checksum(component: str, payload: dict[str, Any]) -> str:
-    encoded = (
-        f"narrative-memory.v1:{component}\n"
-        + json.dumps(
-            payload,
-            ensure_ascii=False,
-            sort_keys=True,
-            separators=(",", ":"),
-        )
+    encoded = f"narrative-memory.v1:{component}\n" + json.dumps(
+        payload,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
     )
     return sha256(encoded.encode("utf-8")).hexdigest()
 

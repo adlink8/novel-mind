@@ -426,9 +426,8 @@ def validate_exact_source(
                 reason_code="chapter_content_hash_mismatch",
                 detail="chapter content hash does not replay from the current text",
             )
-        if (
-            source_range.source_start < 0
-            or source_range.source_end > len(chapter_content)
+        if source_range.source_start < 0 or source_range.source_end > len(
+            chapter_content
         ):
             return AnchorValidationResult(
                 ok=False,
@@ -436,9 +435,7 @@ def validate_exact_source(
                 reason_code="source_range_out_of_bounds",
                 detail="source span is outside the current chapter content",
             )
-        actual = chapter_content[
-            source_range.source_start : source_range.source_end
-        ]
+        actual = chapter_content[source_range.source_start : source_range.source_end]
         if actual != excerpt:
             return AnchorValidationResult(
                 ok=False,
@@ -540,9 +537,7 @@ def validate_published_anchor(
             "anchor caption/alt/citation does not match the manifest copy"
         )
     if anchor.approval_request_id is None or anchor.approval_request_id <= 0:
-        raise AnchorGateError(
-            "a valid published anchor must bind an approved action"
-        )
+        raise AnchorGateError("a valid published anchor must bind an approved action")
 
 
 # ---------------------------------------------------------------------------

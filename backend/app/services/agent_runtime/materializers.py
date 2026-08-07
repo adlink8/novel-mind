@@ -20,7 +20,7 @@ from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Chapter, Novel
+from app.models import Chapter
 from app.models.agent_runtime import SkillRun
 from app.schemas.key_scene import (
     KeySceneReviewState,
@@ -69,6 +69,7 @@ async def materialize_to_domain(
 # key_scenes（detect-key-scenes → SceneCandidateSetContract → import_set）
 # ══════════════════════════════════════════════════════════════════════
 
+
 async def _materialize_key_scenes(
     session: AsyncSession,
     *,
@@ -91,10 +92,7 @@ async def _materialize_key_scenes(
         return "skipped:invalid_scene_candidate_set"
     if set_contract.review_state != KeySceneReviewState.CANDIDATE:
         return "skipped:non_candidate_review_state"
-    if (
-        set_contract.owner_id != run.owner_id
-        or set_contract.novel_id != run.novel_id
-    ):
+    if set_contract.owner_id != run.owner_id or set_contract.novel_id != run.novel_id:
         return "skipped:set_scope_mismatch"
 
     boundaries = SceneBoundaryService(session)
@@ -131,6 +129,7 @@ async def _materialize_key_scenes(
 # ══════════════════════════════════════════════════════════════════════
 # world_model_knowledge（propose-world-model-candidates → EpistemicGate）
 # ══════════════════════════════════════════════════════════════════════
+
 
 async def _materialize_world_model_knowledge(
     session: AsyncSession,
@@ -250,7 +249,11 @@ async def _map_epistemic_claim(
     if not isinstance(disclosure_cutoff, int) or disclosure_cutoff < 1:
         return None
     authority_raw = raw.get("authority")
-    authority = Authority(authority_raw) if authority_raw in Authority._value2member_map_ else None
+    authority = (
+        Authority(authority_raw)
+        if authority_raw in Authority._value2member_map_
+        else None
+    )
     if authority is None:
         return None
     confidence = raw.get("confidence")
@@ -314,9 +317,7 @@ async def _map_epistemic_claim(
     )
 
 
-async def _authorized_cutoff(
-    session: AsyncSession, *, novel_id: int
-) -> int | None:
+async def _authorized_cutoff(session: AsyncSession, *, novel_id: int) -> int | None:
     from app.models.novel import Novel as NovelModel
 
     novel = await session.get(NovelModel, novel_id)
@@ -332,6 +333,7 @@ async def _authorized_cutoff(
 # ══════════════════════════════════════════════════════════════════════
 # visual_bible（build-visual-bible → VisualBibleEvidenceService + create_revision）
 # ══════════════════════════════════════════════════════════════════════
+
 
 async def _materialize_visual_bible(
     session: AsyncSession,
@@ -386,6 +388,7 @@ async def _materialize_visual_bible(
 # ══════════════════════════════════════════════════════════════════════
 # 共用辅助
 # ══════════════════════════════════════════════════════════════════════
+
 
 def _parse_qp_key(key: str) -> tuple[int, int, int, str] | None:
     """解析 ``qp:<chapter_id>:<source_start>:<source_end>:<content_hash>``。"""

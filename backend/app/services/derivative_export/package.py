@@ -46,7 +46,6 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.derivative_visual_asset import DERIVATIVE_ASSET_NAMESPACE
 from app.services.derivative_export.manifest import (
-    DERIVATIVE_EXPORT_ARTIFACT_KIND,
     DERIVATIVE_EXPORT_SCHEMA_VERSION,
     DERIVATIVE_EXPORT_SPACE,
     DERIVATIVE_EXPORT_VERSION,
@@ -394,7 +393,9 @@ def provenance_payload(
 # ---------------------------------------------------------------------------
 
 
-def _zip_entry(name: str, content: bytes, *, stored: bool = False) -> tuple[ZipInfo, bytes]:
+def _zip_entry(
+    name: str, content: bytes, *, stored: bool = False
+) -> tuple[ZipInfo, bytes]:
     info = ZipInfo(name, date_time=_FIXED_ZIP_TIME)
     info.compress_type = ZIP_STORED if stored else ZIP_DEFLATED
     info.external_attr = 0o644 << 16
@@ -505,11 +506,19 @@ def build_derivative_export_package(
     # Content entries (deterministic order). Names are generated, never guessed.
     content_entries: list[tuple[str, str, bytes]] = [
         (_MANIFEST_ENTRY, "manifest", _manifest_json_bytes(manifest)),
-        (_PROVENANCE_ENTRY, "provenance", _json_bytes(provenance_payload(snapshot, manifest))),
+        (
+            _PROVENANCE_ENTRY,
+            "provenance",
+            _json_bytes(provenance_payload(snapshot, manifest)),
+        ),
     ]
     for asset in snapshot.assets:
         content_entries.append(
-            (f"{_ASSET_PREFIX}{asset_filename(asset)}", "asset", asset_payloads[asset.asset_id])
+            (
+                f"{_ASSET_PREFIX}{asset_filename(asset)}",
+                "asset",
+                asset_payloads[asset.asset_id],
+            )
         )
 
     if len(content_entries) + 1 > MAX_PACKAGE_ENTRIES:

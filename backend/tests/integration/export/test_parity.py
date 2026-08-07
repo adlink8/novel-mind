@@ -39,7 +39,7 @@ from sqlalchemy.pool import NullPool
 
 from app.models import Chapter, Novel, User
 from app.models.illustration import AssetRevision
-from app.models.illustration_anchor import IllustrationAnchor, IllustrationAnchorProposal
+from app.models.illustration_anchor import IllustrationAnchorProposal
 from app.models.illustration_job import IllustrationJob
 from app.services.agent_runtime.approvals import confirm
 from app.services.export.epub import build_epub
@@ -97,9 +97,7 @@ def _async_url(sync_url: str) -> str:
     return sync_url
 
 
-def _seed(
-    sync_url: str, storage: AssetStorage, *, suffix: str
-) -> dict[str, Any]:
+def _seed(sync_url: str, storage: AssetStorage, *, suffix: str) -> dict[str, Any]:
     """Seed owner + novel + chapter + succeeded job + proposal-ready cleared asset
     whose real bytes are stored in the temp AssetStorage."""
     engine = create_engine(sync_url, poolclass=NullPool)
@@ -185,7 +183,9 @@ def _seed(
             approved_by="editor",
             canonical_payload={},
             canonical_payload_hash=HEX64,
-            idempotency_key=hashlib.sha256(f"asset-{suffix}".encode("utf-8")).hexdigest(),
+            idempotency_key=hashlib.sha256(
+                f"asset-{suffix}".encode("utf-8")
+            ).hexdigest(),
             projection_hash=HEX64,
             schema_version="illustration-asset.v1",
         )
@@ -250,7 +250,10 @@ async def _publish_valid_anchor(
         ids["proposal_id"] = result.proposal.id
         ids["approval_id"] = result.approval_request.id
         await confirm(
-            session, request_id=ids["approval_id"], owner_id=ids["owner_id"], mode="once"
+            session,
+            request_id=ids["approval_id"],
+            owner_id=ids["owner_id"],
+            mode="once",
         )
         await session.commit()
         anchor = await publish_anchor(
@@ -321,10 +324,16 @@ async def test_freeze_is_owner_scoped_and_replayable(
         suffix=f"fx_ok_{uuid.uuid4().hex[:6]}",
     )
     first = await _freeze(
-        runtime_factory, asset_storage, owner_id=ids["owner_id"], novel_id=ids["novel_id"]
+        runtime_factory,
+        asset_storage,
+        owner_id=ids["owner_id"],
+        novel_id=ids["novel_id"],
     )
     second = await _freeze(
-        runtime_factory, asset_storage, owner_id=ids["owner_id"], novel_id=ids["novel_id"]
+        runtime_factory,
+        asset_storage,
+        owner_id=ids["owner_id"],
+        novel_id=ids["novel_id"],
     )
     manifest = first.manifest
 
@@ -389,7 +398,10 @@ async def test_freeze_is_approved_only_candidates_never_appear(
         )
         await session.commit()
     frozen = await _freeze(
-        runtime_factory, asset_storage, owner_id=ids["owner_id"], novel_id=ids["novel_id"]
+        runtime_factory,
+        asset_storage,
+        owner_id=ids["owner_id"],
+        novel_id=ids["novel_id"],
     )
     assert len(frozen.manifest.chapters[0].anchors) == 1
     # The proposal table carries two rows but only the published anchor exports.
@@ -416,10 +428,15 @@ async def test_freeze_marks_missing_binary_asset_missing(
         suffix=f"fx_miss_{uuid.uuid4().hex[:6]}",
     )
     asset_storage.remove(
-        owner_id=ids["owner_id"], novel_id=ids["novel_id"], storage_key=ids["storage_key"]
+        owner_id=ids["owner_id"],
+        novel_id=ids["novel_id"],
+        storage_key=ids["storage_key"],
     )
     frozen = await _freeze(
-        runtime_factory, asset_storage, owner_id=ids["owner_id"], novel_id=ids["novel_id"]
+        runtime_factory,
+        asset_storage,
+        owner_id=ids["owner_id"],
+        novel_id=ids["novel_id"],
     )
     manifest = frozen.manifest
     entry = manifest.chapters[0].anchors[0]
@@ -441,9 +458,14 @@ async def test_freeze_marks_edited_chapter_stale(
         asset_storage,
         suffix=f"fx_stale_{uuid.uuid4().hex[:6]}",
     )
-    await _edit_chapter(runtime_factory, chapter_id=ids["chapter_id"], content=EDITED_TEXT)
+    await _edit_chapter(
+        runtime_factory, chapter_id=ids["chapter_id"], content=EDITED_TEXT
+    )
     frozen = await _freeze(
-        runtime_factory, asset_storage, owner_id=ids["owner_id"], novel_id=ids["novel_id"]
+        runtime_factory,
+        asset_storage,
+        owner_id=ids["owner_id"],
+        novel_id=ids["novel_id"],
     )
     entry = frozen.manifest.chapters[0].anchors[0]
     assert entry.status is ExportAnchorStatus.STALE
@@ -466,7 +488,10 @@ async def test_markdown_html_epub_share_one_frozen_manifest(
         suffix=f"ad_all_{uuid.uuid4().hex[:6]}",
     )
     frozen = await _freeze(
-        runtime_factory, asset_storage, owner_id=ids["owner_id"], novel_id=ids["novel_id"]
+        runtime_factory,
+        asset_storage,
+        owner_id=ids["owner_id"],
+        novel_id=ids["novel_id"],
     )
     manifest = frozen.manifest
 
@@ -480,7 +505,7 @@ async def test_markdown_html_epub_share_one_frozen_manifest(
 
     html = build_html_export(frozen).decode("utf-8")
     assert manifest.manifest_hash in html
-    assert "data-anchor-status=\"render\"" in html
+    assert 'data-anchor-status="render"' in html
     assert "data:image/png;base64," in html
     assert "The lanterns flickered in the wind" in html
     assert "引用：Chapter 4" in html
@@ -513,7 +538,10 @@ async def test_html_epub_chapter_body_parity(
         suffix=f"parity_{uuid.uuid4().hex[:6]}",
     )
     frozen = await _freeze(
-        runtime_factory, asset_storage, owner_id=ids["owner_id"], novel_id=ids["novel_id"]
+        runtime_factory,
+        asset_storage,
+        owner_id=ids["owner_id"],
+        novel_id=ids["novel_id"],
     )
     chapter = frozen.manifest.chapters[0]
 
@@ -539,10 +567,15 @@ async def test_missing_asset_is_explicit_in_all_formats(
         suffix=f"md_miss_{uuid.uuid4().hex[:6]}",
     )
     asset_storage.remove(
-        owner_id=ids["owner_id"], novel_id=ids["novel_id"], storage_key=ids["storage_key"]
+        owner_id=ids["owner_id"],
+        novel_id=ids["novel_id"],
+        storage_key=ids["storage_key"],
     )
     frozen = await _freeze(
-        runtime_factory, asset_storage, owner_id=ids["owner_id"], novel_id=ids["novel_id"]
+        runtime_factory,
+        asset_storage,
+        owner_id=ids["owner_id"],
+        novel_id=ids["novel_id"],
     )
 
     md = build_markdown(frozen).decode("utf-8")
@@ -569,9 +602,14 @@ async def test_stale_anchor_is_explicit_in_markdown(
         asset_storage,
         suffix=f"md_stale_{uuid.uuid4().hex[:6]}",
     )
-    await _edit_chapter(runtime_factory, chapter_id=ids["chapter_id"], content=EDITED_TEXT)
+    await _edit_chapter(
+        runtime_factory, chapter_id=ids["chapter_id"], content=EDITED_TEXT
+    )
     frozen = await _freeze(
-        runtime_factory, asset_storage, owner_id=ids["owner_id"], novel_id=ids["novel_id"]
+        runtime_factory,
+        asset_storage,
+        owner_id=ids["owner_id"],
+        novel_id=ids["novel_id"],
     )
     md = build_markdown(frozen).decode("utf-8")
     assert "插图待修复" in md

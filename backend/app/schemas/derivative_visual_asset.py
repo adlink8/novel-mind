@@ -475,7 +475,9 @@ def _declares_style_divergence(spec: Any) -> bool:
     return False
 
 
-def chapter_evidence_from_spec(spec: Any, chapter_number: int) -> ChapterConsistencyEvidence:
+def chapter_evidence_from_spec(
+    spec: Any, chapter_number: int
+) -> ChapterConsistencyEvidence:
     """Frozen per-chapter evidence derived deterministically from the spec."""
     identity_row = spec.identity[0]
     source_ref = dict(identity_row.source_entity_ref or {})
@@ -498,7 +500,8 @@ def chapter_evidence_from_spec(spec: Any, chapter_number: int) -> ChapterConsist
     )
 
 
-__all__ = [    "DERIVATIVE_ASSET_ACTIONS",
+__all__ = [
+    "DERIVATIVE_ASSET_ACTIONS",
     "DERIVATIVE_ASSET_NAMESPACE",
     "DERIVATIVE_ASSET_SCHEMA_VERSION",
     "DERIVATIVE_ASSET_STATES",

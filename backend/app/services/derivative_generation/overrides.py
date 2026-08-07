@@ -100,7 +100,9 @@ class OverrideApprovalResult:
     status: str  # ``applied`` (new revision) or ``noop`` (idempotent replay)
 
 
-def override_hash(*, kind: str, reason: str, affected_evidence: list[str], package_hash: str) -> str:
+def override_hash(
+    *, kind: str, reason: str, affected_evidence: list[str], package_hash: str
+) -> str:
     """Deterministic CanonDelta hash for an override without a candidate delta."""
     encoded = json.dumps(
         {
@@ -262,7 +264,9 @@ def _resolve_kind_and_evidence(
                 f"declared CanonDelta type {declared_type!r}",
             )
         kind = str(declared_type)
-        declared_evidence = [str(key) for key in (divergence.get("affected_evidence") or [])]
+        declared_evidence = [
+            str(key) for key in (divergence.get("affected_evidence") or [])
+        ]
         if requested_evidence and not set(requested_evidence) <= set(declared_evidence):
             raise OverrideError(
                 CODE_EVIDENCE_OUTSIDE_PACKAGE,
@@ -491,13 +495,16 @@ async def approve_override(
     if checksum == chapter.markdown_checksum:
         # Idempotent replay: the approved draft already equals the chapter head.
         latest = await db.scalar(
-            select(DerivativeRevision).where(
+            select(DerivativeRevision)
+            .where(
                 DerivativeRevision.chapter_id == chapter.id,
                 DerivativeRevision.owner_id == owner_id,
-            ).order_by(
+            )
+            .order_by(
                 DerivativeRevision.revision_number.desc(),
                 DerivativeRevision.id.desc(),
-            ).limit(1)
+            )
+            .limit(1)
         )
         revision_id = latest.id if latest is not None else None
     else:
@@ -527,9 +534,7 @@ async def approve_override(
             content=canonical,
             checksum=checksum,
             actor_id=actor_id,
-            reason=(
-                f"divergence override:{row.id}:{row.kind}:{approval[:400]}"
-            )[:400],
+            reason=(f"divergence override:{row.id}:{row.kind}:{approval[:400]}")[:400],
             approval_state="approved",
         )
         revision_id = revision.id

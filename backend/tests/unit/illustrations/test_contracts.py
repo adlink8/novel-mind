@@ -48,7 +48,6 @@ from app.schemas.illustration import (
     ILLUSTRATION_CONSISTENCY_VERDICTS,
     ILLUSTRATION_JOB_NONTERMINAL_STATUSES,
     ILLUSTRATION_JOB_STATUSES,
-    ILLUSTRATION_RESERVATION_STATUSES,
     ILLUSTRATION_REVIEW_ACTIONS,
     ILLUSTRATION_RIGHTS_STATUSES,
     LEGAL_ILLUSTRATION_REVIEW_TRANSITIONS,
@@ -56,7 +55,6 @@ from app.schemas.illustration import (
     AssetRevisionView,
     ConsistencyReportContract,
     FrozenAssetRevisionView,
-    IllustrationActorSource,
     IllustrationApprovalState,
     IllustrationConsistencyVerdict,
     IllustrationGateError,
@@ -209,7 +207,10 @@ def _asset(**overrides):
         "provider_model": "mock-img-v1",
         "provider_request_id": "req-1",
         "provider_response": {"redacted": True},
-        "provenance": {"source": "mock-provider", "fixture": "illustration-mock-success"},
+        "provenance": {
+            "source": "mock-provider",
+            "fixture": "illustration-mock-success",
+        },
         "rights_status": "unreviewed",
         "approval_state": "candidate",
         "idempotency_key": HEX64,
@@ -365,17 +366,38 @@ def _job_view(**overrides):
 
 
 def test_illustration_vocabulary_is_closed_and_pinned():
-    assert [s.value for s in IllustrationApprovalState] == list(ILLUSTRATION_APPROVAL_STATES)
-    assert [a.value for a in IllustrationReviewAction] == list(ILLUSTRATION_REVIEW_ACTIONS)
-    assert [r.value for r in IllustrationRightsStatus] == list(ILLUSTRATION_RIGHTS_STATUSES)
+    assert [s.value for s in IllustrationApprovalState] == list(
+        ILLUSTRATION_APPROVAL_STATES
+    )
+    assert [a.value for a in IllustrationReviewAction] == list(
+        ILLUSTRATION_REVIEW_ACTIONS
+    )
+    assert [r.value for r in IllustrationRightsStatus] == list(
+        ILLUSTRATION_RIGHTS_STATUSES
+    )
     assert [v.value for v in IllustrationConsistencyVerdict] == list(
         ILLUSTRATION_CONSISTENCY_VERDICTS
     )
-    assert JOB_STATUSES_HASH == "c90b3aa86bc17ed458792d47f824e21a37540f635b3b818be6fb1986f642e2ea"
-    assert ATTEMPT_STATUSES_HASH == "8f68af445bf876c994c12292c006f3e4631ea4a7590b1853205f59816bddc314"
-    assert APPROVAL_STATES_HASH == "8e0516cace67d20db5ae5ef36a2748f3e8e2cbecfa04adc64e91243b46714202"
-    assert RIGHTS_STATUSES_HASH == "42a345ca5bdfdf6e40bd8c1489cbacbd98b052b5cc4ddd5219e6aa79611a2095"
-    assert CONSISTENCY_VERDICTS_HASH == "b71e86befb4255abf29135f2077384da2b8f5538a3411c4f7ea912c70af8abbf"
+    assert (
+        JOB_STATUSES_HASH
+        == "c90b3aa86bc17ed458792d47f824e21a37540f635b3b818be6fb1986f642e2ea"
+    )
+    assert (
+        ATTEMPT_STATUSES_HASH
+        == "8f68af445bf876c994c12292c006f3e4631ea4a7590b1853205f59816bddc314"
+    )
+    assert (
+        APPROVAL_STATES_HASH
+        == "8e0516cace67d20db5ae5ef36a2748f3e8e2cbecfa04adc64e91243b46714202"
+    )
+    assert (
+        RIGHTS_STATUSES_HASH
+        == "42a345ca5bdfdf6e40bd8c1489cbacbd98b052b5cc4ddd5219e6aa79611a2095"
+    )
+    assert (
+        CONSISTENCY_VERDICTS_HASH
+        == "b71e86befb4255abf29135f2077384da2b8f5538a3411c4f7ea912c70af8abbf"
+    )
 
 
 def test_job_status_vocabulary_has_explicit_failure_and_unknown():
@@ -424,9 +446,7 @@ def test_idempotency_key_changes_when_lineage_changes():
     )
     assert (
         _job(
-            lineage=_lineage(
-                model_lineage={"provider": "mock", "model": "mock-img-v2"}
-            )
+            lineage=_lineage(model_lineage={"provider": "mock", "model": "mock-img-v2"})
         ).idempotency_key
         != base.idempotency_key
     )
@@ -451,9 +471,7 @@ def test_strict_job_contract_rejects_provider_fields_and_secrets():
     with pytest.raises(ValidationError):
         _job(provider_secret="sk-live")
     with pytest.raises(IllustrationGateError):
-        validate_illustration_job_contract(
-            _job(price_snapshot={"api_key": "sk-live"})
-        )
+        validate_illustration_job_contract(_job(price_snapshot={"api_key": "sk-live"}))
     with pytest.raises(IllustrationGateError):
         validate_illustration_job_contract(
             _job(price_snapshot={"token": "secret-token"})
@@ -502,9 +520,7 @@ def test_asset_revision_lineage_must_match_job():
     validate_asset_revision_contract(asset, job)
 
     with pytest.raises(IllustrationGateError):
-        validate_asset_revision_contract(
-            _asset(owner_id=12, job_id=1), job
-        )
+        validate_asset_revision_contract(_asset(owner_id=12, job_id=1), job)
     with pytest.raises(IllustrationGateError):
         validate_asset_revision_contract(_asset(novel_id=23, job_id=1), job)
     with pytest.raises(IllustrationGateError):
@@ -579,9 +595,7 @@ def test_unknown_pricing_fails_closed():
 
 def test_budget_reserve_is_idempotent_and_settles_explicit():
     gate = IllustrationBudgetGate(
-        policy=IllustrationBudgetPolicy(
-            max_calls=5, max_cost_usd=Decimal("0.50")
-        )
+        policy=IllustrationBudgetPolicy(max_calls=5, max_cost_usd=Decimal("0.50"))
     )
     price = _price_snapshot()
     first = gate.reserve(
@@ -612,9 +626,7 @@ def test_budget_reserve_is_idempotent_and_settles_explicit():
 
 def test_budget_exhaustion_fails_closed():
     gate = IllustrationBudgetGate(
-        policy=IllustrationBudgetPolicy(
-            max_calls=1, max_cost_usd=Decimal("0.10")
-        )
+        policy=IllustrationBudgetPolicy(max_calls=1, max_cost_usd=Decimal("0.10"))
     )
     price = _price_snapshot()
     gate.reserve(
@@ -690,15 +702,33 @@ def test_approval_transition_map_is_closed():
     for state, actions in LEGAL_ILLUSTRATION_REVIEW_TRANSITIONS.items():
         for action in actions:
             assert action in ILLUSTRATION_ACTION_TO_STATE
-            assert approval_state_after(state, action) == ILLUSTRATION_ACTION_TO_STATE[action]
+            assert (
+                approval_state_after(state, action)
+                == ILLUSTRATION_ACTION_TO_STATE[action]
+            )
 
 
 def test_approval_chain_and_idempotency():
-    assert approval_state_after("candidate", "approve") is IllustrationApprovalState.PROPOSAL_READY
-    assert approval_state_after("candidate", "reject") is IllustrationApprovalState.REJECTED
-    assert approval_state_after("candidate", "needs_relink") is IllustrationApprovalState.CANDIDATE
-    assert approval_state_after("proposal_ready", "supersede") is IllustrationApprovalState.SUPERSEDED
-    assert approval_state_after("proposal_ready", "needs_relink") is IllustrationApprovalState.CANDIDATE
+    assert (
+        approval_state_after("candidate", "approve")
+        is IllustrationApprovalState.PROPOSAL_READY
+    )
+    assert (
+        approval_state_after("candidate", "reject")
+        is IllustrationApprovalState.REJECTED
+    )
+    assert (
+        approval_state_after("candidate", "needs_relink")
+        is IllustrationApprovalState.CANDIDATE
+    )
+    assert (
+        approval_state_after("proposal_ready", "supersede")
+        is IllustrationApprovalState.SUPERSEDED
+    )
+    assert (
+        approval_state_after("proposal_ready", "needs_relink")
+        is IllustrationApprovalState.CANDIDATE
+    )
     with pytest.raises(IllustrationGateError):
         approval_state_after("proposal_ready", "approve")  # double approval impossible
     with pytest.raises(IllustrationGateError):
@@ -802,9 +832,7 @@ def test_job_orm_carries_lineage_and_nonterminal_idempotency():
     assert "idx_illustration_jobs_scope" in index_names
 
     check_names = {
-        c.name
-        for c in IllustrationJob.__table__.constraints
-        if hasattr(c, "name")
+        c.name for c in IllustrationJob.__table__.constraints if hasattr(c, "name")
     }
     assert "ck_illustration_jobs_status" in check_names
     assert "ck_illustration_jobs_idempotency_key" in check_names
@@ -818,9 +846,7 @@ def test_attempt_orm_enforces_job_number_uniqueness():
     }
     assert ("job_id", "attempt_number") in unique
     check_names = {
-        c.name
-        for c in IllustrationAttempt.__table__.constraints
-        if hasattr(c, "name")
+        c.name for c in IllustrationAttempt.__table__.constraints if hasattr(c, "name")
     }
     assert "ck_illustration_attempts_status" in check_names
     assert "ck_illustration_attempts_number" in check_names
@@ -857,9 +883,7 @@ def test_asset_orm_carries_immutable_lineage_and_approval_projection():
     } <= cols
 
     check_names = {
-        c.name
-        for c in AssetRevision.__table__.constraints
-        if hasattr(c, "name")
+        c.name for c in AssetRevision.__table__.constraints if hasattr(c, "name")
     }
     assert "ck_asset_revisions_approval_state" in check_names
     assert "ck_asset_revisions_bytes_hash" in check_names
@@ -876,9 +900,7 @@ def test_asset_orm_carries_immutable_lineage_and_approval_projection():
 
 def test_consistency_orm_enforces_closed_verdict():
     check_names = {
-        c.name
-        for c in ConsistencyReport.__table__.constraints
-        if hasattr(c, "name")
+        c.name for c in ConsistencyReport.__table__.constraints if hasattr(c, "name")
     }
     assert "ck_illustration_consistency_verdict" in check_names
     assert "ck_illustration_consistency_fixture_hash" in check_names
@@ -1017,9 +1039,7 @@ async def test_asset_approval_projection_is_the_only_mutable_surface(
 
 
 async def test_review_event_row_is_append_only(db_session: AsyncSession):
-    asset_row, _, owner, novel = await _persist_asset(
-        db_session, "ill_append_review"
-    )
+    asset_row, _, owner, novel = await _persist_asset(db_session, "ill_append_review")
     event = IllustrationReviewEvent(
         owner_id=owner.id,
         novel_id=novel.id,

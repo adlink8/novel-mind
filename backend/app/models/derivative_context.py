@@ -152,9 +152,7 @@ class ContextPackageRecord(TimestampMixin, Base):
     scope_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     manifest_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     # ---- sealed payload ----
-    canonical_payload: Mapped[dict] = mapped_column(
-        JSONB, nullable=False, default=dict
-    )
+    canonical_payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     budget_estimate: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     package_hash: Mapped[str] = mapped_column(String(64), nullable=False)
 

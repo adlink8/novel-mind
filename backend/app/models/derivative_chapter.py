@@ -90,9 +90,7 @@ class DerivativeChapter(TimestampMixin, Base):
     # Canonical Markdown is the editing representation; checksum seals it.
     markdown: Mapped[str] = mapped_column(Text, nullable=False, default="")
     markdown_checksum: Mapped[str] = mapped_column(String(64), nullable=False)
-    status: Mapped[str] = mapped_column(
-        String(16), nullable=False, default="draft"
-    )
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="draft")
     # Optimistic concurrency token (client echoes it as base_revision).
     revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
 

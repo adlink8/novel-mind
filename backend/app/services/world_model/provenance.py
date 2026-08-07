@@ -114,10 +114,7 @@ def validate_entity_package(
         exception_keys.add(exception.exception_key)
         if exception.rule_key not in rule_keys:
             reasons.add(EntityProvenanceReason.ORPHAN_EXCEPTION_RULE.value)
-        if (
-            exception.applies_to is not None
-            and exception.applies_to not in entity_keys
-        ):
+        if exception.applies_to is not None and exception.applies_to not in entity_keys:
             reasons.add(EntityProvenanceReason.ORPHAN_EXCEPTION_TARGET.value)
         if not exception.source_refs:
             reasons.add(EntityProvenanceReason.MISSING_SOURCE_LINEAGE.value)

@@ -206,9 +206,7 @@ class PromptRevision(TimestampMixin, Base):
     uncertainties: Mapped[list | None] = mapped_column(JSONB)
     prompt_text: Mapped[str] = mapped_column(Text, nullable=False)
     redacted_preview: Mapped[str | None] = mapped_column(Text)
-    canonical_payload: Mapped[dict] = mapped_column(
-        JSONB, nullable=False, default=dict
-    )
+    canonical_payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     canonical_payload_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     idempotency_key: Mapped[str] = mapped_column(String(64), nullable=False)
     projection_hash: Mapped[str] = mapped_column(String(64), nullable=False)

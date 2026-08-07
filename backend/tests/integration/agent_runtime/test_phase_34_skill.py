@@ -46,7 +46,10 @@ from app.models.agent_runtime import (
     SkillVersion,
 )
 from app.models.illustration import AssetRevision
-from app.models.illustration_anchor import IllustrationAnchor, IllustrationAnchorProposal
+from app.models.illustration_anchor import (
+    IllustrationAnchor,
+    IllustrationAnchorProposal,
+)
 from app.models.illustration_job import IllustrationJob
 from app.schemas.agent_runtime import SkillVersionRegister
 from app.services.agent_runtime.approvals import confirm
@@ -230,7 +233,9 @@ def _seed(sync_url: str, *, suffix: str) -> dict[str, Any]:
             approved_by="editor",
             canonical_payload={},
             canonical_payload_hash=HEX64,
-            idempotency_key=hashlib.sha256(f"asset-{suffix}".encode("utf-8")).hexdigest(),
+            idempotency_key=hashlib.sha256(
+                f"asset-{suffix}".encode("utf-8")
+            ).hexdigest(),
             projection_hash=HEX64,
             schema_version="illustration-asset.v1",
         )
@@ -395,9 +400,7 @@ async def _count(
             )
         return int(
             await session.scalar(
-                select(func.count())
-                .select_from(model)
-                .where(model.run_id == run_id)  # type: ignore[attr-defined]
+                select(func.count()).select_from(model).where(model.run_id == run_id)  # type: ignore[attr-defined]
             )
             or 0
         )
@@ -571,7 +574,9 @@ async def _set_up(
         owner_id=ids["owner_id"],
         novel_id=ids["novel_id"],
         contract=_skill_contract(
-            novel_id=ids["novel_id"], name="propose-illustration-anchor", tools=DEFAULT_TOOLS
+            novel_id=ids["novel_id"],
+            name="propose-illustration-anchor",
+            tools=DEFAULT_TOOLS,
         ),
     )
     run_input = _run_input(ids, branch=branch)
@@ -697,7 +702,9 @@ async def test_phase34_happy_path_proposal_to_publish(
             db=session,
             novel=novel,
             owner_id=ctx["owner_id"],
-            params=_anchor_params(ctx, proposal_key="anchor-lantern-publish_illustration"),
+            params=_anchor_params(
+                ctx, proposal_key="anchor-lantern-publish_illustration"
+            ),
         )
         await session.commit()
     assert tool_view["candidate_only"] is True
@@ -713,13 +720,21 @@ async def test_phase34_happy_path_proposal_to_publish(
     assert proposal is not None and proposal.status == "pending_approval"
     assert approval is not None and approval.status == "pending"
     assert approval.payload_hash == proposal.canonical_payload_hash
-    assert await _count(runtime_factory, IllustrationAnchor, owner_id=ctx["owner_id"]) == 0
+    assert (
+        await _count(runtime_factory, IllustrationAnchor, owner_id=ctx["owner_id"]) == 0
+    )
 
     # finalize 写入 candidate IllustrationAnchorProposal 产物。
-    frozen_manifest = {"evidence_refs": ctx["evidence_keys"], "manifest_checksum": "m" * 64}
+    frozen_manifest = {
+        "evidence_refs": ctx["evidence_keys"],
+        "manifest_checksum": "m" * 64,
+    }
     envelope = _build_envelope(ctx)
     outcome = await _finalize(
-        runtime_factory, run_id=run_id, envelope=envelope, frozen_manifest=frozen_manifest
+        runtime_factory,
+        run_id=run_id,
+        envelope=envelope,
+        frozen_manifest=frozen_manifest,
     )
     assert outcome.status == "completed", outcome.status_reason
     assert outcome.artifact_id is not None
@@ -756,11 +771,15 @@ async def test_phase34_happy_path_proposal_to_publish(
         assert forbidden not in content
     # Original 零变更：章节正文未动、无 valid anchor、无 published。
     assert chapter_row is not None and chapter_row.content == CHAPTER_TEXT
-    assert await _count(runtime_factory, IllustrationAnchor, owner_id=ctx["owner_id"]) == 0
+    assert (
+        await _count(runtime_factory, IllustrationAnchor, owner_id=ctx["owner_id"]) == 0
+    )
 
     # 用户 Web 确认 → 确定性 publisher → valid anchor + frozen manifest。
     async with runtime_factory() as session:
-        await confirm(session, request_id=approval_id, owner_id=ctx["owner_id"], mode="once")
+        await confirm(
+            session, request_id=approval_id, owner_id=ctx["owner_id"], mode="once"
+        )
         await session.commit()
         anchor = await publish_anchor(
             session,
@@ -775,7 +794,9 @@ async def test_phase34_happy_path_proposal_to_publish(
     assert anchor.approval_request_id == approval_id
     assert fresh_proposal is not None and fresh_proposal.status == "valid"
     assert anchor.publish_manifest_hash == fresh_proposal.publish_manifest_hash
-    assert await _count(runtime_factory, IllustrationAnchor, owner_id=ctx["owner_id"]) == 1
+    assert (
+        await _count(runtime_factory, IllustrationAnchor, owner_id=ctx["owner_id"]) == 1
+    )
     # 提案投影推进到 valid。
     async with runtime_factory() as session:
         proposal = await session.get(IllustrationAnchorProposal, proposal_id)
@@ -787,9 +808,7 @@ async def test_phase34_happy_path_proposal_to_publish(
 # ────────────────────────── 对抗路径（fail closed，零权威写入） ──────────────────────────
 
 
-async def test_phase34_cancellation_no_write(
-    runtime_factory, migrated_postgres: str
-):
+async def test_phase34_cancellation_no_write(runtime_factory, migrated_postgres: str):
     """取消 → cancelled，0 artifact/revision/ApprovalRequest/anchor（cancel-without-write）。"""
     ctx = await _set_up(
         runtime_factory,
@@ -857,13 +876,14 @@ async def test_phase34_wrong_skill_version_lineage_blocks(
         frozen_manifest={"evidence_refs": ctx["evidence_keys"]},
     )
     assert outcome.status == "failed"
-    assert outcome.status_reason is not None and "skill_version_id" in outcome.status_reason
+    assert (
+        outcome.status_reason is not None
+        and "skill_version_id" in outcome.status_reason
+    )
     await _assert_zero_writes(runtime_factory, run_id=ctx["run_id"])
 
 
-async def test_phase34_stale_input_hash_blocks(
-    runtime_factory, migrated_postgres: str
-):
+async def test_phase34_stale_input_hash_blocks(runtime_factory, migrated_postgres: str):
     """envelope input_hash 与 run 不符（stale）→ blocked，零写入。"""
     ctx = await _set_up(
         runtime_factory,
@@ -882,9 +902,7 @@ async def test_phase34_stale_input_hash_blocks(
     await _assert_zero_writes(runtime_factory, run_id=ctx["run_id"])
 
 
-async def test_phase34_schema_drift_blocks(
-    runtime_factory, migrated_postgres: str
-):
+async def test_phase34_schema_drift_blocks(runtime_factory, migrated_postgres: str):
     """schema drift：proposal_status 非 proposed（approval bypass / published 伪造）
     → blocked，零写入。"""
     ctx = await _set_up(
@@ -901,13 +919,13 @@ async def test_phase34_schema_drift_blocks(
     )
     assert outcome.status == "failed"
     assert outcome.error_code == ERROR_CODE_FAILED_VALIDATION
-    assert outcome.status_reason is not None and "proposal_status" in outcome.status_reason
+    assert (
+        outcome.status_reason is not None and "proposal_status" in outcome.status_reason
+    )
     await _assert_zero_writes(runtime_factory, run_id=ctx["run_id"])
 
 
-async def test_phase34_wrong_branch_blocks(
-    runtime_factory, migrated_postgres: str
-):
+async def test_phase34_wrong_branch_blocks(runtime_factory, migrated_postgres: str):
     """wrong branch/fork：run 绑定 original 主线（branch=None），envelope 声称
     derivative 模式（branch + fork）→ blocked，零写入。"""
     ctx = await _set_up(
@@ -959,7 +977,9 @@ async def test_phase34_approval_not_confirmed_blocks_publish(
                 novel_id=ctx["novel_id"],
                 proposal_id=proposal_id,
             )
-    assert await _count(runtime_factory, IllustrationAnchor, owner_id=ctx["owner_id"]) == 0
+    assert (
+        await _count(runtime_factory, IllustrationAnchor, owner_id=ctx["owner_id"]) == 0
+    )
 
 
 async def test_phase34_approval_payload_hash_drift_blocks_publish(
@@ -984,7 +1004,9 @@ async def test_phase34_approval_payload_hash_drift_blocks_publish(
     proposal_id = int(tool_view["proposal_id"])
     approval_id = int(tool_view["approval_request_id"])
     async with runtime_factory() as session:
-        await confirm(session, request_id=approval_id, owner_id=ctx["owner_id"], mode="once")
+        await confirm(
+            session, request_id=approval_id, owner_id=ctx["owner_id"], mode="once"
+        )
         approval = await session.get(ApprovalRequest, approval_id)
         approval.payload_hash = "c" * 64  # 篡改重放哈希
         await session.commit()
@@ -997,7 +1019,9 @@ async def test_phase34_approval_payload_hash_drift_blocks_publish(
                 proposal_id=proposal_id,
             )
     assert "payload hash" in str(exc.value)
-    assert await _count(runtime_factory, IllustrationAnchor, owner_id=ctx["owner_id"]) == 0
+    assert (
+        await _count(runtime_factory, IllustrationAnchor, owner_id=ctx["owner_id"]) == 0
+    )
 
 
 async def test_phase34_original_authority_untouched(
@@ -1066,16 +1090,18 @@ async def test_phase34_forbidden_tool_action_never_publishes(
     assert tool_view["approval_status"] == "pending"
     assert tool_view["status"] == "pending_approval"
     async with runtime_factory() as session:
-        proposal = await session.get(IllustrationAnchorProposal, int(tool_view["proposal_id"]))
+        proposal = await session.get(
+            IllustrationAnchorProposal, int(tool_view["proposal_id"])
+        )
     assert proposal is not None and proposal.status == "pending_approval"
     assert proposal.published_asset_revision_id is None
     assert proposal.publish_manifest_hash is None
-    assert await _count(runtime_factory, IllustrationAnchor, owner_id=ctx["owner_id"]) == 0
+    assert (
+        await _count(runtime_factory, IllustrationAnchor, owner_id=ctx["owner_id"]) == 0
+    )
 
 
-async def test_phase34_tool_idempotent_replay(
-    runtime_factory, migrated_postgres: str
-):
+async def test_phase34_tool_idempotent_replay(runtime_factory, migrated_postgres: str):
     """publish_illustration 幂等：重复 span/asset/proposal_key → 重放既有候选
     proposal + approval（一个 proposal、一个 approval）。"""
     ctx = await _set_up(

@@ -95,9 +95,7 @@ def evaluate_approval_gate(
     """Fail closed unless every canon claim has evidence and every asset is
     rights-cleared. A version with no canon claims and no assets is clean."""
     no_evidence = [
-        key
-        for key, count in canon_claim_evidence_counts.items()
-        if int(count) <= 0
+        key for key, count in canon_claim_evidence_counts.items() if int(count) <= 0
     ]
     blocked_assets = [
         key
@@ -109,8 +107,7 @@ def evaluate_approval_gate(
             ok=False,
             reason_code="evidence_unresolved",
             detail=(
-                f"{len(no_evidence)} canon_fact claim(s) have no persisted "
-                "evidence ref"
+                f"{len(no_evidence)} canon_fact claim(s) have no persisted evidence ref"
             ),
             unresolved_claims=tuple(no_evidence),
         )
@@ -118,10 +115,7 @@ def evaluate_approval_gate(
         return ApprovalGateResult(
             ok=False,
             reason_code="rights_unresolved",
-            detail=(
-                f"{len(blocked_assets)} reference asset(s) are not "
-                "rights-cleared"
-            ),
+            detail=(f"{len(blocked_assets)} reference asset(s) are not rights-cleared"),
             unresolved_assets=tuple(blocked_assets),
         )
     return ApprovalGateResult(ok=True)
@@ -436,7 +430,10 @@ async def build_review_envelope(
             parent_revision_ref = None  # orphaned lineage stays visible, not fatal
 
     approval_gate: VisualApprovalGateView | None = None
-    if view.review_state in (VisualReviewState.CANDIDATE, VisualReviewState.NEEDS_RELINK):
+    if view.review_state in (
+        VisualReviewState.CANDIDATE,
+        VisualReviewState.NEEDS_RELINK,
+    ):
         service = VisualBibleReviewService(session)
         approval_gate = _gate_view(
             await service._approval_gate(

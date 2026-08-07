@@ -168,7 +168,9 @@ class WorldEntityQueries:
             owner_id=owner_id,
             novel_id=novel_id,
             version_id=version_id,
-            entities=[WorldEntity.model_validate(row.canonical_payload) for row in entities],
+            entities=[
+                WorldEntity.model_validate(row.canonical_payload) for row in entities
+            ],
             links=links,
             rules=rules,
             exceptions=exceptions,

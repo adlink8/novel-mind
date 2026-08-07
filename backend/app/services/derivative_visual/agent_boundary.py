@@ -79,9 +79,7 @@ CODE_REVIEW_BLOCKED = "review_blocked"
 # A candidate can only be published from an explicitly approvable review state;
 # ``blocked`` (identity drift / undeclared divergence) is terminal and can never
 # be approved (D-38-03 / LEGAL_DERIVATIVE_ASSET_TRANSITIONS).
-APPROVABLE_CANDIDATE_STATES: frozenset[str] = frozenset(
-    {"candidate", "needs_review"}
-)
+APPROVABLE_CANDIDATE_STATES: frozenset[str] = frozenset({"candidate", "needs_review"})
 
 
 class DerivativeVisualBoundaryError(ValueError):

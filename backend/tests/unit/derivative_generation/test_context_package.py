@@ -51,11 +51,15 @@ def _lineage(**overrides):
 
 def _dimensions(**overrides):
     data = {
-        "world_state": dimension_view(status=DimensionStatus.AVAILABLE, items=[{"entity_key": "hero"}]),
+        "world_state": dimension_view(
+            status=DimensionStatus.AVAILABLE, items=[{"entity_key": "hero"}]
+        ),
         "timeline": dimension_view(status=DimensionStatus.UNAVAILABLE),
         "unresolved_clues": dimension_view(status=DimensionStatus.UNAVAILABLE),
         "world_rules": dimension_view(status=DimensionStatus.UNAVAILABLE),
-        "evidence": dimension_view(status=DimensionStatus.AVAILABLE, items=[{"leaf_key": "chapter:1"}]),
+        "evidence": dimension_view(
+            status=DimensionStatus.AVAILABLE, items=[{"leaf_key": "chapter:1"}]
+        ),
         "user_intent": {
             "status": "available",
             "kind": "continuation",
@@ -99,7 +103,9 @@ def test_package_hash_is_deterministic():
 def test_package_hash_is_sensitive_to_content():
     a = package_hash(_payload())
     b = package_hash(_payload(intent="rewrite"))
-    c = package_hash(_payload(through_chapter=3) if False else _payload(intent="continuation"))
+    c = package_hash(
+        _payload(through_chapter=3) if False else _payload(intent="continuation")
+    )
     assert a != b
     assert a == c
 

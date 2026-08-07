@@ -18,7 +18,6 @@ import pytest
 from httpx import AsyncClient
 
 from app.config import settings
-from app.services.ai_service import ai_service
 
 pytestmark = pytest.mark.contract
 
@@ -73,9 +72,7 @@ def gateway_client(client: AsyncClient, monkeypatch):
     """配置网关令牌并把 AIService 换成 stub。"""
     monkeypatch.setattr(settings, "novelmind_gateway_token", GATEWAY_TOKEN)
     fake = _FakeAiService()
-    monkeypatch.setattr(
-        "app.api.gateway.ai_service", fake, raising=False
-    )
+    monkeypatch.setattr("app.api.gateway.ai_service", fake, raising=False)
     return client, fake
 
 
@@ -163,7 +160,7 @@ async def test_gateway_stream_openai_sse_shape(gateway_client):
     assert resp.status_code == 200
     assert resp.headers["content-type"].startswith("text/event-stream")
     lines = resp.text.split("\n")
-    chunks = [l for l in lines if l.startswith("data: ")]
+    chunks = [line for line in lines if line.startswith("data: ")]
     assert chunks[-1] == "data: [DONE]"  # SSE 终止标记
     # OpenAI SSE 契约：内容块带 delta.content；末尾有 finish_reason:"stop" 的
     # 终止块（delta 为空），之后才是 [DONE]。

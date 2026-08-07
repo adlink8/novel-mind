@@ -29,7 +29,6 @@ import pytest
 from app.services.derivative_export import audit as audit_module
 from app.services.derivative_export import package as package_module
 from app.services.derivative_export.audit import (
-    DerivativeExportAuditDimension,
     DerivativeExportAuditDimensionKind,
     DerivativeExportAuditEvidence,
     DerivativeExportAuditReport,
@@ -48,13 +47,10 @@ from app.services.derivative_export.package import (
     derivative_export_package_hash,
 )
 from tests.fixtures.derivative_export_roundtrip_fixtures import (
-    HEX64_F,
-    OWNER_ID,
     build_fixture_snapshot,
     fixture_asset,
     fixture_chapter,
     fixture_export_asset,
-    fixture_export_revision,
     seal_fixture_manifest,
 )
 
@@ -90,7 +86,9 @@ def _phase22(green_observed: int = 0) -> DerivativeExportPhase22Evidence:
     )
 
 
-def _audit_evidence(kind: str = "roundtrip_fixtures_present") -> tuple[DerivativeExportAuditEvidence, ...]:
+def _audit_evidence(
+    kind: str = "roundtrip_fixtures_present",
+) -> tuple[DerivativeExportAuditEvidence, ...]:
     return (
         DerivativeExportAuditEvidence(
             kind=kind, location="backend/tests", detail="fixture evidence present"
@@ -239,9 +237,7 @@ def test_package_imports_only_stdlib_and_app():
             "pydantic",
         }
     ]
-    assert third_party == [], (
-        f"package module must be stdlib-only; found {third_party}"
-    )
+    assert third_party == [], f"package module must be stdlib-only; found {third_party}"
 
 
 # ---------------------------------------------------------------------------
@@ -358,9 +354,7 @@ def test_audit_quality_dimension_cannot_be_forced_green():
 def test_audit_direct_report_requires_exactly_three_dimensions():
     snapshot = _readable_snapshot()
     manifest = seal_fixture_manifest(snapshot)
-    report = build_derivative_export_audit(
-        manifest=manifest, phase22=_phase22(0)
-    )
+    report = build_derivative_export_audit(manifest=manifest, phase22=_phase22(0))
     data = report.model_dump(mode="json")
     data["dimensions"] = data["dimensions"][:2]
     with pytest.raises(ValueError):
@@ -371,9 +365,10 @@ def test_audit_has_no_promotion_or_pointer_capability():
     assert audit_derivative_export_has_promotion_capability() is False
     assert audit_derivative_export_mutates_planning_state() is False
     # The module owns no write surface to STATE/ROADMAP or an active pointer.
-    assert "def audit_derivative_export_mutates_planning_state" in open(
-        audit_module.__file__, encoding="utf-8"
-    ).read()
+    assert (
+        "def audit_derivative_export_mutates_planning_state"
+        in open(audit_module.__file__, encoding="utf-8").read()
+    )
 
 
 def test_audit_phase22_evidence_is_bound_and_source_hashed():

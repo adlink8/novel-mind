@@ -37,8 +37,12 @@ from app.services.world_model.queries import EpistemicQueryEngine
 pytestmark = pytest.mark.unit
 
 FIXTURE = json.loads(
-    (Path(__file__).resolve().parents[2] / "fixtures" / "world_model" / "epistemic_v1.json")
-    .read_text(encoding="utf-8")
+    (
+        Path(__file__).resolve().parents[2]
+        / "fixtures"
+        / "world_model"
+        / "epistemic_v1.json"
+    ).read_text(encoding="utf-8")
 )
 
 
@@ -109,7 +113,9 @@ def test_mistaken_belief_visible_until_truth_cutoff():
     }
     # The mistaken belief is preserved next to the truth, never overwritten.
     by_key = {claim.knowledge_key: claim for claim in after.claims}
-    assert by_key["k-belief-withdrawn"].epistemic_status == EpistemicStatus.MISTAKEN_BELIEF
+    assert (
+        by_key["k-belief-withdrawn"].epistemic_status == EpistemicStatus.MISTAKEN_BELIEF
+    )
     assert by_key["k-truth-siege"].authority == Authority.CANON_FACT
     assert by_key["k-truth-siege"].epistemic_status == EpistemicStatus.ASSERTED
 
@@ -197,13 +203,23 @@ def test_wrong_pov_reads_fail_closed():
     engine = engine_for("wrong_pov")
     # Querying as a different POV sees nothing authored from the other character.
     other_pov = engine.query_character_knowledge(
-        owner_id=1, novel_id=1, version_id=5, subject="mei-niang", cutoff=3, pov="lin-an"
+        owner_id=1,
+        novel_id=1,
+        version_id=5,
+        subject="mei-niang",
+        cutoff=3,
+        pov="lin-an",
     )
     assert other_pov.status == KnowledgeResultStatus.ABSTAINED
     assert other_pov.claims == ()
     # The owning POV sees the claim.
     own_pov = engine.query_character_knowledge(
-        owner_id=1, novel_id=1, version_id=5, subject="mei-niang", cutoff=3, pov="mei-niang"
+        owner_id=1,
+        novel_id=1,
+        version_id=5,
+        subject="mei-niang",
+        cutoff=3,
+        pov="mei-niang",
     )
     assert own_pov.status == KnowledgeResultStatus.ANSWERED
     assert own_pov.claims[0].knowledge_key == "k-other-pov"
@@ -252,9 +268,7 @@ def test_reader_chat_can_never_serialize_as_canon_fact():
         if reason == GateReason.CHAT_NOT_FACT_SOURCE
     } == {GateReason.CHAT_NOT_FACT_SOURCE}
     # Even with canon_fact approved, Reader Chat stays a non-source.
-    assert (
-        GateReason.CHAT_NOT_FACT_SOURCE in results[0].reason_codes
-    )
+    assert GateReason.CHAT_NOT_FACT_SOURCE in results[0].reason_codes
 
 
 def test_user_conversation_never_canon_and_not_silently_promoted():
@@ -274,7 +288,11 @@ def test_user_conversation_never_canon_and_not_silently_promoted():
 def test_state_history_transitions_do_not_skip_nodes():
     projection = valid_projection()
     history = EpistemicQueryEngine(projection.claims).query_character_history(
-        owner_id=1, novel_id=1, version_id=1, subject="lin-an", aspect=EpistemicAspect.STATE
+        owner_id=1,
+        novel_id=1,
+        version_id=1,
+        subject="lin-an",
+        aspect=EpistemicAspect.STATE,
     )
     keys = [claim.knowledge_key for claim in history]
     assert keys == ["k-state-arrival", "k-state-court", "k-state-declare"]
@@ -291,9 +309,7 @@ def test_transition_gap_is_rejected_by_projection():
     claims, _ = gated_claims("transition_gap")
     assert len(claims) == 1
     with pytest.raises(ValueError):
-        build_knowledge_projection(
-            owner_id=1, novel_id=1, version_id=8, claims=claims
-        )
+        build_knowledge_projection(owner_id=1, novel_id=1, version_id=8, claims=claims)
 
 
 def test_transition_cannot_skip_an_unevidenced_node():
@@ -312,9 +328,7 @@ def test_transition_cannot_skip_an_unevidenced_node():
         EpistemicClaim.model_validate(unevidenced),
     ]
     with pytest.raises(ValueError):
-        build_knowledge_projection(
-            owner_id=1, novel_id=1, version_id=1, claims=claims
-        )
+        build_knowledge_projection(owner_id=1, novel_id=1, version_id=1, claims=claims)
 
 
 # ---------------------------------------------------------------------------
@@ -371,7 +385,10 @@ def test_authority_filter_applies_after_scoping():
 def test_candidate_only_claims_are_labeled_not_promoted():
     claims, _ = gated_claims("valid")
     engine = EpistemicQueryEngine(
-        [claim.model_copy(update={"gate_status": GateStatus.PENDING}) for claim in claims]
+        [
+            claim.model_copy(update={"gate_status": GateStatus.PENDING})
+            for claim in claims
+        ]
     )
     answer = engine.query_character_knowledge(
         owner_id=1, novel_id=1, version_id=1, subject="lin-an", cutoff=2
@@ -434,10 +451,10 @@ def test_checksum_is_content_anchored():
     mutated = claim.model_copy(update={"authority": Authority.CANON_FACT})
     assert claim_checksum(mutated) != claim_checksum(claim)
     # Evidence is part of the claim checksum — dropping a ref changes the hash.
-    without_evidence = claim.model_copy(
-        update={"source_refs": claim.source_refs[1:]}
-    ) if len(claim.source_refs) > 1 else claim.model_copy(
-        update={"proposition": "不同表述"}
+    without_evidence = (
+        claim.model_copy(update={"source_refs": claim.source_refs[1:]})
+        if len(claim.source_refs) > 1
+        else claim.model_copy(update={"proposition": "不同表述"})
     )
     assert claim_checksum(without_evidence) != claim_checksum(claim)
 
@@ -472,7 +489,8 @@ def test_evidence_is_returned_with_answers():
 
 def test_query_engine_is_read_only():
     members = {
-        name for name, _ in EpistemicQueryEngine.__dict__.items()
+        name
+        for name, _ in EpistemicQueryEngine.__dict__.items()
         if callable(getattr(EpistemicQueryEngine, name, None))
     }
     assert not {m for m in members if m.startswith(("append", "write", "update"))}

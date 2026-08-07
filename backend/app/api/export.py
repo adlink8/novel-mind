@@ -90,22 +90,17 @@ def _unsupported(detail: str) -> HTTPException:
 
 async def _freeze(db: AsyncSession, *, owner_id: int, novel_id: int) -> FrozenExport:
     try:
-        return await ExportManifestService(
-            db, storage=_storage()
-        ).freeze(owner_id=owner_id, novel_id=novel_id)
+        return await ExportManifestService(db, storage=_storage()).freeze(
+            owner_id=owner_id, novel_id=novel_id
+        )
     except ExportManifestError as exc:
         raise _not_found() from exc
 
 
-def _export_filename(
-    *, novel_title: str, text_version_hash: str, format: str
-) -> str:
+def _export_filename(*, novel_title: str, text_version_hash: str, format: str) -> str:
     import re
 
-    stem = (
-        re.sub(r"[^\w\-]+", "-", novel_title, flags=re.UNICODE).strip("-")
-        or "novel"
-    )
+    stem = re.sub(r"[^\w\-]+", "-", novel_title, flags=re.UNICODE).strip("-") or "novel"
     return f"{stem}-v{text_version_hash[:8]}.{_FORMAT_EXTENSIONS[format]}"
 
 

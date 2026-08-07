@@ -145,9 +145,7 @@ class ContinuityClaim(StrictGateModel):
             self.category is ContinuityClaimCategory.CHARACTER_BEHAVIOR
             and not self.entity_key
         ):
-            raise ValueError(
-                "character_behavior claims must carry an entity_key"
-            )
+            raise ValueError("character_behavior claims must carry an entity_key")
         if self.category is ContinuityClaimCategory.CLUE and not self.clue_id:
             raise ValueError("clue claims must carry a clue_id")
         return self
@@ -365,7 +363,9 @@ def check_package_scope(
     return violations
 
 
-def check_intent(draft: CandidateDraft, package_intent: str) -> list[ConsistencyViolation]:
+def check_intent(
+    draft: CandidateDraft, package_intent: str
+) -> list[ConsistencyViolation]:
     if draft.intent.value != package_intent:
         return [
             ConsistencyViolation(
@@ -601,7 +601,9 @@ def check_continuity_claims(
     cutoff = package_cutoff(package)
     entity_keys = _world_state_entity_keys(package)
     clue_ids = _unresolved_clue_ids(package)
-    declared_types = {draft.divergence.divergence_type} if draft.has_divergence else set()
+    declared_types = (
+        {draft.divergence.divergence_type} if draft.has_divergence else set()
+    )
 
     violations: list[ConsistencyViolation] = []
     for claim in claims:
@@ -630,7 +632,11 @@ def check_continuity_claims(
                         ),
                     )
                 )
-        if claim.chapter_number is not None and cutoff and claim.chapter_number > cutoff:
+        if (
+            claim.chapter_number is not None
+            and cutoff
+            and claim.chapter_number > cutoff
+        ):
             violations.append(
                 ConsistencyViolation(
                     CODE_CUTOFF_EXCEEDED,
@@ -688,16 +694,26 @@ def check_continuity_claims(
             ):
                 items = package_dimension(package, "world_state").get("items") or []
                 for index, item in enumerate(items):
-                    if isinstance(item, dict) and item.get("entity_key") == claim.entity_key:
-                        field = f"dimensions.world_state.items[{index}].canonical_payload"
+                    if (
+                        isinstance(item, dict)
+                        and item.get("entity_key") == claim.entity_key
+                    ):
+                        field = (
+                            f"dimensions.world_state.items[{index}].canonical_payload"
+                        )
                         break
             if (
                 claim.category is ContinuityClaimCategory.CLUE
                 and claim.clue_id in clue_ids
             ):
-                items = package_dimension(package, "unresolved_clues").get("items") or []
+                items = (
+                    package_dimension(package, "unresolved_clues").get("items") or []
+                )
                 for index, item in enumerate(items):
-                    if isinstance(item, dict) and item.get("logical_clue_id") == claim.clue_id:
+                    if (
+                        isinstance(item, dict)
+                        and item.get("logical_clue_id") == claim.clue_id
+                    ):
                         field = f"dimensions.unresolved_clues.items[{index}].status"
                         break
             violations.append(

@@ -71,9 +71,7 @@ class WorldEntityRepository:
 
     # ------------------------------------------------------------------ append
 
-    async def append_projection(
-        self, projection: EntityCandidateProjection
-    ) -> None:
+    async def append_projection(self, projection: EntityCandidateProjection) -> None:
         """Persist one immutable projection; idempotent on key conflicts."""
 
         if projection.projection_hash != entity_projection_checksum(projection):
@@ -123,7 +121,9 @@ class WorldEntityRepository:
                 "projection rows disagree on the sealed projection hash"
             )
 
-        entity_rows = [WorldEntity.model_validate(row.canonical_payload) for row in entities]
+        entity_rows = [
+            WorldEntity.model_validate(row.canonical_payload) for row in entities
+        ]
         rule_rows = [WorldRule.model_validate(row.canonical_payload) for row in rules]
         exception_rows = [
             RuleException.model_validate(row.canonical_payload) for row in exceptions

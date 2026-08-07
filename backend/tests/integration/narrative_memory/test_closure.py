@@ -22,7 +22,6 @@ from app.services.narrative_memory.closure import (
     run_one_click_analysis,
 )
 from app.services.narrative_memory.contracts import (
-    DimensionKind,
     DimensionStatus,
     candidate_manifest_checksum,
     dimension_result_checksum,
@@ -312,9 +311,7 @@ async def test_analysis_api_smoke(closure_env) -> None:
     app.dependency_overrides[require_agent_actor] = _current_user
     transport = ASGITransport(app=app)
     try:
-        async with AsyncClient(
-            transport=transport, base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
             url = (
                 f"/api/narrative-memory/{closure_env['novel_id']}/versions/"
                 f"{closure_env['version_id']}/analysis"

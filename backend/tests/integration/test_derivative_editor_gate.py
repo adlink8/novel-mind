@@ -111,7 +111,9 @@ def _seed_owner(sync_url: str, *, suffix: str, chapter_count: int = 3) -> dict:
             status="ready",
             reading_progress={},
             chapter_count=chapter_count,
-            word_count=sum(len(f"original {i} body") for i in range(1, chapter_count + 1)),
+            word_count=sum(
+                len(f"original {i} body") for i in range(1, chapter_count + 1)
+            ),
         )
         session.add(novel)
         session.flush()
@@ -152,7 +154,9 @@ def _original_canon_state(sync_url: str) -> list[tuple]:
 
 async def _create_fork(client, headers, novel_id, fork_key) -> dict:
     resp = await client.post(
-        FORK_BASE.format(novel_id=novel_id), json={"fork_key": fork_key}, headers=headers
+        FORK_BASE.format(novel_id=novel_id),
+        json={"fork_key": fork_key},
+        headers=headers,
     )
     assert resp.status_code == 201, resp.text
     return resp.json()["fork"]
@@ -168,7 +172,9 @@ async def _create_project(client, headers, novel_id, fork_id, name, **extra) -> 
     return resp.json()["project"]
 
 
-async def _create_chapter(client, headers, novel_id, project_id, title, **extra) -> dict:
+async def _create_chapter(
+    client, headers, novel_id, project_id, title, **extra
+) -> dict:
     payload = {"title": title}
     payload.update(extra)
     resp = await client.post(
@@ -182,8 +188,7 @@ async def _create_chapter(client, headers, novel_id, project_id, title, **extra)
 
 def _chapter_url(novel_id: int, project_id: int, chapter_id: int) -> str:
     return (
-        CHAPTER_BASE.format(novel_id=novel_id, project_id=project_id)
-        + f"/{chapter_id}"
+        CHAPTER_BASE.format(novel_id=novel_id, project_id=project_id) + f"/{chapter_id}"
     )
 
 
@@ -195,7 +200,9 @@ async def _autosave(client, headers, novel_id, project_id, chapter_id, content, 
     )
 
 
-async def _rollback(client, headers, novel_id, project_id, chapter_id, target, base, **extra):
+async def _rollback(
+    client, headers, novel_id, project_id, chapter_id, target, base, **extra
+):
     payload = {"target_revision_id": target, "base_revision": base}
     payload.update(extra)
     return await client.post(
@@ -225,9 +232,7 @@ async def test_no_publish_or_release_route_on_derivative_surface(api_client):
     """
     paths = list(app.openapi()["paths"].keys())
     derivative_paths = [
-        p
-        for p in paths
-        if "derivative" in p and not p.startswith("/api/agent-tools/")
+        p for p in paths if "derivative" in p and not p.startswith("/api/agent-tools/")
     ]
     assert derivative_paths, "expected the derivative route surface to exist"
     for path in derivative_paths:
@@ -349,11 +354,21 @@ async def test_editor_session_never_touches_original_canon(api_client):
         client, headers, novel_id, project["id"], "T", markdown="draft one"
     )
     url = _chapter_url(novel_id, project["id"], chapter["id"])
-    assert (await _autosave(client, headers, novel_id, project["id"], chapter["id"], "draft two", 1)).status_code == 200
-    assert (await _autosave(client, headers, novel_id, project["id"], chapter["id"], "draft three", 2)).status_code == 200
+    assert (
+        await _autosave(
+            client, headers, novel_id, project["id"], chapter["id"], "draft two", 1
+        )
+    ).status_code == 200
+    assert (
+        await _autosave(
+            client, headers, novel_id, project["id"], chapter["id"], "draft three", 2
+        )
+    ).status_code == 200
     history = await client.get(f"{url}/revisions", headers=headers)
     root_id = history.json()["items"][-1]["id"]
-    rollback = await _rollback(client, headers, novel_id, project["id"], chapter["id"], root_id, 3)
+    rollback = await _rollback(
+        client, headers, novel_id, project["id"], chapter["id"], root_id, 3
+    )
     assert rollback.status_code == 200
 
     # The original chapters (Original Canon) are byte-identical.
@@ -366,9 +381,9 @@ async def test_editor_session_never_touches_original_canon(api_client):
             spaces = conn.execute(
                 text("SELECT DISTINCT space FROM derivative_projects")
             ).fetchall()
-            assert spaces and all(
-                row[0] == "fanfiction_canon" for row in spaces
-            ), spaces
+            assert spaces and all(row[0] == "fanfiction_canon" for row in spaces), (
+                spaces
+            )
             revision_kinds = conn.execute(
                 text("SELECT DISTINCT kind FROM derivative_revisions")
             ).fetchall()
@@ -391,16 +406,35 @@ async def test_cross_owner_editor_probe_does_not_leak(api_client):
     headers_a = {"Authorization": f"Bearer {a['token']}"}
     headers_b = {"Authorization": f"Bearer {b['token']}"}
     fork_a = await _create_fork(client, headers_a, a["novel_id"], "ff-lea")
-    project_a = await _create_project(client, headers_a, a["novel_id"], fork_a["id"], "LeakA")
-    chapter_a = await _create_chapter(
-        client, headers_a, a["novel_id"], project_a["id"], "A", markdown="SECRET_MARKDOWN"
+    project_a = await _create_project(
+        client, headers_a, a["novel_id"], fork_a["id"], "LeakA"
     )
-    await _autosave(client, headers_a, a["novel_id"], project_a["id"], chapter_a["id"], "SECRET_MARKDOWN v2", 1)
+    chapter_a = await _create_chapter(
+        client,
+        headers_a,
+        a["novel_id"],
+        project_a["id"],
+        "A",
+        markdown="SECRET_MARKDOWN",
+    )
+    await _autosave(
+        client,
+        headers_a,
+        a["novel_id"],
+        project_a["id"],
+        chapter_a["id"],
+        "SECRET_MARKDOWN v2",
+        1,
+    )
     url_a = _chapter_url(a["novel_id"], project_a["id"], chapter_a["id"])
 
     # Owner B probes A's chapter under B's own novel: identical 404 everywhere.
     probes = [
-        ("get", f"{_chapter_url(b['novel_id'], project_a['id'], chapter_a['id'])}/revisions", None),
+        (
+            "get",
+            f"{_chapter_url(b['novel_id'], project_a['id'], chapter_a['id'])}/revisions",
+            None,
+        ),
         (
             "post",
             f"{_chapter_url(b['novel_id'], project_a['id'], chapter_a['id'])}/autosave",
@@ -447,7 +481,9 @@ async def test_cross_owner_editor_probe_does_not_leak(api_client):
     assert "SECRET_MARKDOWN" not in resp.text
 
     # A still reads its own history; the data was never leaked to B.
-    assert (await client.get(f"{url_a}/revisions", headers=headers_a)).status_code == 200
+    assert (
+        await client.get(f"{url_a}/revisions", headers=headers_a)
+    ).status_code == 200
 
 
 # ---------------------------------------------------------------------------
@@ -478,7 +514,13 @@ async def test_rollback_requires_explicit_base_and_journals_approval(api_client)
     rev_a_id = items[1]["id"]
 
     rollback = await _rollback(
-        client, headers, novel_id, project["id"], chapter["id"], rev_a_id, 3,
+        client,
+        headers,
+        novel_id,
+        project["id"],
+        chapter["id"],
+        rev_a_id,
+        3,
         reason="revert bad chapter",
     )
     assert rollback.status_code == 200, rollback.text
@@ -495,12 +537,16 @@ async def test_rollback_requires_explicit_base_and_journals_approval(api_client)
     after_items = after.json()["items"]
     assert after.json()["total"] == 4
     assert [item["revision_number"] for item in after_items] == [4, 3, 2, 1]
-    rev_b_detail = await client.get(f"{url}/revisions/{items[0]['id']}", headers=headers)
+    rev_b_detail = await client.get(
+        f"{url}/revisions/{items[0]['id']}", headers=headers
+    )
     assert rev_b_detail.json()["content"] == "B"
 
     # A stale rollback (base 3 while the head is now 4) fails closed with 409
     # and the head is untouched.
-    stale = await _rollback(client, headers, novel_id, project["id"], chapter["id"], rev_a_id, 3)
+    stale = await _rollback(
+        client, headers, novel_id, project["id"], chapter["id"], rev_a_id, 3
+    )
     assert stale.status_code == 409, stale.text
     detail = stale.json()["detail"]
     assert detail["code"] == "revision_conflict"

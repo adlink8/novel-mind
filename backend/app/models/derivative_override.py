@@ -213,7 +213,13 @@ def _reject_override_frozen_mutation(
             "only the approval action may change — create a new override instead "
             f"of mutating: {sorted(forbidden)}"
         )
-    allowed = {"approval_state", "approver_id", "approved_at", "rejected_at", "approval_reason"}
+    allowed = {
+        "approval_state",
+        "approver_id",
+        "approved_at",
+        "rejected_at",
+        "approval_reason",
+    }
     unexpected = changed - allowed
     if unexpected:
         raise ValueError(

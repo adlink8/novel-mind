@@ -21,7 +21,9 @@ pytestmark = pytest.mark.integration
 REPO = Path(__file__).resolve().parents[4]
 GATE = REPO / "scripts" / "check_phase_execution_gate.py"
 
-LEDGER_REL = Path(".planning") / "phases" / "22-ci-nightly-gap-closure" / "22-VALIDATION.md"
+LEDGER_REL = (
+    Path(".planning") / "phases" / "22-ci-nightly-gap-closure" / "22-VALIDATION.md"
+)
 
 GREEN_ROWS = "\n".join(
     [
@@ -174,55 +176,58 @@ def test_synthetic_complete_evidence_passes(tmp_path: Path) -> None:
     assert "PASS" in result.stderr
 
 
-@pytest.mark.parametrize("rows", [
-    # 仅 2 条
-    "\n".join(
-        [
-            "| 1 | 30623438107 | 912ca6b | green | passed |",
-            "| 2 | 30623438108 | a904d64 | green | passed |",
-        ]
-    ),
-    # run pending
-    "\n".join(
-        [
-            "| 1 | 30623438107 | 912ca6b | green | passed |",
-            "| 2 | pending | a904d64 | green | passed |",
-            "| 3 | 30623438109 | 2c4b4bb | green | passed |",
-        ]
-    ),
-    # artifact status 非 green
-    "\n".join(
-        [
-            "| 1 | 30623438107 | 912ca6b | green | passed |",
-            "| 2 | 30623438108 | a904d64 | red | passed |",
-            "| 3 | 30623438109 | 2c4b4bb | green | passed |",
-        ]
-    ),
-    # result 非 green/passed
-    "\n".join(
-        [
-            "| 1 | 30623438107 | 912ca6b | green | passed |",
-            "| 2 | 30623438108 | a904d64 | green | failed |",
-            "| 3 | 30623438109 | 2c4b4bb | green | passed |",
-        ]
-    ),
-    # commit 畸形
-    "\n".join(
-        [
-            "| 1 | 30623438107 | 912ca6b | green | passed |",
-            "| 2 | 30623438108 | not-a-commit | green | passed |",
-            "| 3 | 30623438109 | 2c4b4bb | green | passed |",
-        ]
-    ),
-    # 字段不全（缺 Result 列）
-    "\n".join(
-        [
-            "| 1 | 30623438107 | 912ca6b | green | passed |",
-            "| 2 | 30623438108 | a904d64 | green |",
-            "| 3 | 30623438109 | 2c4b4bb | green | passed |",
-        ]
-    ),
-])
+@pytest.mark.parametrize(
+    "rows",
+    [
+        # 仅 2 条
+        "\n".join(
+            [
+                "| 1 | 30623438107 | 912ca6b | green | passed |",
+                "| 2 | 30623438108 | a904d64 | green | passed |",
+            ]
+        ),
+        # run pending
+        "\n".join(
+            [
+                "| 1 | 30623438107 | 912ca6b | green | passed |",
+                "| 2 | pending | a904d64 | green | passed |",
+                "| 3 | 30623438109 | 2c4b4bb | green | passed |",
+            ]
+        ),
+        # artifact status 非 green
+        "\n".join(
+            [
+                "| 1 | 30623438107 | 912ca6b | green | passed |",
+                "| 2 | 30623438108 | a904d64 | red | passed |",
+                "| 3 | 30623438109 | 2c4b4bb | green | passed |",
+            ]
+        ),
+        # result 非 green/passed
+        "\n".join(
+            [
+                "| 1 | 30623438107 | 912ca6b | green | passed |",
+                "| 2 | 30623438108 | a904d64 | green | failed |",
+                "| 3 | 30623438109 | 2c4b4bb | green | passed |",
+            ]
+        ),
+        # commit 畸形
+        "\n".join(
+            [
+                "| 1 | 30623438107 | 912ca6b | green | passed |",
+                "| 2 | 30623438108 | not-a-commit | green | passed |",
+                "| 3 | 30623438109 | 2c4b4bb | green | passed |",
+            ]
+        ),
+        # 字段不全（缺 Result 列）
+        "\n".join(
+            [
+                "| 1 | 30623438107 | 912ca6b | green | passed |",
+                "| 2 | 30623438108 | a904d64 | green |",
+                "| 3 | 30623438109 | 2c4b4bb | green | passed |",
+            ]
+        ),
+    ],
+)
 def test_phase22_less_than_3_or_non_green_fails(tmp_path: Path, rows: str) -> None:
     root = tmp_path / "repo"
     make_complete_evidence(root, ledger_rows=rows)
@@ -320,8 +325,12 @@ def test_verification_phase_id_mismatch_fails(tmp_path: Path) -> None:
     root = tmp_path / "repo"
     make_ledger(root)
     make_verification(root, "25.1", "25.1-analysis-chat-workspace")
-    make_verification(root, "25.2", "25.2-embedded-novel-agent-runtime", phase_field="25.2")
-    make_verification(root, "25.3", "25.3-pi-package-compatibility-governance", phase_field="25.3")
+    make_verification(
+        root, "25.2", "25.2-embedded-novel-agent-runtime", phase_field="25.2"
+    )
+    make_verification(
+        root, "25.3", "25.3-pi-package-compatibility-governance", phase_field="25.3"
+    )
     # 篡改 25.3 的 phase id 为 25.2 → lineage 不一致
     path = (
         root

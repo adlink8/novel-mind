@@ -22,7 +22,6 @@ from sqlalchemy import inspect
 from app.models.visual_bible import (
     VisualBibleReviewEvent,
     VisualBibleVersion,
-    VisualClaim,
     VisualEntity,
     VisualReferenceAsset,
 )
@@ -215,7 +214,10 @@ def test_authority_vocabulary_is_exactly_four_labels():
         "literary_interpretation",
         "user_interpretation",
     ]
-    assert AUTHORITY_HASH == "578e80c59a8eaecc0e1beeb4f50a4de2c74aaa9a8ea7d881069bc009cfedbd3c"
+    assert (
+        AUTHORITY_HASH
+        == "578e80c59a8eaecc0e1beeb4f50a4de2c74aaa9a8ea7d881069bc009cfedbd3c"
+    )
 
 
 def test_review_action_and_state_vocabulary():
@@ -397,9 +399,7 @@ def test_version_manifest_payload_is_canonical_and_stable():
     assert version_manifest_payload(a) == version_manifest_payload(b)
     assert recompute_manifest_hash(a) == recompute_manifest_hash(b)
     # Changing a claim changes the manifest hash.
-    changed = _version(
-        claims=[_claim(description="raven-black hair").model_dump()]
-    )
+    changed = _version(claims=[_claim(description="raven-black hair").model_dump()])
     assert changed.manifest_hash != a.manifest_hash
 
 
@@ -409,7 +409,9 @@ def test_duplicate_stable_ids_are_rejected():
             _version(
                 entities=[
                     _entity().model_dump(),
-                    _entity(stable_id="char-arya", entity_key="char-arya-2").model_dump(),
+                    _entity(
+                        stable_id="char-arya", entity_key="char-arya-2"
+                    ).model_dump(),
                 ]
             )
         )
@@ -418,11 +420,7 @@ def test_duplicate_stable_ids_are_rejected():
 def test_claim_referencing_unknown_entity_is_rejected():
     with pytest.raises(VisualBibleGateError):
         validate_version_contract(
-            _version(
-                claims=[
-                    _claim(entity_stable_id="char-unknown").model_dump()
-                ]
-            )
+            _version(claims=[_claim(entity_stable_id="char-unknown").model_dump()])
         )
 
 
@@ -772,9 +770,7 @@ def test_version_orm_has_owner_novel_parent_and_hash_lineage():
     assert ("owner_id", "novel_id", "id") in unique
 
     check_names = {
-        c.name
-        for c in VisualBibleVersion.__table__.constraints
-        if hasattr(c, "name")
+        c.name for c in VisualBibleVersion.__table__.constraints if hasattr(c, "name")
     }
     assert "ck_visual_bible_versions_review_state" in check_names
 
@@ -794,9 +790,7 @@ def test_evidence_orm_enforces_spoiler_cutoff_check():
     from app.models.visual_bible import VisualEvidenceRef as EvidenceRefModel
 
     check_names = {
-        c.name
-        for c in EvidenceRefModel.__table__.constraints
-        if hasattr(c, "name")
+        c.name for c in EvidenceRefModel.__table__.constraints if hasattr(c, "name")
     }
     assert "ck_visual_bible_evidence_spoiler_cutoff" in check_names
     assert "ck_visual_bible_evidence_offsets" in check_names
@@ -830,9 +824,7 @@ def test_reference_asset_orm_has_rights_and_approval_gate():
         "approved",
     } <= cols
     check_names = {
-        c.name
-        for c in VisualReferenceAsset.__table__.constraints
-        if hasattr(c, "name")
+        c.name for c in VisualReferenceAsset.__table__.constraints if hasattr(c, "name")
     }
     assert "ck_visual_bible_assets_rights_status" in check_names
     assert VisualReferenceAsset.__table__.c.approved.server_default.arg == "false"

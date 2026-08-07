@@ -93,4 +93,8 @@ class CanonContaminationBlock(TimestampMixin, Base):
     attempt_hash: Mapped[str] = mapped_column(String(64), nullable=False)
 
 
-__all__ = ["CANON_CONTAMINATION_PIPELINES", "CANON_DERIVATIVE_SPACES", "CanonContaminationBlock"]
+__all__ = [
+    "CANON_CONTAMINATION_PIPELINES",
+    "CANON_DERIVATIVE_SPACES",
+    "CanonContaminationBlock",
+]

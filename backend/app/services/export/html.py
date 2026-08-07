@@ -97,7 +97,7 @@ def render_anchor_figure(
         src = asset_src_resolver(entry.asset) if entry.asset else None
         if src is None:
             return (
-                f"<figure{_figure_attrs(entry)} data-reason=\"asset_bytes_missing\">"
+                f'<figure{_figure_attrs(entry)} data-reason="asset_bytes_missing">'
                 '<div class="export-missing"><strong>插图缺失</strong>'
                 f"<p>{escape_text(entry.detail or '')}</p></div>"
                 f"{_caption_html(entry)}"
@@ -114,7 +114,7 @@ def render_anchor_figure(
     if entry.status is ExportAnchorStatus.ASSET_MISSING:
         reason = escape_text(entry.reason_code or "asset_bytes_missing")
         return (
-            f"<figure{_figure_attrs(entry)} data-reason=\"{reason}\">"
+            f'<figure{_figure_attrs(entry)} data-reason="{reason}">'
             '<div class="export-missing"><strong>插图缺失</strong>'
             f"<p>{escape_text(entry.detail or '')}</p></div>"
             f"{_caption_html(entry)}"
@@ -123,7 +123,7 @@ def render_anchor_figure(
     if entry.status is ExportAnchorStatus.STALE:
         reason = escape_text(entry.reason_code or "stale")
         return (
-            f"<figure{_figure_attrs(entry)} data-reason=\"{reason}\">"
+            f'<figure{_figure_attrs(entry)} data-reason="{reason}">'
             '<div class="export-stale"><strong>插图待修复</strong>'
             f"<p>{escape_text(entry.detail or '')}</p></div>"
             f"{_caption_html(entry)}"
@@ -131,7 +131,7 @@ def render_anchor_figure(
         )
     reason = escape_text(entry.reason_code or "invalid")
     return (
-        f"<figure{_figure_attrs(entry)} data-reason=\"{reason}\">"
+        f'<figure{_figure_attrs(entry)} data-reason="{reason}">'
         '<div class="export-invalid"><strong>插图已失效</strong>'
         f"<p>{escape_text(entry.detail or '')}</p></div>"
         f"{_caption_html(entry)}"
@@ -254,19 +254,23 @@ def build_html_export(frozen: FrozenExport) -> bytes:
 
     report_items = ""
     if manifest.missing_assets:
-        report_items = "<ul>" + "".join(
-            f"<li>asset_revision_id={record.asset_revision_id} "
-            f"bytes_hash={record.bytes_hash} "
-            f"({escape_text(record.reason_code)}): {escape_text(record.detail)}</li>"
-            for record in manifest.missing_assets
-        ) + "</ul>"
+        report_items = (
+            "<ul>"
+            + "".join(
+                f"<li>asset_revision_id={record.asset_revision_id} "
+                f"bytes_hash={record.bytes_hash} "
+                f"({escape_text(record.reason_code)}): {escape_text(record.detail)}</li>"
+                for record in manifest.missing_assets
+            )
+            + "</ul>"
+        )
     else:
         report_items = "<p>无缺失资产</p>"
 
     document = (
         "<!DOCTYPE html>\n"
         '<html lang="zh-CN">\n'
-        "<head><meta charset=\"utf-8\"/>"
+        '<head><meta charset="utf-8"/>'
         "<title>"
         f"{title}"
         "</title><style>"

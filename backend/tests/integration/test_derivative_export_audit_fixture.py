@@ -86,7 +86,11 @@ def _audit_verdict(snapshot) -> dict:
     }
     # REQ-SHIP-02: the export never promotes a production pointer.
     promoted = False
-    return {"dimensions": dimensions, "promoted": promoted, "snapshot_hash": snapshot.snapshot_hash}
+    return {
+        "dimensions": dimensions,
+        "promoted": promoted,
+        "snapshot_hash": snapshot.snapshot_hash,
+    }
 
 
 async def test_frozen_fixture_manifest_replays_and_aligns():
@@ -107,7 +111,9 @@ async def test_frozen_fixture_manifest_replays_and_aligns():
 async def test_clean_snapshot_is_qualified_candidate_never_promoted(
     factory, asset_storage: DerivativeAssetStorage, migrated_postgres: str
 ):
-    ids = _seed_chain(migrated_postgres, asset_storage, suffix=f"audit_{uuid.uuid4().hex[:6]}")
+    ids = _seed_chain(
+        migrated_postgres, asset_storage, suffix=f"audit_{uuid.uuid4().hex[:6]}"
+    )
     async with factory() as session:
         frozen = await ExportSnapshotService(session, storage=asset_storage).build(
             owner_id=ids["owner_id"],
@@ -152,13 +158,14 @@ async def test_missing_provenance_is_blocked_not_green(
     factory, asset_storage: DerivativeAssetStorage, migrated_postgres: str
 ):
     """Any parity mismatch must surface as blocked, never a false green."""
-    ids = _seed_chain(migrated_postgres, asset_storage, suffix=f"blk_{uuid.uuid4().hex[:6]}")
+    ids = _seed_chain(
+        migrated_postgres, asset_storage, suffix=f"blk_{uuid.uuid4().hex[:6]}"
+    )
     # Drift a chapter version token -> stale revision -> blocked.
     async with factory() as session:
         await session.execute(
             text(
-                "UPDATE derivative_chapters SET revision = revision + 1 "
-                "WHERE id = :cid"
+                "UPDATE derivative_chapters SET revision = revision + 1 WHERE id = :cid"
             ),
             {"cid": ids["chapter_ids"][0]},
         )

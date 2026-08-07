@@ -43,6 +43,7 @@ from app.schemas.derivative_chapter import (
     DerivativeChapterView,
 )
 
+
 class DerivativeChapterError(ValueError):
     """Fail-closed chapter gate violation with an HTTP status code."""
 
@@ -180,9 +181,7 @@ def _to_scope(project: DerivativeProject) -> DerivativeChapterScope:
     )
 
 
-async def _next_position(
-    db: AsyncSession, *, project_id: int
-) -> int:
+async def _next_position(db: AsyncSession, *, project_id: int) -> int:
     """Append position: max(position)+1, or 0 for the first chapter."""
     current_max = await db.scalar(
         select(func.max(DerivativeChapter.position)).where(
@@ -206,9 +205,7 @@ async def create_chapter(
     _require_scope(owner_id=owner_id, novel_id=novel_id)
     title = (title or "").strip()
     if not title:
-        raise DerivativeChapterError(
-            "invalid_title", "chapter title must be non-empty"
-        )
+        raise DerivativeChapterError("invalid_title", "chapter title must be non-empty")
 
     project = await _load_scoped_project(
         db, owner_id=owner_id, novel_id=novel_id, project_id=project_id
@@ -216,9 +213,7 @@ async def create_chapter(
     _require_writable_project(project)
 
     canonical = canonicalize_markdown(markdown)
-    row_status = (
-        status if status in DERIVATIVE_CHAPTER_STATUSES else "draft"
-    )
+    row_status = status if status in DERIVATIVE_CHAPTER_STATUSES else "draft"
 
     # Append position = max(position)+1; on a (rare) concurrent create the
     # unique (project_id, position) constraint may fire — rebuild the row at the
@@ -292,9 +287,7 @@ async def list_chapters(
                     DerivativeChapter.owner_id == owner_id,
                     DerivativeChapter.novel_id == novel_id,
                 )
-                .order_by(
-                    DerivativeChapter.position.asc(), DerivativeChapter.id.asc()
-                )
+                .order_by(DerivativeChapter.position.asc(), DerivativeChapter.id.asc())
             )
         ).all()
     )
@@ -436,7 +429,8 @@ async def reorder_chapters(
         )
     if len(set(chapter_ids)) != len(chapter_ids):
         raise DerivativeChapterError(
-            "reorder_duplicate", "reorder chapter_ids must not contain duplicates",
+            "reorder_duplicate",
+            "reorder chapter_ids must not contain duplicates",
             status_code=409,
         )
     foreign = [cid for cid in chapter_ids if cid not in by_id]

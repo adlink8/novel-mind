@@ -108,12 +108,8 @@ def _resolved(**overrides) -> ResolvedLeaf:
 
 def test_retrieval_source_filters_before_ranking():
     """The source must run cutoff filter, then snapshot filter, then sort."""
-    cutoff_pos = RETRIEVAL_SOURCE.index(
-        "[r for r in records if within_cutoff(scope"
-    )
-    stale_pos = RETRIEVAL_SOURCE.index(
-        "[r for r in within if snapshot_replays(scope"
-    )
+    cutoff_pos = RETRIEVAL_SOURCE.index("[r for r in records if within_cutoff(scope")
+    stale_pos = RETRIEVAL_SOURCE.index("[r for r in within if snapshot_replays(scope")
     sort_pos = RETRIEVAL_SOURCE.index("sorted(replayed, key=_rank_key)")
     assert cutoff_pos < stale_pos < sort_pos
 
@@ -121,7 +117,9 @@ def test_retrieval_source_filters_before_ranking():
 def test_retrieval_service_validates_scope_before_loading():
     """The frozen scope is validated before any adapter load."""
     validate_pos = RETRIEVAL_SOURCE.index("validate_scope(scope)")
-    load_pos = RETRIEVAL_SOURCE.index("load_scoped_candidates(self._session, scope=scope)")
+    load_pos = RETRIEVAL_SOURCE.index(
+        "load_scoped_candidates(self._session, scope=scope)"
+    )
     assert validate_pos < load_pos
 
 
@@ -228,7 +226,9 @@ async def test_future_version_citation_blocked():
 @pytest.mark.asyncio
 async def test_spoiler_beyond_cutoff_citation_blocked():
     scope = _scope("original_canon", through_chapter=2, source_snapshot_hash=HEX64)
-    ref = _ref(cited_space=CanonSpace.ORIGINAL_CANON, cited_namespace="original:chapters")
+    ref = _ref(
+        cited_space=CanonSpace.ORIGINAL_CANON, cited_namespace="original:chapters"
+    )
     verdict = await CanonCitationService(session=object()).revalidate(
         ref, scope=scope, provider=FakeProvider(_resolved(chapter_number=4))
     )
@@ -239,7 +239,9 @@ async def test_spoiler_beyond_cutoff_citation_blocked():
 @pytest.mark.asyncio
 async def test_stale_source_hash_citation_blocked():
     scope = _scope("original_canon", source_snapshot_hash=HEX64)
-    ref = _ref(cited_space=CanonSpace.ORIGINAL_CANON, cited_namespace="original:chapters")
+    ref = _ref(
+        cited_space=CanonSpace.ORIGINAL_CANON, cited_namespace="original:chapters"
+    )
     verdict = await CanonCitationService(session=object()).revalidate(
         ref, scope=scope, provider=FakeProvider(_resolved(source_snapshot_hash=HEX64_B))
     )
@@ -385,7 +387,9 @@ async def test_blocked_never_masks_as_empty_success():
 @pytest.mark.asyncio
 async def test_blocked_citation_never_returns_fake_empty_leaf():
     scope = _scope("original_canon", through_chapter=2, source_snapshot_hash=HEX64)
-    ref = _ref(cited_space=CanonSpace.ORIGINAL_CANON, cited_namespace="original:chapters")
+    ref = _ref(
+        cited_space=CanonSpace.ORIGINAL_CANON, cited_namespace="original:chapters"
+    )
     verdict = await CanonCitationService(session=object()).revalidate(
         ref, scope=scope, provider=FakeProvider(_resolved(chapter_number=3))
     )
@@ -409,6 +413,4 @@ def test_citation_source_bans_raw_rationale_fields():
 
 def test_citation_source_bans_active_pointer_and_write_path():
     for token in ("active=True", "active = True", "session.add", "session.commit"):
-        assert token not in CITATIONS_SOURCE, (
-            f"citations.py must not write: {token}"
-        )
+        assert token not in CITATIONS_SOURCE, f"citations.py must not write: {token}"

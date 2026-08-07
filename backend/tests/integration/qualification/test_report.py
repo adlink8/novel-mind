@@ -31,9 +31,7 @@ from app.services.qualification.runner import (
 pytestmark = [pytest.mark.integration]
 
 GOLD_PATH = Path(__file__).resolve().parents[3] / "evals" / "reading_qa_v1.json"
-QUAL_DIR = (
-    Path(__file__).resolve().parents[3] / "app" / "services" / "qualification"
-)
+QUAL_DIR = Path(__file__).resolve().parents[3] / "app" / "services" / "qualification"
 
 COMMIT = "912ca6b423d6c2309bc2972cbfc083c4eaa280e1"
 
@@ -152,8 +150,7 @@ def test_report_never_hides_failures_behind_single_score(gold_set):
         assert banned not in dump
     # Metrics are keyed per bucket, per system — not one merged score.
     assert all(
-        isinstance(bucket.metrics, dict) and bucket.metrics
-        for bucket in report.buckets
+        isinstance(bucket.metrics, dict) and bucket.metrics for bucket in report.buckets
     )
 
 
@@ -171,7 +168,10 @@ def test_verdict_only_two_values(gold_set):
         _run(gold_set, cand, deepcopy(cand)),
         _run(
             gold_set,
-            {**cand, next(iter(cand)): {**cand[next(iter(cand))], "provider_error": "x"}},
+            {
+                **cand,
+                next(iter(cand)): {**cand[next(iter(cand))], "provider_error": "x"},
+            },
             deepcopy(cand),
         ),
     ]

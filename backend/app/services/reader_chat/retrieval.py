@@ -605,18 +605,17 @@ async def fetch_knowledge_evidence(
     from app.services.world_model.knowledge import EpistemicClaim
 
     wm_rows = (
-        (
-            await session.scalars(
-                select(WorldModelKnowledge).where(
-                    WorldModelKnowledge.owner_id == owner_id,
-                    WorldModelKnowledge.novel_id == novel_id,
-                    WorldModelKnowledge.version_id == version_id,
-                    WorldModelKnowledge.gate_status == "passed",
-                ).order_by(WorldModelKnowledge.known_at.asc())
+        await session.scalars(
+            select(WorldModelKnowledge)
+            .where(
+                WorldModelKnowledge.owner_id == owner_id,
+                WorldModelKnowledge.novel_id == novel_id,
+                WorldModelKnowledge.version_id == version_id,
+                WorldModelKnowledge.gate_status == "passed",
             )
+            .order_by(WorldModelKnowledge.known_at.asc())
         )
-        .all()
-    )
+    ).all()
     for row in wm_rows:
         if not full_book and row.disclosure_cutoff > (cutoff_chapter or 0):
             continue
@@ -658,22 +657,19 @@ async def fetch_knowledge_evidence(
     from app.models.key_scene import SceneCandidateSet, SceneEvidenceRange
 
     ks_rows = (
-        (
-            await session.scalars(
-                select(SceneEvidenceRange)
-                .join(
-                    SceneCandidateSet,
-                    SceneCandidateSet.id == SceneEvidenceRange.set_id,
-                )
-                .where(
-                    SceneEvidenceRange.owner_id == owner_id,
-                    SceneEvidenceRange.novel_id == novel_id,
-                )
-                .order_by(SceneEvidenceRange.chapter_number.asc())
+        await session.scalars(
+            select(SceneEvidenceRange)
+            .join(
+                SceneCandidateSet,
+                SceneCandidateSet.id == SceneEvidenceRange.set_id,
             )
+            .where(
+                SceneEvidenceRange.owner_id == owner_id,
+                SceneEvidenceRange.novel_id == novel_id,
+            )
+            .order_by(SceneEvidenceRange.chapter_number.asc())
         )
-        .all()
-    )
+    ).all()
     for row in ks_rows:
         if not full_book and row.cutoff_chapter > (cutoff_chapter or 0):
             continue
@@ -704,22 +700,19 @@ async def fetch_knowledge_evidence(
     from app.models.visual_bible import VisualBibleVersion, VisualEvidenceRef
 
     vb_rows = (
-        (
-            await session.scalars(
-                select(VisualEvidenceRef)
-                .join(
-                    VisualBibleVersion,
-                    VisualBibleVersion.id == VisualEvidenceRef.version_id,
-                )
-                .where(
-                    VisualEvidenceRef.owner_id == owner_id,
-                    VisualEvidenceRef.novel_id == novel_id,
-                )
-                .order_by(VisualEvidenceRef.chapter_number.asc())
+        await session.scalars(
+            select(VisualEvidenceRef)
+            .join(
+                VisualBibleVersion,
+                VisualBibleVersion.id == VisualEvidenceRef.version_id,
             )
+            .where(
+                VisualEvidenceRef.owner_id == owner_id,
+                VisualEvidenceRef.novel_id == novel_id,
+            )
+            .order_by(VisualEvidenceRef.chapter_number.asc())
         )
-        .all()
-    )
+    ).all()
     for row in vb_rows:
         if not full_book and row.cutoff_chapter > (cutoff_chapter or 0):
             continue
@@ -893,7 +886,9 @@ async def retrieve_visible_evidence(
 # ---------------------------------------------------------------------------
 
 
-def _snapshot_hash(novel_id: int, version_id: int, records: tuple[ChapterRecord, ...]) -> str:
+def _snapshot_hash(
+    novel_id: int, version_id: int, records: tuple[ChapterRecord, ...]
+) -> str:
     """Deterministic content address of the frozen chapter snapshot.
 
     Covers the owner/novel/version lineage (via novel+version) and every

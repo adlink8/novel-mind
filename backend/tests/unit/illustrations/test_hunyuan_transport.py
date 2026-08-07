@@ -16,7 +16,13 @@ from app.services.illustrations.hunyuan_transport import (
 pytestmark = pytest.mark.unit
 
 # 1x1 PNG（IHDR 宽高 = 1x1）
-_PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 8 + (1).to_bytes(4, "big") + (1).to_bytes(4, "big") + b"\x00" * 8
+_PNG = (
+    b"\x89PNG\r\n\x1a\n"
+    + b"\x00" * 8
+    + (1).to_bytes(4, "big")
+    + (1).to_bytes(4, "big")
+    + b"\x00" * 8
+)
 
 
 class TestProbeImage:

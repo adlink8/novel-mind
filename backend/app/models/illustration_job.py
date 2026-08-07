@@ -252,9 +252,7 @@ class IllustrationBudgetLedger(TimestampMixin, Base):
     __tablename__ = "illustration_budget_ledgers"
     __table_args__ = (
         CheckConstraint("max_calls >= 0", name="ck_illustration_budget_max_calls"),
-        CheckConstraint(
-            "max_cost_usd >= 0", name="ck_illustration_budget_max_cost"
-        ),
+        CheckConstraint("max_cost_usd >= 0", name="ck_illustration_budget_max_cost"),
         UniqueConstraint(
             "owner_id",
             "novel_id",

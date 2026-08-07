@@ -324,9 +324,7 @@ def assert_citation_authority(
         )
 
 
-def assert_original_readonly(
-    space: CanonSpace, *, mutation: bool = False
-) -> None:
+def assert_original_readonly(space: CanonSpace, *, mutation: bool = False) -> None:
     """Original Canon is queried read-only; mutation is always forbidden."""
     if space is CanonSpace.ORIGINAL_CANON and mutation:
         raise CanonForkContractError(
@@ -335,9 +333,7 @@ def assert_original_readonly(
         )
 
 
-def assert_original_pipeline_input(
-    space: CanonSpace, pipeline: PipelineName
-) -> None:
+def assert_original_pipeline_input(space: CanonSpace, pipeline: PipelineName) -> None:
     """Reject derivative spaces from every Original Canon consumer (REQ-CRE-02)."""
     if pipeline in ORIGINAL_PIPELINES and space is not CanonSpace.ORIGINAL_CANON:
         raise CanonForkContractError(

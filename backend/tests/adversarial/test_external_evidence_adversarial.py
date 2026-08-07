@@ -19,10 +19,11 @@ from pydantic import ValidationError
 
 from app.schemas.agent_runtime import (
     ExternalEvidenceArtifact,
-    ExternalEvidenceClaim,
-    ExternalEvidenceSource,
 )
-from app.schemas.reader_chat import ReaderAnswerEnvelope, validate_answer_against_manifest
+from app.schemas.reader_chat import (
+    ReaderAnswerEnvelope,
+    validate_answer_against_manifest,
+)
 from app.services.agent_runtime import artifacts as artifact_service
 from app.services.agent_runtime import finalize
 
@@ -69,7 +70,9 @@ def test_backend_core_retrieval_and_evidence_validation_import_no_mcp():
     for target in _import_targets(READER_CHAT_API):
         if "mcp" in target.lower():
             offenders.append(f"app/api/reader_chat.py imports {target}")
-    assert not offenders, "核心检索/证据校验模块不得导入 mcp 相关模块:\n" + "\n".join(offenders)
+    assert not offenders, "核心检索/证据校验模块不得导入 mcp 相关模块:\n" + "\n".join(
+        offenders
+    )
 
 
 def test_agent_service_core_sources_do_not_import_mcp():
@@ -91,8 +94,12 @@ def test_agent_service_core_sources_do_not_import_mcp():
                 continue
             lowered = stripped.lower()
             if "pi-mcp-adapter" in lowered or "mcp" in lowered:
-                offenders.append(f"{path.relative_to(AGENT_SERVICE)}:{lineno}: {stripped}")
-    assert not offenders, "agent-service 核心源码不得导入 mcp 相关模块:\n" + "\n".join(offenders)
+                offenders.append(
+                    f"{path.relative_to(AGENT_SERVICE)}:{lineno}: {stripped}"
+                )
+    assert not offenders, "agent-service 核心源码不得导入 mcp 相关模块:\n" + "\n".join(
+        offenders
+    )
 
 
 # ────────────────────────── 运行时：finalizer 拒绝外部引用 ──────────────────────────
@@ -124,7 +131,11 @@ def test_finalize_gate_rejects_external_ref_with_stable_code():
         "answer": {
             "schema_version": "reader-answer.v1",
             "answer_blocks": [
-                {"block_id": "b1", "text": "external claim", "evidence_refs": ["mcp://external-research/1"]}
+                {
+                    "block_id": "b1",
+                    "text": "external claim",
+                    "evidence_refs": ["mcp://external-research/1"],
+                }
             ],
         },
     }
@@ -201,7 +212,10 @@ def test_external_evidence_envelope_carries_all_d09_fields():
             }
         ],
         "retrieval_time": "2026-08-02T00:00:00Z",
-        "claims": [{"text": "c1", "source_index": 0}, {"text": "c2", "source_index": 1}],
+        "claims": [
+            {"text": "c1", "source_index": 0},
+            {"text": "c2", "source_index": 1},
+        ],
         "confidence": "medium",
         "prohibited_from_canon": True,
         "release_status": "external",

@@ -12,7 +12,7 @@ This module is pure and deterministic (no database, no write path).
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from hashlib import sha256
 
 CANON_FORK_SCHEMA_VERSION = "canon-fork.v1"
@@ -128,9 +128,7 @@ def validate_leaf_lineage(
             )
         content_hash = leaf.get("content_hash")
         if not isinstance(content_hash, str) or len(content_hash) != 64:
-            raise ValueError(
-                "invalid_citation_leaf: content_hash must be 64-hex"
-            )
+            raise ValueError("invalid_citation_leaf: content_hash must be 64-hex")
         leaf_key = leaf.get("leaf_key")
         if not leaf_key or str(leaf_key) != f"chapter:{chapter_number}":
             raise ValueError(

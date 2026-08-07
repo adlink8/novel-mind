@@ -138,7 +138,12 @@ def _visual_bible_snapshot_hash(ids: dict[str, Any]) -> str:
 
 def _scene_coordinates(chapter_number: int) -> dict[str, Any]:
     if chapter_number == 1:
-        return {"cast": ["ayla"], "place": "northern keep", "time": "night", "pov": "ayla"}
+        return {
+            "cast": ["ayla"],
+            "place": "northern keep",
+            "time": "night",
+            "pov": "ayla",
+        }
     if chapter_number == 2:
         return {"cast": ["ayla"], "place": "hall", "time": "day", "pov": "ayla"}
     return {"cast": ["mara"], "place": "courtyard", "time": "night", "pov": "mara"}
@@ -292,12 +297,17 @@ def build_version_payload(
             },
         ],
         "entities": entities,
-        "claims": [ayla_claim.model_dump(mode="json"), mara_claim.model_dump(mode="json")],
+        "claims": [
+            ayla_claim.model_dump(mode="json"),
+            mara_claim.model_dump(mode="json"),
+        ],
         "reference_assets": [],
         "review_state": "candidate",
     }
     version = VisualBibleVersionContract.model_validate(payload)
-    version = version.model_copy(update={"manifest_hash": recompute_manifest_hash(version)})
+    version = version.model_copy(
+        update={"manifest_hash": recompute_manifest_hash(version)}
+    )
     return {"version": version.model_dump(mode="json")}
 
 
@@ -321,7 +331,9 @@ def _generate_payload(
     }
 
 
-def _scene_ids(ids: dict[str, Any], snapshot_hash: str) -> tuple[list[str], dict[str, dict[str, Any]]]:
+def _scene_ids(
+    ids: dict[str, Any], snapshot_hash: str
+) -> tuple[list[str], dict[str, dict[str, Any]]]:
     scene_ids: list[str] = []
     coordinates: dict[str, dict[str, Any]] = {}
     for i, (chapter_id, content) in enumerate(
@@ -481,7 +493,9 @@ async def test_cross_owner_scene_spec_matrix_404(api_client):
     base_a = f"/api/novels/{ids_a['novel_id']}/scene-specs"
     created = await client.post(
         base_a,
-        json=_spec_preview_payload(frozen_a, spec_key="spec-a", vb_version_id=vb_a["id"]),
+        json=_spec_preview_payload(
+            frozen_a, spec_key="spec-a", vb_version_id=vb_a["id"]
+        ),
         headers=headers_a,
     )
     assert created.status_code == 201, created.text
@@ -496,12 +510,16 @@ async def test_cross_owner_scene_spec_matrix_404(api_client):
     assert foreign_diff.status_code == 404
     foreign_preview = await client.post(
         f"{base_a}/preview",
-        json=_spec_preview_payload(frozen_a, spec_key="spec-x", vb_version_id=vb_a["id"]),
+        json=_spec_preview_payload(
+            frozen_a, spec_key="spec-x", vb_version_id=vb_a["id"]
+        ),
         headers=headers_b,
     )
     assert foreign_preview.status_code == 404
 
-    missing_novel = await client.get("/api/novels/999999991/scene-specs", headers=headers_b)
+    missing_novel = await client.get(
+        "/api/novels/999999991/scene-specs", headers=headers_b
+    )
     assert missing_novel.status_code == 404
     assert foreign_list.json() == missing_novel.json()
 
@@ -570,11 +588,16 @@ async def test_preview_compiles_without_persisting_and_without_provider(api_clie
             assert detail["visual_bible_stable_ids"]
     assert spec["negative_constraints"], "negative constraints must be preserved"
     for constraint in spec["negative_constraints"]:
-        assert constraint["scope"] in {"costume", "era", "identity", "style", "physical", "continuity"}
+        assert constraint["scope"] in {
+            "costume",
+            "era",
+            "identity",
+            "style",
+            "physical",
+            "continuity",
+        }
     # Continuity clause keeps stable Visual Bible IDs.
-    continuity = next(
-        d for d in spec["details"] if d["kind"] == "continuity"
-    )
+    continuity = next(d for d in spec["details"] if d["kind"] == "continuity")
     assert "ayla" in continuity["visual_bible_stable_ids"]
 
 
@@ -639,7 +662,9 @@ async def test_conflicting_create_fails_closed(api_client):
     assert (
         await client.post(
             base,
-            json=_spec_preview_payload(frozen, spec_key="spec-cf", vb_version_id=vb["id"]),
+            json=_spec_preview_payload(
+                frozen, spec_key="spec-cf", vb_version_id=vb["id"]
+            ),
             headers=headers,
         )
     ).status_code == 201
@@ -699,7 +724,10 @@ async def test_visual_bible_change_marks_spec_stale_and_shows_diff(api_client):
         cutoff_chapter=3,
         version_key="vb-v2",
     )
-    vb2_payload["version"]["style_profile"] = {"palette": "warm tones", "lighting": "golden hour"}
+    vb2_payload["version"]["style_profile"] = {
+        "palette": "warm tones",
+        "lighting": "golden hour",
+    }
     vb2_version = VisualBibleVersionContract.model_validate(vb2_payload["version"])
     vb2_version = vb2_version.model_copy(
         update={"manifest_hash": recompute_manifest_hash(vb2_version)}
@@ -852,8 +880,7 @@ async def test_service_persists_content_rows(api_client):
         ).all()
         assert evidence, "evidence ref rows must be persisted"
         assert all(
-            (row.detail_id is None) != (row.constraint_id is None)
-            for row in evidence
+            (row.detail_id is None) != (row.constraint_id is None) for row in evidence
         )
         # Content rows are immutable append-only records; no in-place canon
         # promotion or evidence mutation is possible for this spec.

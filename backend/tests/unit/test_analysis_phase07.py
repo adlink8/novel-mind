@@ -6,9 +6,12 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.novel import Chapter, Novel
-from app.models.text_chunk import TextChunk
 from app.models.user import User
-from app.services.analysis_service import SUPPORTED_TYPES, build_structural_result, ensure_hierarchy
+from app.services.analysis_service import (
+    SUPPORTED_TYPES,
+    build_structural_result,
+    ensure_hierarchy,
+)
 
 pytestmark = pytest.mark.unit
 

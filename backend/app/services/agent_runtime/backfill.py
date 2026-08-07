@@ -96,10 +96,12 @@ async def _resolve_active_skill_version(
     if registry is None:
         return None
     return await db.scalar(
-        select(SkillVersion).where(
+        select(SkillVersion)
+        .where(
             SkillVersion.registry_id == registry.id,
             SkillVersion.status == "active",
-        ).order_by(SkillVersion.id.desc())
+        )
+        .order_by(SkillVersion.id.desc())
     )
 
 

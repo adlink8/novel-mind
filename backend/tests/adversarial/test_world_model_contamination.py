@@ -43,8 +43,12 @@ from app.services.world_model.queries import (
 pytestmark = [pytest.mark.unit]
 
 FIXTURE = json.loads(
-    (Path(__file__).resolve().parents[1] / "fixtures" / "world_model" / "epistemic_v1.json")
-    .read_text(encoding="utf-8")
+    (
+        Path(__file__).resolve().parents[1]
+        / "fixtures"
+        / "world_model"
+        / "epistemic_v1.json"
+    ).read_text(encoding="utf-8")
 )
 
 
@@ -417,9 +421,7 @@ async def test_chat_claims_can_never_enter_a_world_projection():
         source=source,
         resolver=await _world_resolver((chat_claim,)),
     )
-    world = next(
-        r for r in results if r.dimension == QueryDimension.WORLD_PROJECTION
-    )
+    world = next(r for r in results if r.dimension == QueryDimension.WORLD_PROJECTION)
     assert world.status.value == "unavailable"
     assert world.refs == ()
 
@@ -440,8 +442,6 @@ async def test_stale_snapshot_world_projection_fails_closed():
         source=source,
         resolver=await _world_resolver((claim,)),
     )
-    world = next(
-        r for r in results if r.dimension == QueryDimension.WORLD_PROJECTION
-    )
+    world = next(r for r in results if r.dimension == QueryDimension.WORLD_PROJECTION)
     assert world.status.value == "unavailable"
     assert world.refs == ()

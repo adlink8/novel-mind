@@ -114,7 +114,9 @@ def _claim(**fields):
 def test_all_frozen_fixtures_qualify():
     results = run_frozen_qualification()
     assert len(results) == len(FIXTURE_KEYS)
-    failed = [(key, verdict, missing) for key, ok, verdict, missing in results if not ok]
+    failed = [
+        (key, verdict, missing) for key, ok, verdict, missing in results if not ok
+    ]
     assert failed == [], f"frozen qualification fixtures failed: {failed}"
 
 
@@ -162,9 +164,7 @@ def test_non_fanfiction_space_is_scope_denied():
     package = build_package()
     forged = dict(package)
     forged["space"] = "original_canon"
-    result = _evaluate(
-        build_candidate_json(draft="阿宁走入竹林。"), forged
-    )
+    result = _evaluate(build_candidate_json(draft="阿宁走入竹林。"), forged)
     assert result.verdict is GateVerdict.BLOCKED
     assert result.has_code(CODE_SCOPE_DENIED)
     assert result.violations[0].field == "space"
@@ -253,9 +253,7 @@ def test_blocked_evidence_dimension_blocks_qualification():
 def test_citation_outside_package_blocks():
     package = build_package()
     result = _evaluate(
-        build_candidate_json(
-            draft="阿宁走入竹林。", citations=[OUTSIDE_EVIDENCE]
-        ),
+        build_candidate_json(draft="阿宁走入竹林。", citations=[OUTSIDE_EVIDENCE]),
         package,
     )
     assert result.verdict is GateVerdict.BLOCKED
@@ -332,7 +330,9 @@ def test_character_contradiction_blocks_and_is_locatable():
     )
     assert result.verdict is GateVerdict.BLOCKED
     assert result.has_code(CODE_CHARACTER_CONTRADICTION)
-    violation = next(v for v in result.violations if v.code == CODE_CHARACTER_CONTRADICTION)
+    violation = next(
+        v for v in result.violations if v.code == CODE_CHARACTER_CONTRADICTION
+    )
     # Locatable to the hero's frozen world_state canonical_payload field.
     assert violation.field == "dimensions.world_state.items[0].canonical_payload"
     assert violation.claim_key == "hero-knows"
@@ -698,7 +698,9 @@ def test_failure_keeps_candidate_and_reason():
     """Blocked means the candidate row keeps its reason — never silent publish."""
     package = build_package()
     result = _evaluate(
-        build_candidate_json(draft="阿宁宣告他知道秘密。", citations=[OUTSIDE_EVIDENCE]),
+        build_candidate_json(
+            draft="阿宁宣告他知道秘密。", citations=[OUTSIDE_EVIDENCE]
+        ),
         package,
     )
     assert result.verdict is GateVerdict.BLOCKED

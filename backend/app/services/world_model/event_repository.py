@@ -123,8 +123,7 @@ class WorldModelEventRepository:
         fact_rows = [EventFact.model_validate(row.canonical_payload) for row in events]
         edge_rows = [CausalEdge.model_validate(row.canonical_payload) for row in edges]
         conflict_rows = [
-            ConflictContract.model_validate(row.canonical_payload)
-            for row in conflicts
+            ConflictContract.model_validate(row.canonical_payload) for row in conflicts
         ]
         for row, fact in zip(events, fact_rows):
             if row.canonical_payload_hash != event_checksum(fact):

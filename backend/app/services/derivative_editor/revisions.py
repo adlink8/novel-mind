@@ -628,7 +628,10 @@ async def create_agent_edit_proposal(
         project_id=project.id,
         chapter_id=chapter_id,
     )
-    if source_snapshot_hash is not None and source_snapshot_hash != project.source_snapshot_hash:
+    if (
+        source_snapshot_hash is not None
+        and source_snapshot_hash != project.source_snapshot_hash
+    ):
         raise DerivativeEditApplyError(
             "source_snapshot_mismatch",
             "proposal source snapshot hash does not replay the project's frozen "

@@ -283,7 +283,9 @@ def test_phase_gate_blocks_on_each_fail_closed_condition():
             ContaminationBlockedReason.CROSS_OWNER_LEAKAGE,
         ),
         (
-            PhaseGateEvidence(preflight_ok=True, publish_requested=True, approved=False),
+            PhaseGateEvidence(
+                preflight_ok=True, publish_requested=True, approved=False
+            ),
             ContaminationBlockedReason.APPROVAL_REQUIRED,
         ),
     )

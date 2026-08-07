@@ -26,7 +26,9 @@ def test_fanfiction_is_not_an_original_candidate_builder_input():
 
 def test_scope_is_owner_and_novel_bound():
     authority, citation = expected_rule("user_interpretation")
-    ref = CanonSpaceRef(7, 9, "user_interpretation", "user:7", "v2", authority, citation)
+    ref = CanonSpaceRef(
+        7, 9, "user_interpretation", "user:7", "v2", authority, citation
+    )
     validate_ref(ref)
     with pytest.raises(CanonSpacePolicyError, match="owner_scope"):
         assert_scope(ref, owner_id=8, novel_id=9)

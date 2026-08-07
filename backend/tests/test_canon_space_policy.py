@@ -39,9 +39,29 @@ def test_unknown_space_fails_closed():
 def test_authority_and_citation_mismatch_fail_closed():
     ref = _ref("original_canon")
     with pytest.raises(CanonSpacePolicyError, match="authority_mismatch"):
-        validate_ref(ref.__class__(1, 2, ref.space, ref.namespace, ref.version_key, "user_assertion", ref.citation_policy))
+        validate_ref(
+            ref.__class__(
+                1,
+                2,
+                ref.space,
+                ref.namespace,
+                ref.version_key,
+                "user_assertion",
+                ref.citation_policy,
+            )
+        )
     with pytest.raises(CanonSpacePolicyError, match="citation_policy_mismatch"):
-        validate_ref(ref.__class__(1, 2, ref.space, ref.namespace, ref.version_key, ref.authority, "fanfiction_only"))
+        validate_ref(
+            ref.__class__(
+                1,
+                2,
+                ref.space,
+                ref.namespace,
+                ref.version_key,
+                ref.authority,
+                "fanfiction_only",
+            )
+        )
 
 
 @pytest.mark.parametrize("space", ["user_interpretation", "fanfiction_canon"])

@@ -134,9 +134,7 @@ def event_checksum(event: "EventFact") -> str:
 
 
 def edge_checksum(edge: "CausalEdge") -> str:
-    return _sha256(
-        WORLD_MODEL_HASH_EDGE, _canonical_json(edge.model_dump(mode="json"))
-    )
+    return _sha256(WORLD_MODEL_HASH_EDGE, _canonical_json(edge.model_dump(mode="json")))
 
 
 def conflict_checksum(conflict: "WorldModelConflict") -> str:
@@ -206,9 +204,7 @@ class EventFact(StrictModel):
 
     @property
     def idempotency_key(self) -> str:
-        return row_idempotency_key(
-            WORLD_MODEL_HASH_EVENT, self.model_dump(mode="json")
-        )
+        return row_idempotency_key(WORLD_MODEL_HASH_EVENT, self.model_dump(mode="json"))
 
 
 class CausalEdge(StrictModel):
@@ -257,9 +253,7 @@ class CausalEdge(StrictModel):
 
     @property
     def idempotency_key(self) -> str:
-        return row_idempotency_key(
-            WORLD_MODEL_HASH_EDGE, self.model_dump(mode="json")
-        )
+        return row_idempotency_key(WORLD_MODEL_HASH_EDGE, self.model_dump(mode="json"))
 
 
 class WorldModelConflict(StrictModel):

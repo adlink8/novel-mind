@@ -155,9 +155,7 @@ async def _make_prompt_chain(
     snapshot_hash: str | None = None,
     prompt_hash: str = PROMPT_HASH,
 ):
-    snapshot_hash = snapshot_hash or await _source_snapshot_hash(
-        db, user.id, novel.id
-    )
+    snapshot_hash = snapshot_hash or await _source_snapshot_hash(db, user.id, novel.id)
     vb = VisualBibleVersion(
         owner_id=user.id,
         novel_id=novel.id,
@@ -414,7 +412,9 @@ async def _seed_complete_candidate(
     job = _seed_job(user=user, novel=novel, status=job_status, job_key=seed_id)
     db.add(job)
     await db.flush()
-    asset = _seed_asset_row(user=user, novel=novel, job=job, rights_status=rights_status)
+    asset = _seed_asset_row(
+        user=user, novel=novel, job=job, rights_status=rights_status
+    )
     db.add(asset)
     await db.flush()
     if with_budget:
@@ -453,7 +453,9 @@ def _review_url(novel_id: int, asset_id: int) -> str:
     return f"/api/novels/{novel_id}/illustrations/assets/{asset_id}/review"
 
 
-def _approve_payload(asset_id: int, *, event_key: str | None = None, **overrides) -> dict:
+def _approve_payload(
+    asset_id: int, *, event_key: str | None = None, **overrides
+) -> dict:
     payload = {
         "event_key": event_key or f"ev-{asset_id}-approve",
         "action": "approve",
@@ -518,37 +520,49 @@ def test_proposal_gate_pure_lineage_and_preconditions():
         lineage=ok_lineage,
     ) == IllustrationProposalGateResult(ok=True)
 
-    assert evaluate_illustration_proposal_gate(
-        job_status="failed",
-        rights_status="cleared",
-        budget_settled=True,
-        has_consistency_report=True,
-        lineage=ok_lineage,
-    ).reason_code == "job_not_succeeded"
+    assert (
+        evaluate_illustration_proposal_gate(
+            job_status="failed",
+            rights_status="cleared",
+            budget_settled=True,
+            has_consistency_report=True,
+            lineage=ok_lineage,
+        ).reason_code
+        == "job_not_succeeded"
+    )
 
-    assert evaluate_illustration_proposal_gate(
-        job_status="succeeded",
-        rights_status="unreviewed",
-        budget_settled=True,
-        has_consistency_report=True,
-        lineage=ok_lineage,
-    ).reason_code == "rights_unresolved"
+    assert (
+        evaluate_illustration_proposal_gate(
+            job_status="succeeded",
+            rights_status="unreviewed",
+            budget_settled=True,
+            has_consistency_report=True,
+            lineage=ok_lineage,
+        ).reason_code
+        == "rights_unresolved"
+    )
 
-    assert evaluate_illustration_proposal_gate(
-        job_status="succeeded",
-        rights_status="cleared",
-        budget_settled=False,
-        has_consistency_report=True,
-        lineage=ok_lineage,
-    ).reason_code == "budget_unsettled"
+    assert (
+        evaluate_illustration_proposal_gate(
+            job_status="succeeded",
+            rights_status="cleared",
+            budget_settled=False,
+            has_consistency_report=True,
+            lineage=ok_lineage,
+        ).reason_code
+        == "budget_unsettled"
+    )
 
-    assert evaluate_illustration_proposal_gate(
-        job_status="succeeded",
-        rights_status="cleared",
-        budget_settled=True,
-        has_consistency_report=False,
-        lineage=ok_lineage,
-    ).reason_code == "consistency_missing"
+    assert (
+        evaluate_illustration_proposal_gate(
+            job_status="succeeded",
+            rights_status="cleared",
+            budget_settled=True,
+            has_consistency_report=False,
+            lineage=ok_lineage,
+        ).reason_code
+        == "consistency_missing"
+    )
 
     broken = dict(ok_lineage)
     broken["prompt_revision_hash"] = "short"
@@ -577,9 +591,7 @@ def test_proposal_gate_has_no_publish_transition():
     assert IllustrationApprovalState.PROPOSAL_READY.value == "proposal_ready"
     assert (
         IllustrationReviewAction.APPROVE.value
-        in LEGAL_ILLUSTRATION_REVIEW_TRANSITIONS[
-            IllustrationApprovalState.CANDIDATE
-        ]
+        in LEGAL_ILLUSTRATION_REVIEW_TRANSITIONS[IllustrationApprovalState.CANDIDATE]
     )
     assert "publish" not in {
         action.value
@@ -742,9 +754,7 @@ async def test_generated_candidate_is_candidate_only_in_gallery(
     assert eval_resp.status_code == 201
     await db_session.commit()
 
-    gallery = await auth_client.get(
-        f"/api/novels/{novel.id}/illustrations/gallery"
-    )
+    gallery = await auth_client.get(f"/api/novels/{novel.id}/illustrations/gallery")
     assert gallery.status_code == 200
     items = gallery.json()["items"]
     assert len(items) == 1
@@ -836,7 +846,9 @@ async def test_approve_requires_job_and_from_state_match(db_session):
         assert "does not match" in str(exc)
 
     # Cross-owner asset is indistinguishable from not found.
-    other_user, other_novel = await _seed_user_and_novel(db_session, "ill_review_xowner")
+    other_user, other_novel = await _seed_user_and_novel(
+        db_session, "ill_review_xowner"
+    )
     other_asset = await _seed_complete_candidate(
         db_session, other_user, other_novel, seed_id="job-xowner"
     )
@@ -906,9 +918,7 @@ async def test_approve_is_idempotent_and_stale_from_state_fails(
     assert "does not match" in stale.json()["detail"]
 
 
-async def test_reject_then_supersede_then_needs_relink(
-    auth_client, db_session
-):
+async def test_reject_then_supersede_then_needs_relink(auth_client, db_session):
     user, novel = await _seed_testuser_novel(db_session)
     asset = await _seed_complete_candidate(db_session, user, novel)
     await db_session.commit()
@@ -1046,9 +1056,7 @@ async def test_review_cross_owner_is_not_found(auth_client, db_session):
     assert approve.status_code == 404
     envelope = await auth_client.get(_review_url(novel.id, asset.id))
     assert envelope.status_code == 404
-    gallery = await auth_client.get(
-        f"/api/novels/{novel.id}/illustrations/gallery"
-    )
+    gallery = await auth_client.get(f"/api/novels/{novel.id}/illustrations/gallery")
     assert gallery.status_code == 404
 
 
@@ -1057,9 +1065,7 @@ async def test_gallery_and_envelope_via_service(db_session):
     asset = await _seed_complete_candidate(db_session, user, novel)
     await db_session.commit()
 
-    gallery = await build_gallery(
-        db_session, owner_id=user.id, novel_id=novel.id
-    )
+    gallery = await build_gallery(db_session, owner_id=user.id, novel_id=novel.id)
     assert gallery.total == 1
     item = gallery.items[0]
     assert item.asset.approval_state == "candidate"

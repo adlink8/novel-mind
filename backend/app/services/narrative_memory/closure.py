@@ -33,7 +33,6 @@ from app.services.narrative_memory.builder_contracts import (
 )
 from app.services.narrative_memory.builder_repository import BuilderRepository
 from app.services.narrative_memory.contracts import (
-    CANDIDATE_MANIFEST_SCHEMA_VERSION,
     BudgetTotals,
     CandidateManifest,
     DimensionKind,
@@ -52,7 +51,6 @@ from app.services.narrative_memory.manifest_contract import (
 from app.services.narrative_memory.optional_sources import load_optional_signals
 from app.services.narrative_memory.progress import (
     ProgressNotification,
-    build_progress_notification,
     load_durable_progress,
 )
 from app.services.narrative_memory.recovery import terminal_state_for_status
@@ -159,9 +157,7 @@ def _chapter_progress(
     if not chapter_numbers:
         return 0.0
     completed = sum(
-        1
-        for s in stages
-        if s.stage_kind == "chapter_state" and s.status == "completed"
+        1 for s in stages if s.stage_kind == "chapter_state" and s.status == "completed"
     )
     return round(min(completed / len(chapter_numbers), 1.0), 4)
 
@@ -395,12 +391,8 @@ async def compute_dimension_closure(
     nodes = await _load_nodes(
         session, owner_id=owner_id, novel_id=novel_id, version_id=version_id
     )
-    cutoff = _cutoff_for(
-        chapter_numbers=chapter_numbers, nodes=nodes, claims=claims
-    )
-    ledger = (
-        await repo.get_ledger_totals(int(run.id)) if run is not None else None
-    )
+    cutoff = _cutoff_for(chapter_numbers=chapter_numbers, nodes=nodes, claims=claims)
+    ledger = await repo.get_ledger_totals(int(run.id)) if run is not None else None
     budget = _budget_from_ledger(ledger)
     base_lineage = _version_lineage(version)
     # One shared parity lineage: identical for every DimensionResult and the
@@ -477,9 +469,7 @@ async def compute_dimension_closure(
         checksum="0" * 64,
     )
     manifest = manifest_placeholder.model_copy(
-        update={
-            "checksum": candidate_manifest_checksum(manifest_placeholder)
-        }
+        update={"checksum": candidate_manifest_checksum(manifest_placeholder)}
     )
     # Fail closed on checksum/parity/pointer integrity before any consumer use.
     validate_candidate_manifest(manifest)
@@ -607,7 +597,5 @@ async def analysis_report_with_progress(
     )
     report = closure.model_dump(mode="json")
     report["durable_progress"] = progress.model_dump(mode="json")
-    report["sse_frames"] = list(
-        assemble_sse_frames(closure.notifications)
-    )
+    report["sse_frames"] = list(assemble_sse_frames(closure.notifications))
     return report

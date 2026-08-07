@@ -200,4 +200,3 @@ class TestAnchorResolution:
             "source_snapshot_id",
             "job_key",
         }
-

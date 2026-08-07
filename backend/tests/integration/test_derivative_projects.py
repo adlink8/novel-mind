@@ -29,7 +29,6 @@ from sqlalchemy.pool import NullPool
 from app.core.database import get_db
 from app.core.security import create_access_token, hash_password
 from app.main import app
-from app.models.derivative_project import DerivativeProject
 from app.models.novel import Chapter, Novel
 from app.models.user import User
 from tests.integration.conftest import reset_public_schema, run_alembic
@@ -98,7 +97,9 @@ def _seed_owner(sync_url: str, *, suffix: str, chapter_count: int = 3) -> dict:
             status="ready",
             reading_progress={},
             chapter_count=chapter_count,
-            word_count=sum(len(f"chapter {i} body") for i in range(1, chapter_count + 1)),
+            word_count=sum(
+                len(f"chapter {i} body") for i in range(1, chapter_count + 1)
+            ),
         )
         session.add(novel)
         session.flush()
@@ -125,7 +126,9 @@ def _seed_owner(sync_url: str, *, suffix: str, chapter_count: int = 3) -> dict:
 
 async def _create_fork(client, headers, novel_id, fork_key) -> dict:
     resp = await client.post(
-        FORK_BASE.format(novel_id=novel_id), json={"fork_key": fork_key}, headers=headers
+        FORK_BASE.format(novel_id=novel_id),
+        json={"fork_key": fork_key},
+        headers=headers,
     )
     assert resp.status_code == 201, resp.text
     return resp.json()["fork"]
@@ -153,7 +156,9 @@ async def test_crud_round_trip(api_client):
     base = PROJECT_BASE.format(novel_id=ids["novel_id"])
     fork = await _create_fork(client, headers, ids["novel_id"], "ff-crud")
 
-    created = await _create_project(client, headers, ids["novel_id"], fork["id"], "Round Trip")
+    created = await _create_project(
+        client, headers, ids["novel_id"], fork["id"], "Round Trip"
+    )
     pid = created["id"]
 
     # List contains the row with scope/version lineage.
@@ -169,7 +174,9 @@ async def test_crud_round_trip(api_client):
 
     # Patch mutable state only.
     patched = await client.patch(
-        f"{base}/{pid}", json={"name": "Renamed", "description": "hello"}, headers=headers
+        f"{base}/{pid}",
+        json={"name": "Renamed", "description": "hello"},
+        headers=headers,
     )
     assert patched.status_code == 200
     body = patched.json()
@@ -201,7 +208,9 @@ async def test_empty_patch_is_rejected(api_client):
     headers = {"Authorization": f"Bearer {ids['token']}"}
     base = PROJECT_BASE.format(novel_id=ids["novel_id"])
     fork = await _create_fork(client, headers, ids["novel_id"], "ff-patch")
-    pid = (await _create_project(client, headers, ids["novel_id"], fork["id"], "Patch Me"))["id"]
+    pid = (
+        await _create_project(client, headers, ids["novel_id"], fork["id"], "Patch Me")
+    )["id"]
     resp = await client.patch(f"{base}/{pid}", json={}, headers=headers)
     assert resp.status_code == 422, resp.text
 
@@ -219,7 +228,9 @@ async def test_duplicate_name_fails_closed(api_client):
     fork_a = await _create_fork(client, headers, ids["novel_id"], "ff-dup-a")
     fork_b = await _create_fork(client, headers, ids["novel_id"], "ff-dup-b")
 
-    await _create_project(client, headers, ids["novel_id"], fork_a["id"], "Duplicate Name")
+    await _create_project(
+        client, headers, ids["novel_id"], fork_a["id"], "Duplicate Name"
+    )
 
     # Same name under the same owner/novel is a conflict even on another fork.
     resp = await client.post(
@@ -231,7 +242,9 @@ async def test_duplicate_name_fails_closed(api_client):
     assert "name_conflict" in resp.json()["detail"]
 
     # Renaming an existing project onto a taken name is also a conflict.
-    pid = (await _create_project(client, headers, ids["novel_id"], fork_a["id"], "Second"))["id"]
+    pid = (
+        await _create_project(client, headers, ids["novel_id"], fork_a["id"], "Second")
+    )["id"]
     resp = await client.patch(
         f"{base}/{pid}", json={"name": "Duplicate Name"}, headers=headers
     )
@@ -318,7 +331,7 @@ async def test_database_rejects_non_fanfiction_fork_space(api_client):
                     " status, source_version_key, source_snapshot_id,"
                     " source_snapshot_hash, through_chapter, full_book_authorized,"
                     " cutoff_snapshot_hash, scope_hash, manifest_hash,"
-                    " citation_lineage, \"authorization\", active)"
+                    ' citation_lineage, "authorization", active)'
                     " VALUES (:owner_id, :novel_id, 'ff-original', 'original_canon',"
                     " 'candidate', 'original:1', 'snap-1', :h, 1, false, :h, :h, :h,"
                     " '[]', '{}', false)"
@@ -367,7 +380,9 @@ async def test_database_rejects_non_fanfiction_project_space(api_client):
         except IntegrityError as exc:
             assert "ck_derivative_projects_space" in str(exc)
         else:
-            pytest.fail("original_canon project row must be rejected by the DB constraint")
+            pytest.fail(
+                "original_canon project row must be rejected by the DB constraint"
+            )
         finally:
             conn.rollback()
     engine.dispose()

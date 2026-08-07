@@ -33,7 +33,10 @@ from app.services.qualification.runner import (
 pytestmark = [pytest.mark.integration]
 
 GOLD_PATH = Path(__file__).resolve().parents[3] / "evals" / "reading_qa_v1.json"
-LINEAGE = {"hierarchy_build_id": "b" * 64, "commit": "912ca6b423d6c2309bc2972cbfc083c4eaa280e1"}
+LINEAGE = {
+    "hierarchy_build_id": "b" * 64,
+    "commit": "912ca6b423d6c2309bc2972cbfc083c4eaa280e1",
+}
 
 
 @pytest.fixture(scope="module")
@@ -322,9 +325,7 @@ def test_manifest_budget_mismatch_fails_closed(gold_set):
     snapshot = gold_set.source_snapshot_hash
     other_budget = _budget(calls=99)
     cand_manifest = _consistent_manifest(snapshot)
-    base_manifest = _consistent_manifest(
-        snapshot, budget=other_budget
-    )
+    base_manifest = _consistent_manifest(snapshot, budget=other_budget)
     report = _run(
         gold_set,
         cand,

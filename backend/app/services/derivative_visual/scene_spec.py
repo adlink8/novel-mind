@@ -517,7 +517,9 @@ class DerivativeSceneSpecService:
                     "derivative_constraint_invalid",
                     f"derivative constraint[{index}] is not an object",
                 )
-            constraint_key = entry.get("constraint_key") or f"derivative-constraint-{index}"
+            constraint_key = (
+                entry.get("constraint_key") or f"derivative-constraint-{index}"
+            )
             text = entry.get("text")
             if not isinstance(text, str) or not text:
                 raise DerivativeSceneSpecBlockedError(
@@ -525,7 +527,10 @@ class DerivativeSceneSpecService:
                     f"derivative constraint {constraint_key!r} has no text",
                 )
             scope = entry.get("scope")
-            if not isinstance(scope, str) or scope not in ConstraintScope._value2member_map_:
+            if (
+                not isinstance(scope, str)
+                or scope not in ConstraintScope._value2member_map_
+            ):
                 raise DerivativeSceneSpecBlockedError(
                     "derivative_constraint_invalid",
                     f"derivative constraint {constraint_key!r} has unsupported scope",
@@ -548,7 +553,8 @@ class DerivativeSceneSpecService:
     def _reconstruct_scene_spec(
         self,
         spec_row: SceneSpecVersionRow,
-        evidence_rows: list[SceneSpecEvidenceRefRow] | tuple[SceneSpecEvidenceRefRow, ...],
+        evidence_rows: list[SceneSpecEvidenceRefRow]
+        | tuple[SceneSpecEvidenceRefRow, ...],
     ) -> SceneSpecContract:
         """Reconstruct the immutable SceneSpec contract from persisted rows.
 

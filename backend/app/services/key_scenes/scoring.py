@@ -54,7 +54,7 @@ _ACTION_TERMS = (
     "pursued",
     "exploded",
     "struck the",
-    "!" ,
+    "!",
     "！",
     "拔剑",
     "冲锋",
@@ -194,7 +194,9 @@ DEFAULT_SCENE_POLICY = KeySceneScoringPolicy()
 
 def policy_hash(policy: KeySceneScoringPolicy = DEFAULT_SCENE_POLICY) -> str:
     """Canonical hash of the versioned scoring policy (recorded per candidate)."""
-    return canonical_key_scene_hash({"kind": "key_scene.scoring_policy"} | policy.payload())
+    return canonical_key_scene_hash(
+        {"kind": "key_scene.scoring_policy"} | policy.payload()
+    )
 
 
 @dataclass(frozen=True)
@@ -264,9 +266,7 @@ def _visual_density(text: str) -> float:
 def _coverage_score(coordinates: SceneCoordinates) -> float:
     """Deterministic coordinate coverage (cast/place/time/pov) in [0, 1]."""
     filled = sum(
-        1
-        for value in (coordinates.place, coordinates.time, coordinates.pov)
-        if value
+        1 for value in (coordinates.place, coordinates.time, coordinates.pov) if value
     )
     filled += min(len(coordinates.cast), 3)
     return min(1.0, filled / 6.0)
@@ -344,8 +344,7 @@ def diversity_groups(
     for item in scored:
         grouped.setdefault(item.diversity_key, []).append(item)
     return tuple(
-        DiversityGroup(key=key, items=tuple(grouped[key]))
-        for key in sorted(grouped)
+        DiversityGroup(key=key, items=tuple(grouped[key])) for key in sorted(grouped)
     )
 
 
@@ -431,12 +430,10 @@ def rank_with_diversity(
         selected.append(replace(winner, salience_reasons=tuple(reasons)))
 
     # Fill remaining budget with the rest of each group by score.
-    rest = [
-        item
-        for key in sorted(by_group)
-        for item in by_group[key][1:]
-    ]
-    rest.sort(key=lambda s: (-s.score_total, s.chapter_number, s.source_start, s.scene_id))
+    rest = [item for key in sorted(by_group) for item in by_group[key][1:]]
+    rest.sort(
+        key=lambda s: (-s.score_total, s.chapter_number, s.source_start, s.scene_id)
+    )
     for item in rest:
         if len(selected) >= policy.max_candidates:
             break
@@ -603,7 +600,9 @@ class KeySceneScorer:
         def add(code: KeySceneReasonCode, detail: str, score: float) -> None:
             if score >= threshold:
                 reasons.append(
-                    SalienceReason(reason_code=code, detail=detail, score=round(score, 6))
+                    SalienceReason(
+                        reason_code=code, detail=detail, score=round(score, 6)
+                    )
                 )
 
         add(

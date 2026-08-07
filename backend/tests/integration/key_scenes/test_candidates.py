@@ -136,9 +136,7 @@ def _seed_owner(
         )
         scene_ids: list[str] = []
         coordinates: dict[str, dict[str, Any]] = {}
-        for i, (chapter_id, content) in enumerate(
-            zip(chapter_ids, contents), start=1
-        ):
+        for i, (chapter_id, content) in enumerate(zip(chapter_ids, contents), start=1):
             outcome = detect_chapter_boundaries(
                 novel_id=novel.id,
                 chapter_id=chapter_id,
@@ -299,9 +297,7 @@ async def test_action_candidate_exposes_available_heuristic_signal(api_client):
     )
     assert resp.status_code == 201, resp.text
     candidates = resp.json()["set"]["candidates"]
-    action = next(
-        c for c in candidates if c["chapter_number"] == 1
-    )
+    action = next(c for c in candidates if c["chapter_number"] == 1)
     signal = action["heuristic_signal"]
     assert signal is not None
     assert signal["availability"] == "available"
@@ -312,10 +308,7 @@ async def test_action_candidate_exposes_available_heuristic_signal(api_client):
 
     # The advisory dialogue contribution only changes ranking; it is never a
     # citation. Evidence ranges carry only source-verified fields.
-    assert any(
-        r["reason_code"] == "dialogue_turn"
-        for r in action["salience_reasons"]
-    )
+    assert any(r["reason_code"] == "dialogue_turn" for r in action["salience_reasons"])
     ref_keys = set(action["evidence_ranges"][0])
     assert ref_keys >= {
         "evidence_key",
@@ -349,9 +342,7 @@ async def test_quiet_and_ambiguous_candidates_preserve_signals(api_client):
         f"{base}/generate", json=_generate_payload(ids), headers=headers
     )
     assert resp.status_code == 201, resp.text
-    by_chapter = {
-        c["chapter_number"]: c for c in resp.json()["set"]["candidates"]
-    }
+    by_chapter = {c["chapter_number"]: c for c in resp.json()["set"]["candidates"]}
     # Quiet chapter: no dialogue → explicit unavailable, never silent zero.
     quiet = by_chapter[2]
     quiet_signal = quiet["heuristic_signal"]
@@ -361,10 +352,7 @@ async def test_quiet_and_ambiguous_candidates_preserve_signals(api_client):
     assert "no_dialogue_detected" in quiet_signal["warnings"]
     assert quiet["score_breakdown"]["dialogue_turn"] == 0.0
     # Quiet-emotional salience survives as a reason code.
-    assert any(
-        r["reason_code"] == "quiet_emotional"
-        for r in quiet["salience_reasons"]
-    )
+    assert any(r["reason_code"] == "quiet_emotional" for r in quiet["salience_reasons"])
 
     # Ambiguous chapter: visually weak, no strong signal → still a candidate.
     ambiguous = by_chapter[3]
@@ -392,7 +380,10 @@ async def test_spoiler_cutoff_excludes_future_chapter_candidates(api_client):
     set_view = resp.json()["set"]
     assert set_view["cutoff_chapter"] == 1
     assert {c["chapter_number"] for c in set_view["candidates"]} == {1}
-    assert all(c["chapter_number"] <= set_view["cutoff_chapter"] for c in set_view["candidates"])
+    assert all(
+        c["chapter_number"] <= set_view["cutoff_chapter"]
+        for c in set_view["candidates"]
+    )
     assert all(c["spoiler_cutoff"] == 1 for c in set_view["candidates"])
     # Each seeded chapter is a single scene; cutoff=1 keeps only chapter 1.
     assert len(set_view["candidates"]) == 1
@@ -419,9 +410,7 @@ async def test_generate_never_promotes_candidate_or_touches_source(api_client):
     assert "promote_to_canon" not in set_view
     assert "cover_url" not in set_view
     assert set_view["review_state"] == "candidate"
-    assert all(
-        c["review_state"] == "candidate" for c in set_view["candidates"]
-    )
+    assert all(c["review_state"] == "candidate" for c in set_view["candidates"])
 
     # The authoritative chapter body is untouched by generation.
     engine = create_engine(sync_url, poolclass=NullPool)
@@ -523,17 +512,13 @@ async def test_service_generates_persists_and_owner_scope_fails_closed(api_clien
         # Content rows were persisted append-only.
         assert (
             await session.scalar(
-                select(SceneCandidate).where(
-                    SceneCandidate.set_id == set_id
-                )
+                select(SceneCandidate).where(SceneCandidate.set_id == set_id)
             )
             is not None
         )
         assert (
             await session.scalar(
-                select(SceneEvidenceRange).where(
-                    SceneEvidenceRange.set_id == set_id
-                )
+                select(SceneEvidenceRange).where(SceneEvidenceRange.set_id == set_id)
             )
             is not None
         )

@@ -42,12 +42,8 @@ from app.services.qualification.rubric import (
 
 pytestmark = pytest.mark.unit
 
-GOLD_PATH = (
-    Path(__file__).resolve().parents[3] / "evals" / "reading_qa_v1.json"
-)
-QUAL_DIR = (
-    Path(__file__).resolve().parents[3] / "app" / "services" / "qualification"
-)
+GOLD_PATH = Path(__file__).resolve().parents[3] / "evals" / "reading_qa_v1.json"
+QUAL_DIR = Path(__file__).resolve().parents[3] / "app" / "services" / "qualification"
 
 
 @pytest.fixture(scope="module")
@@ -238,9 +234,7 @@ def test_fingerprint_and_agreement_reproducible_across_reloads(raw_payload):
 
 
 def test_clean_candidates_qualify(gold_set):
-    candidate_answers = {
-        s.id: _answers_for(s) for s in gold_set.samples
-    }
+    candidate_answers = {s.id: _answers_for(s) for s in gold_set.samples}
     result = evaluate_qualification(gold_set, candidate_answers=candidate_answers)
     assert result.verdict == RubricVerdict.QUALIFIED_CANDIDATE
     assert result.violations == ()
@@ -428,7 +422,9 @@ def test_content_leak_beyond_cutoff_blocks(gold_set):
     candidate_answers = {
         sample.id: {
             "answer": "何太太被捕，灯塔重新亮起",
-            "evidence": [r.model_dump(mode="json") for r in sample.source_answers[0].evidence],
+            "evidence": [
+                r.model_dump(mode="json") for r in sample.source_answers[0].evidence
+            ],
             "abstained": False,
         }
     }

@@ -495,18 +495,13 @@ def evaluate_qualification(
                 context=context_by_sample.get(sample.id),
             )
         )
-    verdict = (
-        RubricVerdict.BLOCKED
-        if violations
-        else RubricVerdict.QUALIFIED_CANDIDATE
-    )
+    verdict = RubricVerdict.BLOCKED if violations else RubricVerdict.QUALIFIED_CANDIDATE
     agreement = curator_agreement(gold_set)
     return RubricResult(
         verdict=verdict,
         violations=tuple(violations),
-        fingerprint=gold_set.fingerprint or dataset_fingerprint(
-            gold_set.model_dump(mode="json")
-        ),
+        fingerprint=gold_set.fingerprint
+        or dataset_fingerprint(gold_set.model_dump(mode="json")),
         agreement=agreement.overall,
         bucket_counts=gold_set.bucket_counts(),
         audited_samples=len(gold_set.samples),

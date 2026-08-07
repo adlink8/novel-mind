@@ -70,11 +70,15 @@ def _freeze_payload(reason: str = "人工审查：冻结关键场景集") -> dic
     }
 
 
-async def _generate_set(client, ids: dict[str, Any]) -> tuple[str, dict[str, str], dict[str, Any]]:
+async def _generate_set(
+    client, ids: dict[str, Any]
+) -> tuple[str, dict[str, str], dict[str, Any]]:
     """Generate a candidate set and return (base, headers, set view)."""
     base = f"/api/novels/{ids['novel_id']}/key-scenes"
     headers = {"Authorization": f"Bearer {ids['token']}"}
-    resp = await client.post(f"{base}/generate", json=_generate_payload(ids), headers=headers)
+    resp = await client.post(
+        f"{base}/generate", json=_generate_payload(ids), headers=headers
+    )
     assert resp.status_code == 201, resp.text
     return base, headers, resp.json()["set"]
 
@@ -88,7 +92,6 @@ async def test_review_freeze_frozen_are_owner_scoped_404(api_client):
     client, _, sync_url = api_client
     ids_a = _seed_owner(sync_url, suffix=f"ra_{uuid.uuid4().hex[:8]}")
     ids_b = _seed_owner(sync_url, suffix=f"rb_{uuid.uuid4().hex[:8]}")
-    headers_a = {"Authorization": f"Bearer {ids_a['token']}"}
     headers_b = {"Authorization": f"Bearer {ids_b['token']}"}
 
     base_a, _, set_view = await _generate_set(client, ids_a)
@@ -190,7 +193,9 @@ async def test_reject_candidate_keeps_audit_history(api_client):
     )
     assert rejected["review_state"] == "rejected"
     # The rejected candidate stays in the candidate list (auditable history).
-    assert any(c["candidate_key"] == target["candidate_key"] for c in body["candidates"])
+    assert any(
+        c["candidate_key"] == target["candidate_key"] for c in body["candidates"]
+    )
     assert body["review_decisions"][0]["action"] == "reject"
     assert body["review_decisions"][0]["to_review_state"] == "rejected"
 
@@ -229,12 +234,16 @@ async def test_repeated_decision_key_is_idempotent(api_client):
     # Durable layer confirms exactly one decision row (no duplicate approval).
     engine = create_engine(sync_url, poolclass=NullPool)
     with Session(engine) as session:
-        count = session.query(SceneReviewDecision).filter_by(
-            decision_key=decision_key,
-            owner_id=ids["owner_id"],
-            novel_id=ids["novel_id"],
-            set_id=set_id,
-        ).count()
+        count = (
+            session.query(SceneReviewDecision)
+            .filter_by(
+                decision_key=decision_key,
+                owner_id=ids["owner_id"],
+                novel_id=ids["novel_id"],
+                set_id=set_id,
+            )
+            .count()
+        )
         assert count == 1
     engine.dispose()
 
@@ -261,7 +270,9 @@ async def test_duplicate_approval_with_fresh_key_fails_closed(api_client):
         headers=headers,
     )
     assert dup.status_code == 409, dup.text
-    assert "illegal" in dup.json()["detail"] or "from_review_state" in dup.json()["detail"]
+    assert (
+        "illegal" in dup.json()["detail"] or "from_review_state" in dup.json()["detail"]
+    )
 
 
 async def test_from_review_state_mismatch_fails_closed(api_client):
@@ -404,11 +415,7 @@ async def test_freeze_builds_frozen_set_with_only_approved_candidates(api_client
         from app.services.key_scenes.candidates import derive_candidate_review_states
 
         effective = derive_candidate_review_states(decision_rows)
-        approved_keys = [
-            key
-            for key, state in effective.items()
-            if state == "approved"
-        ]
+        approved_keys = [key for key, state in effective.items() if state == "approved"]
         approved_rows = (
             session.query(CandidateRow)
             .filter(
@@ -462,13 +469,17 @@ async def test_freeze_is_idempotent(api_client):
 
     engine = create_engine(sync_url, poolclass=NullPool)
     with Session(engine) as session:
-        count = session.query(SceneReviewDecision).filter_by(
-            owner_id=ids["owner_id"],
-            novel_id=ids["novel_id"],
-            set_id=set_id,
-            action="approve",
-            candidate_key=None,
-        ).count()
+        count = (
+            session.query(SceneReviewDecision)
+            .filter_by(
+                owner_id=ids["owner_id"],
+                novel_id=ids["novel_id"],
+                set_id=set_id,
+                action="approve",
+                candidate_key=None,
+            )
+            .count()
+        )
         assert count == 1  # append-only: re-freeze never adds a second decision
     engine.dispose()
 
@@ -576,7 +587,5 @@ async def test_service_append_decision_and_freeze(api_client):
             reason="服务级冻结",
         )
         assert frozen_row.review_state == "approved"
-        assert [c.candidate_key for c in frozen.candidates] == [
-            target["candidate_key"]
-        ]
+        assert [c.candidate_key for c in frozen.candidates] == [target["candidate_key"]]
         await session.rollback()

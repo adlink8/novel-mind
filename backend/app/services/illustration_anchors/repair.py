@@ -223,8 +223,7 @@ def classify_anchor_repair(
             paragraph_end=paragraph_end,
         )
     if (
-        current_snapshot_id is not None
-        and current_snapshot_id != source_snapshot_id
+        current_snapshot_id is not None and current_snapshot_id != source_snapshot_id
     ) or (
         current_snapshot_hash is not None
         and current_snapshot_hash != source_snapshot_hash
@@ -351,7 +350,9 @@ class AnchorRepairService:
         _require_scope(owner_id=owner_id, novel_id=novel_id)
         anchor = await self._anchor(owner_id, novel_id, anchor_id)
         if anchor is None:
-            raise AnchorRepairError("published anchor not found in the owner/novel scope")
+            raise AnchorRepairError(
+                "published anchor not found in the owner/novel scope"
+            )
         chapter = await self._chapter(owner_id, novel_id, anchor.chapter_id)
         if chapter is None:
             raise AnchorRepairError("anchor chapter not found in the owner/novel scope")
@@ -372,7 +373,9 @@ class AnchorRepairService:
             paragraph_end=anchor.paragraph_end,
             current_content=content,
             current_content_hash=(
-                sha256(content.encode("utf-8")).hexdigest() if content is not None else None
+                sha256(content.encode("utf-8")).hexdigest()
+                if content is not None
+                else None
             ),
             current_snapshot_id=current_snapshot_id,
             current_snapshot_hash=current_snapshot_hash,
@@ -646,7 +649,9 @@ async def propose_anchor_repair(
         owner_id=owner_id,
         run_id=int(request["run_id"]) if request.get("run_id") else None,
         skill_version_id=(
-            int(request["skill_version_id"]) if request.get("skill_version_id") else None
+            int(request["skill_version_id"])
+            if request.get("skill_version_id")
+            else None
         ),
         artifact_id=int(request["artifact_id"]) if request.get("artifact_id") else None,
         artifact_revision_id=(

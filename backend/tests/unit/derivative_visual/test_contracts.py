@@ -36,7 +36,6 @@ from app.schemas.derivative_visual import (
     DerivativeVisualAssetContract,
     DerivativeVisualEntityContract,
     DerivativeVisualGateError,
-    DerivativeVisualRightsStatus,
     DerivativeVisualState,
     DerivativeVisualVersionContract,
     canonical_derivative_visual_hash,
@@ -256,9 +255,7 @@ def test_manifest_hash_is_byte_replayable_and_content_sensitive():
     )
     # A stale manifest_hash fails the fork gate.
     with pytest.raises(DerivativeVisualGateError):
-        validate_derivative_visual_fork_contract(
-            _version(manifest_hash=HEX64_B)
-        )
+        validate_derivative_visual_fork_contract(_version(manifest_hash=HEX64_B))
 
 
 def test_wrong_manifest_hash_is_rejected():
@@ -272,7 +269,9 @@ def test_duplicate_identity_keys_are_rejected():
             _version(
                 entities=[
                     _entity().model_dump(),
-                    _entity(stable_id="char-arya", entity_key="char-arya-2").model_dump(),
+                    _entity(
+                        stable_id="char-arya", entity_key="char-arya-2"
+                    ).model_dump(),
                 ]
             )
         )
@@ -281,7 +280,9 @@ def test_duplicate_identity_keys_are_rejected():
             _version(
                 entities=[
                     _entity().model_dump(),
-                    _entity(stable_id="char-arya-2", entity_key="char-arya").model_dump(),
+                    _entity(
+                        stable_id="char-arya-2", entity_key="char-arya"
+                    ).model_dump(),
                 ]
             )
         )
@@ -290,7 +291,9 @@ def test_duplicate_identity_keys_are_rejected():
             _version(
                 reference_assets=[
                     _asset().model_dump(),
-                    _asset(asset_key="dv-arya-sketch", asset_id="dv-obj-2").model_dump(),
+                    _asset(
+                        asset_key="dv-arya-sketch", asset_id="dv-obj-2"
+                    ).model_dump(),
                 ]
             )
         )
@@ -626,7 +629,6 @@ def test_canonical_hash_is_deterministic():
 
 
 def test_require_scope_rejects_invalid_scope():
-    from app.services.derivative_visual.fork import _require_scope
 
     for owner_id, novel_id in (
         (0, 1),

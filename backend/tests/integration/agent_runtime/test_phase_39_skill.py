@@ -37,13 +37,13 @@ from typing import Any
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import create_engine, func, select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
 from app.core.database import get_db
 from app.main import app
-from app.models import Novel, User
+from app.models import Novel
 from app.models.agent_runtime import (
     ApprovalRequest,
     Artifact,
@@ -70,11 +70,9 @@ from app.services.agent_tools.errors import InvalidInputError
 from app.services.agent_tools.facade import ToolFacade
 from app.services.derivative_export.materializer import (
     APPROVE_EXPORT_APPROVAL_ACTION,
-    ExportMaterializationError,
     set_materializer_asset_storage,
 )
 from app.services.derivative_export.preparation import (
-    export_preparation_hash,
     prepare_export,
 )
 from app.services.derivative_visual.assets import DerivativeAssetStorage
@@ -105,7 +103,9 @@ def _async_url(sync_url: str) -> str:
     return sync_url
 
 
-def _skill_contract(*, novel_id: int, name: str, tools: list[str]) -> SkillVersionRegister:
+def _skill_contract(
+    *, novel_id: int, name: str, tools: list[str]
+) -> SkillVersionRegister:
     base: dict[str, Any] = {
         "novel_id": novel_id,
         "name": name,
@@ -266,12 +266,19 @@ async def _finalize(
             "revision": "stub-1",
         },
         source_versions=dict(envelope.get("source_versions") or {}),
-        usage={"calls": 4, "input_tokens": 600, "output_tokens": 300, "cost_usd": "0.0015"},
+        usage={
+            "calls": 4,
+            "input_tokens": 600,
+            "output_tokens": 300,
+            "cost_usd": "0.0015",
+        },
         frozen_manifest=frozen_manifest,
     )
 
 
-async def _count(factory, model, *, run_id: int | None = None, owner_id: int | None = None) -> int:
+async def _count(
+    factory, model, *, run_id: int | None = None, owner_id: int | None = None
+) -> int:
     async with factory() as session:
         if owner_id is not None:
             return int(
@@ -283,12 +290,12 @@ async def _count(factory, model, *, run_id: int | None = None, owner_id: int | N
                 or 0
             )
         if run_id is None:
-            return int(await session.scalar(select(func.count()).select_from(model)) or 0)
+            return int(
+                await session.scalar(select(func.count()).select_from(model)) or 0
+            )
         return int(
             await session.scalar(
-                select(func.count())
-                .select_from(model)
-                .where(model.run_id == run_id)  # type: ignore[attr-defined]
+                select(func.count()).select_from(model).where(model.run_id == run_id)  # type: ignore[attr-defined]
             )
             or 0
         )
@@ -644,7 +651,9 @@ async def test_phase39_approval_and_deterministic_materialize(
 
     # 用户 Web 确认 → 确定性 materialize_export 推进 approved 并产出 bundle。
     async with runtime_factory() as session:
-        await confirm(session, request_id=approval_id, owner_id=ctx["owner_id"], mode="once")
+        await confirm(
+            session, request_id=approval_id, owner_id=ctx["owner_id"], mode="once"
+        )
         await session.commit()
 
     async with runtime_factory() as session:
@@ -685,7 +694,9 @@ async def test_phase39_approval_and_deterministic_materialize(
         from app.models.visual_bible import VisualBibleVersion
 
         original = await session.scalar(
-            select(VisualBibleVersion).where(VisualBibleVersion.owner_id == ctx["owner_id"])
+            select(VisualBibleVersion).where(
+                VisualBibleVersion.owner_id == ctx["owner_id"]
+            )
         )
     assert original is not None
     assert original.source_snapshot_hash == HEX64
@@ -926,7 +937,10 @@ async def test_phase39_source_snapshot_drift_blocks(
     )
     assert outcome.status == "failed"
     assert outcome.error_code == ERROR_CODE_FAILED_VALIDATION
-    assert outcome.status_reason is not None and "source_snapshot_hash" in outcome.status_reason
+    assert (
+        outcome.status_reason is not None
+        and "source_snapshot_hash" in outcome.status_reason
+    )
     await _assert_zero_writes(runtime_factory, run_id=ctx["run_id"])
 
 
@@ -1221,9 +1235,7 @@ async def test_phase39_cancelled_approval_fails(
     approval_id = int(tool_view["approval_request_id"])
     ctx["approval_id"] = approval_id
     async with runtime_factory() as session:
-        await expire_request(
-            session, request_id=approval_id, owner_id=ctx["owner_id"]
-        )
+        await expire_request(session, request_id=approval_id, owner_id=ctx["owner_id"])
         await session.commit()
 
     with pytest.raises(InvalidInputError) as exc:
@@ -1407,7 +1419,9 @@ async def test_phase39_original_authority_untouched(
         from app.models.visual_bible import VisualBibleVersion
 
         original = await session.scalar(
-            select(VisualBibleVersion).where(VisualBibleVersion.owner_id == ctx["owner_id"])
+            select(VisualBibleVersion).where(
+                VisualBibleVersion.owner_id == ctx["owner_id"]
+            )
         )
     assert int(approvals_for_run or 0) == 0
     assert original is not None

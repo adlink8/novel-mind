@@ -696,7 +696,9 @@ def _attempt_view(row: IllustrationAttempt) -> IllustrationAttemptView:
     )
 
 
-def _budget_view(evidence: dict[str, Any] | None) -> IllustrationBudgetEvidenceView | None:
+def _budget_view(
+    evidence: dict[str, Any] | None,
+) -> IllustrationBudgetEvidenceView | None:
     if evidence is None:
         return None
     return IllustrationBudgetEvidenceView(
@@ -775,9 +777,7 @@ async def build_review_envelope(
     consistency = await service._latest_report(owner_id, novel_id, asset.id)
     gate: IllustrationProposalGateView | None = None
     if asset.approval_state == IllustrationApprovalState.CANDIDATE.value:
-        gate = _gate_view(
-            await service._proposal_gate(owner_id, novel_id, asset, job)
-        )
+        gate = _gate_view(await service._proposal_gate(owner_id, novel_id, asset, job))
     return IllustrationReviewEnvelope(
         asset=_asset_view(asset),
         job=_job_view(job),

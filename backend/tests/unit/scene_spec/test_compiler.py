@@ -113,7 +113,9 @@ def _candidate(
         source_start=0,
         source_end=min(len(CH_ACTION), 120),
         source_hash=HEX64,
-        coordinates=SceneCoordinates(cast=list(cast), place=place, time=time, pov="arin"),
+        coordinates=SceneCoordinates(
+            cast=list(cast), place=place, time=time, pov="arin"
+        ),
         spoiler_cutoff=cutoff,
         salience_reasons=[],
         score_total=1.0,
@@ -219,7 +221,9 @@ def _build_visual_bible(
         "review_state": VisualReviewState.APPROVED.value,
     }
     version = VisualBibleVersionContract.model_validate(payload)
-    return version.model_copy(update={"manifest_hash": recompute_manifest_hash(version)})
+    return version.model_copy(
+        update={"manifest_hash": recompute_manifest_hash(version)}
+    )
 
 
 def _continuity_bible() -> VisualBibleVersionContract:
@@ -349,21 +353,24 @@ def test_continuity_keeps_stable_visual_bible_ids():
     assert arin.source is SpecSource.VISUAL_BIBLE
     assert arin.text == "Arin, a tall swordsman in a grey cloak"
     assert arin.visual_bible_refs[0].stable_id == "arin"
-    assert arin.visual_bible_refs[0].revision_hash == compiled.spec.visual_bible_revision_hash
+    assert (
+        arin.visual_bible_refs[0].revision_hash
+        == compiled.spec.visual_bible_revision_hash
+    )
     # VB-sourced clauses cite the immutable Visual Bible revision; the spec's
     # own evidence lineage is carried by evidence-sourced clauses instead.
     assert arin.evidence_refs == []
 
     # Place matched to the Visual Bible PLACE entity keeps its stable id.
-    settings = {d.detail_key: d for d in spec.details if d.kind is SpecDetailKind.SETTING}
+    settings = {
+        d.detail_key: d for d in spec.details if d.kind is SpecDetailKind.SETTING
+    }
     place_detail = settings["setting:place:courtyard"]
     assert place_detail.source is SpecSource.VISUAL_BIBLE
     assert place_detail.visual_bible_refs[0].stable_id == "courtyard"
 
     # Continuity clause lists every matched entity and carries every ref.
-    continuity = next(
-        d for d in spec.details if d.kind is SpecDetailKind.CONTINUITY
-    )
+    continuity = next(d for d in spec.details if d.kind is SpecDetailKind.CONTINUITY)
     assert "arin" in continuity.text
     assert "mara" in continuity.text
     assert "courtyard" in continuity.text
@@ -374,15 +381,15 @@ def test_continuity_keeps_stable_visual_bible_ids():
 def test_action_and_time_are_evidence_bounded():
     compiled = compile_scene_spec(_compile_input())
     spec = compiled.spec
-    action = next(
-        d for d in spec.details if d.kind is SpecDetailKind.ACTION
-    )
+    action = next(d for d in spec.details if d.kind is SpecDetailKind.ACTION)
     assert action.source is SpecSource.EVIDENCE
     assert action.evidence_refs, "action clause must be evidence-linked"
     assert action.text.startswith("Arin drew his sword")
 
     time_detail = next(
-        d for d in spec.details if d.kind is SpecDetailKind.SETTING and "time" in d.detail_key
+        d
+        for d in spec.details
+        if d.kind is SpecDetailKind.SETTING and "time" in d.detail_key
     )
     assert time_detail.source is SpecSource.EVIDENCE
     assert time_detail.evidence_refs
@@ -391,9 +398,7 @@ def test_action_and_time_are_evidence_bounded():
 def test_style_profile_renders_deterministically():
     compiled = compile_scene_spec(_compile_input())
     spec = compiled.spec
-    style = next(
-        d for d in spec.details if d.kind is SpecDetailKind.STYLE
-    )
+    style = next(d for d in spec.details if d.kind is SpecDetailKind.STYLE)
     assert style.source is SpecSource.VISUAL_BIBLE
     assert "lighting: overcast daylight" in style.text
     assert "palette: muted cold tones" in style.text
@@ -427,9 +432,7 @@ def test_negative_constraints_preserved_and_never_in_positive_sections():
     for clause in spec_negative_constraint_texts(spec):
         assert clause in sections["negative_constraints"]
     for detail in spec.details:
-        assert not any(
-            c.text in detail.text for c in spec.negative_constraints
-        )
+        assert not any(c.text in detail.text for c in spec.negative_constraints)
 
 
 def test_unsupported_constraint_shape_fails_closed():
@@ -495,9 +498,7 @@ def test_conflicting_canon_claims_withhold_the_detail():
     vb = _build_visual_bible(entities=entities, claims=claims)
     compiled = compile_scene_spec(_compile_input(visual_bible=vb))
     spec = compiled.spec
-    subjects = [
-        d for d in spec.details if d.kind is SpecDetailKind.SUBJECT
-    ]
+    subjects = [d for d in spec.details if d.kind is SpecDetailKind.SUBJECT]
     assert not subjects, "conflicting claim must not be emitted as canon"
     assert any(
         u.reason is UncertaintyReason.CONFLICTING_CLAIM
@@ -517,9 +518,7 @@ def test_future_spoiler_entity_is_withheld():
     ]
     vb = _build_visual_bible(entities=entities, claims=[])
     candidate = _candidate(cast=("zephyr",))
-    compiled = compile_scene_spec(
-        _compile_input(candidate=candidate, visual_bible=vb)
-    )
+    compiled = compile_scene_spec(_compile_input(candidate=candidate, visual_bible=vb))
     spec = compiled.spec
     assert all(d.kind is not SpecDetailKind.SUBJECT for d in spec.details)
     assert any(
@@ -551,9 +550,7 @@ def test_interpretation_entity_needs_author_and_rationale():
     vb = _build_visual_bible(entities=entities, claims=claims)
     compiled = compile_scene_spec(_compile_input(visual_bible=vb))
     spec = compiled.spec
-    mara = next(
-        d for d in spec.details if d.detail_key == "subject:mara"
-    )
+    mara = next(d for d in spec.details if d.detail_key == "subject:mara")
     assert mara.source is SpecSource.USER_INTERPRETATION
     assert mara.author == "author-1"
     assert mara.rationale == "user visual preference"
@@ -607,9 +604,7 @@ def test_candidate_evidence_beyond_cutoff_fails_closed():
     # cutoff; the compile-level gate must fail closed.
     candidate = _candidate(chapter_number=CUTOFF + 1, cutoff=CUTOFF + 1)
     with pytest.raises(SceneSpecCompileError):
-        compile_scene_spec(
-            _compile_input(candidate=candidate)
-        )
+        compile_scene_spec(_compile_input(candidate=candidate))
 
 
 def test_candidate_chapter_beyond_cutoff_fails_closed():

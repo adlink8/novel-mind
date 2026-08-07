@@ -311,7 +311,9 @@ async def request_approve_export(
         preparation_hash=computed,
     )
     if existing is not None:
-        return _approve_view_for_tool(artifact, existing, preparation_hash, replayed=True)
+        return _approve_view_for_tool(
+            artifact, existing, preparation_hash, replayed=True
+        )
 
     approval = ApprovalRequest(
         owner_id=owner_id,

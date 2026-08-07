@@ -80,9 +80,7 @@ class AssetStorage:
             )
         actual_hash = hashlib.sha256(payload).hexdigest()
         if actual_hash != bytes_hash:
-            raise AssetStorageError(
-                "asset bytes_hash does not replay from the payload"
-            )
+            raise AssetStorageError("asset bytes_hash does not replay from the payload")
 
         storage_key = (
             f"{ASSET_SCOPE_PREFIX}/{owner_id}/{novel_id}/"
@@ -174,15 +172,13 @@ class AssetStorage:
         self._require_scope(owner_id, novel_id)
         if not isinstance(storage_key, str) or not storage_key:
             raise AssetStorageError("storage_key must be a non-empty string")
-        expected_prefix = (
-            f"{ASSET_SCOPE_PREFIX}/{owner_id}/{novel_id}/"
-        )
+        expected_prefix = f"{ASSET_SCOPE_PREFIX}/{owner_id}/{novel_id}/"
         if not storage_key.startswith(expected_prefix):
-            raise AssetStorageError(
-                "storage_key is outside the owner/novel scope"
-            )
+            raise AssetStorageError("storage_key is outside the owner/novel scope")
         candidate = (self.root / storage_key).resolve()
-        scope_root = (self.root / ASSET_SCOPE_PREFIX / str(owner_id) / str(novel_id)).resolve()
+        scope_root = (
+            self.root / ASSET_SCOPE_PREFIX / str(owner_id) / str(novel_id)
+        ).resolve()
         try:
             candidate.relative_to(scope_root)
         except ValueError:

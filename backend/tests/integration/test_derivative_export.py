@@ -56,7 +56,10 @@ from app.models.derivative_visual import (
 from app.models.novel import Novel
 from app.models.user import User
 from app.models.visual_bible import VisualBibleVersion
-from app.services.derivative_editor.chapters import canonicalize_markdown, markdown_checksum
+from app.services.derivative_editor.chapters import (
+    canonicalize_markdown,
+    markdown_checksum,
+)
 from app.services.derivative_export.audit import audit_report_hash
 from app.services.derivative_export.manifest import (
     derivative_export_manifest_hash,
@@ -71,18 +74,12 @@ from tests.integration.conftest import reset_public_schema, run_alembic
 
 pytestmark = pytest.mark.integration
 
-PREPARE_BASE = (
-    "/api/novels/{novel_id}/derivative-projects/{project_id}/export/prepare"
-)
+PREPARE_BASE = "/api/novels/{novel_id}/derivative-projects/{project_id}/export/prepare"
 DOWNLOAD_BASE = (
     "/api/novels/{novel_id}/derivative-projects/{project_id}/export/download"
 )
-PACKAGE_BASE = (
-    "/api/novels/{novel_id}/derivative-projects/{project_id}/export/package"
-)
-AUDIT_BASE = (
-    "/api/novels/{novel_id}/derivative-projects/{project_id}/export/audit"
-)
+PACKAGE_BASE = "/api/novels/{novel_id}/derivative-projects/{project_id}/export/package"
+AUDIT_BASE = "/api/novels/{novel_id}/derivative-projects/{project_id}/export/audit"
 
 TINY_PNG = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
@@ -553,11 +550,17 @@ async def test_snapshot_freeze_is_reproducible(
     factory, sync_url, _ = api_client
     ids = _seed_chain(sync_url, asset_storage, suffix=f"rx_{uuid.uuid4().hex[:6]}")
     first = await _freeze(
-        factory, asset_storage, owner_id=ids["owner_id"], novel_id=ids["novel_id"],
+        factory,
+        asset_storage,
+        owner_id=ids["owner_id"],
+        novel_id=ids["novel_id"],
         project_id=ids["project_id"],
     )
     second = await _freeze(
-        factory, asset_storage, owner_id=ids["owner_id"], novel_id=ids["novel_id"],
+        factory,
+        asset_storage,
+        owner_id=ids["owner_id"],
+        novel_id=ids["novel_id"],
         project_id=ids["project_id"],
     )
     snap = first.snapshot
@@ -598,7 +601,6 @@ async def test_prepare_and_download_round_trip(
 ):
     from httpx import ASGITransport, AsyncClient
 
-    from app.api.dependencies import require_owned_novel
     from app.core.database import get_db
     from app.main import app
 
@@ -629,9 +631,10 @@ async def test_prepare_and_download_round_trip(
             assert body["asset_count"] == 1
             assert body["missing_asset_count"] == 0
             assert body["manifest"]["text_version_hash"]
-            assert derivative_export_manifest_hash(
-                body["manifest"]
-            ) == body["manifest_hash"]
+            assert (
+                derivative_export_manifest_hash(body["manifest"])
+                == body["manifest_hash"]
+            )
 
             md_1 = await client.get(
                 DOWNLOAD_BASE.format(novel_id=novel_id, project_id=project_id),
@@ -680,9 +683,7 @@ async def test_prepare_and_download_round_trip(
                 assert '<itemref idref="chapter-1"/>' in opf
                 embedded = archive.read("OEBPS/export-manifest.json").decode("utf-8")
                 assert body["manifest_hash"] in embedded
-                image = archive.read(
-                    f"OEBPS/assets/{TINY_PNG_HASH}.png"
-                )
+                image = archive.read(f"OEBPS/assets/{TINY_PNG_HASH}.png")
                 assert hashlib.sha256(image).hexdigest() == TINY_PNG_HASH
     finally:
         app.dependency_overrides.clear()
@@ -709,7 +710,10 @@ async def test_missing_binary_is_explicit(
         mime_type="image/png",
     )
     frozen = await _freeze(
-        factory, asset_storage, owner_id=ids["owner_id"], novel_id=ids["novel_id"],
+        factory,
+        asset_storage,
+        owner_id=ids["owner_id"],
+        novel_id=ids["novel_id"],
         project_id=ids["project_id"],
     )
     assert len(frozen.snapshot.missing_assets) == 1
@@ -776,16 +780,18 @@ async def test_stale_revision_blocks_export(
     async with factory() as session:
         await session.execute(
             text(
-                "UPDATE derivative_chapters SET revision = revision + 1 "
-                "WHERE id = :cid"
+                "UPDATE derivative_chapters SET revision = revision + 1 WHERE id = :cid"
             ),
             {"cid": ids["chapter_ids"][0]},
         )
         await session.commit()
     with pytest.raises(ExportSnapshotError) as exc:
         await _freeze(
-            factory, asset_storage, owner_id=ids["owner_id"],
-            novel_id=ids["novel_id"], project_id=ids["project_id"],
+            factory,
+            asset_storage,
+            owner_id=ids["owner_id"],
+            novel_id=ids["novel_id"],
+            project_id=ids["project_id"],
         )
     assert exc.value.code == "revision_version_stale"
 
@@ -844,11 +850,16 @@ async def test_rejected_asset_never_exports(
 ):
     factory, sync_url, _ = api_client
     ids = _seed_chain(
-        sync_url, asset_storage, suffix=f"rej_{uuid.uuid4().hex[:6]}",
+        sync_url,
+        asset_storage,
+        suffix=f"rej_{uuid.uuid4().hex[:6]}",
         asset_review_state="rejected",
     )
     frozen = await _freeze(
-        factory, asset_storage, owner_id=ids["owner_id"], novel_id=ids["novel_id"],
+        factory,
+        asset_storage,
+        owner_id=ids["owner_id"],
+        novel_id=ids["novel_id"],
         project_id=ids["project_id"],
     )
     # The rejected candidate is simply absent — never a silent provenance drop
@@ -885,7 +896,10 @@ async def test_export_never_mutates_original_space(
             or 0
         )
     await _freeze(
-        factory, asset_storage, owner_id=ids["owner_id"], novel_id=ids["novel_id"],
+        factory,
+        asset_storage,
+        owner_id=ids["owner_id"],
+        novel_id=ids["novel_id"],
         project_id=ids["project_id"],
     )
     async with factory() as session:

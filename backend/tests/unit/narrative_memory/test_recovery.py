@@ -140,7 +140,9 @@ def test_terminal_state_mapping() -> None:
     assert terminal_state_for_status("failed") == TerminalState.ISOLATED.value
     assert terminal_state_for_status("paused_budget") == TerminalState.ISOLATED.value
     assert terminal_state_for_status("cancelled") == TerminalState.ISOLATED.value
-    assert terminal_state_for_status("blocked_dependency") == TerminalState.BLOCKED.value
+    assert (
+        terminal_state_for_status("blocked_dependency") == TerminalState.BLOCKED.value
+    )
     assert terminal_state_for_status("pending") is None
     assert terminal_state_for_status("running") is None
 

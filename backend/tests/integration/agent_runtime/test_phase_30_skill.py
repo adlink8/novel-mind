@@ -32,7 +32,6 @@ from __future__ import annotations
 import hashlib
 import uuid
 from copy import deepcopy
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -60,13 +59,11 @@ from app.schemas.agent_runtime import SkillVersionRegister
 from app.schemas.visual_bible import (
     VisualBibleVersionContract,
     VisualClaimContract,
-    VisualReviewState,
     claim_content_hash,
     recompute_manifest_hash,
 )
 from app.services.agent_runtime.finalize import (
     ERROR_CODE_FAILED_VALIDATION,
-    ERROR_CODE_INVALID_STOP_REASON,
     ERROR_CODE_UPSTREAM_ERROR,
     finalize_skill_run,
 )
@@ -128,7 +125,11 @@ def _skill_contract(
         "allowed_tools": list(tools),
         "read_permissions": ["canon", "visual_bible", "reference_assets"],
         "write_permissions": [],
-        "forbidden_spaces": ["canon:original", "visual_bible:write", "derivative:write"],
+        "forbidden_spaces": [
+            "canon:original",
+            "visual_bible:write",
+            "derivative:write",
+        ],
         "budget": {
             "max_calls": 60,
             "max_input_tokens": 60_000,
@@ -650,7 +651,11 @@ async def _set_up(
         ),
     )
     snapshot_hash = _snapshot_hash(seed)
-    assets = None if asset_rights is None else [_asset_payload(asset_key="ref-cover", rights_status=asset_rights)]
+    assets = (
+        None
+        if asset_rights is None
+        else [_asset_payload(asset_key="ref-cover", rights_status=asset_rights)]
+    )
     version = _build_version_contract(
         seed=seed, snapshot_hash=snapshot_hash, assets=assets
     )
@@ -658,7 +663,10 @@ async def _set_up(
         "novel_id": seed["novel_id"],
         "branch": None,
         "cutoff": CUTOFF,
-        "source_snapshot": {"snapshot_hash": snapshot_hash, "dataset_lineage": "novel-source.v1"},
+        "source_snapshot": {
+            "snapshot_hash": snapshot_hash,
+            "dataset_lineage": "novel-source.v1",
+        },
         "reference_assets": assets or [],
     }
     input_hash = canonical_input_hash(run_input)
@@ -760,9 +768,7 @@ async def test_phase30_happy_path_visual_bible_artifact_and_approval(
     （证据物化）→ `visual_bible:approve` 批准 → review_state=approved；
     Chapter / cover_url 零变更。"""
     client, factory, sync_url = api_client
-    ctx = await _set_up(
-        runtime_factory, sync_url, suffix=f"ok_{uuid.uuid4().hex[:6]}"
-    )
+    ctx = await _set_up(runtime_factory, sync_url, suffix=f"ok_{uuid.uuid4().hex[:6]}")
     svid, run_id = ctx["skill_version_id"], ctx["run_id"]
     evidence_key = _evidence_key_of(ctx)
 
@@ -838,9 +844,10 @@ async def test_phase30_happy_path_visual_bible_artifact_and_approval(
 
     content = revision.content
     # 服务器重放：剥离 trail 后重算 repaired_hash 必须一致。
-    assert canonical_content_hash(_strip_trail(content)) == content["normalization"][
-        "repaired_hash"
-    ]
+    assert (
+        canonical_content_hash(_strip_trail(content))
+        == content["normalization"]["repaired_hash"]
+    )
     # 血缘绑定。
     assert content["owner_id"] == ctx["owner_id"]
     assert content["novel_id"] == ctx["novel_id"]
@@ -906,9 +913,9 @@ async def test_phase30_happy_path_visual_bible_artifact_and_approval(
     async with runtime_factory() as session:
         novel_row = await session.get(Novel, ctx["novel_id"])
         chapter_row = await session.scalar(
-            select(Chapter).options(undefer(Chapter.content)).where(
-                Chapter.id == ctx["chapter1_id"]
-            )
+            select(Chapter)
+            .options(undefer(Chapter.content))
+            .where(Chapter.id == ctx["chapter1_id"])
         )
         version_row = await session.get(VisualBibleVersion, version_id)
     assert novel_row is not None and novel_row.cover_url is None
@@ -978,9 +985,9 @@ async def test_phase30_approval_requires_rights_cleared(
     async with runtime_factory() as session:
         version_row = await session.get(VisualBibleVersion, version_id)
         chapter_row = await session.scalar(
-            select(Chapter).options(undefer(Chapter.content)).where(
-                Chapter.id == ctx["chapter1_id"]
-            )
+            select(Chapter)
+            .options(undefer(Chapter.content))
+            .where(Chapter.id == ctx["chapter1_id"])
         )
     assert version_row is not None and version_row.review_state == "candidate"
     assert chapter_row is not None and chapter_row.content == CHAPTER_CONTENT
@@ -1305,8 +1312,7 @@ async def test_phase30_approval_bypass_review_state_blocks(
     )
     assert outcome.status == "failed"
     assert (
-        outcome.status_reason is not None
-        and "approval bypass" in outcome.status_reason
+        outcome.status_reason is not None and "approval bypass" in outcome.status_reason
     )
     await _assert_zero_writes(runtime_factory, run_id=ctx["run_id"])
 
@@ -1329,7 +1335,9 @@ async def test_phase30_unknown_evidence_ref_blocks(
         tool_runs=[{"tool_name": "get_evidence_span", "calls": 1}],
     )
     # 白名单只含真实 claim 证据；信封额外声明一个不在 manifest 的未知 ref。
-    unknown = "qp:1:0:10:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    unknown = (
+        "qp:1:0:10:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    )
     envelope["evidence_refs"] = [evidence_key, unknown]
     envelope["normalization"]["repaired_hash"] = canonical_content_hash(
         _strip_trail(envelope)
@@ -1381,10 +1389,7 @@ async def test_phase30_claim_evidence_not_in_envelope_blocks(
         frozen_manifest={"evidence_refs": [evidence_key, "0" * 64]},
     )
     assert outcome.status == "failed"
-    assert (
-        outcome.status_reason is not None
-        and "evidence" in outcome.status_reason
-    )
+    assert outcome.status_reason is not None and "evidence" in outcome.status_reason
     await _assert_zero_writes(runtime_factory, run_id=ctx["run_id"])
 
 
@@ -1416,9 +1421,9 @@ async def test_phase30_stale_snapshot_publisher_blocked(
             .where(VisualBibleVersion.novel_id == seed["novel_id"])
         )
         chapter_row = await session.scalar(
-            select(Chapter).options(undefer(Chapter.content)).where(
-                Chapter.id == seed["chapter1_id"]
-            )
+            select(Chapter)
+            .options(undefer(Chapter.content))
+            .where(Chapter.id == seed["chapter1_id"])
         )
     assert int(version_count or 0) == 0  # 零域写入
     assert chapter_row is not None and chapter_row.content == CHAPTER_CONTENT

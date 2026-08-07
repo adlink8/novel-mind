@@ -116,10 +116,13 @@ def _asset_figure(
     payload = asset_reader(asset)
     # Defense in depth (T-39-01-02): never embed bytes that do not replay the
     # frozen content hash — a drift degrades to the explicit placeholder.
-    if payload is not None and hashlib.sha256(payload).hexdigest() == asset.content_hash:
+    if (
+        payload is not None
+        and hashlib.sha256(payload).hexdigest() == asset.content_hash
+    ):
         src = f"assets/{asset_filename(asset)}"
         return (
-            "<figure class=\"derivative-export-asset\">"
+            '<figure class="derivative-export-asset">'
             f'<img src="{src}" alt="{asset.asset_id}"/>'
             "<figcaption>"
             f"asset_id={asset.asset_id} chapter={asset.chapter_number} "
@@ -139,8 +142,7 @@ def _missing_figure(asset) -> str:
     hash_part = f" content_hash={content_hash}" if content_hash else ""
     return (
         "> **插图缺失**：asset_id="
-        f"{asset.asset_id}（{reason}{hash_part}）"
-        + f" {detail}"
+        f"{asset.asset_id}（{reason}{hash_part}）" + f" {detail}"
     )
 
 

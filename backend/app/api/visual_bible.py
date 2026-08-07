@@ -131,9 +131,7 @@ async def get_visual_bible_versions(
 ):
     """List every candidate revision for the owned novel (oldest first)."""
 
-    items = await list_versions(
-        db, owner_id=current_user.id, novel_id=novel.id
-    )
+    items = await list_versions(db, owner_id=current_user.id, novel_id=novel.id)
     return VisualBibleVersionListResponse(items=items, total=len(items))
 
 

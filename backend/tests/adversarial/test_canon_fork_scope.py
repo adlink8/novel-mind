@@ -52,20 +52,20 @@ BACKEND_ROOT = Path(__file__).resolve().parents[2]
 API_SOURCE = (BACKEND_ROOT / "app" / "api" / "canon_fork.py").read_text(
     encoding="utf-8"
 )
-SNAPSHOT_SOURCE = (BACKEND_ROOT / "app" / "services" / "canon_fork" / "snapshot.py").read_text(
-    encoding="utf-8"
-)
+SNAPSHOT_SOURCE = (
+    BACKEND_ROOT / "app" / "services" / "canon_fork" / "snapshot.py"
+).read_text(encoding="utf-8")
 MODEL_SOURCE = (BACKEND_ROOT / "app" / "models" / "canon_fork.py").read_text(
     encoding="utf-8"
 )
 
 CONTENTS = ("chapter 1 body", "chapter 2 body", "chapter 3 body")
-CONTENT_HASHES = {
-    i + 1: chapter_content_hash(text) for i, text in enumerate(CONTENTS)
-}
+CONTENT_HASHES = {i + 1: chapter_content_hash(text) for i, text in enumerate(CONTENTS)}
 
 
-def _manifest(*, fork_key: str = "ff-main", through_chapter: int = 3, **overrides) -> CanonForkManifest:
+def _manifest(
+    *, fork_key: str = "ff-main", through_chapter: int = 3, **overrides
+) -> CanonForkManifest:
     payload = dict(
         owner_id=1,
         novel_id=2,
@@ -323,12 +323,18 @@ def test_api_and_snapshot_sources_never_set_active_true():
                 for target in node.targets:
                     if isinstance(target, ast.Name) and target.id == "active":
                         # The only literal assignment is the immutable default False.
-                        if isinstance(node.value, ast.Constant) and node.value.value is True:
+                        if (
+                            isinstance(node.value, ast.Constant)
+                            and node.value.value is True
+                        ):
                             raise AssertionError(
                                 f"active=True must never be assigned in {source}"
                             )
                     if isinstance(target, ast.Attribute) and target.attr == "active":
-                        if isinstance(node.value, ast.Constant) and node.value.value is True:
+                        if (
+                            isinstance(node.value, ast.Constant)
+                            and node.value.value is True
+                        ):
                             raise AssertionError(
                                 f"active=True must never be assigned in {source}"
                             )
@@ -342,7 +348,6 @@ def test_orm_binds_active_to_false():
 
 
 def test_contracts_source_is_write_free():
-    tree = ast.parse(SNAPSHOT_SOURCE)
     # The service may persist candidate rows, but it must never write an active
     # pointer and never touch the Original Canon mutation path.
     assert "NarrativeActivePointer" not in SNAPSHOT_SOURCE

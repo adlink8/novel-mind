@@ -348,8 +348,7 @@ class ChapterAnalysisArtifact(BuilderFrozenModel):
         | None
     ) = None
     next_context_hint: (
-        Annotated[StrictStr, StringConstraints(max_length=NEXT_HINT_MAX_LENGTH)]
-        | None
+        Annotated[StrictStr, StringConstraints(max_length=NEXT_HINT_MAX_LENGTH)] | None
     ) = None
     next_hint_reason_code: VersionLabel | None = None
     continuity_notes: (
@@ -360,9 +359,7 @@ class ChapterAnalysisArtifact(BuilderFrozenModel):
     @model_validator(mode="after")
     def validate_hint_reason(self) -> "ChapterAnalysisArtifact":
         if self.next_context_hint is None and self.next_hint_reason_code is None:
-            raise ValueError(
-                "next_context_hint omitted without a stable reason code"
-            )
+            raise ValueError("next_context_hint omitted without a stable reason code")
         if (
             self.next_hint_reason_code is not None
             and self.next_context_hint is not None
@@ -386,9 +383,7 @@ def chapter_digest_for(value: str | dict[str, Any]) -> str:
 def chunk_digest_for(chunk_repr: str | dict[str, Any]) -> str:
     """Namespaced compressed-payload digest for one context chunk."""
     canonical = chunk_repr if isinstance(chunk_repr, str) else _stable_json(chunk_repr)
-    return sha256(
-        f"{CHUNK_DIGEST_NAMESPACE}\n{canonical}".encode("utf-8")
-    ).hexdigest()
+    return sha256(f"{CHUNK_DIGEST_NAMESPACE}\n{canonical}".encode("utf-8")).hexdigest()
 
 
 def hint_safe_at_cutoff(hint: str, *, cutoff: int) -> bool:

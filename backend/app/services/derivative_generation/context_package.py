@@ -172,7 +172,9 @@ def estimate_input_characters(payload: dict[str, Any]) -> int:
 def estimate_input_tokens(
     payload: dict[str, Any], chars_per_token: int = DEFAULT_CHARS_PER_TOKEN
 ) -> int:
-    return max(1, math.ceil(estimate_input_characters(payload) / max(chars_per_token, 1)))
+    return max(
+        1, math.ceil(estimate_input_characters(payload) / max(chars_per_token, 1))
+    )
 
 
 def budget_verdict(
@@ -267,15 +269,11 @@ def assemble_package_payload(
             "invalid_scope", "novel_id must be a positive integer"
         )
     if not isinstance(fork_id, int) or fork_id < 1:
-        raise ContextPackageError(
-            "invalid_scope", "fork_id must be a positive integer"
-        )
+        raise ContextPackageError("invalid_scope", "fork_id must be a positive integer")
     try:
         intent_value = ContextPackageIntent(intent).value
     except ValueError:
-        raise ContextPackageError(
-            "invalid_intent", f"unsupported intent: {intent!r}"
-        )
+        raise ContextPackageError("invalid_intent", f"unsupported intent: {intent!r}")
     validate_lineage(lineage)
     missing_dims = [dim for dim in REQUIRED_DIMENSIONS if dim not in dimensions]
     if missing_dims:
@@ -451,7 +449,9 @@ async def _load_timeline(
                     WorldModelCausalEdge.gate_status == WORLD_MODEL_GATE_PASSED,
                     WorldModelCausalEdge.disclosure_cutoff <= cutoff,
                 )
-                .order_by(WorldModelCausalEdge.edge_key.asc(), WorldModelCausalEdge.id.asc())
+                .order_by(
+                    WorldModelCausalEdge.edge_key.asc(), WorldModelCausalEdge.id.asc()
+                )
             )
         ).all()
     )
@@ -531,9 +531,7 @@ async def _load_unresolved_clues(
     logical clue id). A clue already paid off or dismissed is not unresolved;
     a missing clue version is ``unavailable`` — never fabricated.
     """
-    version = await _resolve_clue_version(
-        session, owner_id=owner_id, novel_id=novel_id
-    )
+    version = await _resolve_clue_version(session, owner_id=owner_id, novel_id=novel_id)
     if version is None:
         return dimension_view(status=DimensionStatus.UNAVAILABLE)
 
@@ -542,9 +540,7 @@ async def _load_unresolved_clues(
             await session.scalars(
                 select(ClueLifecycleEvent)
                 .where(ClueLifecycleEvent.version_id == version)
-                .order_by(
-                    ClueLifecycleEvent.logical_clue_id, ClueLifecycleEvent.id
-                )
+                .order_by(ClueLifecycleEvent.logical_clue_id, ClueLifecycleEvent.id)
             )
         ).all()
     )

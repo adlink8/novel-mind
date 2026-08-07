@@ -48,12 +48,19 @@ from app.services.world_model.knowledge_repository import (
 pytestmark = pytest.mark.integration
 
 FIXTURE = json.loads(
-    (Path(__file__).resolve().parents[2] / "fixtures" / "world_model" / "epistemic_v1.json")
-    .read_text(encoding="utf-8")
+    (
+        Path(__file__).resolve().parents[2]
+        / "fixtures"
+        / "world_model"
+        / "epistemic_v1.json"
+    ).read_text(encoding="utf-8")
 )
 
-MIGRATION_PATH = Path(__file__).resolve().parents[3] / "migrations" / "versions" / (
-    "20260801_2702_world_knowledge_projection.py"
+MIGRATION_PATH = (
+    Path(__file__).resolve().parents[3]
+    / "migrations"
+    / "versions"
+    / ("20260801_2702_world_knowledge_projection.py")
 )
 
 
@@ -90,7 +97,9 @@ def build_valid_projection(*, version_id: int = 1) -> KnowledgeCandidateProjecti
     )
 
 
-def build_contradiction_projection(*, version_id: int = 10) -> KnowledgeCandidateProjection:
+def build_contradiction_projection(
+    *, version_id: int = 10
+) -> KnowledgeCandidateProjection:
     """Fixture contradiction scenario: both claims preserved, never overwritten."""
     scenario = load_scenario("contradiction")
     scope = scenario["scope"]
@@ -224,11 +233,18 @@ def test_migration_upgrade_downgrade_is_reversible_and_old_rows_compat(tmp_path)
                  '2026-08-03 00:00:00')
                 """
             ),
-            {"knowledge_key": "k-old", "subject": "lin-an", "pov": "lin-an", "aspect": "knowledge"},
+            {
+                "knowledge_key": "k-old",
+                "subject": "lin-an",
+                "pov": "lin-an",
+                "aspect": "knowledge",
+            },
         )
         conn.commit()
         row = conn.execute(
-            text("SELECT knowledge_key, subject, gate_status FROM world_model_knowledge")
+            text(
+                "SELECT knowledge_key, subject, gate_status FROM world_model_knowledge"
+            )
         ).fetchone()
         assert row == ("k-old", "lin-an", "passed")
 
@@ -267,7 +283,9 @@ async def test_restart_replay_is_byte_equivalent(tmp_path):
         assert len(replayed.claims) == row_count == 8
         assert projection_checksum(replayed) == replayed.projection_hash
         # Mistaken belief and hidden knowledge survive the restart intact.
-        statuses = {claim.knowledge_key: claim.epistemic_status for claim in replayed.claims}
+        statuses = {
+            claim.knowledge_key: claim.epistemic_status for claim in replayed.claims
+        }
         assert statuses["k-belief-ally"] == EpistemicStatus.MISTAKEN_BELIEF
         assert statuses["k-hidden-inheritance"] == EpistemicStatus.HIDDEN_KNOWLEDGE
 
@@ -341,8 +359,7 @@ async def test_stale_version_append_is_rejected(tmp_path):
 def test_repository_exposes_no_update_api():
     """Immutability: no UPDATE / DELETE / promote path (D-02)."""
     members = {
-        name
-        for name, _ in inspect.getmembers(KnowledgeRepository, predicate=callable)
+        name for name, _ in inspect.getmembers(KnowledgeRepository, predicate=callable)
     }
     assert not {m for m in members if m.startswith(("update", "delete", "promote"))}
     assert "append_projection" in members
@@ -356,9 +373,7 @@ async def test_tampered_row_checksum_fails_closed(tmp_path):
         await KnowledgeRepository(session).append_projection(
             build_valid_projection(version_id=1)
         )
-        row = (
-            await session.scalars(select(WorldModelKnowledge).limit(1))
-        ).first()
+        row = (await session.scalars(select(WorldModelKnowledge).limit(1))).first()
         row.canonical_payload_hash = "0" * 64  # tamper (test-only; no update API)
         await session.flush()
         with pytest.raises(KnowledgeRepositoryError):
@@ -422,9 +437,7 @@ async def test_durable_cutoff_query_hides_future_and_hidden_knowledge(tmp_path):
         full = await queries.query_character_knowledge(
             owner_id=1, novel_id=1, version_id=1, subject="lin-an", cutoff=8
         )
-        assert "k-hidden-inheritance" in {
-            claim.knowledge_key for claim in full.claims
-        }
+        assert "k-hidden-inheritance" in {claim.knowledge_key for claim in full.claims}
 
         # Cross-owner query fails closed.
         missing = await queries.query_character_knowledge(
@@ -447,8 +460,13 @@ async def test_durable_history_keeps_mistaken_belief_and_lineage(tmp_path):
             owner_id=1, novel_id=1, version_id=1, subject="lin-an"
         )
         by_key = {claim.knowledge_key: claim for claim in history}
-        assert by_key["k-belief-ally"].epistemic_status == EpistemicStatus.MISTAKEN_BELIEF
-        assert by_key["k-hidden-inheritance"].epistemic_status == EpistemicStatus.HIDDEN_KNOWLEDGE
+        assert (
+            by_key["k-belief-ally"].epistemic_status == EpistemicStatus.MISTAKEN_BELIEF
+        )
+        assert (
+            by_key["k-hidden-inheritance"].epistemic_status
+            == EpistemicStatus.HIDDEN_KNOWLEDGE
+        )
 
         statuses = await queries.query_by_status(
             owner_id=1,
@@ -512,8 +530,7 @@ async def test_durable_pov_and_authority_filters(tmp_path):
 
 def test_query_module_exposes_read_only_api():
     members = {
-        name
-        for name, _ in inspect.getmembers(KnowledgeQueries, predicate=callable)
+        name for name, _ in inspect.getmembers(KnowledgeQueries, predicate=callable)
     }
     assert "query_character_knowledge" in members
     assert "query_character_history" in members

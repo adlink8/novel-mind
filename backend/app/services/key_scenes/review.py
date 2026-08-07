@@ -461,28 +461,32 @@ class KeySceneReviewService:
         approved = [
             c
             for c in candidates
-            if effective_states.get(c.candidate_key, KeySceneReviewState(c.review_state))
+            if effective_states.get(
+                c.candidate_key, KeySceneReviewState(c.review_state)
+            )
             is KeySceneReviewState.APPROVED
         ]
 
         approved_evidence: dict[str, CandidateApprovalGateResult] = {}
         for candidate in approved:
-            approved_evidence[candidate.candidate_key] = (
-                await self._candidate_approval_gate(
-                    owner_id=owner_id,
-                    novel_id=novel_id,
-                    set_id=set_row.id,
-                    candidate_id=candidate.id,
-                    source_snapshot_hash=set_row.source_snapshot_hash,
-                    cutoff_chapter=set_row.cutoff_chapter,
-                )
+            approved_evidence[
+                candidate.candidate_key
+            ] = await self._candidate_approval_gate(
+                owner_id=owner_id,
+                novel_id=novel_id,
+                set_id=set_row.id,
+                candidate_id=candidate.id,
+                source_snapshot_hash=set_row.source_snapshot_hash,
+                cutoff_chapter=set_row.cutoff_chapter,
             )
         gate = evaluate_freeze_gate(
             approved_count=len(approved),
             approved_evidence=approved_evidence,
         )
         if not gate.ok:
-            raise KeySceneGateError(f"freeze blocked by {gate.reason_code}: {gate.detail}")
+            raise KeySceneGateError(
+                f"freeze blocked by {gate.reason_code}: {gate.detail}"
+            )
 
         decision = SceneReviewDecisionInput(
             owner_id=owner_id,
@@ -791,7 +795,9 @@ async def build_frozen_set_view(
     approved = [
         row
         for row in candidate_rows
-        if effective_states.get(row.candidate_key, KeySceneReviewState(row.review_state))
+        if effective_states.get(
+            row.candidate_key, KeySceneReviewState(row.review_state)
+        )
         is KeySceneReviewState.APPROVED
     ]
     candidate_views = [

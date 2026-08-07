@@ -18,7 +18,6 @@ Covers the full compile/seal surface on the real CI database:
 
 from __future__ import annotations
 
-import json
 import uuid
 
 import pytest
@@ -100,7 +99,9 @@ def _seed_owner(sync_url: str, *, suffix: str, chapter_count: int = 3) -> dict:
             status="ready",
             reading_progress={},
             chapter_count=chapter_count,
-            word_count=sum(len(f"chapter {i} body") for i in range(1, chapter_count + 1)),
+            word_count=sum(
+                len(f"chapter {i} body") for i in range(1, chapter_count + 1)
+            ),
         )
         session.add(novel)
         session.flush()
@@ -127,7 +128,9 @@ def _seed_owner(sync_url: str, *, suffix: str, chapter_count: int = 3) -> dict:
 
 async def _create_fork(client, headers, novel_id, fork_key) -> dict:
     resp = await client.post(
-        FORK_BASE.format(novel_id=novel_id), json={"fork_key": fork_key}, headers=headers
+        FORK_BASE.format(novel_id=novel_id),
+        json={"fork_key": fork_key},
+        headers=headers,
     )
     assert resp.status_code == 201, resp.text
     return resp.json()["fork"]
@@ -270,7 +273,12 @@ def _seed_clues(sync_url: str, *, owner_id: int, novel_id: int) -> None:
                 )
                 """
             ),
-            {"owner_id": owner_id, "novel_id": novel_id, "version_id": version_id, "clue_id": open_clue_id},
+            {
+                "owner_id": owner_id,
+                "novel_id": novel_id,
+                "version_id": version_id,
+                "clue_id": open_clue_id,
+            },
         )
         # Paid off: candidate -> active -> reinforced -> paid_off (legal path).
         conn.execute(
@@ -288,7 +296,12 @@ def _seed_clues(sync_url: str, *, owner_id: int, novel_id: int) -> None:
                 )
                 """
             ),
-            {"owner_id": owner_id, "novel_id": novel_id, "version_id": version_id, "clue_id": payoff_clue_id},
+            {
+                "owner_id": owner_id,
+                "novel_id": novel_id,
+                "version_id": version_id,
+                "clue_id": payoff_clue_id,
+            },
         )
         conn.execute(
             text(
@@ -305,7 +318,12 @@ def _seed_clues(sync_url: str, *, owner_id: int, novel_id: int) -> None:
                 )
                 """
             ),
-            {"owner_id": owner_id, "novel_id": novel_id, "version_id": version_id, "clue_id": payoff_clue_id},
+            {
+                "owner_id": owner_id,
+                "novel_id": novel_id,
+                "version_id": version_id,
+                "clue_id": payoff_clue_id,
+            },
         )
         conn.execute(
             text(
@@ -322,7 +340,12 @@ def _seed_clues(sync_url: str, *, owner_id: int, novel_id: int) -> None:
                 )
                 """
             ),
-            {"owner_id": owner_id, "novel_id": novel_id, "version_id": version_id, "clue_id": payoff_clue_id},
+            {
+                "owner_id": owner_id,
+                "novel_id": novel_id,
+                "version_id": version_id,
+                "clue_id": payoff_clue_id,
+            },
         )
         # Active pointer -> the validated version.
         conn.execute(
@@ -332,13 +355,20 @@ def _seed_clues(sync_url: str, *, owner_id: int, novel_id: int) -> None:
                 VALUES (:owner_id, :novel_id, :version_id, 1, :h)
                 """
             ),
-            {"owner_id": owner_id, "novel_id": novel_id, "version_id": version_id, "h": HEX64},
+            {
+                "owner_id": owner_id,
+                "novel_id": novel_id,
+                "version_id": version_id,
+                "h": HEX64,
+            },
         )
         conn.commit()
     engine.dispose()
 
 
-async def _compile(client, headers, novel_id, fork_id, *, intent="continuation", **extra) -> dict:
+async def _compile(
+    client, headers, novel_id, fork_id, *, intent="continuation", **extra
+) -> dict:
     payload = {"fork_id": fork_id, "intent": intent}
     payload.update(extra)
     resp = await client.post(
@@ -387,9 +417,13 @@ async def test_compile_seals_complete_package(api_client):
     assert dims["world_state"]["status"] == "available"
     assert [e["entity_key"] for e in dims["world_state"]["items"]] == ["hero"]
     assert dims["world_rules"]["status"] == "available"
-    assert [r["rule_key"] for r in dims["world_rules"]["items"]] == ["magic-no-resurrection"]
+    assert [r["rule_key"] for r in dims["world_rules"]["items"]] == [
+        "magic-no-resurrection"
+    ]
     assert dims["timeline"]["status"] == "available"
-    assert any(e.get("event_key") == "ev-seal-breaks" for e in dims["timeline"]["items"])
+    assert any(
+        e.get("event_key") == "ev-seal-breaks" for e in dims["timeline"]["items"]
+    )
     assert any(e.get("edge_key") == "edge-seal" for e in dims["timeline"]["items"])
 
     # Only the unresolved clue is reported; the paid-off clue is not.
@@ -439,7 +473,9 @@ async def test_list_and_detail_read_back_sealed_package(api_client):
     listing = await client.get(base, headers=headers)
     assert listing.json()["total"] == 1
     assert listing.json()["items"][0]["id"] == pid
-    assert listing.json()["items"][0]["package_hash"] == created["package"]["package_hash"]
+    assert (
+        listing.json()["items"][0]["package_hash"] == created["package"]["package_hash"]
+    )
 
     detail = await client.get(f"{base}/{pid}", headers=headers)
     assert detail.status_code == 200
@@ -460,9 +496,7 @@ async def test_requested_cutoff_can_shrink_scope(api_client):
     novel_id = ids["novel_id"]
     fork = await _create_fork(client, headers, novel_id, "ff-cut")
 
-    body = await _compile(
-        client, headers, novel_id, fork["id"], through_chapter=2
-    )
+    body = await _compile(client, headers, novel_id, fork["id"], through_chapter=2)
     pkg = body["package"]
     assert pkg["through_chapter"] == 2
     assert pkg["scope_hash"] != fork["scope_hash"]
@@ -611,7 +645,9 @@ async def test_compile_writes_nothing_to_original_canon(api_client):
 # ---------------------------------------------------------------------------
 
 
-async def test_package_row_is_immutable_at_database_level(api_client, migrated_postgres):
+async def test_package_row_is_immutable_at_database_level(
+    api_client, migrated_postgres
+):
     client, _, sync_url = api_client
     ids = _seed_owner(sync_url, suffix=f"imm_{uuid.uuid4().hex[:8]}")
     headers = {"Authorization": f"Bearer {ids['token']}"}

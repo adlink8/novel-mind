@@ -84,8 +84,12 @@ from app.services.world_model.knowledge import (
 pytestmark = [pytest.mark.unit]
 
 FIXTURE = json.loads(
-    (Path(__file__).resolve().parents[1] / "fixtures" / "world_model" / "events_v1.json")
-    .read_text(encoding="utf-8")
+    (
+        Path(__file__).resolve().parents[1]
+        / "fixtures"
+        / "world_model"
+        / "events_v1.json"
+    ).read_text(encoding="utf-8")
 )
 
 
@@ -211,7 +215,9 @@ def test_temporal_conflict_cannot_be_silently_resolved():
 
 def test_wrong_owner_claim_is_rejected_and_not_relabeled():
     gate = make_gate("wrong_owner")
-    result = gate.validate_event(EventClaim.model_validate(scenario("wrong_owner")["events"][0]))
+    result = gate.validate_event(
+        EventClaim.model_validate(scenario("wrong_owner")["events"][0])
+    )
     assert result.fact is None
     assert {v.reason_code for v in result.verdicts} == {GateReason.WRONG_OWNER}
 
@@ -376,9 +382,7 @@ async def test_durable_row_rejects_silent_authority_upgrade(tmp_path):
         # Tampering the stored payload's authority breaks the sealed checksum.
         row = (
             await session.scalars(
-                select(WorldModelEvent).where(
-                    WorldModelEvent.event_key == "e-arrival"
-                )
+                select(WorldModelEvent).where(WorldModelEvent.event_key == "e-arrival")
             )
         ).first()
         payload = dict(row.canonical_payload)
@@ -432,7 +436,9 @@ def test_repository_has_no_promotion_and_queries_are_read_only():
             WorldModelEventQueries, predicate=callable
         )
     }
-    assert not {m for m in repo_members if m.startswith(("promote", "update", "delete"))}
+    assert not {
+        m for m in repo_members if m.startswith(("promote", "update", "delete"))
+    }
     assert not {m for m in query_members if m.startswith(("append", "write", "update"))}
     assert "append_projection" in repo_members
     assert "query_cutoff_projection" in query_members
@@ -586,9 +592,8 @@ def test_rule_exception_is_never_dropped_by_normalization():
         rules=list(projection.rules),
         exceptions=(),
     )
-    assert (
-        entity_projection_checksum(without_exception)
-        != entity_projection_checksum(projection)
+    assert entity_projection_checksum(without_exception) != entity_projection_checksum(
+        projection
     )
 
 

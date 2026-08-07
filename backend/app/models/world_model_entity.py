@@ -41,16 +41,11 @@ from app.models.base import Base, JSONB, TimestampMixin
 
 ENTITY_TYPE_VALUES = "'entity','faction','place','item'"
 LINK_KIND_VALUES = (
-    "'member_of','allegiance','controls',"
-    "'owns','located_in','carried_by'"
+    "'member_of','allegiance','controls','owns','located_in','carried_by'"
 )
-SOURCE_KIND_VALUES = (
-    "'canon_source','reader_chat',"
-    "'user_conversation','human_override'"
-)
+SOURCE_KIND_VALUES = "'canon_source','reader_chat','user_conversation','human_override'"
 AUTHORITY_VALUES = (
-    "'canon_fact','probable_inference',"
-    "'literary_interpretation','user_interpretation'"
+    "'canon_fact','probable_inference','literary_interpretation','user_interpretation'"
 )
 GATE_STATUS_VALUES = "'pending','passed','rejected'"
 ALIAS_REVIEW_STATUS_VALUES = "'review','resolved','rejected'"
@@ -59,9 +54,7 @@ ALIAS_REVIEW_STATUS_VALUES = "'review','resolved','rejected'"
 class WorldModelEntity(TimestampMixin, Base):
     __tablename__ = "world_model_entities"
     __table_args__ = (
-        UniqueConstraint(
-            "idempotency_key", name="uq_world_model_entities_idempotency"
-        ),
+        UniqueConstraint("idempotency_key", name="uq_world_model_entities_idempotency"),
         Index(
             "idx_world_model_entities_scope",
             "owner_id",
@@ -118,9 +111,7 @@ class WorldModelEntity(TimestampMixin, Base):
         Integer, ForeignKey("novels.id", ondelete="CASCADE"), nullable=False
     )
     version_id: Mapped[int] = mapped_column(Integer, nullable=False)
-    canonical_payload: Mapped[dict] = mapped_column(
-        JSONB, nullable=False, default=dict
-    )
+    canonical_payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     canonical_payload_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     idempotency_key: Mapped[str] = mapped_column(String(64), nullable=False)
     projection_hash: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -130,9 +121,7 @@ class WorldModelEntity(TimestampMixin, Base):
 class WorldModelRule(TimestampMixin, Base):
     __tablename__ = "world_model_rules"
     __table_args__ = (
-        UniqueConstraint(
-            "idempotency_key", name="uq_world_model_rules_idempotency"
-        ),
+        UniqueConstraint("idempotency_key", name="uq_world_model_rules_idempotency"),
         Index(
             "idx_world_model_rules_scope",
             "owner_id",
@@ -177,9 +166,7 @@ class WorldModelRule(TimestampMixin, Base):
         Integer, ForeignKey("novels.id", ondelete="CASCADE"), nullable=False
     )
     version_id: Mapped[int] = mapped_column(Integer, nullable=False)
-    canonical_payload: Mapped[dict] = mapped_column(
-        JSONB, nullable=False, default=dict
-    )
+    canonical_payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     canonical_payload_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     idempotency_key: Mapped[str] = mapped_column(String(64), nullable=False)
     projection_hash: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -245,9 +232,7 @@ class WorldModelRuleException(TimestampMixin, Base):
         Integer, ForeignKey("novels.id", ondelete="CASCADE"), nullable=False
     )
     version_id: Mapped[int] = mapped_column(Integer, nullable=False)
-    canonical_payload: Mapped[dict] = mapped_column(
-        JSONB, nullable=False, default=dict
-    )
+    canonical_payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     canonical_payload_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     idempotency_key: Mapped[str] = mapped_column(String(64), nullable=False)
     projection_hash: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -259,9 +244,7 @@ class WorldModelEntityLink(TimestampMixin, Base):
 
     __tablename__ = "world_model_entity_links"
     __table_args__ = (
-        UniqueConstraint(
-            "idempotency_key", name="uq_world_model_links_idempotency"
-        ),
+        UniqueConstraint("idempotency_key", name="uq_world_model_links_idempotency"),
         Index(
             "idx_world_model_links_scope",
             "owner_id",
@@ -318,9 +301,7 @@ class WorldModelEntityLink(TimestampMixin, Base):
         Integer, ForeignKey("novels.id", ondelete="CASCADE"), nullable=False
     )
     version_id: Mapped[int] = mapped_column(Integer, nullable=False)
-    canonical_payload: Mapped[dict] = mapped_column(
-        JSONB, nullable=False, default=dict
-    )
+    canonical_payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     canonical_payload_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     idempotency_key: Mapped[str] = mapped_column(String(64), nullable=False)
     projection_hash: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -376,9 +357,7 @@ class WorldModelAliasReview(TimestampMixin, Base):
         Integer, ForeignKey("novels.id", ondelete="CASCADE"), nullable=False
     )
     version_id: Mapped[int] = mapped_column(Integer, nullable=False)
-    canonical_payload: Mapped[dict] = mapped_column(
-        JSONB, nullable=False, default=dict
-    )
+    canonical_payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     canonical_payload_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     idempotency_key: Mapped[str] = mapped_column(String(64), nullable=False)
     projection_hash: Mapped[str] = mapped_column(String(64), nullable=False)

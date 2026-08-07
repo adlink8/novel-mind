@@ -38,7 +38,6 @@ from app.services.queryplan.schemas import (
     QueryPlanIntent,
     QueryPlanRequest,
     QueryPlanTrace,
-    QUERYPLAN_DATASET_VERSION,
     QUERYPLAN_PARSER_VERSION,
     QUERYPLAN_SCHEMA_VERSION,
     SpoilerCutoff,
@@ -145,7 +144,9 @@ def _referenced_chapters(text: str) -> set[int]:
     return refs
 
 
-def _blocked(code: BlockedReasonCode, message: str, clarification: str) -> BlockedResult:
+def _blocked(
+    code: BlockedReasonCode, message: str, clarification: str
+) -> BlockedResult:
     return BlockedResult(reason_code=code, message=message, clarification=clarification)
 
 
@@ -199,7 +200,9 @@ def _check_future_probing(request: QueryPlanRequest) -> BlockedResult | None:
         # Whole-book scope legitimately covers every chapter.
         return None
     cutoff = request.reading_progress.through_chapter
-    future = sorted(c for c in _referenced_chapters(request.question_text) if c > cutoff)
+    future = sorted(
+        c for c in _referenced_chapters(request.question_text) if c > cutoff
+    )
     if future:
         return _blocked(
             BlockedReasonCode.FUTURE_PROBING,
@@ -212,10 +215,7 @@ def _check_future_probing(request: QueryPlanRequest) -> BlockedResult | None:
             f"selection chapter {request.selection.chapter_id} exceeds cutoff {cutoff}",
             "选中的章节超出当前阅读进度。",
         )
-    if (
-        request.chapter_range is not None
-        and request.chapter_range.chapter_end > cutoff
-    ):
+    if request.chapter_range is not None and request.chapter_range.chapter_end > cutoff:
         return _blocked(
             BlockedReasonCode.SCOPE_ESCAPE,
             f"chapter_range end {request.chapter_range.chapter_end} exceeds cutoff {cutoff}",
@@ -326,9 +326,7 @@ def _build_plan(
     anchor: Anchor | None = (
         request.selection if request.selection is not None else request.chapter_range
     )
-    dummy_trace = _new_trace(
-        request, payload_hash="0" * 64, avail_checksum="0" * 64
-    )
+    dummy_trace = _new_trace(request, payload_hash="0" * 64, avail_checksum="0" * 64)
     base = QueryPlan(
         intent=request.intent,
         owner_id=request.owner_id,
@@ -345,7 +343,9 @@ def _build_plan(
     )
     payload_hash = plan_payload_hash(base.model_dump(mode="json", exclude={"trace"}))
     avail_checksum = availability_checksum(base.availability)
-    trace = _new_trace(request, payload_hash=payload_hash, avail_checksum=avail_checksum)
+    trace = _new_trace(
+        request, payload_hash=payload_hash, avail_checksum=avail_checksum
+    )
     return base.model_copy(update={"trace": trace})
 
 

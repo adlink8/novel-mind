@@ -110,7 +110,10 @@ class HierarchyCandidate(BuilderFrozenModel):
             raise ValueError("hierarchy must stay candidate-only")
         if self.outline.source_snapshot_hash != self.source_snapshot_hash:
             raise ValueError("hierarchy snapshot must match the outline")
-        if self.outline.chapter_min != self.chapter_min or self.outline.chapter_max != self.chapter_max:
+        if (
+            self.outline.chapter_min != self.chapter_min
+            or self.outline.chapter_max != self.chapter_max
+        ):
             raise ValueError("hierarchy range must match the outline")
         if self.mainline.source_snapshot_hash != self.source_snapshot_hash:
             raise ValueError("hierarchy snapshot must match the mainline")
@@ -242,9 +245,7 @@ def lineage_for_chapter(
             },
         )
     chain: list[dict[str, Any]] = []
-    arc = next(
-        arc for arc in candidate.outline.arcs if arc.stage_key == arc_key
-    )
+    arc = next(arc for arc in candidate.outline.arcs if arc.stage_key == arc_key)
     chain.append(
         {
             "chapter_number": number,
@@ -323,9 +324,7 @@ def coverage_analysis(candidate: HierarchyCandidate) -> dict[str, Any]:
     return {
         "chapter_min": candidate.chapter_min,
         "chapter_max": candidate.chapter_max,
-        "covered_ranges": [
-            list(range_) for range_ in candidate.outline.covered_ranges
-        ],
+        "covered_ranges": [list(range_) for range_ in candidate.outline.covered_ranges],
         "gaps": [
             {
                 "chapter_start": gap.chapter_start,

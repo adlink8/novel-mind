@@ -248,9 +248,7 @@ class FanfictionLeafProvider:
         )
         if fork is None:
             return None
-        lineage = {
-            leaf.get("leaf_key"): leaf for leaf in (fork.citation_lineage or [])
-        }
+        lineage = {leaf.get("leaf_key"): leaf for leaf in (fork.citation_lineage or [])}
         leaf = lineage.get(ref.leaf_key)
         if leaf is None:
             return None
@@ -286,7 +284,9 @@ def leaf_provider_for(cited_space: CanonSpace) -> CitationLeafProvider:
         return InterpretationLeafProvider()
     if cited_space is CanonSpace.FANFICTION_CANON:
         return FanfictionLeafProvider()
-    raise CanonForkContractError("unknown_space", f"unsupported knowledge space: {cited_space}")
+    raise CanonForkContractError(
+        "unknown_space", f"unsupported knowledge space: {cited_space}"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -324,46 +324,67 @@ def revalidation_gate(
     owner -> novel -> fork/version -> cutoff -> snapshot replay.
     """
     if resolved.owner_id != scope.owner_id:
-        return False, CitationBlockedReason.OWNER_SCOPE, (
-            "cited leaf owner is outside the frozen scope"
+        return (
+            False,
+            CitationBlockedReason.OWNER_SCOPE,
+            ("cited leaf owner is outside the frozen scope"),
         )
     if resolved.novel_id != scope.novel_id:
-        return False, CitationBlockedReason.NOVEL_SCOPE, (
-            "cited leaf novel is outside the frozen scope"
+        return (
+            False,
+            CitationBlockedReason.NOVEL_SCOPE,
+            ("cited leaf novel is outside the frozen scope"),
         )
     if resolved.namespace not in authorized_citation_namespaces(scope):
-        return False, CitationBlockedReason.FORK_VERSION_MISMATCH, (
-            f"cited namespace {resolved.namespace!r} is not authorized by the "
-            f"{scope.space.value} scope"
+        return (
+            False,
+            CitationBlockedReason.FORK_VERSION_MISMATCH,
+            (
+                f"cited namespace {resolved.namespace!r} is not authorized by the "
+                f"{scope.space.value} scope"
+            ),
         )
-    if (
-        resolved.version_key is not None
-        and resolved.version_key != scope.version_key
-    ):
-        return False, CitationBlockedReason.FORK_VERSION_MISMATCH, (
-            f"cited version {resolved.version_key!r} does not match the scope "
-            f"version {scope.version_key!r}"
+    if resolved.version_key is not None and resolved.version_key != scope.version_key:
+        return (
+            False,
+            CitationBlockedReason.FORK_VERSION_MISMATCH,
+            (
+                f"cited version {resolved.version_key!r} does not match the scope "
+                f"version {scope.version_key!r}"
+            ),
         )
     if resolved.chapter_number > scope.through_chapter:
-        return False, CitationBlockedReason.BEYOND_CUTOFF, (
-            f"cited leaf chapter {resolved.chapter_number} is beyond the "
-            f"server-derived cutoff {scope.through_chapter}"
+        return (
+            False,
+            CitationBlockedReason.BEYOND_CUTOFF,
+            (
+                f"cited leaf chapter {resolved.chapter_number} is beyond the "
+                f"server-derived cutoff {scope.through_chapter}"
+            ),
         )
     if ref.source_snapshot_hash != resolved.source_snapshot_hash:
-        return False, CitationBlockedReason.STALE_HASH, (
-            "citation source_snapshot_hash does not replay from the resolved "
-            "leaf lineage"
+        return (
+            False,
+            CitationBlockedReason.STALE_HASH,
+            (
+                "citation source_snapshot_hash does not replay from the resolved "
+                "leaf lineage"
+            ),
         )
     if resolved.source_snapshot_hash != scope.source_snapshot_hash:
-        return False, CitationBlockedReason.STALE_HASH, (
-            "cited leaf source snapshot does not replay from the frozen scope"
+        return (
+            False,
+            CitationBlockedReason.STALE_HASH,
+            ("cited leaf source snapshot does not replay from the frozen scope"),
         )
     return True, None, None
 
 
 def slice_revalidation(
     ref: CanonCitationRef, resolved: ResolvedLeaf
-) -> tuple[bool, CitationBlockedReason | None, str | None, tuple[int, int] | None, str | None]:
+) -> tuple[
+    bool, CitationBlockedReason | None, str | None, tuple[int, int] | None, str | None
+]:
     """Offset/hash replay over the resolved leaf content (T-35-03-02)."""
     start, end = effective_offsets(ref, resolved)
     if (
@@ -373,19 +394,31 @@ def slice_revalidation(
         or end <= start
         or end > len(resolved.content)
     ):
-        return False, CitationBlockedReason.INVALID_OFFSET, (
-            "citation offsets are out of bounds for the resolved leaf"
-        ), None, None
+        return (
+            False,
+            CitationBlockedReason.INVALID_OFFSET,
+            ("citation offsets are out of bounds for the resolved leaf"),
+            None,
+            None,
+        )
     excerpt = resolved.content[start:end]
     if not excerpt:
-        return False, CitationBlockedReason.STALE_HASH, (
-            "citation slice is empty"
-        ), None, None
+        return (
+            False,
+            CitationBlockedReason.STALE_HASH,
+            ("citation slice is empty"),
+            None,
+            None,
+        )
     recomputed = content_sha256(excerpt)
     if recomputed != ref.content_hash:
-        return False, CitationBlockedReason.STALE_HASH, (
-            "citation content_hash does not replay from the leaf slice"
-        ), None, None
+        return (
+            False,
+            CitationBlockedReason.STALE_HASH,
+            ("citation content_hash does not replay from the leaf slice"),
+            None,
+            None,
+        )
     return True, None, None, (start, end), excerpt
 
 
@@ -475,9 +508,7 @@ class CanonCitationService:
     ) -> tuple[CitationVerdict, ...]:
         """Revalidate a batch; each verdict is independent and auditable."""
         return tuple(
-            await asyncio.gather(
-                *(self.revalidate(ref, scope=scope) for ref in refs)
-            )
+            await asyncio.gather(*(self.revalidate(ref, scope=scope) for ref in refs))
         )
 
 
@@ -501,6 +532,7 @@ def _parse_chapter_leaf(leaf_key: str) -> int | None:
         return int(leaf_key.split(":", 1)[1])
     except (ValueError, IndexError):
         return None
+
 
 __all__ = [
     "CanonCitationRef",

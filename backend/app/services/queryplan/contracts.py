@@ -42,7 +42,9 @@ from app.services.queryplan.schemas import (
     StrictQueryPlanModel,
 )
 
-Key = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=180)]
+Key = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=180)
+]
 
 WORLD_PROJECTION_CONTRACT_VERSION = "world-model-projection.v1"
 
@@ -58,9 +60,7 @@ AUTHORITY_LABELS: tuple[str, ...] = (
     AUTHORITY_USER_INTERPRETATION,
 )
 
-_LEAF_EVIDENCE_KEY_RE = re.compile(
-    r"^qp:[0-9]+:[0-9]+:[0-9]+:[0-9a-f]{64}$"
-)
+_LEAF_EVIDENCE_KEY_RE = re.compile(r"^qp:[0-9]+:[0-9]+:[0-9]+:[0-9a-f]{64}$")
 
 
 def leaf_evidence_key(

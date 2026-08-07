@@ -29,7 +29,6 @@ Adversarial paths (all stable blocked/cancelled with zero authoritative writes):
 
 from __future__ import annotations
 
-import hashlib
 import uuid
 from typing import Any
 
@@ -359,9 +358,7 @@ async def _count(
             )
         return int(
             await session.scalar(
-                select(func.count())
-                .select_from(model)
-                .where(model.run_id == run_id)  # type: ignore[attr-defined]
+                select(func.count()).select_from(model).where(model.run_id == run_id)  # type: ignore[attr-defined]
             )
             or 0
         )
@@ -753,7 +750,10 @@ async def test_phase36_happy_path_proposal_to_apply(
     frozen_manifest = {"evidence_refs": ["chapter:1"]}
     envelope = _build_envelope(ctx)
     outcome = await _finalize(
-        runtime_factory, run_id=run_id, envelope=envelope, frozen_manifest=frozen_manifest
+        runtime_factory,
+        run_id=run_id,
+        envelope=envelope,
+        frozen_manifest=frozen_manifest,
     )
     assert outcome.status == "completed", outcome.status_reason
     assert outcome.artifact_id is not None
@@ -794,7 +794,9 @@ async def test_phase36_happy_path_proposal_to_apply(
 
     # 用户 Web 确认 → HTTP apply 端点 → 确定性 Revision Service 应用。
     async with runtime_factory() as session:
-        await confirm(session, request_id=approval_id, owner_id=ctx["owner_id"], mode="once")
+        await confirm(
+            session, request_id=approval_id, owner_id=ctx["owner_id"], mode="once"
+        )
         await session.commit()
 
     headers = {"Authorization": f"Bearer {ctx['token']}"}
@@ -847,9 +849,7 @@ async def test_phase36_happy_path_proposal_to_apply(
 # ────────────────────────── 对抗路径（fail closed，零权威写入） ──────────────────────────
 
 
-async def test_phase36_cancellation_no_write(
-    runtime_factory, migrated_postgres: str
-):
+async def test_phase36_cancellation_no_write(runtime_factory, migrated_postgres: str):
     """取消 → cancelled，0 artifact/revision/ApprovalRequest（cancel-without-write）。"""
     ctx = await _set_up(
         runtime_factory,
@@ -918,13 +918,14 @@ async def test_phase36_wrong_skill_version_lineage_blocks(
         frozen_manifest={"evidence_refs": ["chapter:1"]},
     )
     assert outcome.status == "failed"
-    assert outcome.status_reason is not None and "skill_version_id" in outcome.status_reason
+    assert (
+        outcome.status_reason is not None
+        and "skill_version_id" in outcome.status_reason
+    )
     await _assert_zero_writes(runtime_factory, run_id=ctx["run_id"])
 
 
-async def test_phase36_stale_input_hash_blocks(
-    runtime_factory, migrated_postgres: str
-):
+async def test_phase36_stale_input_hash_blocks(runtime_factory, migrated_postgres: str):
     """envelope input_hash 与 run 不符（stale）→ blocked，零写入。"""
     ctx = await _set_up(
         runtime_factory,
@@ -943,9 +944,7 @@ async def test_phase36_stale_input_hash_blocks(
     await _assert_zero_writes(runtime_factory, run_id=ctx["run_id"])
 
 
-async def test_phase36_schema_drift_blocks(
-    runtime_factory, migrated_postgres: str
-):
+async def test_phase36_schema_drift_blocks(runtime_factory, migrated_postgres: str):
     """schema drift：proposal_status 非 proposed（直接应用伪造）→ blocked，零写入。"""
     ctx = await _set_up(
         runtime_factory,
@@ -962,8 +961,7 @@ async def test_phase36_schema_drift_blocks(
     assert outcome.status == "failed"
     assert outcome.error_code == ERROR_CODE_FAILED_VALIDATION
     assert (
-        outcome.status_reason is not None
-        and "proposal_status" in outcome.status_reason
+        outcome.status_reason is not None and "proposal_status" in outcome.status_reason
     )
     await _assert_zero_writes(runtime_factory, run_id=ctx["run_id"])
 
@@ -990,9 +988,7 @@ async def test_phase36_content_hash_drift_blocks(
     await _assert_zero_writes(runtime_factory, run_id=ctx["run_id"])
 
 
-async def test_phase36_wrong_branch_blocks(
-    runtime_factory, migrated_postgres: str
-):
+async def test_phase36_wrong_branch_blocks(runtime_factory, migrated_postgres: str):
     """wrong branch：run 绑定 derivative 分支，envelope 声称别的分支（branch 血缘
     不符）→ blocked，零写入。"""
     ctx = await _set_up(
@@ -1093,7 +1089,9 @@ async def test_phase36_approval_payload_hash_drift_blocks_apply(
     )
     assert outcome.status == "completed"
     async with runtime_factory() as session:
-        await confirm(session, request_id=approval_id, owner_id=ctx["owner_id"], mode="once")
+        await confirm(
+            session, request_id=approval_id, owner_id=ctx["owner_id"], mode="once"
+        )
         approval = await session.get(ApprovalRequest, approval_id)
         approval.payload_hash = "c" * 64  # 篡改重放哈希
         await session.commit()
@@ -1186,7 +1184,9 @@ async def test_phase36_stale_base_revision_blocks_apply(
     )
     assert outcome.status == "completed"
     async with runtime_factory() as session:
-        await confirm(session, request_id=approval_id, owner_id=ctx["owner_id"], mode="once")
+        await confirm(
+            session, request_id=approval_id, owner_id=ctx["owner_id"], mode="once"
+        )
         # user autosave 在 proposal 之后推进 revision（base 1 → 2）。
         await autosave_revision(
             session,
@@ -1245,7 +1245,9 @@ async def test_phase36_apply_is_idempotent(
     )
     assert outcome.status == "completed"
     async with runtime_factory() as session:
-        await confirm(session, request_id=approval_id, owner_id=ctx["owner_id"], mode="once")
+        await confirm(
+            session, request_id=approval_id, owner_id=ctx["owner_id"], mode="once"
+        )
         await session.commit()
 
     headers = {"Authorization": f"Bearer {ctx['token']}"}
@@ -1303,7 +1305,9 @@ async def test_phase36_concurrent_autosave_and_proposal_never_last_write_win(
     )
     assert outcome.status == "completed"
     async with runtime_factory() as session:
-        await confirm(session, request_id=approval_id, owner_id=ctx["owner_id"], mode="once")
+        await confirm(
+            session, request_id=approval_id, owner_id=ctx["owner_id"], mode="once"
+        )
         await session.commit()
 
     headers = {"Authorization": f"Bearer {ctx['token']}"}
@@ -1319,7 +1323,10 @@ async def test_phase36_concurrent_autosave_and_proposal_never_last_write_win(
     async def user_autosave():
         return await api_client.post(
             autosave_url,
-            json={"content": "# Draft\nUser concurrent draft.", "base_revision": ctx["base_revision"]},
+            json={
+                "content": "# Draft\nUser concurrent draft.",
+                "base_revision": ctx["base_revision"],
+            },
             headers=headers,
         )
 
@@ -1432,9 +1439,7 @@ async def test_phase36_original_authority_untouched(
     assert int(revisions_for_owner or 0) == 1  # root create only
 
 
-async def test_phase36_tool_idempotent_replay(
-    runtime_factory, migrated_postgres: str
-):
+async def test_phase36_tool_idempotent_replay(runtime_factory, migrated_postgres: str):
     """apply_derivative_edit 幂等：重复 proposal_key + content → 重放既有 approval
     （一个 approval）。"""
     ctx = await _set_up(
@@ -1502,6 +1507,8 @@ async def test_phase36_proposal_conflict_blocks_second_intent(
                 db=session,
                 novel=novel,
                 owner_id=ctx["owner_id"],
-                params=_edit_params(ctx, proposal_key="edit-conf-2", content=PROPOSED_CONTENT + " extra"),
+                params=_edit_params(
+                    ctx, proposal_key="edit-conf-2", content=PROPOSED_CONTENT + " extra"
+                ),
             )
     assert "proposal_conflict" in str(exc.value)

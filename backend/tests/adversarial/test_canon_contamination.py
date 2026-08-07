@@ -135,9 +135,7 @@ def test_original_write_cannot_carry_derivative_text():
         CanonWriteIntent(
             scope=original,
             content="derivative text smuggled into original canon",
-            content_hash=content_sha256(
-                "derivative text smuggled into original canon"
-            ),
+            content_hash=content_sha256("derivative text smuggled into original canon"),
         )
 
 

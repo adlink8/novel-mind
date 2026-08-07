@@ -497,7 +497,9 @@ class IllustrationGateway:
             cost_usd=actual_cost,
             latency_ms=latency_ms,
         )
-        return GatewayResult(response=response, response_hash=response_hash, attempt=attempt)
+        return GatewayResult(
+            response=response, response_hash=response_hash, attempt=attempt
+        )
 
 
 def _cost_usd(price_snapshot: PriceSnapshot, usage: dict[str, int]) -> Decimal:
@@ -506,7 +508,8 @@ def _cost_usd(price_snapshot: PriceSnapshot, usage: dict[str, int]) -> Decimal:
     image_cost = price_snapshot.image_price_per_image or Decimal(0)
     token_cost = (
         Decimal(input_tokens) * (price_snapshot.input_price_per_million or Decimal(0))
-        + Decimal(output_tokens) * (price_snapshot.output_price_per_million or Decimal(0))
+        + Decimal(output_tokens)
+        * (price_snapshot.output_price_per_million or Decimal(0))
     ) / Decimal(1_000_000)
     return image_cost + token_cost
 
@@ -584,8 +587,14 @@ class MockIllustrationTransport:
             provider=self.provider,
             provider_model=self.model,
             provider_request_id=f"mock-req-{digest[:16]}",
-            usage={"input_tokens": self.input_tokens, "output_tokens": self.output_tokens},
-            response_metadata={"mode": "success", "fixture": "illustration-mock-success"},
+            usage={
+                "input_tokens": self.input_tokens,
+                "output_tokens": self.output_tokens,
+            },
+            response_metadata={
+                "mode": "success",
+                "fixture": "illustration-mock-success",
+            },
         )
 
 

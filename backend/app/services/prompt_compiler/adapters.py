@@ -252,9 +252,7 @@ def compile_prompt(
         compiler_version=spec.compiler_version,
         adapter_id=adapter.adapter_id,
         adapter_version=adapter.adapter_version,
-        config_hash=adapter_config_hash(
-            adapter.adapter_id, adapter.adapter_version
-        ),
+        config_hash=adapter_config_hash(adapter.adapter_id, adapter.adapter_version),
         input_hash="0" * 64,
         prompt_hash="0" * 64,
         sections=dict(sections),
@@ -559,9 +557,7 @@ class PromptRevisionService:
 
     # ------------------------------------------------------------ read seams
 
-    async def list(
-        self, *, owner_id: int, novel_id: int
-    ) -> list[PromptRevisionView]:
+    async def list(self, *, owner_id: int, novel_id: int) -> list[PromptRevisionView]:
         rows = (
             await self._session.scalars(
                 select(PromptRevisionRow)
@@ -587,9 +583,7 @@ class PromptRevisionService:
             raise PromptRevisionNotFound(
                 "prompt revision not found in the explicit owner/novel scope"
             )
-        stale = await self._is_stale(
-            owner_id=owner_id, novel_id=novel_id, revision=row
-        )
+        stale = await self._is_stale(owner_id=owner_id, novel_id=novel_id, revision=row)
         return self._view_from_row(row), stale
 
     async def diff(
@@ -608,7 +602,9 @@ class PromptRevisionService:
                 "prompt revision has no parent to diff against"
             )
         parent = await self._revision_by_id(
-            owner_id=owner_id, novel_id=novel_id, revision_id=row.parent_prompt_revision_id
+            owner_id=owner_id,
+            novel_id=novel_id,
+            revision_id=row.parent_prompt_revision_id,
         )
         if parent is None:
             raise PromptRevisionNotFound(
@@ -731,7 +727,9 @@ class PromptRevisionService:
             if evidence.detail_id is not None:
                 evidence_by_detail.setdefault(evidence.detail_id, []).append(ref)
             if evidence.constraint_id is not None:
-                evidence_by_constraint.setdefault(evidence.constraint_id, []).append(ref)
+                evidence_by_constraint.setdefault(evidence.constraint_id, []).append(
+                    ref
+                )
 
         payload = spec_row.canonical_payload
 
@@ -937,7 +935,9 @@ class PromptRevisionService:
             or spec_row.source_snapshot_hash != current_hash
         )
 
-    async def _current_snapshot(self, *, owner_id: int, novel_id: int) -> tuple[str, int]:
+    async def _current_snapshot(
+        self, *, owner_id: int, novel_id: int
+    ) -> tuple[str, int]:
         from app.services.key_scenes.boundaries import SceneBoundaryService
 
         service = SceneBoundaryService(self._session)

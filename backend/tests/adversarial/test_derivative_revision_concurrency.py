@@ -58,12 +58,12 @@ EVENTS_SOURCE = (
 SERVICE_SOURCE = (
     BACKEND_ROOT / "app" / "services" / "derivative_editor" / "revisions.py"
 ).read_text(encoding="utf-8")
-SCHEMA_SOURCE = (
-    BACKEND_ROOT / "app" / "schemas" / "derivative_revision.py"
-).read_text(encoding="utf-8")
-MODEL_SOURCE = (
-    BACKEND_ROOT / "app" / "models" / "derivative_revision.py"
-).read_text(encoding="utf-8")
+SCHEMA_SOURCE = (BACKEND_ROOT / "app" / "schemas" / "derivative_revision.py").read_text(
+    encoding="utf-8"
+)
+MODEL_SOURCE = (BACKEND_ROOT / "app" / "models" / "derivative_revision.py").read_text(
+    encoding="utf-8"
+)
 CHAPTER_SERVICE_SOURCE = (
     BACKEND_ROOT / "app" / "services" / "derivative_editor" / "chapters.py"
 ).read_text(encoding="utf-8")
@@ -120,7 +120,7 @@ def test_rollback_only_creates_a_new_child_revision():
     # rollback_revision appends an immutable rollback row and never mutates the
     # target/history rows; the actor/reason/approval journal is always written.
     assert 'kind="rollback"' in SERVICE_SOURCE
-    assert "approval_state=\"approved\"" in SERVICE_SOURCE
+    assert 'approval_state="approved"' in SERVICE_SOURCE
     assert "reason" in SERVICE_SOURCE
     assert "actor_id" in SERVICE_SOURCE
     # The restored content comes from the target row, never from client input.
@@ -270,18 +270,24 @@ def test_autosave_dto_rejects_scope_and_authority_injection():
     with pytest.raises(ValidationError, match="extra_forbidden"):
         DerivativeAutosaveRequest(content="x", base_revision=1, revision_number=5)
     with pytest.raises(ValidationError, match="extra_forbidden"):
-        DerivativeAutosaveRequest(content="x", base_revision=1, content_checksum="a" * 64)
+        DerivativeAutosaveRequest(
+            content="x", base_revision=1, content_checksum="a" * 64
+        )
     with pytest.raises(ValidationError, match="extra_forbidden"):
         DerivativeAutosaveRequest(content="x", base_revision=1, kind="publish")
     with pytest.raises(ValidationError, match="extra_forbidden"):
-        DerivativeAutosaveRequest(content="x", base_revision=1, approval_state="approved")
+        DerivativeAutosaveRequest(
+            content="x", base_revision=1, approval_state="approved"
+        )
 
 
 def test_rollback_dto_rejects_scope_injection_and_zero_ids():
     with pytest.raises(ValidationError, match="extra_forbidden"):
         DerivativeRollbackRequest(target_revision_id=1, base_revision=1, owner_id=1)
     with pytest.raises(ValidationError, match="extra_forbidden"):
-        DerivativeRollbackRequest(target_revision_id=1, base_revision=1, revision_number=1)
+        DerivativeRollbackRequest(
+            target_revision_id=1, base_revision=1, revision_number=1
+        )
     with pytest.raises(ValidationError, match="base_revision"):
         DerivativeRollbackRequest(target_revision_id=1)
     with pytest.raises(ValidationError):
@@ -301,7 +307,9 @@ def test_rollback_reason_bounded():
         DerivativeRollbackRequest(
             target_revision_id=1, base_revision=1, reason="x" * 2_001
         )
-    valid = DerivativeRollbackRequest(target_revision_id=1, base_revision=1, reason="ok")
+    valid = DerivativeRollbackRequest(
+        target_revision_id=1, base_revision=1, reason="ok"
+    )
     assert valid.reason == "ok"
 
 
@@ -335,8 +343,8 @@ def test_agent_proposal_kind_is_distinct_from_autosave():
     # kind, the event name and the actor label all differ.
     assert "agent_proposal" in MODEL_SOURCE
     assert "'agent_proposal'" in MODEL_SOURCE
-    assert "kind=\"agent_proposal\"" in SERVICE_SOURCE
-    assert "approval_state=\"approved\"" in SERVICE_SOURCE
+    assert 'kind="agent_proposal"' in SERVICE_SOURCE
+    assert 'approval_state="approved"' in SERVICE_SOURCE
     # The deterministic Revision Service apply is CAS-guarded exactly like the
     # user autosave (no last-write-wins, conflict carries the latest revision).
     assert "DerivativeChapter.revision == base_revision" in SERVICE_SOURCE
@@ -350,7 +358,7 @@ def test_agent_edit_approval_gate_is_server_authoritative():
     assert "DERIVATIVE_AGENT_EDIT_APPROVAL_ACTION" in SERVICE_SOURCE
     assert "apply_derivative_edit" in SERVICE_SOURCE
     assert "payload_hash" in SERVICE_SOURCE
-    assert "status=\"pending\"" in SERVICE_SOURCE
+    assert 'status="pending"' in SERVICE_SOURCE
 
 
 def test_user_autosave_and_agent_proposal_events_are_disjoint():
@@ -380,7 +388,10 @@ def test_agent_proposal_endpoint_is_separate_and_apply_only():
     assert "/derivative-edit-proposals/{artifact_id}/apply" in AGENT_API_SOURCE
     assert "apply_agent_edit" in AGENT_API_SOURCE
     assert "approval_not_approved" in AGENT_API_SOURCE
-    assert "approval_payload_mismatch" in AGENT_API_SOURCE or "approval_not_found" in AGENT_API_SOURCE
+    assert (
+        "approval_payload_mismatch" in AGENT_API_SOURCE
+        or "approval_not_found" in AGENT_API_SOURCE
+    )
     assert "apply_derivative_edit" in AGENT_API_SOURCE
     # The autosave route is distinct (not served by the agent endpoint module).
     assert "/autosave" not in AGENT_API_SOURCE
@@ -436,7 +447,7 @@ def test_append_links_parent_to_the_current_head():
     assert "parent_revision_id=latest.id" in SERVICE_SOURCE
     assert "revision_number=revision_number" in SERVICE_SOURCE
     assert "revision_number=chapter.revision" in SERVICE_SOURCE
-    assert 'revision_number=1' in CHAPTER_SERVICE_SOURCE  # root row
+    assert "revision_number=1" in CHAPTER_SERVICE_SOURCE  # root row
 
 
 def test_diff_is_computed_after_canonicalization():

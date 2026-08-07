@@ -64,7 +64,6 @@ from app.services.illustrations.budget import (
 from app.services.illustrations.gateway import (
     GenerationGateError,
     GatewayAttempt,
-    IllustrationBudget,
     IllustrationGateway,
     ProviderOutcomeUnknown,
     ProviderRejected,
@@ -106,7 +105,9 @@ class IllustrationWorkerRuntime:
     sessions: async_sessionmaker[AsyncSession]
     gateway: IllustrationGateway
     storage: AssetStorage
-    price_snapshot: PriceSnapshot = field(default_factory=default_illustration_price_snapshot)
+    price_snapshot: PriceSnapshot = field(
+        default_factory=default_illustration_price_snapshot
+    )
     budget_policy: IllustrationBudgetPolicy = DEFAULT_ILLUSTRATION_POLICY
     width: int = MOCK_IMAGE_WIDTH
     height: int = MOCK_IMAGE_HEIGHT
@@ -248,7 +249,9 @@ class DurableIllustrationBudgetRepository:
             Decimal(0), (ledger.reserved_cost_usd or Decimal(0)) - row.cost_usd
         )
         ledger.settled_calls = (ledger.settled_calls or 0) + 1
-        ledger.settled_cost_usd = (ledger.settled_cost_usd or Decimal(0)) + actual_cost_usd
+        ledger.settled_cost_usd = (
+            ledger.settled_cost_usd or Decimal(0)
+        ) + actual_cost_usd
         await self._session.flush()
 
     async def settle_unknown(self, *, key: str, error_code: str) -> None:
@@ -335,9 +338,7 @@ def production_runtime() -> IllustrationWorkerRuntime:
 
         return IllustrationWorkerRuntime(
             sessions=async_session_factory,
-            gateway=IllustrationGateway(
-                MockIllustrationTransport(mode=transport_mode)
-            ),
+            gateway=IllustrationGateway(MockIllustrationTransport(mode=transport_mode)),
             storage=AssetStorage(root),
         )
     if settings.illustration_provider == "hunyuan":
@@ -398,9 +399,7 @@ async def run_illustration_worker(
             return
         await _execute_attempts(runtime, job_id, context, lease_id)
     except GenerationGateError as exc:
-        await _finish_job(
-            runtime.sessions, job_id, "failed", exc.reason_code, str(exc)
-        )
+        await _finish_job(runtime.sessions, job_id, "failed", exc.reason_code, str(exc))
     except (UnknownPricing, BudgetExceeded) as exc:
         await _finish_job(
             runtime.sessions,
@@ -473,7 +472,9 @@ async def _load_job_context(
             "job": job,
             "prompt_text": prompt_row.prompt_text,
             "lineage": illustration_lineage_from_job(job),
-            "price_snapshot": PriceSnapshot.model_validate(dict(job.price_snapshot or {})),
+            "price_snapshot": PriceSnapshot.model_validate(
+                dict(job.price_snapshot or {})
+            ),
         }
 
 
@@ -482,9 +483,7 @@ async def _has_succeeded_asset(
 ) -> bool:
     async with sessions() as session:
         asset = await session.scalar(
-            select(AssetRevision)
-            .where(AssetRevision.job_id == job_id)
-            .limit(1)
+            select(AssetRevision).where(AssetRevision.job_id == job_id).limit(1)
         )
     return asset is not None
 

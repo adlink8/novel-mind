@@ -22,7 +22,6 @@ REQ-FORK-04 / REQ-CRE-06 / D-38-01 / D-38-02. These deterministic gates
 from __future__ import annotations
 
 import ast
-import re
 from pathlib import Path
 
 import pytest
@@ -37,12 +36,12 @@ from app.schemas.derivative_visual import (
 pytestmark = [pytest.mark.unit, pytest.mark.adversarial]
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
-SCHEMA_SOURCE = (
-    BACKEND_ROOT / "app" / "schemas" / "derivative_visual.py"
-).read_text(encoding="utf-8")
-MODEL_SOURCE = (
-    BACKEND_ROOT / "app" / "models" / "derivative_visual.py"
-).read_text(encoding="utf-8")
+SCHEMA_SOURCE = (BACKEND_ROOT / "app" / "schemas" / "derivative_visual.py").read_text(
+    encoding="utf-8"
+)
+MODEL_SOURCE = (BACKEND_ROOT / "app" / "models" / "derivative_visual.py").read_text(
+    encoding="utf-8"
+)
 FORK_SOURCE = (
     BACKEND_ROOT / "app" / "services" / "derivative_visual" / "fork.py"
 ).read_text(encoding="utf-8")
@@ -55,9 +54,9 @@ GATES_SOURCE = (
 SCENE_SPEC_SOURCE = (
     BACKEND_ROOT / "app" / "services" / "derivative_visual" / "scene_spec.py"
 ).read_text(encoding="utf-8")
-API_SOURCE = (
-    BACKEND_ROOT / "app" / "api" / "derivative_visual.py"
-).read_text(encoding="utf-8")
+API_SOURCE = (BACKEND_ROOT / "app" / "api" / "derivative_visual.py").read_text(
+    encoding="utf-8"
+)
 MIGRATION_SOURCE = (
     BACKEND_ROOT / "migrations" / "versions" / "38_derivative_visual01.py"
 ).read_text(encoding="utf-8")
@@ -117,9 +116,7 @@ def test_client_cannot_inject_original_namespace_or_scope():
             _version() | {"original_canon": True}
         )
     with pytest.raises(ValidationError, match="extra_forbidden"):
-        DerivativeVisualVersionContract.model_validate(
-            _version() | {"approved": True}
-        )
+        DerivativeVisualVersionContract.model_validate(_version() | {"approved": True})
     # owner/novel are server-derived from the request scope: a mismatch fails
     # closed in the service before any row is written.
     assert "scope_mismatch" in FORK_SOURCE
@@ -145,7 +142,10 @@ def test_asset_contract_cannot_carry_approval():
                 "asset_id": "obj-1",
                 "mime_type": "image/png",
                 "bytes_hash": HEX64,
-                "source_asset_ref": {"source_asset_id": "obj-1", "source_bytes_hash": HEX64},
+                "source_asset_ref": {
+                    "source_asset_id": "obj-1",
+                    "source_bytes_hash": HEX64,
+                },
                 "approved": True,
             }
         )
@@ -155,7 +155,9 @@ def test_divergence_is_required_and_explicit():
     with pytest.raises(ValidationError, match="divergence"):
         DerivativeVisualVersionContract.model_validate(_version() | {"divergence": {}})
     with pytest.raises(ValidationError, match="divergence"):
-        DerivativeVisualVersionContract.model_validate(_version() | {"divergence": None})
+        DerivativeVisualVersionContract.model_validate(
+            _version() | {"divergence": None}
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -165,9 +167,10 @@ def test_divergence_is_required_and_explicit():
 
 def test_no_original_visual_authority_write_path():
     for source in (FORK_SOURCE, LINEAGE_SOURCE):
-        assert "visual_bible_versions" not in source.replace(
-            "VisualBibleVersion", ""
-        ) or "VisualBibleVersion" in source  # read reference only
+        assert (
+            "visual_bible_versions" not in source.replace("VisualBibleVersion", "")
+            or "VisualBibleVersion" in source
+        )  # read reference only
     # The fork service only reads the Original snapshot; it never instantiates
     # an Original Visual Bible row.
     assert "VisualBibleVersion(" not in FORK_SOURCE
@@ -178,12 +181,12 @@ def test_no_original_visual_authority_write_path():
 
 def test_source_is_referenced_read_only_via_restrict():
     assert "fk_derivative_visual_versions_source_scope" in MODEL_SOURCE
-    assert "ondelete=\"RESTRICT\"" in MODEL_SOURCE
+    assert 'ondelete="RESTRICT"' in MODEL_SOURCE
     assert "visual_bible_versions.owner_id" in MODEL_SOURCE
     # The source composite FK binds owner+novel+source_version_id together.
     assert '["owner_id", "novel_id", "source_version_id"]' in MODEL_SOURCE
     assert "fk_derivative_visual_versions_source_scope" in MIGRATION_SOURCE
-    assert "ondelete=\"RESTRICT\"" in MIGRATION_SOURCE
+    assert 'ondelete="RESTRICT"' in MIGRATION_SOURCE
 
 
 def test_model_and_migration_seal_namespace_to_fanfiction_visual():
@@ -490,9 +493,7 @@ def test_scene_spec_wrong_namespace_is_rejected():
     checks = run_compile_gates(_compile_input(visual_namespace="original_canon"))
     assert any(c.code == "namespace_denied" for c in checks)
     with pytest.raises(DerivativeSceneSpecGateError, match="namespace_denied"):
-        compile_derivative_scene_spec(
-            _compile_input(visual_namespace="original_canon")
-        )
+        compile_derivative_scene_spec(_compile_input(visual_namespace="original_canon"))
 
 
 def test_scene_spec_stale_source_hash_is_rejected():
@@ -502,7 +503,9 @@ def test_scene_spec_stale_source_hash_is_rejected():
     from app.services.derivative_visual.scene_spec import compile_derivative_scene_spec
 
     # The sealed SceneSpec frozen against a different snapshot is stale.
-    with pytest.raises(DerivativeSceneSpecGateError, match="source_snapshot_hash_mismatch"):
+    with pytest.raises(
+        DerivativeSceneSpecGateError, match="source_snapshot_hash_mismatch"
+    ):
         compile_derivative_scene_spec(
             _compile_input(scene_spec_source_snapshot_hash="b" * 64)
         )
@@ -674,7 +677,7 @@ def test_review_api_uses_owned_novel_and_uniform_404():
     # one uniform 404 detail — no owner enumeration.
     assert "require_owned_novel" in REVIEW_API_SOURCE
     assert "require_user" in REVIEW_API_SOURCE
-    assert "extra=\"forbid\"" in REVIEW_API_SOURCE
+    assert 'extra="forbid"' in REVIEW_API_SOURCE
     assert "derivative review candidate not found in scope" in REVIEW_API_SOURCE
     assert "status_code=404" in REVIEW_API_SOURCE
     # A blocked approval must fail closed with a conflict (409), never 200.

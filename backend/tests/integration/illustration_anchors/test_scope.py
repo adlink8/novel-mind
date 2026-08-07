@@ -34,7 +34,10 @@ from sqlalchemy.pool import NullPool
 
 from app.models import Chapter, Novel, User
 from app.models.illustration import AssetRevision
-from app.models.illustration_anchor import IllustrationAnchor, IllustrationAnchorProposal
+from app.models.illustration_anchor import (
+    IllustrationAnchor,
+    IllustrationAnchorProposal,
+)
 from app.models.illustration_job import IllustrationJob
 from app.schemas.illustration_anchor import AnchorStatus
 from app.services.agent_runtime.approvals import confirm
@@ -166,7 +169,9 @@ def _seed(sync_url: str, *, suffix: str) -> dict[str, Any]:
             approved_by="editor",
             canonical_payload={},
             canonical_payload_hash=HEX64,
-            idempotency_key=hashlib.sha256(f"asset-{suffix}".encode("utf-8")).hexdigest(),
+            idempotency_key=hashlib.sha256(
+                f"asset-{suffix}".encode("utf-8")
+            ).hexdigest(),
             projection_hash=HEX64,
             schema_version="illustration-asset.v1",
         )
@@ -279,9 +284,7 @@ async def _proposal_by_id(
         return await session.get(IllustrationAnchorProposal, proposal_id)
 
 
-async def _edit_chapter(
-    factory, *, chapter_id: int, content: str
-) -> None:
+async def _edit_chapter(factory, *, chapter_id: int, content: str) -> None:
     async with factory() as session:
         await session.execute(
             text("UPDATE chapters SET content = :content WHERE id = :cid"),
@@ -307,7 +310,10 @@ async def _publish_valid_anchor(
         ids["proposal_id"] = result.proposal.id
         ids["approval_id"] = result.approval_request.id
         await confirm(
-            session, request_id=ids["approval_id"], owner_id=ids["owner_id"], mode="once"
+            session,
+            request_id=ids["approval_id"],
+            owner_id=ids["owner_id"],
+            mode="once",
         )
         await session.commit()
         anchor = await publish_anchor(
@@ -375,7 +381,9 @@ async def test_revalidate_after_text_edit_marks_needs_repair(
     ids = await _publish_valid_anchor(
         runtime_factory, migrated_postgres, suffix=f"rv_stale_{uuid.uuid4().hex[:6]}"
     )
-    await _edit_chapter(runtime_factory, chapter_id=ids["chapter_id"], content=EDITED_TEXT)
+    await _edit_chapter(
+        runtime_factory, chapter_id=ids["chapter_id"], content=EDITED_TEXT
+    )
     async with runtime_factory() as session:
         result = await AnchorRepairService(session).revalidate(
             owner_id=ids["owner_id"],
@@ -441,7 +449,9 @@ async def test_revalidate_out_of_scope_fails_closed(
 
 async def _stale_anchor(runtime_factory, migrated_postgres: str, *, suffix: str):
     ids = await _publish_valid_anchor(runtime_factory, migrated_postgres, suffix=suffix)
-    await _edit_chapter(runtime_factory, chapter_id=ids["chapter_id"], content=EDITED_TEXT)
+    await _edit_chapter(
+        runtime_factory, chapter_id=ids["chapter_id"], content=EDITED_TEXT
+    )
     async with runtime_factory() as session:
         result = await AnchorRepairService(session).revalidate(
             owner_id=ids["owner_id"],
@@ -474,7 +484,12 @@ async def test_propose_repair_creates_candidate_proposal(
     assert result.approval_request.status == "pending"
     assert result.repaired_anchor.id == ids["anchor_id"]
     # Candidate-only: nothing became reader/export visible.
-    assert await _count_for_owner(runtime_factory, IllustrationAnchor, owner_id=ids["owner_id"]) == 1
+    assert (
+        await _count_for_owner(
+            runtime_factory, IllustrationAnchor, owner_id=ids["owner_id"]
+        )
+        == 1
+    )
 
     payload = dict(result.proposal.canonical_payload or {})
     assert payload["repair_anchor_id"] == ids["anchor_id"]
@@ -694,7 +709,9 @@ async def test_approve_repair_publishes_new_anchor_preserves_old(
     assert old.anchor_key == result.repaired_anchor.anchor_key
 
     # Repair proposal moved to valid (append-only projection).
-    proposal = await _proposal_by_id(runtime_factory, proposal_id=ids["repair_proposal_id"])
+    proposal = await _proposal_by_id(
+        runtime_factory, proposal_id=ids["repair_proposal_id"]
+    )
     assert proposal is not None
     assert proposal.status == AnchorStatus.VALID.value
     assert proposal.published_asset_revision_id == ids["asset_id"]
@@ -702,7 +719,9 @@ async def test_approve_repair_publishes_new_anchor_preserves_old(
 
     # Exactly two anchors exist for the owner: the old history + the repair.
     assert (
-        await _count_for_owner(runtime_factory, IllustrationAnchor, owner_id=ids["owner_id"])
+        await _count_for_owner(
+            runtime_factory, IllustrationAnchor, owner_id=ids["owner_id"]
+        )
         == 2
     )
 
@@ -724,7 +743,9 @@ async def test_approve_repair_rejects_unapproved(
             )
     assert "approved" in str(exc.value)
     assert (
-        await _count_for_owner(runtime_factory, IllustrationAnchor, owner_id=ids["owner_id"])
+        await _count_for_owner(
+            runtime_factory, IllustrationAnchor, owner_id=ids["owner_id"]
+        )
         == 1
     )
 
@@ -757,7 +778,9 @@ async def test_approve_repair_rejects_when_anchor_no_longer_stale(
             )
     assert "needs_repair anchor" in str(exc.value)
     assert (
-        await _count_for_owner(runtime_factory, IllustrationAnchor, owner_id=ids["owner_id"])
+        await _count_for_owner(
+            runtime_factory, IllustrationAnchor, owner_id=ids["owner_id"]
+        )
         == 1
     )
 
@@ -770,7 +793,9 @@ async def test_approve_repair_rejects_asset_not_proposal_ready(
     )
     async with runtime_factory() as session:
         await session.execute(
-            text("UPDATE asset_revisions SET approval_state = 'candidate' WHERE id = :id"),
+            text(
+                "UPDATE asset_revisions SET approval_state = 'candidate' WHERE id = :id"
+            ),
             {"id": ids["asset_id"]},
         )
         await confirm(
@@ -790,7 +815,9 @@ async def test_approve_repair_rejects_asset_not_proposal_ready(
             )
     assert "proposal_ready" in str(exc.value)
     assert (
-        await _count_for_owner(runtime_factory, IllustrationAnchor, owner_id=ids["owner_id"])
+        await _count_for_owner(
+            runtime_factory, IllustrationAnchor, owner_id=ids["owner_id"]
+        )
         == 1
     )
 
@@ -813,9 +840,7 @@ async def test_approve_repair_rejects_plain_proposal(
     assert "not a repair candidate" in str(exc.value)
 
 
-async def test_repair_proposal_is_append_only(
-    runtime_factory, migrated_postgres: str
-):
+async def test_repair_proposal_is_append_only(runtime_factory, migrated_postgres: str):
     """The repair candidate row is immutable: an in-place mutation fails closed."""
     ids = await _proposed_repair(
         runtime_factory, migrated_postgres, suffix=f"ap_imm_{uuid.uuid4().hex[:6]}"

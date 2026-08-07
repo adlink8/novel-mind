@@ -95,7 +95,6 @@ from app.services.derivative_visual.agent_boundary import (
 )
 from app.services.derivative_visual.assets import (
     DerivativeAssetStorage,
-    DerivativeCandidateConflict,
     store_derivative_candidate_asset,
 )
 from app.services.derivative_visual.fork import create_derivative_visual_fork
@@ -297,7 +296,9 @@ def _seed_owner(sync_url: str, *, suffix: str) -> dict:
     return data
 
 
-def _fork_payload(ids: dict, *, version_key: str, **overrides) -> DerivativeVisualVersionContract:
+def _fork_payload(
+    ids: dict, *, version_key: str, **overrides
+) -> DerivativeVisualVersionContract:
     payload = {
         "schema_version": "derivative-visual.v1",
         "namespace": "fanfiction_visual",
@@ -405,7 +406,9 @@ def _spec_payload(
                 "disclosure_cutoff": 8,
             }
         ],
-        "style_profile": style_profile if style_profile is not None else {"palette": "warm"},
+        "style_profile": style_profile
+        if style_profile is not None
+        else {"palette": "warm"},
         "negative_constraints": [],
         "reference_assets": [
             {
@@ -669,7 +672,9 @@ async def _finalize(
     )
 
 
-async def _count(factory, model, *, run_id: int | None = None, owner_id: int | None = None) -> int:
+async def _count(
+    factory, model, *, run_id: int | None = None, owner_id: int | None = None
+) -> int:
     async with factory() as session:
         if owner_id is not None:
             return int(
@@ -681,12 +686,12 @@ async def _count(factory, model, *, run_id: int | None = None, owner_id: int | N
                 or 0
             )
         if run_id is None:
-            return int(await session.scalar(select(func.count()).select_from(model)) or 0)
+            return int(
+                await session.scalar(select(func.count()).select_from(model)) or 0
+            )
         return int(
             await session.scalar(
-                select(func.count())
-                .select_from(model)
-                .where(model.run_id == run_id)  # type: ignore[attr-defined]
+                select(func.count()).select_from(model).where(model.run_id == run_id)  # type: ignore[attr-defined]
             )
             or 0
         )
@@ -1080,12 +1085,17 @@ async def test_phase38_publish_approval_and_deterministic_review_publish(
     assert tool_view["approval_status"] == "pending"
     assert tool_view["candidate_asset_id"] == ctx["candidate_asset_id"]
     assert tool_view["content_hash"] == ctx["candidate"].content_hash
-    assert tool_view["divergence_manifest_hash"] == ctx["candidate"].divergence_manifest_hash
+    assert (
+        tool_view["divergence_manifest_hash"]
+        == ctx["candidate"].divergence_manifest_hash
+    )
     assert tool_view["consistency_verdict"] == "unavailable"
     assert tool_view["review_state"] == "needs_review"
     approval_id = int(tool_view["approval_request_id"])
     approval_payload_hash = str(tool_view["approval_payload_hash"])
-    assert approval_payload_hash == derivative_visual_approval_payload_hash(ctx["candidate"])
+    assert approval_payload_hash == derivative_visual_approval_payload_hash(
+        ctx["candidate"]
+    )
 
     async with runtime_factory() as session:
         approval = await session.get(ApprovalRequest, approval_id)
@@ -1099,7 +1109,10 @@ async def test_phase38_publish_approval_and_deterministic_review_publish(
     frozen_manifest = {"evidence_refs": [EVIDENCE_KEY]}
     envelope = _build_envelope(ctx)
     outcome = await _finalize(
-        runtime_factory, run_id=run_id, envelope=envelope, frozen_manifest=frozen_manifest
+        runtime_factory,
+        run_id=run_id,
+        envelope=envelope,
+        frozen_manifest=frozen_manifest,
     )
     assert outcome.status == "completed", outcome.status_reason
     assert await _count(runtime_factory, Artifact, run_id=run_id) == 1
@@ -1121,8 +1134,14 @@ async def test_phase38_publish_approval_and_deterministic_review_publish(
     assert content["revision"]["authority_space"] == "derivative"
     assert content["revision"]["fork"] == FORK_VALUE
     assert content["revision"]["review_state"] == "candidate"
-    assert content["revision"]["candidate_asset"]["candidate_asset_id"] == ctx["candidate_asset_id"]
-    assert content["revision"]["divergence_manifest_hash"] == ctx["candidate"].divergence_manifest_hash
+    assert (
+        content["revision"]["candidate_asset"]["candidate_asset_id"]
+        == ctx["candidate_asset_id"]
+    )
+    assert (
+        content["revision"]["divergence_manifest_hash"]
+        == ctx["candidate"].divergence_manifest_hash
+    )
     assert content["revision"]["consistency_verdict"] == "unavailable"
 
     # 用户 Web 确认 publish approval → 确定性 review seam 物化 approved published asset。
@@ -1143,7 +1162,9 @@ async def test_phase38_publish_approval_and_deterministic_review_publish(
     assert published.review.review_state.value == "approved"
     assert published.asset_id == ctx["candidate"].asset_id
     assert published.content_hash == ctx["candidate"].content_hash
-    assert published.divergence_manifest_hash == ctx["candidate"].divergence_manifest_hash
+    assert (
+        published.divergence_manifest_hash == ctx["candidate"].divergence_manifest_hash
+    )
     assert published.fork_id == ctx["candidate"].fork_id
 
     # published query 对该 owner/project/fork 可见。
@@ -1191,7 +1212,9 @@ async def test_phase38_http_action_route_wired(
     assert body["candidate_only"] is True
     assert body["approval_action"] == PUBLISH_DERIVATIVE_VISUAL_APPROVAL_ACTION
     assert body["approval_status"] == "pending"
-    assert body["approval_payload_hash"] == derivative_visual_approval_payload_hash(ctx["candidate"])
+    assert body["approval_payload_hash"] == derivative_visual_approval_payload_hash(
+        ctx["candidate"]
+    )
 
 
 # ────────────────────────── 对抗路径（fail closed，零权威写入） ──────────────────────────
@@ -1370,9 +1393,7 @@ async def test_phase38_blocked_candidate_action_fails_closed(
 ):
     """validator failure（identity drift → consistency fail → blocked candidate）：
     publish_derivative_visual action → candidate_not_approvable，零 ApprovalRequest。"""
-    ids = _seed_owner(
-        migrated_postgres, suffix=f"blk_{uuid.uuid4().hex[:6]}"
-    )
+    ids = _seed_owner(migrated_postgres, suffix=f"blk_{uuid.uuid4().hex[:6]}")
     async with runtime_factory() as session:
         result = await create_derivative_visual_fork(
             session,
@@ -1387,7 +1408,9 @@ async def test_phase38_blocked_candidate_action_fails_closed(
 
     # 先存 chapter 1（unavailable），再用 drifted identity 存 chapter 2 → blocked。
     storage = DerivativeAssetStorage(tmp_path / "derivative_assets")
-    spec1 = _make_spec(ids, version, spec_key=f"ds1-{uuid.uuid4().hex[:6]}", chapter_number=1)
+    spec1 = _make_spec(
+        ids, version, spec_key=f"ds1-{uuid.uuid4().hex[:6]}", chapter_number=1
+    )
     payload1 = bytes([1]) * 8
     async with runtime_factory() as session:
         await store_derivative_candidate_asset(
@@ -1433,7 +1456,6 @@ async def test_phase38_blocked_candidate_action_fails_closed(
     assert blocked_row.review_state == "blocked"
 
     # blocked candidate 无法请求发布（candidate_not_approvable）。
-    from app.services.derivative_visual.agent_boundary import DerivativeVisualBoundaryError
 
     with pytest.raises(InvalidInputError) as exc:
         async with runtime_factory() as session:
@@ -1522,7 +1544,9 @@ async def test_phase38_consume_pending_approval_fails(
 ):
     """确定性 review seam 消费 pending approval（未确认）→ approval_not_approved，
     零权威写入。"""
-    from app.services.derivative_visual.agent_boundary import DerivativeVisualBoundaryError
+    from app.services.derivative_visual.agent_boundary import (
+        DerivativeVisualBoundaryError,
+    )
 
     ctx = await _set_up(
         runtime_factory,
@@ -1570,7 +1594,9 @@ async def test_phase38_forged_approval_hash_fails(
 ):
     """伪造 approval：确认后篡改 payload_hash（hash 绑定漂移）→ 确定性 review
     seam fail closed，不发布。"""
-    from app.services.derivative_visual.agent_boundary import DerivativeVisualBoundaryError
+    from app.services.derivative_visual.agent_boundary import (
+        DerivativeVisualBoundaryError,
+    )
 
     ctx = await _set_up(
         runtime_factory,
@@ -1624,7 +1650,9 @@ async def test_phase38_wrong_fork_scope_fails(
 ):
     """wrong fork scope：确认后篡改 approval.fork_id → 确定性 review seam fail
     closed（fork_scope_mismatch），不发布。"""
-    from app.services.derivative_visual.agent_boundary import DerivativeVisualBoundaryError
+    from app.services.derivative_visual.agent_boundary import (
+        DerivativeVisualBoundaryError,
+    )
 
     ctx = await _set_up(
         runtime_factory,
@@ -1677,7 +1705,9 @@ async def test_phase38_rejected_approval_fails(
     runtime_factory, migrated_postgres: str, tmp_path
 ):
     """approval 被拒绝（rejected）→ 确定性 review seam fail closed（不发布）。"""
-    from app.services.derivative_visual.agent_boundary import DerivativeVisualBoundaryError
+    from app.services.derivative_visual.agent_boundary import (
+        DerivativeVisualBoundaryError,
+    )
 
     ctx = await _set_up(
         runtime_factory,
@@ -1697,9 +1727,7 @@ async def test_phase38_rejected_approval_fails(
         await session.commit()
     approval_id = int(tool_view["approval_request_id"])
     async with runtime_factory() as session:
-        await reject(
-            session, request_id=approval_id, owner_id=ctx["owner_id"]
-        )
+        await reject(session, request_id=approval_id, owner_id=ctx["owner_id"])
         await session.commit()
 
     with pytest.raises(DerivativeVisualBoundaryError) as exc:
@@ -1729,7 +1757,9 @@ async def test_phase38_cancelled_approval_fails(
 ):
     """取消（run 结束/超时主动 expire）→ approval expired，确定性 review seam
     fail closed（不发布）。"""
-    from app.services.derivative_visual.agent_boundary import DerivativeVisualBoundaryError
+    from app.services.derivative_visual.agent_boundary import (
+        DerivativeVisualBoundaryError,
+    )
 
     ctx = await _set_up(
         runtime_factory,
@@ -1749,9 +1779,7 @@ async def test_phase38_cancelled_approval_fails(
         await session.commit()
     approval_id = int(tool_view["approval_request_id"])
     async with runtime_factory() as session:
-        await expire_request(
-            session, request_id=approval_id, owner_id=ctx["owner_id"]
-        )
+        await expire_request(session, request_id=approval_id, owner_id=ctx["owner_id"])
         await session.commit()
 
     with pytest.raises(DerivativeVisualBoundaryError) as exc:
@@ -1782,7 +1810,9 @@ async def test_phase38_wrong_action_approval_fails(
     """wrong approval action：把另一 action 的 approved approval 当 publish
     approval 消费 → approval_not_found（不发布）。"""
     from app.models.agent_runtime import ApprovalRequest as AR
-    from app.services.derivative_visual.agent_boundary import DerivativeVisualBoundaryError
+    from app.services.derivative_visual.agent_boundary import (
+        DerivativeVisualBoundaryError,
+    )
 
     ctx = await _set_up(
         runtime_factory,

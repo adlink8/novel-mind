@@ -87,7 +87,9 @@ class VisualBibleGateError(ValueError):
 
 def canonical_visual_hash(payload: dict[str, Any]) -> str:
     """SHA-256 over stable, sorted JSON (canonical ordering convention)."""
-    encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    encoded = json.dumps(
+        payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    )
     return sha256(encoded.encode("utf-8")).hexdigest()
 
 
@@ -158,13 +160,9 @@ class VisualClaimContract(StrictVisualBibleModel):
                 raise ValueError("canon_fact requires at least one evidence ref")
         else:
             if not self.author:
-                raise ValueError(
-                    f"{self.authority.value} claims require an author"
-                )
+                raise ValueError(f"{self.authority.value} claims require an author")
             if not self.rationale:
-                raise ValueError(
-                    f"{self.authority.value} claims require a rationale"
-                )
+                raise ValueError(f"{self.authority.value} claims require a rationale")
         return self
 
 
@@ -220,9 +218,7 @@ class VisualBibleVersionContract(StrictVisualBibleModel):
     constraints: list[dict[str, Any]] | None = None
     entities: list[VisualEntityContract] = Field(default_factory=list)
     claims: list[VisualClaimContract] = Field(default_factory=list)
-    reference_assets: list[VisualReferenceAssetContract] = Field(
-        default_factory=list
-    )
+    reference_assets: list[VisualReferenceAssetContract] = Field(default_factory=list)
     review_state: VisualReviewState = VisualReviewState.CANDIDATE
 
 
@@ -295,14 +291,10 @@ def recompute_manifest_hash(version: VisualBibleVersionContract) -> str:
 def validate_claim_hash(claim: VisualClaimContract) -> None:
     """Reject claims whose claim_hash does not match canonical content."""
     if claim.claim_hash != claim_content_hash(claim):
-        raise VisualBibleGateError(
-            f"claim {claim.claim_key!r} content hash mismatch"
-        )
+        raise VisualBibleGateError(f"claim {claim.claim_key!r} content hash mismatch")
 
 
-def validate_evidence_against_source(
-    source_text: str, ref: VisualEvidenceRef
-) -> None:
+def validate_evidence_against_source(source_text: str, ref: VisualEvidenceRef) -> None:
     """Revalidate an evidence ref against the authoritative source slice."""
     if ref.source_start < 0 or ref.source_end > len(source_text):
         raise VisualBibleGateError(
@@ -363,7 +355,6 @@ def validate_version_contract(version: VisualBibleVersionContract) -> None:
         raise VisualBibleGateError("duplicate entity_key in version")
 
     known_stable_ids = set(stable_ids)
-    known_entity_keys = set(entity_keys)
     claim_keys = [claim.claim_key for claim in version.claims]
     if len(set(claim_keys)) != len(claim_keys):
         raise VisualBibleGateError("duplicate claim_key in version")
@@ -404,9 +395,7 @@ REVIEW_ACTION_TO_STATE: dict[VisualReviewAction, VisualReviewState | None] = {
     VisualReviewAction.EDIT: None,
 }
 
-LEGAL_REVIEW_TRANSITIONS: dict[
-    VisualReviewState, frozenset[VisualReviewAction]
-] = {
+LEGAL_REVIEW_TRANSITIONS: dict[VisualReviewState, frozenset[VisualReviewAction]] = {
     VisualReviewState.CANDIDATE: frozenset(
         {
             VisualReviewAction.APPROVE,

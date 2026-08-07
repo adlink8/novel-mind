@@ -140,7 +140,9 @@ def test_serialization_fails_closed_on_tampered_prompt_text():
     )
     payload = json.loads(serialize_prompt_artifact(artifact))
     # Tamper with the rendered output: the prompt_hash no longer replays.
-    payload["revision"]["prompt_text"] = payload["revision"]["prompt_text"] + "\nMAYBE MORE"
+    payload["revision"]["prompt_text"] = (
+        payload["revision"]["prompt_text"] + "\nMAYBE MORE"
+    )
     with pytest.raises(SceneSpecGateError):
         replay_prompt_artifact(payload, spec)
 
@@ -333,6 +335,4 @@ def test_edit_keeps_negative_constraints_intact():
         edited, adapter=BlockPromptAdapter(), prompt_key="pk-edited"
     )
     assert "costume: no modern clothing" in edited_prompt.negative_constraints
-    assert edited_prompt.negative_constraints == [
-        "costume: no modern clothing"
-    ]
+    assert edited_prompt.negative_constraints == ["costume: no modern clothing"]

@@ -402,13 +402,9 @@ async def test_cross_owner_visual_bible_matrix_404(api_client):
     # Owner B probing owner A's novel: every route is an identical 404.
     foreign_list = await client.get(base_a, headers=headers_b)
     assert foreign_list.status_code == 404
-    foreign_detail = await client.get(
-        f"{base_a}/{version_id}", headers=headers_b
-    )
+    foreign_detail = await client.get(f"{base_a}/{version_id}", headers=headers_b)
     assert foreign_detail.status_code == 404
-    foreign_create = await client.post(
-        base_a, json={"version": {}}, headers=headers_b
-    )
+    foreign_create = await client.post(base_a, json={"version": {}}, headers=headers_b)
     assert foreign_create.status_code == 404
     foreign_review = await client.post(
         f"{base_a}/{version_id}/review",
@@ -517,7 +513,9 @@ async def test_wrong_snapshot_hash_fails_closed_with_reason(api_client):
     resp = await client.post(base, json=payload, headers=headers)
     assert resp.status_code == 409, resp.text
     assert resp.json()["kind"] == "visual_bible_unresolved"
-    codes = {item["claim_key"]: item["reason_code"] for item in resp.json()["unresolved"]}
+    codes = {
+        item["claim_key"]: item["reason_code"] for item in resp.json()["unresolved"]
+    }
     assert codes["char-ayla-hair"] == "stale_snapshot_lineage"
     assert codes["place-hall-windows"] == "stale_snapshot_lineage"
 
@@ -629,9 +627,7 @@ async def test_conflicting_create_fails_closed(api_client):
     new_claim = rebuilt.claims[0].model_copy(
         update={"claim_hash": claim_content_hash(rebuilt.claims[0])}
     )
-    rebuilt = rebuilt.model_copy(
-        update={"claims": [new_claim, *rebuilt.claims[1:]]}
-    )
+    rebuilt = rebuilt.model_copy(update={"claims": [new_claim, *rebuilt.claims[1:]]})
     changed["version"] = rebuilt.model_copy(
         update={"manifest_hash": recompute_manifest_hash(rebuilt)}
     ).model_dump(mode="json")
@@ -659,9 +655,7 @@ async def test_approval_is_append_only_and_idempotent(api_client):
     version_id = created.json()["version"]["id"]
     review_url = f"{base}/{version_id}/review"
 
-    approved = await client.post(
-        review_url, json=_review_payload(), headers=headers
-    )
+    approved = await client.post(review_url, json=_review_payload(), headers=headers)
     assert approved.status_code == 200, approved.text
     assert approved.json()["review_state"] == "approved"
     assert len(approved.json()["review_events"]) == 1
@@ -675,9 +669,7 @@ async def test_approval_is_append_only_and_idempotent(api_client):
     # Stale from_review_state is rejected: candidate is no longer current.
     stale = await client.post(
         review_url,
-        json=_review_payload(
-            from_review_state="candidate", event_key="ev-approve-2"
-        ),
+        json=_review_payload(from_review_state="candidate", event_key="ev-approve-2"),
         headers=headers,
     )
     assert stale.status_code == 409, stale.text
@@ -827,9 +819,7 @@ async def test_authority_service_persists_rows_and_replays(api_client):
 
         assert (
             await session.scalar(
-                select(VisualEntity).where(
-                    VisualEntity.version_id == version_id
-                )
+                select(VisualEntity).where(VisualEntity.version_id == version_id)
             )
             is not None
         )

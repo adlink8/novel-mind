@@ -44,9 +44,7 @@ class KnowledgeRepository:
 
     # ------------------------------------------------------------------ append
 
-    async def append_projection(
-        self, projection: KnowledgeCandidateProjection
-    ) -> None:
+    async def append_projection(self, projection: KnowledgeCandidateProjection) -> None:
         """Persist one immutable projection; idempotent on key conflicts."""
 
         if projection.projection_hash != projection_checksum(projection):
@@ -89,9 +87,7 @@ class KnowledgeRepository:
                 "projection rows disagree on the sealed projection hash"
             )
 
-        claims = [
-            EpistemicClaim.model_validate(row.canonical_payload) for row in rows
-        ]
+        claims = [EpistemicClaim.model_validate(row.canonical_payload) for row in rows]
         for row, claim in zip(rows, claims):
             if row.canonical_payload_hash != claim_checksum(claim):
                 raise KnowledgeRepositoryError("claim checksum drift on replay")
@@ -144,7 +140,9 @@ class KnowledgeRepository:
                 f"is {max_version}, tried {projection.version_id}"
             )
 
-    def _to_rows(self, projection: KnowledgeCandidateProjection) -> list[WorldModelKnowledge]:
+    def _to_rows(
+        self, projection: KnowledgeCandidateProjection
+    ) -> list[WorldModelKnowledge]:
         rows: list[WorldModelKnowledge] = []
         for claim in projection.claims:
             rows.append(

@@ -26,7 +26,6 @@ server scope + audit evidence contract.
 
 from __future__ import annotations
 
-import base64
 import hashlib
 import tempfile
 import uuid
@@ -37,7 +36,7 @@ from zipfile import ZipFile
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import func, select, text
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
@@ -69,16 +68,12 @@ BRANCH_VALUE = "deriv-branch"
 DOWNLOAD_BASE = (
     "/api/novels/{novel_id}/derivative-projects/{project_id}/export/download"
 )
-AUDIT_BASE = (
-    "/api/novels/{novel_id}/derivative-projects/{project_id}/export/audit"
-)
+AUDIT_BASE = "/api/novels/{novel_id}/derivative-projects/{project_id}/export/audit"
 
 
 def _async_url(sync_url: str) -> str:
     if sync_url.startswith("postgresql+psycopg2://"):
-        return sync_url.replace(
-            "postgresql+psycopg2://", "postgresql+asyncpg://", 1
-        )
+        return sync_url.replace("postgresql+psycopg2://", "postgresql+asyncpg://", 1)
     return sync_url
 
 
@@ -320,7 +315,9 @@ async def test_cross_owner_materialize_fails_closed(
         or "not found" in resp.text.lower()
     )
     # B 的 owner 空间零 approval / artifact 变更（无越权写入）。
-    assert await _count(runtime_factory, ApprovalRequest, owner_id=ids_b["owner_id"]) == 0
+    assert (
+        await _count(runtime_factory, ApprovalRequest, owner_id=ids_b["owner_id"]) == 0
+    )
     async with runtime_factory() as session:
         artifact_a = await session.get(Artifact, ids_a["artifact_id"])
     # A 的 artifact 未被 B 越权提升（仍 candidate，未 materialize）。
@@ -424,10 +421,7 @@ async def test_stale_artifact_materialize_blocked(
     # 项目名称变化 → 新 snapshot hash，approved artifact 的冻结血缘不再重放。
     async with runtime_factory() as session:
         await session.execute(
-            text(
-                "UPDATE derivative_projects SET name = name || ' v2' "
-                "WHERE id = :pid"
-            ),
+            text("UPDATE derivative_projects SET name = name || ' v2' WHERE id = :pid"),
             {"pid": ids["project_id"]},
         )
         await session.commit()
@@ -436,7 +430,11 @@ async def test_stale_artifact_materialize_blocked(
     assert resp.status_code == 400, resp.text
     assert any(
         code in resp.text
-        for code in ("preparation_parity", "preparation_hash_mismatch", "content_hash_stale")
+        for code in (
+            "preparation_parity",
+            "preparation_hash_mismatch",
+            "content_hash_stale",
+        )
     )
     # 零提升：artifact 保持 candidate。
     assert await _artifact_status(runtime_factory, ids) == "candidate"
@@ -499,7 +497,12 @@ async def test_missing_asset_blocks_materialize(
     assert resp.status_code == 400, resp.text
     assert any(
         code in resp.text
-        for code in ("preparation_parity", "bundle_blocked", "missing_asset", "content_hash_stale")
+        for code in (
+            "preparation_parity",
+            "bundle_blocked",
+            "missing_asset",
+            "content_hash_stale",
+        )
     )
     assert await _artifact_status(runtime_factory, ids) == "candidate"
 

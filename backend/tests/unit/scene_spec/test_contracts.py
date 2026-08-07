@@ -94,12 +94,12 @@ HEX64_C = "c" * 64
 HEX64_D = "d" * 64
 
 # Shared lineage hashes used by the fixture builders below.
-VB_HASH = HEX64            # approved Visual Bible revision the spec is frozen against
-CANDIDATE_HASH = HEX64_B   # source SceneCandidate content hash
-SNAPSHOT_HASH = HEX64_C    # source snapshot hash
-SCHEMA_HASH = HEX64_D      # scene-spec schema hash
-POLICY_HASH = HEX64        # compiler policy hash
-CONFIG_HASH = HEX64_B      # compiler config hash
+VB_HASH = HEX64  # approved Visual Bible revision the spec is frozen against
+CANDIDATE_HASH = HEX64_B  # source SceneCandidate content hash
+SNAPSHOT_HASH = HEX64_C  # source snapshot hash
+SCHEMA_HASH = HEX64_D  # scene-spec schema hash
+POLICY_HASH = HEX64  # compiler policy hash
+CONFIG_HASH = HEX64_B  # compiler config hash
 
 MIGRATIONS_DIR = Path(__file__).resolve().parents[3] / "migrations" / "versions"
 
@@ -114,9 +114,7 @@ PROMPT_TABLES = {"prompt_revisions"}
 
 # Pinned canonical hashes of the closed vocabularies so a future rename cannot
 # pass silently (stable hash pins the closed contract, D-32-02/03).
-DETAIL_KINDS_HASH = canonical_scene_spec_hash(
-    {"detail_kinds": list(SPEC_DETAIL_KINDS)}
-)
+DETAIL_KINDS_HASH = canonical_scene_spec_hash({"detail_kinds": list(SPEC_DETAIL_KINDS)})
 SOURCES_HASH = canonical_scene_spec_hash({"sources": list(SPEC_SOURCES)})
 SCOPES_HASH = canonical_scene_spec_hash(
     {"constraint_scopes": list(SPEC_CONSTRAINT_SCOPES)}
@@ -124,9 +122,8 @@ SCOPES_HASH = canonical_scene_spec_hash(
 REASONS_HASH = canonical_scene_spec_hash(
     {"uncertainty_reasons": list(SPEC_UNCERTAINTY_REASONS)}
 )
-SECTIONS_HASH = canonical_scene_spec_hash(
-    {"section_order": list(SPEC_SECTION_ORDER)}
-)
+SECTIONS_HASH = canonical_scene_spec_hash({"section_order": list(SPEC_SECTION_ORDER)})
+
 
 # Mock provider adapters: deterministic, provider-neutral section renderers.
 # Adapter B deliberately reorders sections to prove the canonical sections and
@@ -253,9 +250,7 @@ def _spec(**overrides):
     payload.update(overrides)
     spec = SceneSpecContract.model_validate(payload)
     if "content_hash" not in overrides:
-        spec = spec.model_copy(
-            update={"content_hash": recompute_scene_spec_hash(spec)}
-        )
+        spec = spec.model_copy(update={"content_hash": recompute_scene_spec_hash(spec)})
     return spec
 
 
@@ -357,9 +352,7 @@ def _scene_spec_view(**overrides):
                 "rationale": d.rationale,
                 "spoiler_cutoff": d.spoiler_cutoff,
                 "evidence_keys": [r.evidence_key for r in d.evidence_refs],
-                "visual_bible_stable_ids": [
-                    r.stable_id for r in d.visual_bible_refs
-                ],
+                "visual_bible_stable_ids": [r.stable_id for r in d.visual_bible_refs],
             }
             for d in spec.details
         ],
@@ -441,11 +434,26 @@ def test_spec_vocabulary_is_closed_and_pinned():
         "negative_constraints",
         "uncertainties",
     ]
-    assert DETAIL_KINDS_HASH == "a329e210e3634013906814192689a085d6b5ed3bc4461e952899438d397a170d"
-    assert SOURCES_HASH == "6e3979c9f9a6950a2b3a4e5129c4a2b40299c148667fb1324742b6c5eef8ae6d"
-    assert SCOPES_HASH == "33adb6d6f5e1593ba29796f3894d242187086b8fa968489e7cf48320a5dfc30b"
-    assert REASONS_HASH == "268df3749d3655bf63e193939c024dcdf2a7537229dc00334c5beccd11ab1106"
-    assert SECTIONS_HASH == "c2adc0a1dca328bdadf50587782dc6525f164ba1706442fc29a46c295a82f451"
+    assert (
+        DETAIL_KINDS_HASH
+        == "a329e210e3634013906814192689a085d6b5ed3bc4461e952899438d397a170d"
+    )
+    assert (
+        SOURCES_HASH
+        == "6e3979c9f9a6950a2b3a4e5129c4a2b40299c148667fb1324742b6c5eef8ae6d"
+    )
+    assert (
+        SCOPES_HASH
+        == "33adb6d6f5e1593ba29796f3894d242187086b8fa968489e7cf48320a5dfc30b"
+    )
+    assert (
+        REASONS_HASH
+        == "268df3749d3655bf63e193939c024dcdf2a7537229dc00334c5beccd11ab1106"
+    )
+    assert (
+        SECTIONS_HASH
+        == "c2adc0a1dca328bdadf50587782dc6525f164ba1706442fc29a46c295a82f451"
+    )
 
 
 def test_review_vocabulary_is_closed():
@@ -552,8 +560,12 @@ def test_unsupported_future_spoiler_evidence_rejected():
     with pytest.raises(ValidationError):
         _evidence(chapter_number=9, cutoff_chapter=8)
     with pytest.raises(ValidationError):
-        _detail(evidence_refs=[_evidence(chapter_number=9, cutoff_chapter=8).model_dump()])
-    ok = _detail(evidence_refs=[_evidence(chapter_number=8, cutoff_chapter=8).model_dump()])
+        _detail(
+            evidence_refs=[_evidence(chapter_number=9, cutoff_chapter=8).model_dump()]
+        )
+    ok = _detail(
+        evidence_refs=[_evidence(chapter_number=8, cutoff_chapter=8).model_dump()]
+    )
     assert ok.spoiler_cutoff == 8
 
 
@@ -618,7 +630,9 @@ def test_evidence_lineage_must_match_spec_snapshot_and_cutoff():
 
     bad_snapshot_id = _spec(
         details=[
-            _detail(evidence_refs=[_evidence(source_snapshot_id="other-ss").model_dump()]).model_dump()
+            _detail(
+                evidence_refs=[_evidence(source_snapshot_id="other-ss").model_dump()]
+            ).model_dump()
         ]
     )
     with pytest.raises(SceneSpecGateError):
@@ -626,7 +640,9 @@ def test_evidence_lineage_must_match_spec_snapshot_and_cutoff():
 
     bad_snapshot_hash = _spec(
         details=[
-            _detail(evidence_refs=[_evidence(source_snapshot_hash=HEX64_D).model_dump()]).model_dump()
+            _detail(
+                evidence_refs=[_evidence(source_snapshot_hash=HEX64_D).model_dump()]
+            ).model_dump()
         ]
     )
     with pytest.raises(SceneSpecGateError):
@@ -634,7 +650,9 @@ def test_evidence_lineage_must_match_spec_snapshot_and_cutoff():
 
     bad_cutoff = _spec(
         details=[
-            _detail(evidence_refs=[_evidence(cutoff_chapter=3).model_dump()]).model_dump()
+            _detail(
+                evidence_refs=[_evidence(cutoff_chapter=3).model_dump()]
+            ).model_dump()
         ]
     )
     with pytest.raises(SceneSpecGateError):
@@ -651,7 +669,9 @@ def test_visual_bible_revision_lineage_must_match():
                 detail_key="sub-mara",
                 source="visual_bible",
                 text="Mara the harbor-runner",
-                visual_bible_refs=[_vbref(stable_id="char-mara", revision_hash=HEX64_D)],
+                visual_bible_refs=[
+                    _vbref(stable_id="char-mara", revision_hash=HEX64_D)
+                ],
             ).model_dump()
         ]
     )
@@ -705,9 +725,7 @@ def test_spec_continuity_preserves_stable_visual_bible_ids():
     spec = _spec(details=[d.model_dump() for d in details])
     validate_scene_spec_contract(spec)
 
-    stable_ids = {
-        ref.stable_id for d in spec.details for ref in d.visual_bible_refs
-    }
+    stable_ids = {ref.stable_id for d in spec.details for ref in d.visual_bible_refs}
     assert {"char-arin", "char-mara", "place-courtyard"} <= stable_ids
     for detail in spec.details:
         for ref in detail.visual_bible_refs:
@@ -785,8 +803,12 @@ def test_negative_constraint_scope_is_closed():
 
 def test_prompt_golden_is_deterministic_across_runs():
     spec = _spec()
-    a = _prompt(spec, adapter_id="mock-a", adapter_version="1.0.0", render=_mock_adapter_a)
-    b = _prompt(spec, adapter_id="mock-a", adapter_version="1.0.0", render=_mock_adapter_a)
+    a = _prompt(
+        spec, adapter_id="mock-a", adapter_version="1.0.0", render=_mock_adapter_a
+    )
+    b = _prompt(
+        spec, adapter_id="mock-a", adapter_version="1.0.0", render=_mock_adapter_a
+    )
     assert a == b
     assert a.input_hash == b.input_hash
     assert a.prompt_hash == b.prompt_hash
@@ -796,8 +818,12 @@ def test_prompt_golden_is_deterministic_across_runs():
 
 def test_prompt_input_hash_is_adapter_independent_output_differs():
     spec = _spec()
-    a = _prompt(spec, adapter_id="mock-a", adapter_version="1.0.0", render=_mock_adapter_a)
-    b = _prompt(spec, adapter_id="mock-b", adapter_version="2.0.0", render=_mock_adapter_b)
+    a = _prompt(
+        spec, adapter_id="mock-a", adapter_version="1.0.0", render=_mock_adapter_a
+    )
+    b = _prompt(
+        spec, adapter_id="mock-b", adapter_version="2.0.0", render=_mock_adapter_b
+    )
     # Canonical sections are provider-neutral: identical across adapters.
     assert a.sections == b.sections
     # The input lineage (spec + canonical sections) is adapter-independent.
@@ -925,13 +951,17 @@ def test_review_transition_map_is_closed():
     for state, actions in LEGAL_SPEC_REVIEW_TRANSITIONS.items():
         for action in actions:
             assert action in SPEC_REVIEW_ACTION_TO_STATE
-            assert review_state_after(state, action) == SPEC_REVIEW_ACTION_TO_STATE[action]
+            assert (
+                review_state_after(state, action) == SPEC_REVIEW_ACTION_TO_STATE[action]
+            )
 
 
 def test_review_chain_and_idempotency():
     assert review_state_after("candidate", "approve") is SpecReviewState.APPROVED
     assert review_state_after("candidate", "reject") is SpecReviewState.REJECTED
-    assert review_state_after("candidate", "needs_relink") is SpecReviewState.NEEDS_RELINK
+    assert (
+        review_state_after("candidate", "needs_relink") is SpecReviewState.NEEDS_RELINK
+    )
     assert review_state_after("approved", "supersede") is SpecReviewState.SUPERSEDED
     with pytest.raises(SceneSpecGateError):
         review_state_after("approved", "approve")  # double approval impossible
@@ -941,9 +971,7 @@ def test_review_chain_and_idempotency():
     result = validate_review_event(_review_event())
     assert result is SpecReviewState.APPROVED
     with pytest.raises(SceneSpecGateError):
-        validate_review_event(
-            _review_event(), seen_event_keys={"ev-approve-1"}
-        )
+        validate_review_event(_review_event(), seen_event_keys={"ev-approve-1"})
 
 
 # ---------------------------------------------------------------------------
@@ -1070,9 +1098,7 @@ def test_spec_orm_carries_owner_novel_version_snapshot_lineage():
     assert ("owner_id", "novel_id", "id") in unique
 
     check_names = {
-        c.name
-        for c in SceneSpecVersion.__table__.constraints
-        if hasattr(c, "name")
+        c.name for c in SceneSpecVersion.__table__.constraints if hasattr(c, "name")
     }
     assert "ck_scene_spec_versions_review_state" in check_names
     assert "ck_scene_spec_versions_candidate_hash" in check_names
@@ -1087,9 +1113,7 @@ def test_detail_orm_enforces_closed_kind_source_and_unique_key():
     }
     assert ("owner_id", "novel_id", "spec_id", "detail_key") in unique
     check_names = {
-        c.name
-        for c in SceneSpecDetail.__table__.constraints
-        if hasattr(c, "name")
+        c.name for c in SceneSpecDetail.__table__.constraints if hasattr(c, "name")
     }
     assert "ck_scene_spec_details_kind" in check_names
     assert "ck_scene_spec_details_source" in check_names
@@ -1097,9 +1121,7 @@ def test_detail_orm_enforces_closed_kind_source_and_unique_key():
 
 def test_evidence_orm_enforces_spoiler_gate_and_owner_shape():
     check_names = {
-        c.name
-        for c in SceneSpecEvidenceRef.__table__.constraints
-        if hasattr(c, "name")
+        c.name for c in SceneSpecEvidenceRef.__table__.constraints if hasattr(c, "name")
     }
     assert "ck_scene_spec_evidence_spoiler_cutoff" in check_names
     assert "ck_scene_spec_evidence_owner" in check_names
@@ -1149,9 +1171,7 @@ def test_prompt_orm_carries_lineage_and_hash_separation():
     assert ("owner_id", "novel_id", "prompt_key") in unique
 
     check_names = {
-        c.name
-        for c in PromptRevision.__table__.constraints
-        if hasattr(c, "name")
+        c.name for c in PromptRevision.__table__.constraints if hasattr(c, "name")
     }
     assert "ck_prompt_revisions_hash_separation" in check_names
     assert "ck_prompt_revisions_review_state" in check_names

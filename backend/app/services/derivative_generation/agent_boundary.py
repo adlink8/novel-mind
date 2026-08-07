@@ -213,7 +213,9 @@ async def revalidate_approved_divergence(
     created. A blocked/mismatched result fails closed (``revalidation_failed``).
     """
     job = await db.scalar(
-        select(DerivativeGenerationJob).where(DerivativeGenerationJob.id == candidate.job_id)
+        select(DerivativeGenerationJob).where(
+            DerivativeGenerationJob.id == candidate.job_id
+        )
     )
     if job is None:
         raise OverrideError(

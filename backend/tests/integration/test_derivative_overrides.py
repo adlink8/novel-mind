@@ -35,10 +35,6 @@ from app.api.derivative_generation import (
 from app.core.database import get_db
 from app.core.security import create_access_token, hash_password
 from app.main import app
-from app.models.derivative_generation_job import (
-    DerivativeGenerationCandidate,
-    DerivativeGenerationJob,
-)
 from app.models.derivative_override import DerivativeOverride
 from app.models.novel import Chapter, Novel
 from app.models.user import User
@@ -91,7 +87,13 @@ def _override_budget_gate():
     return current_budget_gate
 
 
-def _candidate_json(*, intent="continuation", citations=None, divergence=None, draft="阿宁在竹林入口站定，深吸一口气。"):
+def _candidate_json(
+    *,
+    intent="continuation",
+    citations=None,
+    divergence=None,
+    draft="阿宁在竹林入口站定，深吸一口气。",
+):
     payload = {
         "schema_version": "derivative-candidate.v1",
         "intent": intent,
@@ -171,7 +173,9 @@ def _seed_owner(sync_url: str, *, suffix: str, chapter_count: int = 3) -> dict:
             status="ready",
             reading_progress={},
             chapter_count=chapter_count,
-            word_count=sum(len(f"chapter {i} body") for i in range(1, chapter_count + 1)),
+            word_count=sum(
+                len(f"chapter {i} body") for i in range(1, chapter_count + 1)
+            ),
         )
         session.add(novel)
         session.flush()
@@ -198,7 +202,9 @@ def _seed_owner(sync_url: str, *, suffix: str, chapter_count: int = 3) -> dict:
 
 async def _create_fork(client, headers, novel_id, fork_key) -> dict:
     resp = await client.post(
-        FORK_BASE.format(novel_id=novel_id), json={"fork_key": fork_key}, headers=headers
+        FORK_BASE.format(novel_id=novel_id),
+        json={"fork_key": fork_key},
+        headers=headers,
     )
     assert resp.status_code == 201, resp.text
     return resp.json()["fork"]
@@ -244,7 +250,9 @@ def _seed_world_model(sync_url: str, *, owner_id: int, novel_id: int) -> None:
     engine.dispose()
 
 
-async def _compile(client, headers, novel_id, fork_id, *, intent="continuation") -> dict:
+async def _compile(
+    client, headers, novel_id, fork_id, *, intent="continuation"
+) -> dict:
     resp = await client.post(
         PACKAGE_BASE.format(novel_id=novel_id),
         json={"fork_id": fork_id, "intent": intent},
@@ -263,17 +271,22 @@ def _first_evidence_key(pkg: dict) -> str:
 async def _create_project(client, headers, novel_id, fork_id, name) -> dict:
     resp = await client.post(
         PROJECT_BASE.format(novel_id=novel_id),
-        json={"fork_id": fork_id, "name": name, "project_key": f"key-{uuid.uuid4().hex[:8]}"},
+        json={
+            "fork_id": fork_id,
+            "name": name,
+            "project_key": f"key-{uuid.uuid4().hex[:8]}",
+        },
         headers=headers,
     )
     assert resp.status_code == 201, resp.text
     return resp.json()["project"]
 
 
-async def _create_chapter(client, headers, novel_id, project_id, title="Chapter 4") -> dict:
+async def _create_chapter(
+    client, headers, novel_id, project_id, title="Chapter 4"
+) -> dict:
     resp = await client.post(
-        PROJECT_BASE.format(novel_id=novel_id)
-        + f"/{project_id}/chapters",
+        PROJECT_BASE.format(novel_id=novel_id) + f"/{project_id}/chapters",
         json={"title": title},
         headers=headers,
     )
@@ -284,7 +297,11 @@ async def _create_chapter(client, headers, novel_id, project_id, title="Chapter 
 async def _create_job(client, headers, novel_id, package_id, job_key) -> dict:
     resp = await client.post(
         JOB_BASE.format(novel_id=novel_id),
-        json={"context_package_id": package_id, "intent": "continuation", "job_key": job_key},
+        json={
+            "context_package_id": package_id,
+            "intent": "continuation",
+            "job_key": job_key,
+        },
         headers=headers,
     )
     assert resp.status_code == 201, resp.text
@@ -305,17 +322,25 @@ def _reset_gateway() -> None:
     current_budget_gate.__init__(DEFAULT_DERIVATIVE_BUDGET)
 
 
-async def _build_override_candidate(client, headers, ids, suffix, *, divergence_evidence=None) -> dict:
+async def _build_override_candidate(
+    client, headers, ids, suffix, *, divergence_evidence=None
+) -> dict:
     """Fork + world model + package + job + run producing a needs_override candidate."""
     novel_id = ids["novel_id"]
     fork = await _create_fork(client, headers, novel_id, f"ff-{suffix}")
-    _seed_world_model(sync_url=ids["_sync_url"], owner_id=ids["owner_id"], novel_id=novel_id)
+    _seed_world_model(
+        sync_url=ids["_sync_url"], owner_id=ids["owner_id"], novel_id=novel_id
+    )
     pkg = await _compile(client, headers, novel_id, fork["id"])
     pkg_view = pkg["package"]
     cite = _first_evidence_key(pkg_view)
     _reset_gateway()
-    divergence = _divergence_payload([cite] if divergence_evidence is None else divergence_evidence)
-    created = await _create_job(client, headers, novel_id, pkg_view["id"], job_key=f"{suffix}-key")
+    divergence = _divergence_payload(
+        [cite] if divergence_evidence is None else divergence_evidence
+    )
+    created = await _create_job(
+        client, headers, novel_id, pkg_view["id"], job_key=f"{suffix}-key"
+    )
     gateway.responses = [
         {
             "content": _candidate_json(citations=[cite], divergence=divergence),
@@ -324,17 +349,35 @@ async def _build_override_candidate(client, headers, ids, suffix, *, divergence_
     ]
     run = await _run_job(client, headers, novel_id, created["job"]["id"])
     assert run["job"]["status"] == "needs_override", run
-    return {"fork": fork, "package": pkg_view, "candidate": run["candidate"], "cite": cite}
+    return {
+        "fork": fork,
+        "package": pkg_view,
+        "candidate": run["candidate"],
+        "cite": cite,
+    }
 
 
 async def _project_chapter(client, headers, ids, fork) -> dict:
     novel_id = ids["novel_id"]
-    project = await _create_project(client, headers, novel_id, fork["id"], "Override Project")
+    project = await _create_project(
+        client, headers, novel_id, fork["id"], "Override Project"
+    )
     chapter = await _create_chapter(client, headers, novel_id, project["id"])
     return {"project": project, "chapter": chapter}
 
 
-async def _create_override(client, headers, novel_id, *, candidate_id, project_id, chapter_id, reason="the twist requires the hero to know the secret", evidence=None, kind=None):
+async def _create_override(
+    client,
+    headers,
+    novel_id,
+    *,
+    candidate_id,
+    project_id,
+    chapter_id,
+    reason="the twist requires the hero to know the secret",
+    evidence=None,
+    kind=None,
+):
     body = {
         "candidate_id": candidate_id,
         "project_id": project_id,
@@ -344,7 +387,9 @@ async def _create_override(client, headers, novel_id, *, candidate_id, project_i
     }
     if kind is not None:
         body["kind"] = kind
-    return await client.post(OVERRIDE_BASE.format(novel_id=novel_id), json=body, headers=headers)
+    return await client.post(
+        OVERRIDE_BASE.format(novel_id=novel_id), json=body, headers=headers
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -363,7 +408,9 @@ async def test_clean_candidate_is_never_overridable(api_client):
     pkg = await _compile(client, headers, novel_id, fork["id"])
     cite = _first_evidence_key(pkg["package"])
     _reset_gateway()
-    created = await _create_job(client, headers, novel_id, pkg["package"]["id"], job_key="clean-key")
+    created = await _create_job(
+        client, headers, novel_id, pkg["package"]["id"], job_key="clean-key"
+    )
     gateway.responses = [
         {
             "content": _candidate_json(citations=[cite]),
@@ -372,11 +419,15 @@ async def test_clean_candidate_is_never_overridable(api_client):
     ]
     run = await _run_job(client, headers, novel_id, created["job"]["id"])
     assert run["candidate"]["gate_verdict"] == "candidate"
-    project = await _create_project(client, headers, novel_id, fork["id"], "Clean Project")
+    project = await _create_project(
+        client, headers, novel_id, fork["id"], "Clean Project"
+    )
     chapter = await _create_chapter(client, headers, novel_id, project["id"])
 
     resp = await _create_override(
-        client, headers, novel_id,
+        client,
+        headers,
+        novel_id,
         candidate_id=run["candidate"]["id"],
         project_id=project["id"],
         chapter_id=chapter["id"],
@@ -400,8 +451,12 @@ async def test_override_without_reason_or_evidence_is_rejected(api_client):
 
     # No reason -> rejected (service strips the blank and fails closed).
     resp = await _create_override(
-        client, headers, novel_id,
-        candidate_id=candidate_id, project_id=project_id, chapter_id=chapter_id,
+        client,
+        headers,
+        novel_id,
+        candidate_id=candidate_id,
+        project_id=project_id,
+        chapter_id=chapter_id,
         reason="   ",
     )
     assert resp.status_code == 400, resp.text
@@ -409,8 +464,12 @@ async def test_override_without_reason_or_evidence_is_rejected(api_client):
 
     # Evidence outside the sealed package allowlist -> rejected.
     resp = await _create_override(
-        client, headers, novel_id,
-        candidate_id=candidate_id, project_id=project_id, chapter_id=chapter_id,
+        client,
+        headers,
+        novel_id,
+        candidate_id=candidate_id,
+        project_id=project_id,
+        chapter_id=chapter_id,
         evidence=["fork:req:future:999"],
     )
     assert resp.status_code == 400, resp.text
@@ -426,7 +485,9 @@ async def test_approve_without_approval_note_is_rejected(api_client):
     data = await _build_override_candidate(client, headers, ids, "appr")
     target = await _project_chapter(client, headers, ids, data["fork"])
     created = await _create_override(
-        client, headers, novel_id,
+        client,
+        headers,
+        novel_id,
         candidate_id=data["candidate"]["id"],
         project_id=target["project"]["id"],
         chapter_id=target["chapter"]["id"],
@@ -453,7 +514,9 @@ async def test_approve_materializes_fanfiction_revision_only(api_client):
     data = await _build_override_candidate(client, headers, ids, "full")
     target = await _project_chapter(client, headers, ids, data["fork"])
     created = await _create_override(
-        client, headers, novel_id,
+        client,
+        headers,
+        novel_id,
         candidate_id=data["candidate"]["id"],
         project_id=target["project"]["id"],
         chapter_id=target["chapter"]["id"],
@@ -504,9 +567,9 @@ async def test_approve_materializes_fanfiction_revision_only(api_client):
             {"n": novel_id},
         )
         override_count = await session.scalar(
-            select(func.count()).select_from(DerivativeOverride).where(
-                DerivativeOverride.candidate_id == data["candidate"]["id"]
-            )
+            select(func.count())
+            .select_from(DerivativeOverride)
+            .where(DerivativeOverride.candidate_id == data["candidate"]["id"])
         )
         chapter_markdown = await session.scalar(
             text("SELECT markdown FROM derivative_chapters WHERE id = :c"),
@@ -534,7 +597,11 @@ async def test_approve_materializes_fanfiction_revision_only(api_client):
     assert revision_count == 2  # create root + one override materialization
     assert override_count == 1
     assert chapter_markdown == data["candidate"]["draft_text"]
-    assert original == [(1, "chapter 1 body"), (2, "chapter 2 body"), (3, "chapter 3 body")]
+    assert original == [
+        (1, "chapter 1 body"),
+        (2, "chapter 2 body"),
+        (3, "chapter 3 body"),
+    ]
     assert artifact_count == 0
 
 
@@ -547,7 +614,9 @@ async def test_reject_override_creates_no_revision(api_client):
     data = await _build_override_candidate(client, headers, ids, "rej")
     target = await _project_chapter(client, headers, ids, data["fork"])
     created = await _create_override(
-        client, headers, novel_id,
+        client,
+        headers,
+        novel_id,
         candidate_id=data["candidate"]["id"],
         project_id=target["project"]["id"],
         chapter_id=target["chapter"]["id"],
@@ -600,14 +669,19 @@ async def test_cross_owner_override_is_identical_404(api_client):
     data = await _build_override_candidate(client, headers_a, a, "owna")
     # Owner B's own project/chapter (valid scope for B).
     b_fork = await _create_fork(client, headers_b, b["novel_id"], "ff-ownb")
-    b_project = await _create_project(client, headers_b, b["novel_id"], b_fork["id"], "B Project")
+    b_project = await _create_project(
+        client, headers_b, b["novel_id"], b_fork["id"], "B Project"
+    )
     b_chapter = await _create_chapter(client, headers_b, b["novel_id"], b_project["id"])
 
     # Owner B cannot create an override on owner A's candidate (identical 404).
     resp = await _create_override(
-        client, headers_b, b["novel_id"],
+        client,
+        headers_b,
+        b["novel_id"],
         candidate_id=data["candidate"]["id"],
-        project_id=b_project["id"], chapter_id=b_chapter["id"],
+        project_id=b_project["id"],
+        chapter_id=b_chapter["id"],
         evidence=["fork:any"],
     )
     assert resp.status_code == 404, resp.text
@@ -623,11 +697,17 @@ async def test_cross_fork_project_override_fails_closed(api_client):
     data = await _build_override_candidate(client, headers, ids, "cf")
     # A second project bound to a different fork.
     other_fork = await _create_fork(client, headers, novel_id, "ff-cf-other")
-    foreign_project = await _create_project(client, headers, novel_id, other_fork["id"], "Wrong Fork Project")
-    foreign_chapter = await _create_chapter(client, headers, novel_id, foreign_project["id"])
+    foreign_project = await _create_project(
+        client, headers, novel_id, other_fork["id"], "Wrong Fork Project"
+    )
+    foreign_chapter = await _create_chapter(
+        client, headers, novel_id, foreign_project["id"]
+    )
 
     resp = await _create_override(
-        client, headers, novel_id,
+        client,
+        headers,
+        novel_id,
         candidate_id=data["candidate"]["id"],
         project_id=foreign_project["id"],
         chapter_id=foreign_chapter["id"],
@@ -637,7 +717,9 @@ async def test_cross_fork_project_override_fails_closed(api_client):
     assert "cross_fork_override" in resp.json()["detail"]
 
 
-async def test_override_row_frozen_surface_is_immutable_at_database_level(api_client, migrated_postgres):
+async def test_override_row_frozen_surface_is_immutable_at_database_level(
+    api_client, migrated_postgres
+):
     """T-37-04-01: the divergence surface cannot be rewritten or deleted."""
     client, _, sync_url = api_client
     ids = _seed_owner(sync_url, suffix=f"imm_{uuid.uuid4().hex[:8]}")
@@ -647,7 +729,9 @@ async def test_override_row_frozen_surface_is_immutable_at_database_level(api_cl
     data = await _build_override_candidate(client, headers, ids, "imm")
     target = await _project_chapter(client, headers, ids, data["fork"])
     created = await _create_override(
-        client, headers, novel_id,
+        client,
+        headers,
+        novel_id,
         candidate_id=data["candidate"]["id"],
         project_id=target["project"]["id"],
         chapter_id=target["chapter"]["id"],
@@ -690,7 +774,9 @@ async def test_blocked_candidate_accepts_owner_supplied_divergence(api_client):
     pkg = await _compile(client, headers, novel_id, fork["id"])
     cite = _first_evidence_key(pkg["package"])
     _reset_gateway()
-    created = await _create_job(client, headers, novel_id, pkg["package"]["id"], job_key="block-key")
+    created = await _create_job(
+        client, headers, novel_id, pkg["package"]["id"], job_key="block-key"
+    )
     # Provider cites evidence outside the package -> deterministic blocked.
     gateway.responses = [
         {
@@ -705,7 +791,9 @@ async def test_blocked_candidate_accepts_owner_supplied_divergence(api_client):
 
     # Without a kind the override is rejected (the candidate declares no CanonDelta).
     resp = await _create_override(
-        client, headers, novel_id,
+        client,
+        headers,
+        novel_id,
         candidate_id=run["candidate"]["id"],
         project_id=target["project"]["id"],
         chapter_id=target["chapter"]["id"],
@@ -716,7 +804,9 @@ async def test_blocked_candidate_accepts_owner_supplied_divergence(api_client):
 
     # A kind without affected evidence is rejected (missing_evidence).
     resp = await _create_override(
-        client, headers, novel_id,
+        client,
+        headers,
+        novel_id,
         candidate_id=run["candidate"]["id"],
         project_id=target["project"]["id"],
         chapter_id=target["chapter"]["id"],
@@ -728,7 +818,9 @@ async def test_blocked_candidate_accepts_owner_supplied_divergence(api_client):
 
     # With an explicit owner-declared kind the override is accepted.
     resp = await _create_override(
-        client, headers, novel_id,
+        client,
+        headers,
+        novel_id,
         candidate_id=run["candidate"]["id"],
         project_id=target["project"]["id"],
         chapter_id=target["chapter"]["id"],

@@ -28,7 +28,6 @@ from zipfile import ZipFile
 import pytest
 
 from app.schemas.derivative_visual_asset import (
-    DERIVATIVE_ASSET_NAMESPACE,
     DerivativeVisualAssetState,
 )
 from app.services.derivative_export import package as package_module
@@ -63,7 +62,6 @@ from tests.fixtures.derivative_export_roundtrip_fixtures import (
     HEX64_A,
     HEX64_B,
     HEX64_F,
-    NOVEL_ID,
     OWNER_ID,
     PROJECT_ID,
     build_fixture_snapshot,
@@ -146,9 +144,7 @@ def test_clean_revision_passes_parity():
 
 def test_cross_owner_revision_is_blocked():
     revision = fixture_revision(version_id=1)
-    revision = revision.__class__(
-        **{**revision.as_dict(), "owner_id": OTHER_OWNER}
-    )
+    revision = revision.__class__(**{**revision.as_dict(), "owner_id": OTHER_OWNER})
     assert "revision_owner_mismatch" in validate_published_revision(
         revision, **_scope()
     )
@@ -165,17 +161,13 @@ def test_cross_project_revision_is_blocked():
 def test_cross_fork_revision_is_blocked():
     revision = fixture_revision(version_id=1)
     revision = revision.__class__(**{**revision.as_dict(), "fork_id": OTHER_FORK})
-    assert "revision_fork_mismatch" in validate_published_revision(
-        revision, **_scope()
-    )
+    assert "revision_fork_mismatch" in validate_published_revision(revision, **_scope())
 
 
 def test_original_or_promoted_status_is_blocked():
     revision = fixture_revision(version_id=1)
     revision = revision.__class__(**{**revision.as_dict(), "status": "original"})
-    assert "revision_status_denied" in validate_published_revision(
-        revision, **_scope()
-    )
+    assert "revision_status_denied" in validate_published_revision(revision, **_scope())
 
 
 def test_source_snapshot_drift_is_blocked():
@@ -195,9 +187,7 @@ def test_manifest_hash_drift_is_blocked():
 def test_stale_revision_version_is_blocked():
     # The chapter version token has moved ahead of the published revision.
     revision = fixture_revision(version_id=1)
-    errors = validate_published_revision(
-        revision, **_scope(chapter_version_id=2)
-    )
+    errors = validate_published_revision(revision, **_scope(chapter_version_id=2))
     assert "revision_version_stale" in errors
 
 
@@ -316,17 +306,13 @@ def test_asset_hashes_membership_passes_for_published_hashes():
 
 def test_asset_hash_not_member_is_blocked():
     revision = fixture_revision(version_id=1, asset_hashes=["7" * 64])
-    assert "asset_hash_not_member" in validate_asset_membership(
-        revision, {HEX64_F}
-    )
+    assert "asset_hash_not_member" in validate_asset_membership(revision, {HEX64_F})
 
 
 def test_unapproved_asset_hash_referenced_is_blocked():
     # A rejected asset's hash must never satisfy membership.
     revision = fixture_revision(version_id=1, asset_hashes=["5" * 64])
-    assert "asset_hash_not_member" in validate_asset_membership(
-        revision, {HEX64_F}
-    )
+    assert "asset_hash_not_member" in validate_asset_membership(revision, {HEX64_F})
 
 
 # ---------------------------------------------------------------------------
@@ -361,9 +347,7 @@ def test_clean_snapshot_builds_package_with_replayable_hash():
 
 def test_package_cross_owner_revision_is_blocked():
     revision = fixture_export_revision().model_copy(update={"owner_id": OTHER_OWNER})
-    snapshot = build_fixture_snapshot(
-        revisions=(revision,), assets=(), citations=()
-    )
+    snapshot = build_fixture_snapshot(revisions=(revision,), assets=(), citations=())
     with pytest.raises(ExportSnapshotError) as exc:
         build_derivative_export_package(snapshot, _TinyReader())
     assert exc.value.code == "revision_owner_mismatch"
@@ -471,9 +455,7 @@ def test_package_citation_source_snapshot_drift_is_blocked():
 
 
 def test_package_rejected_asset_is_blocked():
-    asset = fixture_export_asset(
-        fixture_asset(review_state="rejected")
-    )
+    asset = fixture_export_asset(fixture_asset(review_state="rejected"))
     snapshot = build_fixture_snapshot(assets=(asset,))
     with pytest.raises(ExportSnapshotError) as exc:
         build_derivative_export_package(snapshot, _TinyReader())
@@ -516,9 +498,7 @@ def test_package_missing_bytes_are_blocked():
 )
 def test_package_path_traversal_asset_id_is_blocked(malicious):
     # T-39-02-02 / zip-slip: a malicious asset id must never reach the archive.
-    asset = fixture_export_asset(
-        fixture_asset(asset_id=malicious)
-    )
+    asset = fixture_export_asset(fixture_asset(asset_id=malicious))
     snapshot = build_fixture_snapshot(assets=(asset,))
     with pytest.raises(ExportSnapshotError) as exc:
         build_derivative_export_package(snapshot, _TinyReader())

@@ -152,9 +152,7 @@ async def get_key_scene_sets(
     current_user: User = Depends(require_user),
 ):
     """List every candidate set for the owned novel (oldest first)."""
-    items = await list_candidate_sets(
-        db, owner_id=current_user.id, novel_id=novel.id
-    )
+    items = await list_candidate_sets(db, owner_id=current_user.id, novel_id=novel.id)
     return KeySceneSetListResponse(items=items, total=len(items))
 
 

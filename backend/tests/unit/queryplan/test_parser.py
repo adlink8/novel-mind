@@ -152,7 +152,9 @@ def test_whole_book_skips_future_probing():
 
 
 def test_whole_book_without_authorization_is_contradictory():
-    result = parse_query_plan(analysis_payload(question_text="全书主线是什么？", whole_book=True))
+    result = parse_query_plan(
+        analysis_payload(question_text="全书主线是什么？", whole_book=True)
+    )
     assert isinstance(result, BlockedResult)
     assert result.reason_code == BlockedReasonCode.CONTRADICTORY
 
@@ -174,7 +176,11 @@ def test_selection_half_open_range_and_range_order_enforced():
 
     bad_range = parse_query_plan(
         analysis_payload(
-            chapter_range={"kind": "chapter_range", "chapter_start": 3, "chapter_end": 1}
+            chapter_range={
+                "kind": "chapter_range",
+                "chapter_start": 3,
+                "chapter_end": 1,
+            }
         )
     )
     assert isinstance(bad_range, BlockedResult)
@@ -204,9 +210,7 @@ def test_explicit_dimensions_dedup_and_are_validated():
     assert isinstance(result, QueryPlan)
     assert [d.value for d in result.dimensions] == ["relations", "timeline"]
 
-    unknown_dimension = parse_query_plan(
-        analysis_payload(dimensions=["memes"])
-    )
+    unknown_dimension = parse_query_plan(analysis_payload(dimensions=["memes"]))
     assert isinstance(unknown_dimension, BlockedResult)
     assert unknown_dimension.reason_code == BlockedReasonCode.INVALID_INPUT
 

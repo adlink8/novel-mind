@@ -770,7 +770,10 @@ async def _phase33_validate(
         run_row = await session.get(SkillRun, run_id)
         assert run_row is not None
         content = revision.content
-        if content["owner_id"] != run_row.owner_id or content["novel_id"] != run_row.novel_id:
+        if (
+            content["owner_id"] != run_row.owner_id
+            or content["novel_id"] != run_row.novel_id
+        ):
             raise IllustrationGateError("illustration revision scope mismatch")
         if content.get("branch") != run_row.branch:
             raise IllustrationGateError("illustration revision branch mismatch")
@@ -898,9 +901,7 @@ async def _latest_report(
     )
 
 
-async def _approve_domain_asset(
-    factory, *, ids: dict[str, Any], asset_id: int
-) -> None:
+async def _approve_domain_asset(factory, *, ids: dict[str, Any], asset_id: int) -> None:
     """显式服务端 review approve：proposal gate 通过 → 域 approval_state 前移。"""
     async with factory() as session:
         service = IllustrationReviewService(session)
@@ -956,9 +957,7 @@ async def _set_up(
     snapshot_hash = await _source_snapshot_hash(
         runtime_factory, owner_id=ids["owner_id"], novel_id=ids["novel_id"]
     )
-    chain = await _make_prompt_chain(
-        runtime_factory, ids, snapshot_hash=snapshot_hash
-    )
+    chain = await _make_prompt_chain(runtime_factory, ids, snapshot_hash=snapshot_hash)
     svid = await _register_skill(
         runtime_factory,
         owner_id=ids["owner_id"],
@@ -1201,21 +1200,22 @@ async def test_phase33_happy_path_proposal_ready(
         validated_rev = await session.get(ArtifactRevision, validated_rev_id)
         validated_artifact = await session.get(Artifact, outcome.artifact_id)
     assert validated_rev is not None
-    assert (
-        validated_rev.content["illustration_revision"]["review_state"] == "validated"
-    )
+    assert validated_rev.content["illustration_revision"]["review_state"] == "validated"
     assert validated_rev.parent_revision_id == outcome.artifact_revision_id
     assert validated_artifact is not None and validated_artifact.status == "candidate"
 
     # ── 显式服务端 review approve（域权威）→ proposal_ready ──
-    await _approve_domain_asset(
-        runtime_factory, ids=ctx, asset_id=ctx["asset_id"]
-    )
+    await _approve_domain_asset(runtime_factory, ids=ctx, asset_id=ctx["asset_id"])
     async with runtime_factory() as session:
         asset = await session.get(AssetRevision, ctx["asset_id"])
     assert asset is not None and asset.approval_state == "proposal_ready"
-    assert await _count_domain_review_events(runtime_factory, asset_id=ctx["asset_id"]) == 1
-    assert await _count_approvals(runtime_factory, run_id=run_id) == 0  # 非 ApprovalRequest
+    assert (
+        await _count_domain_review_events(runtime_factory, asset_id=ctx["asset_id"])
+        == 1
+    )
+    assert (
+        await _count_approvals(runtime_factory, run_id=run_id) == 0
+    )  # 非 ApprovalRequest
 
     # validator 推进 validated → proposal_ready（域 approve 已就位）。
     proposal_rev_id = await _phase33_validate(
@@ -1234,7 +1234,8 @@ async def test_phase33_happy_path_proposal_ready(
         )
     assert proposal_rev is not None
     assert (
-        proposal_rev.content["illustration_revision"]["review_state"] == "proposal_ready"
+        proposal_rev.content["illustration_revision"]["review_state"]
+        == "proposal_ready"
     )
     # 唯一官方状态机：candidate → validated → proposal_ready。
     assert [
@@ -1500,7 +1501,9 @@ async def test_phase33_validator_blocks_before_domain_approve(
         frozen_manifest={"evidence_refs": ctx["evidence_keys"]},
     )
     assert outcome.status == "completed"
-    await _phase33_validate(runtime_factory, ctx=ctx, run_id=ctx["run_id"], to_state="validated")
+    await _phase33_validate(
+        runtime_factory, ctx=ctx, run_id=ctx["run_id"], to_state="validated"
+    )
     # 未调用域 review approve → 域 approval_state 仍是 candidate → proposal_ready 拒绝。
     async with runtime_factory() as session:
         asset = await session.get(AssetRevision, ctx["asset_id"])
@@ -1571,8 +1574,9 @@ async def test_phase33_forbidden_tool_never_publishes(
         attempts = list(
             (
                 await session.scalars(
-                    select(IllustrationAttempt)
-                    .where(IllustrationAttempt.job_id == ctx["job_id"])
+                    select(IllustrationAttempt).where(
+                        IllustrationAttempt.job_id == ctx["job_id"]
+                    )
                 )
             ).all()
         )

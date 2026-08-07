@@ -17,9 +17,7 @@ class BookmarkCreate(BaseModel):
     position_percent: float = Field(
         ..., ge=0, le=100, description="章内阅读位置百分比 0-100"
     )
-    label: Optional[str] = Field(
-        None, max_length=200, description="书签标签（短标题）"
-    )
+    label: Optional[str] = Field(None, max_length=200, description="书签标签（短标题）")
     note: Optional[str] = Field(None, description="书签备注")
 
 

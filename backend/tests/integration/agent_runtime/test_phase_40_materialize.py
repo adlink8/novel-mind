@@ -324,7 +324,9 @@ class TestKeyScenesMaterialization:
             factory,
             seed=seed,
             run_id=run_id,
-            set_payload=await _build_scene_set_payload(seed, snapshot_hash=snapshot_hash),
+            set_payload=await _build_scene_set_payload(
+                seed, snapshot_hash=snapshot_hash
+            ),
         )
         async with factory() as session:
             await session.execute(
@@ -379,7 +381,9 @@ class TestKeyScenesMaterialization:
             factory,
             seed=seed,
             run_id=run_id,
-            set_payload=await _build_scene_set_payload(seed, snapshot_hash=snapshot_hash),
+            set_payload=await _build_scene_set_payload(
+                seed, snapshot_hash=snapshot_hash
+            ),
         )
         async with factory() as session:
             await session.execute(
@@ -455,7 +459,9 @@ class TestKnowledgeRetrievalWiring:
             factory,
             seed=seed,
             run_id=run_id,
-            set_payload=await _build_scene_set_payload(seed, snapshot_hash=snapshot_hash),
+            set_payload=await _build_scene_set_payload(
+                seed, snapshot_hash=snapshot_hash
+            ),
         )
         async with factory() as session:
             await session.execute(
@@ -471,13 +477,10 @@ class TestKnowledgeRetrievalWiring:
 
         async with factory() as session:
             chapters = (
-                (
-                    await session.scalars(
-                        select(Chapter).where(Chapter.novel_id == seed["novel_id"])
-                    )
+                await session.scalars(
+                    select(Chapter).where(Chapter.novel_id == seed["novel_id"])
                 )
-                .all()
-            )
+            ).all()
             chapters_by_number = {c.chapter_number: c for c in chapters}
             items, omitted, status = await fetch_knowledge_evidence(
                 session,
@@ -501,13 +504,10 @@ class TestKnowledgeRetrievalWiring:
 
         async with factory() as session:
             chapters = (
-                (
-                    await session.scalars(
-                        select(Chapter).where(Chapter.novel_id == seed["novel_id"])
-                    )
+                await session.scalars(
+                    select(Chapter).where(Chapter.novel_id == seed["novel_id"])
                 )
-                .all()
-            )
+            ).all()
             chapters_by_number = {c.chapter_number: c for c in chapters}
             items, omitted, status = await fetch_knowledge_evidence(
                 session,

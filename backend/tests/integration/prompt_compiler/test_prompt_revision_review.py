@@ -102,7 +102,11 @@ async def _seed_prompt_chain(
     prompt_base = f"/api/novels/{ids['novel_id']}/prompt-revisions"
     compiled = await client.post(
         prompt_base,
-        json={"spec_id": spec_id, "prompt_key": prompt_key, "adapter_id": "mock-provider"},
+        json={
+            "spec_id": spec_id,
+            "prompt_key": prompt_key,
+            "adapter_id": "mock-provider",
+        },
         headers=headers,
     )
     assert compiled.status_code == 201, compiled.text
@@ -207,9 +211,7 @@ def test_approval_gate_rejects_hash_separation_violation():
 
 def test_approval_gate_passes_fresh_replayable_prompt():
     contract = _contract()
-    assert evaluate_prompt_approval_gate(
-        revision=contract, stale=False
-    ).ok is True
+    assert evaluate_prompt_approval_gate(revision=contract, stale=False).ok is True
 
 
 def test_input_hash_replays_from_revision_lineage():
@@ -248,10 +250,14 @@ async def test_cross_owner_review_and_history_are_404(api_client):
     )
     assert foreign_review.status_code == 404
 
-    foreign_history = await client.get(f"{base_a}/{revision_id}/history", headers=headers_b)
+    foreign_history = await client.get(
+        f"{base_a}/{revision_id}/history", headers=headers_b
+    )
     assert foreign_history.status_code == 404
 
-    missing_novel = await client.get("/api/novels/999999991/prompt-revisions", headers=headers_b)
+    missing_novel = await client.get(
+        "/api/novels/999999991/prompt-revisions", headers=headers_b
+    )
     assert missing_novel.status_code == 404
     assert foreign_history.json() == missing_novel.json()
 
@@ -281,7 +287,9 @@ async def test_approve_moves_projection_and_persists_event(api_client):
     base = chain["prompt_base"]
     revision_id = chain["revision_id"]
 
-    history_before = await client.get(f"{base}/{revision_id}/history", headers=chain["headers"])
+    history_before = await client.get(
+        f"{base}/{revision_id}/history", headers=chain["headers"]
+    )
     assert history_before.status_code == 200
     assert history_before.json()["revision"]["review_state"] == "candidate"
     assert history_before.json()["stale"] is False
@@ -310,7 +318,9 @@ async def test_approve_moves_projection_and_persists_event(api_client):
     assert event["actor"] == "test-reviewer"
 
     # History now carries the appended event.
-    history_after = await client.get(f"{base}/{revision_id}/history", headers=chain["headers"])
+    history_after = await client.get(
+        f"{base}/{revision_id}/history", headers=chain["headers"]
+    )
     assert len(history_after.json()["review_events"]) == 1
 
 
@@ -377,7 +387,9 @@ async def test_from_review_state_mismatch_fails_closed(api_client):
     assert "does not match" in mismatched.json()["detail"]
 
     # No event was appended by the failed action.
-    history = await client.get(f"{base}/{revision_id}/history", headers=chain["headers"])
+    history = await client.get(
+        f"{base}/{revision_id}/history", headers=chain["headers"]
+    )
     assert history.json()["revision"]["review_state"] == "candidate"
     assert history.json()["review_events"] == []
 
@@ -397,7 +409,9 @@ async def test_duplicate_event_key_replays_without_second_approval(api_client):
 
     first = await client.post(
         f"{base}/{revision_id}/review",
-        json=_review_payload(action="approve", from_review_state="candidate", event_key=event_key),
+        json=_review_payload(
+            action="approve", from_review_state="candidate", event_key=event_key
+        ),
         headers=chain["headers"],
     )
     assert first.status_code == 200, first.text
@@ -406,7 +420,9 @@ async def test_duplicate_event_key_replays_without_second_approval(api_client):
     # Retrying the SAME event_key must replay, never append a second approval.
     second = await client.post(
         f"{base}/{revision_id}/review",
-        json=_review_payload(action="approve", from_review_state="candidate", event_key=event_key),
+        json=_review_payload(
+            action="approve", from_review_state="candidate", event_key=event_key
+        ),
         headers=chain["headers"],
     )
     assert second.status_code == 200, second.text
@@ -429,7 +445,9 @@ async def test_supersede_is_legal_from_approved(api_client):
     approved = await client.post(
         f"{base}/{revision_id}/review",
         json=_review_payload(
-            action="approve", from_review_state="candidate", event_key=f"ev-a-{uuid.uuid4().hex[:8]}"
+            action="approve",
+            from_review_state="candidate",
+            event_key=f"ev-a-{uuid.uuid4().hex[:8]}",
         ),
         headers=chain["headers"],
     )
@@ -438,7 +456,9 @@ async def test_supersede_is_legal_from_approved(api_client):
     superseded = await client.post(
         f"{base}/{revision_id}/review",
         json=_review_payload(
-            action="supersede", from_review_state="approved", event_key=f"ev-s-{uuid.uuid4().hex[:8]}"
+            action="supersede",
+            from_review_state="approved",
+            event_key=f"ev-s-{uuid.uuid4().hex[:8]}",
         ),
         headers=chain["headers"],
     )
@@ -475,7 +495,10 @@ async def test_stale_prompt_approval_fails_closed(api_client):
         cutoff_chapter=3,
         version_key="vb-v2",
     )
-    vb2_payload["version"]["style_profile"] = {"palette": "warm tones", "lighting": "golden hour"}
+    vb2_payload["version"]["style_profile"] = {
+        "palette": "warm tones",
+        "lighting": "golden hour",
+    }
     from app.schemas.visual_bible import (
         VisualBibleVersionContract,
         recompute_manifest_hash,
@@ -553,7 +576,9 @@ async def test_approval_never_rewrites_scene_spec_or_source(api_client):
     approved = await client.post(
         f"{base}/{revision_id}/review",
         json=_review_payload(
-            action="approve", from_review_state="candidate", event_key=f"ev-np-{uuid.uuid4().hex[:8]}"
+            action="approve",
+            from_review_state="candidate",
+            event_key=f"ev-np-{uuid.uuid4().hex[:8]}",
         ),
         headers=chain["headers"],
     )
@@ -642,7 +667,9 @@ async def test_edited_candidate_can_be_approved(api_client):
     approved = await client.post(
         f"{base}/{child_id}/review",
         json=_review_payload(
-            action="approve", from_review_state="candidate", event_key=f"ev-ed-{uuid.uuid4().hex[:8]}"
+            action="approve",
+            from_review_state="candidate",
+            event_key=f"ev-ed-{uuid.uuid4().hex[:8]}",
         ),
         headers=chain["headers"],
     )
@@ -650,5 +677,7 @@ async def test_edited_candidate_can_be_approved(api_client):
     assert approved.json()["revision"]["review_state"] == "approved"
 
     # The base candidate stays a candidate — edits never mutate the parent.
-    base_history = await client.get(f"{base}/{revision_id}/history", headers=chain["headers"])
+    base_history = await client.get(
+        f"{base}/{revision_id}/history", headers=chain["headers"]
+    )
     assert base_history.json()["revision"]["review_state"] == "candidate"

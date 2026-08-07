@@ -341,7 +341,9 @@ class DerivativeGenerationCandidate(TimestampMixin, Base):
     # Explicit derivative override (D-37-03) — stored, never promoted.
     divergence: Mapped[dict | None] = mapped_column(JSONB)
     # Disabled-by-default branch suggestions (D-37-05).
-    branch_suggestions: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    branch_suggestions: Mapped[list] = mapped_column(
+        JSONB, nullable=False, default=list
+    )
     canon_delta_hash: Mapped[str | None] = mapped_column(String(64))
     # Deterministic gate verdict + stable reason code (RESEARCH).
     gate_verdict: Mapped[str] = mapped_column(String(24), nullable=False)
@@ -373,12 +375,8 @@ def _reject_candidate_mutation(
 # Candidates are append-only: the gate verdict and lineage are frozen at write
 # time. Job/attempt rows stay mutable for explicit state transitions and follow
 # the reader-chat pattern without a delete guard (the job FK cascades).
-event.listen(
-    DerivativeGenerationCandidate, "before_update", _reject_candidate_mutation
-)
-event.listen(
-    DerivativeGenerationCandidate, "before_delete", _reject_candidate_mutation
-)
+event.listen(DerivativeGenerationCandidate, "before_update", _reject_candidate_mutation)
+event.listen(DerivativeGenerationCandidate, "before_delete", _reject_candidate_mutation)
 
 __all__ = [
     "DERIVATIVE_CANDIDATE_APPROVAL_STATES",

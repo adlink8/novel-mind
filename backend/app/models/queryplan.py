@@ -12,12 +12,10 @@ Immutable durable QueryPlanTrace authority (Phase 26-01 / REQ-QP-01).
 
 from __future__ import annotations
 
-from datetime import datetime
 
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
-    DateTime,
     ForeignKey,
     Index,
     Integer,
@@ -42,15 +40,9 @@ class QueryPlanTrace(TimestampMixin, Base):
     __tablename__ = "query_plan_traces"
     __table_args__ = (
         UniqueConstraint("trace_id", name="uq_query_plan_traces_trace_id"),
-        UniqueConstraint(
-            "idempotency_key", name="uq_query_plan_traces_idempotency"
-        ),
-        Index(
-            "idx_query_plan_traces_scope", "owner_id", "novel_id", "version_id"
-        ),
-        Index(
-            "idx_query_plan_traces_owner_created", "owner_id", "created_at"
-        ),
+        UniqueConstraint("idempotency_key", name="uq_query_plan_traces_idempotency"),
+        Index("idx_query_plan_traces_scope", "owner_id", "novel_id", "version_id"),
+        Index("idx_query_plan_traces_owner_created", "owner_id", "created_at"),
         CheckConstraint(
             "length(canonical_payload_hash) = 64",
             name="ck_query_plan_traces_payload_hash",
@@ -84,14 +76,10 @@ class QueryPlanTrace(TimestampMixin, Base):
     parser_version: Mapped[str] = mapped_column(String(64), nullable=False)
     source: Mapped[str] = mapped_column(String(64), nullable=False)
     dataset_lineage: Mapped[str] = mapped_column(String(128), nullable=False)
-    canonical_payload: Mapped[dict] = mapped_column(
-        JSONB, nullable=False, default=dict
-    )
+    canonical_payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     canonical_payload_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     availability_checksum: Mapped[str] = mapped_column(String(64), nullable=False)
     fallback: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
-    blocked_reason: Mapped[str | None] = mapped_column(
-        String(120), nullable=True
-    )
+    blocked_reason: Mapped[str | None] = mapped_column(String(120), nullable=True)
     # created_at / updated_at come from TimestampMixin; repository sets them
     # explicitly from the trace so SQLite tests never depend on a server default.

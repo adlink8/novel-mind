@@ -221,9 +221,7 @@ async def test_long_book_every_chapter_terminal_with_reason(builder_env) -> None
     )
     stages = await _chapter_stages(builder_env["factory"], run_id)
     assert len(stages) == fixture["chapter_count"]
-    by_number = {
-        int(s.chapter_start): s for s in stages
-    }
+    by_number = {int(s.chapter_start): s for s in stages}
 
     # Every chapter reached a durable terminal state with a stable reason.
     for stage in stages:
@@ -352,9 +350,7 @@ async def test_source_mutation_drift_fails_closed_on_resume(builder_env) -> None
         await session.commit()
 
         # Recomputation from the live DB exposes the drift (D-05).
-        version = await session.get(
-            NarrativeMemoryVersion, builder_env["version_id"]
-        )
+        version = await session.get(NarrativeMemoryVersion, builder_env["version_id"])
         recomputed = await recompute_source_manifest(session, version=version)
         assert source_manifest_drift_reasons(tampered, recomputed)
         assert "chapter:5:chapter_content_drift" in source_manifest_drift_reasons(
@@ -527,9 +523,7 @@ async def test_chapter_artifact_bounded_context_and_continuity(builder_env) -> N
     artifacts: list[tuple[int, ChapterAnalysisArtifact, NarrativeMemoryBuildStage]] = []
     async with builder_env["factory"]() as session:
         stages = await _chapter_stages(builder_env["factory"], run_id)
-        version = await session.get(
-            NarrativeMemoryVersion, builder_env["version_id"]
-        )
+        version = await session.get(NarrativeMemoryVersion, builder_env["version_id"])
         for stage in stages:
             if stage.status != "completed":
                 continue
@@ -563,8 +557,7 @@ async def test_chapter_artifact_bounded_context_and_continuity(builder_env) -> N
         authority_hashes = (
             await session.scalars(
                 select(NarrativeMemorySourceLink.content_hash).where(
-                    NarrativeMemorySourceLink.version_id
-                    == builder_env["version_id"]
+                    NarrativeMemorySourceLink.version_id == builder_env["version_id"]
                 )
             )
         ).all()

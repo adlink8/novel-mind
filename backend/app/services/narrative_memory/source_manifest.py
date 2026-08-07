@@ -251,7 +251,9 @@ def frozen_manifest_from_progress(
     try:
         return SourceManifest.from_dict(payload)
     except (KeyError, TypeError, ValueError) as exc:
-        raise SourceManifestError(f"stored source manifest is unreadable: {exc}") from exc
+        raise SourceManifestError(
+            f"stored source manifest is unreadable: {exc}"
+        ) from exc
 
 
 def store_frozen_manifest(

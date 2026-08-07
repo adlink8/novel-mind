@@ -39,6 +39,7 @@ from app.schemas.derivative_generation import (
     GenerationJobSummary,
     GenerationJobView,
 )
+from app.services.derivative_generation.candidate import schema_hash
 from app.services.derivative_generation.context_package import (
     ContextPackageError,
     verify_package_hash,
@@ -56,7 +57,6 @@ from app.services.derivative_generation.runner import (
     build_generation_idempotency_key,
     config_hash,
     prompt_hash,
-    schema_hash,
 )
 
 router = APIRouter(dependencies=[Depends(require_user)])
@@ -236,7 +236,9 @@ class DerivativeGenerationJobService:
                 status_code=404,
             )
         try:
-            verify_package_hash(dict(package.canonical_payload or {}), package.package_hash)
+            verify_package_hash(
+                dict(package.canonical_payload or {}), package.package_hash
+            )
         except ContextPackageError as exc:
             raise GenerationJobConflict(
                 "package_hash_mismatch", exc.detail, status_code=409
@@ -300,17 +302,21 @@ class DerivativeGenerationJobService:
     async def run_job(
         self, *, owner_id: int, novel_id: int, job_id: int
     ) -> CandidateRunResult:
-        return await self._runner.run(owner_id=owner_id, novel_id=novel_id, job_id=job_id)
+        return await self._runner.run(
+            owner_id=owner_id, novel_id=novel_id, job_id=job_id
+        )
 
     async def cancel_job(
         self, *, owner_id: int, novel_id: int, job_id: int
     ) -> DerivativeGenerationJob:
         row = await self._session.scalar(
-            select(DerivativeGenerationJob).where(
+            select(DerivativeGenerationJob)
+            .where(
                 DerivativeGenerationJob.id == job_id,
                 DerivativeGenerationJob.owner_id == owner_id,
                 DerivativeGenerationJob.novel_id == novel_id,
-            ).with_for_update()
+            )
+            .with_for_update()
         )
         if row is None:
             raise GenerationJobConflict(
@@ -333,7 +339,9 @@ class DerivativeGenerationJobService:
         await self._session.refresh(row)
         return row
 
-    async def list_jobs(self, *, owner_id: int, novel_id: int) -> list[DerivativeGenerationJob]:
+    async def list_jobs(
+        self, *, owner_id: int, novel_id: int
+    ) -> list[DerivativeGenerationJob]:
         return list(
             (
                 await self._session.scalars(
@@ -408,7 +416,9 @@ async def create_generation_job(
     job — one charge, one candidate. A package outside the owner/novel scope is
     an identical 404; a mismatched intent is a 409.
     """
-    service = DerivativeGenerationJobService(db, transport=transport, budget_gate=budget_gate)
+    service = DerivativeGenerationJobService(
+        db, transport=transport, budget_gate=budget_gate
+    )
     try:
         job, replayed = await service.create_job(
             owner_id=current_user.id,
@@ -442,7 +452,9 @@ async def list_generation_jobs(
     budget_gate: DerivativeBudgetGate = Depends(get_derivative_budget_gate),
 ) -> GenerationJobListResponse:
     """List the owner's derivative generation jobs for one novel."""
-    service = DerivativeGenerationJobService(db, transport=transport, budget_gate=budget_gate)
+    service = DerivativeGenerationJobService(
+        db, transport=transport, budget_gate=budget_gate
+    )
     rows = await service.list_jobs(owner_id=current_user.id, novel_id=novel.id)
     return GenerationJobListResponse(
         novel_id=novel.id, total=len(rows), items=[_to_summary(r) for r in rows]
@@ -462,7 +474,9 @@ async def get_generation_job(
     budget_gate: DerivativeBudgetGate = Depends(get_derivative_budget_gate),
 ) -> GenerationJobDetailResponse:
     """Read one job with its candidate (if any) and attempt lineage."""
-    service = DerivativeGenerationJobService(db, transport=transport, budget_gate=budget_gate)
+    service = DerivativeGenerationJobService(
+        db, transport=transport, budget_gate=budget_gate
+    )
     try:
         job, candidate, attempts = await service.get_detail(
             owner_id=current_user.id, novel_id=novel.id, job_id=job_id
@@ -494,7 +508,9 @@ async def run_generation_job(
     (``job_not_runnable``) and is never silently re-called. Budget overruns and
     schema violations never call or publish.
     """
-    service = DerivativeGenerationJobService(db, transport=transport, budget_gate=budget_gate)
+    service = DerivativeGenerationJobService(
+        db, transport=transport, budget_gate=budget_gate
+    )
     try:
         result = await service.run_job(
             owner_id=current_user.id, novel_id=novel.id, job_id=job_id
@@ -525,7 +541,9 @@ async def cancel_generation_job(
     budget_gate: DerivativeBudgetGate = Depends(get_derivative_budget_gate),
 ) -> GenerationJobCancelResponse:
     """Cancel a recoverable job; a run then returns ``cancelled`` without a call."""
-    service = DerivativeGenerationJobService(db, transport=transport, budget_gate=budget_gate)
+    service = DerivativeGenerationJobService(
+        db, transport=transport, budget_gate=budget_gate
+    )
     try:
         job = await service.cancel_job(
             owner_id=current_user.id, novel_id=novel.id, job_id=job_id

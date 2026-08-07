@@ -167,9 +167,7 @@ async def test_persist_chapter_without_characters_survives_llm_entity_id(db_sess
     version_id = version.id
     novel_id = novel.id
     db_session.expire_all()
-    participants = list(
-        (await db_session.scalars(select(TimelineParticipant))).all()
-    )
+    participants = list((await db_session.scalars(select(TimelineParticipant))).all())
     assert len(participants) == 2
     assert {p.mention for p in participants} == {"阿宁", "路人"}
     assert all(p.entity_id is None for p in participants)
@@ -193,8 +191,8 @@ async def test_persist_chapter_keeps_known_character_and_nullifies_unknown(db_se
     _, novel, chapter, run, version = await _seed_persist_scope(
         db_session, with_characters=True
     )
-    known_id = (
-        await db_session.scalar(select(Character.id).where(Character.novel_id == novel.id))
+    known_id = await db_session.scalar(
+        select(Character.id).where(Character.novel_id == novel.id)
     )
     extraction = _extraction_with_participants(
         Participant(mention="阿宁", entity_id=known_id),
@@ -207,9 +205,7 @@ async def test_persist_chapter_keeps_known_character_and_nullifies_unknown(db_se
     )
 
     db_session.expire_all()
-    participants = list(
-        (await db_session.scalars(select(TimelineParticipant))).all()
-    )
+    participants = list((await db_session.scalars(select(TimelineParticipant))).all())
     by_mention = {p.mention: p.entity_id for p in participants}
     assert by_mention["阿宁"] == known_id
     assert by_mention["幽灵"] is None
@@ -218,9 +214,7 @@ async def test_persist_chapter_keeps_known_character_and_nullifies_unknown(db_se
 @pytest.mark.asyncio
 async def test_character_loaders_are_novel_scoped(db_session):
     """_load_character_ids / _load_character_registry 只返回该 novel 的角色。"""
-    owner, novel, _, _, _ = await _seed_persist_scope(
-        db_session, with_characters=True
-    )
+    owner, novel, _, _, _ = await _seed_persist_scope(db_session, with_characters=True)
     known_id = await db_session.scalar(
         select(Character.id).where(Character.novel_id == novel.id)
     )

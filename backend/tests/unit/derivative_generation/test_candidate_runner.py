@@ -48,7 +48,6 @@ from app.services.derivative_generation.context_package import (
     budget_verdict,
     dimension_view,
     package_hash,
-    verify_package_hash,
 )
 from app.services.derivative_generation.runner import (
     BudgetExceeded,
@@ -132,9 +131,7 @@ def _payload(*, intent="continuation", dimensions=None, budget_estimate=None):
         budget_estimate={},
     )
     core["budget_estimate"] = (
-        budget_estimate
-        if budget_estimate is not None
-        else budget_verdict(core, None)
+        budget_estimate if budget_estimate is not None else budget_verdict(core, None)
     )
     return core
 
@@ -379,9 +376,11 @@ def test_parse_candidate_accepts_strict_payload():
 
 def test_parse_candidate_rejects_extra_fields():
     with pytest.raises(ValueError) as exc:
-        parse_candidate('{"schema_version":"derivative-candidate.v1","intent":"continuation",'
-                        '"draft_text":"x","citation_keys":[],"divergence":null,'
-                        '"branch_suggestions":[],"bonus_field":1}')
+        parse_candidate(
+            '{"schema_version":"derivative-candidate.v1","intent":"continuation",'
+            '"draft_text":"x","citation_keys":[],"divergence":null,'
+            '"branch_suggestions":[],"bonus_field":1}'
+        )
     assert "schema_invalid" in str(exc.value)
 
 
@@ -389,14 +388,18 @@ def test_parse_candidate_rejects_empty_draft():
     with pytest.raises(ValueError):
         parse_candidate("")
     with pytest.raises(ValueError):
-        parse_candidate('{"schema_version":"derivative-candidate.v1","intent":"continuation",'
-                        '"draft_text":"","citation_keys":[]}')
+        parse_candidate(
+            '{"schema_version":"derivative-candidate.v1","intent":"continuation",'
+            '"draft_text":"","citation_keys":[]}'
+        )
 
 
 def test_parse_candidate_rejects_unknown_intent():
     with pytest.raises(ValueError):
-        parse_candidate('{"schema_version":"derivative-candidate.v1","intent":"autofork",'
-                        '"draft_text":"x","citation_keys":[]}')
+        parse_candidate(
+            '{"schema_version":"derivative-candidate.v1","intent":"autofork",'
+            '"draft_text":"x","citation_keys":[]}'
+        )
 
 
 def test_branch_suggestion_must_be_disabled_by_default():
@@ -425,11 +428,12 @@ def test_branch_suggestion_must_be_disabled_by_default():
 
 def test_deterministic_gates_evidence_outside_package_blocked():
     payload = _payload()
-    draft = parse_candidate(
-        _candidate_json(citations=["fork:ff-test:future:99"])
-    )
+    draft = parse_candidate(_candidate_json(citations=["fork:ff-test:future:99"]))
     gate = apply_deterministic_gates(
-        draft, payload, expected_package_hash=package_hash(payload), package_intent="continuation"
+        draft,
+        payload,
+        expected_package_hash=package_hash(payload),
+        package_intent="continuation",
     )
     assert gate.verdict is GateVerdict.BLOCKED
     assert gate.reason == "evidence_outside_package"
@@ -447,11 +451,12 @@ def test_deterministic_gates_package_hash_mismatch_fails_closed():
 
 def test_deterministic_gates_divergence_needs_override():
     payload = _payload()
-    draft = parse_candidate(
-        _candidate_json(divergence=_divergence_payload())
-    )
+    draft = parse_candidate(_candidate_json(divergence=_divergence_payload()))
     gate = apply_deterministic_gates(
-        draft, payload, expected_package_hash=package_hash(payload), package_intent="continuation"
+        draft,
+        payload,
+        expected_package_hash=package_hash(payload),
+        package_intent="continuation",
     )
     assert gate.verdict is GateVerdict.NEEDS_OVERRIDE
     assert gate.reason == "divergence_requires_override"
@@ -461,7 +466,10 @@ def test_deterministic_gates_intent_mismatch_blocked():
     payload = _payload(intent="rewrite")
     draft = parse_candidate(_candidate_json(intent="continuation"))
     gate = apply_deterministic_gates(
-        draft, payload, expected_package_hash=package_hash(payload), package_intent="rewrite"
+        draft,
+        payload,
+        expected_package_hash=package_hash(payload),
+        package_intent="rewrite",
     )
     assert gate.verdict is GateVerdict.BLOCKED
     assert gate.reason == "intent_mismatch"
@@ -471,7 +479,10 @@ def test_deterministic_gates_clean_candidate_passes():
     payload = _payload()
     draft = parse_candidate(_candidate_json())
     gate = apply_deterministic_gates(
-        draft, payload, expected_package_hash=package_hash(payload), package_intent="continuation"
+        draft,
+        payload,
+        expected_package_hash=package_hash(payload),
+        package_intent="continuation",
     )
     assert gate.verdict is GateVerdict.CANDIDATE
     assert gate.reason is None
@@ -597,10 +608,19 @@ async def test_run_produces_candidate_only_and_never_writes_original(db):
     assert result.attempts[0].reserved_input_tokens >= 1
     assert len(transport.calls) == 1
     # D-37-02: the provider output only landed in the candidate table.
-    assert await db.scalar(select(func.count()).select_from(DerivativeGenerationCandidate)) == 1
-    assert await db.scalar(select(func.count()).select_from(DerivativeGenerationAttempt)) == 1
+    assert (
+        await db.scalar(select(func.count()).select_from(DerivativeGenerationCandidate))
+        == 1
+    )
+    assert (
+        await db.scalar(select(func.count()).select_from(DerivativeGenerationAttempt))
+        == 1
+    )
     # REQ-FORK-03: Original chapter content is untouched.
-    assert await _original_content(db, seed["novel_id"], seed["chapter_id"]) == "chapter 1 body"
+    assert (
+        await _original_content(db, seed["novel_id"], seed["chapter_id"])
+        == "chapter 1 body"
+    )
     # job reload shows terminal succeeded with response lineage.
     job = await db.get(DerivativeGenerationJob, job.id)
     assert job.status == "succeeded" and job.response_hash is not None
@@ -637,7 +657,10 @@ async def test_schema_invalid_blocks_without_publishing(db):
     job = await _make_job(db, seed)
     transport = FakeTransport(
         [
-            {"content": "not json at all", "usage": {"input_tokens": 5, "output_tokens": 1}},
+            {
+                "content": "not json at all",
+                "usage": {"input_tokens": 5, "output_tokens": 1},
+            },
         ]
     )
     result = await _runner(db, transport).run(
@@ -648,7 +671,10 @@ async def test_schema_invalid_blocks_without_publishing(db):
     assert result.candidate is None
     assert result.attempts[0].status == "failed"
     assert result.attempts[0].error_code == "schema_invalid"
-    assert await db.scalar(select(func.count()).select_from(DerivativeGenerationCandidate)) == 0
+    assert (
+        await db.scalar(select(func.count()).select_from(DerivativeGenerationCandidate))
+        == 0
+    )
 
 
 @pytest.mark.asyncio
@@ -711,7 +737,10 @@ async def test_budget_exhausted_never_calls_provider(db):
     assert result.error_code == "budget_exhausted"
     assert transport.calls == []
     assert result.candidate is None
-    assert await db.scalar(select(func.count()).select_from(DerivativeGenerationCandidate)) == 0
+    assert (
+        await db.scalar(select(func.count()).select_from(DerivativeGenerationCandidate))
+        == 0
+    )
     # The rejected attempt is still audited (failure lineage).
     assert result.attempts[0].error_code == "budget_exhausted"
     # A paused job is recoverable: a fresh budget gate lets the retry run.
@@ -743,7 +772,10 @@ async def test_provider_timeout_is_outcome_unknown_not_publish(db):
     assert result.error_code == "provider_timeout"
     assert result.candidate is None
     assert result.attempts[0].status == "outcome_unknown"
-    assert await db.scalar(select(func.count()).select_from(DerivativeGenerationCandidate)) == 0
+    assert (
+        await db.scalar(select(func.count()).select_from(DerivativeGenerationCandidate))
+        == 0
+    )
 
 
 @pytest.mark.asyncio
@@ -766,7 +798,9 @@ async def test_terminal_job_is_never_silently_recalled(db):
     transport = FakeTransport([{"content": _candidate_json(), "usage": {}}])
     runner = _runner(db, transport)
     with pytest.raises(CandidateRunError) as exc:
-        await runner.run(owner_id=seed["owner_id"], novel_id=seed["novel_id"], job_id=job.id)
+        await runner.run(
+            owner_id=seed["owner_id"], novel_id=seed["novel_id"], job_id=job.id
+        )
     assert exc.value.code == "job_not_runnable"
     assert transport.calls == []
 
@@ -804,7 +838,9 @@ async def test_package_hash_mismatch_fails_before_provider_call(db):
 @pytest.mark.asyncio
 async def test_intent_mismatch_fails_before_provider_call(db):
     seed = await _seed(db, intent="rewrite")
-    job = await _make_job(db, seed, intent="continuation")  # job intent != package intent
+    job = await _make_job(
+        db, seed, intent="continuation"
+    )  # job intent != package intent
     transport = FakeTransport([{"content": _candidate_json(), "usage": {}}])
     result = await _runner(db, transport).run(
         owner_id=seed["owner_id"], novel_id=seed["novel_id"], job_id=job.id
@@ -865,7 +901,11 @@ async def test_cross_fork_package_is_rejected(db):
         intent="continuation",
         job_key="other-job",
         idempotency_key=build_generation_idempotency_key(
-            other_user.id, seed["novel_id"], package_hash=seed["package_hash"], intent="continuation", job_key="other-job"
+            other_user.id,
+            seed["novel_id"],
+            package_hash=seed["package_hash"],
+            intent="continuation",
+            job_key="other-job",
         ),
         status="queued",
         prompt_hash=compute_prompt_hash(payload, intent="continuation"),
@@ -889,7 +929,11 @@ async def test_fake_gateway_replay_produces_identical_candidates(db):
     seed = await _seed(db)
     first_job = await _make_job(db, seed, job_key="replay-a")
     second_job = await _make_job(db, seed, job_key="replay-b")
-    response = {"content": _candidate_json(), "usage": {"input_tokens": 10, "output_tokens": 5}, "id": "req-x"}
+    response = {
+        "content": _candidate_json(),
+        "usage": {"input_tokens": 10, "output_tokens": 5},
+        "id": "req-x",
+    }
     r1 = await _runner(db, FakeTransport([dict(response)])).run(
         owner_id=seed["owner_id"], novel_id=seed["novel_id"], job_id=first_job.id
     )
@@ -930,7 +974,9 @@ async def test_create_job_is_idempotent(db):
     )
     assert replayed2 is True
     assert job2.id == job.id
-    assert await db.scalar(select(func.count()).select_from(DerivativeGenerationJob)) == 1
+    assert (
+        await db.scalar(select(func.count()).select_from(DerivativeGenerationJob)) == 1
+    )
 
 
 @pytest.mark.asyncio
@@ -951,7 +997,9 @@ async def test_create_job_rejects_cross_fork_package(db):
             job_key="foreign",
         )
     assert getattr(exc.value, "code", None) == "package_not_found"
-    assert await db.scalar(select(func.count()).select_from(DerivativeGenerationJob)) == 0
+    assert (
+        await db.scalar(select(func.count()).select_from(DerivativeGenerationJob)) == 0
+    )
 
 
 @pytest.mark.asyncio
@@ -987,6 +1035,8 @@ async def test_cancel_then_run_is_cancelled_without_call(db):
     transport = FakeTransport([{"content": _candidate_json(), "usage": {}}])
     runner = _runner(db, transport)
     with pytest.raises(CandidateRunError) as exc:
-        await runner.run(owner_id=seed["owner_id"], novel_id=seed["novel_id"], job_id=job.id)
+        await runner.run(
+            owner_id=seed["owner_id"], novel_id=seed["novel_id"], job_id=job.id
+        )
     assert exc.value.code == "job_not_runnable"
     assert transport.calls == []

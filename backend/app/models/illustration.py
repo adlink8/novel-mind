@@ -29,14 +29,11 @@ Design conventions (following ``visual_bible.py`` / ``prompt_revision.py``):
 from __future__ import annotations
 
 from sqlalchemy import (
-    Boolean,
     CheckConstraint,
-    ForeignKey,
     ForeignKeyConstraint,
     Index,
     Integer,
     String,
-    Text,
     UniqueConstraint,
     event,
 )
@@ -203,9 +200,7 @@ class AssetRevision(TimestampMixin, Base):
         server_default="candidate",
     )
     approved_by: Mapped[str | None] = mapped_column(String(200))
-    canonical_payload: Mapped[dict] = mapped_column(
-        JSONB, nullable=False, default=dict
-    )
+    canonical_payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     canonical_payload_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     idempotency_key: Mapped[str] = mapped_column(String(64), nullable=False)
     projection_hash: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -278,13 +273,13 @@ class ConsistencyReport(TimestampMixin, Base):
     evaluator_version: Mapped[str] = mapped_column(String(64), nullable=False)
     model_lineage: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     fixture_set_hash: Mapped[str] = mapped_column(String(64), nullable=False)
-    reference_asset_ids: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    reference_asset_ids: Mapped[list] = mapped_column(
+        JSONB, nullable=False, default=list
+    )
     scores: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     verdict: Mapped[str] = mapped_column(String(24), nullable=False)
     details: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
-    canonical_payload: Mapped[dict] = mapped_column(
-        JSONB, nullable=False, default=dict
-    )
+    canonical_payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     canonical_payload_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     idempotency_key: Mapped[str] = mapped_column(String(64), nullable=False)
     projection_hash: Mapped[str] = mapped_column(String(64), nullable=False)

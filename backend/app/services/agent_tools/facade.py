@@ -378,7 +378,11 @@ async def _default_get_character_state(
             pov=pov,
             aspect=aspect,
         )
-        for aspect in (EpistemicAspect.STATE, EpistemicAspect.GOAL, EpistemicAspect.MOTIVATION)
+        for aspect in (
+            EpistemicAspect.STATE,
+            EpistemicAspect.GOAL,
+            EpistemicAspect.MOTIVATION,
+        )
     ]
     return _merge_state_answers(
         subject=subject,
@@ -503,9 +507,7 @@ async def _default_get_visual_bible(
         except CandidateNotFoundError:
             return None
         return view.model_dump(mode="json")
-    views = await list_visual_bible_versions(
-        db, owner_id=owner_id, novel_id=novel_id
-    )
+    views = await list_visual_bible_versions(db, owner_id=owner_id, novel_id=novel_id)
     if approved_only:
         views = [view for view in views if view.review_state == "approved"]
     return {
@@ -579,9 +581,7 @@ async def _default_generate_image_candidate(
         max_input_tokens=DEFAULT_MAX_INPUT_TOKENS,
         max_output_tokens=DEFAULT_MAX_OUTPUT_TOKENS,
     )
-    idempotency_key = build_illustration_idempotency_key(
-        owner_id, novel_id, lineage
-    )
+    idempotency_key = build_illustration_idempotency_key(owner_id, novel_id, lineage)
     price_snapshot = PriceSnapshot(
         provider=provider,
         model=model,
@@ -1640,7 +1640,9 @@ class ToolFacade:
 
     async def _publish_derivative_revision(self, *, db, novel, owner_id, params):
         """创建独立 publish ApprovalRequest（相同 hash 绑定；candidate-only，37-05）。"""
-        svc = self._svc("publish_derivative_revision", _default_publish_derivative_revision)
+        svc = self._svc(
+            "publish_derivative_revision", _default_publish_derivative_revision
+        )
         return await svc(
             db,
             owner_id=owner_id,

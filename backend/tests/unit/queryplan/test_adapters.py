@@ -512,9 +512,7 @@ async def test_run_plan_adapters_unregistered_dimension_fails_closed():
     plan = parse_query_plan(reader_payload(dimensions=["raw_text"]))
     assert isinstance(plan, QueryPlan)
     source = make_snapshot(chapters=_state_chapters())
-    results = await run_plan_adapters(
-        plan, source=source, resolver=None, adapters={}
-    )
+    results = await run_plan_adapters(plan, source=source, resolver=None, adapters={})
     assert len(results) == 1
     assert results[0].status == AvailabilityStatus.UNAVAILABLE
     assert results[0].reason == "reader_unavailable"

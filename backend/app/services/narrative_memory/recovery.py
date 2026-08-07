@@ -53,7 +53,13 @@ class RecoveryError(RuntimeError):
 def terminal_state_for_status(status: str | None) -> str | None:
     if status == "completed":
         return TerminalState.COMPLETED.value
-    if status in {"failed", "isolated", "paused_budget", "paused_dependency", "cancelled"}:
+    if status in {
+        "failed",
+        "isolated",
+        "paused_budget",
+        "paused_dependency",
+        "cancelled",
+    }:
         return TerminalState.ISOLATED.value
     if status == "blocked_dependency":
         return TerminalState.BLOCKED.value
@@ -193,7 +199,9 @@ class RecoveryCoordinator:
             stage,
             status="cancelled",
             reason=(
-                reason_code.value if isinstance(reason_code, ReasonCode) else reason_code
+                reason_code.value
+                if isinstance(reason_code, ReasonCode)
+                else reason_code
             ),
             reason_code=reason_code,
             journal=True,
@@ -221,9 +229,7 @@ class RecoveryCoordinator:
         await self._repo.set_run_error_code(run_id, code.value)
         return code.value
 
-    async def require_owner(
-        self, *, owner_id: int, version_id: int
-    ) -> None:
+    async def require_owner(self, *, owner_id: int, version_id: int) -> None:
         """Owner/version audit gate before any recovery write (V4)."""
         version = await self._repo._session.scalar(  # noqa: SLF001
             select(NarrativeMemoryVersion).where(

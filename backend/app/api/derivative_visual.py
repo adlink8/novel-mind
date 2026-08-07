@@ -88,7 +88,9 @@ def _map_error(exc: Exception) -> HTTPException:
     return HTTPException(status_code=400, detail=str(exc))
 
 
-def _compile_response(result: CompiledDerivativeSceneSpec) -> DerivativeSceneSpecCompileResponse:
+def _compile_response(
+    result: CompiledDerivativeSceneSpec,
+) -> DerivativeSceneSpecCompileResponse:
     return DerivativeSceneSpecCompileResponse(
         spec=result.spec,
         content_hash=result.spec.content_hash,
@@ -114,9 +116,7 @@ async def list_derivative_visual_versions(
 ) -> list[DerivativeVisualVersionView]:
     """List every derivative visual fork version for the owned novel."""
     try:
-        return await list_versions(
-            db, owner_id=current_user.id, novel_id=novel.id
-        )
+        return await list_versions(db, owner_id=current_user.id, novel_id=novel.id)
     except DerivativeVisualLineageError as exc:
         raise _map_error(exc) from exc
 

@@ -313,9 +313,7 @@ class QueryPlanService:
             source=source,
             dataset_lineage=dataset_lineage,
             dimensions=(
-                tuple(dict.fromkeys(dimensions))
-                if dimensions is not None
-                else None
+                tuple(dict.fromkeys(dimensions)) if dimensions is not None else None
             ),
         )
         return request.model_dump(mode="json")

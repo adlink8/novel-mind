@@ -45,12 +45,12 @@ API_SOURCE = (BACKEND_ROOT / "app" / "api" / "derivative_projects.py").read_text
 SERVICE_SOURCE = (
     BACKEND_ROOT / "app" / "services" / "derivative_editor" / "projects.py"
 ).read_text(encoding="utf-8")
-SCHEMA_SOURCE = (
-    BACKEND_ROOT / "app" / "schemas" / "derivative_project.py"
-).read_text(encoding="utf-8")
-MODEL_SOURCE = (
-    BACKEND_ROOT / "app" / "models" / "derivative_project.py"
-).read_text(encoding="utf-8")
+SCHEMA_SOURCE = (BACKEND_ROOT / "app" / "schemas" / "derivative_project.py").read_text(
+    encoding="utf-8"
+)
+MODEL_SOURCE = (BACKEND_ROOT / "app" / "models" / "derivative_project.py").read_text(
+    encoding="utf-8"
+)
 MIGRATION_SOURCE = (
     BACKEND_ROOT / "migrations" / "versions" / "36_derivative_project01.py"
 ).read_text(encoding="utf-8")
@@ -120,7 +120,9 @@ def test_require_scope_rejects_invalid_scope():
 
 def test_slugify_project_key_is_deterministic_and_never_empty():
     assert slugify_project_key("My Draft Story") == "my-draft-story"
-    assert slugify_project_key("My Draft Story") == slugify_project_key("My Draft Story")
+    assert slugify_project_key("My Draft Story") == slugify_project_key(
+        "My Draft Story"
+    )
     for name in ("新的世界", "!!!", "   "):
         key = slugify_project_key(name)
         assert len(key) > 0
@@ -167,9 +169,11 @@ def test_model_and_migration_bind_space_to_fanfiction_canon():
 def test_migration_chains_from_canon_contamination_head():
     assert 'down_revision = "20260801_canon_contamination04"' in MIGRATION_SOURCE
     assert 'revision: str = "20260801_derivative_project01"' in MIGRATION_SOURCE
-    assert 'sa.ForeignKeyConstraint(["fork_id"], ["canon_forks.id"]' in MIGRATION_SOURCE.replace(
-        " " * 0, ""
-    ) or "canon_forks.id" in MIGRATION_SOURCE
+    assert (
+        'sa.ForeignKeyConstraint(["fork_id"], ["canon_forks.id"]'
+        in MIGRATION_SOURCE.replace(" " * 0, "")
+        or "canon_forks.id" in MIGRATION_SOURCE
+    )
 
 
 # ---------------------------------------------------------------------------

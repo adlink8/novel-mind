@@ -87,15 +87,11 @@ def replay_prompt_revision(payload: Mapping[str, Any]) -> PromptRevisionContract
     if ``prompt_hash`` does not replay (deterministic output lineage)."""
     revision = PromptRevisionContract.model_validate(payload)
     if recompute_prompt_hash(revision) != revision.prompt_hash:
-        raise SceneSpecGateError(
-            "serialized prompt does not replay its prompt_hash"
-        )
+        raise SceneSpecGateError("serialized prompt does not replay its prompt_hash")
     return revision
 
 
-def replay_prompt_artifact(
-    payload: Mapping[str, Any], spec: SceneSpecContract
-) -> Any:
+def replay_prompt_artifact(payload: Mapping[str, Any], spec: SceneSpecContract) -> Any:
     """Reconstruct a PromptArtifact from its canonical serialization and fail
     closed on spec/lineage/hash drift.
 
@@ -172,9 +168,7 @@ def _string_list_diff(
     result: list[tuple[str, int | None, int | None]] = []
     for item in sorted(set(original_counts) | set(current_counts)):
         if original_counts[item] != current_counts[item]:
-            result.append(
-                (item, original_counts.get(item), current_counts.get(item))
-            )
+            result.append((item, original_counts.get(item), current_counts.get(item)))
     return tuple(result)
 
 
@@ -194,7 +188,9 @@ def diff_prompt_revisions(
                     current=current_sections.get(key),
                 )
             )
-    negative = _string_list_diff(original.negative_constraints, current.negative_constraints)
+    negative = _string_list_diff(
+        original.negative_constraints, current.negative_constraints
+    )
     uncertainties = _string_list_diff(original.uncertainties, current.uncertainties)
     prompt_text_changed = original.prompt_text != current.prompt_text
     return PromptDiff(
@@ -301,7 +297,9 @@ def edited_spec_with_interpretation(
     try:
         validate_scene_spec_contract(edited)
     except SceneSpecGateError as exc:
-        raise SceneSpecGateError(f"edited spec failed its own contract gate: {exc}") from exc
+        raise SceneSpecGateError(
+            f"edited spec failed its own contract gate: {exc}"
+        ) from exc
     return edited
 
 

@@ -38,6 +38,7 @@ HEX64_C = "c" * 64
 def _idem64() -> str:
     return uuid.uuid4().hex * 2
 
+
 VERSIONS = "derivative_visual_versions"
 TABLES = {
     VERSIONS,
@@ -87,9 +88,13 @@ def _seed_owner(sync_url: str, *, suffix: str) -> dict:
                 )
             )
         # Fanfiction Canon fork (usable anchor for the project).
-        fork = _insert_fork(session, owner_id=user.id, novel_id=novel.id, fork_key=f"ff-{suffix}")
+        fork = _insert_fork(
+            session, owner_id=user.id, novel_id=novel.id, fork_key=f"ff-{suffix}"
+        )
         session.flush()
-        project = _insert_project(session, owner_id=user.id, novel_id=novel.id, fork_id=fork.id)
+        project = _insert_project(
+            session, owner_id=user.id, novel_id=novel.id, fork_id=fork.id
+        )
         session.flush()
         original = _insert_original_visual_bible(
             session, owner_id=user.id, novel_id=novel.id
@@ -272,7 +277,7 @@ def _insert_derivative_version_raw(conn, *, ids, version_key, namespace):
             " canonical_payload_hash, idempotency_key, projection_hash)"
             " VALUES (:owner_id, :novel_id, :project_id, :fork_id, :namespace,"
             " :version_key, 1, :source_version_id, 'snap-1', :snap, :manifest, 8,"
-            " '{\"style\":\"warm\"}', '{\"branch\":\"fork-1\"}', 'candidate',"
+            ' \'{"style":"warm"}\', \'{"branch":"fork-1"}\', \'candidate\','
             " 'derivative-visual.v1', :h1, :h2, :manifest, '{}'::jsonb, :h1, :idem, :h4)"
         ),
         {
@@ -310,7 +315,9 @@ def test_original_snapshot_cannot_be_deleted_while_referenced(migrated_postgres)
         except IntegrityError as exc:
             assert "fk_derivative_visual_versions_source_scope" in str(exc)
         else:
-            pytest.fail("deleting a referenced Original Visual Bible snapshot must fail")
+            pytest.fail(
+                "deleting a referenced Original Visual Bible snapshot must fail"
+            )
         finally:
             conn.rollback()
     engine.dispose()
@@ -327,7 +334,9 @@ def test_original_rows_stay_unchanged_by_derivative_write(migrated_postgres):
                     "visual_bible_versions WHERE id = :vid"
                 ),
                 {"vid": ids["source_version_id"]},
-            ).mappings().one()
+            )
+            .mappings()
+            .one()
         )
         _insert_derivative_version_raw(
             conn, ids=ids, version_key="dv-mut", namespace="fanfiction_visual"
@@ -340,7 +349,9 @@ def test_original_rows_stay_unchanged_by_derivative_write(migrated_postgres):
                     "visual_bible_versions WHERE id = :vid"
                 ),
                 {"vid": ids["source_version_id"]},
-            ).mappings().one()
+            )
+            .mappings()
+            .one()
         )
         assert before == after
     engine.dispose()

@@ -172,7 +172,9 @@ def _child_idempotency_key(
     )
 
 
-def _scene_boundary_from_scored(item: ScoredScene, *, order_index: int) -> SceneBoundary:
+def _scene_boundary_from_scored(
+    item: ScoredScene, *, order_index: int
+) -> SceneBoundary:
     return SceneBoundary(
         scene_id=item.scene_id,
         chapter_id=item.chapter_id,
@@ -229,9 +231,7 @@ class CandidateService:
             approved_visual_bible_revision_hash=input_.approved_visual_bible_revision_hash,
         )
         if not approval.ok:
-            raise KeySceneGateError(
-                f"{approval.reason_code}: {approval.detail}"
-            )
+            raise KeySceneGateError(f"{approval.reason_code}: {approval.detail}")
 
         snapshot_hash, chapters = await boundaries_service.load_source_snapshot(
             owner_id=owner_id, novel_id=novel_id
@@ -256,9 +256,7 @@ class CandidateService:
             boundaries.extend(kept.kept)
 
         if not boundaries:
-            raise KeySceneGateError(
-                "no scene boundaries survive the spoiler cutoff"
-            )
+            raise KeySceneGateError("no scene boundaries survive the spoiler cutoff")
 
         scorer = KeySceneScorer(
             self._policy,
@@ -292,10 +290,7 @@ class CandidateService:
 
         diversity = rank_with_diversity(scored, policy=self._policy)
         ranked: Sequence[ScoredScene] = diversity.ordered
-        if (
-            input_.max_candidates is not None
-            and input_.max_candidates < len(ranked)
-        ):
+        if input_.max_candidates is not None and input_.max_candidates < len(ranked):
             ranked = ranked[: input_.max_candidates]
 
         source_snapshot_id = input_.source_snapshot_id or f"ks-{input_.version_key}"
@@ -386,10 +381,7 @@ class CandidateService:
             raise KeySceneCandidateNotFound(
                 "novel is not in the explicit owner/novel scope"
             )
-        if (
-            set_contract.owner_id != owner_id
-            or set_contract.novel_id != novel_id
-        ):
+        if set_contract.owner_id != owner_id or set_contract.novel_id != novel_id:
             raise KeySceneGateError("set scope does not match request scope")
 
         approval = await boundaries_service.verify_visual_bible_approval(
@@ -538,9 +530,7 @@ class CandidateService:
                             owner_id=owner_id,
                             novel_id=novel_id,
                             version_key=set_contract.version_key,
-                            child_key=(
-                                f"{candidate.candidate_key}:{ref.evidence_key}"
-                            ),
+                            child_key=(f"{candidate.candidate_key}:{ref.evidence_key}"),
                             payload_hash=ref.content_hash,
                         ),
                     )

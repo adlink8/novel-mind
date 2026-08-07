@@ -365,9 +365,7 @@ class AIService:
                 response = await vertex_acomplete(
                     messages, model=model, tools=_extra.get("tools")
                 )
-                tool_calls = getattr(
-                    response.choices[0].message, "tool_calls", None
-                )
+                tool_calls = getattr(response.choices[0].message, "tool_calls", None)
                 if tool_calls:
                     # 工具调用：yield 结构化 dict，gateway 转成 SSE delta.tool_calls。
                     yield {"__tool_calls__": tool_calls}

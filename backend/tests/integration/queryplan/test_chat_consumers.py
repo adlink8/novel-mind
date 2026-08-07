@@ -26,6 +26,7 @@ from app.services.queryplan.adapters import (
     chapter_content_hash,
 )
 from app.services.queryplan.evidence import FrozenManifest
+from app.services.reader_chat.context import ValidatedSelection
 from app.services.queryplan.schemas import (
     AvailabilityStatus,
     BlockedReasonCode,
@@ -50,9 +51,7 @@ CHAPTER_2_TEXT = "第二章：剑客没有回答。林安握紧剑柄。"
 CHAPTER_3_TEXT = "第三章：两人并肩走出竹林。"
 
 
-def make_chapter(
-    chapter_id: int, chapter_number: int, content: str
-) -> ChapterRecord:
+def make_chapter(chapter_id: int, chapter_number: int, content: str) -> ChapterRecord:
     return ChapterRecord(
         chapter_id=chapter_id,
         chapter_number=chapter_number,
@@ -170,7 +169,11 @@ def legal_producer():
             {
                 "schema_version": "reader-answer.v1",
                 "answer_blocks": [
-                    {"block_id": "b1", "text": "林安走进竹林。", "evidence_refs": [keys[0]]}
+                    {
+                        "block_id": "b1",
+                        "text": "林安走进竹林。",
+                        "evidence_refs": [keys[0]],
+                    }
                 ],
             }
         )
@@ -218,15 +221,19 @@ async def test_reader_anchor_requires_selection_and_analysis_requires_range():
     # Reader cannot carry a chapter_range anchor (D-10).
     with pytest.raises(ConsumerPlanBlocked) as exc:
         QueryPlanService.parse_consumer_request(
-            reader_payload(chapter_range={"kind": "chapter_range", "chapter_start": 1, "chapter_end": 2})
+            reader_payload(
+                chapter_range={
+                    "kind": "chapter_range",
+                    "chapter_start": 1,
+                    "chapter_end": 2,
+                }
+            )
         )
     assert exc.value.reason_code == BlockedReasonCode.AMBIGUOUS_INTENT.value
 
     # Analysis requires a chapter_range anchor (D-10).
     with pytest.raises(ConsumerPlanBlocked) as exc:
-        QueryPlanService.parse_consumer_request(
-            analysis_payload(chapter_range=None)
-        )
+        QueryPlanService.parse_consumer_request(analysis_payload(chapter_range=None))
     assert exc.value.reason_code == BlockedReasonCode.AMBIGUOUS_INTENT.value
 
 
@@ -279,8 +286,12 @@ async def test_frozen_manifest_reaches_cited_answer_gate_leaf_only():
 def test_provable_call_chain_queryplan_to_gateway_to_schema():
     """AST-proof: service -> gateway::business_validate_answer -> schema validator."""
     root = Path(__file__).resolve().parents[3]
-    service_src = (root / "app/services/queryplan/service.py").read_text(encoding="utf-8")
-    gateway_src = (root / "app/services/reader_chat/gateway.py").read_text(encoding="utf-8")
+    service_src = (root / "app/services/queryplan/service.py").read_text(
+        encoding="utf-8"
+    )
+    gateway_src = (root / "app/services/reader_chat/gateway.py").read_text(
+        encoding="utf-8"
+    )
 
     service_ast = ast.parse(service_src)
     gateway_ast = ast.parse(gateway_src)
@@ -885,7 +896,13 @@ async def test_queryplan_view_rehydrates_from_stored_manifest():
 
 
 def _fixture() -> dict:
-    path = Path(__file__).resolve().parents[3] / "tests" / "fixtures" / "queryplan" / "questions_v1.json"
+    path = (
+        Path(__file__).resolve().parents[3]
+        / "tests"
+        / "fixtures"
+        / "queryplan"
+        / "questions_v1.json"
+    )
     return json.loads(path.read_text(encoding="utf-8"))
 
 
@@ -900,7 +917,9 @@ def test_frozen_qa_samples_parse_for_both_intents():
             "version_id": defaults["version_id"],
             "question_text": case["question"],
             "reading_progress": {
-                "through_chapter": case.get("through_chapter", defaults["through_chapter"]),
+                "through_chapter": case.get(
+                    "through_chapter", defaults["through_chapter"]
+                ),
                 "snapshot_hash": case.get("snapshot_hash", defaults["snapshot_hash"]),
                 "full_book_authorized": case.get(
                     "full_book_authorized", defaults["full_book_authorized"]
@@ -939,7 +958,5 @@ def test_frozen_qa_samples_parse_for_both_intents():
         if expected_dimensions:
             assert [d.value for d in plan.dimensions] == expected_dimensions
         for dim, status in (case.get("expected_availability") or {}).items():
-            entry = next(
-                e for e in plan.availability if e.dimension.value == dim
-            )
+            entry = next(e for e in plan.availability if e.dimension.value == dim)
             assert entry.status.value == status

@@ -27,7 +27,6 @@ from app.core.database import get_db
 from app.core.security import create_access_token, hash_password
 from app.main import app
 from app.models import Chapter, Novel, User
-from app.models.agent_runtime import ApprovalRequest
 from app.schemas.agent_runtime import SkillVersionRegister
 from app.services.agent_runtime.registry import register_skill_version
 from tests.integration.conftest import reset_public_schema, run_alembic
@@ -57,7 +56,9 @@ def _async_url(sync_url: str) -> str:
     return sync_url
 
 
-def _skill_contract(*, novel_id: int, name: str = DEFAULT_SKILL, **overrides: Any) -> SkillVersionRegister:
+def _skill_contract(
+    *, novel_id: int, name: str = DEFAULT_SKILL, **overrides: Any
+) -> SkillVersionRegister:
     base: dict[str, Any] = {
         "novel_id": novel_id,
         "name": name,
@@ -75,7 +76,10 @@ def _skill_contract(*, novel_id: int, name: str = DEFAULT_SKILL, **overrides: An
         "approval_required_for": [ASK_ACTION],
         "input_schema": {
             "type": "object",
-            "properties": {"question": {"type": "string"}, "novel_id": {"type": "integer"}},
+            "properties": {
+                "question": {"type": "string"},
+                "novel_id": {"type": "integer"},
+            },
             "required": ["question", "novel_id"],
         },
         "output_schema": {
@@ -178,17 +182,25 @@ async def _register_skill(factory, *, owner_id: int, novel_id: int) -> int:
     """service 层注册技能并提交，返回 skill_version id。"""
     async with factory() as session:
         _, version = await register_skill_version(
-            session, owner_id=owner_id, novel_id=novel_id, contract=_skill_contract(novel_id=novel_id)
+            session,
+            owner_id=owner_id,
+            novel_id=novel_id,
+            contract=_skill_contract(novel_id=novel_id),
         )
         await session.commit()
         return version.id
 
 
-async def _accept_run(client, *, token: str, novel_id: int, skill_version_id: int) -> int:
+async def _accept_run(
+    client, *, token: str, novel_id: int, skill_version_id: int
+) -> int:
     """POST skill-runs 铸造一次 queued run，返回 run.id。"""
     resp = await client.post(
         f"/api/agent/novels/{novel_id}/skill-runs",
-        json={"skill_version_id": skill_version_id, "input": {"question": FIXED_QUESTION}},
+        json={
+            "skill_version_id": skill_version_id,
+            "input": {"question": FIXED_QUESTION},
+        },
         headers={"Authorization": f"Bearer {token}"},
     )
     assert resp.status_code == 202, resp.text
@@ -237,7 +249,10 @@ async def test_ask_round_trip_confirm_once(
         factory, owner_id=seed["owner_id"], novel_id=seed["novel_id"]
     )
     run_id = await _accept_run(
-        client, token=seed["owner_token"], novel_id=seed["novel_id"], skill_version_id=skill_version_id
+        client,
+        token=seed["owner_token"],
+        novel_id=seed["novel_id"],
+        skill_version_id=skill_version_id,
     )
 
     resp = await _create_approval(
@@ -279,10 +294,17 @@ async def test_confirm_session_sets_approved_for_session(api_client) -> None:
         factory, owner_id=seed["owner_id"], novel_id=seed["novel_id"]
     )
     run_id = await _accept_run(
-        client, token=seed["owner_token"], novel_id=seed["novel_id"], skill_version_id=skill_version_id
+        client,
+        token=seed["owner_token"],
+        novel_id=seed["novel_id"],
+        skill_version_id=skill_version_id,
     )
     resp = await _create_approval(
-        client, token=seed["owner_token"], run_id=run_id, novel_id=seed["novel_id"], owner_id=seed["owner_id"]
+        client,
+        token=seed["owner_token"],
+        run_id=run_id,
+        novel_id=seed["novel_id"],
+        owner_id=seed["owner_id"],
     )
     request = resp.json()
     confirm_resp = await client.post(
@@ -303,10 +325,17 @@ async def test_reject_is_terminal(api_client) -> None:
         factory, owner_id=seed["owner_id"], novel_id=seed["novel_id"]
     )
     run_id = await _accept_run(
-        client, token=seed["owner_token"], novel_id=seed["novel_id"], skill_version_id=skill_version_id
+        client,
+        token=seed["owner_token"],
+        novel_id=seed["novel_id"],
+        skill_version_id=skill_version_id,
     )
     resp = await _create_approval(
-        client, token=seed["owner_token"], run_id=run_id, novel_id=seed["novel_id"], owner_id=seed["owner_id"]
+        client,
+        token=seed["owner_token"],
+        run_id=run_id,
+        novel_id=seed["novel_id"],
+        owner_id=seed["owner_id"],
     )
     request = resp.json()
 
@@ -334,10 +363,17 @@ async def test_cross_owner_confirm_is_404_hidden(api_client) -> None:
         factory, owner_id=seed["owner_id"], novel_id=seed["novel_id"]
     )
     run_id = await _accept_run(
-        client, token=seed["owner_token"], novel_id=seed["novel_id"], skill_version_id=skill_version_id
+        client,
+        token=seed["owner_token"],
+        novel_id=seed["novel_id"],
+        skill_version_id=skill_version_id,
     )
     resp = await _create_approval(
-        client, token=seed["owner_token"], run_id=run_id, novel_id=seed["novel_id"], owner_id=seed["owner_id"]
+        client,
+        token=seed["owner_token"],
+        run_id=run_id,
+        novel_id=seed["novel_id"],
+        owner_id=seed["owner_id"],
     )
     request = resp.json()
 
@@ -371,7 +407,10 @@ async def test_expired_request_refuses_decision(api_client) -> None:
         factory, owner_id=seed["owner_id"], novel_id=seed["novel_id"]
     )
     run_id = await _accept_run(
-        client, token=seed["owner_token"], novel_id=seed["novel_id"], skill_version_id=skill_version_id
+        client,
+        token=seed["owner_token"],
+        novel_id=seed["novel_id"],
+        skill_version_id=skill_version_id,
     )
     resp = await _create_approval(
         client,
@@ -399,10 +438,17 @@ async def test_direct_status_mutation_forgery_has_no_api_path(api_client) -> Non
         factory, owner_id=seed["owner_id"], novel_id=seed["novel_id"]
     )
     run_id = await _accept_run(
-        client, token=seed["owner_token"], novel_id=seed["novel_id"], skill_version_id=skill_version_id
+        client,
+        token=seed["owner_token"],
+        novel_id=seed["novel_id"],
+        skill_version_id=skill_version_id,
     )
     resp = await _create_approval(
-        client, token=seed["owner_token"], run_id=run_id, novel_id=seed["novel_id"], owner_id=seed["owner_id"]
+        client,
+        token=seed["owner_token"],
+        run_id=run_id,
+        novel_id=seed["novel_id"],
+        owner_id=seed["owner_id"],
     )
     request = resp.json()
 
@@ -444,7 +490,10 @@ async def test_create_rejects_owner_forgery(api_client) -> None:
         factory, owner_id=seed["owner_id"], novel_id=seed["novel_id"]
     )
     run_id = await _accept_run(
-        client, token=seed["owner_token"], novel_id=seed["novel_id"], skill_version_id=skill_version_id
+        client,
+        token=seed["owner_token"],
+        novel_id=seed["novel_id"],
+        skill_version_id=skill_version_id,
     )
     # 用 other 的 token 铸造 owner 的请求 → 拒绝。
     resp = await _create_approval(
@@ -466,11 +515,18 @@ async def test_list_pagination_shape(api_client) -> None:
         factory, owner_id=seed["owner_id"], novel_id=seed["novel_id"]
     )
     run_id = await _accept_run(
-        client, token=seed["owner_token"], novel_id=seed["novel_id"], skill_version_id=skill_version_id
+        client,
+        token=seed["owner_token"],
+        novel_id=seed["novel_id"],
+        skill_version_id=skill_version_id,
     )
     for _ in range(2):
         resp = await _create_approval(
-            client, token=seed["owner_token"], run_id=run_id, novel_id=seed["novel_id"], owner_id=seed["owner_id"]
+            client,
+            token=seed["owner_token"],
+            run_id=run_id,
+            novel_id=seed["novel_id"],
+            owner_id=seed["owner_id"],
         )
         assert resp.status_code == 201
 
@@ -503,10 +559,17 @@ async def test_service_sole_mutator_via_db_row(api_client) -> None:
         factory, owner_id=seed["owner_id"], novel_id=seed["novel_id"]
     )
     run_id = await _accept_run(
-        client, token=seed["owner_token"], novel_id=seed["novel_id"], skill_version_id=skill_version_id
+        client,
+        token=seed["owner_token"],
+        novel_id=seed["novel_id"],
+        skill_version_id=skill_version_id,
     )
     resp = await _create_approval(
-        client, token=seed["owner_token"], run_id=run_id, novel_id=seed["novel_id"], owner_id=seed["owner_id"]
+        client,
+        token=seed["owner_token"],
+        run_id=run_id,
+        novel_id=seed["novel_id"],
+        owner_id=seed["owner_id"],
     )
     request = resp.json()
     assert request["action"] == ASK_ACTION

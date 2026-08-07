@@ -62,9 +62,7 @@ class SourceKind(StrEnum):
     HUMAN_OVERRIDE = "human_override"
 
 
-CHAT_SOURCE_KINDS = frozenset(
-    {SourceKind.READER_CHAT, SourceKind.USER_CONVERSATION}
-)
+CHAT_SOURCE_KINDS = frozenset({SourceKind.READER_CHAT, SourceKind.USER_CONVERSATION})
 
 
 class GateReason(StrEnum):
@@ -401,7 +399,10 @@ class RuleGate:
                 )
             )
 
-        if authority == Authority.CANON_FACT and Authority.CANON_FACT not in self.approvals:
+        if (
+            authority == Authority.CANON_FACT
+            and Authority.CANON_FACT not in self.approvals
+        ):
             verdicts.append(
                 RuleVerdict(
                     passed=False,

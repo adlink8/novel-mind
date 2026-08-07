@@ -87,7 +87,9 @@ class PromptCompileRequest(StrictWireModel):
 
     spec_id: int = Field(gt=0)
     prompt_key: str = Field(min_length=1, max_length=120)
-    adapter_id: str = Field(default=MOCK_PROMPT_ADAPTER_ID, min_length=1, max_length=120)
+    adapter_id: str = Field(
+        default=MOCK_PROMPT_ADAPTER_ID, min_length=1, max_length=120
+    )
     revision_number: int = Field(default=1, ge=1)
     parent_prompt_revision_id: int | None = Field(default=None, gt=0)
 
@@ -150,9 +152,7 @@ class PromptDiffResponse(StrictWireModel):
     changed_negative_constraints: list[PromptListDiffItemView] = Field(
         default_factory=list
     )
-    changed_uncertainties: list[PromptListDiffItemView] = Field(
-        default_factory=list
-    )
+    changed_uncertainties: list[PromptListDiffItemView] = Field(default_factory=list)
     prompt_text_changed: bool = False
 
 
@@ -326,7 +326,11 @@ async def preview_prompt_revision(
         )
     except PromptRevisionNotFound:
         raise _not_found() from None
-    except (PromptRevisionServiceError, PromptCompileError, PromptRevisionConflict) as exc:
+    except (
+        PromptRevisionServiceError,
+        PromptCompileError,
+        PromptRevisionConflict,
+    ) as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     return _artifact_view(artifact)
 
@@ -356,7 +360,11 @@ async def create_prompt_revision(
         )
     except PromptRevisionNotFound:
         raise _not_found() from None
-    except (PromptRevisionServiceError, PromptCompileError, PromptRevisionConflict) as exc:
+    except (
+        PromptRevisionServiceError,
+        PromptCompileError,
+        PromptRevisionConflict,
+    ) as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     return PromptCreateResponse(
         revision=persisted.view,
@@ -418,7 +426,11 @@ async def edit_prompt_revision(
         )
     except PromptRevisionNotFound:
         raise _not_found() from None
-    except (PromptRevisionServiceError, PromptCompileError, PromptRevisionConflict) as exc:
+    except (
+        PromptRevisionServiceError,
+        PromptCompileError,
+        PromptRevisionConflict,
+    ) as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     return PromptEditResponse(revision=result.view, diff=_diff_view(result.diff))
 

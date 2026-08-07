@@ -151,7 +151,8 @@ class KnowledgeQueries:
         matched = [
             row
             for row in rows
-            if row.knowledge_key == knowledge_key or knowledge_key in (row.lineage or [])
+            if row.knowledge_key == knowledge_key
+            or knowledge_key in (row.lineage or [])
         ]
         return tuple(_claim_from_row(row) for row in matched)
 

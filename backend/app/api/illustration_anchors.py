@@ -40,7 +40,10 @@ from app.api.dependencies import require_owned_novel
 from app.core.database import get_db
 from app.core.security import require_user
 from app.models import Novel, User
-from app.models.illustration_anchor import IllustrationAnchor, IllustrationAnchorProposal
+from app.models.illustration_anchor import (
+    IllustrationAnchor,
+    IllustrationAnchorProposal,
+)
 from app.schemas.agent_approvals import ApprovalRequestView
 from app.schemas.agent_tools import StrictAgentToolModel
 from app.schemas.illustration_anchor import (
@@ -443,7 +446,10 @@ async def get_illustration_anchor_manifest(
     )
     if proposal is None:
         raise _not_found()
-    if proposal.status != AnchorStatus.VALID.value or proposal.published_asset_revision_id is None:
+    if (
+        proposal.status != AnchorStatus.VALID.value
+        or proposal.published_asset_revision_id is None
+    ):
         raise _conflict("proposal has not been published yet")
     anchor = await db.scalar(
         select(IllustrationAnchor).where(
@@ -460,7 +466,10 @@ async def get_illustration_anchor_manifest(
         )
     except AnchorPublishError as exc:
         raise _conflict(str(exc)) from exc
-    return {"manifest": manifest.model_dump(mode="json"), "manifest_hash": anchor.publish_manifest_hash}
+    return {
+        "manifest": manifest.model_dump(mode="json"),
+        "manifest_hash": anchor.publish_manifest_hash,
+    }
 
 
 # ---------------------------------------------------------------------------

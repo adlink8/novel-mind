@@ -26,6 +26,8 @@ from pathlib import Path
 
 import pytest
 
+from httpx import AsyncClient
+
 from app.services.agent_tools.errors import AgentToolError
 from app.services.agent_tools.facade import ToolFacade
 
@@ -131,7 +133,10 @@ def _params(tool: str, **extra) -> dict:
             "content_hash": "a" * 64,
         },
         "get_visual_bible": {"version_id": 1},
-        "generate_image_candidate": {"prompt_revision_id": 1, "job_key": "adversarial-job"},
+        "generate_image_candidate": {
+            "prompt_revision_id": 1,
+            "job_key": "adversarial-job",
+        },
     }[tool]
     return {**base, **extra}
 
@@ -192,13 +197,20 @@ def _service_stub(tool: str, handler):
         return await _call_handler(handler, db=db, chapter_id=chapter_id)
 
     async def stub_search(db, *, owner_id, novel_id, query, mode, top_k):
-        return await _call_handler(
-            handler, db=db, owner_id=owner_id, novel_id=novel_id
-        )
+        return await _call_handler(handler, db=db, owner_id=owner_id, novel_id=novel_id)
 
     async def stub_timeline(
-        db, *, novel, owner_id, source, ordering, person, include_causal,
-        request_full_book, chapter_start, chapter_end,
+        db,
+        *,
+        novel,
+        owner_id,
+        source,
+        ordering,
+        person,
+        include_causal,
+        request_full_book,
+        chapter_start,
+        chapter_end,
     ):
         return await _call_handler(
             handler,
@@ -213,8 +225,17 @@ def _service_stub(tool: str, handler):
         )
 
     async def stub_relationships(
-        db, *, novel, owner_id, source, version_id, through_chapter,
-        request_full_book, character_id, relation_type, include_provisional,
+        db,
+        *,
+        novel,
+        owner_id,
+        source,
+        version_id,
+        through_chapter,
+        request_full_book,
+        character_id,
+        relation_type,
+        include_provisional,
     ):
         return await _call_handler(
             handler,
@@ -227,10 +248,19 @@ def _service_stub(tool: str, handler):
         )
 
     async def stub_clues(
-        db, *, novel, owner_id, request_full_book, character_id, status_filter,
+        db,
+        *,
+        novel,
+        owner_id,
+        request_full_book,
+        character_id,
+        status_filter,
     ):
         return await _call_handler(
-            handler, db=db, novel=novel, owner_id=owner_id,
+            handler,
+            db=db,
+            novel=novel,
+            owner_id=owner_id,
             request_full_book=request_full_book,
         )
 
@@ -305,9 +335,7 @@ def _service_stub(tool: str, handler):
             content_hash=content_hash,
         )
 
-    async def stub_visual_bible(
-        db, *, owner_id, novel_id, version_id, approved_only
-    ):
+    async def stub_visual_bible(db, *, owner_id, novel_id, version_id, approved_only):
         return await _call_handler(
             handler,
             db=db,
@@ -349,9 +377,7 @@ def _service_stub(tool: str, handler):
 
 
 @pytest.mark.parametrize("tool", ALL_TOOLS)
-async def test_cross_owner_novel_id_404_hides(
-    tool, client: "AsyncClient", db_session
-):
+async def test_cross_owner_novel_id_404_hides(tool, client: "AsyncClient", db_session):
     """他人小说 ID：7 个路由全部 404-hide，绝不 403（无 oracle）。
 
     注意：第一个注册用户是 bootstrap admin（is_superuser=True），会绕过
@@ -389,9 +415,7 @@ async def test_cross_owner_novel_id_404_hides(
     assert login_resp.status_code == 200
     client.headers["Authorization"] = f"Bearer {login_resp.json()['access_token']}"
 
-    resp = await client.post(
-        TOOL_ROUTES[tool], params={"novel_id": novel.id}, json={}
-    )
+    resp = await client.post(TOOL_ROUTES[tool], params={"novel_id": novel.id}, json={})
     assert resp.status_code == 404, f"{tool} 未 404-hide: {resp.text}"
     assert resp.status_code != 403, f"{tool} 泄露了 403 oracle"
 
@@ -408,7 +432,9 @@ async def test_beyond_cutoff_no_content_leak(tool):
         "get_timeline": {"chapter_end": BEYOND_CHAPTER},
         "get_relationships": {"through_chapter": BEYOND_CHAPTER},
         "get_narrative_memory": {
-            "view": "tree", "version_id": 1, "through_chapter": BEYOND_CHAPTER
+            "view": "tree",
+            "version_id": 1,
+            "through_chapter": BEYOND_CHAPTER,
         },
         # 无章节范围参数的工具：底层服务本就 cutoff-limited。
         "get_novel": {},
@@ -417,10 +443,14 @@ async def test_beyond_cutoff_no_content_leak(tool):
         # Phase 27 世界模型工具：显式 cutoff 超过服务端截止点 → beyond_cutoff。
         "get_events": {"version_id": 1, "cutoff": BEYOND_CHAPTER},
         "get_character_state": {
-            "version_id": 1, "subject": "林安", "cutoff": BEYOND_CHAPTER
+            "version_id": 1,
+            "subject": "林安",
+            "cutoff": BEYOND_CHAPTER,
         },
         "get_character_knowledge": {
-            "version_id": 1, "subject": "林安", "cutoff": BEYOND_CHAPTER
+            "version_id": 1,
+            "subject": "林安",
+            "cutoff": BEYOND_CHAPTER,
         },
         "get_world_rules": {"version_id": 1, "cutoff": BEYOND_CHAPTER},
         # get_evidence_span 按章节号执行 cutoff（handler 在服务返回后裁决）。
@@ -440,7 +470,9 @@ async def test_beyond_cutoff_no_content_leak(tool):
     }[tool]
 
     if tool == "get_chapter":
-        service = _service_stub(tool, lambda db, **kw: _chapter(BEYOND_CHAPTER, PROTECTED))
+        service = _service_stub(
+            tool, lambda db, **kw: _chapter(BEYOND_CHAPTER, PROTECTED)
+        )
         facade = ToolFacade(
             cutoff_resolver=_fake_cutoff,
             service_overrides={"get_chapter": service},
@@ -786,7 +818,10 @@ async def test_full_book_spoof_without_persisted_switch_is_cutoff_limited(tool):
     if tool in ("get_timeline", "get_relationships", "get_clues"):
         # 注意 get_clues 的 stub 签名不含 request_full_book 透传，改走自定义 stub。
         if tool == "get_clues":
-            async def clues_record(db, *, novel, owner_id, request_full_book, character_id, status_filter):
+
+            async def clues_record(
+                db, *, novel, owner_id, request_full_book, character_id, status_filter
+            ):
                 received.append(bool(request_full_book))
                 return {"active": None, "running_candidate": None}
 
@@ -840,7 +875,9 @@ async def test_full_book_spoof_without_persisted_switch_is_cutoff_limited(tool):
         return
 
     if tool == "get_chapter":
-        service = _service_stub(tool, lambda db, **kw: _chapter(BEYOND_CHAPTER, PROTECTED))
+        service = _service_stub(
+            tool, lambda db, **kw: _chapter(BEYOND_CHAPTER, PROTECTED)
+        )
         facade = ToolFacade(
             cutoff_resolver=_fake_cutoff,
             service_overrides={"get_chapter": service},
@@ -919,9 +956,7 @@ async def test_full_book_spoof_without_persisted_switch_is_cutoff_limited(tool):
     assert PROTECTED not in json.dumps(payload, ensure_ascii=False)
 
 
-async def test_full_book_spoof_via_http_is_rejected_by_schema(
-    auth_client, db_session
-):
+async def test_full_book_spoof_via_http_is_rejected_by_schema(auth_client, db_session):
     """HTTP 层：裸 full_book 参数被 StrictPydantic 拒绝 → invalid_input。
 
     需要真实小说通过 require_owned_novel（否则先 404），才能观测到 Schema 422。
@@ -955,21 +990,21 @@ async def test_full_book_spoof_via_http_is_rejected_by_schema(
 
 
 FORBIDDEN_DOMAIN_IMPORTS = (
-    "app.services.illustration",        # 插图/作画任务（写入）
-    "app.services.canon_space",         # canon/branch 变异
-    "app.services.fanfiction",          # 同人文写入
-    "app.services.reader_chat",         # reader_chat 写路径 / 事实源（V08-BUILD-05）
-    "app.services.creative_projects",   # 创作项目（写入）
+    "app.services.illustration",  # 插图/作画任务（写入）
+    "app.services.canon_space",  # canon/branch 变异
+    "app.services.fanfiction",  # 同人文写入
+    "app.services.reader_chat",  # reader_chat 写路径 / 事实源（V08-BUILD-05）
+    "app.services.creative_projects",  # 创作项目（写入）
     "app.services.creative_generation",  # 创作生成（写入）
-    "app.services.analysis_service",    # 分析触发（写入）
-    "app.services.import_service",      # 导入管线（写入）
+    "app.services.analysis_service",  # 分析触发（写入）
+    "app.services.import_service",  # 导入管线（写入）
     "app.services.timeline.promotion",  # 时间线晋升（写）
     "app.services.timeline.overrides",  # 时间线人工覆盖（写）
-    "app.services.timeline.worker",     # 时间线 worker（写）
-    "app.services.clues.overrides",     # 线索人工操作（写）
-    "app.services.clues.worker",        # 线索 worker（写）
+    "app.services.timeline.worker",  # 时间线 worker（写）
+    "app.services.clues.overrides",  # 线索人工操作（写）
+    "app.services.clues.worker",  # 线索 worker（写）
     "app.services.relationships.overrides",  # 关系覆盖（写）
-    "app.models.agent_runtime",         # 25.2-03 运行时（本阶段不可达）
+    "app.models.agent_runtime",  # 25.2-03 运行时（本阶段不可达）
 )
 
 # 门面禁止出现任何模型调用构造（强制留在服务端，D-07）。

@@ -128,9 +128,7 @@ class WorldModelEventQueries:
                 .order_by(WorldModelEvent.version_id.asc(), WorldModelEvent.id.asc())
             )
         ).all()
-        return tuple(
-            EventFact.model_validate(row.canonical_payload) for row in rows
-        )
+        return tuple(EventFact.model_validate(row.canonical_payload) for row in rows)
 
     async def query_conflicts(
         self, *, owner_id: int, novel_id: int, version_id: int

@@ -29,7 +29,6 @@ from sqlalchemy.pool import NullPool
 from app.core.database import get_db
 from app.core.security import create_access_token, hash_password
 from app.main import app
-from app.models.derivative_project import DerivativeProject
 from app.models.novel import Chapter, Novel
 from app.models.user import User
 from tests.integration.conftest import reset_public_schema, run_alembic
@@ -98,7 +97,9 @@ def _seed_owner(sync_url: str, *, suffix: str, chapter_count: int = 3) -> dict:
             status="ready",
             reading_progress={},
             chapter_count=chapter_count,
-            word_count=sum(len(f"chapter {i} body") for i in range(1, chapter_count + 1)),
+            word_count=sum(
+                len(f"chapter {i} body") for i in range(1, chapter_count + 1)
+            ),
         )
         session.add(novel)
         session.flush()
@@ -125,7 +126,9 @@ def _seed_owner(sync_url: str, *, suffix: str, chapter_count: int = 3) -> dict:
 
 async def _create_fork(client, headers, novel_id, fork_key) -> dict:
     resp = await client.post(
-        FORK_BASE.format(novel_id=novel_id), json={"fork_key": fork_key}, headers=headers
+        FORK_BASE.format(novel_id=novel_id),
+        json={"fork_key": fork_key},
+        headers=headers,
     )
     assert resp.status_code == 201, resp.text
     return resp.json()["fork"]
@@ -141,7 +144,9 @@ async def _create_project(client, headers, novel_id, fork_id, name, **extra) -> 
     return resp.json()["project"]
 
 
-async def _create_chapter(client, headers, novel_id, project_id, title, **extra) -> dict:
+async def _create_chapter(
+    client, headers, novel_id, project_id, title, **extra
+) -> dict:
     payload = {"title": title}
     payload.update(extra)
     resp = await client.post(
@@ -318,8 +323,12 @@ async def test_illegal_patch_fields_are_rejected(api_client):
         assert resp.status_code == 422, f"{illegal}: {resp.text}"
 
     # Missing base_revision and empty patch fail closed.
-    assert (await client.patch(url, json={"markdown": "x"}, headers=headers)).status_code == 422
-    assert (await client.patch(url, json={"base_revision": 1}, headers=headers)).status_code == 422
+    assert (
+        await client.patch(url, json={"markdown": "x"}, headers=headers)
+    ).status_code == 422
+    assert (
+        await client.patch(url, json={"base_revision": 1}, headers=headers)
+    ).status_code == 422
 
 
 async def test_create_rejects_authority_fields(api_client):
@@ -331,9 +340,7 @@ async def test_create_rejects_authority_fields(api_client):
     project = await _create_project(client, headers, novel_id, fork["id"], "CF")
     base = _chapter_url(novel_id, project["id"])
 
-    resp = await client.post(
-        base, json={"title": "T", "revision": 5}, headers=headers
-    )
+    resp = await client.post(base, json={"title": "T", "revision": 5}, headers=headers)
     assert resp.status_code == 422, resp.text
     resp = await client.post(
         base, json={"title": "T", "markdown_checksum": "x" * 64}, headers=headers
@@ -369,7 +376,11 @@ async def test_reorder_applies_stable_positions(api_client):
 
     # The new order is stable on the next list.
     listing = await client.get(_chapter_url(novel_id, project["id"]), headers=headers)
-    assert [item["id"] for item in listing.json()["items"]] == [c3["id"], c1["id"], c2["id"]]
+    assert [item["id"] for item in listing.json()["items"]] == [
+        c3["id"],
+        c1["id"],
+        c2["id"],
+    ]
 
 
 async def test_reorder_conflicts_fail_closed(api_client):
@@ -380,7 +391,7 @@ async def test_reorder_conflicts_fail_closed(api_client):
     fork = await _create_fork(client, headers, novel_id, "ff-oc")
     project = await _create_project(client, headers, novel_id, fork["id"], "OC")
     c1 = await _create_chapter(client, headers, novel_id, project["id"], "A")
-    c2 = await _create_chapter(client, headers, novel_id, project["id"], "B")
+    await _create_chapter(client, headers, novel_id, project["id"], "B")
     url = f"{_chapter_url(novel_id, project['id'])}/order"
 
     # Missing one chapter.
@@ -397,7 +408,9 @@ async def test_reorder_conflicts_fail_closed(api_client):
     resp = await client.put(
         url, json={"chapter_ids": [c1["id"], 999999991]}, headers=headers
     )
-    assert resp.status_code == 409 and "reorder_foreign_chapter" in resp.json()["detail"]
+    assert (
+        resp.status_code == 409 and "reorder_foreign_chapter" in resp.json()["detail"]
+    )
 
     # Empty list.
     resp = await client.put(url, json={"chapter_ids": []}, headers=headers)
@@ -470,8 +483,12 @@ async def test_foreign_owner_project_chapter_are_identical_404(api_client):
     headers_a = {"Authorization": f"Bearer {a['token']}"}
     headers_b = {"Authorization": f"Bearer {b['token']}"}
     fork_a = await _create_fork(client, headers_a, a["novel_id"], "ff-oa")
-    project_a = await _create_project(client, headers_a, a["novel_id"], fork_a["id"], "A")
-    chapter_a = await _create_chapter(client, headers_a, a["novel_id"], project_a["id"], "A1")
+    project_a = await _create_project(
+        client, headers_a, a["novel_id"], fork_a["id"], "A"
+    )
+    chapter_a = await _create_chapter(
+        client, headers_a, a["novel_id"], project_a["id"], "A1"
+    )
 
     # Owner B cannot see or touch owner A's project chapters.
     base_b = _chapter_url(b["novel_id"], project_a["id"])
@@ -502,7 +519,11 @@ async def test_database_fk_rejects_unknown_project_id(api_client):
                     " VALUES (:owner_id, :novel_id, 999999991, 0, 't', '', :h,"
                     " 'draft', 1)"
                 ),
-                {"owner_id": ids["owner_id"], "novel_id": ids["novel_id"], "h": "a" * 64},
+                {
+                    "owner_id": ids["owner_id"],
+                    "novel_id": ids["novel_id"],
+                    "h": "a" * 64,
+                },
             )
         except IntegrityError as exc:
             assert "derivative_chapters_project_id_fkey" in str(exc)
@@ -561,7 +582,9 @@ async def test_database_rejects_bad_checksum_and_status(api_client):
         except IntegrityError as exc:
             assert "ck_derivative_chapters_status" in str(exc)
         else:
-            pytest.fail("published chapter status must be rejected by the DB constraint")
+            pytest.fail(
+                "published chapter status must be rejected by the DB constraint"
+            )
         finally:
             conn.rollback()
 

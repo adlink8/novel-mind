@@ -133,11 +133,22 @@ def test_export_preparation_payload_freezes_full_branch_aware_lineage():
     assert payload["fork"] == FORK
     assert payload["project_id"] == PROJECT_ID
     assert payload["project_key"] == PROJECT_KEY
-    assert payload["source_snapshot"]["source_snapshot_hash"] == snapshot.source_snapshot
-    assert payload["source_snapshot"]["source_manifest_hash"] == snapshot.project_manifest_hash
-    assert payload["base_revision"]["project_manifest_hash"] == snapshot.project_manifest_hash
+    assert (
+        payload["source_snapshot"]["source_snapshot_hash"] == snapshot.source_snapshot
+    )
+    assert (
+        payload["source_snapshot"]["source_manifest_hash"]
+        == snapshot.project_manifest_hash
+    )
+    assert (
+        payload["base_revision"]["project_manifest_hash"]
+        == snapshot.project_manifest_hash
+    )
     assert payload["base_revision"]["scope_hash"] == snapshot.scope_hash
-    assert payload["base_revision"]["cutoff_snapshot_hash"] == snapshot.cutoff_snapshot_hash
+    assert (
+        payload["base_revision"]["cutoff_snapshot_hash"]
+        == snapshot.cutoff_snapshot_hash
+    )
     assert payload["base_revision"]["text_version_hash"] == snapshot.text_version_hash
     # content_hash claims the frozen manifest/snapshot hash (stale -> fail closed).
     assert payload["content_hash"] == snapshot.snapshot_hash
@@ -156,7 +167,11 @@ def test_validate_preparation_payload_passes_on_replayed_lineage():
     payload = _payload(snapshot, manifest)
     assert (
         validate_preparation_payload(
-            payload, snapshot=snapshot, manifest=manifest, project_id=PROJECT_ID, fork=FORK
+            payload,
+            snapshot=snapshot,
+            manifest=manifest,
+            project_id=PROJECT_ID,
+            fork=FORK,
         )
         == []
     )
@@ -221,7 +236,11 @@ def test_validate_rejects_missing_evidence_and_malformed_hash():
 
     malformed = _payload(snapshot, manifest, content_hash="not-a-hash")
     errors = validate_preparation_payload(
-        malformed, snapshot=snapshot, manifest=manifest, project_id=PROJECT_ID, fork=FORK
+        malformed,
+        snapshot=snapshot,
+        manifest=manifest,
+        project_id=PROJECT_ID,
+        fork=FORK,
     )
     assert "content_hash_malformed" in errors
 
@@ -229,7 +248,11 @@ def test_validate_rejects_missing_evidence_and_malformed_hash():
 def test_validate_rejects_non_dict_payload():
     snapshot, manifest = _snapshot_manifest()
     errors = validate_preparation_payload(
-        "not-a-payload", snapshot=snapshot, manifest=manifest, project_id=PROJECT_ID, fork=FORK
+        "not-a-payload",
+        snapshot=snapshot,
+        manifest=manifest,
+        project_id=PROJECT_ID,
+        fork=FORK,
     )
     assert errors == ["preparation_payload_missing"]
 
@@ -237,7 +260,9 @@ def test_validate_rejects_non_dict_payload():
 def test_validate_returns_stable_codes_never_mutates():
     """The pure gate never mutates the payload and never fabricates a pass."""
     snapshot, manifest = _snapshot_manifest()
-    payload = _payload(snapshot, manifest, review_state="approved", content_hash="9" * 64)
+    payload = _payload(
+        snapshot, manifest, review_state="approved", content_hash="9" * 64
+    )
     before = dict(payload)
     errors = validate_preparation_payload(
         payload, snapshot=snapshot, manifest=manifest, project_id=PROJECT_ID, fork=FORK

@@ -177,7 +177,9 @@ def test_revision_ref_is_stable_across_rebuilds():
 def test_revision_ref_binds_parent_lineage():
     parent = build_revision_ref(_version_view(id=3, version_key="vb-main-v1"))
     child = build_revision_ref(
-        _version_view(id=7, version_key="vb-main-v2", revision_number=2, parent_version_id=3)
+        _version_view(
+            id=7, version_key="vb-main-v2", revision_number=2, parent_version_id=3
+        )
     )
     assert child.parent_version_id == parent.version_id
     # The parent ref itself never changes when a child is built.

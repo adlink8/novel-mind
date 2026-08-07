@@ -144,9 +144,7 @@ def materialize_evidence_ref(
             "(owner/novel/version/snapshot boundary)",
         )
 
-    chapter = next(
-        (c for c in source.chapters if c.chapter_id == ref.chapter_id), None
-    )
+    chapter = next((c for c in source.chapters if c.chapter_id == ref.chapter_id), None)
     if chapter is None:
         raise EvidenceError(
             "chapter_missing",

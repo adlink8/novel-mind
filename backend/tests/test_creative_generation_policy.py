@@ -66,7 +66,11 @@ def test_context_package_scope_and_hash_are_checked():
     with pytest.raises(CreativeContextPolicyError, match="owner_scope"):
         validate_context_package(package, owner_id=6, novel_id=11)
     with pytest.raises(CreativeContextPolicyError, match="context_hash"):
-        validate_context_package(package.model_copy(update={"context_hash": "b" * 64}), owner_id=5, novel_id=11)
+        validate_context_package(
+            package.model_copy(update={"context_hash": "b" * 64}),
+            owner_id=5,
+            novel_id=11,
+        )
 
 
 def test_evidence_and_state_lineage_cannot_cross_novel_or_cutoff_shape():

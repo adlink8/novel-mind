@@ -262,7 +262,9 @@ def _messages_to_vertex_contents(
                 name = fn.get("name") or ""
                 args_raw = fn.get("arguments") or "{}"
                 try:
-                    args = json.loads(args_raw) if isinstance(args_raw, str) else args_raw
+                    args = (
+                        json.loads(args_raw) if isinstance(args_raw, str) else args_raw
+                    )
                 except json.JSONDecodeError:
                     args = {}
                 fc_part: dict[str, Any] = {"functionCall": {"name": name, "args": args}}

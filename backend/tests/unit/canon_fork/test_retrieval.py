@@ -154,7 +154,9 @@ async def test_all_future_rows_are_blocked_not_fake_success():
 
 @pytest.mark.asyncio
 async def test_all_stale_rows_are_blocked_not_fake_success():
-    scope = _scope("user_interpretation", namespace="user:1", source_snapshot_hash=HEX64)
+    scope = _scope(
+        "user_interpretation", namespace="user:1", source_snapshot_hash=HEX64
+    )
     records = [_record("interpretation:artifact:1", chapter=1, snapshot=HEX64_B)]
     result = await CanonRetrievalService(session=object()).retrieve(
         scope, adapter=FakeAdapter(records)
@@ -249,7 +251,9 @@ def test_trace_exposes_only_counts_never_candidate_keys_or_hashes():
 
 
 def test_adapter_dispatch_covers_all_three_spaces():
-    assert index_adapter_for(CanonSpace.ORIGINAL_CANON).space is CanonSpace.ORIGINAL_CANON
+    assert (
+        index_adapter_for(CanonSpace.ORIGINAL_CANON).space is CanonSpace.ORIGINAL_CANON
+    )
     assert (
         index_adapter_for(CanonSpace.USER_INTERPRETATION).space
         is CanonSpace.USER_INTERPRETATION
@@ -272,7 +276,16 @@ def test_unknown_space_enum_fails_closed():
 # ---------------------------------------------------------------------------
 
 
-def _ref(*, cited_space, cited_namespace, leaf_key="chapter:1", content_hash=HEX64, source_snapshot_hash=HEX64, start=None, end=None):
+def _ref(
+    *,
+    cited_space,
+    cited_namespace,
+    leaf_key="chapter:1",
+    content_hash=HEX64,
+    source_snapshot_hash=HEX64,
+    start=None,
+    end=None,
+):
     return CanonCitationRef(
         cited_space=cited_space,
         cited_namespace=cited_namespace,
@@ -315,7 +328,9 @@ async def test_citation_policy_gate_blocks_cross_space():
 @pytest.mark.asyncio
 async def test_wrong_owner_citation_blocked():
     scope = _scope("original_canon", owner_id=1)
-    ref = _ref(cited_space=CanonSpace.ORIGINAL_CANON, cited_namespace="original:chapters")
+    ref = _ref(
+        cited_space=CanonSpace.ORIGINAL_CANON, cited_namespace="original:chapters"
+    )
     verdict = await CanonCitationService(session=object()).revalidate(
         ref, scope=scope, provider=FakeProvider(_resolved(owner_id=7))
     )
@@ -326,7 +341,9 @@ async def test_wrong_owner_citation_blocked():
 @pytest.mark.asyncio
 async def test_wrong_novel_citation_blocked():
     scope = _scope("original_canon", novel_id=2)
-    ref = _ref(cited_space=CanonSpace.ORIGINAL_CANON, cited_namespace="original:chapters")
+    ref = _ref(
+        cited_space=CanonSpace.ORIGINAL_CANON, cited_namespace="original:chapters"
+    )
     verdict = await CanonCitationService(session=object()).revalidate(
         ref, scope=scope, provider=FakeProvider(_resolved(novel_id=9))
     )
@@ -391,7 +408,9 @@ async def test_version_drift_within_same_namespace_blocked():
 @pytest.mark.asyncio
 async def test_beyond_cutoff_citation_blocked():
     scope = _scope("original_canon", through_chapter=2)
-    ref = _ref(cited_space=CanonSpace.ORIGINAL_CANON, cited_namespace="original:chapters")
+    ref = _ref(
+        cited_space=CanonSpace.ORIGINAL_CANON, cited_namespace="original:chapters"
+    )
     verdict = await CanonCitationService(session=object()).revalidate(
         ref, scope=scope, provider=FakeProvider(_resolved(chapter_number=3))
     )
@@ -402,7 +421,9 @@ async def test_beyond_cutoff_citation_blocked():
 @pytest.mark.asyncio
 async def test_stale_snapshot_citation_blocked():
     scope = _scope("original_canon", source_snapshot_hash=HEX64)
-    ref = _ref(cited_space=CanonSpace.ORIGINAL_CANON, cited_namespace="original:chapters")
+    ref = _ref(
+        cited_space=CanonSpace.ORIGINAL_CANON, cited_namespace="original:chapters"
+    )
     verdict = await CanonCitationService(session=object()).revalidate(
         ref, scope=scope, provider=FakeProvider(_resolved(source_snapshot_hash=HEX64_B))
     )
@@ -437,7 +458,9 @@ async def test_stale_content_hash_citation_blocked():
     verdict = await CanonCitationService(session=object()).revalidate(
         ref,
         scope=scope,
-        provider=FakeProvider(_resolved(content="chapter one body", source_snapshot_hash=HEX64)),
+        provider=FakeProvider(
+            _resolved(content="chapter one body", source_snapshot_hash=HEX64)
+        ),
     )
     assert verdict.allowed is False
     assert verdict.blocked_reason is CitationBlockedReason.STALE_HASH
@@ -475,7 +498,9 @@ async def test_out_of_bounds_offset_citation_blocked():
 @pytest.mark.asyncio
 async def test_unknown_leaf_citation_blocked():
     scope = _scope("original_canon")
-    ref = _ref(cited_space=CanonSpace.ORIGINAL_CANON, cited_namespace="original:chapters")
+    ref = _ref(
+        cited_space=CanonSpace.ORIGINAL_CANON, cited_namespace="original:chapters"
+    )
     verdict = await CanonCitationService(session=object()).revalidate(
         ref, scope=scope, provider=NoneProvider()
     )

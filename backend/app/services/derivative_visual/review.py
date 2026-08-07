@@ -194,7 +194,10 @@ async def list_review_candidates(
         select(DerivativeVisualCandidateAsset)
         .join(
             DerivativeVisualVersion,
-            (DerivativeVisualVersion.owner_id == DerivativeVisualCandidateAsset.owner_id)
+            (
+                DerivativeVisualVersion.owner_id
+                == DerivativeVisualCandidateAsset.owner_id
+            )
             & (
                 DerivativeVisualVersion.novel_id
                 == DerivativeVisualCandidateAsset.novel_id

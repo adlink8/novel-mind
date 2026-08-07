@@ -63,8 +63,12 @@ from app.services.world_model.rules import (
 pytestmark = pytest.mark.unit
 
 FIXTURE = json.loads(
-    (Path(__file__).resolve().parents[2] / "fixtures" / "world_model" / "entities_v1.json")
-    .read_text(encoding="utf-8")
+    (
+        Path(__file__).resolve().parents[2]
+        / "fixtures"
+        / "world_model"
+        / "entities_v1.json"
+    ).read_text(encoding="utf-8")
 )
 
 
@@ -96,7 +100,9 @@ def make_rule_gate(name: str, *, version_id: int | None = None) -> RuleGate:
     )
 
 
-def build_valid(name: str = "valid", *, version_id: int = 1) -> EntityCandidateProjection:
+def build_valid(
+    name: str = "valid", *, version_id: int = 1
+) -> EntityCandidateProjection:
     """Run one fixture scenario through the gates into an immutable candidate."""
     sc = scenario(name)
     scope = sc["scope"]
@@ -272,8 +278,7 @@ def test_alias_collision_produces_reviews_and_never_merges():
 def test_alias_reviews_are_never_auto_resolved():
     projection = build_valid("alias_collision", version_id=2)
     assert all(
-        review.status == AliasReviewStatus.REVIEW
-        for review in projection.alias_reviews
+        review.status == AliasReviewStatus.REVIEW for review in projection.alias_reviews
     )
     # No review field can silently upgrade; the pair keeps two entity keys.
     for review in projection.alias_reviews:
@@ -406,9 +411,11 @@ def test_provenance_rejects_orphan_exception_rule():
     from app.services.world_model.rules import RuleException
 
     orphan = RuleException.model_validate(
-        projection.exceptions[0].model_copy(
+        projection.exceptions[0]
+        .model_copy(
             update={"exception_key": "exc-orphan-rule", "rule_key": "rule-no-such"}
-        ).model_dump(mode="json")
+        )
+        .model_dump(mode="json")
     )
     result = validate_entity_package(
         entities=list(projection.entities),
@@ -426,9 +433,14 @@ def test_provenance_rejects_orphan_exception_target():
     from app.services.world_model.rules import RuleException
 
     orphan = RuleException.model_validate(
-        projection.exceptions[0].model_copy(
-            update={"exception_key": "exc-orphan-target", "applies_to": "e-no-such-entity"}
-        ).model_dump(mode="json")
+        projection.exceptions[0]
+        .model_copy(
+            update={
+                "exception_key": "exc-orphan-target",
+                "applies_to": "e-no-such-entity",
+            }
+        )
+        .model_dump(mode="json")
     )
     result = validate_entity_package(
         entities=list(projection.entities),
@@ -517,9 +529,7 @@ def test_projection_rejects_cross_scope_rows():
     projection = build_valid()
     hijack = projection.entities[0].model_copy(update={"owner_id": 2})
     with pytest.raises(ValueError):
-        build_entity_candidate(
-            owner_id=1, novel_id=1, version_id=1, entities=[hijack]
-        )
+        build_entity_candidate(owner_id=1, novel_id=1, version_id=1, entities=[hijack])
 
 
 def test_projection_rejects_link_to_unknown_entity():
@@ -577,4 +587,6 @@ def test_entity_gate_has_no_promotion_path():
         for name, _ in EntityGate.__dict__.items()
         if callable(getattr(EntityGate, name, None))
     }
-    assert not {m for m in gate_members if m.startswith(("promote", "update", "delete"))}
+    assert not {
+        m for m in gate_members if m.startswith(("promote", "update", "delete"))
+    }

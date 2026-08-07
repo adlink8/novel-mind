@@ -77,8 +77,7 @@ def worst_case_cost_usd(
 
     image_cost = Decimal(calls) * (price_snapshot.image_price_per_image or Decimal(0))
     token_cost = (
-        Decimal(input_tokens)
-        * (price_snapshot.input_price_per_million or Decimal(0))
+        Decimal(input_tokens) * (price_snapshot.input_price_per_million or Decimal(0))
         + Decimal(output_tokens)
         * (price_snapshot.output_price_per_million or Decimal(0))
     ) / Decimal(1_000_000)
@@ -131,9 +130,7 @@ class IllustrationBudgetGate:
             input_tokens=input_tokens,
             output_tokens=output_tokens,
         )
-        active = [
-            r for r in self.reservations.values() if r.status == "reserved"
-        ]
+        active = [r for r in self.reservations.values() if r.status == "reserved"]
         if (
             len(active) + 1 > self.policy.max_calls
             or sum((r.cost_usd for r in active), Decimal(0)) + cost
@@ -213,7 +210,8 @@ class IllustrationBudgetGate:
                     (
                         Decimal(r.settled_usage["cost_usd"])
                         for r in self.reservations.values()
-                        if r.status == "settled" and not r.settled_usage.get("usage_unknown")
+                        if r.status == "settled"
+                        and not r.settled_usage.get("usage_unknown")
                     ),
                     Decimal(0),
                 )

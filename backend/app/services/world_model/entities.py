@@ -124,9 +124,7 @@ def _sha256(component: str, body: str) -> str:
 
 
 def entity_checksum(entity: "WorldEntity") -> str:
-    return _sha256(
-        ENTITY_HASH_ENTITY, _canonical_json(entity.model_dump(mode="json"))
-    )
+    return _sha256(ENTITY_HASH_ENTITY, _canonical_json(entity.model_dump(mode="json")))
 
 
 def link_checksum(link: "EntityLink") -> str:
@@ -189,9 +187,7 @@ class WorldEntity(StrictModel):
 
     @field_validator("aliases")
     @classmethod
-    def _unique_aliases(
-        cls, value: tuple[EntityAlias, ...]
-    ) -> tuple[EntityAlias, ...]:
+    def _unique_aliases(cls, value: tuple[EntityAlias, ...]) -> tuple[EntityAlias, ...]:
         names = [alias.alias for alias in value]
         if len(names) != len(set(names)):
             raise ValueError("aliases must be unique within an entity")
@@ -216,9 +212,7 @@ class WorldEntity(StrictModel):
 
     @property
     def idempotency_key(self) -> str:
-        return row_idempotency_key(
-            ENTITY_HASH_ENTITY, self.model_dump(mode="json")
-        )
+        return row_idempotency_key(ENTITY_HASH_ENTITY, self.model_dump(mode="json"))
 
 
 class EntityLink(StrictModel):
@@ -349,9 +343,7 @@ class EntityClaim(StrictModel):
 
     @field_validator("aliases")
     @classmethod
-    def _unique_aliases(
-        cls, value: tuple[EntityAlias, ...]
-    ) -> tuple[EntityAlias, ...]:
+    def _unique_aliases(cls, value: tuple[EntityAlias, ...]) -> tuple[EntityAlias, ...]:
         names = [alias.alias for alias in value]
         if len(names) != len(set(names)):
             raise ValueError("aliases must be unique within an entity")
@@ -530,7 +522,10 @@ class EntityGate:
                 )
             )
 
-        if authority == Authority.CANON_FACT and Authority.CANON_FACT not in self.approvals:
+        if (
+            authority == Authority.CANON_FACT
+            and Authority.CANON_FACT not in self.approvals
+        ):
             verdicts.append(
                 EntityVerdict(
                     passed=False,
@@ -680,15 +675,27 @@ def detect_alias_collisions(
             best_kind = AliasCollisionKind.ALIAS_SIMILARITY
             candidates: list[tuple[str, str, AliasCollisionKind]] = []
             candidates.append(
-                (left.primary_name, right.primary_name, AliasCollisionKind.NAME_SIMILARITY)
+                (
+                    left.primary_name,
+                    right.primary_name,
+                    AliasCollisionKind.NAME_SIMILARITY,
+                )
             )
             for alias in right.aliases:
                 candidates.append(
-                    (left.primary_name, alias.alias, AliasCollisionKind.ALIAS_SIMILARITY)
+                    (
+                        left.primary_name,
+                        alias.alias,
+                        AliasCollisionKind.ALIAS_SIMILARITY,
+                    )
                 )
             for alias in left.aliases:
                 candidates.append(
-                    (alias.alias, right.primary_name, AliasCollisionKind.ALIAS_SIMILARITY)
+                    (
+                        alias.alias,
+                        right.primary_name,
+                        AliasCollisionKind.ALIAS_SIMILARITY,
+                    )
                 )
                 for other in right.aliases:
                     candidates.append(
@@ -711,9 +718,7 @@ def detect_alias_collisions(
                 matched_alias=best_label or a_key,
                 similarity=best_similarity,
                 status=AliasReviewStatus.REVIEW,
-                disclosure_cutoff=max(
-                    left.disclosure_cutoff, right.disclosure_cutoff
-                ),
+                disclosure_cutoff=max(left.disclosure_cutoff, right.disclosure_cutoff),
                 source_refs=left.source_refs,
                 owner_id=left.owner_id,
                 novel_id=left.novel_id,
@@ -750,7 +755,13 @@ class EntityCandidateProjection(StrictModel):
 
     @model_validator(mode="after")
     def _scope_matches_rows(self) -> "EntityCandidateProjection":
-        for row in (*self.entities, *self.links, *self.rules, *self.exceptions, *self.alias_reviews):
+        for row in (
+            *self.entities,
+            *self.links,
+            *self.rules,
+            *self.exceptions,
+            *self.alias_reviews,
+        ):
             if (
                 row.owner_id != self.owner_id
                 or row.novel_id != self.novel_id
@@ -962,8 +973,7 @@ class WorldEntityQueryEngine:
             for exception in self._projection.exceptions
             if (rule_key is None or exception.rule_key == rule_key)
             and (
-                cutoff is None
-                or visible_at_cutoff(exception.disclosure_cutoff, cutoff)
+                cutoff is None or visible_at_cutoff(exception.disclosure_cutoff, cutoff)
             )
         ]
         rows.sort(key=lambda exception: exception.exception_key)

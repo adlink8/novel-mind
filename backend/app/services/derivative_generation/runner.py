@@ -26,7 +26,7 @@ import hashlib
 import json
 import logging
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any, Protocol
 
@@ -53,7 +53,6 @@ from app.services.derivative_generation.candidate import (
     canonical_candidate_hash,
     candidate_hash,
     parse_candidate,
-    schema_hash,
 )
 from app.services.derivative_generation.context_package import (
     ContextPackageError,
@@ -229,12 +228,10 @@ def compile_prompt(
         for item in evidence_items
         if isinstance(item, dict) and item.get("candidate_key")
     )
-    world_state = ((dimensions.get("world_state") or {}).get("items") or [])
-    timeline = ((dimensions.get("timeline") or {}).get("items") or [])
-    unresolved_clues = (
-        (dimensions.get("unresolved_clues") or {}).get("items") or []
-    )
-    world_rules = ((dimensions.get("world_rules") or {}).get("items") or [])
+    world_state = (dimensions.get("world_state") or {}).get("items") or []
+    timeline = (dimensions.get("timeline") or {}).get("items") or []
+    unresolved_clues = (dimensions.get("unresolved_clues") or {}).get("items") or []
+    world_rules = (dimensions.get("world_rules") or {}).get("items") or []
 
     system = (
         "You are the constrained derivative writer for a Fanfiction Canon Fork.\n"
@@ -558,7 +555,9 @@ class DerivativeCandidateRunner:
         package = await self._load_scoped_package(owner_id, novel_id, job)
         if package is None:
             return await self._fail(
-                job, CODE_PACKAGE_NOT_FOUND, "context package is outside the owner/novel scope"
+                job,
+                CODE_PACKAGE_NOT_FOUND,
+                "context package is outside the owner/novel scope",
             )
         payload = dict(package.canonical_payload or {})
         try:
@@ -651,7 +650,7 @@ class DerivativeCandidateRunner:
                 max_tokens=self._max_output_tokens,
                 temperature=self._temperature,
             )
-        except asyncio.TimeoutError as exc:
+        except asyncio.TimeoutError:
             self._budget_gate.release(reservation_key)
             attempt.status = "outcome_unknown"
             attempt.error_code = CODE_PROVIDER_TIMEOUT
@@ -731,9 +730,7 @@ class DerivativeCandidateRunner:
                 s.model_dump(mode="json") for s in draft.branch_suggestions
             ],
             canon_delta_hash=(
-                candidate_hash(draft)
-                if draft.divergence is not None
-                else None
+                candidate_hash(draft) if draft.divergence is not None else None
             ),
             gate_verdict=verdict,
             gate_reason=gate.reason,
@@ -842,13 +839,15 @@ class DerivativeCandidateRunner:
 
     async def _next_attempt_number(self, job_id: int) -> int:
         current = await self._session.scalar(
-            select(func.coalesce(func.max(DerivativeGenerationAttempt.attempt_number), 0)).where(
-                DerivativeGenerationAttempt.job_id == job_id
-            )
+            select(
+                func.coalesce(func.max(DerivativeGenerationAttempt.attempt_number), 0)
+            ).where(DerivativeGenerationAttempt.job_id == job_id)
         )
         return int(current or 0) + 1
 
-    def _request_hash(self, job: DerivativeGenerationJob, deployment: ModelDeployment) -> str:
+    def _request_hash(
+        self, job: DerivativeGenerationJob, deployment: ModelDeployment
+    ) -> str:
         return canonical_hash(
             {
                 "artifact_kind": "derivative_generation",

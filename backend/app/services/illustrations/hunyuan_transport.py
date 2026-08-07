@@ -121,9 +121,7 @@ class HunyuanIllustrationTransport:
         }
         url = f"{self.base_url}/v1/images/generations"
         try:
-            async with httpx.AsyncClient(
-                timeout=timeout, proxy=self.proxy
-            ) as client:
+            async with httpx.AsyncClient(timeout=timeout, proxy=self.proxy) as client:
                 resp = await client.post(url, json=body)
         except httpx.HTTPError as exc:
             # 连接错误/超时：provider outcome unknown（可重试可对账）。
@@ -133,9 +131,7 @@ class HunyuanIllustrationTransport:
             ) from exc
 
         if resp.status_code in (429, 500, 502, 503, 504):
-            raise RuntimeError(
-                f"hunyuan provider returned HTTP {resp.status_code}"
-            )
+            raise RuntimeError(f"hunyuan provider returned HTTP {resp.status_code}")
         if resp.status_code >= 400:
             raise HunyuanRejectedError(
                 f"hunyuan provider rejected request: HTTP {resp.status_code}"

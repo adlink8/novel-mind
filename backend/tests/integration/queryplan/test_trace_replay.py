@@ -177,7 +177,9 @@ async def test_cross_owner_replay_fails_closed(tmp_path):
         await repo.append_trace(plan)
 
         with pytest.raises(QueryPlanRepositoryError):
-            await repo.replay_by_key(owner_id=2, idempotency_key=plan.trace.idempotency_key)
+            await repo.replay_by_key(
+                owner_id=2, idempotency_key=plan.trace.idempotency_key
+            )
         with pytest.raises(QueryPlanRepositoryError):
             await repo.replay_by_trace_id(owner_id=2, trace_id=plan.trace.trace_id)
     await engine.dispose()
@@ -211,7 +213,9 @@ async def test_checksum_drift_fails_closed(tmp_path):
         row = await repo.replay_by_key(
             owner_id=plan.owner_id, idempotency_key=plan.trace.idempotency_key
         )
-        row.canonical_payload_hash = "0" * 64  # tamper (test-only; repo has no update API)
+        row.canonical_payload_hash = (
+            "0" * 64
+        )  # tamper (test-only; repo has no update API)
         await session.flush()
 
         with pytest.raises(QueryPlanRepositoryError):
@@ -230,7 +234,11 @@ async def test_validation_error_leaves_no_half_trace(tmp_path):
         assert isinstance(plan, QueryPlan)
         # Corrupt the trace's payload hash so append validation fails before write.
         broken = plan.model_copy(
-            update={"trace": plan.trace.model_copy(update={"canonical_payload_hash": "0" * 64})}
+            update={
+                "trace": plan.trace.model_copy(
+                    update={"canonical_payload_hash": "0" * 64}
+                )
+            }
         )
         with pytest.raises(QueryPlanRepositoryError):
             await repo.append_trace(broken)
@@ -264,8 +272,7 @@ def test_repository_exposes_no_update_api():
     """Immutability: the repository must not expose any update/delete method (D-14)."""
 
     members = {
-        name
-        for name, _ in inspect.getmembers(QueryPlanRepository, predicate=callable)
+        name for name, _ in inspect.getmembers(QueryPlanRepository, predicate=callable)
     }
     assert not {m for m in members if m.startswith(("update", "delete", "promote"))}
     assert "append_trace" in members

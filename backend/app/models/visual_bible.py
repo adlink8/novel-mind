@@ -58,7 +58,13 @@ VISUAL_AUTHORITY_LABELS = (
     "user_interpretation",
 )
 VISUAL_REVIEW_ACTIONS = ("approve", "reject", "edit", "supersede", "needs_relink")
-VISUAL_REVIEW_STATES = ("candidate", "approved", "rejected", "superseded", "needs_relink")
+VISUAL_REVIEW_STATES = (
+    "candidate",
+    "approved",
+    "rejected",
+    "superseded",
+    "needs_relink",
+)
 VISUAL_RIGHTS_STATUSES = ("unreviewed", "cleared", "pending", "denied")
 VISUAL_ACTOR_SOURCES = ("human", "machine")
 
@@ -161,9 +167,7 @@ class VisualBibleVersion(TimestampMixin, Base):
     manifest_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     style_profile: Mapped[dict | None] = mapped_column(JSONB)
     constraints: Mapped[list | None] = mapped_column(JSONB)
-    canonical_payload: Mapped[dict] = mapped_column(
-        JSONB, nullable=False, default=dict
-    )
+    canonical_payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     canonical_payload_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     idempotency_key: Mapped[str] = mapped_column(String(64), nullable=False)
     projection_hash: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -252,9 +256,7 @@ class VisualEntity(TimestampMixin, Base):
     disclosure_cutoff: Mapped[int] = mapped_column(Integer, nullable=False)
     authority: Mapped[str] = mapped_column(String(32), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
-    canonical_payload: Mapped[dict] = mapped_column(
-        JSONB, nullable=False, default=dict
-    )
+    canonical_payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     canonical_payload_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     idempotency_key: Mapped[str] = mapped_column(String(64), nullable=False)
     projection_hash: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -356,9 +358,7 @@ class VisualClaim(TimestampMixin, Base):
     rationale: Mapped[str | None] = mapped_column(Text)
     cutoff_chapter: Mapped[int] = mapped_column(Integer, nullable=False)
     claim_hash: Mapped[str] = mapped_column(String(64), nullable=False)
-    canonical_payload: Mapped[dict] = mapped_column(
-        JSONB, nullable=False, default=dict
-    )
+    canonical_payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     canonical_payload_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     idempotency_key: Mapped[str] = mapped_column(String(64), nullable=False)
     projection_hash: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -539,9 +539,7 @@ class VisualReferenceAsset(TimestampMixin, Base):
     approved: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default="false"
     )
-    canonical_payload: Mapped[dict] = mapped_column(
-        JSONB, nullable=False, default=dict
-    )
+    canonical_payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     canonical_payload_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     idempotency_key: Mapped[str] = mapped_column(String(64), nullable=False)
     projection_hash: Mapped[str] = mapped_column(String(64), nullable=False)

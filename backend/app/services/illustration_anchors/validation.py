@@ -81,9 +81,7 @@ class AnchorValidationService:
             raise AnchorValidationGateError(
                 "anchor proposal scope does not match request scope"
             )
-        asset = await self._asset(
-            owner_id, novel_id, proposal.proposal_asset.id
-        )
+        asset = await self._asset(owner_id, novel_id, proposal.proposal_asset.id)
         if asset is None:
             raise AnchorValidationGateError(
                 "proposal asset not found in the owner/novel scope"
@@ -104,8 +102,7 @@ class AnchorValidationService:
                 status=AnchorStatus.INVALID,
                 reason_code="asset_rights_unresolved",
                 detail=(
-                    "asset rights must be cleared before an anchor proposal "
-                    "can proceed"
+                    "asset rights must be cleared before an anchor proposal can proceed"
                 ),
             )
         if proposal.proposal_asset.bytes_hash != asset.bytes_hash:
@@ -157,9 +154,21 @@ def validate_exact_proposal(
     proposal-ready/rights/hash gates fail closed.
     """
     if asset is not None:
-        approval_state = asset.get("approval_state") if isinstance(asset, dict) else getattr(asset, "approval_state", None)
-        rights_status = asset.get("rights_status") if isinstance(asset, dict) else getattr(asset, "rights_status", None)
-        bytes_hash = asset.get("bytes_hash") if isinstance(asset, dict) else getattr(asset, "bytes_hash", None)
+        approval_state = (
+            asset.get("approval_state")
+            if isinstance(asset, dict)
+            else getattr(asset, "approval_state", None)
+        )
+        rights_status = (
+            asset.get("rights_status")
+            if isinstance(asset, dict)
+            else getattr(asset, "rights_status", None)
+        )
+        bytes_hash = (
+            asset.get("bytes_hash")
+            if isinstance(asset, dict)
+            else getattr(asset, "bytes_hash", None)
+        )
         if approval_state != IllustrationApprovalState.PROPOSAL_READY.value:
             return AnchorValidationResult(
                 ok=False,

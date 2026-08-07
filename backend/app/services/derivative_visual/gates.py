@@ -63,7 +63,12 @@ from app.schemas.scene_spec import (
 HEX64_RE = re.compile(r"^[0-9a-f]{64}$")
 
 # Closed approval vocabularies mirrored from the ORM contracts.
-DERIVATIVE_ASSET_LINEAGE_STATES = ("candidate", "proposal_ready", "rejected", "superseded")
+DERIVATIVE_ASSET_LINEAGE_STATES = (
+    "candidate",
+    "proposal_ready",
+    "rejected",
+    "superseded",
+)
 DERIVATIVE_ANCHOR_PUBLISHED_STATUSES = ("valid", "needs_repair", "invalid")
 
 # Closed gate names in evaluation order.
@@ -220,8 +225,10 @@ def evaluate_upstream_gate(input_: DerivativeSceneSpecCompileInput) -> GateCheck
             "visual_bible_source_not_approved",
             "only an approved Original Visual Bible revision can be forked from",
         )
-    if input_.scene_spec_id is None or input_.scene_spec_id <= 0 or not _is_hex64(
-        input_.scene_spec_hash
+    if (
+        input_.scene_spec_id is None
+        or input_.scene_spec_id <= 0
+        or not _is_hex64(input_.scene_spec_hash)
     ):
         return _fail(
             "upstream",
@@ -272,14 +279,20 @@ def evaluate_source_hash_gate(input_: DerivativeSceneSpecCompileInput) -> GateCh
             "the derivative fork and the sealed SceneSpec must be frozen against "
             "the same original source snapshot (stale source hash)",
         )
-    if input_.scene_spec_visual_bible_revision_hash != input_.visual_bible_revision_hash:
+    if (
+        input_.scene_spec_visual_bible_revision_hash
+        != input_.visual_bible_revision_hash
+    ):
         return _fail(
             "source_hash",
             "scene_spec_visual_bible_revision_mismatch",
             "the sealed SceneSpec was compiled against a different Original Visual "
             "Bible revision than the fork references",
         )
-    if input_.scene_spec is not None and input_.scene_spec.content_hash != input_.scene_spec_hash:
+    if (
+        input_.scene_spec is not None
+        and input_.scene_spec.content_hash != input_.scene_spec_hash
+    ):
         return _fail(
             "source_hash",
             "scene_spec_hash_mismatch",
@@ -371,9 +384,8 @@ def evaluate_mixed_authority_gate(
     """Derivative-only authority; no Original path reuse and no silent approval."""
     for asset in input_.reference_assets:
         ref = asset.source_asset_ref or {}
-        if (
-            not ref.get("source_asset_id")
-            or not _is_hex64(str(ref.get("source_bytes_hash")))
+        if not ref.get("source_asset_id") or not _is_hex64(
+            str(ref.get("source_bytes_hash"))
         ):
             return _fail(
                 "mixed_authority",
@@ -396,7 +408,10 @@ def evaluate_mixed_authority_gate(
                 f"asset revision {row.asset_revision_id} carries unsupported "
                 f"approval_state {row.approval_state!r}",
             )
-        if not _is_hex64(row.bytes_hash) or row.scene_spec_hash != input_.scene_spec_hash:
+        if (
+            not _is_hex64(row.bytes_hash)
+            or row.scene_spec_hash != input_.scene_spec_hash
+        ):
             return _fail(
                 "mixed_authority",
                 "asset_lineage_spec_mismatch",

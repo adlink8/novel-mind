@@ -63,7 +63,9 @@ def _all_verified() -> tuple[DerivativeExportShipmentItem, ...]:
     return tuple(_item(req) for req in _REQUIREMENTS)
 
 
-def _audit_evidence(kind: str = "package_buildable") -> tuple[DerivativeExportAuditEvidence, ...]:
+def _audit_evidence(
+    kind: str = "package_buildable",
+) -> tuple[DerivativeExportAuditEvidence, ...]:
     return (
         DerivativeExportAuditEvidence(
             kind=kind, location="backend/tests", detail="evidence present"
@@ -98,7 +100,9 @@ def test_empty_baseline_blocks_every_requirement():
 
 def test_missing_single_requirement_blocks_the_baseline():
     provided = tuple(
-        _item(req) for req in _REQUIREMENTS if req != DerivativeExportShipmentRequirement.COST_BUDGET
+        _item(req)
+        for req in _REQUIREMENTS
+        if req != DerivativeExportShipmentRequirement.COST_BUDGET
     )
     baseline = build_derivative_export_shipment_baseline(provided)
     assert baseline.status == DerivativeExportAuditStatus.BLOCKED

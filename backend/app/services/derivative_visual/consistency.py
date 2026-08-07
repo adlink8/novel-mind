@@ -33,7 +33,9 @@ from app.schemas.derivative_visual_asset import (
 )
 
 
-def _unavailable(reason: str, detail: str, chapters: tuple[ChapterConsistencyEvidence, ...]) -> DerivativeConsistencyReport:
+def _unavailable(
+    reason: str, detail: str, chapters: tuple[ChapterConsistencyEvidence, ...]
+) -> DerivativeConsistencyReport:
     return DerivativeConsistencyReport(
         schema_version="derivative-visual-asset.v1",
         evaluator_id=DERIVATIVE_CONSISTENCY_EVALUATOR_ID,
@@ -76,8 +78,7 @@ def score_cross_chapter_consistency(
     if any(chapter.missing_style_evidence for chapter in chapters):
         return _unavailable(
             "missing_style_evidence",
-            "a chapter carries no frozen style profile; the score cannot "
-            "be computed",
+            "a chapter carries no frozen style profile; the score cannot be computed",
             chapters,
         )
 
@@ -95,9 +96,7 @@ def score_cross_chapter_consistency(
         style_consistent = chapter.style_hash == reference.style_hash
         if not identity_consistent:
             fail = True
-            reasons.append(
-                f"identity_drift:chapter{chapter.chapter_number}"
-            )
+            reasons.append(f"identity_drift:chapter{chapter.chapter_number}")
         if not style_consistent:
             if chapter.declared_style_divergence:
                 concern = True

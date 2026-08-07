@@ -54,7 +54,6 @@ from app.models.agent_runtime import (
 from app.schemas.agent_runtime import SkillVersionRegister
 from app.services.agent_runtime.finalize import (
     ERROR_CODE_FAILED_VALIDATION,
-    ERROR_CODE_INVALID_STOP_REASON,
     ERROR_CODE_UPSTREAM_ERROR,
     finalize_skill_run,
 )
@@ -134,7 +133,11 @@ def _skill_contract(
         "allowed_tools": list(tools),
         "read_permissions": ["canon", "narrative_memory", "qualification"],
         "write_permissions": [],
-        "forbidden_spaces": ["canon:original", "qualification:write", "derivative:write"],
+        "forbidden_spaces": [
+            "canon:original",
+            "qualification:write",
+            "derivative:write",
+        ],
         "budget": {
             "max_calls": 80,
             "max_input_tokens": 60_000,
@@ -475,7 +478,11 @@ async def _seed_evaluated_records(
             input_hash=eval_input_hash,
             frozen_manifest={"evidence_refs": [evidence_key]},
             budget_snapshot={"max_calls": 40},
-            model_lineage={"provider": "fixture", "model": "stub-model", "revision": "stub-1"},
+            model_lineage={
+                "provider": "fixture",
+                "model": "stub-model",
+                "revision": "stub-1",
+            },
             source_versions={"novel": "v1"},
             cancel_requested=False,
             retry_count=0,
@@ -491,7 +498,11 @@ async def _seed_evaluated_records(
             type="cited_answer",
             schema_version="cited-answer.v1",
             status="candidate",
-            model_lineage={"provider": "fixture", "model": "stub-model", "revision": "stub-1"},
+            model_lineage={
+                "provider": "fixture",
+                "model": "stub-model",
+                "revision": "stub-1",
+            },
             source_versions={"novel": "v1"},
             input_hash=eval_input_hash,
         )
@@ -606,7 +617,9 @@ async def _set_up(factory, sync_url: str, *, suffix: str) -> dict[str, Any]:
         owner_id=seed["owner_id"],
         novel_id=seed["novel_id"],
         contract=_skill_contract(
-            novel_id=seed["novel_id"], name="evaluate-reading-skill-runs", tools=DEFAULT_TOOLS
+            novel_id=seed["novel_id"],
+            name="evaluate-reading-skill-runs",
+            tools=DEFAULT_TOOLS,
         ),
     )
     candidate_svid = await _register_skill(
@@ -614,7 +627,9 @@ async def _set_up(factory, sync_url: str, *, suffix: str) -> dict[str, Any]:
         owner_id=seed["owner_id"],
         novel_id=seed["novel_id"],
         contract=_skill_contract(
-            novel_id=seed["novel_id"], name="answer-reading-question", tools=CANDIDATE_TOOLS
+            novel_id=seed["novel_id"],
+            name="answer-reading-question",
+            tools=CANDIDATE_TOOLS,
         ),
     )
     evidence_key = evidence_key_for(seed["chapter1_id"])
@@ -680,7 +695,9 @@ async def test_phase29_versioned_skill_registers(
         owner_id=seed["owner_id"],
         novel_id=seed["novel_id"],
         contract=_skill_contract(
-            novel_id=seed["novel_id"], name="evaluate-reading-skill-runs", tools=DEFAULT_TOOLS
+            novel_id=seed["novel_id"],
+            name="evaluate-reading-skill-runs",
+            tools=DEFAULT_TOOLS,
         ),
     )
     async with runtime_factory() as session:
@@ -817,9 +834,10 @@ async def test_phase29_happy_path_skill_evaluation_artifact(
 
     content = revision.content
     # 服务器重放：剥离 trail 后重算 repaired_hash 必须一致。
-    assert canonical_content_hash(_strip_trail(content)) == content["normalization"][
-        "repaired_hash"
-    ]
+    assert (
+        canonical_content_hash(_strip_trail(content))
+        == content["normalization"]["repaired_hash"]
+    )
     # 血缘绑定。
     assert content["owner_id"] == ctx["owner_id"]
     assert content["novel_id"] == ctx["novel_id"]
@@ -829,9 +847,16 @@ async def test_phase29_happy_path_skill_evaluation_artifact(
     # 被评估冻结血缘（SkillRun + ToolRun + Artifact revision）。
     assert content["evaluated_run"]["run_id"] == ctx["evaluated"]["run_id"]
     assert content["evaluated_run"]["status"] == "completed"
-    assert content["evaluated_artifact"]["artifact_id"] == ctx["evaluated"]["artifact_id"]
-    assert content["evaluated_artifact"]["revision_id"] == ctx["evaluated"]["revision_id"]
-    assert content["evaluated_artifact"]["content_hash"] == ctx["evaluated"]["content_hash"]
+    assert (
+        content["evaluated_artifact"]["artifact_id"] == ctx["evaluated"]["artifact_id"]
+    )
+    assert (
+        content["evaluated_artifact"]["revision_id"] == ctx["evaluated"]["revision_id"]
+    )
+    assert (
+        content["evaluated_artifact"]["content_hash"]
+        == ctx["evaluated"]["content_hash"]
+    )
     # 密封报告：two-value verdict + checksum 可重放。
     assert content["report"]["verdict"] == "qualified_candidate"
     assert content["report"]["checksum"] == report["checksum"]
@@ -879,9 +904,7 @@ async def test_phase29_blocked_report_is_official_outcome(
     )
     assert outcome.status == "completed", outcome.status_reason
     assert await _count(runtime_factory, Artifact, run_id=ctx["run_id"]) == 1
-    assert (
-        await _count_approvals(runtime_factory, run_id=ctx["run_id"]) == 0
-    )
+    assert await _count_approvals(runtime_factory, run_id=ctx["run_id"]) == 0
     async with runtime_factory() as session:
         revision = await session.get(ArtifactRevision, outcome.artifact_revision_id)
     assert revision is not None
@@ -901,13 +924,23 @@ async def test_phase29_cancellation_no_write(runtime_factory, migrated_postgres:
         owner_id=seed["owner_id"],
         novel_id=seed["novel_id"],
         contract=_skill_contract(
-            novel_id=seed["novel_id"], name="evaluate-reading-skill-runs", tools=DEFAULT_TOOLS
+            novel_id=seed["novel_id"],
+            name="evaluate-reading-skill-runs",
+            tools=DEFAULT_TOOLS,
         ),
     )
     run_input = {
         "novel_id": seed["novel_id"],
-        "dataset": {"dataset_version": DATASET_VERSION, "source_snapshot_hash": SOURCE_SNAPSHOT_HASH},
-        "evaluated_run": {"run_id": 1, "artifact_id": 1, "revision_id": 1, "content_hash": "b" * 64},
+        "dataset": {
+            "dataset_version": DATASET_VERSION,
+            "source_snapshot_hash": SOURCE_SNAPSHOT_HASH,
+        },
+        "evaluated_run": {
+            "run_id": 1,
+            "artifact_id": 1,
+            "revision_id": 1,
+            "content_hash": "b" * 64,
+        },
     }
     run_id = await _create_run(
         runtime_factory,
@@ -1261,8 +1294,7 @@ async def test_phase29_report_verdict_promotion_blocks(
     )
     assert outcome.status == "failed"
     assert (
-        outcome.status_reason is not None
-        and "qualification" in outcome.status_reason
+        outcome.status_reason is not None and "qualification" in outcome.status_reason
     )
     await _assert_zero_writes(runtime_factory, run_id=ctx["run_id"])
 
@@ -1377,7 +1409,9 @@ async def test_phase29_http_end_to_end_no_approval_no_publisher(
     resp = await client.post(
         "/api/agent/skills",
         json=_skill_contract(
-            novel_id=seed["novel_id"], name="evaluate-reading-skill-runs", tools=DEFAULT_TOOLS
+            novel_id=seed["novel_id"],
+            name="evaluate-reading-skill-runs",
+            tools=DEFAULT_TOOLS,
         ).model_dump(),
         headers=headers,
     )
@@ -1389,7 +1423,9 @@ async def test_phase29_http_end_to_end_no_approval_no_publisher(
         owner_id=seed["owner_id"],
         novel_id=seed["novel_id"],
         contract=_skill_contract(
-            novel_id=seed["novel_id"], name="answer-reading-question", tools=CANDIDATE_TOOLS
+            novel_id=seed["novel_id"],
+            name="answer-reading-question",
+            tools=CANDIDATE_TOOLS,
         ),
     )
     evidence_key = evidence_key_for(seed["chapter1_id"])

@@ -148,11 +148,11 @@ async def _seed_novel(f, *, suffix: str) -> dict[str, Any]:
             )
         ).scalar()
         await session.execute(
-                text(
-                    "INSERT INTO timeline_active_pointers (owner_id, novel_id, version_id, revision, manifest_checksum, created_at, updated_at) "
-                    "VALUES (:o, :n, :v, 1, :h, now(), now())"
-                ),
-                {"o": user, "n": novel, "v": aversion, "h": HEX64},
+            text(
+                "INSERT INTO timeline_active_pointers (owner_id, novel_id, version_id, revision, manifest_checksum, created_at, updated_at) "
+                "VALUES (:o, :n, :v, 1, :h, now(), now())"
+            ),
+            {"o": user, "n": novel, "v": aversion, "h": HEX64},
         )
         await session.execute(
             text("UPDATE analysis_runs SET version_id=:v WHERE id=:r"),
@@ -281,8 +281,11 @@ class TestWorldModelKnowledgeMaterialization:
             },
         }
         await _create_artifact(
-            factory, seed=seed, run_id=run_id,
-            artifact_type="world_model_candidate", payload=payload,
+            factory,
+            seed=seed,
+            run_id=run_id,
+            artifact_type="world_model_candidate",
+            payload=payload,
         )
         await _complete_run(factory, run_id)
 
@@ -332,8 +335,11 @@ class TestWorldModelKnowledgeMaterialization:
             },
         }
         await _create_artifact(
-            factory, seed=seed, run_id=run_id,
-            artifact_type="world_model_candidate", payload=payload,
+            factory,
+            seed=seed,
+            run_id=run_id,
+            artifact_type="world_model_candidate",
+            payload=payload,
         )
         await _complete_run(factory, run_id)
 
@@ -343,7 +349,9 @@ class TestWorldModelKnowledgeMaterialization:
         async with factory() as session:
             n = (
                 await session.execute(
-                    text("SELECT COUNT(*) FROM world_model_knowledge WHERE owner_id=:o"),
+                    text(
+                        "SELECT COUNT(*) FROM world_model_knowledge WHERE owner_id=:o"
+                    ),
                     {"o": seed["owner_id"]},
                 )
             ).scalar()
@@ -361,8 +369,11 @@ class TestVisualBibleMaterialization:
         )
         payload = {"type": "visual_bible"}
         await _create_artifact(
-            factory, seed=seed, run_id=run_id,
-            artifact_type="visual_bible", payload=payload,
+            factory,
+            seed=seed,
+            run_id=run_id,
+            artifact_type="visual_bible",
+            payload=payload,
         )
         await _complete_run(factory, run_id)
 
@@ -371,7 +382,9 @@ class TestVisualBibleMaterialization:
         async with factory() as session:
             n = (
                 await session.execute(
-                    text("SELECT COUNT(*) FROM visual_bible_versions WHERE owner_id=:o"),
+                    text(
+                        "SELECT COUNT(*) FROM visual_bible_versions WHERE owner_id=:o"
+                    ),
                     {"o": seed["owner_id"]},
                 )
             ).scalar()
@@ -451,9 +464,7 @@ class TestVisualBiblePositiveMaterialization:
                 "evidence_refs": [evidence_ref],
             }
         )
-        claim = claim.model_copy(
-            update={"claim_hash": claim_content_hash(claim)}
-        )
+        claim = claim.model_copy(update={"claim_hash": claim_content_hash(claim)})
         version = VisualBibleVersionContract.model_validate(
             {
                 "schema_version": "visual-bible.v1",

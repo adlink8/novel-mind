@@ -60,9 +60,7 @@ async def test_bootstrap_token_required_when_configured(
     monkeypatch.setattr(settings, "debug", True)
 
     # 缺失 token → 403
-    resp = await client.post(
-        "/api/auth/register", json=_payload("hacker-no-token")
-    )
+    resp = await client.post("/api/auth/register", json=_payload("hacker-no-token"))
     assert resp.status_code == 403
 
     # 错误 token → 403
@@ -121,9 +119,7 @@ async def test_production_with_token_allows_bootstrap(
     monkeypatch.setattr(settings, "debug", False)
 
     # 缺失 token → 403
-    resp = await client.post(
-        "/api/auth/register", json=_payload("prod-hacker")
-    )
+    resp = await client.post("/api/auth/register", json=_payload("prod-hacker"))
     assert resp.status_code == 403
 
     # 携带 token → superuser
@@ -141,8 +137,6 @@ async def test_dev_without_token_keeps_legacy_behavior(
     monkeypatch.setattr(settings, "bootstrap_admin_token", "")
     monkeypatch.setattr(settings, "debug", True)
 
-    resp = await client.post(
-        "/api/auth/register", json=_payload("local-dev-user")
-    )
+    resp = await client.post("/api/auth/register", json=_payload("local-dev-user"))
     assert resp.status_code == 201
     assert await _user_superuser(client, db_session, "local-dev-user") is True

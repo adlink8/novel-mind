@@ -51,7 +51,9 @@ from app.services.agent_runtime.registry import (
     register_skill_version,
     validate_skill_contract,
 )
-from app.services.agent_runtime.structured_output_integrity import canonical_content_hash
+from app.services.agent_runtime.structured_output_integrity import (
+    canonical_content_hash,
+)
 from app.services.agent_tools.facade import ToolFacade
 from tests.integration.conftest import reset_public_schema, run_alembic
 
@@ -94,7 +96,9 @@ def _async_url(sync_url: str) -> str:
     return sync_url
 
 
-def _skill_contract(*, novel_id: int, name: str = DEFAULT_SKILL, **overrides: Any) -> SkillVersionRegister:
+def _skill_contract(
+    *, novel_id: int, name: str = DEFAULT_SKILL, **overrides: Any
+) -> SkillVersionRegister:
     base: dict[str, Any] = {
         "novel_id": novel_id,
         "name": name,
@@ -381,7 +385,9 @@ async def _count_artifacts(factory, *, run_id: int) -> int:
     async with factory() as session:
         return int(
             await session.scalar(
-                select(func.count()).select_from(Artifact).where(Artifact.run_id == run_id)
+                select(func.count())
+                .select_from(Artifact)
+                .where(Artifact.run_id == run_id)
             )
             or 0
         )
@@ -421,11 +427,15 @@ async def test_register_skill_rejects_unknown_tool(
     """allowed_tools 含未注册工具 → 注册拒绝，无 active 行（T-25.2-03-01）。"""
     seed = _seed_owner_novel(migrated_postgres, suffix=f"unk_{uuid.uuid4().hex[:6]}")
     contract = _skill_contract(
-        novel_id=seed["novel_id"], allowed_tools=list(DEFAULT_TOOLS) + ["read_evil_file"]
+        novel_id=seed["novel_id"],
+        allowed_tools=list(DEFAULT_TOOLS) + ["read_evil_file"],
     )
     with pytest.raises(SkillContractError):
         await _register_skill(
-            runtime_factory, owner_id=seed["owner_id"], novel_id=seed["novel_id"], contract=contract
+            runtime_factory,
+            owner_id=seed["owner_id"],
+            novel_id=seed["novel_id"],
+            contract=contract,
         )
     # 无任何 active 行（registry 或 version 都不应该产生）。
     async with runtime_factory() as session:
@@ -504,7 +514,11 @@ async def test_finalize_happy_path_writes_candidate_artifact(
     assert revision is not None and revision.revision_no == 1
     assert revision.parent_revision_id is None
     assert artifact.current_revision_id == revision.id
-    assert run_row is not None and run_row.status == "completed" and run_row.stop_reason == "stop"
+    assert (
+        run_row is not None
+        and run_row.status == "completed"
+        and run_row.stop_reason == "stop"
+    )
     _assert_d10_fields(revision.content)
 
 
@@ -559,7 +573,9 @@ async def test_finalize_cancel_no_write(runtime_factory, migrated_postgres: str)
     assert run_row is not None and run_row.status == "cancelled"
 
 
-async def test_finalize_unknown_evidence_ref_fails(runtime_factory, migrated_postgres: str):
+async def test_finalize_unknown_evidence_ref_fails(
+    runtime_factory, migrated_postgres: str
+):
     """引证不在冻结 manifest 白名单 → run failed(failed_validation)，什么都不写。"""
     seed = _seed_owner_novel(migrated_postgres, suffix=f"evid_{uuid.uuid4().hex[:6]}")
     svid = await _register_skill(
@@ -617,7 +633,9 @@ async def test_finalize_unknown_evidence_ref_fails(runtime_factory, migrated_pos
     assert await _count_revisions(runtime_factory, run_id=run_id) == 0
 
 
-async def test_finalize_over_budget_fails_closed(runtime_factory, migrated_postgres: str):
+async def test_finalize_over_budget_fails_closed(
+    runtime_factory, migrated_postgres: str
+):
     """预算超限 → run failed(budget_exceeded)，0 写（T-25.2-03-05）。"""
     seed = _seed_owner_novel(migrated_postgres, suffix=f"budget_{uuid.uuid4().hex[:6]}")
     svid = await _register_skill(
@@ -664,7 +682,12 @@ async def test_finalize_over_budget_fails_closed(runtime_factory, migrated_postg
         model_lineage=loop["model_lineage"],
         source_versions=loop["source_versions"],
         # usage 的 input_tokens 远超 max_input_tokens=10 → fail closed。
-        usage={"calls": 1, "input_tokens": 500, "output_tokens": 48, "cost_usd": "0.0002"},
+        usage={
+            "calls": 1,
+            "input_tokens": 500,
+            "output_tokens": 48,
+            "cost_usd": "0.0002",
+        },
         frozen_manifest=loop["frozen_manifest"],
     )
     assert outcome.status == "failed"
@@ -712,7 +735,10 @@ async def test_artifact_status_only_via_service_and_owner(
     async with runtime_factory() as session:
         with pytest.raises(ArtifactStateError):
             await transition_artifact_status(
-                session, artifact_id=artifact_id, owner_id=seed["owner_id"], to_status="published"
+                session,
+                artifact_id=artifact_id,
+                owner_id=seed["owner_id"],
+                to_status="published",
             )
 
     # 非 owner 走 API approve → 404。
@@ -856,7 +882,11 @@ async def test_end_to_end_skill_run_and_replay(
     assert run2_row.source_versions == run1_row.source_versions
 
     # 不突变第一个 run 的 artifact。
-    assert await _count_revisions(runtime_factory, run_id=run1_id) == first_revision_count == 1
+    assert (
+        await _count_revisions(runtime_factory, run_id=run1_id)
+        == first_revision_count
+        == 1
+    )
     async with runtime_factory() as session:
         rev1_again = await session.get(ArtifactRevision, outcome1.artifact_revision_id)
     assert rev1_again is not None
@@ -889,7 +919,10 @@ async def test_finalize_http_endpoint_happy_path(
     seed = _seed_owner_novel(migrated_postgres, suffix="fh" + uuid.uuid4().hex[:6])
     contract = _skill_contract(novel_id=seed["novel_id"])
     sv_id = await _register_skill(
-        runtime_factory, owner_id=seed["owner_id"], novel_id=seed["novel_id"], contract=contract
+        runtime_factory,
+        owner_id=seed["owner_id"],
+        novel_id=seed["novel_id"],
+        contract=contract,
     )
     run_input = {"question": FIXED_QUESTION}
     run_hash = canonical_input_hash(run_input)
@@ -943,7 +976,10 @@ async def test_finalize_http_endpoint_cancel_no_write(
     seed = _seed_owner_novel(migrated_postgres, suffix="fc" + uuid.uuid4().hex[:6])
     contract = _skill_contract(novel_id=seed["novel_id"])
     sv_id = await _register_skill(
-        runtime_factory, owner_id=seed["owner_id"], novel_id=seed["novel_id"], contract=contract
+        runtime_factory,
+        owner_id=seed["owner_id"],
+        novel_id=seed["novel_id"],
+        contract=contract,
     )
     run_input = {"question": FIXED_QUESTION}
     run_hash = canonical_input_hash(run_input)

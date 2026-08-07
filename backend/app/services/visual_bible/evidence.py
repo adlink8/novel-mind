@@ -234,9 +234,7 @@ class VisualBibleEvidenceService:
         try:
             validate_claim_hash(claim)
         except VisualBibleGateError as exc:
-            return ClaimUnresolved(
-                claim.claim_key, "claim_hash_mismatch", str(exc)
-            )
+            return ClaimUnresolved(claim.claim_key, "claim_hash_mismatch", str(exc))
 
         # Interpretation labels carry author + rationale, never leaf evidence.
         if claim.authority is not VisualAuthority.CANON_FACT:
@@ -292,6 +290,4 @@ class VisualBibleEvidenceService:
                 )
             verified.append(ref)
 
-        return MaterializedClaim(
-            claim=claim, verified_evidence=tuple(verified)
-        )
+        return MaterializedClaim(claim=claim, verified_evidence=tuple(verified))

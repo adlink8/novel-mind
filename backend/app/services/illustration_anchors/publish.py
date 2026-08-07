@@ -69,10 +69,8 @@ from app.schemas.illustration_anchor import (
     anchor_publish_manifest_hash,
     build_anchor_proposal_idempotency_key,
     canonical_anchor_hash,
-    validate_anchor_proposal_contract,
 )
 from app.services.illustration_anchors.validation import (
-    AnchorValidationGateError,
     AnchorValidationService,
 )
 from app.services.illustrations.review import build_proposal_ref
@@ -252,9 +250,7 @@ async def _load_chapter(
         )
     )
     if chapter is None:
-        raise AnchorProposalError(
-            "chapter not found in the owner/novel scope"
-        )
+        raise AnchorProposalError("chapter not found in the owner/novel scope")
     return chapter
 
 
@@ -269,9 +265,7 @@ async def _load_asset(
         )
     )
     if asset is None:
-        raise AnchorProposalError(
-            "proposal asset not found in the owner/novel scope"
-        )
+        raise AnchorProposalError("proposal asset not found in the owner/novel scope")
     return asset
 
 
@@ -337,9 +331,7 @@ async def create_anchor_proposal(
         # build_proposal_ref fails closed on an unapproved/unresolved asset and
         # the branch/fork scope gate fails closed on an incomplete derivative
         # scope; surface a stable proposal-gate reason instead of a raw error.
-        raise AnchorProposalError(
-            f"anchor proposal gate blocked: {exc}"
-        ) from exc
+        raise AnchorProposalError(f"anchor proposal gate blocked: {exc}") from exc
     idempotency_key = build_anchor_proposal_idempotency_key(proposal)
     proposal = proposal.model_copy(update={"idempotency_key": idempotency_key})
 
@@ -385,12 +377,13 @@ async def create_anchor_proposal(
             proposal=existing, approval_request=approval, replayed=True
         )
 
-    now = _utcnow()
     approval = ApprovalRequest(
         owner_id=owner_id,
         run_id=int(request["run_id"]) if request.get("run_id") else None,
         skill_version_id=(
-            int(request["skill_version_id"]) if request.get("skill_version_id") else None
+            int(request["skill_version_id"])
+            if request.get("skill_version_id")
+            else None
         ),
         artifact_id=int(request["artifact_id"]) if request.get("artifact_id") else None,
         artifact_revision_id=(
@@ -457,8 +450,13 @@ async def create_anchor_proposal(
 
 
 def _anchor_idempotency_key(
-    *, owner_id: int, novel_id: int, anchor_key: str, proposal_id: int,
-    published_asset_revision_id: int, publish_manifest_hash: str,
+    *,
+    owner_id: int,
+    novel_id: int,
+    anchor_key: str,
+    proposal_id: int,
+    published_asset_revision_id: int,
+    publish_manifest_hash: str,
     approval_request_id: int,
 ) -> str:
     return canonical_anchor_hash(
@@ -476,7 +474,9 @@ def _anchor_idempotency_key(
     )
 
 
-def _verify_approved_action(approval: ApprovalRequest, *, proposal: IllustrationAnchorProposal) -> None:
+def _verify_approved_action(
+    approval: ApprovalRequest, *, proposal: IllustrationAnchorProposal
+) -> None:
     """Approval gate: server-authoritative approved action + replay payload hash.
 
     Fails closed on a forged (non-approved) decision, an expired/cancelled/
@@ -544,11 +544,12 @@ async def publish_anchor(
         )
     )
     if proposal is None:
-        raise AnchorPublishError(
-            "anchor proposal not found in the owner/novel scope"
-        )
+        raise AnchorPublishError("anchor proposal not found in the owner/novel scope")
 
-    if proposal.status == AnchorStatus.VALID.value and proposal.published_asset_revision_id:
+    if (
+        proposal.status == AnchorStatus.VALID.value
+        and proposal.published_asset_revision_id
+    ):
         existing = await db.scalar(
             select(IllustrationAnchor).where(
                 IllustrationAnchor.proposal_id == proposal.id,

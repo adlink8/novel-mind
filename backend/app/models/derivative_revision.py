@@ -146,11 +146,7 @@ def _reject_revision_mutation(
     from sqlalchemy import inspect as _sa_inspect
 
     state = _sa_inspect(target)
-    changed = {
-        attr.key
-        for attr in state.attrs
-        if attr.history.has_changes()
-    }
+    changed = {attr.key for attr in state.attrs if attr.history.has_changes()}
     if changed:
         raise ValueError(
             f"{type(target).__name__} rows are immutable; append a new revision "

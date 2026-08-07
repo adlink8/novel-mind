@@ -181,13 +181,16 @@ class DerivativeAssetStorage:
         mime_type: str,
     ) -> bool:
         try:
-            return self.read(
-                owner_id=owner_id,
-                novel_id=novel_id,
-                visual_version_id=visual_version_id,
-                asset_id=asset_id,
-                mime_type=mime_type,
-            ) is not None
+            return (
+                self.read(
+                    owner_id=owner_id,
+                    novel_id=novel_id,
+                    visual_version_id=visual_version_id,
+                    asset_id=asset_id,
+                    mime_type=mime_type,
+                )
+                is not None
+            )
         except DerivativeAssetStorageError:
             return False
 
@@ -428,7 +431,8 @@ async def store_derivative_candidate_asset(
         spec = DerivativeSceneSpecContract.model_validate(spec.model_dump())
     except ValidationError as exc:
         raise DerivativeCandidateConflict(
-            "scene_spec_invalid", f"frozen derivative Scene Spec failed its own gate: {exc}"
+            "scene_spec_invalid",
+            f"frozen derivative Scene Spec failed its own gate: {exc}",
         ) from exc
     if candidate.scene_spec_hash != spec.content_hash:
         raise DerivativeCandidateConflict(
@@ -474,7 +478,9 @@ async def store_derivative_candidate_asset(
 
     # Content checksum: always replay from the bytes; a mismatch fails closed.
     if not payload:
-        raise DerivativeCandidateConflict("empty_payload", "cannot store an empty asset")
+        raise DerivativeCandidateConflict(
+            "empty_payload", "cannot store an empty asset"
+        )
     if len(payload) > MAX_DERIVATIVE_ASSET_BYTES:
         raise DerivativeCandidateConflict(
             "payload_too_large",
@@ -504,7 +510,9 @@ async def store_derivative_candidate_asset(
             "the frozen Scene Spec carries no identity; a candidate asset "
             "must be bound to at least one identity (D-38-03)",
         )
-    claimed_identity = [row.model_dump(mode="json") for row in candidate.identity_lineage]
+    claimed_identity = [
+        row.model_dump(mode="json") for row in candidate.identity_lineage
+    ]
     if claimed_identity != expected_identity:
         raise DerivativeCandidateConflict(
             "identity_lineage_mismatch",
@@ -553,9 +561,7 @@ async def store_derivative_candidate_asset(
         identity_key=evidence.identity_key,
         exclude_storage_key=storage_key,
     )
-    report = score_cross_chapter_consistency(
-        tuple(siblings) + (evidence,)
-    )
+    report = score_cross_chapter_consistency(tuple(siblings) + (evidence,))
     review_state = review_state_from_consistency_verdict(report.verdict).value
     identity_lineage = [
         DerivativeAssetIdentityRow.model_validate(row).model_dump(mode="json")
@@ -814,15 +820,15 @@ async def _sibling_evidence(
             .order_by(DerivativeVisualCandidateAsset.chapter_number.asc())
         )
     ).all()
-    return [
-        _evidence_from_row(row) for row in rows if row.consistency_evidence
-    ]
+    return [_evidence_from_row(row) for row in rows if row.consistency_evidence]
 
 
 def _evidence_from_row(row: DerivativeVisualCandidateAsset):
     from app.schemas.derivative_visual_asset import ChapterConsistencyEvidence
 
-    return ChapterConsistencyEvidence.model_validate(dict(row.consistency_evidence or {}))
+    return ChapterConsistencyEvidence.model_validate(
+        dict(row.consistency_evidence or {})
+    )
 
 
 __all__ = [

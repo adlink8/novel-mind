@@ -18,17 +18,15 @@ import hashlib
 import json
 import re
 import unicodedata
-from datetime import datetime, timezone
+from datetime import datetime
 from enum import StrEnum
 from typing import Annotated, Any, Literal
-from uuid import uuid4
 
 from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
     StringConstraints,
-    ValidationError,
     field_validator,
     model_validator,
 )
@@ -185,7 +183,9 @@ class FallbackPolicy(StrictQueryPlanModel):
 
     @field_validator("chain")
     @classmethod
-    def _fixed_chain(cls, value: tuple[FallbackStage, ...]) -> tuple[FallbackStage, ...]:
+    def _fixed_chain(
+        cls, value: tuple[FallbackStage, ...]
+    ) -> tuple[FallbackStage, ...]:
         expected = (
             FallbackStage.EXACT_READER,
             FallbackStage.DETERMINISTIC_HEURISTIC,
@@ -287,7 +287,9 @@ class QueryPlan(StrictQueryPlanModel):
 
     @field_validator("dimensions")
     @classmethod
-    def _non_empty_dedup(cls, value: tuple[QueryDimension, ...]) -> tuple[QueryDimension, ...]:
+    def _non_empty_dedup(
+        cls, value: tuple[QueryDimension, ...]
+    ) -> tuple[QueryDimension, ...]:
         if not value:
             raise ValueError("dimensions must be non-empty")
         return tuple(dict.fromkeys(value))

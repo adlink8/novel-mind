@@ -44,7 +44,9 @@ _FIXED_ZIP_TIME = (1980, 1, 1, 0, 0, 0)
 _FIXED_MODIFIED = "2026-01-01T00:00:00Z"
 
 
-def _zip_entry(name: str, content: bytes, *, stored: bool = False) -> tuple[ZipInfo, bytes]:
+def _zip_entry(
+    name: str, content: bytes, *, stored: bool = False
+) -> tuple[ZipInfo, bytes]:
     info = ZipInfo(name, date_time=_FIXED_ZIP_TIME)
     info.compress_type = ZIP_STORED if stored else ZIP_DEFLATED
     info.external_attr = 0o644 << 16
@@ -86,7 +88,10 @@ def _asset_figure_xhtml(
     payload = asset_reader(asset)
     # Defense in depth (T-39-01-02): never embed bytes that do not replay the
     # frozen content hash — a drift degrades to the explicit placeholder.
-    if payload is not None and hashlib.sha256(payload).hexdigest() == asset.content_hash:
+    if (
+        payload is not None
+        and hashlib.sha256(payload).hexdigest() == asset.content_hash
+    ):
         src = f"assets/{asset_filename(asset)}"
         return (
             '<figure class="derivative-export-asset">'
@@ -235,8 +240,7 @@ def _build_nav(
 ) -> bytes:
     title = _escape_text(manifest.project_name)
     list_items = "".join(
-        f'<li><a href="chapter-{index}.xhtml">'
-        f"{_escape_text(label)}</a></li>"
+        f'<li><a href="chapter-{index}.xhtml">{_escape_text(label)}</a></li>'
         for index, label in chapter_items
     )
     if manifest.citations:
@@ -247,7 +251,7 @@ def _build_nav(
         '<html xmlns="http://www.w3.org/1999/xhtml" lang="zh-CN">\n'
         "<head><title>"
         f"{title}"
-        "</title></head><body><nav epub:type=\"toc\">"
+        '</title></head><body><nav epub:type="toc">'
         f"<h1>{title}</h1><ol>{list_items}</ol></nav></body></html>\n"
     ).encode("utf-8")
     return document
@@ -259,7 +263,7 @@ def _build_ncx(
     points = "".join(
         (
             f'<navPoint id="chapter-{index}" playOrder="{index}">'
-            f'<navLabel><text>{_escape_text(label)}</text></navLabel>'
+            f"<navLabel><text>{_escape_text(label)}</text></navLabel>"
             f'<content src="chapter-{index}.xhtml"/>'
             "</navPoint>"
         )
@@ -268,10 +272,10 @@ def _build_ncx(
     document = (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
         '<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1">'
-        f"<head><meta name=\"dtb:uid\" content=\"{manifest.manifest_hash}\"/>"
-        "<meta name=\"dtb:depth\" content=\"1\"/>"
-        f"<meta name=\"dtb:totalPageCount\" content=\"0\"/>"
-        f"<meta name=\"dtb:maxPageNumber\" content=\"0\"/></head>"
+        f'<head><meta name="dtb:uid" content="{manifest.manifest_hash}"/>'
+        '<meta name="dtb:depth" content="1"/>'
+        f'<meta name="dtb:totalPageCount" content="0"/>'
+        f'<meta name="dtb:maxPageNumber" content="0"/></head>'
         f"<docTitle><text>{_escape_text(manifest.project_name)}</text></docTitle>"
         f"<navMap>{points}</navMap></ncx>\n"
     ).encode("utf-8")
@@ -344,9 +348,7 @@ def render_epub(
         chapter_bytes.append(
             _chapter_xhtml(snapshot, chapter, assets_by_chapter, asset_reader)
         )
-        nav_items.append(
-            (index, chapter.title or f"第 {chapter.chapter_number} 章")
-        )
+        nav_items.append((index, chapter.title or f"第 {chapter.chapter_number} 章"))
 
     asset_items: list[tuple[str, str, str]] = []
     asset_bytes: list[tuple[str, bytes]] = []
@@ -366,7 +368,6 @@ def render_epub(
         '<rootfiles><rootfile full-path="OEBPS/content.opf" '
         'media-type="application/oebps-package+xml"/></rootfiles></container>\n'
     ).encode("utf-8")
-    has_nav = True
     opf = _build_opf(
         manifest,
         chapter_items=chapter_items,

@@ -62,7 +62,9 @@ OVERRIDES_PATH = "/{novel_id}/derivative-overrides"
 
 
 def _map_error(exc: OverrideError) -> HTTPException:
-    return HTTPException(status_code=exc.status_code, detail=f"{exc.code}: {exc.detail}")
+    return HTTPException(
+        status_code=exc.status_code, detail=f"{exc.code}: {exc.detail}"
+    )
 
 
 def _to_override_view(row) -> OverrideView:
@@ -91,7 +93,9 @@ def _to_override_view(row) -> OverrideView:
     )
 
 
-def _to_published_view(published: PublishedDerivativeRevision) -> PublishedDerivativeRevisionView:
+def _to_published_view(
+    published: PublishedDerivativeRevision,
+) -> PublishedDerivativeRevisionView:
     return PublishedDerivativeRevisionView(**published.as_dict())
 
 

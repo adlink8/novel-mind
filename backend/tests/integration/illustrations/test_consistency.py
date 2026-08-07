@@ -30,7 +30,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.illustrations import (
     IllustrationGenerationRequest,
-    IllustrationJobService,
     set_illustration_asset_storage,
     set_illustration_consistency_fixtures,
 )
@@ -137,9 +136,7 @@ async def _make_prompt_chain(
     prompt_hash: str = PROMPT_HASH,
 ):
     """Approved Visual Bible -> SceneSpec -> PromptRevision chain (fresh prompt)."""
-    snapshot_hash = snapshot_hash or await _source_snapshot_hash(
-        db, user.id, novel.id
-    )
+    snapshot_hash = snapshot_hash or await _source_snapshot_hash(db, user.id, novel.id)
     vb = VisualBibleVersion(
         owner_id=user.id,
         novel_id=novel.id,
@@ -392,8 +389,7 @@ async def consistency_fixtures_enabled():
 
 def _evaluate_url(novel_id: int, asset_id: int) -> str:
     return (
-        f"/api/novels/{novel_id}/illustrations/assets/{asset_id}"
-        "/consistency/evaluate"
+        f"/api/novels/{novel_id}/illustrations/assets/{asset_id}/consistency/evaluate"
     )
 
 
@@ -442,8 +438,12 @@ async def test_consistency_evaluate_generated_asset_full_chain(
     assert report["reference_asset_ids"] == ["ref-char-arin-1", "ref-char-arin-2"]
     # The report freezes the exact source/prompt/model lineage of the asset.
     assert report["details"]["asset"]["scene_spec_hash"] == asset.scene_spec_hash
-    assert report["details"]["asset"]["source_snapshot_hash"] == asset.source_snapshot_hash
-    assert report["details"]["asset"]["prompt_revision_hash"] == asset.prompt_revision_hash
+    assert (
+        report["details"]["asset"]["source_snapshot_hash"] == asset.source_snapshot_hash
+    )
+    assert (
+        report["details"]["asset"]["prompt_revision_hash"] == asset.prompt_revision_hash
+    )
     assert report["details"]["asset"]["cutoff_chapter"] == asset.cutoff_chapter
     assert report["details"]["asset"]["model_lineage"] == asset.model_lineage
 
@@ -538,9 +538,7 @@ async def test_consistency_verdicts_and_idempotent_replay(
     assert conflict.status_code == 409
 
 
-async def test_consistency_unavailable_without_evaluator(
-    auth_client, db_session
-):
+async def test_consistency_unavailable_without_evaluator(auth_client, db_session):
     user, novel = await _seed_testuser_novel(db_session)
     asset, _, _, _ = await _persist_asset_row(
         db_session, "ill_cons_unavail", user=user, novel=novel

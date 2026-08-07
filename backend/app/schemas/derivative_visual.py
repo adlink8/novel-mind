@@ -95,7 +95,9 @@ class DerivativeVisualGateError(ValueError):
 
 def canonical_derivative_visual_hash(payload: dict[str, Any]) -> str:
     """SHA-256 over stable, sorted JSON (canonical ordering convention)."""
-    encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    encoded = json.dumps(
+        payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    )
     return sha256(encoded.encode("utf-8")).hexdigest()
 
 
@@ -119,7 +121,9 @@ class DerivativeVisualEntityContract(StrictDerivativeVisualModel):
     entity_key: str = Field(min_length=1, max_length=180)
     entity_type: DerivativeVisualEntityType
     description: str = Field(min_length=1, max_length=8000)
-    authority: str = Field(pattern=r"^(canon_fact|probable_inference|literary_interpretation|user_interpretation)$")
+    authority: str = Field(
+        pattern=r"^(canon_fact|probable_inference|literary_interpretation|user_interpretation)$"
+    )
     divergence: dict[str, Any] = Field(default_factory=dict, min_length=1)
     source_entity_ref: dict[str, Any] = Field(default_factory=dict, min_length=1)
     disclosure_cutoff: int = Field(ge=1)
@@ -133,7 +137,9 @@ class DerivativeVisualEntityContract(StrictDerivativeVisualModel):
                     f"source_entity_ref must carry {key!r} for the original entity"
                 )
         if len(str(ref.get("source_entity_hash"))) != 64:
-            raise ValueError("source_entity_ref.source_entity_hash must be 64 hex chars")
+            raise ValueError(
+                "source_entity_ref.source_entity_hash must be 64 hex chars"
+            )
         return self
 
 
@@ -152,7 +158,9 @@ class DerivativeVisualAssetContract(StrictDerivativeVisualModel):
     asset_id: str = Field(min_length=1, max_length=200)
     mime_type: str = Field(min_length=1, max_length=100)
     bytes_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
-    rights_status: DerivativeVisualRightsStatus = DerivativeVisualRightsStatus.UNREVIEWED
+    rights_status: DerivativeVisualRightsStatus = (
+        DerivativeVisualRightsStatus.UNREVIEWED
+    )
     provenance: dict[str, Any] = Field(default_factory=dict)
     source_asset_ref: dict[str, Any] = Field(default_factory=dict, min_length=1)
 
@@ -161,7 +169,9 @@ class DerivativeVisualAssetContract(StrictDerivativeVisualModel):
         ref = self.source_asset_ref
         for key in ("source_asset_id", "source_bytes_hash"):
             if not ref.get(key):
-                raise ValueError(f"source_asset_ref must carry {key!r} for the original asset")
+                raise ValueError(
+                    f"source_asset_ref must carry {key!r} for the original asset"
+                )
         if len(str(ref.get("source_bytes_hash"))) != 64:
             raise ValueError("source_asset_ref.source_bytes_hash must be 64 hex chars")
         return self
@@ -209,9 +219,7 @@ class DerivativeVisualVersionContract(StrictDerivativeVisualModel):
     style_profile: dict[str, Any] | None = None
     constraints: list[dict[str, Any]] | None = None
     entities: list[DerivativeVisualEntityContract] = Field(default_factory=list)
-    reference_assets: list[DerivativeVisualAssetContract] = Field(
-        default_factory=list
-    )
+    reference_assets: list[DerivativeVisualAssetContract] = Field(default_factory=list)
     review_state: DerivativeVisualState = DerivativeVisualState.CANDIDATE
 
     @model_validator(mode="after")
@@ -309,13 +317,17 @@ def validate_derivative_visual_fork_contract(
 
     stable_ids = [entity.stable_id for entity in version.entities]
     if len(set(stable_ids)) != len(stable_ids):
-        raise DerivativeVisualGateError("duplicate entity stable_id in derivative version")
+        raise DerivativeVisualGateError(
+            "duplicate entity stable_id in derivative version"
+        )
     entity_keys = [entity.entity_key for entity in version.entities]
     if len(set(entity_keys)) != len(entity_keys):
         raise DerivativeVisualGateError("duplicate entity_key in derivative version")
     asset_keys = [asset.asset_key for asset in version.reference_assets]
     if len(set(asset_keys)) != len(asset_keys):
-        raise DerivativeVisualGateError("duplicate reference asset_key in derivative version")
+        raise DerivativeVisualGateError(
+            "duplicate reference asset_key in derivative version"
+        )
 
     if recompute_derivative_visual_manifest_hash(version) != version.manifest_hash:
         raise DerivativeVisualGateError(
@@ -599,9 +611,7 @@ class DerivativeNegativeConstraint(StrictDerivativeVisualModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     constraint_key: str = Field(min_length=1, max_length=180)
-    scope: str = Field(
-        pattern=r"^(costume|era|identity|style|physical|continuity)$"
-    )
+    scope: str = Field(pattern=r"^(costume|era|identity|style|physical|continuity)$")
     source: str = Field(pattern=r"^(scene_spec|derivative)$")
     text: str = Field(min_length=1, max_length=4000)
     rationale: str | None = Field(default=None, max_length=2000)
@@ -800,9 +810,7 @@ def recompute_derivative_scene_spec_hash(
     spec: DerivativeSceneSpecContract,
 ) -> str:
     """Byte-replayable canonical hash of a derivative Scene Spec."""
-    return canonical_derivative_visual_hash(
-        derivative_scene_spec_content_payload(spec)
-    )
+    return canonical_derivative_visual_hash(derivative_scene_spec_content_payload(spec))
 
 
 # ---------------------------------------------------------------------------

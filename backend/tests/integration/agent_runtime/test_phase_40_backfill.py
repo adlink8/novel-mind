@@ -61,9 +61,7 @@ async def api_client(migrated_postgres: str, monkeypatch):
         _async_url(migrated_postgres), pool_pre_ping=True, poolclass=NullPool
     )
     factory = async_sessionmaker(aengine, class_=AsyncSession, expire_on_commit=False)
-    monkeypatch.setattr(
-        "app.core.security.settings.novelmind_gateway_token", GW_TOKEN
-    )
+    monkeypatch.setattr("app.core.security.settings.novelmind_gateway_token", GW_TOKEN)
 
     async def override_get_db():
         async with factory() as session:
@@ -289,7 +287,13 @@ class TestMaterializer:
                         "VALUES (:o, :n, :sv, :r, 'v1', 'chapter_analysis', 'candidate', '{}', '{}', :ih, now(), now()) "
                         "RETURNING id"
                     ),
-                    {"o": seed["owner_id"], "n": seed["novel_id"], "sv": seed["skill_version_id"], "r": run_id, "ih": HEX64},
+                    {
+                        "o": seed["owner_id"],
+                        "n": seed["novel_id"],
+                        "sv": seed["skill_version_id"],
+                        "r": run_id,
+                        "ih": HEX64,
+                    },
                 )
             ).scalar()
             await session.execute(

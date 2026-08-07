@@ -226,9 +226,7 @@ async def test_short_snapshot_hash_rejected_by_db(session_factory):
     async with session_factory() as session:
         user = await _make_user(session, "hash")
         novel = await _make_novel(session, user)
-        stmt, params = _artifact_insert(
-            user.id, novel.id, source_snapshot_hash="short"
-        )
+        stmt, params = _artifact_insert(user.id, novel.id, source_snapshot_hash="short")
         with pytest.raises(IntegrityError):
             await session.execute(stmt, params)
             await session.commit()
@@ -399,4 +397,6 @@ async def test_migration_round_trip(pg_sync_url, pg_async_url, require_postgres)
     # Phase 36-03 adds the append-only derivative revision head on top.
     assert "20260801_derivative_revision01" in current.stdout
     check = run_alembic("check", database_url=pg_sync_url)
-    assert check.returncode == 0, f"alembic check failed:\n{check.stdout}\n{check.stderr}"
+    assert check.returncode == 0, (
+        f"alembic check failed:\n{check.stdout}\n{check.stderr}"
+    )

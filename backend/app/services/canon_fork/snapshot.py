@@ -89,7 +89,9 @@ def canonical_fork_hash(payload: dict) -> str:
     encoded = json.dumps(
         payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")
     )
-    return sha256(f"{CANON_FORK_MANIFEST_PREFIX}\n{encoded}".encode("utf-8")).hexdigest()
+    return sha256(
+        f"{CANON_FORK_MANIFEST_PREFIX}\n{encoded}".encode("utf-8")
+    ).hexdigest()
 
 
 def compute_source_snapshot_hash(
@@ -175,9 +177,7 @@ def resolve_cutoff(
     full_book_authorized = bool(full_book_requested)
     authorization = {
         "source": (
-            "server_superuser"
-            if full_book_authorized
-            else "server_chapter_limit"
+            "server_superuser" if full_book_authorized else "server_chapter_limit"
         ),
         "requested_cutoff_chapter": requested_cutoff_chapter,
         "full_book_requested": full_book_requested,
@@ -296,7 +296,10 @@ def build_canon_fork_manifest(
         active=False,
     )
     sealed = CanonForkManifest(
-        **{**manifest.payload(), "manifest_hash": canonical_fork_hash(manifest.payload())}
+        **{
+            **manifest.payload(),
+            "manifest_hash": canonical_fork_hash(manifest.payload()),
+        }
     )
     return sealed
 

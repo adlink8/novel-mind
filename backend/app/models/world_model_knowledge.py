@@ -112,9 +112,7 @@ class WorldModelKnowledge(TimestampMixin, Base):
         Integer, ForeignKey("novels.id", ondelete="CASCADE"), nullable=False
     )
     version_id: Mapped[int] = mapped_column(Integer, nullable=False)
-    canonical_payload: Mapped[dict] = mapped_column(
-        JSONB, nullable=False, default=dict
-    )
+    canonical_payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     canonical_payload_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     idempotency_key: Mapped[str] = mapped_column(String(64), nullable=False)
     projection_hash: Mapped[str] = mapped_column(String(64), nullable=False)

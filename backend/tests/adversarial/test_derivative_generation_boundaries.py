@@ -18,7 +18,6 @@ deterministic pure functions and AST source checks (no PostgreSQL):
 
 from __future__ import annotations
 
-import ast
 import json
 from pathlib import Path
 

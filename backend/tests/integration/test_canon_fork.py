@@ -33,7 +33,6 @@ from app.models.novel import Chapter, Novel
 from app.models.user import User
 from app.services.canon_fork.snapshot import (
     ForkChapterRecord,
-    chapter_content_hash,
     compute_source_snapshot_hash,
 )
 from tests.integration.conftest import reset_public_schema, run_alembic
@@ -110,7 +109,9 @@ def _seed_owner(
             status="ready",
             reading_progress={},
             chapter_count=chapter_count,
-            word_count=sum(len(f"chapter {i} body") for i in range(1, chapter_count + 1)),
+            word_count=sum(
+                len(f"chapter {i} body") for i in range(1, chapter_count + 1)
+            ),
         )
         session.add(novel)
         session.flush()
@@ -256,7 +257,10 @@ async def test_same_input_replays_same_manifest_hash(api_client):
     )
 
     listing = await client.get(base, headers=headers)
-    assert listing.json()["forks"][0]["manifest_hash"] == first.json()["fork"]["manifest_hash"]
+    assert (
+        listing.json()["forks"][0]["manifest_hash"]
+        == first.json()["fork"]["manifest_hash"]
+    )
 
 
 async def test_conflicting_fork_key_fails_closed(api_client):
@@ -303,7 +307,9 @@ async def test_stale_expected_source_snapshot_fails_closed(api_client):
 
 async def test_future_cutoff_cannot_expand_scope(api_client):
     client, _, sync_url = api_client
-    ids = _seed_owner(sync_url, suffix=f"future_{uuid.uuid4().hex[:8]}", chapter_count=3)
+    ids = _seed_owner(
+        sync_url, suffix=f"future_{uuid.uuid4().hex[:8]}", chapter_count=3
+    )
     headers = {"Authorization": f"Bearer {ids['token']}"}
     base = f"/api/novels/{ids['novel_id']}/canon-fork"
 
@@ -356,9 +362,7 @@ async def test_cross_owner_fork_routes_return_404(api_client):
     headers_b = {"Authorization": f"Bearer {ids_b['token']}"}
     base_a = f"/api/novels/{ids_a['novel_id']}/canon-fork"
 
-    created = await client.post(
-        base_a, json=_fork_payload("ff-a"), headers=headers_a
-    )
+    created = await client.post(base_a, json=_fork_payload("ff-a"), headers=headers_a)
     assert created.status_code == 201, created.text
     fork_id = created.json()["fork"]["id"]
 

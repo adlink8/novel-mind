@@ -85,10 +85,20 @@ class TestPickBackfillSkills:
 class TestInputHashDeterminism:
     def test_same_payload_same_hash(self):
         a = canonical_input_hash(
-            {"novel_id": 6, "question": "主角是谁", "dimension": "raw_text", "branch": None}
+            {
+                "novel_id": 6,
+                "question": "主角是谁",
+                "dimension": "raw_text",
+                "branch": None,
+            }
         )
         b = canonical_input_hash(
-            {"novel_id": 6, "question": "主角是谁", "dimension": "raw_text", "branch": None}
+            {
+                "novel_id": 6,
+                "question": "主角是谁",
+                "dimension": "raw_text",
+                "branch": None,
+            }
         )
         assert a == b
 

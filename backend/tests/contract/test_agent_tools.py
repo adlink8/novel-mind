@@ -225,9 +225,12 @@ def test_every_error_class_code_is_in_frozen_table():
     """每个 AgentToolError 子类的 code 必须 ∈ 冻结表（单一事实源）。"""
     for cls in ERROR_CLASSES:
         assert cls.code in AGENT_TOOL_ERROR_CODES
-        assert isinstance(cls(  # noqa: E1120 - 仅验证可实例化
-            "msg"
-        ), AgentToolError)
+        assert isinstance(
+            cls(  # noqa: E1120 - 仅验证可实例化
+                "msg"
+            ),
+            AgentToolError,
+        )
 
 
 def test_tool_names_are_exactly_the_23_contract_tools():
@@ -288,9 +291,7 @@ def test_timeline_request_rejects_bare_full_book_param():
 def test_narrative_memory_request_validates_view():
     with pytest.raises(ValidationError):
         GetNarrativeMemoryRequest.model_validate({"view": "promote"})
-    assert (
-        GetNarrativeMemoryRequest.model_validate({"view": "tree"}).view == "tree"
-    )
+    assert GetNarrativeMemoryRequest.model_validate({"view": "tree"}).view == "tree"
 
 
 # ────────────────────────── 每工具 × 领域错误 → 冻结码 ──────────────────────────
@@ -387,9 +388,7 @@ async def test_timeout_returns_stable_code():
     async def slow_service(*args, **kwargs):
         await asyncio.sleep(0.5)
 
-    facade = ToolFacade(
-        timeout=0.05, service_overrides={"get_novel": slow_service}
-    )
+    facade = ToolFacade(timeout=0.05, service_overrides={"get_novel": slow_service})
     with pytest.raises(AgentToolError) as excinfo:
         await facade.execute(
             "get_novel", db=object(), novel=_novel(), owner_id=1, params={}
@@ -437,9 +436,7 @@ async def test_narrative_memory_envelope_is_candidate_labeled():
     async def fake_nm(db, *, owner_id, novel_id, version_id, view, through_chapter):
         return {"versions": []}
 
-    facade = _facade(
-        service_overrides={"get_narrative_memory": fake_nm}
-    )
+    facade = _facade(service_overrides={"get_narrative_memory": fake_nm})
     payload = await facade.execute(
         "get_narrative_memory",
         db=object(),
@@ -459,9 +456,19 @@ async def test_full_book_only_from_persisted_switch():
     """full_book 授权只来自持久化开关，绝不来自请求参数。"""
     received: list[bool] = []
 
-    async def record_timeline(db, *, novel, owner_id, source, ordering, person,
-                              include_causal, request_full_book,
-                              chapter_start, chapter_end):
+    async def record_timeline(
+        db,
+        *,
+        novel,
+        owner_id,
+        source,
+        ordering,
+        person,
+        include_causal,
+        request_full_book,
+        chapter_start,
+        chapter_end,
+    ):
         received.append(request_full_book)
         return None
 

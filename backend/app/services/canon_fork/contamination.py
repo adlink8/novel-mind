@@ -25,7 +25,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Any, Awaitable, Callable, Protocol
+from typing import Any, Awaitable, Callable
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -326,8 +326,7 @@ def resolve_gate_verdict(evidence: PhaseGateEvidence) -> PhaseGateResult:
         return PhaseGateResult(
             PhaseGateVerdict.BLOCKED,
             ContaminationBlockedReason.CROSS_OWNER_LEAKAGE,
-            "cross-owner rows resolve for the requested scope; the release is "
-            "blocked",
+            "cross-owner rows resolve for the requested scope; the release is blocked",
         )
     if evidence.publish_requested and not evidence.approved:
         return PhaseGateResult(

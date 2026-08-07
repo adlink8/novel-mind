@@ -205,9 +205,7 @@ class SceneSpecVersion(TimestampMixin, Base):
     policy_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     config_hash: Mapped[str | None] = mapped_column(String(64))
     content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
-    canonical_payload: Mapped[dict] = mapped_column(
-        JSONB, nullable=False, default=dict
-    )
+    canonical_payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     canonical_payload_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     idempotency_key: Mapped[str] = mapped_column(String(64), nullable=False)
     projection_hash: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -284,9 +282,7 @@ class SceneSpecDetail(TimestampMixin, Base):
     author: Mapped[str | None] = mapped_column(String(200))
     rationale: Mapped[str | None] = mapped_column(Text)
     spoiler_cutoff: Mapped[int] = mapped_column(Integer, nullable=False)
-    canonical_payload: Mapped[dict] = mapped_column(
-        JSONB, nullable=False, default=dict
-    )
+    canonical_payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     canonical_payload_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     idempotency_key: Mapped[str] = mapped_column(String(64), nullable=False)
     projection_hash: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -364,9 +360,7 @@ class SceneSpecNegativeConstraint(TimestampMixin, Base):
     author: Mapped[str | None] = mapped_column(String(200))
     rationale: Mapped[str | None] = mapped_column(Text)
     spoiler_cutoff: Mapped[int] = mapped_column(Integer, nullable=False)
-    canonical_payload: Mapped[dict] = mapped_column(
-        JSONB, nullable=False, default=dict
-    )
+    canonical_payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     canonical_payload_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     idempotency_key: Mapped[str] = mapped_column(String(64), nullable=False)
     projection_hash: Mapped[str] = mapped_column(String(64), nullable=False)

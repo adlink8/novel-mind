@@ -29,7 +29,7 @@ from app.core.database import get_db
 from app.core.security import create_access_token, hash_password
 from app.main import app
 from app.models import Chapter, Novel, User
-from app.models.agent_runtime import ApprovalRequest, Artifact, ArtifactRevision
+from app.models.agent_runtime import ApprovalRequest, ArtifactRevision
 from app.models.canon_fork import CanonFork
 from app.services.agent_runtime.approvals import confirm
 from app.services.agent_runtime.finalize import finalize_skill_run
@@ -40,7 +40,6 @@ from app.services.agent_runtime.structured_output_integrity import (
 from app.services.agent_tools.facade import ToolFacade
 from app.services.canon_fork.materializer import (
     ForkMaterializeError,
-    create_fork_proposal,
     materialize_approved_fork,
 )
 from app.services.canon_fork.snapshot import (
@@ -271,9 +270,18 @@ async def _propose_and_finalize(
         run_id=run_id,
         stop_reason="stop",
         envelope=envelope,
-        model_lineage={"provider": "fixture", "model": "stub-model", "revision": "stub-1"},
+        model_lineage={
+            "provider": "fixture",
+            "model": "stub-model",
+            "revision": "stub-1",
+        },
         source_versions=dict(envelope.get("source_versions") or {}),
-        usage={"calls": 2, "input_tokens": 400, "output_tokens": 200, "cost_usd": "0.0008"},
+        usage={
+            "calls": 2,
+            "input_tokens": 400,
+            "output_tokens": 200,
+            "cost_usd": "0.0008",
+        },
         frozen_manifest={"evidence_refs": ["chapter:1", "chapter:2"]},
     )
     assert outcome.status == "completed", outcome.status_reason
@@ -357,7 +365,9 @@ async def api_client(migrated_postgres: str):
     await aengine.dispose()
 
 
-async def _set_up_run(factory, *, ctx: dict[str, Any], branch: str | None = None) -> tuple[int, str]:
+async def _set_up_run(
+    factory, *, ctx: dict[str, Any], branch: str | None = None
+) -> tuple[int, str]:
     run_input = {
         "novel_id": ctx["novel_id"],
         "branch": branch,
@@ -390,7 +400,6 @@ async def _set_up_run(factory, *, ctx: dict[str, Any], branch: str | None = None
 
 
 async def _register_skill(factory, *, ctx: dict[str, Any]) -> int:
-    from app.models.agent_runtime import SkillVersion
     from app.schemas.agent_runtime import SkillVersionRegister
     from app.services.agent_runtime.registry import register_skill_version
 
@@ -431,15 +440,16 @@ async def _register_skill(factory, *, ctx: dict[str, Any]) -> int:
     )
     async with factory() as session:
         _, version = await register_skill_version(
-            session, owner_id=ctx["owner_id"], novel_id=ctx["novel_id"], contract=contract
+            session,
+            owner_id=ctx["owner_id"],
+            novel_id=ctx["novel_id"],
+            contract=contract,
         )
         await session.commit()
         return version.id
 
 
-async def _seed_full(
-    runtime_factory, sync_url: str, *, suffix: str
-) -> dict[str, Any]:
+async def _seed_full(runtime_factory, sync_url: str, *, suffix: str) -> dict[str, Any]:
     ctx = _seed(sync_url, suffix=suffix)
     svid = await _register_skill(runtime_factory, ctx=ctx)
     ctx["skill_version_id"] = svid
@@ -493,9 +503,7 @@ async def test_materializer_happy_path_approves_fork(
     assert [ch.content for ch in chapters] == list(CHAPTER_TEXTS.values())
 
 
-async def test_materializer_idempotent_replay(
-    runtime_factory, migrated_postgres: str
-):
+async def test_materializer_idempotent_replay(runtime_factory, migrated_postgres: str):
     """已 approved fork 的重复 materialize → replayed=True，同一 materialization_hash。"""
     ctx = await _seed_full(
         runtime_factory, migrated_postgres, suffix=f"idem_{uuid.uuid4().hex[:6]}"
@@ -531,9 +539,7 @@ async def test_materializer_idempotent_replay(
     assert first.materialization_hash == second.materialization_hash
 
 
-async def test_materializer_wrong_owner_blocks(
-    runtime_factory, migrated_postgres: str
-):
+async def test_materializer_wrong_owner_blocks(runtime_factory, migrated_postgres: str):
     """foreign owner 无法看到/物化 fork → fork_not_found / approval 越界 fail closed。"""
     ctx = await _seed_full(
         runtime_factory, migrated_postgres, suffix=f"own_{uuid.uuid4().hex[:6]}"
@@ -673,9 +679,7 @@ async def test_materializer_approval_fork_mismatch_blocks(
             db=session,
             novel=novel,
             owner_id=ctx["owner_id"],
-            params=_fork_params(
-                ctx, fork_key="fork-other", delta_key="delta-fkm2"
-            ),
+            params=_fork_params(ctx, fork_key="fork-other", delta_key="delta-fkm2"),
         )
         await session.commit()
     fork_a = int(first["fork_id"])
@@ -708,9 +712,18 @@ async def test_materializer_approval_fork_mismatch_blocks(
         run_id=ctx["run_id"],
         stop_reason="stop",
         envelope=envelope_b,
-        model_lineage={"provider": "fixture", "model": "stub-model", "revision": "stub-1"},
+        model_lineage={
+            "provider": "fixture",
+            "model": "stub-model",
+            "revision": "stub-1",
+        },
         source_versions=dict(envelope_b.get("source_versions") or {}),
-        usage={"calls": 2, "input_tokens": 400, "output_tokens": 200, "cost_usd": "0.0008"},
+        usage={
+            "calls": 2,
+            "input_tokens": 400,
+            "output_tokens": 200,
+            "cost_usd": "0.0008",
+        },
         frozen_manifest={"evidence_refs": ["chapter:1", "chapter:2"]},
     )
     assert outcome_b.status == "completed", outcome_b.status_reason
@@ -777,8 +790,9 @@ async def test_materializer_stale_snapshot_blocks(
     )
     async with runtime_factory() as session:
         chapter = await session.scalar(
-            select(Chapter)
-            .where(Chapter.novel_id == ctx["novel_id"], Chapter.chapter_number == 1)
+            select(Chapter).where(
+                Chapter.novel_id == ctx["novel_id"], Chapter.chapter_number == 1
+            )
         )
         chapter.content = "chapter 1 body CHANGED"
         await session.commit()

@@ -144,9 +144,7 @@ def _strip_none(value: Any) -> Any:
     keeps raw-payload and model-dump fingerprints identical.
     """
     if isinstance(value, dict):
-        return {
-            k: _strip_none(v) for k, v in value.items() if v is not None
-        }
+        return {k: _strip_none(v) for k, v in value.items() if v is not None}
     if isinstance(value, list):
         return [_strip_none(v) for v in value]
     return value
@@ -157,9 +155,7 @@ def dataset_fingerprint(payload: dict[str, Any]) -> str:
     if not isinstance(payload, dict):
         raise TypeError("dataset fingerprint requires a dict payload")
     clean = {k: v for k, v in payload.items() if k != "fingerprint"}
-    return hashlib.sha256(
-        stable_json(_strip_none(clean)).encode("utf-8")
-    ).hexdigest()
+    return hashlib.sha256(stable_json(_strip_none(clean)).encode("utf-8")).hexdigest()
 
 
 # ---------------------------------------------------------------------------
@@ -213,7 +209,12 @@ class GoldEvidenceRef(FrozenGoldModel):
 
 class SourceAnswer(FrozenGoldModel):
     answer: str = Field(min_length=1, max_length=2000)
-    authority: Literal["canon_fact", "probable_inference", "literary_interpretation", "user_interpretation"]
+    authority: Literal[
+        "canon_fact",
+        "probable_inference",
+        "literary_interpretation",
+        "user_interpretation",
+    ]
     cutoff_label: Literal["within_cutoff", "at_cutoff", "forbidden"]
     evidence: tuple[GoldEvidenceRef, ...]
 
@@ -334,9 +335,7 @@ class ReadingQAGoldSet(FrozenGoldModel):
                 raise ValueError(f"duplicate chapter_number {ch.chapter_number}")
             seen.add(ch.chapter_number)
             if ch.content_hash != chapter_content_hash(ch.content):
-                raise ValueError(
-                    f"chapter {ch.chapter_number} content_hash mismatch"
-                )
+                raise ValueError(f"chapter {ch.chapter_number} content_hash mismatch")
 
         # Eight buckets must all be present
         present = {s.bucket for s in self.samples}
@@ -416,11 +415,7 @@ class ReadingQAGoldSet(FrozenGoldModel):
 
     def chapter_by_number(self, chapter_number: int) -> GoldChapter | None:
         return next(
-            (
-                c
-                for c in self.source.chapters
-                if c.chapter_number == chapter_number
-            ),
+            (c for c in self.source.chapters if c.chapter_number == chapter_number),
             None,
         )
 
@@ -460,9 +455,7 @@ def curator_agreement(gold_set: ReadingQAGoldSet) -> CuratorAgreement:
             per_sample[sample.id] = False
             continue
         per_sample[sample.id] = len({_rating_tuple(r) for r in ratings}) == 1
-    rated = [
-        sid for sid, count in per_sample_rating_count.items() if count >= 2
-    ]
+    rated = [sid for sid, count in per_sample_rating_count.items() if count >= 2]
     unanimous = [sid for sid in rated if per_sample[sid]]
     overall = len(unanimous) / len(rated) if rated else 0.0
     return CuratorAgreement(

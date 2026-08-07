@@ -47,12 +47,12 @@ API_SOURCE = (BACKEND_ROOT / "app" / "api" / "derivative_chapters.py").read_text
 SERVICE_SOURCE = (
     BACKEND_ROOT / "app" / "services" / "derivative_editor" / "chapters.py"
 ).read_text(encoding="utf-8")
-SCHEMA_SOURCE = (
-    BACKEND_ROOT / "app" / "schemas" / "derivative_chapter.py"
-).read_text(encoding="utf-8")
-MODEL_SOURCE = (
-    BACKEND_ROOT / "app" / "models" / "derivative_chapter.py"
-).read_text(encoding="utf-8")
+SCHEMA_SOURCE = (BACKEND_ROOT / "app" / "schemas" / "derivative_chapter.py").read_text(
+    encoding="utf-8"
+)
+MODEL_SOURCE = (BACKEND_ROOT / "app" / "models" / "derivative_chapter.py").read_text(
+    encoding="utf-8"
+)
 MIGRATION_SOURCE = (
     BACKEND_ROOT / "migrations" / "versions" / "36_derivative_chapter01.py"
 ).read_text(encoding="utf-8")
@@ -83,8 +83,16 @@ def test_create_rejects_authority_and_lineage_fields():
 
 
 def test_patch_cannot_inject_scope_fields():
-    for kw in ("owner_id", "novel_id", "project_id", "position", "revision",
-               "markdown_checksum", "space", "cutoff_snapshot_hash"):
+    for kw in (
+        "owner_id",
+        "novel_id",
+        "project_id",
+        "position",
+        "revision",
+        "markdown_checksum",
+        "space",
+        "cutoff_snapshot_hash",
+    ):
         with pytest.raises(ValidationError, match="extra_forbidden"):
             DerivativeChapterPatch(base_revision=1, **{kw: 1 if kw != "space" else "x"})
     # A valid allowlisted patch passes (title/markdown/status only + token).

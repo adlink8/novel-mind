@@ -22,7 +22,6 @@ Adversarial paths (all stable blocked/rejected with zero authoritative writes):
 
 from __future__ import annotations
 
-import hashlib
 import tempfile
 import uuid
 from pathlib import Path
@@ -30,22 +29,26 @@ from pathlib import Path
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import create_engine, func, select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
 from app.core.database import get_db
 from app.main import app
-from app.models.agent_runtime import ApprovalRequest, Artifact, SkillRun, SkillVersion
+from app.models.agent_runtime import ApprovalRequest, Artifact, SkillRun
 from app.schemas.agent_runtime import SkillVersionRegister
 from app.services.agent_runtime.finalize import finalize_skill_run
-from app.services.agent_runtime.registry import canonical_input_hash, register_skill_version
-from app.services.agent_runtime.structured_output_integrity import canonical_content_hash
+from app.services.agent_runtime.registry import (
+    canonical_input_hash,
+    register_skill_version,
+)
+from app.services.agent_runtime.structured_output_integrity import (
+    canonical_content_hash,
+)
 from app.services.derivative_export.materializer import (
     APPROVE_EXPORT_APPROVAL_ACTION,
     set_materializer_asset_storage,
 )
-from app.services.derivative_export.package import derivative_export_package_hash
 from app.services.derivative_visual.assets import DerivativeAssetStorage
 from tests.integration.conftest import reset_public_schema, run_alembic
 from tests.integration.test_derivative_export import _seed_chain
@@ -86,7 +89,9 @@ def _async_url(sync_url: str) -> str:
     return sync_url
 
 
-def _skill_contract(*, novel_id: int, name: str, tools: list[str]) -> SkillVersionRegister:
+def _skill_contract(
+    *, novel_id: int, name: str, tools: list[str]
+) -> SkillVersionRegister:
     base: dict = {
         "novel_id": novel_id,
         "name": name,
@@ -290,22 +295,35 @@ def _build_envelope(
     return envelope
 
 
-async def _finalize_candidate(factory, *, run_id: int, envelope: dict, evidence_refs: list[str]):
+async def _finalize_candidate(
+    factory, *, run_id: int, envelope: dict, evidence_refs: list[str]
+):
     outcome = await finalize_skill_run(
         factory,
         run_id=run_id,
         stop_reason="stop",
         envelope=envelope,
-        model_lineage={"provider": "fixture", "model": "stub-model", "revision": "stub-1"},
+        model_lineage={
+            "provider": "fixture",
+            "model": "stub-model",
+            "revision": "stub-1",
+        },
         source_versions=dict(envelope.get("source_versions") or {}),
-        usage={"calls": 3, "input_tokens": 500, "output_tokens": 200, "cost_usd": "0.001"},
+        usage={
+            "calls": 3,
+            "input_tokens": 500,
+            "output_tokens": 200,
+            "cost_usd": "0.001",
+        },
         frozen_manifest={"evidence_refs": evidence_refs},
     )
     assert outcome.status == "completed", outcome.status_reason
     return outcome
 
 
-async def _set_up(runtime_factory, sync_url: str, asset_storage, *, suffix: str) -> dict:
+async def _set_up(
+    runtime_factory, sync_url: str, asset_storage, *, suffix: str
+) -> dict:
     ids = _seed_chain(sync_url, asset_storage, suffix=suffix, chapter_count=2)
     ids["fork_key"] = f"ff-dex-{suffix}"
     svid = await _register_skill(
@@ -380,7 +398,9 @@ async def _freeze_and_finalize(
     return ids
 
 
-async def _approve_via_api(api_client, ids, *, body_override: dict | None = None) -> dict:
+async def _approve_via_api(
+    api_client, ids, *, body_override: dict | None = None
+) -> dict:
     headers = {"Authorization": f"Bearer {ids['token']}"}
     body = {
         "branch": BRANCH_VALUE,
@@ -411,7 +431,9 @@ async def _confirm_via_api(api_client, ids, approval_id: int) -> None:
     assert resp.status_code == 200, resp.text
 
 
-async def _materialize_via_api(api_client, ids, *, approval_id: int, body_override: dict | None = None) -> dict:
+async def _materialize_via_api(
+    api_client, ids, *, approval_id: int, body_override: dict | None = None
+) -> dict:
     headers = {"Authorization": f"Bearer {ids['token']}"}
     body = {
         "branch": BRANCH_VALUE,
@@ -424,7 +446,9 @@ async def _materialize_via_api(api_client, ids, *, approval_id: int, body_overri
     if body_override:
         body.update(body_override)
     resp = await api_client.post(
-        AGENT_MATERIALIZE.format(novel_id=ids["novel_id"], project_id=ids["project_id"]),
+        AGENT_MATERIALIZE.format(
+            novel_id=ids["novel_id"], project_id=ids["project_id"]
+        ),
         params={"novel_id": ids["novel_id"]},
         headers=headers,
         json=body,
@@ -486,7 +510,9 @@ async def test_prepare_approve_materialize_download_chain(
 
     # 3. 用户 Web 确认 → 确定性 materialize → artifact approved + bundle 元数据。
     await _confirm_via_api(api_client, ids, approval_id)
-    materialize_resp = await _materialize_via_api(api_client, ids, approval_id=approval_id)
+    materialize_resp = await _materialize_via_api(
+        api_client, ids, approval_id=approval_id
+    )
     assert materialize_resp.status_code == 200, materialize_resp.text
     materialized = materialize_resp.json()
     assert materialized["status"] == "approved"
@@ -500,7 +526,9 @@ async def test_prepare_approve_materialize_download_chain(
     assert artifact is not None and artifact.status == "approved"
 
     # 4. 幂等：approved artifact 再次 materialize → 相同 bundle 元数据。
-    materialize_resp2 = await _materialize_via_api(api_client, ids, approval_id=approval_id)
+    materialize_resp2 = await _materialize_via_api(
+        api_client, ids, approval_id=approval_id
+    )
     assert materialize_resp2.status_code == 200, materialize_resp2.text
     assert materialize_resp2.json()["package_hash"] == materialized["package_hash"]
 
@@ -671,7 +699,9 @@ async def test_materialize_wrong_scope_artifact_rejected(
     # ids_b 的 owner/novel 下伪造 A 的 artifact 引用 → 404-hide（无 403 oracle）。
     headers = {"Authorization": f"Bearer {ids_b['token']}"}
     resp = await api_client.post(
-        AGENT_APPROVE.format(novel_id=ids_b["novel_id"], project_id=ids_b["project_id"]),
+        AGENT_APPROVE.format(
+            novel_id=ids_b["novel_id"], project_id=ids_b["project_id"]
+        ),
         params={"novel_id": ids_b["novel_id"]},
         headers=headers,
         json={
@@ -684,7 +714,9 @@ async def test_materialize_wrong_scope_artifact_rejected(
     )
     assert resp.status_code in (400, 404), resp.text
     assert "artifact_not_found" in resp.text or "not found" in resp.text.lower()
-    assert await _count(runtime_factory, ApprovalRequest, owner_id=ids_b["owner_id"]) == 0
+    assert (
+        await _count(runtime_factory, ApprovalRequest, owner_id=ids_b["owner_id"]) == 0
+    )
 
 
 async def test_cross_owner_novel_404_hides(
@@ -706,10 +738,16 @@ async def test_cross_owner_novel_404_hides(
     await _freeze_and_finalize(runtime_factory, api_client, ids_a)
     headers = {"Authorization": f"Bearer {ids_b['token']}"}
     resp = await api_client.post(
-        AGENT_PREPARE.format(novel_id=ids_a["novel_id"], project_id=ids_a["project_id"]),
+        AGENT_PREPARE.format(
+            novel_id=ids_a["novel_id"], project_id=ids_a["project_id"]
+        ),
         params={"novel_id": ids_a["novel_id"]},
         headers=headers,
-        json={"branch": BRANCH_VALUE, "fork": ids_a["fork_key"], "evidence_refs": ["chapter:1"]},
+        json={
+            "branch": BRANCH_VALUE,
+            "fork": ids_a["fork_key"],
+            "evidence_refs": ["chapter:1"],
+        },
     )
     assert resp.status_code == 404
     assert resp.status_code != 403

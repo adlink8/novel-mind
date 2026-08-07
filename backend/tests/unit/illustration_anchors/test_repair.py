@@ -25,7 +25,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.agent_runtime import ApprovalRequest
 from app.models.illustration import AssetRevision
-from app.models.illustration_anchor import IllustrationAnchor, IllustrationAnchorProposal
+from app.models.illustration_anchor import (
+    IllustrationAnchor,
+    IllustrationAnchorProposal,
+)
 from app.models.illustration_job import IllustrationJob
 from app.models.novel import Chapter, Novel
 from app.models.user import User
@@ -167,9 +170,7 @@ def _repair_proposal(*, content: str, source_start: int, source_end: int, **over
     proposal = IllustrationAnchorProposalContract.model_validate(payload)
     if "idempotency_key" not in overrides:
         proposal = proposal.model_copy(
-            update={
-                "idempotency_key": build_anchor_proposal_idempotency_key(proposal)
-            }
+            update={"idempotency_key": build_anchor_proposal_idempotency_key(proposal)}
         )
     return proposal
 
@@ -221,9 +222,7 @@ def test_version_switch_by_snapshot_is_needs_repair():
     assert c.previous_snapshot_id == "ss-1"
     assert c.current_snapshot_id == "ss-2"
 
-    c = _classify(
-        current_content=CHAPTER_TEXT, current_snapshot_hash=HEX64_B
-    )
+    c = _classify(current_content=CHAPTER_TEXT, current_snapshot_hash=HEX64_B)
     assert c.status is AnchorStatus.NEEDS_REPAIR
     assert c.reason_code == "source_snapshot_drift"
 
@@ -244,7 +243,7 @@ def test_excerpt_exists_elsewhere_is_needs_repair_not_relocated():
     # The frozen span is preserved — no new coordinates are ever generated.
     assert c.source_start == _EXCERPT_START
     assert c.source_end == _EXCERPT_END
-    assert EDITED_TEXT[c.source_start:c.source_end] != EXCERPT
+    assert EDITED_TEXT[c.source_start : c.source_end] != EXCERPT
 
 
 def test_malformed_anchor_hash_is_invalid():
@@ -318,11 +317,56 @@ def test_repair_proposal_key_is_deterministic_and_span_scoped():
     assert a == b
     assert a.startswith("repair:11:")
     assert len(a) <= 160
-    assert repair_proposal_key(anchor_id=12, source_start=10, source_end=20, excerpt="abc", asset_revision_id=3) != a
-    assert repair_proposal_key(anchor_id=11, source_start=11, source_end=20, excerpt="abc", asset_revision_id=3) != a
-    assert repair_proposal_key(anchor_id=11, source_start=10, source_end=21, excerpt="abc", asset_revision_id=3) != a
-    assert repair_proposal_key(anchor_id=11, source_start=10, source_end=20, excerpt="abd", asset_revision_id=3) != a
-    assert repair_proposal_key(anchor_id=11, source_start=10, source_end=20, excerpt="abc", asset_revision_id=4) != a
+    assert (
+        repair_proposal_key(
+            anchor_id=12,
+            source_start=10,
+            source_end=20,
+            excerpt="abc",
+            asset_revision_id=3,
+        )
+        != a
+    )
+    assert (
+        repair_proposal_key(
+            anchor_id=11,
+            source_start=11,
+            source_end=20,
+            excerpt="abc",
+            asset_revision_id=3,
+        )
+        != a
+    )
+    assert (
+        repair_proposal_key(
+            anchor_id=11,
+            source_start=10,
+            source_end=21,
+            excerpt="abc",
+            asset_revision_id=3,
+        )
+        != a
+    )
+    assert (
+        repair_proposal_key(
+            anchor_id=11,
+            source_start=10,
+            source_end=20,
+            excerpt="abd",
+            asset_revision_id=3,
+        )
+        != a
+    )
+    assert (
+        repair_proposal_key(
+            anchor_id=11,
+            source_start=10,
+            source_end=20,
+            excerpt="abc",
+            asset_revision_id=4,
+        )
+        != a
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -592,7 +636,11 @@ async def _approved_anchor(
     )
     db_session.add(anchor)
     await db_session.flush()
-    return anchor, {"owner_id": owner.id, "novel_id": novel.id, "chapter_id": chapter.id}
+    return anchor, {
+        "owner_id": owner.id,
+        "novel_id": novel.id,
+        "chapter_id": chapter.id,
+    }
 
 
 async def test_revalidate_valid_anchor_keeps_valid(db_session: AsyncSession):
@@ -648,7 +696,11 @@ async def test_revalidate_out_of_scope_fails_closed(db_session: AsyncSession):
     service = AnchorRepairService(db_session)
     with pytest.raises(ValueError):
         await service.revalidate(
-            owner_id=ids["owner_id"] + 999, novel_id=ids["novel_id"], anchor_id=anchor.id
+            owner_id=ids["owner_id"] + 999,
+            novel_id=ids["novel_id"],
+            anchor_id=anchor.id,
         )
     with pytest.raises(ValueError):
-        await service.revalidate(owner_id=0, novel_id=ids["novel_id"], anchor_id=anchor.id)
+        await service.revalidate(
+            owner_id=0, novel_id=ids["novel_id"], anchor_id=anchor.id
+        )

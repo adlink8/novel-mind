@@ -55,7 +55,6 @@ from app.services.illustrations.storage import AssetStorage
 from app.services.illustrations.worker import (
     DEFAULT_ILLUSTRATION_POLICY,
     IllustrationWorkerRuntime,
-    default_illustration_price_snapshot,
     run_illustration_worker,
 )
 from app.services.key_scenes.boundaries import SceneBoundaryService
@@ -174,9 +173,7 @@ async def _make_prompt_chain(
     Visual Bible manifest hash and the current source snapshot so the prompt is
     fresh (non-stale) unless a caller overrides ``vb_hash``.
     """
-    snapshot_hash = snapshot_hash or await _source_snapshot_hash(
-        db, user.id, novel.id
-    )
+    snapshot_hash = snapshot_hash or await _source_snapshot_hash(db, user.id, novel.id)
     vb = VisualBibleVersion(
         owner_id=user.id,
         novel_id=novel.id,
@@ -287,7 +284,9 @@ def _runtime(
     return runtime, transport, storage
 
 
-def _generation_request(*, model: str = "mock-img-v1", **overrides) -> IllustrationGenerationRequest:
+def _generation_request(
+    *, model: str = "mock-img-v1", **overrides
+) -> IllustrationGenerationRequest:
     payload = {
         "prompt_revision_id": 1,
         "job_key": "job-arin-bamboo",
@@ -353,9 +352,7 @@ async def test_generate_rejects_stale_prompt(auth_client, db_session):
     )
     # A newer approved Visual Bible revision supersedes the one the prompt was
     # compiled against -> the prompt is stale and must fail closed.
-    await _make_prompt_chain(
-        db_session, user, novel, approved=True, vb_hash=VB_HASH_2
-    )
+    await _make_prompt_chain(db_session, user, novel, approved=True, vb_hash=VB_HASH_2)
     await db_session.flush()
 
     resp = await auth_client.post(
@@ -431,9 +428,7 @@ async def test_generate_creates_durable_job_idempotently(
 # ---------------------------------------------------------------------------
 
 
-async def test_worker_generates_candidate_asset_with_full_lineage(
-    db_session, tmp_path
-):
+async def test_worker_generates_candidate_asset_with_full_lineage(db_session, tmp_path):
     user, novel = await _seed_user_and_novel(db_session, "ill_success")
     await _make_prompt_chain(db_session, user, novel, approved=True)
     await db_session.commit()
@@ -580,7 +575,9 @@ async def test_worker_retries_timeout_then_succeeds(db_session, tmp_path):
     await db_session.commit()
 
     job, _ = await _create_job(
-        db_session, owner_id=user.id, novel_id=novel.id,
+        db_session,
+        owner_id=user.id,
+        novel_id=novel.id,
         request=_generation_request(),
     )
     await db_session.commit()
@@ -615,7 +612,9 @@ async def test_worker_outcome_unknown_when_retries_exhausted(db_session, tmp_pat
     await db_session.commit()
 
     job, _ = await _create_job(
-        db_session, owner_id=user.id, novel_id=novel.id,
+        db_session,
+        owner_id=user.id,
+        novel_id=novel.id,
         request=_generation_request(),
     )
     await db_session.commit()
@@ -645,7 +644,9 @@ async def test_worker_empty_asset_never_becomes_success(db_session, tmp_path):
     await db_session.commit()
 
     job, _ = await _create_job(
-        db_session, owner_id=user.id, novel_id=novel.id,
+        db_session,
+        owner_id=user.id,
+        novel_id=novel.id,
         request=_generation_request(),
     )
     await db_session.commit()
@@ -678,7 +679,9 @@ async def test_worker_budget_exhaustion_pauses_job(db_session, tmp_path):
     runtime, transport, storage = _runtime(tmp_path, policy=tight)
 
     first, _ = await _create_job(
-        db_session, owner_id=user.id, novel_id=novel.id,
+        db_session,
+        owner_id=user.id,
+        novel_id=novel.id,
         request=_generation_request(model="mock-img-v1"),
     )
     await db_session.commit()
@@ -687,7 +690,9 @@ async def test_worker_budget_exhaustion_pauses_job(db_session, tmp_path):
     # A different lineage (different config hash) still hits the same
     # novel-scoped ledger; the second call exceeds max_calls=1 -> paused.
     second, _ = await _create_job(
-        db_session, owner_id=user.id, novel_id=novel.id,
+        db_session,
+        owner_id=user.id,
+        novel_id=novel.id,
         request=_generation_request(model="mock-img-v2", job_key="job-arin-2"),
     )
     await db_session.commit()
@@ -716,7 +721,9 @@ async def test_worker_fails_closed_when_prompt_becomes_stale_after_create(
     await db_session.commit()
 
     job, _ = await _create_job(
-        db_session, owner_id=user.id, novel_id=novel.id,
+        db_session,
+        owner_id=user.id,
+        novel_id=novel.id,
         request=_generation_request(),
     )
     await db_session.commit()
@@ -759,9 +766,7 @@ async def test_asset_api_is_owner_scoped_and_candidate_only(
 
     await run_illustration_worker(job_id, runtime=runtime)
 
-    listing = await auth_client.get(
-        f"/api/novels/{novel.id}/illustrations/assets"
-    )
+    listing = await auth_client.get(f"/api/novels/{novel.id}/illustrations/assets")
     assert listing.status_code == 200
     items = listing.json()["items"]
     assert len(items) == 1
@@ -802,7 +807,9 @@ async def test_asset_bytes_cross_owner_404(
 
     runtime, transport, storage = _runtime(tmp_path)
     job, _ = await _create_job(
-        db_session, owner_id=owner.id, novel_id=novel.id,
+        db_session,
+        owner_id=owner.id,
+        novel_id=novel.id,
         request=_generation_request(),
     )
     await db_session.commit()
@@ -824,7 +831,5 @@ async def test_asset_bytes_cross_owner_404(
         f"/api/novels/{novel.id}/illustrations/assets/{asset.id}/bytes"
     )
     assert resp.status_code == 404
-    resp = await auth_client.get(
-        f"/api/novels/{novel.id}/illustrations/assets"
-    )
+    resp = await auth_client.get(f"/api/novels/{novel.id}/illustrations/assets")
     assert resp.status_code == 404

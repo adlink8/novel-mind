@@ -112,7 +112,9 @@ class QualificationRunnerError(ValueError):
 # ---------------------------------------------------------------------------
 
 
-def _validate_header(header: dict[str, Any] | QualificationHeader) -> QualificationHeader:
+def _validate_header(
+    header: dict[str, Any] | QualificationHeader,
+) -> QualificationHeader:
     if isinstance(header, QualificationHeader):
         return header
     try:
@@ -123,23 +125,18 @@ def _validate_header(header: dict[str, Any] | QualificationHeader) -> Qualificat
         ) from exc
 
 
-def _budget_overruns(
-    artifact: dict[str, Any], budget: dict[str, Any]
-) -> list[str]:
+def _budget_overruns(artifact: dict[str, Any], budget: dict[str, Any]) -> list[str]:
     reasons: list[str] = []
-    if (
-        "max_calls" in budget
-        and int(artifact.get("calls") or 0) > int(budget["max_calls"])
+    if "max_calls" in budget and int(artifact.get("calls") or 0) > int(
+        budget["max_calls"]
     ):
         reasons.append("calls")
-    if (
-        "max_input_tokens" in budget
-        and int(artifact.get("input_tokens") or 0) > int(budget["max_input_tokens"])
+    if "max_input_tokens" in budget and int(artifact.get("input_tokens") or 0) > int(
+        budget["max_input_tokens"]
     ):
         reasons.append("input_tokens")
-    if (
-        "max_output_tokens" in budget
-        and int(artifact.get("output_tokens") or 0) > int(budget["max_output_tokens"])
+    if "max_output_tokens" in budget and int(artifact.get("output_tokens") or 0) > int(
+        budget["max_output_tokens"]
     ):
         reasons.append("output_tokens")
     cost = artifact.get("cost_usd")
@@ -311,9 +308,7 @@ def run_qualification(
             reasons.append(CODE_MANIFEST_PARITY_FAILED)
             # Expose the concrete parity fields so the report never hides why.
             reasons.extend(cmp_reasons)
-        manifest_snapshot = _manifest_snapshot(
-            candidate_manifest or baseline_manifest
-        )
+        manifest_snapshot = _manifest_snapshot(candidate_manifest or baseline_manifest)
 
     # 3. Frozen gold-set audit (defense in depth; load already froze it).
     dataset_violations = audit_dataset(gold_set)
@@ -374,11 +369,7 @@ def run_qualification(
         )
 
     candidate_violation_codes = sorted(
-        {
-            v.code
-            for violations in candidate_violations.values()
-            for v in violations
-        }
+        {v.code for violations in candidate_violations.values() for v in violations}
     )
     # D-04: a lineage violation on the baseline is also a parity failure.
     baseline_lineage_codes = sorted(
@@ -423,9 +414,7 @@ def run_qualification(
         samples = samples_by_bucket.get(bucket, [])
         cand_cases = [candidate_metrics[s.id] for s in samples]
         base_cases = [baseline_metrics[s.id] for s in samples]
-        missing = required_bucket_metrics_complete(
-            aggregate_bucket_metrics(cand_cases)
-        )
+        missing = required_bucket_metrics_complete(aggregate_bucket_metrics(cand_cases))
         metrics_block = {
             SYSTEM_CANDIDATE: aggregate_bucket_metrics(cand_cases),
             SYSTEM_BASELINE: aggregate_bucket_metrics(base_cases),
@@ -444,11 +433,7 @@ def run_qualification(
             )
         )
         bucket_blocked = sorted(
-            {
-                v.code
-                for s in samples
-                for v in candidate_violations.get(s.id, [])
-            }
+            {v.code for s in samples for v in candidate_violations.get(s.id, [])}
         )
         buckets.append(
             BucketReport(

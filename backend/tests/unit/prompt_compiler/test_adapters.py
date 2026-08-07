@@ -58,12 +58,12 @@ HEX64_B = "b" * 64
 HEX64_C = "c" * 64
 HEX64_D = "d" * 64
 
-VB_HASH = HEX64            # approved Visual Bible revision the spec is frozen against
-CANDIDATE_HASH = HEX64_B   # source SceneCandidate content hash
-SNAPSHOT_HASH = HEX64_C    # source snapshot hash
-SCHEMA_HASH = HEX64_D      # scene-spec schema hash
-POLICY_HASH = HEX64        # compiler policy hash
-CONFIG_HASH = HEX64_B      # compiler config hash
+VB_HASH = HEX64  # approved Visual Bible revision the spec is frozen against
+CANDIDATE_HASH = HEX64_B  # source SceneCandidate content hash
+SNAPSHOT_HASH = HEX64_C  # source snapshot hash
+SCHEMA_HASH = HEX64_D  # scene-spec schema hash
+POLICY_HASH = HEX64  # compiler policy hash
+CONFIG_HASH = HEX64_B  # compiler config hash
 CUTOFF = 8
 
 
@@ -207,9 +207,7 @@ def _spec(**overrides):
     payload.update(overrides)
     spec = SceneSpecContract.model_validate(payload)
     if "content_hash" not in overrides:
-        spec = spec.model_copy(
-            update={"content_hash": recompute_scene_spec_hash(spec)}
-        )
+        spec = spec.model_copy(update={"content_hash": recompute_scene_spec_hash(spec)})
     return spec
 
 
@@ -370,9 +368,7 @@ def test_compile_fails_closed_on_vb_revision_drift():
     bad = _spec(
         details=[
             _detail(
-                visual_bible_refs=[
-                    _vbref(revision_hash=HEX64_D).model_dump()
-                ]
+                visual_bible_refs=[_vbref(revision_hash=HEX64_D).model_dump()]
             ).model_dump(),
             _action_detail().model_dump(),
             _interpretation_detail().model_dump(),

@@ -36,7 +36,6 @@ from app.services.derivative_export.manifest import (
     DerivativeExportManifest,
     DerivativeExportRevision,
     MissingDerivativeAssetRecord,
-    derivative_export_manifest_hash,
 )
 from app.services.derivative_export.snapshot import (
     ExportSnapshot,
@@ -293,7 +292,6 @@ def build_fixture_snapshot(
     text_version_hash: str = HEX64_0,
 ) -> ExportSnapshot:
     """Build a sealed, fully deterministic fixture snapshot."""
-    import hashlib
 
     if chapters is None:
         chapters = (fixture_chapter(),)
@@ -331,7 +329,6 @@ def build_fixture_snapshot(
 def _fixture_text_version_hash(
     chapters: tuple[DerivativeExportChapter, ...],
 ) -> str:
-    import json
 
     from app.services.derivative_export.manifest import canonical_export_hash
 

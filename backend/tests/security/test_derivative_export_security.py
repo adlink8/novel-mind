@@ -67,7 +67,9 @@ def _phase22(green_observed: int = 3) -> DerivativeExportPhase22Evidence:
     )
 
 
-def _audit_evidence(kind: str = "package_buildable") -> tuple[DerivativeExportAuditEvidence, ...]:
+def _audit_evidence(
+    kind: str = "package_buildable",
+) -> tuple[DerivativeExportAuditEvidence, ...]:
     return (
         DerivativeExportAuditEvidence(
             kind=kind, location="backend/tests", detail="evidence present"
@@ -139,11 +141,7 @@ def _clean_lineage(*, epub_validated: bool = True, **overrides):
 
 
 def _blocked_reasons(lineage) -> set[str]:
-    return {
-        reason
-        for check in lineage.checks
-        for reason in check.blocked_reasons
-    }
+    return {reason for check in lineage.checks for reason in check.blocked_reasons}
 
 
 def _blocked_kinds(lineage) -> set[str]:
@@ -349,9 +347,7 @@ def test_rejected_artifact_is_blocked():
 
 
 def test_divergent_artifact_preparation_hash_is_blocked():
-    lineage = _clean_lineage(
-        epub_validated=True, artifact_preparation_hash="9" * 64
-    )
+    lineage = _clean_lineage(epub_validated=True, artifact_preparation_hash="9" * 64)
     assert "artifact_preparation_hash_mismatch" in _blocked_reasons(lineage)
 
 
@@ -384,9 +380,7 @@ def test_wrong_approval_action_is_blocked():
 
 
 def test_approval_revision_mismatch_is_blocked():
-    lineage = _clean_lineage(
-        epub_validated=True, approval_artifact_revision_id=999
-    )
+    lineage = _clean_lineage(epub_validated=True, approval_artifact_revision_id=999)
     assert "approval_revision_mismatch" in _blocked_reasons(lineage)
 
 
@@ -488,9 +482,7 @@ def test_non_verified_lineage_cannot_be_forced_green():
 def test_blocked_reasons_never_carry_promotion_vocabulary():
     report = _build_report(
         phase22_green=3,
-        lineage=_clean_lineage(
-            epub_validated=False, artifact_status="rejected"
-        ),
+        lineage=_clean_lineage(epub_validated=False, artifact_status="rejected"),
         shipment=build_derivative_export_shipment_baseline([]),
     )
     assert report.verdict == "blocked"

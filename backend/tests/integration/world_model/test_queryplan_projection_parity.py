@@ -240,7 +240,9 @@ async def test_projection_parity_unavailable_then_available(kind):
 
     # 3. Fuse + freeze: every ref materializes as an allowlisted leaf entry.
     service = QueryPlanService()
-    fused, manifest = await service.build_manifest(plan, source, dimension_results=filled)
+    fused, manifest = await service.build_manifest(
+        plan, source, dimension_results=filled
+    )
     assert manifest.allowed_evidence_ids()
     verify_manifest(manifest)
     leaf_keys = {
@@ -424,9 +426,7 @@ async def test_user_interpretation_is_isolated_from_candidate_projection():
     assert result.status == AvailabilityStatus.AVAILABLE
     assert result.world_items
     assert result.world_overrides
-    assert all(
-        item.is_override is False for item in result.world_items
-    )
+    assert all(item.is_override is False for item in result.world_items)
     assert all(
         item.is_override and item.authority == AUTHORITY_USER_INTERPRETATION
         for item in result.world_overrides
@@ -436,15 +436,11 @@ async def test_user_interpretation_is_isolated_from_candidate_projection():
         plan, source, dimension_results=results
     )
     # The override's evidence ref never joins the frozen manifest allowlist.
-    assert manifest.allowed_evidence_ids() == {
-        f"qp:1:0:12:{_sha256(_excerpt(0, 12))}"
-    }
+    assert manifest.allowed_evidence_ids() == {f"qp:1:0:12:{_sha256(_excerpt(0, 12))}"}
 
     view = QueryPlanService().consumer_view(plan, manifest, dimension_results=results)
     assert view.world_projection is not None
-    assert [item["claim_key"] for item in view.world_projection["items"]] == [
-        "k-canon"
-    ]
+    assert [item["claim_key"] for item in view.world_projection["items"]] == ["k-canon"]
     assert [item["claim_key"] for item in view.world_projection["overrides"]] == [
         "k-user-read"
     ]
@@ -483,9 +479,7 @@ async def test_freeze_world_projection_manifest_records_candidate_and_override()
         overrides=(override,),
     )
     verify_manifest(manifest)
-    assert manifest.allowed_evidence_ids() == {
-        f"qp:1:0:12:{_sha256(_excerpt(0, 12))}"
-    }
+    assert manifest.allowed_evidence_ids() == {f"qp:1:0:12:{_sha256(_excerpt(0, 12))}"}
     kinds = {entry.kind for entry in manifest.omitted}
     assert kinds == {"world_projection_candidate", "world_projection_override"}
 

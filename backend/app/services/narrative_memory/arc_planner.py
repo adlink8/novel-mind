@@ -13,7 +13,14 @@ from __future__ import annotations
 from hashlib import sha256
 from typing import Annotated, Any, Literal, Mapping, Sequence
 
-from pydantic import Field, StringConstraints, StrictFloat, StrictInt, StrictStr, model_validator
+from pydantic import (
+    Field,
+    StringConstraints,
+    StrictFloat,
+    StrictInt,
+    StrictStr,
+    model_validator,
+)
 
 from app.services.narrative_memory.builder_contracts import (
     BuilderFrozenModel,
@@ -181,9 +188,7 @@ UNCERTAINTY_RANK = {
     Uncertainty.UNCERTAIN: 2,
     Uncertainty.UNKNOWN: 3,
 }
-UNCERTAINTY_BY_RANK = {
-    rank: level for level, rank in UNCERTAINTY_RANK.items()
-}
+UNCERTAINTY_BY_RANK = {rank: level for level, rank in UNCERTAINTY_RANK.items()}
 BOUNDARY_UNCERTAINTY_RANK = {
     BOUNDARY_REASON_SNAPSHOT_EDGE: 1,
     BOUNDARY_REASON_EVIDENCE_DELTA: 1,
@@ -321,11 +326,16 @@ class OutlineCandidateArtifact(BuilderFrozenModel):
     @model_validator(mode="after")
     def validate_coverage(self) -> "OutlineCandidateArtifact":
         ordered = list(self.arcs)
-        if ordered != sorted(ordered, key=lambda arc: (arc.chapter_start, arc.chapter_end)):
+        if ordered != sorted(
+            ordered, key=lambda arc: (arc.chapter_start, arc.chapter_end)
+        ):
             raise ValueError("outline arcs must be ordered")
         seen: set[int] = set()
         for arc in ordered:
-            if arc.chapter_start < self.chapter_min or arc.chapter_end > self.chapter_max:
+            if (
+                arc.chapter_start < self.chapter_min
+                or arc.chapter_end > self.chapter_max
+            ):
                 raise ValueError("arc range must be inside the snapshot range")
             for chapter in arc.chapter_numbers:
                 if chapter in seen:
@@ -397,7 +407,8 @@ def _boundary_signal(
     denominator = max(left.claim_count, right.claim_count, 1)
     density_delta = abs(left.claim_count - right.claim_count) / denominator
     uncertainty_delta = abs(
-        _uncertainty_rank(right.max_uncertainty) - _uncertainty_rank(left.max_uncertainty)
+        _uncertainty_rank(right.max_uncertainty)
+        - _uncertainty_rank(left.max_uncertainty)
     )
     confidence_delta = abs(left.mean_confidence - right.mean_confidence)
     signal = (
@@ -424,9 +435,7 @@ def _split_run(
     for left, right in zip(run, run[1:]):
         if right != left + 1:
             continue
-        signal, reason = _boundary_signal(
-            evidence.get(left), evidence.get(right)
-        )
+        signal, reason = _boundary_signal(evidence.get(left), evidence.get(right))
         if (
             reason == BOUNDARY_REASON_EVIDENCE_DELTA
             and signal >= EVIDENCE_BOUNDARY_THRESHOLD
@@ -457,9 +466,15 @@ def _boundary_reason_at(
     if neighbour < chapter_min or neighbour > chapter_max:
         return BOUNDARY_REASON_SNAPSHOT_EDGE
     neighbour_state = by_number.get(neighbour)
-    if neighbour_state is None or neighbour_state.terminal_state != TerminalState.COMPLETED:
+    if (
+        neighbour_state is None
+        or neighbour_state.terminal_state != TerminalState.COMPLETED
+    ):
         return BOUNDARY_REASON_ADJACENT_GAP
-    left, right = evidence.get(min(chapter, neighbour)), evidence.get(max(chapter, neighbour))
+    left, right = (
+        evidence.get(min(chapter, neighbour)),
+        evidence.get(max(chapter, neighbour)),
+    )
     if left is None or right is None:
         return BOUNDARY_REASON_WEAK_EVIDENCE
     _signal, reason = _boundary_signal(left, right)
@@ -587,7 +602,9 @@ def plan_outline_arcs(
         if start == chapter_min:
             boundaries.append(
                 BoundaryUncertainty(
-                    side="start", chapter_number=start, reason=BOUNDARY_REASON_SNAPSHOT_EDGE
+                    side="start",
+                    chapter_number=start,
+                    reason=BOUNDARY_REASON_SNAPSHOT_EDGE,
                 )
             )
         else:

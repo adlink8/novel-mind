@@ -486,10 +486,14 @@ class DimensionAdapter:
 
 DEFAULT_ADAPTERS: dict[QueryDimension, DimensionAdapter] = {
     QueryDimension.RAW_TEXT: DimensionAdapter(
-        QueryDimension.RAW_TEXT, READER_KNOWLEDGE_UNITS_CHUNKS, GENERIC_HEURISTIC_KEYWORDS
+        QueryDimension.RAW_TEXT,
+        READER_KNOWLEDGE_UNITS_CHUNKS,
+        GENERIC_HEURISTIC_KEYWORDS,
     ),
     QueryDimension.EVENTS_CAUSALITY: DimensionAdapter(
-        QueryDimension.EVENTS_CAUSALITY, READER_TIMELINE_EVENTS, GENERIC_HEURISTIC_KEYWORDS
+        QueryDimension.EVENTS_CAUSALITY,
+        READER_TIMELINE_EVENTS,
+        GENERIC_HEURISTIC_KEYWORDS,
     ),
     QueryDimension.CHARACTER_STATE: DimensionAdapter(
         QueryDimension.CHARACTER_STATE, None, CHARACTER_STATE_KEYWORDS
@@ -501,13 +505,17 @@ DEFAULT_ADAPTERS: dict[QueryDimension, DimensionAdapter] = {
         QueryDimension.TIMELINE, READER_TIMELINE_EVENTS, GENERIC_HEURISTIC_KEYWORDS
     ),
     QueryDimension.CLUES_FORESHAOWING: DimensionAdapter(
-        QueryDimension.CLUES_FORESHAOWING, READER_CLUES_QUERY, GENERIC_HEURISTIC_KEYWORDS
+        QueryDimension.CLUES_FORESHAOWING,
+        READER_CLUES_QUERY,
+        GENERIC_HEURISTIC_KEYWORDS,
     ),
     QueryDimension.WORLD_RULES: DimensionAdapter(
         QueryDimension.WORLD_RULES, None, WORLD_RULES_KEYWORDS
     ),
     QueryDimension.NARRATIVE_UNITS: DimensionAdapter(
-        QueryDimension.NARRATIVE_UNITS, READER_KNOWLEDGE_UNITS_UNITS, GENERIC_HEURISTIC_KEYWORDS
+        QueryDimension.NARRATIVE_UNITS,
+        READER_KNOWLEDGE_UNITS_UNITS,
+        GENERIC_HEURISTIC_KEYWORDS,
     ),
     QueryDimension.WORLD_PROJECTION: DimensionAdapter(
         QueryDimension.WORLD_PROJECTION, READER_WORLD_PROJECTION, ()
@@ -670,9 +678,7 @@ async def run_adapter(
     )
 
 
-def _effective_through_chapter(
-    plan: QueryPlan, source: SourceSnapshot
-) -> int:
+def _effective_through_chapter(plan: QueryPlan, source: SourceSnapshot) -> int:
     if plan.spoiler_cutoff.mode == CutoffMode.WHOLE_BOOK:
         return max((int(c.chapter_number) for c in source.chapters), default=10**9)
     return int(plan.spoiler_cutoff.through_chapter)

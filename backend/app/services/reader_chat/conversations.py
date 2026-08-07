@@ -186,7 +186,10 @@ class ProductionContextBuilder:
                         AnalysisQueryPlanAdapter,
                     )
 
-                    _, queryplan_view = await AnalysisQueryPlanAdapter().execute_manifest(
+                    (
+                        _,
+                        queryplan_view,
+                    ) = await AnalysisQueryPlanAdapter().execute_manifest(
                         db,
                         novel=novel,
                         owner_id=owner_id,

@@ -127,10 +127,13 @@ class DerivativeExportAgentPrepareRequest(StrictAgentToolModel):
         default=None, max_length=80, description="衍生分支；原始主线为 null"
     )
     fork: str | None = Field(
-        default=None, max_length=80, description="衍生 fork（仅 derivative mode；original 必须为 null）"
+        default=None,
+        max_length=80,
+        description="衍生 fork（仅 derivative mode；original 必须为 null）",
     )
     evidence_refs: list[str] = Field(
-        min_length=1, description="run 引用的 leaf 证据键（必须属于冻结 manifest 白名单）"
+        min_length=1,
+        description="run 引用的 leaf 证据键（必须属于冻结 manifest 白名单）",
     )
     generator_lineage: dict = Field(default_factory=dict)
 
@@ -164,13 +167,17 @@ class DerivativeExportAgentApproveRequest(StrictAgentToolModel):
         default=None, max_length=80, description="衍生分支；原始主线为 null"
     )
     fork: str | None = Field(
-        default=None, max_length=80, description="衍生 fork（仅 derivative mode；original 必须为 null）"
+        default=None,
+        max_length=80,
+        description="衍生 fork（仅 derivative mode；original 必须为 null）",
     )
     artifact_id: int = Field(
-        gt=0, description="候选 ExportPreparationArtifact ID（服务端重验 owner/novel + candidate status）"
+        gt=0,
+        description="候选 ExportPreparationArtifact ID（服务端重验 owner/novel + candidate status）",
     )
     artifact_revision_id: int = Field(
-        gt=0, description="候选 ArtifactRevision ID（approval payload 绑定；必须是当前修订）"
+        gt=0,
+        description="候选 ArtifactRevision ID（approval payload 绑定；必须是当前修订）",
     )
     preparation_hash: str = Field(
         min_length=64,
@@ -195,16 +202,21 @@ class DerivativeExportAgentMaterializeRequest(StrictAgentToolModel):
         default=None, max_length=80, description="衍生分支；原始主线为 null"
     )
     fork: str | None = Field(
-        default=None, max_length=80, description="衍生 fork（仅 derivative mode；original 必须为 null）"
+        default=None,
+        max_length=80,
+        description="衍生 fork（仅 derivative mode；original 必须为 null）",
     )
     artifact_id: int = Field(
-        gt=0, description="候选 ExportPreparationArtifact ID（只接受 approved artifact）"
+        gt=0,
+        description="候选 ExportPreparationArtifact ID（只接受 approved artifact）",
     )
     artifact_revision_id: int = Field(
-        gt=0, description="候选 ArtifactRevision ID（approval payload 绑定；必须是当前修订）"
+        gt=0,
+        description="候选 ArtifactRevision ID（approval payload 绑定；必须是当前修订）",
     )
     approval_id: int = Field(
-        gt=0, description="已批准的 approve_export ApprovalRequest ID（服务端重验 action + status + preparation_hash）"
+        gt=0,
+        description="已批准的 approve_export ApprovalRequest ID（服务端重验 action + status + preparation_hash）",
     )
     preparation_hash: str = Field(
         min_length=64,
@@ -213,7 +225,9 @@ class DerivativeExportAgentMaterializeRequest(StrictAgentToolModel):
         description="候选冻结 preparation hash（必须与 approve_export approval payload_hash 一致）",
     )
     reason: str | None = Field(
-        default=None, max_length=4000, description="确定性 materialize 理由（展示/审计）"
+        default=None,
+        max_length=4000,
+        description="确定性 materialize 理由（展示/审计）",
     )
 
 
@@ -449,11 +463,15 @@ def _implementation_evidence(
 def _sample_data_evidence() -> tuple[tuple[DerivativeExportAuditEvidence, ...], bool]:
     """Round-trip fixture evidence for the sample_data_coverage dimension."""
     repo_root = Path(__file__).resolve().parents[3]
-    fixture_path = repo_root / "backend" / "tests" / "fixtures" / (
-        "derivative_export_roundtrip_fixtures.py"
+    fixture_path = (
+        repo_root
+        / "backend"
+        / "tests"
+        / "fixtures"
+        / ("derivative_export_roundtrip_fixtures.py")
     )
-    integration_path = repo_root / "backend" / "tests" / "integration" / (
-        "test_derivative_export.py"
+    integration_path = (
+        repo_root / "backend" / "tests" / "integration" / ("test_derivative_export.py")
     )
     fixture_present = fixture_path.exists()
     integration_present = integration_path.exists()
@@ -519,8 +537,7 @@ def _shipment_baseline_evidence() -> tuple[DerivativeExportShipmentItem, ...]:
                 "backend/app/models/agent_runtime.py:SkillRun.budget_snapshot"
             ),
             detail=(
-                "only per-skill-run budget contracts; no global cost-budget "
-                "evidence"
+                "only per-skill-run budget contracts; no global cost-budget evidence"
             ),
         ),
     )
@@ -570,9 +587,7 @@ async def audit_derivative_export(
         epub_validated=False,
         download_manifest_hash=snapshot.snapshot_hash,
     )
-    shipment = build_derivative_export_shipment_baseline(
-        _shipment_baseline_evidence()
-    )
+    shipment = build_derivative_export_shipment_baseline(_shipment_baseline_evidence())
     report = build_derivative_export_audit(
         manifest=manifest,
         phase22=_phase22_evidence(),

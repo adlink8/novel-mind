@@ -15,7 +15,6 @@ queryplan world_projection）可见候选证据。
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
 
@@ -91,9 +90,7 @@ async def materialize_skill_run(
         return run.status_reason
 
 
-async def _latest_artifact(
-    session: AsyncSession, run_id: int
-) -> Artifact | None:
+async def _latest_artifact(session: AsyncSession, run_id: int) -> Artifact | None:
     from sqlalchemy import select
 
     return await session.scalar(

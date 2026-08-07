@@ -36,12 +36,8 @@ from app.services.qualification.rubric import (
 
 pytestmark = [pytest.mark.unit, pytest.mark.adversarial]
 
-GOLD_PATH = (
-    Path(__file__).resolve().parents[2] / "evals" / "reading_qa_v1.json"
-)
-QUAL_DIR = (
-    Path(__file__).resolve().parents[2] / "app" / "services" / "qualification"
-)
+GOLD_PATH = Path(__file__).resolve().parents[2] / "evals" / "reading_qa_v1.json"
+QUAL_DIR = Path(__file__).resolve().parents[2] / "app" / "services" / "qualification"
 
 
 @pytest.fixture(scope="module")
@@ -121,9 +117,9 @@ def test_fingerprint_tampering_blocks_load(raw_payload):
 def test_source_mutation_detected(raw_payload):
     # mutate chapter text without touching hashes -> re-slice hash mismatch
     mutated = deepcopy(raw_payload)
-    mutated["source"]["chapters"][0]["content"] = (
-        mutated["source"]["chapters"][0]["content"].replace("旧书店", "旧客栈")
-    )
+    mutated["source"]["chapters"][0]["content"] = mutated["source"]["chapters"][0][
+        "content"
+    ].replace("旧书店", "旧客栈")
     with pytest.raises(GoldSetError, match="content_hash mismatch"):
         freeze_gold_set(mutated, require_frozen=False)
 
@@ -316,8 +312,11 @@ def _runner_manifest(snapshot: str, **overrides) -> CandidateManifest:
         version_id=1,
         version_key="v1",
         budget=BudgetTotals(
-            calls=10, input_tokens=2_000, output_tokens=1_000,
-            cost_usd="0.5", cache_hits=1,
+            calls=10,
+            input_tokens=2_000,
+            output_tokens=1_000,
+            cost_usd="0.5",
+            cache_hits=1,
         ),
         lineage=overrides.pop("lineage", _RUNNER_LINEAGE),
     )
@@ -372,8 +371,11 @@ def test_runner_candidate_baseline_budget_spoof_blocks(gold_set):
     cand = _runner_clean_artifacts(gold_set)
     base = _runner_clean_artifacts(gold_set)
     big_budget = BudgetTotals(
-        calls=10_000, input_tokens=2_000, output_tokens=1_000,
-        cost_usd="0.5", cache_hits=1,
+        calls=10_000,
+        input_tokens=2_000,
+        output_tokens=1_000,
+        cost_usd="0.5",
+        cache_hits=1,
     )
     report = run_qualification(
         gold_set=gold_set,
@@ -439,4 +441,3 @@ def test_runner_lineage_spoof_blocks_without_metrics(gold_set):
     assert report.buckets
     bucket = next(b for b in report.buckets if b.bucket.value == "local")
     assert bucket.blocked_reasons
-

@@ -91,10 +91,16 @@ def _skill_contract(*, novel_id: int) -> SkillVersionRegister:
             "approval_required_for": [],
             "input_schema": {
                 "type": "object",
-                "properties": {"question": {"type": "string"}, "novel_id": {"type": "integer"}},
+                "properties": {
+                    "question": {"type": "string"},
+                    "novel_id": {"type": "integer"},
+                },
                 "required": ["question", "novel_id"],
             },
-            "output_schema": {"type": "object", "properties": {"schema_version": {"type": "string"}}},
+            "output_schema": {
+                "type": "object",
+                "properties": {"schema_version": {"type": "string"}},
+            },
         }
     )
 
@@ -193,7 +199,11 @@ def _build_envelope(
         "evidence_refs": [EVIDENCE_KEY] if include_evidence else [],
         "answer": {
             "answer_blocks": [
-                {"block_id": "b1", "text": "阿宁在竹林里看见了使者的身影。", "evidence_refs": [EVIDENCE_KEY]}
+                {
+                    "block_id": "b1",
+                    "text": "阿宁在竹林里看见了使者的身影。",
+                    "evidence_refs": [EVIDENCE_KEY],
+                }
             ],
             "clarifying_question": None,
             "uncertainty": None,
@@ -224,7 +234,10 @@ def _build_envelope(
 async def _register_skill(factory, *, owner_id: int, novel_id: int) -> int:
     async with factory() as session:
         _, version = await register_skill_version(
-            session, owner_id=owner_id, novel_id=novel_id, contract=_skill_contract(novel_id=novel_id)
+            session,
+            owner_id=owner_id,
+            novel_id=novel_id,
+            contract=_skill_contract(novel_id=novel_id),
         )
         await session.commit()
         return version.id
@@ -272,7 +285,9 @@ async def _count_artifacts(factory, *, run_id: int) -> int:
     async with factory() as session:
         return int(
             await session.scalar(
-                select(func.count()).select_from(Artifact).where(Artifact.run_id == run_id)
+                select(func.count())
+                .select_from(Artifact)
+                .where(Artifact.run_id == run_id)
             )
             or 0
         )
@@ -317,7 +332,12 @@ async def _set_up(factory, migrated_postgres: str, *, suffix: str) -> dict[str, 
         skill_version_id=svid,
         input_hash=input_hash,
     )
-    return {**seed, "skill_version_id": svid, "input_hash": input_hash, "run_id": run_id}
+    return {
+        **seed,
+        "skill_version_id": svid,
+        "input_hash": input_hash,
+        "run_id": run_id,
+    }
 
 
 async def _assert_zero_writes(factory, *, run_id: int) -> None:
@@ -349,7 +369,9 @@ async def test_happy_path_records_normalization_trail(
     runtime_factory, migrated_postgres: str
 ):
     """合法 noop 修复信封 → completed；content 携带可重放 trail。"""
-    ctx = await _set_up(runtime_factory, migrated_postgres, suffix=f"ok_{uuid.uuid4().hex[:6]}")
+    ctx = await _set_up(
+        runtime_factory, migrated_postgres, suffix=f"ok_{uuid.uuid4().hex[:6]}"
+    )
     envelope = _build_envelope(
         owner_id=ctx["owner_id"],
         novel_id=ctx["novel_id"],
@@ -360,7 +382,10 @@ async def test_happy_path_records_normalization_trail(
         runtime_factory,
         run_id=ctx["run_id"],
         envelope=envelope,
-        frozen_manifest={"evidence_refs": [EVIDENCE_KEY], "manifest_checksum": "m" * 64},
+        frozen_manifest={
+            "evidence_refs": [EVIDENCE_KEY],
+            "manifest_checksum": "m" * 64,
+        },
     )
     assert outcome.status == "completed", outcome.status_reason
     assert outcome.artifact_id is not None
@@ -376,7 +401,9 @@ async def test_happy_path_records_normalization_trail(
     assert trail["normalization_actions"] == []
     assert trail["warnings"] == []
     # 服务端重放：剥离 trail 后重算 repaired_hash 必须一致。
-    assert canonical_content_hash(_strip_trail(revision.content)) == trail["repaired_hash"]
+    assert (
+        canonical_content_hash(_strip_trail(revision.content)) == trail["repaired_hash"]
+    )
     assert artifact is not None and artifact.status == "candidate"
     assert artifact.status != "published"  # 无自动 promotion
     # finalize 后没有 ApprovalRequest 副作用。
@@ -386,9 +413,13 @@ async def test_happy_path_records_normalization_trail(
 # ────────────────────────── blocked paths（fail closed，零写入） ──────────────────────────
 
 
-async def test_schema_violation_protected_field_blocks(runtime_factory, migrated_postgres: str):
+async def test_schema_violation_protected_field_blocks(
+    runtime_factory, migrated_postgres: str
+):
     """信封含受保护字段 authority → blocked，0 写（extra=forbid + 显式检查）。"""
-    ctx = await _set_up(runtime_factory, migrated_postgres, suffix=f"auth_{uuid.uuid4().hex[:6]}")
+    ctx = await _set_up(
+        runtime_factory, migrated_postgres, suffix=f"auth_{uuid.uuid4().hex[:6]}"
+    )
     envelope = _build_envelope(
         owner_id=ctx["owner_id"],
         novel_id=ctx["novel_id"],
@@ -408,9 +439,13 @@ async def test_schema_violation_protected_field_blocks(runtime_factory, migrated
     await _assert_zero_writes(runtime_factory, run_id=ctx["run_id"])
 
 
-async def test_missing_evidence_heuristic_candidate_blocks(runtime_factory, migrated_postgres: str):
+async def test_missing_evidence_heuristic_candidate_blocks(
+    runtime_factory, migrated_postgres: str
+):
     """cited_answer 无 evidence_refs（heuristic candidate 形状）→ blocked，0 写。"""
-    ctx = await _set_up(runtime_factory, migrated_postgres, suffix=f"noev_{uuid.uuid4().hex[:6]}")
+    ctx = await _set_up(
+        runtime_factory, migrated_postgres, suffix=f"noev_{uuid.uuid4().hex[:6]}"
+    )
     envelope = _build_envelope(
         owner_id=ctx["owner_id"],
         novel_id=ctx["novel_id"],
@@ -426,13 +461,18 @@ async def test_missing_evidence_heuristic_candidate_blocks(runtime_factory, migr
     )
     assert outcome.status == "failed"
     assert outcome.error_code == ERROR_CODE_FAILED_VALIDATION
-    assert outcome.status_reason is not None and "heuristic candidate" in outcome.status_reason
+    assert (
+        outcome.status_reason is not None
+        and "heuristic candidate" in outcome.status_reason
+    )
     await _assert_zero_writes(runtime_factory, run_id=ctx["run_id"])
 
 
 async def test_lineage_owner_mismatch_blocks(runtime_factory, migrated_postgres: str):
     """owner 血缘与 run 不符 → blocked，0 写（不补默认值）。"""
-    ctx = await _set_up(runtime_factory, migrated_postgres, suffix=f"own_{uuid.uuid4().hex[:6]}")
+    ctx = await _set_up(
+        runtime_factory, migrated_postgres, suffix=f"own_{uuid.uuid4().hex[:6]}"
+    )
     envelope = _build_envelope(
         owner_id=ctx["owner_id"],
         novel_id=ctx["novel_id"],
@@ -453,7 +493,9 @@ async def test_lineage_owner_mismatch_blocks(runtime_factory, migrated_postgres:
 
 async def test_stale_repaired_hash_blocks(runtime_factory, migrated_postgres: str):
     """repaired_hash 与内容不符（payload 在规范化后被篡改）→ blocked，0 写。"""
-    ctx = await _set_up(runtime_factory, migrated_postgres, suffix=f"stale_{uuid.uuid4().hex[:6]}")
+    ctx = await _set_up(
+        runtime_factory, migrated_postgres, suffix=f"stale_{uuid.uuid4().hex[:6]}"
+    )
     envelope = _build_envelope(
         owner_id=ctx["owner_id"],
         novel_id=ctx["novel_id"],
@@ -469,13 +511,17 @@ async def test_stale_repaired_hash_blocks(runtime_factory, migrated_postgres: st
         frozen_manifest={"evidence_refs": [EVIDENCE_KEY]},
     )
     assert outcome.status == "failed"
-    assert outcome.status_reason is not None and "repaired_hash" in outcome.status_reason
+    assert (
+        outcome.status_reason is not None and "repaired_hash" in outcome.status_reason
+    )
     await _assert_zero_writes(runtime_factory, run_id=ctx["run_id"])
 
 
 async def test_trail_inconsistent_blocks(runtime_factory, migrated_postgres: str):
     """无 normalization_actions 但 raw_hash != repaired_hash → blocked，0 写。"""
-    ctx = await _set_up(runtime_factory, migrated_postgres, suffix=f"trail_{uuid.uuid4().hex[:6]}")
+    ctx = await _set_up(
+        runtime_factory, migrated_postgres, suffix=f"trail_{uuid.uuid4().hex[:6]}"
+    )
     envelope = _build_envelope(
         owner_id=ctx["owner_id"],
         novel_id=ctx["novel_id"],
@@ -490,13 +536,18 @@ async def test_trail_inconsistent_blocks(runtime_factory, migrated_postgres: str
         frozen_manifest={"evidence_refs": [EVIDENCE_KEY]},
     )
     assert outcome.status == "failed"
-    assert outcome.status_reason is not None and "trail inconsistent" in outcome.status_reason
+    assert (
+        outcome.status_reason is not None
+        and "trail inconsistent" in outcome.status_reason
+    )
     await _assert_zero_writes(runtime_factory, run_id=ctx["run_id"])
 
 
 async def test_unknown_artifact_type_blocks(runtime_factory, migrated_postgres: str):
     """未注册 artifact type → blocked，0 写（fail closed）。"""
-    ctx = await _set_up(runtime_factory, migrated_postgres, suffix=f"type_{uuid.uuid4().hex[:6]}")
+    ctx = await _set_up(
+        runtime_factory, migrated_postgres, suffix=f"type_{uuid.uuid4().hex[:6]}"
+    )
     envelope = _build_envelope(
         owner_id=ctx["owner_id"],
         novel_id=ctx["novel_id"],
@@ -504,7 +555,9 @@ async def test_unknown_artifact_type_blocks(runtime_factory, migrated_postgres: 
         input_hash=ctx["input_hash"],
     )
     envelope["type"] = "hallucinated-type"
-    envelope["normalization"]["repaired_hash"] = canonical_content_hash(_strip_trail(envelope))
+    envelope["normalization"]["repaired_hash"] = canonical_content_hash(
+        _strip_trail(envelope)
+    )
     envelope["normalization"]["raw_hash"] = envelope["normalization"]["repaired_hash"]
     outcome = await _finalize(
         runtime_factory,
@@ -513,13 +566,18 @@ async def test_unknown_artifact_type_blocks(runtime_factory, migrated_postgres: 
         frozen_manifest={"evidence_refs": [EVIDENCE_KEY]},
     )
     assert outcome.status == "failed"
-    assert outcome.status_reason is not None and "unknown artifact type" in outcome.status_reason
+    assert (
+        outcome.status_reason is not None
+        and "unknown artifact type" in outcome.status_reason
+    )
     await _assert_zero_writes(runtime_factory, run_id=ctx["run_id"])
 
 
 async def test_unknown_evidence_ref_blocks(runtime_factory, migrated_postgres: str):
     """evidence_ref 不在冻结 manifest 白名单 → blocked，0 写（leaf-evidence 权威）。"""
-    ctx = await _set_up(runtime_factory, migrated_postgres, suffix=f"evid_{uuid.uuid4().hex[:6]}")
+    ctx = await _set_up(
+        runtime_factory, migrated_postgres, suffix=f"evid_{uuid.uuid4().hex[:6]}"
+    )
     envelope = _build_envelope(
         owner_id=ctx["owner_id"],
         novel_id=ctx["novel_id"],
@@ -528,7 +586,9 @@ async def test_unknown_evidence_ref_blocks(runtime_factory, migrated_postgres: s
         extra={"evidence_refs": ["evidence:forged"]},
     )
     envelope["answer"]["answer_blocks"][0]["evidence_refs"] = ["evidence:forged"]
-    envelope["normalization"]["repaired_hash"] = canonical_content_hash(_strip_trail(envelope))
+    envelope["normalization"]["repaired_hash"] = canonical_content_hash(
+        _strip_trail(envelope)
+    )
     envelope["normalization"]["raw_hash"] = envelope["normalization"]["repaired_hash"]
     outcome = await _finalize(
         runtime_factory,
@@ -537,7 +597,10 @@ async def test_unknown_evidence_ref_blocks(runtime_factory, migrated_postgres: s
         frozen_manifest={"evidence_refs": [EVIDENCE_KEY]},
     )
     assert outcome.status == "failed"
-    assert outcome.status_reason is not None and "unknown evidence ref" in outcome.status_reason
+    assert (
+        outcome.status_reason is not None
+        and "unknown evidence ref" in outcome.status_reason
+    )
     await _assert_zero_writes(runtime_factory, run_id=ctx["run_id"])
 
 
@@ -545,7 +608,9 @@ async def test_blocked_path_no_approval_request_or_promotion(
     runtime_factory, migrated_postgres: str
 ):
     """blocked 路径：无 ApprovalRequest、无 Artifact/Revision、无 promotion 副作用。"""
-    ctx = await _set_up(runtime_factory, migrated_postgres, suffix=f"prom_{uuid.uuid4().hex[:6]}")
+    ctx = await _set_up(
+        runtime_factory, migrated_postgres, suffix=f"prom_{uuid.uuid4().hex[:6]}"
+    )
     envelope = _build_envelope(
         owner_id=ctx["owner_id"],
         novel_id=ctx["novel_id"],
@@ -583,7 +648,13 @@ def test_evaluate_integrity_external_evidence_valid():
         "type": "external_evidence",
         "schema_version": 1,
         "sources": [
-            {"server": "s", "tool": "t", "uri": "https://example.com/x", "title": "T", "retrieved_from": "mcp"}
+            {
+                "server": "s",
+                "tool": "t",
+                "uri": "https://example.com/x",
+                "title": "T",
+                "retrieved_from": "mcp",
+            }
         ],
         "retrieval_time": "2026-08-03T00:00:00Z",
         "claims": [{"text": "外部主张", "source_index": 0}],
@@ -602,7 +673,13 @@ def test_evaluate_integrity_external_evidence_canon_flag_rejected():
         "type": "external_evidence",
         "schema_version": 1,
         "sources": [
-            {"server": "s", "tool": "t", "uri": "https://example.com/x", "title": "T", "retrieved_from": "mcp"}
+            {
+                "server": "s",
+                "tool": "t",
+                "uri": "https://example.com/x",
+                "title": "T",
+                "retrieved_from": "mcp",
+            }
         ],
         "retrieval_time": "2026-08-03T00:00:00Z",
         "claims": [{"text": "x", "source_index": 0}],
@@ -633,7 +710,11 @@ def test_evaluate_integrity_rejects_protected_synthesis():
 def test_evaluate_integrity_owner_mismatch():
     decision = evaluate_integrity(
         envelope=_build_envelope(
-            owner_id=1, novel_id=1, skill_version_id=1, input_hash="c" * 64, wrong_owner=True
+            owner_id=1,
+            novel_id=1,
+            skill_version_id=1,
+            input_hash="c" * 64,
+            wrong_owner=True,
         ),
         run=_fake_run(),
     )
@@ -644,7 +725,11 @@ def test_evaluate_integrity_owner_mismatch():
 def test_evaluate_integrity_no_evidence_heuristic():
     decision = evaluate_integrity(
         envelope=_build_envelope(
-            owner_id=1, novel_id=1, skill_version_id=1, input_hash="c" * 64, include_evidence=False
+            owner_id=1,
+            novel_id=1,
+            skill_version_id=1,
+            input_hash="c" * 64,
+            include_evidence=False,
         ),
         run=_fake_run(),
     )
@@ -667,9 +752,13 @@ def test_evaluate_integrity_stale_hash_and_unknown_type():
     assert stale.ok is False
     assert stale.blocked_reason == BLOCKED_STALE_REPAIRED_HASH
 
-    unknown = _build_envelope(owner_id=1, novel_id=1, skill_version_id=1, input_hash="c" * 64)
+    unknown = _build_envelope(
+        owner_id=1, novel_id=1, skill_version_id=1, input_hash="c" * 64
+    )
     unknown["type"] = "mystery"
-    unknown["normalization"]["repaired_hash"] = canonical_content_hash(_strip_trail(unknown))
+    unknown["normalization"]["repaired_hash"] = canonical_content_hash(
+        _strip_trail(unknown)
+    )
     unknown["normalization"]["raw_hash"] = unknown["normalization"]["repaired_hash"]
     decision = evaluate_integrity(envelope=unknown, run=_fake_run())
     assert decision.ok is False

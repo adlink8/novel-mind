@@ -115,9 +115,7 @@ async def _seed(session: AsyncSession, suffix: str, chapter_count: int = 3) -> d
         await session.flush()
         chapter_ids.append(chapter.id)
         records.append(
-            ForkChapterRecord(
-                chapter_id=chapter.id, chapter_number=i, content=content
-            )
+            ForkChapterRecord(chapter_id=chapter.id, chapter_number=i, content=content)
         )
     snapshot_hash = compute_source_snapshot_hash(
         owner_id=user.id, novel_id=novel.id, chapters=tuple(records)
@@ -168,10 +166,12 @@ async def test_contamination_block_migration_round_trip(
     engine = create_async_engine(async_url(pg_async_url), echo=False)
     async with engine.begin() as conn:
         tables = set(
-            await conn.run_sync(lambda sync: sync.exec_driver_sql(
-                "SELECT table_name FROM information_schema.tables "
-                "WHERE table_schema='public'"
-            ).fetchall())
+            await conn.run_sync(
+                lambda sync: sync.exec_driver_sql(
+                    "SELECT table_name FROM information_schema.tables "
+                    "WHERE table_schema='public'"
+                ).fetchall()
+            )
         )
     await engine.dispose()
     assert ("canon_contamination_blocks",) not in tables
@@ -180,7 +180,9 @@ async def test_contamination_block_migration_round_trip(
     current = run_alembic("current", database_url=pg_sync_url)
     assert NEW_REVISION in current.stdout
     check = run_alembic("check", database_url=pg_sync_url)
-    assert check.returncode == 0, f"alembic check failed:\n{check.stdout}\n{check.stderr}"
+    assert check.returncode == 0, (
+        f"alembic check failed:\n{check.stdout}\n{check.stderr}"
+    )
 
 
 async def test_contamination_block_constraints(session_factory):
@@ -355,10 +357,7 @@ async def test_phase_gate_blocks_without_preflight(session_factory):
             expected_snapshot_hash=ids["snapshot_hash"],
         )
         assert result.verdict is PhaseGateVerdict.BLOCKED
-        assert (
-            result.blocked_reason
-            is ContaminationBlockedReason.MISSING_PREFLIGHT
-        )
+        assert result.blocked_reason is ContaminationBlockedReason.MISSING_PREFLIGHT
 
 
 async def test_phase_gate_candidate_when_clean_and_preflighted(session_factory):
@@ -388,9 +387,7 @@ async def test_phase_gate_publish_requires_approval(session_factory):
             approved=False,
         )
         assert unapproved.verdict is PhaseGateVerdict.BLOCKED
-        assert (
-            unapproved.blocked_reason is ContaminationBlockedReason.APPROVAL_REQUIRED
-        )
+        assert unapproved.blocked_reason is ContaminationBlockedReason.APPROVAL_REQUIRED
         approved = await gate.evaluate(
             owner_id=ids["owner_id"],
             novel_id=ids["novel_id"],
@@ -476,9 +473,7 @@ def test_phase_gate_never_touches_phase22_ledger():
         / "22-ci-nightly-gap-closure"
         / "22-VALIDATION.md"
     )
-    state = (
-        Path(__file__).resolve().parents[3] / ".planning" / "STATE.md"
-    )
+    state = Path(__file__).resolve().parents[3] / ".planning" / "STATE.md"
     ledger_before = ledger.read_text(encoding="utf-8") if ledger.is_file() else ""
     state_before = state.read_text(encoding="utf-8") if state.is_file() else ""
     # Running the pure gate never writes these files; the ledger still reflects

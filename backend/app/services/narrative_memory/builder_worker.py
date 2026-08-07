@@ -411,9 +411,7 @@ class NarrativeMemoryBuilderWorker:
                     leaf.model_dump(mode="json")
                     for leaf in input_package.evidence_leaves
                 ],
-                previous_context_summary=self._bounded_previous_context(
-                    input_package
-                ),
+                previous_context_summary=self._bounded_previous_context(input_package),
                 next_context_hint=self._safe_next_hint(input_package),
                 continuity_notes=(
                     f"source_snapshot:{version.source_snapshot_hash[:12]};"
@@ -512,9 +510,7 @@ class NarrativeMemoryBuilderWorker:
         except (UnknownPricing, BudgetExceeded) as exc:
             stage = await self._reload_stage(session, run_id, stage_key)
             if recovery is not None:
-                await recovery.pause_budget(
-                    run_id=run_id, stage=stage, exc=exc
-                )
+                await recovery.pause_budget(run_id=run_id, stage=stage, exc=exc)
             else:
                 await repo.mark_stage(
                     stage, status="paused_budget", reason=type(exc).__name__

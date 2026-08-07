@@ -404,9 +404,8 @@ def build_case_metrics(
         fallback_used=bool(artifact.get("fallback_used", False)),
         latency_ms=float(artifact.get("latency_ms") or 0),
         calls=int(artifact.get("calls") or 0),
-        tokens=int(artifact.get("input_tokens") or 0) + int(
-            artifact.get("output_tokens") or 0
-        ),
+        tokens=int(artifact.get("input_tokens") or 0)
+        + int(artifact.get("output_tokens") or 0),
         cost_usd=(
             float(artifact["cost_usd"])
             if artifact.get("cost_usd") is not None
@@ -457,13 +456,9 @@ def aggregate_bucket_metrics(
     }
     total_cit = sum(c.citation_total for c in cases)
     valid_cit = sum(c.citation_valid for c in cases)
-    out["citation_accept_rate"] = (
-        (valid_cit / total_cit) if total_cit > 0 else None
-    )
+    out["citation_accept_rate"] = (valid_cit / total_cit) if total_cit > 0 else None
 
-    non_answerable = [
-        c for c in cases if c.expected_answerability != "answerable"
-    ]
+    non_answerable = [c for c in cases if c.expected_answerability != "answerable"]
     out["abstention_rate"] = (
         _rate(sum(1 for c in non_answerable if c.abstained), len(non_answerable))
         if non_answerable
@@ -485,12 +480,8 @@ def aggregate_operations(
     """Run-level operations metrics over candidate + baseline cases."""
     latencies = [c.latency_ms for c in cases]
     out: dict[str, float | int | None] = {
-        "latency_p50_ms": (
-            percentile(latencies, 50) if latencies else None
-        ),
-        "latency_p95_ms": (
-            percentile(latencies, 95) if latencies else None
-        ),
+        "latency_p50_ms": (percentile(latencies, 50) if latencies else None),
+        "latency_p95_ms": (percentile(latencies, 95) if latencies else None),
         "cost_usd_total": _sum_or_none(c.cost_usd for c in cases),
         "calls_total": sum(c.calls for c in cases),
         "tokens_total": sum(c.tokens for c in cases),

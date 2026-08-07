@@ -124,7 +124,9 @@ class WorldModelGate:
                 )
         return None
 
-    def _spoiler_verdict(self, claim: EventClaim | CausalEdgeClaim) -> GateVerdict | None:
+    def _spoiler_verdict(
+        self, claim: EventClaim | CausalEdgeClaim
+    ) -> GateVerdict | None:
         if claim.disclosure_cutoff > self.disclosure_cutoff:
             return GateVerdict.reject(
                 GateReason.SPOILER_CUTOFF,
@@ -141,7 +143,9 @@ class WorldModelGate:
                 )
         return None
 
-    def _authority_verdict(self, claim: EventClaim | CausalEdgeClaim) -> GateVerdict | None:
+    def _authority_verdict(
+        self, claim: EventClaim | CausalEdgeClaim
+    ) -> GateVerdict | None:
         if (
             claim.authority == Authority.CANON_FACT
             and Authority.CANON_FACT not in self.approvals

@@ -269,9 +269,7 @@ class ExportManifestService:
         self._session = session
         self._storage = storage or AssetStorage(AssetStorage.default_storage_root())
 
-    async def freeze(
-        self, *, owner_id: int, novel_id: int
-    ) -> FrozenExport:
+    async def freeze(self, *, owner_id: int, novel_id: int) -> FrozenExport:
         """Freeze text/assets/anchors/citations/hashes once for the export.
 
         Reads only owner/novel-scoped rows (novel, chapters, published anchors,
@@ -317,9 +315,7 @@ class ExportManifestService:
                 )
             ).all()
         )
-        asset_revision_ids = {
-            anchor.published_asset_revision_id for anchor in anchors
-        }
+        asset_revision_ids = {anchor.published_asset_revision_id for anchor in anchors}
         asset_rows: dict[int, AssetRevision] = {}
         if asset_revision_ids:
             asset_rows = {
@@ -368,12 +364,8 @@ class ExportManifestService:
                 anchor for anchor in anchors if anchor.chapter_id == chapter.id
             ]
             entries: list[ExportAnchorEntry] = []
-            for anchor in sorted(
-                chapter_anchors, key=lambda a: (a.source_start, a.id)
-            ):
-                status, reason_code, detail = self._classify_anchor(
-                    anchor, content
-                )
+            for anchor in sorted(chapter_anchors, key=lambda a: (a.source_start, a.id)):
+                status, reason_code, detail = self._classify_anchor(anchor, content)
                 row = asset_rows.get(anchor.published_asset_revision_id)
                 asset_ref: ExportAssetRef | None = None
                 if row is not None:
@@ -521,9 +513,10 @@ class ExportManifestService:
                 "malformed_hash",
                 "anchor_hash and chapter_content_hash must be 64-hex hashes",
             )
-        if anchor.anchor_hash != hashlib.sha256(
-            anchor.excerpt.encode("utf-8")
-        ).hexdigest():
+        if (
+            anchor.anchor_hash
+            != hashlib.sha256(anchor.excerpt.encode("utf-8")).hexdigest()
+        ):
             return (
                 ExportAnchorStatus.INVALID,
                 "anchor_hash_mismatch",
@@ -547,10 +540,7 @@ class ExportManifestService:
                 "source_range_out_of_bounds",
                 "source span is outside the current chapter content",
             )
-        if (
-            chapter_content[anchor.source_start : anchor.source_end]
-            != anchor.excerpt
-        ):
+        if chapter_content[anchor.source_start : anchor.source_end] != anchor.excerpt:
             return (
                 ExportAnchorStatus.STALE,
                 "source_range_mismatch",

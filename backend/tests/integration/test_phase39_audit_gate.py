@@ -63,7 +63,6 @@ from tests.integration.conftest import reset_public_schema, run_alembic
 from tests.integration.test_derivative_export_preparation import (
     _approve_via_api,
     _confirm_via_api,
-    _evidence_refs,
     _freeze_and_finalize,
     _materialize_via_api,
     _set_up,
@@ -78,16 +77,12 @@ from app.services.derivative_export.snapshot import ExportSnapshotService
 pytestmark = pytest.mark.integration
 
 BRANCH_VALUE = "deriv-branch"
-AUDIT_BASE = (
-    "/api/novels/{novel_id}/derivative-projects/{project_id}/export/audit"
-)
+AUDIT_BASE = "/api/novels/{novel_id}/derivative-projects/{project_id}/export/audit"
 
 
 def _async_url(sync_url: str) -> str:
     if sync_url.startswith("postgresql+psycopg2://"):
-        return sync_url.replace(
-            "postgresql+psycopg2://", "postgresql+asyncpg://", 1
-        )
+        return sync_url.replace("postgresql+psycopg2://", "postgresql+asyncpg://", 1)
     return sync_url
 
 
@@ -142,7 +137,9 @@ async def api_client(runtime_factory, asset_storage):
     set_derivative_export_asset_storage(None)
 
 
-def _audit_evidence(kind: str = "package_buildable") -> tuple[DerivativeExportAuditEvidence, ...]:
+def _audit_evidence(
+    kind: str = "package_buildable",
+) -> tuple[DerivativeExportAuditEvidence, ...]:
     return (
         DerivativeExportAuditEvidence(
             kind=kind, location="backend/tests", detail="evidence present"
@@ -251,7 +248,9 @@ async def test_full_flow_lineage_is_independently_recomputable(
     view = await _approve_via_api(api_client, ids)
     approval_id = int(view["approval_request_id"])
     await _confirm_via_api(api_client, ids, approval_id)
-    materialized = (await _materialize_via_api(api_client, ids, approval_id=approval_id)).json()
+    materialized = (
+        await _materialize_via_api(api_client, ids, approval_id=approval_id)
+    ).json()
     assert materialized["status"] == "approved"
 
     async with runtime_factory() as session:
@@ -291,9 +290,7 @@ async def test_full_flow_lineage_is_independently_recomputable(
 
     # Independent recompute of the preparation hash matches the frozen lineage.
     async with runtime_factory() as session:
-        frozen = await ExportSnapshotService(
-            session, storage=asset_storage
-        ).build(
+        frozen = await ExportSnapshotService(session, storage=asset_storage).build(
             owner_id=ids["owner_id"],
             novel_id=ids["novel_id"],
             project_id=ids["project_id"],
@@ -342,10 +339,7 @@ async def test_final_report_carries_lineage_shipment_and_phase22_risk(
     # The independent lineage + REQ-SHIP-01 baseline are present and honest.
     assert report["lineage"]["checks"]
     assert report["shipment"]["items"]
-    assert any(
-        item["requirement"] == "tls"
-        for item in report["shipment"]["items"]
-    )
+    assert any(item["requirement"] == "tls" for item in report["shipment"]["items"])
     # No active pointer / promotion vocabulary anywhere in the report.
     for reason in report["blocked_reasons"]:
         assert "promote" not in reason and "production_ready" not in reason
@@ -448,11 +442,7 @@ async def test_orphaned_lineage_fails_closed_in_db_gate(
     assert "artifact_binding" in blocked
     assert "approval_binding" in blocked
     assert "materialization" in blocked
-    reasons = {
-        reason
-        for check in lineage.checks
-        for reason in check.blocked_reasons
-    }
+    reasons = {reason for check in lineage.checks for reason in check.blocked_reasons}
     assert "artifact_evidence_missing" in reasons
     assert "approval_evidence_missing" in reasons
     assert "bundle_evidence_missing" in reasons

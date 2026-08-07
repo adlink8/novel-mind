@@ -22,9 +22,7 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 # Divergence reason / approval note: the raw string reaches the service which
 # strips and rejects blanks with the stable ``missing_reason`` /
 # ``missing_approval`` codes; an empty string fails the wire schema first.
-ReasonStr = Annotated[
-    str, StringConstraints(min_length=1, max_length=4000)
-]
+ReasonStr = Annotated[str, StringConstraints(min_length=1, max_length=4000)]
 
 
 class StrictDerivativeOverrideModel(BaseModel):

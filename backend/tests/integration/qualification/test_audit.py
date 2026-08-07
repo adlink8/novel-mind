@@ -110,7 +110,10 @@ SCAN_FILES = tuple(
 # Code-level provider markers that must never appear in the qualified services.
 PROVIDER_MARKERS = ("litellm", "openai", "httpx", "asyncpg", "requests")
 
-LINEAGE = {"hierarchy_build_id": "b" * 64, "commit": "912ca6b423d6c2309bc2972cbfc083c4eaa280e1"}
+LINEAGE = {
+    "hierarchy_build_id": "b" * 64,
+    "commit": "912ca6b423d6c2309bc2972cbfc083c4eaa280e1",
+}
 
 
 def _repo_commit() -> str:
@@ -351,8 +354,14 @@ def _capability_violations() -> list[str]:
         (audit, ("audit_has_promotion_capability", "audit_has_provider_capability")),
         (runner, ("runner_has_promotion_capability", "runner_has_provider_capability")),
         (report, ("report_has_promotion_capability", "report_has_provider_capability")),
-        (metrics, ("metrics_has_promotion_capability", "metrics_has_provider_capability")),
-        (gold_set, ("gold_set_has_promotion_capability", "gold_set_has_forbidden_capability")),
+        (
+            metrics,
+            ("metrics_has_promotion_capability", "metrics_has_provider_capability"),
+        ),
+        (
+            gold_set,
+            ("gold_set_has_promotion_capability", "gold_set_has_forbidden_capability"),
+        ),
     ):
         for name in names:
             fn = getattr(module, name)
@@ -362,14 +371,20 @@ def _capability_violations() -> list[str]:
         verdict_has_provider_capability,
     )
 
-    checks.append(("verdict_has_promotion_capability", bool(verdict_has_promotion_capability())))
-    checks.append(("verdict_has_provider_capability", bool(verdict_has_provider_capability())))
+    checks.append(
+        ("verdict_has_promotion_capability", bool(verdict_has_promotion_capability()))
+    )
+    checks.append(
+        ("verdict_has_provider_capability", bool(verdict_has_provider_capability()))
+    )
     return [name for name, enabled in checks if enabled]
 
 
 def _word_search(marker: str, source: str) -> bool:
     return (
-        re.search(r"(?<![A-Za-z_0-9])" + re.escape(marker) + r"(?![A-Za-z_0-9])", source)
+        re.search(
+            r"(?<![A-Za-z_0-9])" + re.escape(marker) + r"(?![A-Za-z_0-9])", source
+        )
         is not None
     )
 
@@ -462,7 +477,9 @@ def _clean_browser() -> BrowserEvidence:
 def _audit(gold_set, report=None, manifest=None, browser=None, **overrides):
     baseline = overrides.pop(
         "baseline_manifest",
-        _consistent_manifest(gold_set.source_snapshot_hash) if manifest is not None else None,
+        _consistent_manifest(gold_set.source_snapshot_hash)
+        if manifest is not None
+        else None,
     )
     kwargs = dict(
         header=_header(gold_set),
@@ -492,9 +509,16 @@ def test_full_clean_audit_qualifies_candidate(gold_set):
     assert audit.checksum_valid
 
     statuses = {d.dimension: d.status for d in audit.dimensions}
-    assert statuses[AuditDimension.IMPLEMENTATION_READINESS] == AuditDimensionStatus.VERIFIED
-    assert statuses[AuditDimension.SAMPLE_DATA_COVERAGE] == AuditDimensionStatus.VERIFIED
-    assert statuses[AuditDimension.QUALITY_QUALIFICATION] == AuditDimensionStatus.VERIFIED
+    assert (
+        statuses[AuditDimension.IMPLEMENTATION_READINESS]
+        == AuditDimensionStatus.VERIFIED
+    )
+    assert (
+        statuses[AuditDimension.SAMPLE_DATA_COVERAGE] == AuditDimensionStatus.VERIFIED
+    )
+    assert (
+        statuses[AuditDimension.QUALITY_QUALIFICATION] == AuditDimensionStatus.VERIFIED
+    )
 
     # Phase 22 0/3 stays independent and never changes the NM verdict.
     assert audit.phase22.blocked is True
@@ -538,9 +562,12 @@ def test_audit_binds_header_lineage(gold_set):
     assert audit.header.schema_version and audit.header.config
     assert audit.header.budget
     # Report header lineage is bound to the audit header.
-    assert audit.dimensions[
-        list(AuditDimension).index(AuditDimension.QUALITY_QUALIFICATION)
-    ].status == AuditDimensionStatus.VERIFIED
+    assert (
+        audit.dimensions[
+            list(AuditDimension).index(AuditDimension.QUALITY_QUALIFICATION)
+        ].status
+        == AuditDimensionStatus.VERIFIED
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -593,7 +620,9 @@ def test_no_promotion_vocabulary_in_audit_report(gold_set):
     for dimension in audit.dimensions:
         for reason in dimension.blocked_reasons:
             for word in banned:
-                assert word not in reason, f"forbidden word in dimension reason: {reason}"
+                assert word not in reason, (
+                    f"forbidden word in dimension reason: {reason}"
+                )
     # No promotion/pointer field exists anywhere in the audit model surface.
     dump = audit.model_dump(mode="json")
     for field in ("promotion", "active_pointer", "current_version", "default_version"):
@@ -675,7 +704,9 @@ def test_header_source_snapshot_mismatch_blocks(gold_set):
 
 def test_missing_browser_evidence_blocks(gold_set):
     report, manifest = _clean_report(gold_set)
-    audit = _audit(gold_set, report=report, manifest=manifest, browser=BrowserEvidence())
+    audit = _audit(
+        gold_set, report=report, manifest=manifest, browser=BrowserEvidence()
+    )
     assert audit.verdict == "blocked"
     assert "browser_evidence_missing" in audit.blocked_reasons
 
@@ -779,7 +810,8 @@ def test_manifest_dimension_parity_mismatch_blocks(gold_set):
 def test_missing_dimension_kind_blocks_sample_data(gold_set):
     report, _ = _clean_report(gold_set)
     dims = [
-        d for d in _dimensions(gold_set.source_snapshot_hash)
+        d
+        for d in _dimensions(gold_set.source_snapshot_hash)
         if d.dimension != DimensionKind.WORLD
     ]
     partial_manifest = _manifest(*dims, snapshot=gold_set.source_snapshot_hash)
@@ -794,9 +826,7 @@ def test_blocked_reason_propagates_through_manifest_snapshot(gold_set):
     audit = _audit(gold_set, report=report, manifest=manifest)
 
     # Report snapshot preserved the blocked dimension with its stable reason.
-    snapshot_dims = {
-        d.dimension: d for d in report.manifest.dimensions
-    }
+    snapshot_dims = {d.dimension: d for d in report.manifest.dimensions}
     assert snapshot_dims["clue"].status == "blocked"
     assert snapshot_dims["clue"].blocked_reason == "clue_unavailable"
     assert snapshot_dims["world"].status == "blocked"

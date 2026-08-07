@@ -95,9 +95,7 @@ CHAPTER_2_TEXT = "第二章：剑客没有回答。林安握紧剑柄。"
 CHAPTER_3_TEXT = "第三章：两人并肩走出竹林。"
 
 
-def make_chapter(
-    chapter_id: int, chapter_number: int, content: str
-) -> ChapterRecord:
+def make_chapter(chapter_id: int, chapter_number: int, content: str) -> ChapterRecord:
     return ChapterRecord(
         chapter_id=chapter_id,
         chapter_number=chapter_number,
@@ -629,7 +627,9 @@ def test_no_evidence_forbids_factual_answer_blocks() -> None:
 
 
 @pytest.mark.asyncio
-async def test_consumer_view_exposes_partial_and_abstained_with_leaf_jump_only() -> None:
+async def test_consumer_view_exposes_partial_and_abstained_with_leaf_jump_only() -> (
+    None
+):
     source = make_source()
     ref = leaf_ref()
     dimensions = (
@@ -863,9 +863,9 @@ def test_retry_uses_original_frozen_manifest_checksum() -> None:
 
 def test_conversations_retry_contract_reuses_original_manifest() -> None:
     """Static contract scan: retry resumes the *original* frozen manifest by checksum."""
-    src = (BACKEND_ROOT / "app" / "services" / "reader_chat" / "conversations.py").read_text(
-        encoding="utf-8"
-    )
+    src = (
+        BACKEND_ROOT / "app" / "services" / "reader_chat" / "conversations.py"
+    ).read_text(encoding="utf-8")
     assert "original manifest" in src.lower() or "context_manifest_checksum" in src
     assert "manifest checksum mismatch" in src
     assert "retry_count" in src

@@ -27,10 +27,7 @@ from app.services.queryplan.schemas import (
 pytestmark = pytest.mark.unit
 
 FIXTURE_PATH = (
-    Path(__file__).resolve().parents[2]
-    / "fixtures"
-    / "queryplan"
-    / "questions_v1.json"
+    Path(__file__).resolve().parents[2] / "fixtures" / "queryplan" / "questions_v1.json"
 )
 MIGRATIONS_DIR = Path(__file__).resolve().parents[3] / "migrations" / "versions"
 MIGRATION_FILE = "20260801_2601_query_plan_trace.py"
@@ -218,9 +215,7 @@ def test_default_reading_progress_cutoff_and_availability_semantics():
 
 
 def test_whole_book_requires_explicit_authorized_switch():
-    denied = parse_query_plan(
-        reader_payload(question_text="全书的主角身份是什么？")
-    )
+    denied = parse_query_plan(reader_payload(question_text="全书的主角身份是什么？"))
     assert isinstance(denied, BlockedResult)
     assert denied.reason_code == BlockedReasonCode.WHOLE_BOOK_UNAUTHORIZED
 
@@ -281,7 +276,11 @@ def test_unknown_intent_rejected():
 def test_ambiguous_intent_rejected():
     reader_with_range = parse_query_plan(
         reader_payload(
-            chapter_range={"kind": "chapter_range", "chapter_start": 1, "chapter_end": 2}
+            chapter_range={
+                "kind": "chapter_range",
+                "chapter_start": 1,
+                "chapter_end": 2,
+            }
         )
     )
     assert isinstance(reader_with_range, BlockedResult)
@@ -301,9 +300,7 @@ def test_ambiguous_intent_rejected():
     assert isinstance(analysis_with_selection, BlockedResult)
     assert analysis_with_selection.reason_code == BlockedReasonCode.AMBIGUOUS_INTENT
 
-    analysis_without_range = parse_query_plan(
-        analysis_payload(chapter_range=None)
-    )
+    analysis_without_range = parse_query_plan(analysis_payload(chapter_range=None))
     assert isinstance(analysis_without_range, BlockedResult)
     assert analysis_without_range.reason_code == BlockedReasonCode.AMBIGUOUS_INTENT
 
@@ -325,7 +322,11 @@ def test_scope_escape_rejected():
 
     range_escape = parse_query_plan(
         analysis_payload(
-            chapter_range={"kind": "chapter_range", "chapter_start": 4, "chapter_end": 8}
+            chapter_range={
+                "kind": "chapter_range",
+                "chapter_start": 4,
+                "chapter_end": 8,
+            }
         )
     )
     assert isinstance(range_escape, BlockedResult)
@@ -408,7 +409,9 @@ def test_no_nm_promotion_or_active_pointer_in_plan():
     payload = plan.model_dump(mode="json", exclude={"trace"})
     lowered = json.dumps(payload).lower()
     for forbidden in ("active_pointer", "promotion", "current_revision", "cutover"):
-        assert forbidden not in lowered, f"forbidden field leaked into plan: {forbidden}"
+        assert forbidden not in lowered, (
+            f"forbidden field leaked into plan: {forbidden}"
+        )
 
 
 # ---------------------------------------------------------------------------

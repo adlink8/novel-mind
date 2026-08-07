@@ -362,7 +362,9 @@ def _find_speaker_before(text: str, quote_start: int) -> tuple[int, int, str] | 
     )
 
 
-def _find_speaker_after(text: str, quote_content_end: int) -> tuple[int, int, str] | None:
+def _find_speaker_after(
+    text: str, quote_content_end: int
+) -> tuple[int, int, str] | None:
     """Advisory speaker attribution from the text after a quoted span.
 
     ``quote_content_end`` is the index of the closing quote character; the
@@ -515,7 +517,10 @@ class SceneBoundaryService:
         match the frozen manifest hash. Any drift fails closed with a stable
         reason code before the set can reference it.
         """
-        if approved_visual_bible_revision_id is None and approved_visual_bible_revision_hash is None:
+        if (
+            approved_visual_bible_revision_id is None
+            and approved_visual_bible_revision_hash is None
+        ):
             return VisualBibleApprovalCheck(ok=True)
         if (approved_visual_bible_revision_id is None) != (
             approved_visual_bible_revision_hash is None

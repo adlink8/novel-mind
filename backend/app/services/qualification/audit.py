@@ -55,7 +55,6 @@ from app.services.narrative_memory.qualification_contracts import (
 )
 from app.services.qualification.gold_set import (
     GOLD_BUCKETS,
-    GoldBucket,
     ReadingQAGoldSet,
     curator_agreement,
     dataset_fingerprint,
@@ -245,9 +244,10 @@ class AuditReport(AuditFrozenModel):
 
     @property
     def checksum_valid(self) -> bool:
-        return self.checksum == hashlib.sha256(
-            self.checksum_payload().encode("utf-8")
-        ).hexdigest()
+        return (
+            self.checksum
+            == hashlib.sha256(self.checksum_payload().encode("utf-8")).hexdigest()
+        )
 
     @property
     def has_completion_percentage(self) -> bool:
@@ -659,8 +659,16 @@ def _audit_quality(
 
         h = report.header
         lineage_checks = (
-            ("report_source_snapshot_mismatch", h.source_snapshot, header.source_snapshot),
-            ("report_dataset_version_mismatch", h.dataset_version, header.dataset_version),
+            (
+                "report_source_snapshot_mismatch",
+                h.source_snapshot,
+                header.source_snapshot,
+            ),
+            (
+                "report_dataset_version_mismatch",
+                h.dataset_version,
+                header.dataset_version,
+            ),
             ("report_db_fingerprint_mismatch", h.db_fingerprint, header.db_fingerprint),
             ("report_commit_mismatch", h.commit, header.commit),
             ("report_model_mismatch", h.model, header.model),
@@ -678,7 +686,9 @@ def _audit_quality(
 
         if report.verdict == VERDICT_BLOCKED:
             blocking.append("report_verdict_blocked")
-            blocking.extend(f"report_reason:{reason}" for reason in report.blocked_reasons)
+            blocking.extend(
+                f"report_reason:{reason}" for reason in report.blocked_reasons
+            )
 
         bucket_kinds = {bucket.bucket for bucket in report.buckets}
         evidence.append(
@@ -715,11 +725,31 @@ def _audit_quality(
                 blocking.append("report_manifest_missing")
             else:
                 snapshot_checks = (
-                    ("report_manifest_snapshot_mismatch", snapshot.source_snapshot_hash, manifest.source_snapshot_hash),
-                    ("report_manifest_cutoff_mismatch", snapshot.cutoff, manifest.cutoff),
-                    ("report_manifest_owner_mismatch", snapshot.owner_id, manifest.owner_id),
-                    ("report_manifest_version_mismatch", snapshot.version_id, manifest.version_id),
-                    ("report_manifest_version_key_mismatch", snapshot.version_key, manifest.version_key),
+                    (
+                        "report_manifest_snapshot_mismatch",
+                        snapshot.source_snapshot_hash,
+                        manifest.source_snapshot_hash,
+                    ),
+                    (
+                        "report_manifest_cutoff_mismatch",
+                        snapshot.cutoff,
+                        manifest.cutoff,
+                    ),
+                    (
+                        "report_manifest_owner_mismatch",
+                        snapshot.owner_id,
+                        manifest.owner_id,
+                    ),
+                    (
+                        "report_manifest_version_mismatch",
+                        snapshot.version_id,
+                        manifest.version_id,
+                    ),
+                    (
+                        "report_manifest_version_key_mismatch",
+                        snapshot.version_key,
+                        manifest.version_key,
+                    ),
                 )
                 for code, actual, expected in snapshot_checks:
                     if actual != expected:

@@ -94,14 +94,12 @@ def _markdown_figure(entry: ExportAnchorEntry) -> str:
         src = f"assets/{asset_filename(entry.asset)}"
         alt = escape_text(entry.alt_text or entry.caption)
         caption = escape_text(entry.caption)
-        citation = (
-            f"引用：{escape_text(entry.citation)}" if entry.citation else ""
-        )
+        citation = f"引用：{escape_text(entry.citation)}" if entry.citation else ""
         return (
-            "<figure class=\"export-illustration\">"
+            '<figure class="export-illustration">'
             f'<img src="{src}" alt="{alt}"/>'
             "<figcaption>"
-            f"<span class=\"export-caption\">{caption}</span>"
+            f'<span class="export-caption">{caption}</span>'
             f'<span class="export-citation">{citation}</span>'
             "</figcaption></figure>"
         )

@@ -26,7 +26,6 @@ from app.services.export.html import (
     asset_filename,
     build_html_export,
     render_anchor_figure,
-    render_chapter_body,
     render_chapter_xhtml,
 )
 from app.services.export.manifest import (
@@ -36,7 +35,6 @@ from app.services.export.manifest import (
     ExportChapter,
     ExportManifestService,
     FrozenExport,
-    MissingAssetRecord,
     NovelExportManifest,
     novel_export_manifest_hash,
 )
@@ -267,7 +265,9 @@ def test_classify_invalid_when_db_status_invalid():
 
 
 def test_markdown_render_and_explicit_missing():
-    frozen = FrozenExport(_manifest(entry=_entry(status=ExportAnchorStatus.RENDER, asset=_asset())))
+    frozen = FrozenExport(
+        _manifest(entry=_entry(status=ExportAnchorStatus.RENDER, asset=_asset()))
+    )
     md = build_markdown(frozen).decode("utf-8")
     assert "# The Lantern Novel" in md
     assert "The lanterns flickered in the wind" in md
@@ -391,7 +391,7 @@ def test_render_anchor_figure_no_inner_html_injection():
     ).model_copy(
         update={
             "caption": "<script>alert(1)</script>",
-            "alt_text": "\"><img onerror=alert(2)>",
+            "alt_text": '"><img onerror=alert(2)>',
         }
     )
     html = render_anchor_figure(entry, lambda asset: "assets/x.png")

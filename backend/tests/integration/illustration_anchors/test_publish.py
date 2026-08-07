@@ -23,13 +23,16 @@ import pytest
 import pytest_asyncio
 from sqlalchemy import create_engine, func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.orm import Session, undefer
+from sqlalchemy.orm import Session
 from sqlalchemy.pool import NullPool
 
 from app.models import Chapter, Novel, User
 from app.models.agent_runtime import ApprovalRequest
 from app.models.illustration import AssetRevision
-from app.models.illustration_anchor import IllustrationAnchor, IllustrationAnchorProposal
+from app.models.illustration_anchor import (
+    IllustrationAnchor,
+    IllustrationAnchorProposal,
+)
 from app.models.illustration_job import IllustrationJob
 from app.schemas.illustration_anchor import AnchorStatus
 from app.services.agent_runtime.approvals import (
@@ -152,7 +155,9 @@ def _seed(sync_url: str, *, suffix: str) -> dict[str, Any]:
             approved_by="editor",
             canonical_payload={},
             canonical_payload_hash=HEX64,
-            idempotency_key=hashlib.sha256(f"asset-{suffix}".encode("utf-8")).hexdigest(),
+            idempotency_key=hashlib.sha256(
+                f"asset-{suffix}".encode("utf-8")
+            ).hexdigest(),
             projection_hash=HEX64,
             schema_version="illustration-asset.v1",
         )
@@ -287,7 +292,10 @@ async def test_publish_happy_path_creates_valid_anchor_and_manifest(
     )
     async with runtime_factory() as session:
         await confirm(
-            session, request_id=ids["approval_id"], owner_id=ids["owner_id"], mode="once"
+            session,
+            request_id=ids["approval_id"],
+            owner_id=ids["owner_id"],
+            mode="once",
         )
         await session.commit()
         anchor = await publish_anchor(
@@ -297,7 +305,10 @@ async def test_publish_happy_path_creates_valid_anchor_and_manifest(
             proposal_id=ids["proposal_id"],
         )
         manifest = await build_anchor_manifest(
-            session, owner_id=ids["owner_id"], novel_id=ids["novel_id"], anchor_id=anchor.id
+            session,
+            owner_id=ids["owner_id"],
+            novel_id=ids["novel_id"],
+            anchor_id=anchor.id,
         )
         await session.commit()
 
@@ -321,7 +332,12 @@ async def test_publish_happy_path_creates_valid_anchor_and_manifest(
     assert proposal.publish_manifest_hash == anchor.publish_manifest_hash
 
     # Published anchor is reader/export visible (reader-visible surface).
-    assert await _count_for_owner(runtime_factory, IllustrationAnchor, owner_id=ids["owner_id"]) == 1
+    assert (
+        await _count_for_owner(
+            runtime_factory, IllustrationAnchor, owner_id=ids["owner_id"]
+        )
+        == 1
+    )
 
 
 async def test_attach_illustration_to_text_action_publishes(
@@ -340,7 +356,9 @@ async def test_attach_illustration_to_text_action_publishes(
         await session.commit()
         approval_id = result.approval_request.id
         proposal_id = result.proposal.id
-        await confirm(session, request_id=approval_id, owner_id=ids["owner_id"], mode="once")
+        await confirm(
+            session, request_id=approval_id, owner_id=ids["owner_id"], mode="once"
+        )
         await session.commit()
         anchor = await publish_anchor(
             session,
@@ -353,16 +371,17 @@ async def test_attach_illustration_to_text_action_publishes(
     assert anchor.approval_request_id == approval_id
 
 
-async def test_publish_is_idempotent_replay(
-    runtime_factory, migrated_postgres: str
-):
+async def test_publish_is_idempotent_replay(runtime_factory, migrated_postgres: str):
     """Publishing an already-valid proposal replays the existing anchor."""
     ids = await _set_up(
         runtime_factory, migrated_postgres, suffix=f"id_{uuid.uuid4().hex[:6]}"
     )
     async with runtime_factory() as session:
         await confirm(
-            session, request_id=ids["approval_id"], owner_id=ids["owner_id"], mode="once"
+            session,
+            request_id=ids["approval_id"],
+            owner_id=ids["owner_id"],
+            mode="once",
         )
         await session.commit()
         first = await publish_anchor(
@@ -379,7 +398,12 @@ async def test_publish_is_idempotent_replay(
         )
         await session.commit()
     assert first.id == second.id
-    assert await _count_for_owner(runtime_factory, IllustrationAnchor, owner_id=ids["owner_id"]) == 1
+    assert (
+        await _count_for_owner(
+            runtime_factory, IllustrationAnchor, owner_id=ids["owner_id"]
+        )
+        == 1
+    )
 
 
 # ────────────────────────── adversarial paths (fail closed) ──────────────────────────
@@ -400,7 +424,12 @@ async def test_publish_rejects_pending_approval(
                 novel_id=ids["novel_id"],
                 proposal_id=ids["proposal_id"],
             )
-    assert await _count_for_owner(runtime_factory, IllustrationAnchor, owner_id=ids["owner_id"]) == 0
+    assert (
+        await _count_for_owner(
+            runtime_factory, IllustrationAnchor, owner_id=ids["owner_id"]
+        )
+        == 0
+    )
 
 
 async def test_publish_rejects_rejected_approval(
@@ -411,9 +440,7 @@ async def test_publish_rejects_rejected_approval(
         runtime_factory, migrated_postgres, suffix=f"rej_{uuid.uuid4().hex[:6]}"
     )
     async with runtime_factory() as session:
-        await reject(
-            session, request_id=ids["approval_id"], owner_id=ids["owner_id"]
-        )
+        await reject(session, request_id=ids["approval_id"], owner_id=ids["owner_id"])
         await session.commit()
     with pytest.raises(AnchorPublishError) as exc:
         async with runtime_factory() as session:
@@ -424,7 +451,12 @@ async def test_publish_rejects_rejected_approval(
                 proposal_id=ids["proposal_id"],
             )
     assert "rejected" in str(exc.value)
-    assert await _count_for_owner(runtime_factory, IllustrationAnchor, owner_id=ids["owner_id"]) == 0
+    assert (
+        await _count_for_owner(
+            runtime_factory, IllustrationAnchor, owner_id=ids["owner_id"]
+        )
+        == 0
+    )
 
 
 async def test_publish_rejects_expired_approval(
@@ -448,7 +480,12 @@ async def test_publish_rejects_expired_approval(
                 proposal_id=ids["proposal_id"],
             )
     assert "expired" in str(exc.value)
-    assert await _count_for_owner(runtime_factory, IllustrationAnchor, owner_id=ids["owner_id"]) == 0
+    assert (
+        await _count_for_owner(
+            runtime_factory, IllustrationAnchor, owner_id=ids["owner_id"]
+        )
+        == 0
+    )
 
 
 async def test_publish_rejects_cancelled_approval(
@@ -471,7 +508,12 @@ async def test_publish_rejects_cancelled_approval(
                 proposal_id=ids["proposal_id"],
             )
     assert "cancelled" in str(exc.value)
-    assert await _count_for_owner(runtime_factory, IllustrationAnchor, owner_id=ids["owner_id"]) == 0
+    assert (
+        await _count_for_owner(
+            runtime_factory, IllustrationAnchor, owner_id=ids["owner_id"]
+        )
+        == 0
+    )
 
 
 async def test_publish_rejects_payload_hash_drift(
@@ -483,7 +525,10 @@ async def test_publish_rejects_payload_hash_drift(
     )
     async with runtime_factory() as session:
         await confirm(
-            session, request_id=ids["approval_id"], owner_id=ids["owner_id"], mode="once"
+            session,
+            request_id=ids["approval_id"],
+            owner_id=ids["owner_id"],
+            mode="once",
         )
         approval = await session.get(ApprovalRequest, ids["approval_id"])
         approval.payload_hash = "c" * 64  # forged replay hash
@@ -497,7 +542,12 @@ async def test_publish_rejects_payload_hash_drift(
                 proposal_id=ids["proposal_id"],
             )
     assert "payload hash" in str(exc.value)
-    assert await _count_for_owner(runtime_factory, IllustrationAnchor, owner_id=ids["owner_id"]) == 0
+    assert (
+        await _count_for_owner(
+            runtime_factory, IllustrationAnchor, owner_id=ids["owner_id"]
+        )
+        == 0
+    )
 
 
 async def test_publish_rejects_wrong_owner_scope(
@@ -516,7 +566,12 @@ async def test_publish_rejects_wrong_owner_scope(
                 proposal_id=ids["proposal_id"],
             )
     assert "not found" in str(exc.value)
-    assert await _count_for_owner(runtime_factory, IllustrationAnchor, owner_id=ids["owner_id"]) == 0
+    assert (
+        await _count_for_owner(
+            runtime_factory, IllustrationAnchor, owner_id=ids["owner_id"]
+        )
+        == 0
+    )
 
 
 async def test_publish_rejects_stale_chapter_revision(
@@ -530,7 +585,10 @@ async def test_publish_rejects_stale_chapter_revision(
 
     async with runtime_factory() as session:
         await confirm(
-            session, request_id=ids["approval_id"], owner_id=ids["owner_id"], mode="once"
+            session,
+            request_id=ids["approval_id"],
+            owner_id=ids["owner_id"],
+            mode="once",
         )
         # Edit the chapter content in place (text authority changed).
         await session.execute(
@@ -554,7 +612,12 @@ async def test_publish_rejects_stale_chapter_revision(
     # Stale revision fails closed at the deterministic gate (never relocated).
     assert "gate blocked" in str(exc.value)
     assert "chapter_content_hash" in str(exc.value)
-    assert await _count_for_owner(runtime_factory, IllustrationAnchor, owner_id=ids["owner_id"]) == 0
+    assert (
+        await _count_for_owner(
+            runtime_factory, IllustrationAnchor, owner_id=ids["owner_id"]
+        )
+        == 0
+    )
 
 
 async def test_create_proposal_rejects_unapproved_asset(
@@ -568,7 +631,9 @@ async def test_create_proposal_rejects_unapproved_asset(
 
     async with runtime_factory() as session:
         await session.execute(
-            text("UPDATE asset_revisions SET approval_state = 'candidate' WHERE id = :id"),
+            text(
+                "UPDATE asset_revisions SET approval_state = 'candidate' WHERE id = :id"
+            ),
             {"id": ids["asset_id"]},
         )
         await session.commit()
@@ -581,8 +646,18 @@ async def test_create_proposal_rejects_unapproved_asset(
                 request=_request(ids),
                 action="publish_illustration",
             )
-    assert await _count_for_owner(runtime_factory, IllustrationAnchorProposal, owner_id=ids["owner_id"]) == 0
-    assert await _count_for_owner(runtime_factory, ApprovalRequest, owner_id=ids["owner_id"]) == 0
+    assert (
+        await _count_for_owner(
+            runtime_factory, IllustrationAnchorProposal, owner_id=ids["owner_id"]
+        )
+        == 0
+    )
+    assert (
+        await _count_for_owner(
+            runtime_factory, ApprovalRequest, owner_id=ids["owner_id"]
+        )
+        == 0
+    )
 
 
 async def test_create_proposal_rejects_wrong_branch_scope(
@@ -612,8 +687,18 @@ async def test_create_proposal_rejects_wrong_branch_scope(
                 request=_request(ids, branch=None, fork="fork-1"),
                 action="publish_illustration",
             )
-    assert await _count_for_owner(runtime_factory, IllustrationAnchorProposal, owner_id=ids["owner_id"]) == 0
-    assert await _count_for_owner(runtime_factory, ApprovalRequest, owner_id=ids["owner_id"]) == 0
+    assert (
+        await _count_for_owner(
+            runtime_factory, IllustrationAnchorProposal, owner_id=ids["owner_id"]
+        )
+        == 0
+    )
+    assert (
+        await _count_for_owner(
+            runtime_factory, ApprovalRequest, owner_id=ids["owner_id"]
+        )
+        == 0
+    )
 
 
 async def test_create_proposal_derivative_mode_success(
@@ -635,7 +720,12 @@ async def test_create_proposal_derivative_mode_success(
     assert result.proposal.canonical_payload["authority_space"] == "derivative"
     assert result.proposal.canonical_payload["branch"] == "deriv-branch"
     assert result.proposal.canonical_payload["fork"] == "fork-1"
-    assert await _count_for_owner(runtime_factory, IllustrationAnchorProposal, owner_id=ids["owner_id"]) == 1
+    assert (
+        await _count_for_owner(
+            runtime_factory, IllustrationAnchorProposal, owner_id=ids["owner_id"]
+        )
+        == 1
+    )
 
 
 async def test_create_proposal_replays_existing_under_same_action(
@@ -663,8 +753,18 @@ async def test_create_proposal_replays_existing_under_same_action(
     assert second.replayed is True
     assert second.proposal.id == first.proposal.id
     assert second.approval_request.id == first.approval_request.id
-    assert await _count_for_owner(runtime_factory, IllustrationAnchorProposal, owner_id=ids["owner_id"]) == 1
-    assert await _count_for_owner(runtime_factory, ApprovalRequest, owner_id=ids["owner_id"]) == 1
+    assert (
+        await _count_for_owner(
+            runtime_factory, IllustrationAnchorProposal, owner_id=ids["owner_id"]
+        )
+        == 1
+    )
+    assert (
+        await _count_for_owner(
+            runtime_factory, ApprovalRequest, owner_id=ids["owner_id"]
+        )
+        == 1
+    )
 
 
 async def test_proposal_append_only_content_is_immutable(

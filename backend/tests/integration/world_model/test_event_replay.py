@@ -49,12 +49,19 @@ from app.services.world_model.gates import WorldModelGate, build_candidate
 pytestmark = pytest.mark.integration
 
 FIXTURE = json.loads(
-    (Path(__file__).resolve().parents[2] / "fixtures" / "world_model" / "events_v1.json")
-    .read_text(encoding="utf-8")
+    (
+        Path(__file__).resolve().parents[2]
+        / "fixtures"
+        / "world_model"
+        / "events_v1.json"
+    ).read_text(encoding="utf-8")
 )
 
-MIGRATION_PATH = Path(__file__).resolve().parents[3] / "migrations" / "versions" / (
-    "20260801_2701_world_event_projection.py"
+MIGRATION_PATH = (
+    Path(__file__).resolve().parents[3]
+    / "migrations"
+    / "versions"
+    / ("20260801_2701_world_event_projection.py")
 )
 
 HEX_A = "a" * 64
@@ -167,7 +174,9 @@ async def make_engine_and_factory(tmp_path, db_name: str = "world_model.db"):
     return engine, factory
 
 
-def assert_projection_matches(actual: WorldModelCandidateProjection, expected: WorldModelCandidateProjection) -> None:
+def assert_projection_matches(
+    actual: WorldModelCandidateProjection, expected: WorldModelCandidateProjection
+) -> None:
     assert actual.projection_hash == expected.projection_hash
     assert actual.owner_id == expected.owner_id
     assert actual.novel_id == expected.novel_id
@@ -225,9 +234,15 @@ async def test_restart_replay_is_byte_equivalent(tmp_path):
         repo = WorldModelEventRepository(session)
         await repo.append_projection(projection)
         await session.commit()
-        event_count = await session.scalar(select(func.count()).select_from(WorldModelEvent))
-        edge_count = await session.scalar(select(func.count()).select_from(WorldModelCausalEdge))
-        conflict_count = await session.scalar(select(func.count()).select_from(WorldModelConflict))
+        event_count = await session.scalar(
+            select(func.count()).select_from(WorldModelEvent)
+        )
+        edge_count = await session.scalar(
+            select(func.count()).select_from(WorldModelCausalEdge)
+        )
+        conflict_count = await session.scalar(
+            select(func.count()).select_from(WorldModelConflict)
+        )
 
     await engine.dispose()
     engine2, factory2 = await make_engine_and_factory(tmp_path)
@@ -246,8 +261,13 @@ async def test_restart_replay_is_byte_equivalent(tmp_path):
         # Idempotent re-append (same content) replays; no duplicate rows.
         await repo2.append_projection(projection)
         await session.flush()
-        assert await session.scalar(select(func.count()).select_from(WorldModelEvent)) == 4
-        assert await session.scalar(select(func.count()).select_from(WorldModelCausalEdge)) == 2
+        assert (
+            await session.scalar(select(func.count()).select_from(WorldModelEvent)) == 4
+        )
+        assert (
+            await session.scalar(select(func.count()).select_from(WorldModelCausalEdge))
+            == 2
+        )
 
         # Version lineage is queryable.
         assert await repo2.list_versions(owner_id=1, novel_id=1) == [1]
@@ -313,9 +333,7 @@ def test_repository_exposes_no_update_api():
     """Immutability: no UPDATE / DELETE / promote path (D-14)."""
     members = {
         name
-        for name, _ in inspect.getmembers(
-            WorldModelEventRepository, predicate=callable
-        )
+        for name, _ in inspect.getmembers(WorldModelEventRepository, predicate=callable)
     }
     assert not {m for m in members if m.startswith(("update", "delete", "promote"))}
     assert "append_projection" in members
@@ -329,9 +347,7 @@ async def test_tampered_row_checksum_fails_closed(tmp_path):
         await WorldModelEventRepository(session).append_projection(
             build_valid_projection(version_id=1)
         )
-        row = (
-            await session.scalars(select(WorldModelEvent).limit(1))
-        ).first()
+        row = (await session.scalars(select(WorldModelEvent).limit(1))).first()
         row.canonical_payload_hash = "0" * 64  # tamper (test-only; no update API)
         await session.flush()
         with pytest.raises(WorldModelRepositoryError):
@@ -402,9 +418,7 @@ async def test_query_returns_evidence_lineage_and_conflicts(tmp_path):
         assert event.source_refs[0].evidence_id == "ev-treaty2"
         assert event.source_refs[0].source_snapshot_hash == "c" * 64
 
-        conflicts = await queries.query_conflicts(
-            owner_id=1, novel_id=1, version_id=2
-        )
+        conflicts = await queries.query_conflicts(owner_id=1, novel_id=1, version_id=2)
         assert [c.kind for c in conflicts] == [ConflictKind.TEMPORAL_CONFLICT]
 
         at_cutoff = await queries.query_cutoff_projection(

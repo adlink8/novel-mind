@@ -279,7 +279,9 @@ async def _stream_completion(payload: GatewayChatRequest):
                         {
                             "index": 0,
                             "delta": {},
-                            "finish_reason": "tool_calls" if tool_calls_sent else "stop",
+                            "finish_reason": "tool_calls"
+                            if tool_calls_sent
+                            else "stop",
                         }
                     ],
                 },

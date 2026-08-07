@@ -186,8 +186,7 @@ class EpistemicQueryEngine:
         rows = [
             claim
             for claim in self._scope(owner_id=owner_id, novel_id=novel_id)
-            if claim.knowledge_key == knowledge_key
-            or knowledge_key in claim.lineage
+            if claim.knowledge_key == knowledge_key or knowledge_key in claim.lineage
         ]
         rows.sort(
             key=lambda claim: (claim.version_id, claim.known_at, claim.knowledge_key)
@@ -232,12 +231,12 @@ class EpistemicQueryEngine:
         ``user_interpretation`` claims are isolated into ``overrides`` (D-06)
         and never merged with the original candidate projection.
         """
-        claims = self._scope(owner_id=owner_id, novel_id=novel_id, version_id=version_id)
+        claims = self._scope(
+            owner_id=owner_id, novel_id=novel_id, version_id=version_id
+        )
         if authorities is not None:
             claims = [claim for claim in claims if claim.authority in authorities]
-        visible = [
-            claim for claim in claims if visible_at_cutoff(claim, cutoff, pov)
-        ]
+        visible = [claim for claim in claims if visible_at_cutoff(claim, cutoff, pov)]
         candidates = [
             claim
             for claim in visible
@@ -291,12 +290,8 @@ class EpistemicQueryEngine:
                 subject,
                 "no knowledge at this cutoff/POV — abstaining, nothing fabricated",
             )
-        approved = [
-            claim for claim in claims if claim.gate_status == GateStatus.PASSED
-        ]
-        evidence = tuple(
-            ref for claim in claims for ref in claim.source_refs
-        )
+        approved = [claim for claim in claims if claim.gate_status == GateStatus.PASSED]
+        evidence = tuple(ref for claim in claims for ref in claim.source_refs)
         status = (
             KnowledgeResultStatus.ANSWERED
             if approved
@@ -426,8 +421,7 @@ async def world_projection_reader(
     novel_id = claims[0].novel_id
     if owner_id != context.owner_id or novel_id != context.novel_id:
         raise WorldProjectionUnavailableError(
-            "world projection claims escape the reader scope "
-            "(owner/novel boundary)"
+            "world projection claims escape the reader scope (owner/novel boundary)"
         )
     answer = EpistemicQueryEngine(claims).query_world_projection(
         owner_id=owner_id,
@@ -446,12 +440,10 @@ async def world_projection_reader(
             refs=(),
         )
     items = tuple(
-        claim_to_world_projection_item(claim, kind=kind)
-        for claim in answer.items
+        claim_to_world_projection_item(claim, kind=kind) for claim in answer.items
     )
     overrides = tuple(
-        claim_to_world_projection_item(claim, kind=kind)
-        for claim in answer.overrides
+        claim_to_world_projection_item(claim, kind=kind) for claim in answer.overrides
     )
     passed_refs: dict[tuple[int, int, int, str], QueryPlanEvidenceRef] = {}
     for claim in answer.items:

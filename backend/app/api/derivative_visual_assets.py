@@ -53,7 +53,6 @@ from app.services.derivative_visual.assets import (
     DerivativeCandidateConflict,
     DerivativeCandidateScopeError,
     apply_derivative_asset_review,
-    load_candidate,
     store_derivative_candidate_asset,
 )
 from app.services.derivative_visual.published_assets import (
@@ -340,9 +339,7 @@ async def review_derivative_visual_candidate(
         raise _not_found() from None
     except DerivativeAssetReviewError as exc:
         raise _conflict(str(exc)) from exc
-    return DerivativeAssetReviewResponse(
-        asset=await derivative_asset_view(db, row)
-    )
+    return DerivativeAssetReviewResponse(asset=await derivative_asset_view(db, row))
 
 
 async def load_candidate_by_asset_id(

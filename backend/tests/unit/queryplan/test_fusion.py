@@ -176,9 +176,7 @@ def test_single_source_baseline_reproduces_dimension_exactly():
         make_ref(chapter_number=1, start=0, end=10),
     )
     result = make_available(RAW, refs)
-    fused = fuse_dimension_results(
-        [result], source=make_source(), through_chapter=3
-    )
+    fused = fuse_dimension_results([result], source=make_source(), through_chapter=3)
     assert fused.status == AvailabilityStatus.AVAILABLE
     assert fused.reason == "all_dimensions_available"
     assert fused.evidence_count == 2
@@ -196,7 +194,9 @@ def test_single_source_baseline_reproduces_dimension_exactly():
 
 def test_fusion_is_deterministic():
     refs = (make_ref(), make_ref(chapter_number=2, start=5, end=15))
-    kwargs = dict(results=[make_available(RAW, refs)], source=make_source(), through_chapter=3)
+    kwargs = dict(
+        results=[make_available(RAW, refs)], source=make_source(), through_chapter=3
+    )
     first = fuse_dimension_results(**kwargs)
     second = fuse_dimension_results(**kwargs)
     assert first == second
@@ -243,9 +243,7 @@ def test_dimension_set_change_is_explainable_and_reversible():
         (2, 5, 15, HEX_B),
         (3, 0, 12, HEX_OTHER),
     ]
-    merged = next(
-        fe for fe in combined.fused_evidence if fe.ref.content_hash == HEX_B
-    )
+    merged = next(fe for fe in combined.fused_evidence if fe.ref.content_hash == HEX_B)
     assert merged.dimensions == (RAW, REL)
     assert merged.provenance == ("exact_reader_v1", "exact_reader_v2")
     assert merged.stages == ("exact_reader",)

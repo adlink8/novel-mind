@@ -129,7 +129,9 @@ async def test_migration_normalises_old_rows(empty_postgres: str, pg_async_url: 
         # Upgrade to head: old rows must survive and be normalised.
         run_alembic("upgrade", "head", database_url=empty_postgres)
         engine = create_async_engine(pg_async_url, pool_pre_ping=True)
-        factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+        factory = async_sessionmaker(
+            engine, class_=AsyncSession, expire_on_commit=False
+        )
         async with factory() as session:
             stage = await session.scalar(
                 select(NarrativeMemoryBuildStage).where(
@@ -147,9 +149,7 @@ async def test_migration_normalises_old_rows(empty_postgres: str, pg_async_url: 
             assert run.last_error_code is None
             # Checkpoint table exists and is empty.
             count = await session.scalar(
-                select(text("count(*)")).select_from(
-                    NarrativeMemoryBuildCheckpoint
-                )
+                select(text("count(*)")).select_from(NarrativeMemoryBuildCheckpoint)
             )
             assert int(count or 0) == 0
     finally:
@@ -274,13 +274,8 @@ async def test_crash_recovery_resumes_only_affected_stage(builder_env) -> None:
         stages = await _run_chapter_stages(builder_env["factory"], run_id)
         by_key = {s.stage_key: s for s in stages}
         assert by_key["chapter_state:2"].status == "failed"
-        assert (
-            by_key["chapter_state:2"].terminal_state == TerminalState.ISOLATED.value
-        )
-        assert (
-            by_key["chapter_state:2"].reason_code
-            == ReasonCode.INTERNAL_ERROR.value
-        )
+        assert by_key["chapter_state:2"].terminal_state == TerminalState.ISOLATED.value
+        assert by_key["chapter_state:2"].reason_code == ReasonCode.INTERNAL_ERROR.value
         assert by_key["chapter_state:1"].status == "completed"
 
     def _chapter_calls() -> int:
@@ -313,9 +308,7 @@ async def test_crash_recovery_resumes_only_affected_stage(builder_env) -> None:
         by_key = {s.stage_key: s for s in stages}
         # The requeued chapter recovered to completed; siblings untouched.
         assert by_key["chapter_state:2"].status == "completed"
-        assert (
-            by_key["chapter_state:2"].terminal_state == TerminalState.COMPLETED.value
-        )
+        assert by_key["chapter_state:2"].terminal_state == TerminalState.COMPLETED.value
         assert by_key["chapter_state:1"].status == "completed"
         assert by_key["chapter_state:3"].status == "completed"
         # Only the requeued chapter re-ran on resume (no whole-book restart).
@@ -400,9 +393,7 @@ async def test_chapter_failure_blocks_dependents_not_whole_book(builder_env) -> 
         )
         # Completed sibling is never rewound.
         assert by_key["chapter_state:1"].status == "completed"
-        assert (
-            by_key["chapter_state:1"].terminal_state == TerminalState.COMPLETED.value
-        )
+        assert by_key["chapter_state:1"].terminal_state == TerminalState.COMPLETED.value
 
 
 # ---------------------------------------------------------------------------

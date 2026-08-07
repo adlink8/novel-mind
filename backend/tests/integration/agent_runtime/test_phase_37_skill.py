@@ -33,7 +33,6 @@ Adversarial paths (all stable blocked/cancelled with zero authoritative writes):
 
 from __future__ import annotations
 
-import hashlib
 import uuid
 from typing import Any
 
@@ -389,9 +388,7 @@ async def _count(
             )
         return int(
             await session.scalar(
-                select(func.count())
-                .select_from(model)
-                .where(model.run_id == run_id)  # type: ignore[attr-defined]
+                select(func.count()).select_from(model).where(model.run_id == run_id)  # type: ignore[attr-defined]
             )
             or 0
         )
@@ -440,7 +437,9 @@ async def _count_forks(factory, *, owner_id: int) -> int:
     async with factory() as session:
         return int(
             await session.scalar(
-                select(func.count()).select_from(CanonFork).where(CanonFork.owner_id == owner_id)
+                select(func.count())
+                .select_from(CanonFork)
+                .where(CanonFork.owner_id == owner_id)
             )
             or 0
         )
@@ -561,7 +560,10 @@ def _build_envelope(
 
 
 def _divergence_params(
-    ctx: dict[str, Any], *, reason: str = "the twist requires the hero to know the secret early", **overrides: Any
+    ctx: dict[str, Any],
+    *,
+    reason: str = "the twist requires the hero to know the secret early",
+    **overrides: Any,
 ) -> dict[str, Any]:
     base: dict[str, Any] = {
         "branch": ctx["branch"],
@@ -786,7 +788,9 @@ async def _set_up(
         owner_id=ids["owner_id"],
         novel_id=ids["novel_id"],
         contract=_skill_contract(
-            novel_id=ids["novel_id"], name="continue-derivative-story", tools=DEFAULT_TOOLS
+            novel_id=ids["novel_id"],
+            name="continue-derivative-story",
+            tools=DEFAULT_TOOLS,
         ),
     )
 
@@ -928,7 +932,10 @@ async def test_phase37_clean_candidate_draft_artifact_and_disabled_branch_sugges
     frozen_manifest = {"evidence_refs": [CANDIDATE_EVIDENCE_1]}
     envelope = _build_envelope(ctx, candidate=ctx["candidate"])
     outcome = await _finalize(
-        runtime_factory, run_id=run_id, envelope=envelope, frozen_manifest=frozen_manifest
+        runtime_factory,
+        run_id=run_id,
+        envelope=envelope,
+        frozen_manifest=frozen_manifest,
     )
     assert outcome.status == "completed", outcome.status_reason
     assert outcome.artifact_id is not None
@@ -1038,7 +1045,10 @@ async def test_phase37_divergence_approval_revalidate_publish_sequence(
     frozen_manifest = {"evidence_refs": [CANDIDATE_EVIDENCE_1]}
     envelope = _build_envelope(ctx, candidate=ctx["candidate"])
     outcome = await _finalize(
-        runtime_factory, run_id=run_id, envelope=envelope, frozen_manifest=frozen_manifest
+        runtime_factory,
+        run_id=run_id,
+        envelope=envelope,
+        frozen_manifest=frozen_manifest,
     )
     assert outcome.status == "completed", outcome.status_reason
     async with runtime_factory() as session:
@@ -1050,7 +1060,12 @@ async def test_phase37_divergence_approval_revalidate_publish_sequence(
 
     # 用户 Web 确认 allow_divergence approval。
     async with runtime_factory() as session:
-        await confirm(session, request_id=divergence_approval_id, owner_id=ctx["owner_id"], mode="once")
+        await confirm(
+            session,
+            request_id=divergence_approval_id,
+            owner_id=ctx["owner_id"],
+            mode="once",
+        )
         await session.commit()
 
     # 独立 publish approval（revalidation 通过 + 相同 hash 绑定）。
@@ -1065,7 +1080,9 @@ async def test_phase37_divergence_approval_revalidate_publish_sequence(
         )
         await session.commit()
     assert publish_view["candidate_only"] is True
-    assert publish_view["approval_action"] == PUBLISH_DERIVATIVE_REVISION_APPROVAL_ACTION
+    assert (
+        publish_view["approval_action"] == PUBLISH_DERIVATIVE_REVISION_APPROVAL_ACTION
+    )
     assert publish_view["approval_status"] == "pending"
     assert publish_view["divergence_approval_id"] == divergence_approval_id
     assert publish_view["divergence_approval_status"] == "approved"
@@ -1075,7 +1092,12 @@ async def test_phase37_divergence_approval_revalidate_publish_sequence(
 
     # 用户 Web 确认独立 publish approval → 确定性 publisher 物化。
     async with runtime_factory() as session:
-        await confirm(session, request_id=publish_approval_id, owner_id=ctx["owner_id"], mode="once")
+        await confirm(
+            session,
+            request_id=publish_approval_id,
+            owner_id=ctx["owner_id"],
+            mode="once",
+        )
         result = await consume_publish_approval(
             session,
             owner_id=ctx["owner_id"],
@@ -1158,15 +1180,15 @@ async def test_phase37_http_action_routes_wired(
     )
 
 
-async def test_phase37_cancellation_no_write(
-    runtime_factory, migrated_postgres: str
-):
+async def test_phase37_cancellation_no_write(runtime_factory, migrated_postgres: str):
     """取消 → cancelled，0 artifact/revision/ApprovalRequest（cancel-without-write）。"""
     ctx = await _set_up(
         runtime_factory,
         migrated_postgres,
         suffix=f"cancel_{uuid.uuid4().hex[:6]}",
-        candidate_content=build_candidate_json(draft=CLEAN_DRAFT, citations=[CANDIDATE_EVIDENCE_1]),
+        candidate_content=build_candidate_json(
+            draft=CLEAN_DRAFT, citations=[CANDIDATE_EVIDENCE_1]
+        ),
     )
     run_id = await _create_run(
         runtime_factory,
@@ -1199,7 +1221,9 @@ async def test_phase37_wrong_owner_lineage_blocks(
         runtime_factory,
         migrated_postgres,
         suffix=f"own_{uuid.uuid4().hex[:6]}",
-        candidate_content=build_candidate_json(draft=CLEAN_DRAFT, citations=[CANDIDATE_EVIDENCE_1]),
+        candidate_content=build_candidate_json(
+            draft=CLEAN_DRAFT, citations=[CANDIDATE_EVIDENCE_1]
+        ),
     )
     envelope = _build_envelope(
         ctx,
@@ -1226,12 +1250,16 @@ async def test_phase37_wrong_skill_version_lineage_blocks(
         runtime_factory,
         migrated_postgres,
         suffix=f"ver_{uuid.uuid4().hex[:6]}",
-        candidate_content=build_candidate_json(draft=CLEAN_DRAFT, citations=[CANDIDATE_EVIDENCE_1]),
+        candidate_content=build_candidate_json(
+            draft=CLEAN_DRAFT, citations=[CANDIDATE_EVIDENCE_1]
+        ),
     )
     envelope = _build_envelope(
         ctx,
         candidate=ctx["candidate"],
-        mutate=lambda e: e.__setitem__("skill_version_id", ctx["skill_version_id"] + 999),
+        mutate=lambda e: e.__setitem__(
+            "skill_version_id", ctx["skill_version_id"] + 999
+        ),
     )
     outcome = await _finalize(
         runtime_factory,
@@ -1240,19 +1268,22 @@ async def test_phase37_wrong_skill_version_lineage_blocks(
         frozen_manifest={"evidence_refs": [CANDIDATE_EVIDENCE_1]},
     )
     assert outcome.status == "failed"
-    assert outcome.status_reason is not None and "skill_version_id" in outcome.status_reason
+    assert (
+        outcome.status_reason is not None
+        and "skill_version_id" in outcome.status_reason
+    )
     await _assert_zero_writes(runtime_factory, run_id=ctx["run_id"])
 
 
-async def test_phase37_stale_input_hash_blocks(
-    runtime_factory, migrated_postgres: str
-):
+async def test_phase37_stale_input_hash_blocks(runtime_factory, migrated_postgres: str):
     """envelope input_hash 与 run 不符（stale）→ blocked，零写入。"""
     ctx = await _set_up(
         runtime_factory,
         migrated_postgres,
         suffix=f"hash_{uuid.uuid4().hex[:6]}",
-        candidate_content=build_candidate_json(draft=CLEAN_DRAFT, citations=[CANDIDATE_EVIDENCE_1]),
+        candidate_content=build_candidate_json(
+            draft=CLEAN_DRAFT, citations=[CANDIDATE_EVIDENCE_1]
+        ),
     )
     envelope = _build_envelope(
         ctx,
@@ -1278,7 +1309,9 @@ async def test_phase37_schema_drift_status_blocks(
         runtime_factory,
         migrated_postgres,
         suffix=f"drift_{uuid.uuid4().hex[:6]}",
-        candidate_content=build_candidate_json(draft=CLEAN_DRAFT, citations=[CANDIDATE_EVIDENCE_1]),
+        candidate_content=build_candidate_json(
+            draft=CLEAN_DRAFT, citations=[CANDIDATE_EVIDENCE_1]
+        ),
     )
     envelope = _build_envelope(
         ctx,
@@ -1306,7 +1339,9 @@ async def test_phase37_branch_suggestion_enabled_blocks(
         migrated_postgres,
         suffix=f"bs_{uuid.uuid4().hex[:6]}",
         candidate_content=build_candidate_json(
-            draft=CLEAN_DRAFT, citations=[CANDIDATE_EVIDENCE_1], branch=BRANCH_SUGGESTION
+            draft=CLEAN_DRAFT,
+            citations=[CANDIDATE_EVIDENCE_1],
+            branch=BRANCH_SUGGESTION,
         ),
     )
     enabled = [dict(s, enabled_by_default=True) for s in BRANCH_SUGGESTION]
@@ -1324,7 +1359,10 @@ async def test_phase37_branch_suggestion_enabled_blocks(
     )
     assert outcome.status == "failed"
     assert outcome.error_code == ERROR_CODE_FAILED_VALIDATION
-    assert outcome.status_reason is not None and "enabled_by_default" in outcome.status_reason
+    assert (
+        outcome.status_reason is not None
+        and "enabled_by_default" in outcome.status_reason
+    )
     await _assert_zero_writes(runtime_factory, run_id=ctx["run_id"])
 
 
@@ -1337,10 +1375,14 @@ async def test_phase37_branch_suggestion_missing_field_blocks(
         migrated_postgres,
         suffix=f"bs2_{uuid.uuid4().hex[:6]}",
         candidate_content=build_candidate_json(
-            draft=CLEAN_DRAFT, citations=[CANDIDATE_EVIDENCE_1], branch=BRANCH_SUGGESTION
+            draft=CLEAN_DRAFT,
+            citations=[CANDIDATE_EVIDENCE_1],
+            branch=BRANCH_SUGGESTION,
         ),
     )
-    broken = {k: v for k, v in BRANCH_SUGGESTION[0].items() if k != "triggering_conflict"}
+    broken = {
+        k: v for k, v in BRANCH_SUGGESTION[0].items() if k != "triggering_conflict"
+    }
 
     def _drop(e):
         e["draft"]["branch_suggestions"] = [broken]
@@ -1362,17 +1404,18 @@ async def test_phase37_branch_suggestion_missing_field_blocks(
     await _assert_zero_writes(runtime_factory, run_id=ctx["run_id"])
 
 
-async def test_phase37_wrong_branch_blocks(
-    runtime_factory, migrated_postgres: str
-):
+async def test_phase37_wrong_branch_blocks(runtime_factory, migrated_postgres: str):
     """wrong branch：run 绑定 derivative 分支，envelope 声称别的分支（branch 血缘
     不符）→ blocked，零写入。"""
     ctx = await _set_up(
         runtime_factory,
         migrated_postgres,
         suffix=f"br_{uuid.uuid4().hex[:6]}",
-        candidate_content=build_candidate_json(draft=CLEAN_DRAFT, citations=[CANDIDATE_EVIDENCE_1]),
+        candidate_content=build_candidate_json(
+            draft=CLEAN_DRAFT, citations=[CANDIDATE_EVIDENCE_1]
+        ),
     )
+
     def _wrong_branch(e):
         e["branch"] = "other-branch"
         e["draft"]["fork"] = "fork-other"
@@ -1416,10 +1459,7 @@ async def test_phase37_evidence_outside_envelope_blocks(
     )
     assert outcome.status == "failed"
     assert outcome.error_code == ERROR_CODE_FAILED_VALIDATION
-    assert (
-        outcome.status_reason is not None
-        and "evidence" in outcome.status_reason
-    )
+    assert outcome.status_reason is not None and "evidence" in outcome.status_reason
     await _assert_zero_writes(runtime_factory, run_id=ctx["run_id"])
 
 
@@ -1464,7 +1504,8 @@ async def test_phase37_publish_without_divergence_approval_fails(
         pending = (
             await session.scalars(
                 select(ApprovalRequest).where(
-                    ApprovalRequest.action == PUBLISH_DERIVATIVE_REVISION_APPROVAL_ACTION,
+                    ApprovalRequest.action
+                    == PUBLISH_DERIVATIVE_REVISION_APPROVAL_ACTION,
                     ApprovalRequest.owner_id == ctx["owner_id"],
                 )
             )
@@ -1520,7 +1561,6 @@ async def test_phase37_revalidation_failure_blocks_publish(
     assert ctx["gate_verdict"] == "blocked"
     # blocked 候选可创建 override（OVERRIDABLE_VERDICTS），但 revalidation 必然失败。
     # 该候选无 declared CanonDelta → canon_delta_hash 由服务端 override_hash 派生。
-    from app.services.derivative_generation.overrides import override_hash
 
     expected_canon = override_hash(
         kind="character",
@@ -1628,7 +1668,6 @@ async def test_phase37_consume_publish_approval_pending_fails(
         await session.commit()
     publish_approval_id = int(publish_view["approval_request_id"])
     # 未确认 publish approval 就调用确定性 publisher → fail closed。
-    from app.services.derivative_generation.overrides import OverrideError
 
     with pytest.raises(OverrideError) as exc:
         async with runtime_factory() as session:
@@ -1691,12 +1730,15 @@ async def test_phase37_forged_publish_approval_hash_fails(
         await session.commit()
     publish_approval_id = int(publish_view["approval_request_id"])
     async with runtime_factory() as session:
-        await confirm(session, request_id=publish_approval_id, owner_id=ctx["owner_id"], mode="once")
+        await confirm(
+            session,
+            request_id=publish_approval_id,
+            owner_id=ctx["owner_id"],
+            mode="once",
+        )
         approval = await session.get(ApprovalRequest, publish_approval_id)
         approval.payload_hash = "c" * 64  # 篡改重放哈希（伪造批准）
         await session.commit()
-
-    from app.services.derivative_generation.overrides import OverrideError
 
     with pytest.raises(OverrideError) as exc:
         async with runtime_factory() as session:
@@ -1743,10 +1785,13 @@ async def test_phase37_divergence_approval_not_reusable(
     override_id = int(tool_view["override_id"])
     divergence_approval_id = int(tool_view["approval_request_id"])
     async with runtime_factory() as session:
-        await confirm(session, request_id=divergence_approval_id, owner_id=ctx["owner_id"], mode="once")
+        await confirm(
+            session,
+            request_id=divergence_approval_id,
+            owner_id=ctx["owner_id"],
+            mode="once",
+        )
         await session.commit()
-
-    from app.services.derivative_generation.overrides import OverrideError
 
     # 直接把已批准的 allow_divergence approval 当 publish approval 消费 → action 不符。
     with pytest.raises(OverrideError) as exc:
@@ -1794,7 +1839,11 @@ async def test_phase37_rejected_divergence_blocks_publish(
         await session.commit()
     override_id = int(tool_view["override_id"])
     async with runtime_factory() as session:
-        await reject(session, request_id=int(tool_view["approval_request_id"]), owner_id=ctx["owner_id"])
+        await reject(
+            session,
+            request_id=int(tool_view["approval_request_id"]),
+            owner_id=ctx["owner_id"],
+        )
         await session.commit()
 
     with pytest.raises(InvalidInputError) as exc:

@@ -51,7 +51,6 @@ from app.models.agent_runtime import (
 from app.schemas.agent_runtime import SkillVersionRegister
 from app.services.agent_runtime.finalize import (
     ERROR_CODE_FAILED_VALIDATION,
-    ERROR_CODE_INVALID_STOP_REASON,
     ERROR_CODE_UPSTREAM_ERROR,
     finalize_skill_run,
 )

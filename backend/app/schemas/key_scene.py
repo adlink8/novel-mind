@@ -113,7 +113,9 @@ class KeySceneGateError(ValueError):
 
 def canonical_key_scene_hash(payload: dict[str, Any]) -> str:
     """SHA-256 over stable, sorted JSON (canonical ordering convention)."""
-    encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    encoded = json.dumps(
+        payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    )
     return sha256(encoded.encode("utf-8")).hexdigest()
 
 
@@ -212,9 +214,7 @@ class SpeakerDialogueHeuristicSignal(StrictKeySceneModel):
                     "unavailable signal must carry no speaker/dialogue offsets"
                 )
             if self.confidence is not None:
-                raise ValueError(
-                    "unavailable signal must carry no confidence value"
-                )
+                raise ValueError("unavailable signal must carry no confidence value")
         else:
             if self.confidence is None:
                 raise ValueError(
@@ -222,9 +222,7 @@ class SpeakerDialogueHeuristicSignal(StrictKeySceneModel):
                 )
             if self.availability is HeuristicSignalAvailability.AMBIGUOUS:
                 if not self.warnings:
-                    raise ValueError(
-                        "ambiguous signal must carry explicit warnings"
-                    )
+                    raise ValueError("ambiguous signal must carry explicit warnings")
         return self
 
 
@@ -445,7 +443,10 @@ def validate_heuristic_signal_isolation(
                 f"[{offset.offset_start},{offset.offset_end}) is outside the "
                 f"candidate's primary evidence range {inside}"
             )
-    if signal.availability is HeuristicSignalAvailability.AMBIGUOUS and not signal.warnings:
+    if (
+        signal.availability is HeuristicSignalAvailability.AMBIGUOUS
+        and not signal.warnings
+    ):
         raise KeySceneGateError(
             f"candidate {candidate.candidate_key!r} ambiguous heuristic signal "
             "must carry explicit warnings"
@@ -481,7 +482,10 @@ def validate_candidate_evidence_lineage(
                 f"candidate {candidate.candidate_key!r} evidence {ref.evidence_key!r} "
                 "chapter_number exceeds the set spoiler cutoff"
             )
-        if ref.source_start < candidate.source_start or ref.source_end > candidate.source_end:
+        if (
+            ref.source_start < candidate.source_start
+            or ref.source_end > candidate.source_end
+        ):
             raise KeySceneGateError(
                 f"candidate {candidate.candidate_key!r} evidence {ref.evidence_key!r} "
                 "must lie inside the candidate's source range"

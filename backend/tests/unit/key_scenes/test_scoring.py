@@ -33,9 +33,7 @@ from app.services.key_scenes.scoring import (
 
 pytestmark = pytest.mark.unit
 
-SCORER = KeySceneScorer(
-    detector_id="key-scene.v1", detector_version="1.0.0"
-)
+SCORER = KeySceneScorer(detector_id="key-scene.v1", detector_version="1.0.0")
 
 ACTION_TEXT = (
     "Arin drew his sword as the rain fell hard across the courtyard walls. "
@@ -141,7 +139,10 @@ def test_score_breakdown_and_reasons_are_inspectable():
     scored = SCORER.score(_action_input())
     assert scored.score_total > 0.0
     assert scored.score_breakdown["plot_turn"] > 0.0
-    assert scored.score_breakdown["evidence_boundary"] == DEFAULT_SCENE_POLICY.evidence_base
+    assert (
+        scored.score_breakdown["evidence_boundary"]
+        == DEFAULT_SCENE_POLICY.evidence_base
+    )
     codes = {r.reason_code for r in scored.salience_reasons}
     assert KeySceneReasonCode.EVIDENCE_BOUNDARY in codes
     assert KeySceneReasonCode.PLOT_TURN in codes
@@ -238,11 +239,13 @@ def test_diversity_groups_split_by_coordinates_and_chapter():
             ),
         )
     )
-    groups = {g.key: len(g.items) for g in diversity_groups([action, quiet, same_as_quiet])}
+    groups = {
+        g.key: len(g.items) for g in diversity_groups([action, quiet, same_as_quiet])
+    }
     assert len(groups) == 2  # action + quiet share one diversity key
-    assert compute_diversity_key(action.coordinates, chapter_number=3) != compute_diversity_key(
-        quiet.coordinates, chapter_number=3
-    )
+    assert compute_diversity_key(
+        action.coordinates, chapter_number=3
+    ) != compute_diversity_key(quiet.coordinates, chapter_number=3)
 
 
 def test_overlapping_duplicate_scene_receives_repetition_penalty():
@@ -295,9 +298,7 @@ def test_dialogue_rich_signal_exposes_offsets_confidence_and_ranking_contributio
 
 
 def test_dialogue_ambiguous_preserves_warnings_and_reduced_confidence():
-    scored = SCORER.score(
-        _input("hn_sffffffffffffffffffffff", DIALOGUE_AMBIGUOUS_TEXT)
-    )
+    scored = SCORER.score(_input("hn_sffffffffffffffffffffff", DIALOGUE_AMBIGUOUS_TEXT))
     signal = scored.heuristic_signal
     assert signal is not None
     assert signal.availability is HeuristicSignalAvailability.AMBIGUOUS
@@ -337,8 +338,7 @@ def test_missing_embedding_and_arc_signals_stay_absent_not_fact():
     assert scored.score_breakdown["embedding_bonus"] == 0.0
     assert scored.score_breakdown["arc_impact"] == 0.0
     assert not any(
-        r.reason_code is KeySceneReasonCode.ARC_IMPACT
-        for r in scored.salience_reasons
+        r.reason_code is KeySceneReasonCode.ARC_IMPACT for r in scored.salience_reasons
     )
     arc_scored = SCORER.score(
         _input(

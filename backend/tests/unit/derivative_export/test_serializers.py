@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import base64
 import hashlib
-import sys
 from io import BytesIO
 from zipfile import ZIP_STORED, ZipFile
 
@@ -29,7 +28,6 @@ from app.services.derivative_export import epub as epub_module
 from app.services.derivative_export.epub import render_epub
 from app.services.derivative_export.manifest import (
     derivative_export_manifest_hash,
-    seal_derivative_export_manifest,
 )
 from app.services.derivative_export.markdown import (
     asset_filename,
@@ -38,17 +36,14 @@ from app.services.derivative_export.markdown import (
 from app.services.derivative_export.snapshot import (
     ExportSnapshotError,
     export_snapshot_hash,
-    seal_export_snapshot,
 )
 from tests.fixtures.derivative_export_roundtrip_fixtures import (
     CITATION_KEYS,
-    FIXED_APPROVED_AT,
     build_fixture_snapshot,
     fixture_asset,
     fixture_chapter,
     fixture_export_asset,
     fixture_export_revision,
-    fixture_revision,
     seal_fixture_manifest,
 )
 
@@ -173,9 +168,7 @@ def test_markdown_and_epub_share_one_snapshot():
         # Chapter order/content/version manifest embedded identically.
         citations_doc = archive.read("OEBPS/citations.xhtml").decode("utf-8")
         assert CITATION_KEYS[0] in citations_doc
-        image = archive.read(
-            f"OEBPS/assets/{asset_filename(snapshot.assets[0])}"
-        )
+        image = archive.read(f"OEBPS/assets/{asset_filename(snapshot.assets[0])}")
         assert hashlib.sha256(image).hexdigest() == TINY_PNG_HASH
 
 
@@ -198,7 +191,9 @@ def test_chapter_order_is_frozen_position_order():
         chapters=(ch1, ch2),
         revisions=(
             fixture_export_revision(chapter_id=1, chapter_number=1),
-            fixture_export_revision(revision_id=502, version_id=1, chapter_id=2, chapter_number=2),
+            fixture_export_revision(
+                revision_id=502, version_id=1, chapter_id=2, chapter_number=2
+            ),
         ),
         assets=(),
         citations=(),
@@ -220,7 +215,10 @@ def test_chapter_order_is_frozen_position_order():
 def test_ordered_assets_follow_snapshot_order():
     asset_1 = fixture_export_asset(
         fixture_asset(
-            asset_id="dv-a", asset_key="a", content_hash=TINY_PNG_HASH, size_bytes=len(TINY_PNG)
+            asset_id="dv-a",
+            asset_key="a",
+            content_hash=TINY_PNG_HASH,
+            size_bytes=len(TINY_PNG),
         )
     )
     asset_2 = fixture_export_asset(
@@ -253,9 +251,7 @@ def test_missing_binary_is_explicit_in_markdown_and_epub():
 
     epub = render_epub(snapshot, _FakeReader(available=False))
     with ZipFile(BytesIO(epub)) as archive:
-        assert not any(
-            name.startswith("OEBPS/assets/") for name in archive.namelist()
-        )
+        assert not any(name.startswith("OEBPS/assets/") for name in archive.namelist())
         chapter = archive.read("OEBPS/chapter-1.xhtml").decode("utf-8")
     assert "插图缺失" in chapter
 
@@ -263,7 +259,10 @@ def test_missing_binary_is_explicit_in_markdown_and_epub():
 def test_hash_drifted_bytes_are_treated_as_missing():
     # The asset declares a content hash; the reader returns different bytes.
     snapshot = _snapshot_with_asset()
-    reader = lambda asset: b"tampered-bytes"
+
+    def reader(_asset):
+        return b"tampered-bytes"
+
     md = render_markdown(snapshot, reader).decode("utf-8")
     assert "插图缺失" in md
     assert "assets/" not in md
@@ -291,7 +290,8 @@ def test_epub_module_imports_only_stdlib_and_app():
         for name in imports
         if name
         and not name.startswith("app.")
-        and name not in {"zipfile", "json", "html", "io", "typing", "__future__", "hashlib"}
+        and name
+        not in {"zipfile", "json", "html", "io", "typing", "__future__", "hashlib"}
     ]
     assert third_party == [], f"EPUB module must be stdlib-only; found {third_party}"
 
@@ -327,8 +327,10 @@ def test_epub_no_raw_asset_path_in_entries():
         if not name.startswith("OEBPS/assets/"):
             continue
         stem = name[len("OEBPS/assets/") :]
-        assert len(stem) == 68 and stem[:64].isalnum() and all(
-            ch in "0123456789abcdef" for ch in stem[:64]
+        assert (
+            len(stem) == 68
+            and stem[:64].isalnum()
+            and all(ch in "0123456789abcdef" for ch in stem[:64])
         )
 
 

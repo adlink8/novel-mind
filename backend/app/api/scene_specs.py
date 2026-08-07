@@ -140,9 +140,7 @@ async def get_scene_specs(
     current_user: User = Depends(require_user),
 ):
     """List every compiled candidate spec for the owned novel (oldest first)."""
-    items = await SceneSpecService(db).list(
-        owner_id=current_user.id, novel_id=novel.id
-    )
+    items = await SceneSpecService(db).list(owner_id=current_user.id, novel_id=novel.id)
     return SceneSpecListResponse(items=items, total=len(items))
 
 

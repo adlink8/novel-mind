@@ -212,7 +212,9 @@ def _seed_owner(sync_url: str, *, suffix: str, fork_status: str = "approved") ->
     return data
 
 
-def _fork_payload(ids: dict, *, version_key: str, **overrides) -> DerivativeVisualVersionContract:
+def _fork_payload(
+    ids: dict, *, version_key: str, **overrides
+) -> DerivativeVisualVersionContract:
     payload = {
         "schema_version": "derivative-visual.v1",
         "namespace": "fanfiction_visual",
@@ -292,7 +294,9 @@ def _count_rows(sync_url: str, table: str, *, owner_id: int | None = None) -> in
 async def test_fork_round_trip(migrated_postgres, db):
     ids = _seed_owner(migrated_postgres, suffix=f"ok_{uuid.uuid4().hex[:8]}")
     result = await create_derivative_visual_fork(
-        db, owner_id=ids["owner_id"], novel_id=ids["novel_id"],
+        db,
+        owner_id=ids["owner_id"],
+        novel_id=ids["novel_id"],
         version=_fork_payload(ids, version_key="dv-ok"),
     )
     await db.commit()
@@ -350,7 +354,9 @@ async def test_identical_fork_retry_replays(migrated_postgres, db):
 async def test_conflicting_fork_retry_fails_closed(migrated_postgres, db):
     ids = _seed_owner(migrated_postgres, suffix=f"conf_{uuid.uuid4().hex[:8]}")
     await create_derivative_visual_fork(
-        db, owner_id=ids["owner_id"], novel_id=ids["novel_id"],
+        db,
+        owner_id=ids["owner_id"],
+        novel_id=ids["novel_id"],
         version=_fork_payload(ids, version_key="dv-conf"),
     )
     await db.commit()
@@ -374,9 +380,7 @@ async def test_foreign_project_or_fork_is_rejected(migrated_postgres, db):
     b = _seed_owner(migrated_postgres, suffix=f"fq_{uuid.uuid4().hex[:8]}")
 
     # Owner B's project referenced from A's scope.
-    bad = _fork_payload(
-        a, version_key="dv-foreign-project", project_id=b["project_id"]
-    )
+    bad = _fork_payload(a, version_key="dv-foreign-project", project_id=b["project_id"])
     with pytest.raises(DerivativeVisualForkError, match="project_not_found"):
         await create_derivative_visual_fork(
             db, owner_id=a["owner_id"], novel_id=a["novel_id"], version=bad
@@ -405,14 +409,18 @@ async def test_rejected_or_archived_fork_cannot_anchor(migrated_postgres, db):
     )
     with pytest.raises(DerivativeVisualForkError, match="fork_not_usable"):
         await create_derivative_visual_fork(
-            db, owner_id=ids["owner_id"], novel_id=ids["novel_id"],
+            db,
+            owner_id=ids["owner_id"],
+            novel_id=ids["novel_id"],
             version=_fork_payload(ids, version_key="dv-archived-fork"),
         )
 
 
 async def test_missing_or_foreign_source_snapshot_is_rejected(migrated_postgres, db):
     ids = _seed_owner(migrated_postgres, suffix=f"src_{uuid.uuid4().hex[:8]}")
-    payload = _fork_payload(ids, version_key="dv-bad-source", source_version_id=999999999)
+    payload = _fork_payload(
+        ids, version_key="dv-bad-source", source_version_id=999999999
+    )
     with pytest.raises(DerivativeVisualForkError, match="source_version_not_found"):
         await create_derivative_visual_fork(
             db, owner_id=ids["owner_id"], novel_id=ids["novel_id"], version=payload
@@ -422,14 +430,22 @@ async def test_missing_or_foreign_source_snapshot_is_rejected(migrated_postgres,
 async def test_source_hash_mutation_fails_closed(migrated_postgres, db):
     ids = _seed_owner(migrated_postgres, suffix=f"hash_{uuid.uuid4().hex[:8]}")
     # Mutated source snapshot hash (original is HEX64).
-    payload = _fork_payload(ids, version_key="dv-bad-hash", source_snapshot_hash=HEX64_B)
-    with pytest.raises(DerivativeVisualForkError, match="source_snapshot_hash_mismatch"):
+    payload = _fork_payload(
+        ids, version_key="dv-bad-hash", source_snapshot_hash=HEX64_B
+    )
+    with pytest.raises(
+        DerivativeVisualForkError, match="source_snapshot_hash_mismatch"
+    ):
         await create_derivative_visual_fork(
             db, owner_id=ids["owner_id"], novel_id=ids["novel_id"], version=payload
         )
     # Mutated source manifest hash (original is HEX64_C).
-    payload = _fork_payload(ids, version_key="dv-bad-manifest", source_manifest_hash=HEX64_B)
-    with pytest.raises(DerivativeVisualForkError, match="source_manifest_hash_mismatch"):
+    payload = _fork_payload(
+        ids, version_key="dv-bad-manifest", source_manifest_hash=HEX64_B
+    )
+    with pytest.raises(
+        DerivativeVisualForkError, match="source_manifest_hash_mismatch"
+    ):
         await create_derivative_visual_fork(
             db, owner_id=ids["owner_id"], novel_id=ids["novel_id"], version=payload
         )
@@ -480,7 +496,9 @@ async def test_empty_divergence_is_rejected(migrated_postgres, db):
 async def test_fork_lineage_is_immutable(migrated_postgres, db):
     ids = _seed_owner(migrated_postgres, suffix=f"imm_{uuid.uuid4().hex[:8]}")
     result = await create_derivative_visual_fork(
-        db, owner_id=ids["owner_id"], novel_id=ids["novel_id"],
+        db,
+        owner_id=ids["owner_id"],
+        novel_id=ids["novel_id"],
         version=_fork_payload(ids, version_key="dv-imm"),
     )
     await db.commit()
@@ -494,13 +512,17 @@ async def test_fork_lineage_is_immutable(migrated_postgres, db):
     # Original Visual Bible rows stay untouched.
     engine = create_engine(migrated_postgres, poolclass=NullPool)
     with engine.connect() as conn:
-        row = conn.execute(
-            text(
-                "SELECT source_snapshot_hash, manifest_hash FROM visual_bible_versions "
-                "WHERE id = :vid"
-            ),
-            {"vid": ids["source_version_id"]},
-        ).mappings().one()
+        row = (
+            conn.execute(
+                text(
+                    "SELECT source_snapshot_hash, manifest_hash FROM visual_bible_versions "
+                    "WHERE id = :vid"
+                ),
+                {"vid": ids["source_version_id"]},
+            )
+            .mappings()
+            .one()
+        )
     engine.dispose()
     assert row["source_snapshot_hash"] == HEX64
     assert row["manifest_hash"] == HEX64_C
@@ -514,7 +536,9 @@ async def test_fork_lineage_is_immutable(migrated_postgres, db):
 async def test_review_approve_and_idempotency(migrated_postgres, db):
     ids = _seed_owner(migrated_postgres, suffix=f"rv_{uuid.uuid4().hex[:8]}")
     result = await create_derivative_visual_fork(
-        db, owner_id=ids["owner_id"], novel_id=ids["novel_id"],
+        db,
+        owner_id=ids["owner_id"],
+        novel_id=ids["novel_id"],
         version=_fork_payload(ids, version_key="dv-review"),
     )
     await db.commit()
@@ -566,7 +590,9 @@ async def test_review_approve_and_idempotency(migrated_postgres, db):
 async def test_review_is_owner_scoped(migrated_postgres, db):
     ids = _seed_owner(migrated_postgres, suffix=f"scope_{uuid.uuid4().hex[:8]}")
     result = await create_derivative_visual_fork(
-        db, owner_id=ids["owner_id"], novel_id=ids["novel_id"],
+        db,
+        owner_id=ids["owner_id"],
+        novel_id=ids["novel_id"],
         version=_fork_payload(ids, version_key="dv-scope"),
     )
     await db.commit()
@@ -584,7 +610,6 @@ async def test_review_is_owner_scoped(migrated_postgres, db):
     )
     from app.services.derivative_visual.lineage import (
         DerivativeVisualScopeMismatchError,
-        DerivativeVisualVersionNotFoundError,
     )
 
     # A foreign owner cannot review the version (event scope mismatch).
@@ -661,7 +686,9 @@ def _spec_payload(
                 "disclosure_cutoff": 8,
             }
         ],
-        "style_profile": style_profile if style_profile is not None else {"palette": "warm"},
+        "style_profile": style_profile
+        if style_profile is not None
+        else {"palette": "warm"},
         "negative_constraints": [],
         "reference_assets": [
             {
@@ -713,8 +740,6 @@ def _make_spec(
 ) -> DerivativeSceneSpecContract:
     """Frozen canonical spec whose content_hash replays from its payload."""
     from app.schemas.derivative_visual import (
-        DerivativeIdentityRow,
-        DerivativeReferenceAssetRow,
         DerivativeSceneSpecEvidenceRef,
     )
 
@@ -883,24 +908,31 @@ async def test_candidate_store_round_trip(migrated_postgres, db, tmp_path):
     assert row.review_state == "needs_review"
     assert row.identity_lineage[0]["source_entity_hash"] == HEX64
     assert row.generator_lineage["provider"] == "mock"
-    assert storage.read(
-        owner_id=ids["owner_id"],
-        novel_id=ids["novel_id"],
-        visual_version_id=result.version.id,
-        asset_id=row.asset_id,
-        mime_type="image/png",
-    ) == payload
+    assert (
+        storage.read(
+            owner_id=ids["owner_id"],
+            novel_id=ids["novel_id"],
+            visual_version_id=result.version.id,
+            asset_id=row.asset_id,
+            mime_type="image/png",
+        )
+        == payload
+    )
 
     # Original Visual Bible rows are never touched (REQ-FORK-04).
     engine = create_engine(migrated_postgres, poolclass=NullPool)
     with engine.connect() as conn:
-        orig = conn.execute(
-            text(
-                "SELECT source_snapshot_hash, manifest_hash FROM visual_bible_versions "
-                "WHERE id = :vid"
-            ),
-            {"vid": ids["source_version_id"]},
-        ).mappings().one()
+        orig = (
+            conn.execute(
+                text(
+                    "SELECT source_snapshot_hash, manifest_hash FROM visual_bible_versions "
+                    "WHERE id = :vid"
+                ),
+                {"vid": ids["source_version_id"]},
+            )
+            .mappings()
+            .one()
+        )
     engine.dispose()
     assert orig["source_snapshot_hash"] == HEX64
     assert orig["manifest_hash"] == HEX64_C
@@ -966,7 +998,9 @@ async def test_duplicate_candidate_replays_and_conflict_fails_closed(
         chapter_number=1,
         content_hash=_content_hash(other_payload),
     )
-    with pytest.raises(DerivativeCandidateConflict, match="duplicate_candidate_conflict"):
+    with pytest.raises(
+        DerivativeCandidateConflict, match="duplicate_candidate_conflict"
+    ):
         await store_derivative_candidate_asset(
             db,
             storage,
@@ -1097,7 +1131,9 @@ async def test_checksum_and_spec_gates_fail_closed(migrated_postgres, db, tmp_pa
     )
 
 
-async def test_unapproved_fork_cannot_anchor_candidates(migrated_postgres, db, tmp_path):
+async def test_unapproved_fork_cannot_anchor_candidates(
+    migrated_postgres, db, tmp_path
+):
     ids = _seed_owner(migrated_postgres, suffix=f"ua_{uuid.uuid4().hex[:8]}")
     result = await create_derivative_visual_fork(
         db,
@@ -1160,7 +1196,9 @@ async def _store_chapter_candidates(
     return rows, storage
 
 
-async def test_cross_chapter_consistency_pass_and_publish(migrated_postgres, db, tmp_path):
+async def test_cross_chapter_consistency_pass_and_publish(
+    migrated_postgres, db, tmp_path
+):
     ids = _seed_owner(migrated_postgres, suffix=f"cc_{uuid.uuid4().hex[:8]}")
     result = await create_derivative_visual_fork(
         db,
@@ -1290,7 +1328,9 @@ async def test_identity_drift_blocks_publish(migrated_postgres, db, tmp_path):
         )
 
 
-async def test_style_divergence_declared_is_needs_review(migrated_postgres, db, tmp_path):
+async def test_style_divergence_declared_is_needs_review(
+    migrated_postgres, db, tmp_path
+):
     ids = _seed_owner(migrated_postgres, suffix=f"sd_{uuid.uuid4().hex[:8]}")
     result = await create_derivative_visual_fork(
         db,
@@ -1492,9 +1532,7 @@ async def test_candidate_lineage_is_immutable(migrated_postgres, db, tmp_path):
     engine = create_engine(migrated_postgres, poolclass=NullPool)
     with engine.connect() as conn:
         count = conn.execute(
-            text(
-                "SELECT count(*) FROM visual_bible_versions WHERE id = :vid"
-            ),
+            text("SELECT count(*) FROM visual_bible_versions WHERE id = :vid"),
             {"vid": ids["source_version_id"]},
         ).scalar_one()
     engine.dispose()
@@ -1517,9 +1555,7 @@ async def test_api_store_publish_and_bytes_smoke(migrated_postgres, db, tmp_path
     storage = DerivativeAssetStorage(tmp_path / "api_assets")
     set_derivative_asset_storage(storage)
 
-    aengine = create_async_engine(
-        async_url(migrated_postgres), poolclass=NullPool
-    )
+    aengine = create_async_engine(async_url(migrated_postgres), poolclass=NullPool)
     factory = async_sessionmaker(aengine, class_=AsyncSession, expire_on_commit=False)
 
     async def override_get_db():

@@ -545,7 +545,10 @@ class VisualBibleAuthorityService:
             ).all()
         }
         return PersistedRevision(
-            version=version, entity_ids=entity_ids, claim_ids=claim_ids, replayed=replayed
+            version=version,
+            entity_ids=entity_ids,
+            claim_ids=claim_ids,
+            replayed=replayed,
         )
 
     @staticmethod
@@ -616,7 +619,12 @@ async def list_versions(
             .order_by(VisualBibleVersion.id.asc())
         )
     ).all()
-    return [await load_version_view(session, owner_id=owner_id, novel_id=novel_id, version_id=row.id) for row in rows]
+    return [
+        await load_version_view(
+            session, owner_id=owner_id, novel_id=novel_id, version_id=row.id
+        )
+        for row in rows
+    ]
 
 
 async def load_version_view(
@@ -664,12 +672,12 @@ async def load_version_view(
     evidence_rows = (
         await session.scalars(
             select(VisualEvidenceRefModel)
-                .where(
-                    VisualEvidenceRefModel.owner_id == owner_id,
-                    VisualEvidenceRefModel.novel_id == novel_id,
-                    VisualEvidenceRefModel.version_id == version_id,
-                )
-                .order_by(VisualEvidenceRefModel.id.asc())
+            .where(
+                VisualEvidenceRefModel.owner_id == owner_id,
+                VisualEvidenceRefModel.novel_id == novel_id,
+                VisualEvidenceRefModel.version_id == version_id,
+            )
+            .order_by(VisualEvidenceRefModel.id.asc())
         )
     ).all()
     asset_rows = (

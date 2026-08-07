@@ -168,9 +168,7 @@ async def create_project(
     fork = await _load_scoped_fork(
         db, owner_id=owner_id, novel_id=novel_id, fork_id=fork_id
     )
-    await _require_unique_name(
-        db, owner_id=owner_id, novel_id=novel_id, name=name
-    )
+    await _require_unique_name(db, owner_id=owner_id, novel_id=novel_id, name=name)
 
     key = (project_key or "").strip() or slugify_project_key(name)
     row = DerivativeProject(
@@ -250,7 +248,9 @@ async def update_project(
     if patch.name is not None:
         new_name = patch.name.strip()
         if not new_name:
-            raise DerivativeProjectError("invalid_name", "project name must be non-empty")
+            raise DerivativeProjectError(
+                "invalid_name", "project name must be non-empty"
+            )
         await _require_unique_name(
             db,
             owner_id=owner_id,

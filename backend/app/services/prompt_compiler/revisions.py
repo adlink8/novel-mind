@@ -120,7 +120,11 @@ def recompute_input_hash_from_revision(revision: PromptRevisionContract) -> str:
 def _malformed_hash(result: PromptApprovalGateResult | None, value: str, name: str):
     if result is not None:
         return result
-    if not isinstance(value, str) or len(value) != 64 or not set(value) <= set("0123456789abcdef"):
+    if (
+        not isinstance(value, str)
+        or len(value) != 64
+        or not set(value) <= set("0123456789abcdef")
+    ):
         return PromptApprovalGateResult(
             ok=False,
             reason_code=f"{name}_malformed",

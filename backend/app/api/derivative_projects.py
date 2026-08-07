@@ -83,9 +83,7 @@ async def list_derivative_projects(
     current_user: User = Depends(require_user),
 ) -> DerivativeProjectListResponse:
     """List the owner's projects for one novel (no default active pick)."""
-    views = await list_projects(
-        db, owner_id=current_user.id, novel_id=novel.id
-    )
+    views = await list_projects(db, owner_id=current_user.id, novel_id=novel.id)
     return DerivativeProjectListResponse(
         novel_id=novel.id, total=len(views), items=views
     )

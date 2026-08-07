@@ -44,11 +44,14 @@ from typing import Any
 import pydantic
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import undefer
 
-from app.models.agent_runtime import ApprovalRequest, Artifact, ArtifactRevision, SkillRun
+from app.models.agent_runtime import (
+    ApprovalRequest,
+    Artifact,
+    ArtifactRevision,
+    SkillRun,
+)
 from app.models.canon_fork import CanonFork
-from app.models.novel import Chapter
 from app.models.user import User
 from app.schemas.agent_runtime import CanonForkProposalArtifact
 from app.services.canon_fork.snapshot import (
@@ -94,7 +97,9 @@ def canonical_fork_approval_hash(payload: dict[str, Any]) -> str:
     encoded = json.dumps(
         payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")
     )
-    return sha256(f"{CANON_FORK_APPROVAL_PREFIX}\n{encoded}".encode("utf-8")).hexdigest()
+    return sha256(
+        f"{CANON_FORK_APPROVAL_PREFIX}\n{encoded}".encode("utf-8")
+    ).hexdigest()
 
 
 def canonical_fork_materialization_hash(
@@ -115,7 +120,9 @@ def canonical_fork_materialization_hash(
     encoded = json.dumps(
         payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")
     )
-    return sha256(f"{CANON_FORK_MATERIALIZATION_PREFIX}\n{encoded}".encode("utf-8")).hexdigest()
+    return sha256(
+        f"{CANON_FORK_MATERIALIZATION_PREFIX}\n{encoded}".encode("utf-8")
+    ).hexdigest()
 
 
 def build_fork_approval_payload(
@@ -225,9 +232,7 @@ async def create_fork_proposal(
             fork_key=str(request["fork_key"]),
             requested_cutoff_chapter=request.get("requested_cutoff_chapter"),
             full_book_requested=bool(request.get("full_book_requested", False)),
-            expected_source_snapshot_hash=request.get(
-                "expected_source_snapshot_hash"
-            ),
+            expected_source_snapshot_hash=request.get("expected_source_snapshot_hash"),
         )
         fork, replayed_fork = await service.persist_fork(manifest=manifest)
     except CanonForkScopeError as exc:
@@ -279,7 +284,9 @@ async def create_fork_proposal(
         owner_id=owner_id,
         run_id=int(request["run_id"]) if request.get("run_id") else None,
         skill_version_id=(
-            int(request["skill_version_id"]) if request.get("skill_version_id") else None
+            int(request["skill_version_id"])
+            if request.get("skill_version_id")
+            else None
         ),
         artifact_id=int(request["artifact_id"]) if request.get("artifact_id") else None,
         artifact_revision_id=(
@@ -347,9 +354,7 @@ async def _load_artifact_revision(
     return revision
 
 
-async def _load_run(
-    db: AsyncSession, *, run_id: int
-) -> SkillRun:
+async def _load_run(db: AsyncSession, *, run_id: int) -> SkillRun:
     run = await db.get(SkillRun, run_id)
     if run is None:
         raise ForkMaterializeError(
@@ -471,10 +476,16 @@ async def _validate_materialization_context(
         "fork_key": (proposal.fork_key, fork.fork_key),
         "manifest_hash": (proposal.manifest_hash, fork.manifest_hash),
         "scope_hash": (proposal.scope_hash, fork.scope_hash),
-        "source_snapshot_hash": (proposal.source_snapshot_hash, fork.source_snapshot_hash),
+        "source_snapshot_hash": (
+            proposal.source_snapshot_hash,
+            fork.source_snapshot_hash,
+        ),
         "source_snapshot_id": (proposal.source_snapshot_id, fork.source_snapshot_id),
         "through_chapter": (proposal.through_chapter, fork.through_chapter),
-        "cutoff_snapshot_hash": (proposal.cutoff_snapshot_hash, fork.cutoff_snapshot_hash),
+        "cutoff_snapshot_hash": (
+            proposal.cutoff_snapshot_hash,
+            fork.cutoff_snapshot_hash,
+        ),
     }
     for field, (actual, expected) in manifest_fields.items():
         if actual != expected:

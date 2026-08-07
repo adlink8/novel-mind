@@ -60,7 +60,6 @@ from app.services.agent_runtime.artifacts import (
 )
 from app.services.agent_runtime.finalize import (
     ERROR_CODE_FAILED_VALIDATION,
-    ERROR_CODE_INVALID_STOP_REASON,
     ERROR_CODE_UPSTREAM_ERROR,
     finalize_skill_run,
 )
@@ -88,9 +87,7 @@ from app.services.world_model.entities import (
     EntityLinkClaim,
     build_entity_candidate,
 )
-from app.services.world_model.entity_queries import WorldEntityQueries
 from app.services.world_model.entity_repository import WorldEntityRepository
-from app.services.world_model.event_queries import WorldModelEventQueries
 from app.services.world_model.event_repository import WorldModelEventRepository
 from app.services.world_model.gates import WorldModelGate, build_candidate
 from app.services.world_model.knowledge import (
@@ -106,8 +103,12 @@ pytestmark = pytest.mark.integration
 
 FIXTURES = Path(__file__).resolve().parents[2] / "fixtures" / "world_model"
 FIXTURE_EVENTS = json.loads((FIXTURES / "events_v1.json").read_text(encoding="utf-8"))
-FIXTURE_EPISTEMIC = json.loads((FIXTURES / "epistemic_v1.json").read_text(encoding="utf-8"))
-FIXTURE_ENTITIES = json.loads((FIXTURES / "entities_v1.json").read_text(encoding="utf-8"))
+FIXTURE_EPISTEMIC = json.loads(
+    (FIXTURES / "epistemic_v1.json").read_text(encoding="utf-8")
+)
+FIXTURE_ENTITIES = json.loads(
+    (FIXTURES / "entities_v1.json").read_text(encoding="utf-8")
+)
 
 CHAPTER_CONTENT = "第一章正文：阿宁走进竹林，月光洒在青石上，看见了使者的身影。"
 CHAPTER2_CONTENT = "第二章正文：阿宁在竹林深处看见了使者的身影，脚步匆匆。"
@@ -235,7 +236,9 @@ def _load_scenario(fixture: dict, name: str) -> dict:
     return fixture["scenarios"][name]
 
 
-def build_event_projection(*, owner_id: int, novel_id: int, version_id: int = 1) -> WorldModelCandidateProjection:
+def build_event_projection(
+    *, owner_id: int, novel_id: int, version_id: int = 1
+) -> WorldModelCandidateProjection:
     """事件 fixture 'valid' → gate → 不可变候选投影（owner/novel 重新作用域）。"""
     scenario = _load_scenario(FIXTURE_EVENTS, "valid")
     scope = scenario["scope"]
@@ -251,7 +254,12 @@ def build_event_projection(*, owner_id: int, novel_id: int, version_id: int = 1)
     for raw in scenario["events"]:
         result = gate.validate_event(
             EventClaim.model_validate(
-                {**raw, "owner_id": owner_id, "novel_id": novel_id, "version_id": version_id}
+                {
+                    **raw,
+                    "owner_id": owner_id,
+                    "novel_id": novel_id,
+                    "version_id": version_id,
+                }
             )
         )
         assert result.fact is not None, result.verdicts
@@ -261,7 +269,12 @@ def build_event_projection(*, owner_id: int, novel_id: int, version_id: int = 1)
     for raw in scenario["edges"]:
         result = gate.validate_edge(
             CausalEdgeClaim.model_validate(
-                {**raw, "owner_id": owner_id, "novel_id": novel_id, "version_id": version_id}
+                {
+                    **raw,
+                    "owner_id": owner_id,
+                    "novel_id": novel_id,
+                    "version_id": version_id,
+                }
             ),
             events_by_key,
         )
@@ -292,7 +305,12 @@ def build_knowledge_projection(*, owner_id: int, novel_id: int, version_id: int 
     for raw in scenario["claims"]:
         result = gate.validate_claim(
             EpistemicClaim.model_validate(
-                {**raw, "owner_id": owner_id, "novel_id": novel_id, "version_id": version_id}
+                {
+                    **raw,
+                    "owner_id": owner_id,
+                    "novel_id": novel_id,
+                    "version_id": version_id,
+                }
             )
         )
         assert result.claim is not None, result.verdicts
@@ -321,7 +339,12 @@ def build_entity_projection(*, owner_id: int, novel_id: int, version_id: int = 1
     for raw in scenario["entities"]:
         result = egate.validate_entity(
             EntityClaim.model_validate(
-                {**raw, "owner_id": owner_id, "novel_id": novel_id, "version_id": version_id}
+                {
+                    **raw,
+                    "owner_id": owner_id,
+                    "novel_id": novel_id,
+                    "version_id": version_id,
+                }
             )
         )
         assert result.entity is not None, result.verdicts
@@ -330,7 +353,12 @@ def build_entity_projection(*, owner_id: int, novel_id: int, version_id: int = 1
     for raw in scenario["links"]:
         result = egate.validate_link(
             EntityLinkClaim.model_validate(
-                {**raw, "owner_id": owner_id, "novel_id": novel_id, "version_id": version_id}
+                {
+                    **raw,
+                    "owner_id": owner_id,
+                    "novel_id": novel_id,
+                    "version_id": version_id,
+                }
             )
         )
         assert result.link is not None, result.verdicts
@@ -347,7 +375,12 @@ def build_entity_projection(*, owner_id: int, novel_id: int, version_id: int = 1
     for raw in scenario["rules"]:
         result = rgate.validate_rule(
             RuleClaim.model_validate(
-                {**raw, "owner_id": owner_id, "novel_id": novel_id, "version_id": version_id}
+                {
+                    **raw,
+                    "owner_id": owner_id,
+                    "novel_id": novel_id,
+                    "version_id": version_id,
+                }
             )
         )
         assert result.rule is not None, result.verdicts
@@ -357,7 +390,12 @@ def build_entity_projection(*, owner_id: int, novel_id: int, version_id: int = 1
     for raw in scenario["exceptions"]:
         result = rgate.validate_exception(
             RuleExceptionClaim.model_validate(
-                {**raw, "owner_id": owner_id, "novel_id": novel_id, "version_id": version_id}
+                {
+                    **raw,
+                    "owner_id": owner_id,
+                    "novel_id": novel_id,
+                    "version_id": version_id,
+                }
             ),
             rule_keys,
         )
@@ -464,7 +502,9 @@ def _raw_model_output(*, chapter_id: int, with_evidence: bool = True) -> dict[st
                 "authority": "probable_inference",
                 "confidence": 0.9,
                 "disclosure_cutoff": 1,
-                "evidence_refs": [evidence_key_for(chapter_id)] if with_evidence else [],
+                "evidence_refs": [evidence_key_for(chapter_id)]
+                if with_evidence
+                else [],
             },
         },
         "status": "candidate",
@@ -998,9 +1038,7 @@ async def test_phase27_user_interpretation_approval_boundary(
 ):
     """审批边界：user interpretation 需要 owner 作用域确认；非 owner 确认被 404-hide；
     finalize 后 Agent 不能绕过审批直接迁移 Artifact 状态。"""
-    seed = _seed_owner_novel(
-        migrated_postgres, suffix=f"appr_{uuid.uuid4().hex[:6]}"
-    )
+    seed = _seed_owner_novel(migrated_postgres, suffix=f"appr_{uuid.uuid4().hex[:6]}")
     svid = await _register_skill(
         runtime_factory,
         owner_id=seed["owner_id"],
@@ -1312,7 +1350,9 @@ async def test_phase27_unknown_evidence_ref_blocks(
         skill_version_id=ctx["skill_version_id"],
         input_hash=ctx["input_hash"],
     )
-    envelope["evidence_refs"] = ["qp:1:0:10:forgednot64hexhash000000000000000000000000000000000000000000000000"]
+    envelope["evidence_refs"] = [
+        "qp:1:0:10:forgednot64hexhash000000000000000000000000000000000000000000000000"
+    ]
     envelope["candidates"]["claims"][0]["evidence_refs"] = envelope["evidence_refs"]
     envelope["normalization"]["repaired_hash"] = canonical_content_hash(
         _strip_trail(envelope)

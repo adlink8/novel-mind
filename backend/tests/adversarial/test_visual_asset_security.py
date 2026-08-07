@@ -25,7 +25,6 @@ source checks + pure storage/consistency logic, no PostgreSQL) prove that:
 from __future__ import annotations
 
 import ast
-import hashlib
 from pathlib import Path
 
 import pytest
@@ -65,9 +64,9 @@ PUBLISHED_SOURCE = (
 SCHEMA_ASSET_SOURCE = (
     BACKEND_ROOT / "app" / "schemas" / "derivative_visual_asset.py"
 ).read_text(encoding="utf-8")
-MODEL_SOURCE = (
-    BACKEND_ROOT / "app" / "models" / "derivative_visual.py"
-).read_text(encoding="utf-8")
+MODEL_SOURCE = (BACKEND_ROOT / "app" / "models" / "derivative_visual.py").read_text(
+    encoding="utf-8"
+)
 API_ASSET_SOURCE = (
     BACKEND_ROOT / "app" / "api" / "derivative_visual_assets.py"
 ).read_text(encoding="utf-8")
@@ -168,7 +167,12 @@ def test_ssrf_metadata_is_rejected():
     with pytest.raises(ValidationError, match="transport URLs"):
         DerivativeAssetCandidateWrite.model_validate(
             _candidate_write()
-            | {"generator_lineage": {"provider": "mock", "model_url": "http://evil.example/x"}}
+            | {
+                "generator_lineage": {
+                    "provider": "mock",
+                    "model_url": "http://evil.example/x",
+                }
+            }
         )
     with pytest.raises(ValidationError, match="transport URLs"):
         DerivativeAssetCandidateWrite.model_validate(
@@ -214,9 +218,7 @@ def test_candidate_namespace_is_sealed():
 def test_candidate_services_have_no_original_write_path():
     for source in (ASSETS_SOURCE, PUBLISHED_SOURCE):
         assert "VisualBibleVersion(" not in source
-        assert "visual_bible_versions" not in source.replace(
-            "source_snapshot", ""
-        )
+        assert "visual_bible_versions" not in source.replace("source_snapshot", "")
     # The read envelope never exposes a storage path to clients.
     assert "storage_key" not in PUBLISHED_SOURCE.replace("storage_key=", "")
 
@@ -264,13 +266,16 @@ def test_storage_scope_escape_fails_closed(tmp_path):
         payload=payload,
     )
     assert key.startswith("derivative_assets/1/2/3/")
-    assert storage.read(
-        owner_id=1,
-        novel_id=2,
-        visual_version_id=3,
-        asset_id="dv-" + "0" * 32,
-        mime_type="image/png",
-    ) == payload
+    assert (
+        storage.read(
+            owner_id=1,
+            novel_id=2,
+            visual_version_id=3,
+            asset_id="dv-" + "0" * 32,
+            mime_type="image/png",
+        )
+        == payload
+    )
 
 
 def test_storage_allowlist_and_empty_payload_fail_closed(tmp_path):
@@ -306,9 +311,14 @@ def test_storage_allowlist_and_empty_payload_fail_closed(tmp_path):
 
 def test_generated_asset_ids_never_come_from_client():
     # The service generates asset ids; the client DTO has no path/id field.
-    assert "dv-{uuid.uuid4().hex}" in ASSETS_SOURCE or "generate_derivative_asset_id" in ASSETS_SOURCE
+    assert (
+        "dv-{uuid.uuid4().hex}" in ASSETS_SOURCE
+        or "generate_derivative_asset_id" in ASSETS_SOURCE
+    )
     assert "asset_key" in SCHEMA_ASSET_SOURCE
-    assert "storage_key" not in SCHEMA_ASSET_SOURCE.replace("DerivativeAssetCandidateWrite", "")
+    assert "storage_key" not in SCHEMA_ASSET_SOURCE.replace(
+        "DerivativeAssetCandidateWrite", ""
+    )
     assert 'asset_id="' not in SCHEMA_ASSET_SOURCE
 
 
@@ -405,7 +415,9 @@ def test_consistency_pass_when_identity_and_style_hold():
     assert report.verdict is DerivativeConsistencyVerdict.PASS
     assert report.reasons == []
     assert len(report.chapters) == 3
-    assert all(ch.identity_score == 1.0 and ch.style_score == 1.0 for ch in report.chapters)
+    assert all(
+        ch.identity_score == 1.0 and ch.style_score == 1.0 for ch in report.chapters
+    )
 
 
 def test_consistency_identity_drift_fails():
@@ -434,7 +446,9 @@ def test_consistency_style_divergence_declared_is_concern():
     report = score_cross_chapter_consistency(
         (
             _chapter(chapter_number=1),
-            _chapter(chapter_number=2, style_hash="f" * 64, declared_style_divergence=True),
+            _chapter(
+                chapter_number=2, style_hash="f" * 64, declared_style_divergence=True
+            ),
         )
     )
     assert report.verdict is DerivativeConsistencyVerdict.CONCERN

@@ -38,7 +38,6 @@ from app.core.database import get_db
 from app.core.security import create_access_token, hash_password
 from app.main import app
 from app.models.derivative_generation_job import (
-    DerivativeGenerationAttempt,
     DerivativeGenerationCandidate,
     DerivativeGenerationJob,
 )
@@ -89,7 +88,13 @@ def _override_budget_gate():
     return current_budget_gate
 
 
-def _candidate_json(*, intent="continuation", citations=None, divergence=None, draft="阿宁走向竹林深处。"):
+def _candidate_json(
+    *,
+    intent="continuation",
+    citations=None,
+    divergence=None,
+    draft="阿宁走向竹林深处。",
+):
     payload = {
         "schema_version": "derivative-candidate.v1",
         "intent": intent,
@@ -169,7 +174,9 @@ def _seed_owner(sync_url: str, *, suffix: str, chapter_count: int = 3) -> dict:
             status="ready",
             reading_progress={},
             chapter_count=chapter_count,
-            word_count=sum(len(f"chapter {i} body") for i in range(1, chapter_count + 1)),
+            word_count=sum(
+                len(f"chapter {i} body") for i in range(1, chapter_count + 1)
+            ),
         )
         session.add(novel)
         session.flush()
@@ -196,7 +203,9 @@ def _seed_owner(sync_url: str, *, suffix: str, chapter_count: int = 3) -> dict:
 
 async def _create_fork(client, headers, novel_id, fork_key) -> dict:
     resp = await client.post(
-        FORK_BASE.format(novel_id=novel_id), json={"fork_key": fork_key}, headers=headers
+        FORK_BASE.format(novel_id=novel_id),
+        json={"fork_key": fork_key},
+        headers=headers,
     )
     assert resp.status_code == 201, resp.text
     return resp.json()["fork"]
@@ -247,7 +256,9 @@ def _seed_world_model(sync_url: str, *, owner_id: int, novel_id: int) -> None:
     engine.dispose()
 
 
-async def _compile(client, headers, novel_id, fork_id, *, intent="continuation") -> dict:
+async def _compile(
+    client, headers, novel_id, fork_id, *, intent="continuation"
+) -> dict:
     resp = await client.post(
         PACKAGE_BASE.format(novel_id=novel_id),
         json={"fork_id": fork_id, "intent": intent},
@@ -263,7 +274,9 @@ def _first_evidence_key(pkg: dict) -> str:
     return str(items[0]["candidate_key"])
 
 
-async def _create_job(client, headers, novel_id, package_id, intent="continuation", job_key=None) -> dict:
+async def _create_job(
+    client, headers, novel_id, package_id, intent="continuation", job_key=None
+) -> dict:
     resp = await client.post(
         JOB_BASE.format(novel_id=novel_id),
         json={
@@ -316,7 +329,14 @@ async def test_create_and_run_produces_candidate_only(api_client):
             "id": "req-happy",
         }
     ]
-    created = await _create_job(client, headers, novel_id, pkg_view["id"], intent="continuation", job_key="happy-key")
+    created = await _create_job(
+        client,
+        headers,
+        novel_id,
+        pkg_view["id"],
+        intent="continuation",
+        job_key="happy-key",
+    )
     job = created["job"]
     assert job["status"] == "queued"
     assert job["package_hash"] == pkg_view["package_hash"]
@@ -362,7 +382,11 @@ async def test_create_and_run_produces_candidate_only(api_client):
             text("SELECT active FROM canon_forks WHERE id = :f"), {"f": fork["id"]}
         )
         job_row = await session.get(DerivativeGenerationJob, job["id"])
-    assert before == [(1, "chapter 1 body"), (2, "chapter 2 body"), (3, "chapter 3 body")]
+    assert before == [
+        (1, "chapter 1 body"),
+        (2, "chapter 2 body"),
+        (3, "chapter 3 body"),
+    ]
     assert revision_count == 0
     assert fork_active is False
     assert job_row is not None and job_row.response_hash is not None
@@ -387,8 +411,12 @@ async def test_duplicate_idempotency_key_replays_job(api_client):
         },
         # The second create must replay; it must NOT make a provider call.
     ]
-    created = await _create_job(client, headers, novel_id, pkg_view["id"], job_key="dup")
-    replayed = await _create_job(client, headers, novel_id, pkg_view["id"], job_key="dup")
+    created = await _create_job(
+        client, headers, novel_id, pkg_view["id"], job_key="dup"
+    )
+    replayed = await _create_job(
+        client, headers, novel_id, pkg_view["id"], job_key="dup"
+    )
     assert replayed["replayed"] is True
     assert replayed["job"]["id"] == created["job"]["id"]
     assert len(gateway.calls) == 0  # no provider call during creation
@@ -425,7 +453,9 @@ async def test_run_is_candidate_only_recovery_on_paused_job(api_client):
     cite = _first_evidence_key(pkg_view)
 
     _setup(ids, "recover")
-    created = await _create_job(client, headers, novel_id, pkg_view["id"], job_key="recover-key")
+    created = await _create_job(
+        client, headers, novel_id, pkg_view["id"], job_key="recover-key"
+    )
     job_id = created["job"]["id"]
     # Budget-exhausted run: no provider call.
     current_budget_gate.__init__(
@@ -465,8 +495,12 @@ async def test_schema_invalid_blocks_and_never_publishes(api_client):
     pkg = await _compile(client, headers, novel_id, fork["id"])
     pkg_view = pkg["package"]
     _setup(ids, "schema")
-    created = await _create_job(client, headers, novel_id, pkg_view["id"], job_key="schema-key")
-    gateway.responses = [{"content": "not json", "usage": {"input_tokens": 4, "output_tokens": 1}}]
+    created = await _create_job(
+        client, headers, novel_id, pkg_view["id"], job_key="schema-key"
+    )
+    gateway.responses = [
+        {"content": "not json", "usage": {"input_tokens": 4, "output_tokens": 1}}
+    ]
     run = await _run_job(client, headers, novel_id, created["job"]["id"])
     assert run["job"]["status"] == "blocked"
     assert run["job"]["error_code"] == "schema_invalid"
@@ -475,9 +509,15 @@ async def test_schema_invalid_blocks_and_never_publishes(api_client):
     assert run["attempts"][0]["error_code"] == "schema_invalid"
     # A terminal blocked job is never silently re-called.
     calls_before = len(gateway.calls)
-    gateway.responses = [{"content": _candidate_json(citations=[_first_evidence_key(pkg_view)]), "usage": {}}]
+    gateway.responses = [
+        {
+            "content": _candidate_json(citations=[_first_evidence_key(pkg_view)]),
+            "usage": {},
+        }
+    ]
     resp = await client.post(
-        JOB_BASE.format(novel_id=novel_id) + f"/{created['job']['id']}/run", headers=headers
+        JOB_BASE.format(novel_id=novel_id) + f"/{created['job']['id']}/run",
+        headers=headers,
     )
     assert resp.status_code == 409
     assert "job_not_runnable" in resp.json()["detail"]
@@ -494,7 +534,9 @@ async def test_evidence_outside_package_blocks_with_lineage(api_client):
     pkg = await _compile(client, headers, novel_id, fork["id"])
     pkg_view = pkg["package"]
     _setup(ids, "ev")
-    created = await _create_job(client, headers, novel_id, pkg_view["id"], job_key="ev-key")
+    created = await _create_job(
+        client, headers, novel_id, pkg_view["id"], job_key="ev-key"
+    )
     gateway.responses = [
         {
             "content": _candidate_json(citations=["fork:ff-ev:chapter:999"]),
@@ -522,7 +564,9 @@ async def test_divergence_yields_needs_override(api_client):
     divergence = _divergence_payload()
     divergence["affected_evidence"] = [cite]
     _setup(ids, "div")
-    created = await _create_job(client, headers, novel_id, pkg_view["id"], job_key="div-key")
+    created = await _create_job(
+        client, headers, novel_id, pkg_view["id"], job_key="div-key"
+    )
     gateway.responses = [
         {
             "content": _candidate_json(citations=[cite], divergence=divergence),
@@ -549,14 +593,21 @@ async def test_cancel_prevents_provider_call(api_client):
     pkg = await _compile(client, headers, novel_id, fork["id"])
     pkg_view = pkg["package"]
     _setup(ids, "cancel")
-    created = await _create_job(client, headers, novel_id, pkg_view["id"], job_key="cancel-key")
+    created = await _create_job(
+        client, headers, novel_id, pkg_view["id"], job_key="cancel-key"
+    )
     job_id = created["job"]["id"]
     cancel_resp = await client.post(
         JOB_BASE.format(novel_id=novel_id) + f"/{job_id}/cancel", headers=headers
     )
     assert cancel_resp.status_code == 200, cancel_resp.text
     assert cancel_resp.json()["job"]["status"] == "cancelled"
-    gateway.responses = [{"content": _candidate_json(citations=[_first_evidence_key(pkg_view)]), "usage": {}}]
+    gateway.responses = [
+        {
+            "content": _candidate_json(citations=[_first_evidence_key(pkg_view)]),
+            "usage": {},
+        }
+    ]
     run_resp = await client.post(
         JOB_BASE.format(novel_id=novel_id) + f"/{job_id}/run", headers=headers
     )
@@ -580,7 +631,11 @@ async def test_cross_fork_package_is_identical_404(api_client):
     # Owner B tries to generate from owner A's sealed package.
     resp = await client.post(
         JOB_BASE.format(novel_id=ids_b["novel_id"]),
-        json={"context_package_id": pkg_view["id"], "intent": "continuation", "job_key": "foreign"},
+        json={
+            "context_package_id": pkg_view["id"],
+            "intent": "continuation",
+            "job_key": "foreign",
+        },
         headers=headers_b,
     )
     assert resp.status_code == 404
@@ -601,7 +656,11 @@ async def test_intent_mismatch_is_conflict(api_client):
     _setup(ids, "intent")
     resp = await client.post(
         JOB_BASE.format(novel_id=novel_id),
-        json={"context_package_id": pkg_view["id"], "intent": "continuation", "job_key": "wrong-intent"},
+        json={
+            "context_package_id": pkg_view["id"],
+            "intent": "continuation",
+            "job_key": "wrong-intent",
+        },
         headers=headers,
     )
     assert resp.status_code == 409
@@ -619,7 +678,9 @@ async def test_list_and_detail_read_back_lineage(api_client):
     pkg_view = pkg["package"]
     cite = _first_evidence_key(pkg_view)
     _setup(ids, "list")
-    created = await _create_job(client, headers, novel_id, pkg_view["id"], job_key="list-key")
+    created = await _create_job(
+        client, headers, novel_id, pkg_view["id"], job_key="list-key"
+    )
     gateway.responses = [
         {
             "content": _candidate_json(citations=[cite]),
@@ -658,8 +719,12 @@ async def test_fake_gateway_replay_is_identical(api_client):
         "id": "req-replay",
     }
     _setup(ids, "replay")
-    job_a = await _create_job(client, headers, novel_id, pkg_view["id"], job_key="replay-a")
-    job_b = await _create_job(client, headers, novel_id, pkg_view["id"], job_key="replay-b")
+    job_a = await _create_job(
+        client, headers, novel_id, pkg_view["id"], job_key="replay-a"
+    )
+    job_b = await _create_job(
+        client, headers, novel_id, pkg_view["id"], job_key="replay-b"
+    )
     gateway.responses = [dict(response)]
     run_a = await _run_job(client, headers, novel_id, job_a["job"]["id"])
     gateway.responses = [dict(response)]

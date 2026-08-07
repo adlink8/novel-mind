@@ -46,7 +46,6 @@ def _current_head(database_url: str) -> str:
 def test_heads_show_agent_runtime(empty_postgres: str, require_postgres: None):
     """upgrade to head 后 alembic heads 只显示一个 head（链式包含 agent_runtime）。"""
     run_alembic("upgrade", "head", database_url=empty_postgres)
-    head = _current_head(empty_postgres)
     # 单一 head 即线性链尾：agent_runtime 迁移（20260801_2601）在链中，
     # 且后续 phase 迁移已在其后推进 head（前缀随 head 移动变化，不断言固定前缀）。
     history = run_alembic("history", database_url=empty_postgres)
@@ -63,7 +62,10 @@ def test_six_tables_and_key_constraints(empty_postgres: str, require_postgres: N
 
         # 循环外键已补上：artifacts.current_revision_id → artifact_revisions。
         artifacts_fks = {
-            (fk.get("referred_table"), fk.get("constrained_columns") and fk["constrained_columns"][0])
+            (
+                fk.get("referred_table"),
+                fk.get("constrained_columns") and fk["constrained_columns"][0],
+            )
             for fk in inspect(conn).get_foreign_keys("artifacts")
         }
         assert ("artifact_revisions", "current_revision_id") in artifacts_fks
@@ -77,7 +79,8 @@ def test_six_tables_and_key_constraints(empty_postgres: str, require_postgres: N
         }
         assert ("artifact_id", "revision_no") in rev_uk
         rev_fks = {
-            fk.get("referred_table") for fk in inspect(conn).get_foreign_keys("artifact_revisions")
+            fk.get("referred_table")
+            for fk in inspect(conn).get_foreign_keys("artifact_revisions")
         }
         assert "artifact_revisions" in rev_fks  # parent_revision_id 自引用
 

@@ -115,9 +115,7 @@ class EvalService:
         """
         # Shared derivative-write guard: the evaluation corpus may only be fed
         # by Original Canon content (REQ-CRE-02 / D-35-02).
-        evaluation_corpus_guard.assert_write_allowed(
-            space=space, novel_id=novel_id
-        )
+        evaluation_corpus_guard.assert_write_allowed(space=space, novel_id=novel_id)
         if strategy not in self.supported_strategies:
             raise EvalServiceError(
                 f"不支持的策略: {strategy}，有效值: {self.supported_strategies}"

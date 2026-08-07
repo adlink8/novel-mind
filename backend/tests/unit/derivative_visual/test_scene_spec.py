@@ -149,9 +149,7 @@ def _make_scene_spec(
         uncertainties=uncertainties,
         review_state=SpecReviewState.APPROVED,
     )
-    return spec.model_copy(
-        update={"content_hash": recompute_scene_spec_hash(spec)}
-    )
+    return spec.model_copy(update={"content_hash": recompute_scene_spec_hash(spec)})
 
 
 def _identity(**overrides):
@@ -260,7 +258,9 @@ def _input(**overrides):
     overrides.setdefault("evidence_refs", (_evidence(),))
     overrides.setdefault("uncertainties", ())
     if spec is not None:
-        overrides.setdefault("asset_lineage", (_asset_lineage(scene_spec_hash=spec_hash),))
+        overrides.setdefault(
+            "asset_lineage", (_asset_lineage(scene_spec_hash=spec_hash),)
+        )
         overrides.setdefault("anchors", (_anchor(),))
     else:
         overrides.setdefault("asset_lineage", ())
@@ -401,27 +401,27 @@ def _input_contract_payload():
 
 def test_wrong_namespace_is_blocked():
     with pytest.raises(DerivativeSceneSpecGateError, match="namespace_denied"):
-        compile_derivative_scene_spec(
-            _input(visual_namespace="original_canon")
-        )
+        compile_derivative_scene_spec(_input(visual_namespace="original_canon"))
 
 
 def test_stale_source_snapshot_hash_is_blocked():
-    with pytest.raises(DerivativeSceneSpecGateError, match="source_snapshot_hash_mismatch"):
-        compile_derivative_scene_spec(
-            _input(scene_spec_source_snapshot_hash=HEX64_B)
-        )
+    with pytest.raises(
+        DerivativeSceneSpecGateError, match="source_snapshot_hash_mismatch"
+    ):
+        compile_derivative_scene_spec(_input(scene_spec_source_snapshot_hash=HEX64_B))
 
 
 def test_source_manifest_hash_mismatch_is_blocked():
-    with pytest.raises(DerivativeSceneSpecGateError, match="source_manifest_hash_mismatch"):
-        compile_derivative_scene_spec(
-            _input(source_manifest_hash=HEX64_B)
-        )
+    with pytest.raises(
+        DerivativeSceneSpecGateError, match="source_manifest_hash_mismatch"
+    ):
+        compile_derivative_scene_spec(_input(source_manifest_hash=HEX64_B))
 
 
 def test_scene_spec_visual_bible_revision_mismatch_is_blocked():
-    with pytest.raises(DerivativeSceneSpecGateError, match="scene_spec_visual_bible_revision_mismatch"):
+    with pytest.raises(
+        DerivativeSceneSpecGateError, match="scene_spec_visual_bible_revision_mismatch"
+    ):
         compile_derivative_scene_spec(
             _input(scene_spec_visual_bible_revision_hash=HEX64_B)
         )
@@ -429,13 +429,13 @@ def test_scene_spec_visual_bible_revision_mismatch_is_blocked():
 
 def test_future_cutoff_is_blocked():
     with pytest.raises(DerivativeSceneSpecGateError, match="cutoff_exceeds_scope"):
-        compile_derivative_scene_spec(
-            _input(scene_spec_cutoff_chapter=12)
-        )
+        compile_derivative_scene_spec(_input(scene_spec_cutoff_chapter=12))
 
 
 def test_identity_disclosure_beyond_cutoff_is_blocked():
-    with pytest.raises(DerivativeSceneSpecGateError, match="identity_disclosure_beyond_cutoff"):
+    with pytest.raises(
+        DerivativeSceneSpecGateError, match="identity_disclosure_beyond_cutoff"
+    ):
         compile_derivative_scene_spec(
             _input(identity=(_identity(disclosure_cutoff=12),))
         )
@@ -447,7 +447,9 @@ def test_undeclared_style_divergence_is_blocked():
 
 
 def test_identity_drift_is_blocked():
-    with pytest.raises(DerivativeSceneSpecGateError, match="identity_source_ref_missing"):
+    with pytest.raises(
+        DerivativeSceneSpecGateError, match="identity_source_ref_missing"
+    ):
         compile_derivative_scene_spec(
             _input(
                 identity=(
@@ -474,9 +476,7 @@ def test_identity_drift_is_blocked():
 def test_mixed_authority_is_blocked():
     # A derivative asset can never be silently approved (D-38-03).
     with pytest.raises(DerivativeSceneSpecGateError, match="derivative_asset_approved"):
-        compile_derivative_scene_spec(
-            _input(reference_assets=(_asset(approved=True),))
-        )
+        compile_derivative_scene_spec(_input(reference_assets=(_asset(approved=True),)))
     # A reused original path without its bytes hash is blocked.
     with pytest.raises(DerivativeSceneSpecGateError, match="asset_source_ref_missing"):
         compile_derivative_scene_spec(
@@ -494,7 +494,9 @@ def test_mixed_authority_is_blocked():
 
 def test_asset_lineage_bound_to_sealed_spec_only():
     # A lineage row bound to a different scene spec hash is blocked.
-    with pytest.raises(DerivativeSceneSpecGateError, match="asset_lineage_spec_mismatch"):
+    with pytest.raises(
+        DerivativeSceneSpecGateError, match="asset_lineage_spec_mismatch"
+    ):
         compile_derivative_scene_spec(
             _input(asset_lineage=(_asset_lineage(scene_spec_hash=HEX64_B),))
         )
@@ -541,17 +543,13 @@ def test_uncertainties_dropped_is_blocked():
 
 def test_unapproved_upstream_is_blocked():
     with pytest.raises(DerivativeSceneSpecGateError, match="visual_fork_not_approved"):
-        compile_derivative_scene_spec(
-            _input(visual_fork_review_state="candidate")
-        )
-    with pytest.raises(DerivativeSceneSpecGateError, match="visual_bible_source_not_approved"):
-        compile_derivative_scene_spec(
-            _input(visual_bible_review_state="candidate")
-        )
+        compile_derivative_scene_spec(_input(visual_fork_review_state="candidate"))
+    with pytest.raises(
+        DerivativeSceneSpecGateError, match="visual_bible_source_not_approved"
+    ):
+        compile_derivative_scene_spec(_input(visual_bible_review_state="candidate"))
     with pytest.raises(DerivativeSceneSpecGateError, match="scene_spec_not_approved"):
-        compile_derivative_scene_spec(
-            _input(scene_spec_review_state="candidate")
-        )
+        compile_derivative_scene_spec(_input(scene_spec_review_state="candidate"))
     with pytest.raises(DerivativeSceneSpecGateError, match="scene_spec_missing"):
         compile_derivative_scene_spec(_input(scene_spec=None))
 

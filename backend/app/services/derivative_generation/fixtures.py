@@ -491,8 +491,7 @@ def build_fixture(fixture_key: str) -> dict[str, Any]:
             fixture_key="contradictory-character-action",
             category="contradictory_character_action",
             description=(
-                "hero acts on secret knowledge the frozen package says he "
-                "does not have"
+                "hero acts on secret knowledge the frozen package says he does not have"
             ),
             package=build_package(),
             candidate=build_candidate_json(
@@ -539,9 +538,7 @@ def build_fixture(fixture_key: str) -> dict[str, Any]:
         "unresolved-clue-payoff": lambda: _assemble_fixture(
             fixture_key="unresolved-clue-payoff",
             category="unresolved_clue_payoff",
-            description=(
-                "candidate pays off clue-1 while the package marks it active"
-            ),
+            description=("candidate pays off clue-1 while the package marks it active"),
             package=build_package(),
             candidate=build_candidate_json(
                 draft="金色脚印之谜已然解开：那只是村民甲的恶作剧。",
@@ -703,7 +700,9 @@ def qualify_fixture(
     verdict_ok = result.verdict.value == payload["expected_verdict"]
     codes = {violation.code for violation in result.violations}
     missing = [
-        reason for reason in payload.get("expected_reasons") or [] if reason not in codes
+        reason
+        for reason in payload.get("expected_reasons") or []
+        if reason not in codes
     ]
     return verdict_ok and not missing, result, missing
 

@@ -209,9 +209,7 @@ class SceneCandidateSet(TimestampMixin, Base):
     # the set verifies owner/novel/approved status and manifest hash before freeze.
     approved_visual_bible_revision_id: Mapped[int | None] = mapped_column(Integer)
     approved_visual_bible_revision_hash: Mapped[str | None] = mapped_column(String(64))
-    canonical_payload: Mapped[dict] = mapped_column(
-        JSONB, nullable=False, default=dict
-    )
+    canonical_payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     canonical_payload_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     idempotency_key: Mapped[str] = mapped_column(String(64), nullable=False)
     projection_hash: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -346,9 +344,7 @@ class SceneCandidate(TimestampMixin, Base):
     # REQ-VIS-06 diagnostic metadata only (offsets/confidence/warnings); never
     # evidence/citation/approval authority.
     heuristic_signal: Mapped[dict | None] = mapped_column(JSONB)
-    canonical_payload: Mapped[dict] = mapped_column(
-        JSONB, nullable=False, default=dict
-    )
+    canonical_payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     canonical_payload_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     idempotency_key: Mapped[str] = mapped_column(String(64), nullable=False)
     projection_hash: Mapped[str] = mapped_column(String(64), nullable=False)

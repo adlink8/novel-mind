@@ -62,12 +62,19 @@ from app.services.world_model.rules import (
 pytestmark = pytest.mark.integration
 
 FIXTURE = json.loads(
-    (Path(__file__).resolve().parents[2] / "fixtures" / "world_model" / "entities_v1.json")
-    .read_text(encoding="utf-8")
+    (
+        Path(__file__).resolve().parents[2]
+        / "fixtures"
+        / "world_model"
+        / "entities_v1.json"
+    ).read_text(encoding="utf-8")
 )
 
-MIGRATION_PATH = Path(__file__).resolve().parents[3] / "migrations" / "versions" / (
-    "20260801_2703_world_entity_projection.py"
+MIGRATION_PATH = (
+    Path(__file__).resolve().parents[3]
+    / "migrations"
+    / "versions"
+    / ("20260801_2703_world_entity_projection.py")
 )
 
 
@@ -302,8 +309,7 @@ def test_migration_upgrade_downgrade_is_reversible_and_old_rows_compat(tmp_path)
         conn.commit()
         row = conn.execute(
             text(
-                "SELECT entity_key, entity_type, gate_status "
-                "FROM world_model_entities"
+                "SELECT entity_key, entity_type, gate_status FROM world_model_entities"
             )
         ).fetchone()
         assert row == ("e-old", "place", "passed")
@@ -414,16 +420,12 @@ async def test_rule_exceptions_and_alias_reviews_survive_restart(tmp_path):
         )
         assert len(reviews) == 2
         assert all(review.status == AliasReviewStatus.REVIEW for review in reviews)
-        assert {
-            review.review_key for review in reviews
-        } == {
+        assert {review.review_key for review in reviews} == {
             "alias-review:e-faction-nan:e-faction-nanjiang",
             "alias-review:e-place-lin-an:e-place-lin-anfu",
         }
         # Both entities are still distinct after replay — nothing was merged.
-        entities = await queries.query_entities(
-            owner_id=1, novel_id=1, version_id=2
-        )
+        entities = await queries.query_entities(owner_id=1, novel_id=1, version_id=2)
         keys = {entity.entity_key for entity in entities}
         assert keys == {
             "e-faction-nan",
@@ -488,9 +490,7 @@ async def test_tampered_row_checksum_fails_closed(tmp_path):
         await WorldEntityRepository(session).append_projection(
             build_valid_projection(version_id=1)
         )
-        row = (
-            await session.scalars(select(WorldModelRuleException).limit(1))
-        ).first()
+        row = (await session.scalars(select(WorldModelRuleException).limit(1))).first()
         assert row is not None
         row.canonical_payload_hash = "0" * 64  # tamper (test-only; no update API)
         await session.flush()
@@ -634,8 +634,7 @@ async def test_reader_chat_claims_never_become_durable_rows(tmp_path):
 
 def test_query_module_exposes_read_only_api():
     members = {
-        name
-        for name, _ in inspect.getmembers(WorldEntityQueries, predicate=callable)
+        name for name, _ in inspect.getmembers(WorldEntityQueries, predicate=callable)
     }
     assert "query_world_projection" in members
     assert "query_entities" in members

@@ -127,9 +127,7 @@ def _sha256(component: str, body: str) -> str:
 
 
 def claim_checksum(claim: "EpistemicClaim") -> str:
-    return _sha256(
-        EPISTEMIC_HASH_CLAIM, _canonical_json(claim.model_dump(mode="json"))
-    )
+    return _sha256(EPISTEMIC_HASH_CLAIM, _canonical_json(claim.model_dump(mode="json")))
 
 
 def projection_checksum(projection: "KnowledgeCandidateProjection") -> str:
@@ -219,9 +217,7 @@ class EpistemicClaim(StrictModel):
 
     @property
     def idempotency_key(self) -> str:
-        return row_idempotency_key(
-            EPISTEMIC_HASH_CLAIM, self.model_dump(mode="json")
-        )
+        return row_idempotency_key(EPISTEMIC_HASH_CLAIM, self.model_dump(mode="json"))
 
 
 class KnowledgeCandidateProjection(StrictModel):

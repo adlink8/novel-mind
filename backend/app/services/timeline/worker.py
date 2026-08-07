@@ -593,9 +593,7 @@ async def _load_character_registry(
     registry = []
     for row in rows:
         aliases = [
-            alias.strip()
-            for alias in (row.aliases or "").split(",")
-            if alias.strip()
+            alias.strip() for alias in (row.aliases or "").split(",") if alias.strip()
         ]
         registry.append({"id": row.id, "name": row.name, "aliases": aliases})
     return registry

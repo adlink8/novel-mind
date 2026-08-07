@@ -10,7 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Sequence
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -383,17 +383,14 @@ def _build_world_projection_resolver(
 
         async def reader(context):
             rows = (
-                (
-                    await session.scalars(
-                        select(WorldModelKnowledge).where(
-                            WorldModelKnowledge.owner_id == context.owner_id,
-                            WorldModelKnowledge.novel_id == context.novel_id,
-                            WorldModelKnowledge.version_id == context.version_id,
-                        )
+                await session.scalars(
+                    select(WorldModelKnowledge).where(
+                        WorldModelKnowledge.owner_id == context.owner_id,
+                        WorldModelKnowledge.novel_id == context.novel_id,
+                        WorldModelKnowledge.version_id == context.version_id,
                     )
                 )
-                .all()
-            )
+            ).all()
             claims = [
                 EpistemicClaim.model_validate(dict(r.canonical_payload or {}))
                 for r in rows

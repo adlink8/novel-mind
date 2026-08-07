@@ -77,9 +77,7 @@ class WorldModelEvent(TimestampMixin, Base):
     disclosure_cutoff: Mapped[int] = mapped_column(Integer, nullable=False)
     gate_status: Mapped[str] = mapped_column(String(16), nullable=False)
     source_refs: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
-    canonical_payload: Mapped[dict] = mapped_column(
-        JSONB, nullable=False, default=dict
-    )
+    canonical_payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     canonical_payload_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     idempotency_key: Mapped[str] = mapped_column(String(64), nullable=False)
     projection_hash: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -89,9 +87,7 @@ class WorldModelEvent(TimestampMixin, Base):
 class WorldModelCausalEdge(TimestampMixin, Base):
     __tablename__ = "world_model_causal_edges"
     __table_args__ = (
-        UniqueConstraint(
-            "idempotency_key", name="uq_world_model_edges_idempotency"
-        ),
+        UniqueConstraint("idempotency_key", name="uq_world_model_edges_idempotency"),
         Index(
             "idx_world_model_edges_scope",
             "owner_id",
@@ -138,9 +134,7 @@ class WorldModelCausalEdge(TimestampMixin, Base):
     disclosure_cutoff: Mapped[int] = mapped_column(Integer, nullable=False)
     gate_status: Mapped[str] = mapped_column(String(16), nullable=False)
     source_refs: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
-    canonical_payload: Mapped[dict] = mapped_column(
-        JSONB, nullable=False, default=dict
-    )
+    canonical_payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     canonical_payload_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     idempotency_key: Mapped[str] = mapped_column(String(64), nullable=False)
     projection_hash: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -185,9 +179,7 @@ class WorldModelConflict(TimestampMixin, Base):
     kind: Mapped[str] = mapped_column(String(32), nullable=False)
     involved_keys: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
     description: Mapped[str] = mapped_column(String(400), nullable=False)
-    canonical_payload: Mapped[dict] = mapped_column(
-        JSONB, nullable=False, default=dict
-    )
+    canonical_payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     canonical_payload_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     idempotency_key: Mapped[str] = mapped_column(String(64), nullable=False)
     projection_hash: Mapped[str] = mapped_column(String(64), nullable=False)
