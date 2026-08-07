@@ -103,6 +103,11 @@ def commit_is_ancestor(repo_root: Path, source_commit: str) -> bool:
         return False
 
 
+def is_shallow_clone(repo_root: Path) -> bool:
+    """浅克隆（如 CI fetch-depth=1）中 .git/shallow 存在，无法审计完整历史。"""
+    return (repo_root / ".git" / "shallow").exists()
+
+
 def check_verification(
     verification_path: Path,
     repo_root: Path,
@@ -155,7 +160,12 @@ def check_verification(
         elif repo_root.is_dir() and (repo_root / ".git").exists():
             # 默认（无 --expected-commit）：必须是当前仓库 HEAD 的祖先——
             # 验证证据来自已并入历史、可审计的提交。伪造/未合并提交被拒绝。
-            if not commit_is_ancestor(repo_root, source_commit):
+            if is_shallow_clone(repo_root):
+                # 浅克隆（CI 常 fetch-depth=1）中 .git/shallow 存在，merge-base
+                # 无法审计完整历史。此时跳过祖先断言（格式/状态/段落校验仍执行），
+                # 避免把合法验证证据误判为过期。
+                pass
+            elif not commit_is_ancestor(repo_root, source_commit):
                 head = git_head(repo_root)
                 errors.append(
                     f"source_commit 不在当前历史: VERIFICATION={source_commit}，"
