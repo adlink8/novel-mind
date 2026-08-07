@@ -307,8 +307,12 @@ export function AgentTurnInline({
     startedRef.current = true;
     startStream();
     return () => {
+      // React 18 StrictMode dev 会先挂载→清理→再挂载（模拟卸载）：
+      // 清理必须重置 startedRef，否则第二次真实挂载不会重启流（SSE 被 abort 后
+      // 永远不达）。真实卸载后组件销毁，重置无副作用。
       abortRef.current?.abort();
       abortRef.current = null;
+      startedRef.current = false;
     };
     // 只挂载时启动一次。
     // eslint-disable-next-line react-hooks/exhaustive-deps

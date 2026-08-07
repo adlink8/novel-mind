@@ -235,4 +235,17 @@ describe("AgentTurnInline", () => {
     );
     expect(onDone).toHaveBeenCalled();
   });
+
+  it("restarts the stream after React 18 StrictMode double-mount cleanup", async () => {
+    // StrictMode dev 先挂载→cleanup（abort）→再挂载。cleanup 必须重置 startedRef，
+    // 否则第二次真实挂载不会重启 SSE 流（回归守卫：修复前第二次挂载 0 次调用）。
+    const { unmount } = renderTurn();
+    await waitStream(); // 第一次挂载启动了流
+    unmount(); // StrictMode 模拟卸载 → cleanup abort
+    const { container } = renderTurn(); // 第二次真实挂载
+    await waitFor(() =>
+      expect(mocks.streamAgentRun).toHaveBeenCalledTimes(2)
+    );
+    expect(container).toBeTruthy();
+  });
 });
