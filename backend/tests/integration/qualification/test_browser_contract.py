@@ -896,10 +896,12 @@ def test_job_status_vocabulary_covers_partial_failure_and_cancel() -> None:
         "failed_validation",
     ):
         assert expected in {s.value for s in GenerationJobStatus}
-    # Frontend maps the same vocabulary (shared contract).
-    frontend = (REPO_ROOT / "frontend" / "src" / "lib" / "api.ts").read_text(
-        encoding="utf-8"
-    )
+    # Frontend maps the same vocabulary (shared contract). The reader-chat
+    # domain file (split from the former src/lib/api.ts barrel) owns the
+    # GenerationJobStatus union.
+    frontend = (
+        REPO_ROOT / "frontend" / "src" / "lib" / "api" / "reader-chat.ts"
+    ).read_text(encoding="utf-8")
     assert "failed_validation" in frontend and "paused_dependency" in frontend
 
 
