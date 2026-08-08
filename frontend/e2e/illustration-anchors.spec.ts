@@ -246,6 +246,9 @@ test("desktop: a missing binary is a graceful accessible placeholder", async ({
   await openReader(page);
 
   const missingFigure = page.locator('[data-testid="illustration-block"][data-anchor-id="2"]');
+  // The reader lazy-loads asset bytes via IntersectionObserver; on narrow
+  // viewports the block sits below the fold so scroll it into view first.
+  await missingFigure.scrollIntoViewIfNeeded();
   await expect(missingFigure.getByTestId("illustration-missing")).toBeVisible({
     timeout: 30_000,
   });

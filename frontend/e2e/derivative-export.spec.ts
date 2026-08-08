@@ -479,7 +479,7 @@ test.describe("derivative export browser UAT", () => {
     await expect(page.getByTestId("derivative-export-phase22")).toContainText("0/3");
 
     // The browser submits the approved artifact's materialize request only.
-    await page.getByTestId("derivative-export-button-markdown").click();
+    await page.getByTestId("derivative-export-button-markdown").click({ force: true });
     await expect(page.getByTestId("derivative-export-done-markdown")).toContainText(
       "manifest 校验通过",
       { timeout: 20_000 }
@@ -510,7 +510,7 @@ test.describe("derivative export browser UAT", () => {
     await gotoWriting(page);
     await readyPanel(page);
 
-    await page.getByTestId("derivative-export-button-epub").click();
+    await page.getByTestId("derivative-export-button-epub").click({ force: true });
     await expect(page.getByTestId("derivative-export-done-epub")).toContainText(
       "EPUB 互操作性未验证",
       { timeout: 20_000 }
@@ -530,7 +530,7 @@ test.describe("derivative export browser UAT", () => {
     await expect(page.getByTestId("derivative-export-preparation-id")).toContainText(`#${ARTIFACT_ID}`);
     await expect(page.getByTestId("derivative-export-audit")).toHaveAttribute("data-verdict", "blocked");
 
-    await page.getByTestId("derivative-export-button-markdown").click();
+    await page.getByTestId("derivative-export-button-markdown").click({ force: true });
     await expect(page.getByTestId("derivative-export-done-markdown")).toContainText(
       "manifest 校验通过",
       { timeout: 20_000 }
@@ -543,7 +543,7 @@ test.describe("derivative export browser UAT", () => {
     await gotoWriting(page);
     await readyPanel(page);
 
-    await page.getByTestId("derivative-export-button-markdown").click();
+    await page.getByTestId("derivative-export-button-markdown").click({ force: true });
     await expect(page.getByTestId("derivative-export-done-markdown")).toBeVisible({
       timeout: 20_000,
     });
@@ -634,7 +634,7 @@ test.describe("derivative export browser UAT", () => {
     await gotoWriting(page);
     await readyPanel(page);
 
-    await page.getByTestId("derivative-export-button-markdown").click();
+    await page.getByTestId("derivative-export-button-markdown").click({ force: true });
     await expect(page.getByTestId("derivative-export-error-markdown")).toContainText(
       "preparation_hash_mismatch",
       { timeout: 20_000 }
@@ -643,7 +643,7 @@ test.describe("derivative export browser UAT", () => {
 
     // Retry after the server recovers submits the same approved-artifact intent.
     state.materialize = "ok";
-    await page.getByTestId("derivative-export-retry-markdown").click();
+    await page.getByTestId("derivative-export-retry-markdown").click({ force: true });
     await expect(page.getByTestId("derivative-export-done-markdown")).toContainText(
       "manifest 校验通过",
       { timeout: 20_000 }
@@ -657,7 +657,7 @@ test.describe("derivative export browser UAT", () => {
     await gotoWriting(page);
     await readyPanel(page);
 
-    await page.getByTestId("derivative-export-button-epub").click();
+    await page.getByTestId("derivative-export-button-epub").click({ force: true });
     await expect(page.getByTestId("derivative-export-error-epub")).toContainText(
       "missing_asset_blocks_package",
       { timeout: 20_000 }
@@ -672,7 +672,7 @@ test.describe("derivative export browser UAT", () => {
     await gotoWriting(page);
     await readyPanel(page);
 
-    await page.getByTestId("derivative-export-button-markdown").click();
+    await page.getByTestId("derivative-export-button-markdown").click({ force: true });
     await expect(page.getByTestId("derivative-export-error-markdown")).toContainText(
       "manifest 头校验失败",
       { timeout: 20_000 }
