@@ -38,11 +38,13 @@ async def load_visual_bible_contract(
     """Reconstruct the immutable Visual Bible contract from persisted rows."""
     entity_rows = (
         await session.scalars(
-            select(VisualEntityRow).where(
+            select(VisualEntityRow)
+            .where(
                 VisualEntityRow.owner_id == version.owner_id,
                 VisualEntityRow.novel_id == version.novel_id,
                 VisualEntityRow.version_id == version.id,
             )
+            .order_by(VisualEntityRow.id.asc())
         )
     ).all()
     entity_contracts = [
@@ -58,20 +60,24 @@ async def load_visual_bible_contract(
     ]
     claim_rows = (
         await session.scalars(
-            select(VisualClaimRow).where(
+            select(VisualClaimRow)
+            .where(
                 VisualClaimRow.owner_id == version.owner_id,
                 VisualClaimRow.novel_id == version.novel_id,
                 VisualClaimRow.version_id == version.id,
             )
+            .order_by(VisualClaimRow.id.asc())
         )
     ).all()
     evidence_rows = (
         await session.scalars(
-            select(VisualEvidenceRefRow).where(
+            select(VisualEvidenceRefRow)
+            .where(
                 VisualEvidenceRefRow.owner_id == version.owner_id,
                 VisualEvidenceRefRow.novel_id == version.novel_id,
                 VisualEvidenceRefRow.version_id == version.id,
             )
+            .order_by(VisualEvidenceRefRow.id.asc())
         )
     ).all()
     evidence_by_claim: dict[int, list[VisualEvidenceRef]] = {}
@@ -106,11 +112,13 @@ async def load_visual_bible_contract(
     ]
     asset_rows = (
         await session.scalars(
-            select(VisualReferenceAssetRow).where(
+            select(VisualReferenceAssetRow)
+            .where(
                 VisualReferenceAssetRow.owner_id == version.owner_id,
                 VisualReferenceAssetRow.novel_id == version.novel_id,
                 VisualReferenceAssetRow.version_id == version.id,
             )
+            .order_by(VisualReferenceAssetRow.id.asc())
         )
     ).all()
     asset_contracts = [

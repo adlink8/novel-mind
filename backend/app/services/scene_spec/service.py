@@ -22,6 +22,7 @@ from app.models.key_scene import (
     SceneCandidate as SceneCandidateRow,
     SceneCandidateSet as SceneCandidateSetRow,
     SceneEvidenceRange as SceneEvidenceRangeRow,
+    SceneReviewDecision as SceneReviewDecisionRow,
 )
 from app.models.novel import Novel
 from app.models.scene_spec import (
@@ -35,6 +36,7 @@ from app.models.visual_bible import (
     VisualBibleVersion as VisualBibleVersionRow,
 )
 from app.schemas.key_scene import (
+    KeySceneReviewState,
     SceneCandidateContract,
     SceneEvidenceRange,
     candidate_content_hash,
@@ -53,6 +55,8 @@ from app.schemas.scene_spec import (
     scene_spec_content_payload,
 )
 from app.schemas.visual_bible import VisualReviewState
+
+from app.services.key_scenes.candidates import derive_candidate_review_states
 
 from .compiler import (
     SCENE_SPEC_DEFAULT_POLICY_HASH,
@@ -224,13 +228,36 @@ class SceneSpecService:
                 f"candidate {request.candidate_key!r} is not in the frozen set"
             )
 
+        # The candidate row's review_state is a static freeze-time snapshot; the
+        # effective state is derived from the append-only decisions (D-31-04).
+        # A rejected or never-approved candidate must not compile into a spec.
+        decision_rows = (
+            await self._session.scalars(
+                select(SceneReviewDecisionRow).where(
+                    SceneReviewDecisionRow.owner_id == owner_id,
+                    SceneReviewDecisionRow.novel_id == novel_id,
+                    SceneReviewDecisionRow.set_id == set_row.id,
+                )
+            )
+        ).all()
+        effective_state = derive_candidate_review_states(decision_rows).get(
+            request.candidate_key,
+            KeySceneReviewState(candidate_row.review_state),
+        )
+        if effective_state != KeySceneReviewState.APPROVED:
+            raise SceneSpecNotFound(
+                f"candidate {request.candidate_key!r} is not approved in the frozen set"
+            )
+
         evidence_rows = (
             await self._session.scalars(
-                select(SceneEvidenceRangeRow).where(
+                select(SceneEvidenceRangeRow)
+                .where(
                     SceneEvidenceRangeRow.owner_id == owner_id,
                     SceneEvidenceRangeRow.novel_id == novel_id,
                     SceneEvidenceRangeRow.set_id == set_row.id,
                 )
+                .order_by(SceneEvidenceRangeRow.id.asc())
             )
         ).all()
 
@@ -322,6 +349,12 @@ class SceneSpecService:
         )
         if existing is not None:
             if existing.content_hash == spec.content_hash:
+                if not self._same_provenance(existing, spec):
+                    raise SceneSpecConflict(
+                        f"conflicting spec replay: spec_key {spec.spec_key!r} already "
+                        "exists with identical content but different provenance "
+                        "(candidate/Visual Bible revision/source snapshot)"
+                    )
                 return PersistedSceneSpec(
                     version=existing,
                     view=await self._view_from_rows(
@@ -376,6 +409,12 @@ class SceneSpecService:
                 raise SceneSpecConflict(
                     f"conflicting spec retry: spec_key {spec.spec_key!r} already "
                     "exists with different immutable content"
+                )
+            if not self._same_provenance(existing, spec):
+                raise SceneSpecConflict(
+                    f"conflicting spec replay: spec_key {spec.spec_key!r} already "
+                    "exists with identical content but different provenance "
+                    "(candidate/Visual Bible revision/source snapshot)"
                 )
             return PersistedSceneSpec(
                 version=existing,
@@ -454,11 +493,34 @@ class SceneSpecService:
         latest_vb = await self._latest_approved_version(
             owner_id=owner_id, novel_id=novel_id
         )
-        stale = (
-            spec.visual_bible_revision_hash != latest_vb.manifest_hash
-            or spec.source_snapshot_hash != current_hash
-        )
-        original_sections = self._sections_from_payload(spec.canonical_payload)
+        if latest_vb is None:
+            # No approved Visual Bible revision to recompile against: the stored
+            # spec still exists, so this is stale-by-default, never a 404.
+            return SceneSpecDiffResult(
+                original_spec_hash=spec.content_hash,
+                current_spec_hash=spec.content_hash,
+                stale=True,
+                same=False,
+                changed_sections=(),
+            )
+        if spec.source_snapshot_hash != current_hash:
+            # The source snapshot drifted: the frozen snapshot is gone, so
+            # recompiling against the stale frozen snapshot would silently
+            # reproduce the old content and hide the drift. Short-circuit as
+            # stale without recompiling (WR-03).
+            return SceneSpecDiffResult(
+                original_spec_hash=spec.content_hash,
+                current_spec_hash=spec.content_hash,
+                stale=True,
+                same=False,
+                changed_sections=(),
+            )
+        stale = spec.visual_bible_revision_hash != latest_vb.manifest_hash
+        try:
+            original_sections = self._sections_from_payload(spec.canonical_payload)
+        except (ValueError, KeyError):
+            # Defensive: a malformed payload must not turn diff into a 500.
+            original_sections = {}
 
         if (
             latest_vb.id == spec.visual_bible_revision_id
@@ -585,7 +647,6 @@ class SceneSpecService:
             detail_canonical_payload,
         )
 
-        detail_rows: dict[str, SceneSpecDetailRow] = {}
         for detail in spec.details:
             payload = detail_canonical_payload(detail)
             payload_hash = canonical_scene_spec_hash(payload)
@@ -617,7 +678,6 @@ class SceneSpecService:
             )
             self._session.add(row)
             await self._session.flush()
-            detail_rows[detail.detail_key] = row
             for ref in detail.evidence_refs:
                 self._session.add(
                     self._evidence_row(
@@ -632,7 +692,6 @@ class SceneSpecService:
                     )
                 )
 
-        constraint_rows: dict[str, SceneSpecNegativeConstraintRow] = {}
         for constraint in spec.negative_constraints:
             payload = constraint_canonical_payload(constraint)
             payload_hash = canonical_scene_spec_hash(payload)
@@ -664,7 +723,6 @@ class SceneSpecService:
             )
             self._session.add(row)
             await self._session.flush()
-            constraint_rows[constraint.constraint_key] = row
             for ref in constraint.evidence_refs:
                 self._session.add(
                     self._evidence_row(
@@ -887,40 +945,112 @@ class SceneSpecService:
     def _sections_from_payload(payload: Mapping[str, Any]) -> dict[str, str]:
         from app.schemas.scene_spec import build_prompt_sections
 
-        details = [
-            SceneDetail(
+        def _detail_from_item(item: Mapping[str, Any]) -> SceneDetail | None:
+            evidence_refs = [
+                SpecEvidenceRef(
+                    evidence_key=key,
+                    source_snapshot_id=payload.get("source_snapshot_id") or "ss",
+                    source_snapshot_hash="0" * 64,
+                    chapter_id=1,
+                    chapter_number=1,
+                    source_start=0,
+                    source_end=1,
+                    content_hash="0" * 64,
+                    cutoff_chapter=1,
+                )
+                for key in (item.get("evidence_keys") or [])
+            ]
+            visual_bible_refs = [
+                VisualBibleRef(
+                    stable_id=ref["stable_id"],
+                    claim_key=ref.get("claim_key"),
+                    revision_hash="0" * 64,
+                )
+                for ref in (item.get("visual_bible_refs") or [])
+            ]
+            source = item["source"]
+            # D-32-02 source-shape gate: a stored payload whose source cannot be
+            # satisfied (e.g. source='visual_bible' with no refs) must not raise
+            # an uncaught ValueError from the strict validator and turn diff into
+            # a 500 (WR-05). Such malformed items are skipped for rendering.
+            if source == "evidence" and not evidence_refs:
+                return None
+            if source == "visual_bible" and not visual_bible_refs:
+                return None
+            if source == "user_interpretation":
+                if not item.get("author") or not item.get("rationale"):
+                    return None
+                evidence_refs = []
+                visual_bible_refs = []
+            return SceneDetail(
                 detail_key=item["detail_key"],
                 kind=item["kind"],
-                source=item["source"],
+                source=source,
                 text=item["text"],
                 author=item.get("author"),
                 rationale=item.get("rationale"),
-                evidence_refs=[
-                    SpecEvidenceRef(
-                        evidence_key=key,
-                        source_snapshot_id=payload.get("source_snapshot_id") or "ss",
-                        source_snapshot_hash="0" * 64,
-                        chapter_id=1,
-                        chapter_number=1,
-                        source_start=0,
-                        source_end=1,
-                        content_hash="0" * 64,
-                        cutoff_chapter=1,
-                    )
-                    for key in (item.get("evidence_keys") or [])
-                ],
-                visual_bible_refs=[
-                    VisualBibleRef(
-                        stable_id=ref["stable_id"],
-                        claim_key=ref.get("claim_key"),
-                        revision_hash="0" * 64,
-                    )
-                    for ref in (item.get("visual_bible_refs") or [])
-                ],
+                evidence_refs=evidence_refs,
+                visual_bible_refs=visual_bible_refs,
                 spoiler_cutoff=item["spoiler_cutoff"],
             )
-            for item in (payload.get("details") or [])
-        ]
+
+        def _constraint_from_item(
+            item: Mapping[str, Any],
+        ) -> NegativeConstraint | None:
+            evidence_refs = [
+                SpecEvidenceRef(
+                    evidence_key=key,
+                    source_snapshot_id=payload.get("source_snapshot_id") or "ss",
+                    source_snapshot_hash="0" * 64,
+                    chapter_id=1,
+                    chapter_number=1,
+                    source_start=0,
+                    source_end=1,
+                    content_hash="0" * 64,
+                    cutoff_chapter=1,
+                )
+                for key in (item.get("evidence_keys") or [])
+            ]
+            visual_bible_refs = [
+                VisualBibleRef(
+                    stable_id=ref["stable_id"],
+                    claim_key=ref.get("claim_key"),
+                    revision_hash="0" * 64,
+                )
+                for ref in (item.get("visual_bible_refs") or [])
+            ]
+            source = item["source"]
+            if source == "evidence" and not evidence_refs:
+                return None
+            if source == "visual_bible" and not visual_bible_refs:
+                return None
+            if source == "user_interpretation":
+                if not item.get("author") or not item.get("rationale"):
+                    return None
+                evidence_refs = []
+                visual_bible_refs = []
+            return NegativeConstraint(
+                constraint_key=item["constraint_key"],
+                scope=item["scope"],
+                source=source,
+                text=item["text"],
+                author=item.get("author"),
+                rationale=item.get("rationale"),
+                evidence_refs=evidence_refs,
+                visual_bible_refs=visual_bible_refs,
+                spoiler_cutoff=item["spoiler_cutoff"],
+            )
+
+        details: list[SceneDetail] = []
+        for item in payload.get("details") or []:
+            detail = _detail_from_item(item)
+            if detail is not None:
+                details.append(detail)
+        constraints: list[NegativeConstraint] = []
+        for item in payload.get("negative_constraints") or []:
+            constraint = _constraint_from_item(item)
+            if constraint is not None:
+                constraints.append(constraint)
         spec = SceneSpecContract(
             schema_version=payload["schema_version"],
             artifact_kind="scene_spec",
@@ -940,26 +1070,7 @@ class SceneSpecService:
             config_hash=payload.get("config_hash"),
             content_hash="0" * 64,
             details=details,
-            negative_constraints=[
-                NegativeConstraint(
-                    constraint_key=item["constraint_key"],
-                    scope=item["scope"],
-                    source=item["source"],
-                    text=item["text"],
-                    author=item.get("author"),
-                    rationale=item.get("rationale"),
-                    visual_bible_refs=[
-                        VisualBibleRef(
-                            stable_id=ref["stable_id"],
-                            claim_key=ref.get("claim_key"),
-                            revision_hash="0" * 64,
-                        )
-                        for ref in (item.get("visual_bible_refs") or [])
-                    ],
-                    spoiler_cutoff=item["spoiler_cutoff"],
-                )
-                for item in (payload.get("negative_constraints") or [])
-            ],
+            negative_constraints=constraints,
             uncertainties=[
                 SceneUncertainty(
                     uncertainty_key=item["uncertainty_key"],
@@ -986,6 +1097,9 @@ class SceneSpecService:
         latest_vb = await self._latest_approved_version(
             owner_id=owner_id, novel_id=novel_id
         )
+        if latest_vb is None:
+            # No current approved revision to compare against: stale by default.
+            return True
         return (
             spec.visual_bible_revision_hash != latest_vb.manifest_hash
             or spec.source_snapshot_hash != current_hash
@@ -1005,8 +1119,11 @@ class SceneSpecService:
 
     async def _latest_approved_version(
         self, *, owner_id: int, novel_id: int
-    ) -> VisualBibleVersionRow:
-        row = await self._session.scalar(
+    ) -> VisualBibleVersionRow | None:
+        """The newest approved Visual Bible revision, or ``None`` when the novel
+        has none. Callers treat ``None`` as stale-by-default for an existing spec
+        (no current revision to compare/recompile against), never as a 404."""
+        return await self._session.scalar(
             select(VisualBibleVersionRow)
             .where(
                 VisualBibleVersionRow.owner_id == owner_id,
@@ -1016,13 +1133,23 @@ class SceneSpecService:
             .order_by(VisualBibleVersionRow.id.desc())
             .limit(1)
         )
-        if row is None:
-            raise SceneSpecNotFound(
-                "novel has no approved Visual Bible revision; spec is stale by default"
-            )
-        return row
 
     # --------------------------------------------------------------- queries
+
+    @staticmethod
+    def _same_provenance(
+        existing: SceneSpecVersionRow, spec: SceneSpecContract
+    ) -> bool:
+        """Replay requires identical provenance, not just identical content hash:
+        the same source candidate, the same approved Visual Bible revision and
+        the same source snapshot. A retry with a different candidate/revision but
+        identical content would otherwise be misreported as a replay of the
+        existing row (WR-06)."""
+        return (
+            existing.visual_bible_revision_id == spec.visual_bible_revision_id
+            and existing.scene_candidate_id == spec.scene_candidate_id
+            and existing.source_snapshot_id == spec.source_snapshot_id
+        )
 
     async def _spec(
         self, *, owner_id: int, novel_id: int, spec_key: str
