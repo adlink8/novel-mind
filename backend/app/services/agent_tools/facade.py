@@ -24,6 +24,14 @@
      状态；候选资产由 durable worker 产出，审批/发布属于 Phase 34。
      ``generate_image_candidate`` 的作业创建复用 illustrations 域确定性服务，
      不越出候选边界。
+
+拆分说明（refactor split）：本模块保留门面本体 —— 冻结工具名表、budget hook
+类型/默认实现、``ToolFacade`` 统一执行门面（字节上限/超时/budget/错误码映射）
+与全局单例。23 个 ``_default_*`` 服务入口按功能域拆到同目录模块
+（``_defaults_reading`` / ``_defaults_analysis`` / ``_defaults_world`` /
+``_defaults_visual`` / ``_defaults_derivative`` / ``_defaults_export``），
+JSON-safe 视图助手在 ``_tool_views`` 叶模块；本模块显式 re-export 全部同名
+符号，``from app.services.agent_tools.facade import X`` 的 import surface 不变。
 """
 
 from __future__ import annotations
@@ -31,12 +39,8 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import uuid
 from collections.abc import Awaitable, Callable
-from decimal import Decimal
 from typing import Any
-
-from sqlalchemy import select
 
 from app.models import Novel
 from app.schemas.novel import ChapterResponse, NovelResponse
@@ -55,26 +59,43 @@ from app.services.agent_tools.errors import (
     ToolTimeoutError,
     UpstreamError,
 )
-from app.services.visual_bible.authority import (
-    CandidateNotFoundError,
-    list_versions as list_visual_bible_versions,
-    load_version_view as load_visual_bible_version_view,
+from app.services.narrative_memory.structure_query import StructureQueryError
+from app.services.timeline.query import resolve_chapter_cutoff
+
+# ────────────────────────── 按功能域的默认服务入口（拆分后 re-export） ──────────────────────────
+from ._defaults_analysis import (
+    _default_get_clues,
+    _default_get_narrative_memory,
+    _default_get_relationships,
+    _default_get_timeline,
 )
-from app.services.clues.query import build_clue_envelope
-from app.services.narrative_memory.structure_query import (
-    StructureQueryError,
-    list_versions,
-    load_structure_tree,
+from ._defaults_derivative import (
+    _default_allow_divergence,
+    _default_apply_derivative_edit,
+    _default_create_canon_fork,
+    _default_publish_derivative_revision,
+    _default_publish_derivative_visual,
 )
-from app.services.novel_service import novel_service
-from app.services.queryplan.adapters import chapter_content_hash
-from app.services.queryplan.contracts import leaf_evidence_key
-from app.services.relationships.query import relationship_graph_query_service
-from app.services.timeline.query import build_version_view, resolve_chapter_cutoff
-from app.services.world_model.entity_queries import WorldEntityQueries
-from app.services.world_model.event_queries import WorldModelEventQueries
-from app.services.world_model.knowledge import EpistemicAspect, KnowledgeResultStatus
-from app.services.world_model.knowledge_queries import KnowledgeQueries
+from ._defaults_export import _default_approve_export, _default_materialize_export
+from ._defaults_reading import (
+    _default_get_chapter,
+    _default_get_novel,
+    _default_search_novel_text,
+)
+from ._defaults_visual import (
+    _default_attach_illustration_to_text,
+    _default_generate_image_candidate,
+    _default_get_visual_bible,
+    _default_publish_illustration,
+)
+from ._defaults_world import (
+    _default_get_character_knowledge,
+    _default_get_character_state,
+    _default_get_events,
+    _default_get_evidence_span,
+    _default_get_world_rules,
+    _resolve_world_model_version,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -162,983 +183,6 @@ async def default_budget_hook(tool_name: str, params: dict[str, Any]) -> None:
 def _persisted_full_book(novel: Novel) -> bool:
     """从持久化的每本小说开关读取 full_book 授权（绝不接受裸请求参数）。"""
     return bool((novel.reading_progress or {}).get("timeline_full_book", False))
-
-
-# ────────────────────────── 默认服务入口（按工具） ──────────────────────────
-
-
-async def _default_get_novel(db, novel_id: int):
-    return await novel_service.get_novel(db, novel_id)
-
-
-async def _default_get_chapter(db, chapter_id: int):
-    return await novel_service.get_chapter(db, chapter_id)
-
-
-async def _default_search_novel_text(
-    db,
-    *,
-    owner_id: int,
-    novel_id: int,
-    query: str,
-    mode: str,
-    top_k: int,
-) -> Any:
-    from app.services.knowledge_units.search import production_retrieval_strategy
-
-    strategy = production_retrieval_strategy()
-    outcome = await strategy.resolve_novel(
-        db,
-        owner_id=owner_id,
-        novel_id=novel_id,
-        domain_profile="fiction",
-        query=query,
-        mode=mode,
-        top_k=top_k,
-    )
-    return {
-        "results": outcome.rows,
-        "resolved_mode": outcome.resolved_mode,
-        "fallback_reason": outcome.fallback_reason,
-    }
-
-
-async def _default_get_timeline(
-    db,
-    *,
-    novel: Novel,
-    owner_id: int,
-    source: TimelineVersionSource,
-    ordering: TimelineOrdering,
-    person: str | None,
-    include_causal: bool,
-    request_full_book: bool,
-    chapter_start: int | None,
-    chapter_end: int | None,
-):
-    return await build_version_view(
-        db,
-        novel=novel,
-        owner_id=owner_id,
-        source=source,
-        ordering=ordering,
-        person=person,
-        include_causal=include_causal,
-        request_full_book=request_full_book,
-        chapter_start=chapter_start,
-        chapter_end=chapter_end,
-    )
-
-
-async def _default_get_relationships(
-    db,
-    *,
-    novel: Novel,
-    owner_id: int,
-    source: RelationshipVersionSource,
-    version_id: int | None,
-    through_chapter: int | None,
-    request_full_book: bool,
-    character_id: int | None,
-    relation_type: str | None,
-    include_provisional: bool,
-):
-    return await relationship_graph_query_service.build_graph(
-        db,
-        novel=novel,
-        owner_id=owner_id,
-        source=source,
-        version_id=version_id,
-        through_chapter=through_chapter,
-        request_full_book=request_full_book,
-        character_id=character_id,
-        relation_type=relation_type,
-        include_provisional=include_provisional,
-    )
-
-
-async def _default_get_clues(
-    db,
-    *,
-    novel: Novel,
-    owner_id: int,
-    request_full_book: bool,
-    character_id: int | None,
-    status_filter: str | None,
-) -> dict[str, Any]:
-    return await build_clue_envelope(
-        db,
-        novel=novel,
-        owner_id=owner_id,
-        request_full_book=request_full_book,
-        character_id=character_id,
-        status_filter=status_filter,
-    )
-
-
-async def _default_get_narrative_memory(
-    db,
-    *,
-    owner_id: int,
-    novel_id: int,
-    version_id: int | None,
-    view: str,
-    through_chapter: int | None,
-) -> Any:
-    if view == "versions":
-        return await list_versions(db, owner_id=owner_id, novel_id=novel_id)
-    if view == "tree":
-        if version_id is None:
-            raise InvalidInputError("narrative_memory tree 视图需要 version_id")
-        return await load_structure_tree(
-            db,
-            owner_id=owner_id,
-            novel_id=novel_id,
-            version_id=version_id,
-            through_chapter=through_chapter,
-        )
-    raise InvalidInputError(f"不支持的 narrative_memory 视图: {view!r}")
-
-
-# ────────────────────────── Phase 27 世界模型默认服务入口（27-05） ──────────────────────────
-
-
-def _epistemic_answer_to_json(answer) -> dict[str, Any]:
-    """把 EpistemicAnswer 序列化为 JSON 安全 payload（claims/evidence 是 pydantic）。"""
-    return {
-        "status": answer.status.value,
-        "subject": answer.subject,
-        "claims": [claim.model_dump(mode="json") for claim in answer.claims],
-        "evidence": [ref.model_dump(mode="json") for ref in answer.evidence],
-        "has_approval": answer.has_approval,
-        "message": answer.message,
-    }
-
-
-def _merge_state_answers(
-    *, subject: str, answers: list[Any], message: str
-) -> dict[str, Any]:
-    """合并 state/goal/motivation 三个 aspect 的查询结果（无编造，abstain 优先）。"""
-    claims = tuple(claim for answer in answers for claim in answer.claims)
-    evidence = tuple(ref for answer in answers for ref in answer.evidence)
-    approved = any(answer.has_approval for answer in answers)
-    if not claims:
-        status = KnowledgeResultStatus.ABSTAINED
-    elif approved:
-        status = KnowledgeResultStatus.ANSWERED
-    else:
-        status = KnowledgeResultStatus.CANDIDATE_ONLY
-    return {
-        "status": status.value,
-        "subject": subject,
-        "claims": [claim.model_dump(mode="json") for claim in claims],
-        "evidence": [ref.model_dump(mode="json") for ref in evidence],
-        "has_approval": approved,
-        "message": message,
-    }
-
-
-async def _default_get_events(
-    db,
-    *,
-    owner_id: int,
-    novel_id: int,
-    version_id: int,
-    cutoff: int,
-) -> dict[str, Any] | None:
-    """世界模型事件/因果投影（D-05 cutoff 过滤；无投影 → None → 404-hide）。"""
-    projection = await WorldModelEventQueries(db).query_cutoff_projection(
-        owner_id=owner_id,
-        novel_id=novel_id,
-        version_id=version_id,
-        cutoff=cutoff,
-    )
-    return projection.model_dump(mode="json") if projection is not None else None
-
-
-async def _default_get_character_state(
-    db,
-    *,
-    owner_id: int,
-    novel_id: int,
-    version_id: int,
-    subject: str,
-    cutoff: int,
-    pov: str | None,
-) -> dict[str, Any]:
-    """角色状态/目标/动机（aspect ∈ state/goal/motivation 合并，D-05）。"""
-    queries = KnowledgeQueries(db)
-    answers = [
-        await queries.query_character_knowledge(
-            owner_id=owner_id,
-            novel_id=novel_id,
-            version_id=version_id,
-            subject=subject,
-            cutoff=cutoff,
-            pov=pov,
-            aspect=aspect,
-        )
-        for aspect in (
-            EpistemicAspect.STATE,
-            EpistemicAspect.GOAL,
-            EpistemicAspect.MOTIVATION,
-        )
-    ]
-    return _merge_state_answers(
-        subject=subject,
-        answers=answers,
-        message="character state merged across state/goal/motivation (D-05)",
-    )
-
-
-async def _default_get_character_knowledge(
-    db,
-    *,
-    owner_id: int,
-    novel_id: int,
-    version_id: int,
-    subject: str,
-    cutoff: int,
-    pov: str | None,
-) -> dict[str, Any]:
-    """角色知识（aspect=knowledge；mistaken/hidden 保持显式标签，D-05）。"""
-    answer = await KnowledgeQueries(db).query_character_knowledge(
-        owner_id=owner_id,
-        novel_id=novel_id,
-        version_id=version_id,
-        subject=subject,
-        cutoff=cutoff,
-        pov=pov,
-        aspect=EpistemicAspect.KNOWLEDGE,
-    )
-    return _epistemic_answer_to_json(answer)
-
-
-async def _default_get_world_rules(
-    db,
-    *,
-    owner_id: int,
-    novel_id: int,
-    version_id: int,
-    cutoff: int,
-) -> dict[str, Any]:
-    """世界规则与规则例外（D-05 cutoff 过滤；例外是 first-class，D-04）。"""
-    queries = WorldEntityQueries(db)
-    rules = [
-        rule.model_dump(mode="json")
-        for rule in await queries.query_rules(
-            owner_id=owner_id, novel_id=novel_id, version_id=version_id
-        )
-        if rule.disclosure_cutoff <= cutoff
-    ]
-    exceptions = [
-        exc.model_dump(mode="json")
-        for exc in await queries.query_rule_exceptions(
-            owner_id=owner_id, novel_id=novel_id, version_id=version_id
-        )
-        if exc.disclosure_cutoff <= cutoff
-    ]
-    return {"rules": rules, "exceptions": exceptions}
-
-
-async def _default_get_evidence_span(
-    db,
-    *,
-    chapter_id: int,
-    source_start: int,
-    source_end: int,
-    content_hash: str,
-) -> dict[str, Any] | None:
-    """按 chapter+offsets+content_hash 物化 leaf 证据跨度（D-07/D-08）。
-
-    chapter 缺失 → None（404-hide）；offsets 非法 / hash 与原文切片不匹配 →
-    InvalidInputError（fail closed，绝不返回错误切片）。
-    """
-    chapter = await novel_service.get_chapter(db, chapter_id)
-    if chapter is None:
-        return None
-    content = chapter.content
-    if source_start < 0 or source_end > len(content) or source_end <= source_start:
-        raise InvalidInputError(
-            f"offsets [{source_start},{source_end}) 不是合法 half-open 区间"
-        )
-    excerpt = content[source_start:source_end]
-    if chapter_content_hash(excerpt) != content_hash:
-        raise InvalidInputError("evidence content hash 与原文切片不匹配")
-    return {
-        "evidence_key": leaf_evidence_key(
-            chapter_id=chapter_id,
-            source_start=source_start,
-            source_end=source_end,
-            content_hash=content_hash,
-        ),
-        "chapter_id": chapter_id,
-        "chapter_number": chapter.chapter_number,
-        "novel_id": chapter.novel_id,
-        "source_start": source_start,
-        "source_end": source_end,
-        "content_hash": content_hash,
-        "excerpt": excerpt,
-    }
-
-
-async def _default_get_visual_bible(
-    db,
-    *,
-    owner_id: int,
-    novel_id: int,
-    version_id: int | None,
-    approved_only: bool,
-) -> dict[str, Any] | None:
-    """按 owner/novel 范围读取 Visual Bible 候选版本视图（31-04 只读工具）。
-
-    显式 ``version_id`` → 单个候选信封（owner/novel 越界 → None，404-hide）；
-    缺省 → 版本列表。``approved_only=True`` 只保留 review_state=approved 的
-    版本（D-30-04 approval 权威仍只在 FastAPI review API，本工具只读）。
-    """
-    if version_id is not None:
-        try:
-            view = await load_visual_bible_version_view(
-                db,
-                owner_id=owner_id,
-                novel_id=novel_id,
-                version_id=version_id,
-            )
-        except CandidateNotFoundError:
-            return None
-        return view.model_dump(mode="json")
-    views = await list_visual_bible_versions(db, owner_id=owner_id, novel_id=novel_id)
-    if approved_only:
-        views = [view for view in views if view.review_state == "approved"]
-    return {
-        "items": [view.model_dump(mode="json") for view in views],
-        "total": len(views),
-    }
-
-
-async def _default_generate_image_candidate(
-    db,
-    *,
-    owner_id: int,
-    novel_id: int,
-    params: dict[str, Any],
-) -> dict[str, Any]:
-    """Phase 33 action 工具默认服务：创建**一个**候选生成作业（D-33-01..D-33-03）。
-
-    只创建 durable idempotent job（queued）——服务端 generation gate 只接受
-    **已批准且非 stale** 的 PromptRevision（``check_generation_prompt_gate``），
-    作业 idempotency key 从 owner/novel/SceneSpec/prompt/model/config 血缘
-    确定性重放。绝不写 Canon / 域表 / ApprovalRequest / published 状态；候选
-    资产由 durable worker 在作业成功时产出，审批/发布属于 Phase 34。
-    """
-    from app.models.illustration_job import (
-        ILLUSTRATION_JOB_NONTERMINAL_STATUSES,
-        IllustrationJob,
-    )
-    from app.schemas.illustration import (
-        IllustrationJobContract,
-        PriceSnapshot,
-        build_illustration_idempotency_key,
-        validate_illustration_job_contract,
-    )
-    from app.services.illustrations.gateway import (
-        GenerationGateError,
-        build_illustration_lineage,
-        check_generation_prompt_gate,
-    )
-    from app.services.illustrations.worker import (
-        DEFAULT_MAX_INPUT_TOKENS,
-        DEFAULT_MAX_OUTPUT_TOKENS,
-        MOCK_ILLUSTRATION_MODEL,
-        MOCK_ILLUSTRATION_PROVIDER,
-    )
-
-    provider = str(params.get("provider") or MOCK_ILLUSTRATION_PROVIDER)
-    model = str(params.get("model") or MOCK_ILLUSTRATION_MODEL)
-    if provider != MOCK_ILLUSTRATION_PROVIDER:
-        raise InvalidInputError(
-            f"illustration provider {provider!r} is not configured; supported: {MOCK_ILLUSTRATION_PROVIDER!r}"
-        )
-    prompt_revision_id = int(params["prompt_revision_id"])
-    try:
-        prompt_row = await check_generation_prompt_gate(
-            db,
-            owner_id=owner_id,
-            novel_id=novel_id,
-            prompt_revision_id=prompt_revision_id,
-        )
-    except GenerationGateError as exc:
-        if exc.reason_code == "prompt_revision_not_found":
-            raise NotFoundError(str(exc)) from None
-        raise InvalidInputError(str(exc)) from exc
-
-    lineage = build_illustration_lineage(
-        prompt_revision=prompt_row,
-        provider=provider,
-        model=model,
-        width=int(params.get("width", 1024)),
-        height=int(params.get("height", 1024)),
-        max_input_tokens=DEFAULT_MAX_INPUT_TOKENS,
-        max_output_tokens=DEFAULT_MAX_OUTPUT_TOKENS,
-    )
-    idempotency_key = build_illustration_idempotency_key(owner_id, novel_id, lineage)
-    price_snapshot = PriceSnapshot(
-        provider=provider,
-        model=model,
-        input_price_per_million=Decimal("0.10"),
-        output_price_per_million=Decimal("0.10"),
-        image_price_per_image=Decimal("0.04"),
-    )
-    job_contract = IllustrationJobContract(
-        schema_version="illustration.v1",
-        artifact_kind="illustration_job",
-        owner_id=owner_id,
-        novel_id=novel_id,
-        job_key=str(params.get("job_key") or f"agent-{uuid.uuid4().hex[:8]}"),
-        lineage=lineage,
-        price_snapshot=price_snapshot.model_dump(mode="json"),
-        idempotency_key=idempotency_key,
-    )
-    validate_illustration_job_contract(job_contract)
-
-    existing = await db.scalar(
-        select(IllustrationJob).where(
-            IllustrationJob.idempotency_key == idempotency_key
-        )
-    )
-    if existing is not None:
-        if (
-            existing.status in ILLUSTRATION_JOB_NONTERMINAL_STATUSES
-            or existing.status == "succeeded"
-        ):
-            return _job_view_for_tool(existing)
-        raise InvalidInputError(
-            "a terminal illustration job with this lineage already exists; retry it explicitly"
-        )
-
-    row = IllustrationJob(
-        owner_id=owner_id,
-        novel_id=novel_id,
-        job_key=job_contract.job_key,
-        idempotency_key=idempotency_key,
-        status="queued",
-        status_reason=None,
-        error_code=None,
-        lease_id=None,
-        lease_expires_at=None,
-        heartbeat_at=None,
-        cancel_requested=False,
-        retry_count=0,
-        scene_spec_hash=lineage.scene_spec_hash,
-        prompt_revision_id=lineage.prompt_revision_id,
-        prompt_revision_hash=lineage.prompt_revision_hash,
-        visual_bible_revision_id=lineage.visual_bible_revision_id,
-        visual_bible_revision_hash=lineage.visual_bible_revision_hash,
-        source_snapshot_id=lineage.source_snapshot_id,
-        source_snapshot_hash=lineage.source_snapshot_hash,
-        cutoff_chapter=lineage.cutoff_chapter,
-        model_lineage=dict(lineage.model_lineage),
-        config_hash=lineage.config_hash,
-        price_snapshot=job_contract.price_snapshot,
-        response_hash=None,
-        schema_version="illustration.v1",
-    )
-    db.add(row)
-    await db.flush()
-    return _job_view_for_tool(row)
-
-
-async def _default_publish_illustration(
-    db,
-    *,
-    owner_id: int,
-    novel_id: int,
-    params: dict[str, Any],
-) -> dict[str, Any]:
-    """Phase 34 action 工具默认服务：创建**一个**候选锚点 proposal（D-34-01）。
-
-    服务端 proposal gate 只接受 proposal-ready + rights cleared 的 AssetRevision
-    （Phase 33 handoff）与精确 source span（excerpt + anchor_hash +
-    chapter_content_hash + source snapshot）；创建候选 IllustrationAnchorProposal
-    + pending Web ApprovalRequest（action=publish_illustration，payload_hash
-    确定性重放，D-11/D-15）。绝不发布——确定性 publisher 在用户 Web 批准后原子
-    校验 approval + payload + scope 才创建 valid anchor；Agent/浏览器绝不发布。
-    """
-    from app.services.illustration_anchors.publish import (
-        AnchorProposalError,
-        create_anchor_proposal,
-    )
-
-    try:
-        result = await create_anchor_proposal(
-            db,
-            owner_id=owner_id,
-            novel_id=novel_id,
-            request=params,
-            action="publish_illustration",
-        )
-    except AnchorProposalError as exc:
-        raise InvalidInputError(str(exc)) from None
-    await db.flush()
-    return _anchor_proposal_view_for_tool(result)
-
-
-async def _default_attach_illustration_to_text(
-    db,
-    *,
-    owner_id: int,
-    novel_id: int,
-    params: dict[str, Any],
-) -> dict[str, Any]:
-    """Phase 34 action 工具默认服务：把锚点绑定到精确文本跨度（candidate-only）。
-
-    与 publish_illustration 同 gate（proposal-ready asset + 精确 source span），
-    但 ApprovalRequest action 为 attach_illustration_to_text。绝不发布。
-    """
-    from app.services.illustration_anchors.publish import (
-        AnchorProposalError,
-        create_anchor_proposal,
-    )
-
-    try:
-        result = await create_anchor_proposal(
-            db,
-            owner_id=owner_id,
-            novel_id=novel_id,
-            request=params,
-            action="attach_illustration_to_text",
-        )
-    except AnchorProposalError as exc:
-        raise InvalidInputError(str(exc)) from None
-    await db.flush()
-    return _anchor_proposal_view_for_tool(result)
-
-
-async def _default_create_canon_fork(
-    db,
-    *,
-    owner_id: int,
-    novel_id: int,
-    params: dict[str, Any],
-) -> dict[str, Any]:
-    """Phase 35 action 工具默认服务：创建**一个**候选 canon fork（D-35-03）。
-
-    服务端 proposal gate 只接受冻结 fork manifest（server-derived cutoff +
-    精确 source snapshot）+ delta 意图；创建候选 CanonFork（status=candidate）+
-    pending Web ApprovalRequest（action=create_canon_fork，payload_hash 确定性
-    重放，D-11/D-15）。绝不物化 fork——确定性 Fork materializer 在用户 Web 批准后
-    原子校验 approval + payload + fork manifest + snapshot 重放 + delta 血缘 +
-    owner/novel/branch/fork scope 才把 fork 物化为 approved；Original Canon
-    不可变、active pointer 恒 false。
-    """
-    from app.services.canon_fork.materializer import (
-        ForkProposalError,
-        create_fork_proposal,
-    )
-
-    try:
-        result = await create_fork_proposal(
-            db,
-            owner_id=owner_id,
-            novel_id=novel_id,
-            request=params,
-        )
-    except ForkProposalError as exc:
-        raise InvalidInputError(f"{exc.code}: {exc.detail}") from None
-    await db.flush()
-    return _fork_proposal_view_for_tool(result)
-
-
-async def _default_apply_derivative_edit(
-    db,
-    *,
-    owner_id: int,
-    novel_id: int,
-    params: dict[str, Any],
-) -> dict[str, Any]:
-    """Phase 36 action 工具默认服务：创建**一个**候选 derivative edit（D-36-02）。
-
-    服务端 proposal gate 只接受冻结 source snapshot 血缘 + 有效 project/chapter
-    scope + base_revision CAS 锚；创建候选 DerivativeEditProposal
-    （proposal_status=proposed）+ pending Web ApprovalRequest
-    （action=apply_derivative_edit，payload_hash 确定性重放，D-11/D-15）。
-    绝不直接应用——确定性 Revision Service（apply_agent_edit）在用户 Web 批准后
-    原子校验 approval + payload + 冻结 proposal artifact 血缘 +
-    owner/novel/branch/fork scope + 同一 base_revision CAS 才把 approved proposal
-    应用为 append-only agent_proposal 修订；Original Canon / user draft
-    （autosave）revisions / published 状态绝不被 Agent 触碰。
-    """
-    from app.services.derivative_editor.revisions import (
-        DerivativeEditApplyError,
-        create_agent_edit_proposal,
-    )
-
-    try:
-        result = await create_agent_edit_proposal(
-            db,
-            owner_id=owner_id,
-            novel_id=novel_id,
-            project_id=int(params["project_id"]),
-            chapter_id=int(params["chapter_id"]),
-            content=str(params["content"]),
-            base_revision=int(params["base_revision"]),
-            proposal_key=str(params["proposal_key"]),
-            branch=params.get("branch"),
-            fork=params.get("fork"),
-            source_snapshot_hash=params.get("source_snapshot_hash"),
-            run_id=params.get("run_id"),
-            skill_version_id=params.get("skill_version_id"),
-            artifact_id=params.get("artifact_id"),
-            artifact_revision_id=params.get("artifact_revision_id"),
-        )
-    except DerivativeEditApplyError as exc:
-        raise InvalidInputError(f"{exc.code}: {exc.detail}") from None
-    await db.flush()
-    return _agent_edit_proposal_view_for_tool(result)
-
-
-async def _default_allow_divergence(
-    db,
-    *,
-    owner_id: int,
-    novel_id: int,
-    params: dict[str, Any],
-) -> dict[str, Any]:
-    """Phase 37 action 工具默认服务：创建**一个**显式 divergence override（D-37-03）。
-
-    委托 `overrides.request_divergence_override`：只为 blocked / ``needs_override``
-    候选创建 pending ``DerivativeOverride`` + pending Web ApprovalRequest
-    （action=allow_divergence，payload_hash 绑定 exact draft_hash +
-    canon_delta_hash，D-11/D-15）。**绝不发布、绝不写 Original Canon**——只有独立
-    ``publish_derivative_revision`` approval 被批准后由确定性 revision
-    publisher 物化。
-    """
-    from app.services.derivative_generation.agent_boundary import (
-        OverrideError,
-        request_divergence_override,
-    )
-
-    try:
-        return await request_divergence_override(
-            db,
-            owner_id=owner_id,
-            novel_id=novel_id,
-            project_id=int(params["project_id"]),
-            chapter_id=int(params["chapter_id"]),
-            candidate_id=int(params["candidate_id"]),
-            reason=str(params["reason"]),
-            affected_evidence=list(params.get("affected_evidence") or []),
-            kind=params.get("kind"),
-            draft_hash=str(params["draft_hash"]),
-            canon_delta_hash=str(params["canon_delta_hash"]),
-            actor_id=owner_id,
-            branch=params.get("branch"),
-            fork=params.get("fork"),
-            run_id=params.get("run_id"),
-            skill_version_id=params.get("skill_version_id"),
-            artifact_id=params.get("artifact_id"),
-            artifact_revision_id=params.get("artifact_revision_id"),
-        )
-    except OverrideError as exc:
-        raise InvalidInputError(f"{exc.code}: {exc.detail}") from None
-
-
-async def _default_publish_derivative_revision(
-    db,
-    *,
-    owner_id: int,
-    novel_id: int,
-    params: dict[str, Any],
-) -> dict[str, Any]:
-    """Phase 37 action 工具默认服务：创建**一个**独立 publish ApprovalRequest。
-
-    委托 `overrides.request_publish_derivative_revision`：只在 **allow_divergence
-    approval 已批准 + 完整 revalidation 通过** 后才为同一候选创建独立 pending
-    Web ApprovalRequest（action=publish_derivative_revision），绑定**与
-    allow_divergence approval 完全相同**的 draft_hash / canon_delta_hash。
-    **绝不发布、绝不写 Original Canon**。
-    """
-    from app.services.derivative_generation.agent_boundary import (
-        OverrideError,
-        request_publish_derivative_revision,
-    )
-
-    try:
-        return await request_publish_derivative_revision(
-            db,
-            owner_id=owner_id,
-            novel_id=novel_id,
-            override_id=int(params["override_id"]),
-            draft_hash=str(params["draft_hash"]),
-            canon_delta_hash=str(params["canon_delta_hash"]),
-            approval_note=params.get("approval_note"),
-            actor_id=owner_id,
-            branch=params.get("branch"),
-            fork=params.get("fork"),
-            run_id=params.get("run_id"),
-            skill_version_id=params.get("skill_version_id"),
-            artifact_id=params.get("artifact_id"),
-            artifact_revision_id=params.get("artifact_revision_id"),
-        )
-    except OverrideError as exc:
-        raise InvalidInputError(f"{exc.code}: {exc.detail}") from None
-
-
-async def _default_publish_derivative_visual(
-    db,
-    *,
-    owner_id: int,
-    novel_id: int,
-    params: dict[str, Any],
-) -> dict[str, Any]:
-    """Phase 38 action 工具默认服务：为已存储 candidate 创建**一个** pending
-    ApprovalRequest（D-38-03/D-38-04）。
-
-    委托 `derivative_visual.agent_boundary.request_publish_derivative_visual`：
-    只接受 owner/novel/fork scope 内可批准（candidate/needs_review）的候选
-    （blocked candidate / wrong owner/branch/fork / scene_spec_hash drift →
-    fail closed）；创建 pending Web ApprovalRequest
-    （action=publish_derivative_visual，payload_hash 绑定候选冻结血缘，
-    D-11/D-15）。**绝不发布、绝不写 Original Visual Bible**——只有独立 approval
-    被用户批准后由确定性 review seam（review_candidate_asset）物化为 approved
-    published asset。
-    """
-    from app.services.derivative_visual.agent_boundary import (
-        DerivativeVisualBoundaryError,
-        request_publish_derivative_visual,
-    )
-
-    try:
-        return await request_publish_derivative_visual(
-            db,
-            owner_id=owner_id,
-            novel_id=novel_id,
-            candidate_asset_id=int(params["candidate_asset_id"]),
-            scene_spec_hash=str(params["scene_spec_hash"]),
-            actor_id=owner_id,
-            approval_note=params.get("approval_note"),
-            branch=params.get("branch"),
-            fork=params.get("fork"),
-            run_id=params.get("run_id"),
-            skill_version_id=params.get("skill_version_id"),
-            artifact_id=params.get("artifact_id"),
-            artifact_revision_id=params.get("artifact_revision_id"),
-        )
-    except DerivativeVisualBoundaryError as exc:
-        raise InvalidInputError(f"{exc.code}: {exc.detail}") from None
-
-
-async def _default_approve_export(
-    db,
-    *,
-    owner_id: int,
-    novel_id: int,
-    params: dict[str, Any],
-) -> dict[str, Any]:
-    """Phase 39 action 工具默认服务：创建**一个** pending approve_export
-    ApprovalRequest（D-39-01/D-39-02）。
-
-    委托 `derivative_export.materializer.request_approve_export`：只接受
-    owner/novel/branch/fork/project scope 内已 finalize 的候选
-    ExportPreparationArtifact + 确定性 preparation_hash 重放（stale/伪造 hash /
-    wrong owner/branch/fork/project → fail closed）；创建 pending Web
-    ApprovalRequest（action=approve_export，payload_hash 绑定 artifact
-    revision + preparation_hash，D-11/D-15）。**绝不物化、绝不写 Original
-    Canon / 域表 / Artifact 状态 / bundle**。
-    """
-    from app.services.derivative_export.materializer import (
-        ExportMaterializationError,
-        request_approve_export,
-    )
-
-    try:
-        return await request_approve_export(
-            db,
-            owner_id=owner_id,
-            novel_id=novel_id,
-            project_id=int(params["project_id"]),
-            artifact_id=int(params["artifact_id"]),
-            artifact_revision_id=int(params["artifact_revision_id"]),
-            preparation_hash=str(params["preparation_hash"]),
-            actor_id=owner_id,
-            branch=params.get("branch"),
-            fork=params.get("fork"),
-            approval_note=params.get("approval_note"),
-            run_id=params.get("run_id"),
-            skill_version_id=params.get("skill_version_id"),
-        )
-    except ExportMaterializationError as exc:
-        raise InvalidInputError(f"{exc.code}: {exc.detail}") from None
-
-
-async def _default_materialize_export(
-    db,
-    *,
-    owner_id: int,
-    novel_id: int,
-    params: dict[str, Any],
-) -> dict[str, Any]:
-    """Phase 39 action 工具默认服务：确定性 materializer（D-39-01/D-39-02）。
-
-    委托 `derivative_export.materializer.materialize_export`：只接受 approved
-    artifact + preparation_hash 匹配的 approve_export ApprovalRequest，原子校验
-    approval action + 相同 hash 绑定 + artifact revision 血缘 + owner/novel/
-    branch/fork/project scope + 冻结 manifest 重放，才把候选 artifact 推进为
-    approved 并产出可复现 bundle。**绝不写 Original Canon / 域表 / approval
-    lineage**（download 只读）。
-    """
-    from app.services.derivative_export.materializer import (
-        ExportMaterializationError,
-        materialize_export,
-    )
-
-    try:
-        return await materialize_export(
-            db,
-            owner_id=owner_id,
-            novel_id=novel_id,
-            project_id=int(params["project_id"]),
-            artifact_id=int(params["artifact_id"]),
-            artifact_revision_id=int(params["artifact_revision_id"]),
-            approval_id=int(params["approval_id"]),
-            preparation_hash=str(params["preparation_hash"]),
-            reason=params.get("reason"),
-            actor_id=owner_id,
-            branch=params.get("branch"),
-            fork=params.get("fork"),
-        )
-    except ExportMaterializationError as exc:
-        raise InvalidInputError(f"{exc.code}: {exc.detail}") from None
-
-
-def _agent_edit_proposal_view_for_tool(result) -> dict[str, Any]:
-    """DerivativeEditProposal approval ORM → JSON-safe 工具响应。
-
-    candidate-only：proposal_status 恒为 proposed、绝不 applied；approval_request_id /
-    payload_hash 供 Web 审批轮询与确定性 Revision Service 引用。
-    """
-    return {
-        "proposal_key": result.proposal_key,
-        "owner_id": result.owner_id,
-        "novel_id": result.novel_id,
-        "project_id": result.project_id,
-        "chapter_id": result.chapter_id,
-        "base_revision": result.base_revision,
-        "content_hash": result.content_hash,
-        "approval_request_id": result.approval_request_id,
-        "approval_action": result.approval_action,
-        "approval_status": result.approval_status,
-        "approval_payload_hash": result.approval_payload_hash,
-        "status": "candidate",
-        "candidate_only": True,
-        "replayed": bool(result.replayed),
-    }
-
-
-def _fork_proposal_view_for_tool(result) -> dict[str, Any]:
-    """CanonFork + ApprovalRequest ORM → JSON-safe 工具响应。
-
-    candidate-only：fork status 恒为 candidate、active 恒 false，绝不 approved/
-    published；approval_request_id / payload_hash 供 Web 审批轮询与确定性 Fork
-    materializer 引用。
-    """
-    fork = result.fork
-    approval = result.approval_request
-    return {
-        "fork_id": fork.id,
-        "owner_id": fork.owner_id,
-        "novel_id": fork.novel_id,
-        "fork_key": fork.fork_key,
-        "space": fork.space,
-        "status": fork.status,
-        "source_version_key": fork.source_version_key,
-        "source_snapshot_id": fork.source_snapshot_id,
-        "source_snapshot_hash": fork.source_snapshot_hash,
-        "through_chapter": fork.through_chapter,
-        "full_book_authorized": fork.full_book_authorized,
-        "cutoff_snapshot_hash": fork.cutoff_snapshot_hash,
-        "scope_hash": fork.scope_hash,
-        "manifest_hash": fork.manifest_hash,
-        "delta_content_hash": result.delta_content_hash,
-        "approval_request_id": approval.id,
-        "approval_action": approval.action,
-        "approval_status": approval.status,
-        "approval_payload_hash": approval.payload_hash,
-        "active": bool(fork.active),
-        "candidate_only": True,
-        "replayed": bool(result.replayed),
-    }
-
-
-def _anchor_proposal_view_for_tool(result) -> dict[str, Any]:
-    """IllustrationAnchorProposal + ApprovalRequest ORM → JSON-safe 工具响应。
-
-    candidate-only：status 恒为 pending_approval/proposed，绝不 published；
-    approval_request_id / payload_hash 供 Web 审批轮询与确定性 publisher 引用。
-    """
-    proposal = result.proposal
-    approval = result.approval_request
-    return {
-        "proposal_id": proposal.id,
-        "owner_id": proposal.owner_id,
-        "novel_id": proposal.novel_id,
-        "chapter_id": proposal.chapter_id,
-        "chapter_number": proposal.chapter_number,
-        "proposal_key": proposal.proposal_key,
-        "source_start": proposal.source_start,
-        "source_end": proposal.source_end,
-        "anchor_hash": proposal.anchor_hash,
-        "proposal_asset_revision_id": proposal.proposal_asset_revision_id,
-        "approval_request_id": approval.id,
-        "approval_action": approval.action,
-        "approval_status": approval.status,
-        "approval_payload_hash": approval.payload_hash,
-        "status": proposal.status,
-        "candidate_only": True,
-        "replayed": bool(result.replayed),
-    }
-
-
-def _job_view_for_tool(job) -> dict[str, Any]:
-    """IllustrationJob ORM → JSON-safe 工具响应（候选作业读信封，永不 published）。"""
-    return {
-        "id": job.id,
-        "owner_id": job.owner_id,
-        "novel_id": job.novel_id,
-        "job_key": job.job_key,
-        "idempotency_key": job.idempotency_key,
-        "status": job.status,
-        "status_reason": job.status_reason,
-        "error_code": job.error_code,
-        "retry_count": job.retry_count,
-        "scene_spec_hash": job.scene_spec_hash,
-        "prompt_revision_id": job.prompt_revision_id,
-        "prompt_revision_hash": job.prompt_revision_hash,
-        "visual_bible_revision_hash": job.visual_bible_revision_hash,
-        "source_snapshot_id": job.source_snapshot_id,
-        "source_snapshot_hash": job.source_snapshot_hash,
-        "cutoff_chapter": job.cutoff_chapter,
-        "config_hash": job.config_hash,
-        "candidate_only": True,
-    }
-
-
-async def _resolve_world_model_version(
-    db,
-    *,
-    owner_id: int,
-    novel_id: int,
-    version_id: int | None,
-) -> int:
-    """显式 version 直接返回；缺省取该 owner/novel 最新版本（无 → 404-hide）。"""
-    if version_id is not None:
-        return int(version_id)
-    versions = await WorldModelEventQueries(db).list_versions(
-        owner_id=owner_id, novel_id=novel_id
-    )
-    if not versions:
-        raise NotFoundError("world-model projection not found in owner scope")
-    return versions[-1]
 
 
 # ────────────────────────── 门面本体 ──────────────────────────
@@ -1692,3 +736,53 @@ def _json_default(obj: Any) -> str:
 
 # 全局单例：API 路由与测试共用；测试可用独立实例注入 stub。
 tool_facade = ToolFacade()
+
+
+# ---------------------------------------------------------------------------
+# Lazy re-export of JSON-safe helper symbols (keeps the historical module
+# surface; these are no longer referenced inside facade.py itself).
+# ---------------------------------------------------------------------------
+
+_HELPER_EXPORTS = {
+    # world-model serializers (moved to _defaults_world)
+    "_epistemic_answer_to_json",
+    "_merge_state_answers",
+    # candidate proposal / job views (moved to _tool_views leaf)
+    "_agent_edit_proposal_view_for_tool",
+    "_anchor_proposal_view_for_tool",
+    "_fork_proposal_view_for_tool",
+    "_job_view_for_tool",
+}
+
+
+def __getattr__(name: str) -> Any:
+    if name in {"_epistemic_answer_to_json", "_merge_state_answers"}:
+        from ._defaults_world import (  # noqa: PLC0415
+            _epistemic_answer_to_json,
+            _merge_state_answers,
+        )
+
+        return {
+            "_epistemic_answer_to_json": _epistemic_answer_to_json,
+            "_merge_state_answers": _merge_state_answers,
+        }[name]
+    if name in {
+        "_agent_edit_proposal_view_for_tool",
+        "_anchor_proposal_view_for_tool",
+        "_fork_proposal_view_for_tool",
+        "_job_view_for_tool",
+    }:
+        from ._tool_views import (  # noqa: PLC0415
+            _agent_edit_proposal_view_for_tool,
+            _anchor_proposal_view_for_tool,
+            _fork_proposal_view_for_tool,
+            _job_view_for_tool,
+        )
+
+        return {
+            "_agent_edit_proposal_view_for_tool": _agent_edit_proposal_view_for_tool,
+            "_anchor_proposal_view_for_tool": _anchor_proposal_view_for_tool,
+            "_fork_proposal_view_for_tool": _fork_proposal_view_for_tool,
+            "_job_view_for_tool": _job_view_for_tool,
+        }[name]
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
