@@ -436,7 +436,9 @@ async function gotoWriting(page: Page) {
   await page.goto("/writing");
   await page.waitForLoadState("domcontentloaded");
   await expect(
-    page.locator('[data-testid="app-shell-nav"], [data-testid="app-shell-nav-mobile"]').first()
+    page.locator(
+      '[data-testid="app-shell-nav"]:visible, [data-testid="app-shell-nav-mobile"]:visible'
+    )
   ).toBeVisible({ timeout: 20_000 });
 }
 

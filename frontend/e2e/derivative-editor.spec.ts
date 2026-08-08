@@ -355,7 +355,9 @@ async function gotoWriting(page: Page) {
   await page.waitForLoadState("domcontentloaded");
   // The authenticated shell must be present (desktop rail or mobile nav).
   await expect(
-    page.locator('[data-testid="app-shell-nav"], [data-testid="app-shell-nav-mobile"]').first()
+    page.locator(
+      '[data-testid="app-shell-nav"]:visible, [data-testid="app-shell-nav-mobile"]:visible'
+    )
   ).toBeVisible({ timeout: 20_000 });
 }
 
