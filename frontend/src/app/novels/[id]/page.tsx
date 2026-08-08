@@ -23,12 +23,9 @@ import {
   type ReaderBookmark,
   type SelectionCoordinate,
 } from "@/lib/api";
-import {
-  clampReaderChatWidth,
-  loadReaderChatPresentation,
-  READER_CHAT_WIDTH_DEFAULT,
-  saveReaderChatPresentation,
-} from "@/lib/reader-selection";
+import { clampReaderChatWidth } from "@/lib/reader-selection";
+import { loadProgress, saveProgress } from "@/lib/reader-progress";
+import { useReaderChatLayout } from "@/hooks/use-reader-chat-layout";
 import {
   illustrationAnchorApi,
   type IllustrationAnchorView,
@@ -46,41 +43,6 @@ import {
 import { BookLoader } from "@/components/book-loader";
 
 const AUTO_SCROLL_BASE_PX_PER_SECOND = 80;
-
-function getStorageKey(novelId: string): string {
-  return `novelmind:reading:${novelId}`;
-}
-
-function loadProgress(
-  novelId: string
-): { chapterId: number; chapterPercent?: number } | null {
-  try {
-    const raw = localStorage.getItem(getStorageKey(novelId));
-    if (raw) return JSON.parse(raw);
-  } catch {
-    /* ignore */
-  }
-  return null;
-}
-
-function saveProgress(
-  novelId: string,
-  chapterId: number,
-  chapterPercent: number
-): void {
-  try {
-    localStorage.setItem(
-      getStorageKey(novelId),
-      JSON.stringify({
-        chapterId,
-        chapterPercent,
-        updatedAt: Date.now(),
-      })
-    );
-  } catch {
-    /* ignore */
-  }
-}
 
 function resolveChapterFromQuery(
   chapterList: Chapter[],
@@ -144,88 +106,24 @@ function NovelReaderInner() {
   /** 书签跳转：跨章时在 loadChapter 中恢复到的章内百分比（一次性） */
   const bookmarkJumpRef = useRef<number | null>(null);
 
-  // Phase 10 reader chat — presentation only in localStorage; truth is PostgreSQL
-  const [chatOpen, setChatOpen] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return Boolean(loadReaderChatPresentation(novelId).open);
-  });
-  const [chatCollapsed, setChatCollapsed] = useState(() => {
-    if (typeof window === "undefined") return false;
-    const saved = loadReaderChatPresentation(novelId).collapsed;
-    // 无存档时，较窄桌面（<1536px）默认收成轨道：目录 + 面板同开会挤窄正文
-    return saved ?? window.innerWidth < 1536;
-  });
-  const [chatWidthPx, setChatWidthPx] = useState(() => {
-    if (typeof window === "undefined") return READER_CHAT_WIDTH_DEFAULT;
-    const saved = loadReaderChatPresentation(novelId).panelWidthPx;
-    return clampReaderChatWidth(saved ?? READER_CHAT_WIDTH_DEFAULT);
-  });
-  const chatResizeRef = useRef<{ startX: number; startW: number } | null>(null);
+  const {
+    isDesktop,
+    chatOpen,
+    setChatOpen,
+    chatCollapsed,
+    setChatCollapsed,
+    chatWidthPx,
+    setChatWidthPx,
+    onChatResizePointerDown,
+    onChatResizePointerMove,
+    onChatResizePointerUp,
+  } = useReaderChatLayout(novelId);
   const [pendingSelection, setPendingSelection] =
     useState<SelectionCoordinate | null>(null);
   const [highlightRange, setHighlightRange] = useState<{
     sourceStart: number;
     sourceEnd: number;
   } | null>(null);
-  const [isDesktop, setIsDesktop] = useState(() => {
-    if (typeof window === "undefined") return true;
-    return window.innerWidth >= 1280;
-  });
-
-  useEffect(() => {
-    const onResize = () => setIsDesktop(window.innerWidth >= 1280);
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
-
-  // Persist chat presentation width (desktop).
-  useEffect(() => {
-    const prev = loadReaderChatPresentation(novelId);
-    saveReaderChatPresentation(novelId, {
-      ...prev,
-      open: chatOpen,
-      collapsed: chatCollapsed,
-      panelWidthPx: chatWidthPx,
-    });
-  }, [novelId, chatOpen, chatCollapsed, chatWidthPx]);
-
-  const onChatResizePointerDown = useCallback(
-    (e: React.PointerEvent<HTMLDivElement>) => {
-      e.preventDefault();
-      chatResizeRef.current = { startX: e.clientX, startW: chatWidthPx };
-      const target = e.currentTarget;
-      target.setPointerCapture(e.pointerId);
-      document.body.style.cursor = "col-resize";
-      document.body.style.userSelect = "none";
-    },
-    [chatWidthPx]
-  );
-
-  const onChatResizePointerMove = useCallback(
-    (e: React.PointerEvent<HTMLDivElement>) => {
-      const drag = chatResizeRef.current;
-      if (!drag) return;
-      // Dragging the left handle: move left → wider panel.
-      const delta = drag.startX - e.clientX;
-      setChatWidthPx(clampReaderChatWidth(drag.startW + delta));
-    },
-    []
-  );
-
-  const onChatResizePointerUp = useCallback(
-    (e: React.PointerEvent<HTMLDivElement>) => {
-      if (!chatResizeRef.current) return;
-      chatResizeRef.current = null;
-      try {
-        e.currentTarget.releasePointerCapture(e.pointerId);
-      } catch {
-        /* ignore */
-      }
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
-    },
-    []
-  );
 
   useEffect(() => {
     saveReaderPreferences(preferences);

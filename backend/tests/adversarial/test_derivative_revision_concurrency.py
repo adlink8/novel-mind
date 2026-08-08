@@ -58,6 +58,12 @@ EVENTS_SOURCE = (
 SERVICE_SOURCE = (
     BACKEND_ROOT / "app" / "services" / "derivative_editor" / "revisions.py"
 ).read_text(encoding="utf-8")
+# Phase 36-06 refactor split: the deterministic diff moved to the ``_diff``
+# leaf; the canonicalization-before-diff guarantee (D-36-02) now covers both
+# the facade (write/query paths) and the leaf (pure diff).
+DIFF_SOURCE = (
+    BACKEND_ROOT / "app" / "services" / "derivative_editor" / "_diff.py"
+).read_text(encoding="utf-8")
 SCHEMA_SOURCE = (BACKEND_ROOT / "app" / "schemas" / "derivative_revision.py").read_text(
     encoding="utf-8"
 )
@@ -451,6 +457,8 @@ def test_append_links_parent_to_the_current_head():
 
 
 def test_diff_is_computed_after_canonicalization():
-    assert "canonicalize_markdown(old_text)" in SERVICE_SOURCE
-    assert "canonicalize_markdown(new_text)" in SERVICE_SOURCE
-    assert "autojunk=False" in SERVICE_SOURCE
+    # The deterministic diff lives in the ``_diff`` leaf (refactor split); the
+    # canonicalization-before-diff guarantee still applies to its source.
+    assert "canonicalize_markdown(old_text)" in DIFF_SOURCE
+    assert "canonicalize_markdown(new_text)" in DIFF_SOURCE
+    assert "autojunk=False" in DIFF_SOURCE

@@ -25,14 +25,18 @@ The service owns the append-only revision lineage of a chapter:
 Per D-36-03 every write only forms a **Fanfiction Canon draft**: the service
 never writes Original Canon or User Interpretation and exposes no release
 surface (Phase 39 owns release via the immutable revision service).
+
+拆分说明（refactor split）：CAS 写入路径（``autosave_revision`` /
+``apply_agent_edit`` / ``rollback_revision``）、owner 作用域加载与行追加原语
+保留在本门面；确定性 diff（``diff_markdown``）拆到 ``_diff.py``，视图构建器
+（``to_*_view``）拆到 ``_views.py``，agent-edit proposal 原语（payload/hash/
+错误/结果载体）拆到 ``_agent_edit.py``。本模块显式 re-export 全部同名符号，
+``from app.services.derivative_editor.revisions import X`` 的 import surface
+不变。
 """
 
 from __future__ import annotations
 
-import difflib
-import json
-from dataclasses import dataclass
-from hashlib import sha256
 from typing import Any
 
 from sqlalchemy import func, select, update
@@ -46,20 +50,25 @@ from app.models.derivative_revision import (
     DERIVATIVE_REVISION_KINDS,
     DerivativeRevision,
 )
-from app.schemas.derivative_chapter import (
-    DerivativeChapterStatus,
-    DerivativeChapterView,
-)
-from app.schemas.derivative_revision import (
-    DerivativeRevisionApproval,
-    DerivativeRevisionKind,
-    DerivativeRevisionSummary,
-    DerivativeRevisionView,
-)
+from app.schemas.derivative_chapter import DerivativeChapterView
+from app.schemas.derivative_revision import DerivativeRevisionView
 from app.services.derivative_editor.chapters import (
     canonicalize_markdown,
     markdown_checksum,
 )
+
+# ────────────────────────── 拆分后 leaf 模块 re-export ──────────────────────────
+from ._agent_edit import (
+    DERIVATIVE_AGENT_EDIT_APPROVAL_PREFIX,
+    DERIVATIVE_AGENT_EDIT_APPROVAL_SCHEMA_VERSION,
+    AgentEditProposalResult,
+    DerivativeEditApplyError,
+    build_derivative_edit_approval_payload,
+    canonical_derivative_edit_approval_hash,
+    derivative_edit_content_hash,
+)
+from ._diff import _split_lines, diff_markdown  # noqa: F401  (parity: was module-level)
+from ._views import to_chapter_view, to_revision_summary, to_revision_view
 
 
 class DerivativeRevisionError(ValueError):
@@ -90,120 +99,6 @@ def _require_scope(*, owner_id: int, novel_id: int) -> None:
         raise DerivativeRevisionError(
             "invalid_scope", "scope identifiers must be explicit positive integers"
         )
-
-
-def _split_lines(text: str) -> list[str]:
-    """Canonical Markdown -> line list; the empty draft is an empty list."""
-    if text == "":
-        return []
-    return text.split("\n")
-
-
-def diff_markdown(old_text: str, new_text: str) -> list[dict[str, Any]]:
-    """Deterministic line diff between two canonical Markdown documents.
-
-    Both sides are canonicalized first (CRLF → LF, trailing whitespace
-    stripped, D-36-02) so identical logical content always diffs to zero hunks.
-    Returns unified-diff-style hunks: each hunk carries 1-based line numbers
-    (``old_start``/``old_count``/``new_start``/``new_count``) and ordered lines
-    with an op of ``delete``, ``add`` or ``context`` (3 lines of context around
-    each contiguous change).
-    """
-    old_lines = _split_lines(canonicalize_markdown(old_text))
-    new_lines = _split_lines(canonicalize_markdown(new_text))
-    matcher = difflib.SequenceMatcher(None, old_lines, new_lines, autojunk=False)
-    hunks: list[dict[str, Any]] = []
-    for group in matcher.get_grouped_opcodes(n=3):
-        first = group[0]
-        last = group[-1]
-        old_start = first[1] + 1
-        old_count = last[2] - first[1]
-        new_start = first[3] + 1
-        new_count = last[4] - first[3]
-        lines: list[dict[str, str]] = []
-        for tag, i1, i2, j1, j2 in group:
-            if tag == "equal":
-                for line in old_lines[i1:i2]:
-                    lines.append({"op": "context", "text": line})
-            elif tag == "replace":
-                for line in old_lines[i1:i2]:
-                    lines.append({"op": "delete", "text": line})
-                for line in new_lines[j1:j2]:
-                    lines.append({"op": "add", "text": line})
-            elif tag == "delete":
-                for line in old_lines[i1:i2]:
-                    lines.append({"op": "delete", "text": line})
-            elif tag == "insert":
-                for line in new_lines[j1:j2]:
-                    lines.append({"op": "add", "text": line})
-        hunks.append(
-            {
-                "old_start": old_start,
-                "old_count": old_count,
-                "new_start": new_start,
-                "new_count": new_count,
-                "lines": lines,
-            }
-        )
-    return hunks
-
-
-# ---------------------------------------------------------------------------
-# View builders (single source for both the service and the API error mapping)
-# ---------------------------------------------------------------------------
-
-
-def to_chapter_view(row: DerivativeChapter) -> DerivativeChapterView:
-    return DerivativeChapterView(
-        id=row.id,
-        project_id=row.project_id,
-        owner_id=row.owner_id,
-        novel_id=row.novel_id,
-        position=row.position,
-        title=row.title,
-        markdown=row.markdown,
-        markdown_checksum=row.markdown_checksum,
-        status=DerivativeChapterStatus(row.status),
-        revision=row.revision,
-        created_at=row.created_at,
-        updated_at=row.updated_at,
-    )
-
-
-def to_revision_view(row: DerivativeRevision) -> DerivativeRevisionView:
-    return DerivativeRevisionView(
-        id=row.id,
-        chapter_id=row.chapter_id,
-        project_id=row.project_id,
-        owner_id=row.owner_id,
-        novel_id=row.novel_id,
-        revision_number=row.revision_number,
-        parent_revision_id=row.parent_revision_id,
-        kind=DerivativeRevisionKind(row.kind),
-        content=row.content,
-        content_checksum=row.content_checksum,
-        actor_id=row.actor_id,
-        reason=row.reason,
-        approval_state=DerivativeRevisionApproval(row.approval_state),
-        created_at=row.created_at,
-        updated_at=row.updated_at,
-    )
-
-
-def to_revision_summary(row: DerivativeRevision) -> DerivativeRevisionSummary:
-    return DerivativeRevisionSummary(
-        id=row.id,
-        chapter_id=row.chapter_id,
-        project_id=row.project_id,
-        revision_number=row.revision_number,
-        parent_revision_id=row.parent_revision_id,
-        kind=DerivativeRevisionKind(row.kind),
-        content_checksum=row.content_checksum,
-        actor_id=row.actor_id,
-        reason=row.reason,
-        approval_state=DerivativeRevisionApproval(row.approval_state),
-        created_at=row.created_at,
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -482,92 +377,6 @@ async def autosave_revision(
 
 # The only approval action that may reach the deterministic Revision Service.
 DERIVATIVE_AGENT_EDIT_APPROVAL_ACTION = "apply_derivative_edit"
-DERIVATIVE_AGENT_EDIT_APPROVAL_PREFIX = "derivative-edit.v1:approval"
-DERIVATIVE_AGENT_EDIT_APPROVAL_SCHEMA_VERSION = "derivative-edit-proposal.v1"
-
-
-class DerivativeEditApplyError(ValueError):
-    """Agent-proposal gate violation (fail closed, no authoritative write)."""
-
-    def __init__(self, code: str, detail: str, status_code: int = 409):
-        self.code = code
-        self.detail = detail
-        self.status_code = status_code
-        super().__init__(f"{code}: {detail}")
-
-
-@dataclass(frozen=True)
-class AgentEditProposalResult:
-    """Proposal creation result: the pending approval (+ replay flag)."""
-
-    owner_id: int
-    novel_id: int
-    project_id: int
-    chapter_id: int
-    approval_request_id: int
-    approval_action: str
-    approval_status: str
-    approval_payload_hash: str
-    content_hash: str
-    proposal_key: str
-    base_revision: int
-    replayed: bool = False
-
-
-def derivative_edit_content_hash(content: str) -> str:
-    """Deterministic content hash of a candidate derivative edit (D-36-02).
-
-    The hash is the SHA-256 of the canonical Markdown — the same replay lineage
-    the revision row's ``content_checksum`` uses — so the apply endpoint can
-    verify the proposal content is byte-replayable before any write.
-    """
-    return markdown_checksum(content)
-
-
-def build_derivative_edit_approval_payload(
-    *,
-    owner_id: int,
-    novel_id: int,
-    branch: str | None,
-    fork: str | None,
-    proposal_key: str,
-    project_id: int,
-    chapter_id: int,
-    base_revision: int,
-    content_hash: str,
-    source_snapshot_hash: str,
-) -> dict[str, Any]:
-    """Frozen approval payload bound to one derivative edit proposal (D-15).
-
-    The ApprovalRequest ``payload_hash`` and the apply-time replay both compute
-    from this canonical snapshot, so a forged or drifted decision can never
-    apply a derivative edit. ``base_revision`` seals the exact CAS token and
-    ``content_hash`` seals the exact proposed Markdown.
-    """
-    return {
-        "artifact_kind": "derivative_edit_proposal",
-        "schema_version": DERIVATIVE_AGENT_EDIT_APPROVAL_SCHEMA_VERSION,
-        "owner_id": owner_id,
-        "novel_id": novel_id,
-        "branch": branch,
-        "fork": fork,
-        "proposal_key": proposal_key,
-        "project_id": project_id,
-        "chapter_id": chapter_id,
-        "base_revision": base_revision,
-        "content_hash": content_hash,
-        "source_snapshot_hash": source_snapshot_hash,
-    }
-
-
-def canonical_derivative_edit_approval_hash(payload: dict[str, Any]) -> str:
-    """Byte-replayable canonical hash of a frozen derivative-edit approval payload."""
-    encoded = json.dumps(
-        payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")
-    )
-    return sha256(
-        f"{DERIVATIVE_AGENT_EDIT_APPROVAL_PREFIX}\n{encoded}".encode("utf-8")
-    ).hexdigest()
 
 
 async def create_agent_edit_proposal(
