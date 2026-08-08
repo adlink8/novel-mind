@@ -20,7 +20,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, rmSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -724,6 +724,12 @@ function transpileGovernanceTo(dir: string): void {
     "src/governance/permission-manifest.ts",
     "src/governance/tool-registry-manifest.ts",
   ];
+  // 域工具拆分（tools/domain/*）是 registry 的构建依赖，必须一并转译。
+  for (const entry of readdirSync(join(AGENT_SERVICE, "src/tools/domain"))) {
+    if (entry.endsWith(".ts")) {
+      sources.push(`src/tools/domain/${entry}`);
+    }
+  }
   for (const rel of sources) {
     const source = readFileSync(join(AGENT_SERVICE, rel), "utf8");
     const outPath = join(dir, rel.replace(/\.ts$/, ".mjs"));
