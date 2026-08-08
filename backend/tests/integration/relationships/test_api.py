@@ -1124,4 +1124,5 @@ async def test_api_router_mounted_and_cross_owner_404(
     finally:
         app.dependency_overrides.pop(get_db, None)
         app.dependency_overrides.pop(require_user, None)
+        app.dependency_overrides.pop(require_agent_actor, None)
         await aengine.dispose()

@@ -385,7 +385,7 @@ function NovelReaderInner() {
     setPendingSelection(payload);
     setChatOpen(true);
     setChatCollapsed(false);
-  }, []);
+  }, [setPendingSelection, setChatOpen, setChatCollapsed]);
 
   /** 智能体回合结束后刷新当前章节已发布插图锚点（可能有新发布）。 */
   const refreshChapterAnchors = useCallback(async () => {
