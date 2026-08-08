@@ -36,8 +36,11 @@ from app.api import (
     search,
 )
 from app.api.agent_tools import router as agent_tools_router
-from app.api.agent import router as agent_router
-from app.api.agent import service_router as agent_service_router
+from app.api.agent_skills import router as agent_skills_router
+from app.api.agent_runs import router as agent_runs_router
+from app.api.agent_artifacts import router as agent_artifacts_router
+from app.api.agent_approvals import router as agent_approvals_router
+from app.api.agent_service_runs import service_router as agent_service_router
 from app.api.clues import router as clues_router
 from app.api.asset_audit import router as asset_audit_router
 from app.api.eval import router as eval_router
@@ -281,7 +284,22 @@ app.include_router(
     tags=["模型网关"],
 )
 app.include_router(
-    agent_router,
+    agent_skills_router,
+    prefix="/api/agent",
+    tags=["智能体运行时"],
+)
+app.include_router(
+    agent_runs_router,
+    prefix="/api/agent",
+    tags=["智能体运行时"],
+)
+app.include_router(
+    agent_artifacts_router,
+    prefix="/api/agent",
+    tags=["智能体运行时"],
+)
+app.include_router(
+    agent_approvals_router,
     prefix="/api/agent",
     tags=["智能体运行时"],
 )

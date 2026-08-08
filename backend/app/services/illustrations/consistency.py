@@ -709,6 +709,27 @@ def mock_consistency_fixture_registry() -> dict[str, FrozenCharacterFixture]:
     }
 
 
+# ---------------------------------------------------------------------------
+# Consistency evaluator seam (D-33-04): default registry is empty so any
+# evaluation fails closed to ``unavailable`` until fixtures are configured.
+# Tests seed the deterministic mock fixture set through this seam.
+# ---------------------------------------------------------------------------
+
+_consistency_fixtures: dict[str, FrozenCharacterFixture] = {}
+
+
+def set_illustration_consistency_fixtures(
+    fixtures: dict[str, FrozenCharacterFixture] | None,
+) -> None:
+    """Override the frozen consistency fixture registry (used by tests)."""
+    global _consistency_fixtures
+    _consistency_fixtures = dict(fixtures or {})
+
+
+def consistency_evaluator() -> ConsistencyEvaluator:
+    return ConsistencyEvaluator(_consistency_fixtures)
+
+
 __all__ = [
     "CONSISTENCY_EVALUATOR_ID",
     "CONSISTENCY_EVALUATOR_VERSION",
@@ -721,6 +742,8 @@ __all__ = [
     "ConsistencyReportServiceError",
     "ConsistencyReportView",
     "FrozenCharacterFixture",
+    "consistency_evaluator",
     "mock_consistency_fixture_registry",
     "report_view",
+    "set_illustration_consistency_fixtures",
 ]

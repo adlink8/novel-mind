@@ -621,3 +621,55 @@ class FrozenAssetRevisionView(StrictIllustrationModel):
                 "asset rights must be cleared before proposal_ready can publish"
             )
         return self
+
+
+# ---------------------------------------------------------------------------
+# Wire request/response envelopes (moved from the API module)
+# ---------------------------------------------------------------------------
+
+
+class IllustrationJobListResponse(StrictIllustrationModel):
+    items: list[IllustrationJobView]
+    total: int
+
+
+class IllustrationCreateJobResponse(StrictIllustrationModel):
+    job: IllustrationJobView
+    replayed: bool = False
+
+
+class AssetListResponse(StrictIllustrationModel):
+    items: list[AssetRevisionView]
+    total: int
+
+
+class ConsistencyEvaluateRequest(StrictIllustrationModel):
+    """Candidate consistency evidence for one scene evaluation (D-33-04).
+
+    The candidate's declared identity/style descriptors and the negative
+    constraints it contains are compared against the frozen per-character
+    fixture; scope comes from the path, never the body.
+    """
+
+    character_key: str = Field(min_length=1, max_length=60)
+    scene_key: str = Field(min_length=1, max_length=60)
+    report_key: str | None = Field(default=None, min_length=1, max_length=180)
+    identity_attributes: list[str] = Field(default_factory=list, max_length=64)
+    style_attributes: list[str] = Field(default_factory=list, max_length=64)
+    negative_constraints_present: list[str] = Field(default_factory=list, max_length=64)
+
+
+class IllustrationReviewActionRequest(StrictIllustrationModel):
+    """One explicit approval action; scope comes from the path, never the body.
+
+    Mirrors ``IllustrationReviewEventInput`` minus owner/novel/asset ids so the
+    client can never widen scope. The server derives the result approval state
+    from the legal transition map (D-33-03).
+    """
+
+    event_key: str = Field(min_length=1, max_length=160)
+    action: IllustrationReviewAction
+    actor_source: IllustrationActorSource
+    actor: str = Field(min_length=1, max_length=200)
+    reason: str = Field(min_length=1, max_length=1000)
+    from_approval_state: IllustrationApprovalState
