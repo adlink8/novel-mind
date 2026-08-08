@@ -4,15 +4,23 @@ Owner/version/spoiler-scoped relationship graph read model.
 PostgreSQL accepted observations are the sole fact source. Nodes, edges,
 filters, counts and evidence previews all derive from one visible-set fold.
 Legacy CharacterRelation is never read.
+
+拆分说明（refactor split）：折叠/退化/provisional seam 拆到
+``_query_fold.py``（``FoldQueryMixin``），identity/override/evidence 加载拆到
+``_query_identity.py``（``IdentityQueryMixin``），共享纯工具
+（``logical_relationship_key`` / ``_FoldedEdge`` / ``_covers_position`` /
+``_position_tuple`` / D-22 caps）下沉到叶模块 ``query_primitives.py`` 并在本
+模块 re-export——``RelationshipGraphQueryService`` /
+``relationship_graph_query_service`` / ``logical_relationship_key`` /
+``_FoldedEdge`` / caps 的 import surface 不变。
 """
 
 from __future__ import annotations
 
 from collections import defaultdict
-from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Iterable
+from typing import Any
 
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,20 +28,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.analysis import AnalysisRun, AnalysisVersion
 from app.models.character import Character
 from app.models.novel import Chapter, Novel
-from app.models.relationship import (
-    CharacterIdentityOverride,
-    RelationshipEvidenceLink,
-    RelationshipObservation,
-    RelationshipOverride,
-)
-from app.models.timeline import (
-    MachineTimelineEvent,
-    TimelineActivePointer,
-    TimelineParticipant,
-)
+from app.models.relationship import RelationshipObservation
+from app.models.timeline import TimelineActivePointer
 from app.schemas.relationship import (
     GraphDegradationMode,
-    ProvenanceKind,
     RelationshipCounts,
     RelationshipDegradation,
     RelationshipEdgeKind,
@@ -48,11 +46,33 @@ from app.schemas.relationship import (
     RelationshipVersionSource,
 )
 
-# D-22 degradation thresholds (immutable product contract).
-NORMAL_NODE_CAP = 200
-NORMAL_EDGE_CAP = 600
-HARD_NODE_CAP = 500
-HARD_EDGE_CAP = 1500
+from ._query_fold import FoldQueryMixin
+from ._query_identity import IdentityQueryMixin
+from .query_primitives import (
+    HARD_EDGE_CAP,
+    HARD_NODE_CAP,
+    NORMAL_EDGE_CAP,
+    NORMAL_NODE_CAP,
+    _FoldedEdge,
+    _covers_position,
+    _position_tuple,
+    logical_relationship_key,
+)
+
+__all__ = [
+    # re-exported from query_primitives (leaf) — unchanged import surface.
+    "HARD_EDGE_CAP",
+    "HARD_NODE_CAP",
+    "NORMAL_EDGE_CAP",
+    "NORMAL_NODE_CAP",
+    "_FoldedEdge",
+    "_covers_position",
+    "_position_tuple",
+    "logical_relationship_key",
+    "ResolvedVersion",
+    "RelationshipGraphQueryService",
+    "relationship_graph_query_service",
+]
 
 
 @dataclass(frozen=True)
@@ -63,64 +83,16 @@ class ResolvedVersion:
     progress: dict[str, Any]
 
 
-@dataclass
-class _FoldedEdge:
-    observation_id: int
-    source_character_id: int
-    target_character_id: int
-    relation_type: str
-    transition: str
-    confidence: float
-    valid_from_chapter: int
-    valid_to_chapter: int | None
-    logical_key: str
-    provenance: ProvenanceKind = ProvenanceKind.MACHINE
-    evidence_preview: str | None = None
-    evidence_count: int = 0
-    edge_kind: RelationshipEdgeKind = RelationshipEdgeKind.ACCEPTED_OBSERVATION
-    suggested_type: str | None = None
-    intake_kind: str = RelationshipIntakeKind.UNKNOWN.value
-
-
-def logical_relationship_key(
-    source_character_id: int,
-    target_character_id: int,
-    relation_type: str,
-) -> str:
-    """Stable directed key used by overrides and fold grouping."""
-    return f"{source_character_id}:{target_character_id}:{relation_type}"
-
-
-def _position_tuple(chapter: int, narrative_index: int = 0) -> tuple[int, int]:
-    return (chapter, narrative_index)
-
-
-def _covers_position(
-    *,
-    valid_from_chapter: int,
-    valid_from_narrative_index: int,
-    valid_to_chapter: int | None,
-    valid_to_narrative_index: int | None,
-    through_chapter: int,
-    through_narrative_index: int = 0,
-) -> bool:
-    start = _position_tuple(valid_from_chapter, valid_from_narrative_index)
-    pos = _position_tuple(through_chapter, through_narrative_index)
-    if start > pos:
-        return False
-    if valid_to_chapter is None:
-        return True
-    end = _position_tuple(valid_to_chapter, valid_to_narrative_index or 0)
-    return end >= pos
-
-
 def _parse_aliases(raw: str | None) -> list[str]:
     if not raw:
         return []
     return [part.strip() for part in raw.split(",") if part.strip()]
 
 
-class RelationshipGraphQueryService:
+class RelationshipGraphQueryService(
+    FoldQueryMixin,
+    IdentityQueryMixin,
+):
     """Server-side version proof, narrative fold, and spoiler-safe projection."""
 
     async def resolve_version(
@@ -845,626 +817,6 @@ class RelationshipGraphQueryService:
                 }
             )
         return payload
-
-    # ------------------------------------------------------------------
-    # Internals
-    # ------------------------------------------------------------------
-
-    @staticmethod
-    def _mention_synthetic_id(mention: str) -> int:
-        """Stable positive graph id for mention-only nodes (no characters row yet)."""
-        import hashlib
-
-        digest = hashlib.sha1(
-            mention.strip().lower().encode("utf-8"), usedforsecurity=False
-        ).hexdigest()
-        # Keep in positive int32-ish range, avoid 0.
-        return (int(digest[:8], 16) % 1_900_000_000) + 1
-
-    @staticmethod
-    def _pair_synthetic_id(
-        source_id: int, target_id: int, relation_type: str = "ally"
-    ) -> int:
-        """Stable unique provisional observation id for a character pair + type."""
-        import hashlib
-
-        lo, hi = (
-            (source_id, target_id) if source_id <= target_id else (target_id, source_id)
-        )
-        digest = hashlib.sha1(
-            f"rel:{lo}:{hi}:{relation_type}".encode("utf-8"), usedforsecurity=False
-        ).hexdigest()
-        return (int(digest[:8], 16) % 1_900_000_000) + 1
-
-    # Keyword heuristics for provisional typing (zh + common novel terms).
-    # Priority: more specific types first when multiple match.
-    _TYPE_KEYWORDS: dict[str, tuple[str, ...]] = {
-        RelationshipEdgeType.ENEMY.value: (
-            "战斗",
-            "对决",
-            "开战",
-            "攻打",
-            "攻击",
-            "击败",
-            "击杀",
-            "杀死",
-            "杀害",
-            "仇敌",
-            "敌人",
-            "敌对",
-            "对峙",
-            "追杀",
-            "讨伐",
-            "交战",
-            "开战",
-            "冲突",
-            "挑衅",
-            "侮辱",
-            "背叛",
-            "反叛",
-            "魔王战",
-            "死斗",
-            "斩杀",
-            "围攻",
-            "侵攻",
-            "侵略",
-            "battle",
-            "fight",
-            "enemy",
-            "kill",
-        ),
-        RelationshipEdgeType.FAMILY.value: (
-            "父亲",
-            "母亲",
-            "父女",
-            "父子",
-            "母女",
-            "母子",
-            "兄妹",
-            "姐弟",
-            "兄弟",
-            "姐妹",
-            "哥哥",
-            "姐姐",
-            "弟弟",
-            "妹妹",
-            "儿子",
-            "女儿",
-            "亲人",
-            "血缘",
-            "家族",
-            "家人",
-            "妻子",
-            "丈夫",
-            "夫妻",
-            "父",
-            "母",
-            "family",
-            "father",
-            "mother",
-            "sibling",
-        ),
-        RelationshipEdgeType.MENTOR.value: (
-            "师父",
-            "师傅",
-            "徒弟",
-            "弟子",
-            "传授",
-            "教导",
-            "指导",
-            "师从",
-            "拜师",
-            "收徒",
-            "训练",
-            "培养",
-            "指点",
-            "mentor",
-            "master",
-            "disciple",
-            "apprentice",
-        ),
-        RelationshipEdgeType.ROMANTIC.value: (
-            "恋爱",
-            "恋人",
-            "告白",
-            "表白",
-            "亲吻",
-            "接吻",
-            "结婚",
-            "婚约",
-            "爱慕",
-            "喜欢",
-            "倾心",
-            "情人",
-            "伴侣",
-            "romance",
-            "love",
-            "kiss",
-            "marry",
-        ),
-        RelationshipEdgeType.ALLY.value: (
-            "同盟",
-            "结盟",
-            "盟友",
-            "并肩",
-            "合作",
-            "帮助",
-            "救援",
-            "援护",
-            "部下",
-            "主从",
-            "效忠",
-            "誓约",
-            "结成",
-            "命名",
-            "庇护",
-            "守护",
-            "好友",
-            "伙伴",
-            "友军",
-            "ally",
-            "friend",
-            "allyship",
-        ),
-    }
-
-    @classmethod
-    def _infer_provisional_type(
-        cls, *, title: str, description: str, event_type: str
-    ) -> str:
-        """Infer edge type from event text + timeline event_type (heuristic)."""
-        blob = f"{title or ''}\n{description or ''}".lower()
-        et = (event_type or "").lower().strip()
-
-        # Event-type prior (timeline schema: conflict/plot/character/world).
-        if et in {"conflict", "battle", "fight", "war"}:
-            base = RelationshipEdgeType.ENEMY.value
-        elif et in {"character", "dialogue", "social"}:
-            base = RelationshipEdgeType.ALLY.value
-        else:
-            base = RelationshipEdgeType.ALLY.value
-
-        scores: dict[str, int] = {t.value: 0 for t in RelationshipEdgeType}
-        scores[base] += 1
-        if et in {"conflict", "battle", "fight", "war"}:
-            scores[RelationshipEdgeType.ENEMY.value] += 3
-
-        for rel_type, keywords in cls._TYPE_KEYWORDS.items():
-            for kw in keywords:
-                if kw.lower() in blob:
-                    scores[rel_type] += 2
-
-        # Prefer non-ally when it has clear keyword evidence.
-        ranked = sorted(
-            scores.items(),
-            key=lambda item: (
-                item[1],
-                1 if item[0] != RelationshipEdgeType.ALLY.value else 0,
-            ),
-            reverse=True,
-        )
-        best_type, best_score = ranked[0]
-        if best_score <= 0:
-            return RelationshipEdgeType.ALLY.value
-        return best_type
-
-    async def _provisional_from_timeline(
-        self,
-        session: AsyncSession,
-        *,
-        owner_id: int,
-        novel_id: int,
-        version_id: int,
-        through_chapter: int,
-        character_id: int | None,
-        relation_type: str | None,
-    ) -> tuple[list[_FoldedEdge], dict[int, str]]:
-        """Provisional co-occurrence graph from timeline participants.
-
-        Primary label is always ``cooccur`` (not a confirmed fiction type).
-        Heuristic ally/enemy/… live only in ``suggested_type`` and preview text
-        as non-assertive type clues, never as accepted observations.
-        """
-        events = list(
-            (
-                await session.scalars(
-                    select(MachineTimelineEvent).where(
-                        MachineTimelineEvent.owner_id == owner_id,
-                        MachineTimelineEvent.novel_id == novel_id,
-                        MachineTimelineEvent.version_id == version_id,
-                        MachineTimelineEvent.narrative_chapter_number
-                        <= through_chapter,
-                    )
-                )
-            ).all()
-        )
-        if not events:
-            return [], {}
-
-        event_by_id = {e.id: e for e in events}
-        event_ids = list(event_by_id.keys())
-        parts = list(
-            (
-                await session.scalars(
-                    select(TimelineParticipant).where(
-                        TimelineParticipant.event_id.in_(event_ids)
-                    )
-                )
-            ).all()
-        )
-        by_event: dict[int, list[TimelineParticipant]] = defaultdict(list)
-        for p in parts:
-            by_event[p.event_id].append(p)
-
-        # pair -> aggregate co-occurrence + per-type votes
-        pair_stats: dict[tuple[int, int], dict[str, Any]] = {}
-        names: dict[int, str] = {}
-
-        for event_id, plist in by_event.items():
-            event = event_by_id.get(event_id)
-            if event is None:
-                continue
-            inferred = self._infer_provisional_type(
-                title=event.title or "",
-                description=event.description or "",
-                event_type=event.event_type or "",
-            )
-            seen: dict[int, str] = {}
-            for p in plist:
-                mention = (p.mention or "").strip()
-                if not mention:
-                    continue
-                cid = (
-                    p.entity_id
-                    if p.entity_id is not None
-                    else self._mention_synthetic_id(mention)
-                )
-                names[cid] = mention if p.entity_id is None else names.get(cid, mention)
-                seen[cid] = mention
-            ids = sorted(seen.keys())
-            ch = event.narrative_chapter_number
-            for i in range(len(ids)):
-                for j in range(i + 1, len(ids)):
-                    a, b = ids[i], ids[j]
-                    key = (a, b)
-                    st = pair_stats.get(key)
-                    if st is None:
-                        st = {
-                            "count": 0,
-                            "first_chapter": ch,
-                            "type_votes": defaultdict(int),
-                            "type_samples": {},
-                        }
-                        pair_stats[key] = st
-                    st["count"] += 1
-                    st["type_votes"][inferred] += 1
-                    if ch < st["first_chapter"]:
-                        st["first_chapter"] = ch
-                    # Keep a short sample title per type for preview.
-                    if inferred not in st["type_samples"]:
-                        st["type_samples"][inferred] = (event.title or "")[:80]
-
-        # One co-occurrence edge per pair; optional suggested_type for UI tint.
-        # Quotas still diversify by suggested heuristic so conflict arcs surface
-        # without claiming accepted fiction types.
-        min_cooccur = 2
-        type_quota = {
-            RelationshipEdgeType.ENEMY.value: 14,
-            RelationshipEdgeType.ALLY.value: 14,
-            RelationshipEdgeType.FAMILY.value: 8,
-            RelationshipEdgeType.MENTOR.value: 8,
-            RelationshipEdgeType.ROMANTIC.value: 6,
-        }
-        type_label = {
-            "ally": "同盟/协作",
-            "enemy": "敌对/冲突",
-            "family": "亲属",
-            "mentor": "师徒",
-            "romantic": "爱慕",
-        }
-        cooccur_label = RelationshipGraphEdgeLabel.COOCCUR.value
-
-        # (pair, suggested_t, vote_n, st)
-        typed: list[tuple[tuple[int, int], str, int, dict[str, Any]]] = []
-        for key, st in pair_stats.items():
-            if st["count"] < min_cooccur:
-                continue
-            a, b = key
-            if character_id is not None and character_id not in (a, b):
-                continue
-            votes: dict[str, int] = dict(st["type_votes"])
-            if not votes:
-                votes = {RelationshipEdgeType.ALLY.value: int(st["count"])}
-            ordered = sorted(votes.items(), key=lambda kv: (-kv[1], kv[0]))
-            selected: list[tuple[str, int]] = [ordered[0]]
-            if len(ordered) > 1:
-                top_t, top_v = ordered[0]
-                second_t, second_v = ordered[1]
-                if second_v >= max(2, int(top_v * 0.4)) and second_t != top_t:
-                    selected.append((second_t, second_v))
-            for suggested_t, vote_n in selected:
-                if relation_type is not None and relation_type not in (
-                    suggested_t,
-                    cooccur_label,
-                ):
-                    continue
-                if vote_n < 1:
-                    continue
-                typed.append((key, suggested_t, vote_n, st))
-
-        # Prefer higher votes; enemy slightly boosted so conflict arcs surface.
-        def sort_key(
-            item: tuple[tuple[int, int], str, int, dict[str, Any]],
-        ) -> tuple[int, int, int, tuple[int, int]]:
-            key, suggested_t, vote_n, st = item
-            boost = 3 if suggested_t == RelationshipEdgeType.ENEMY.value else 0
-            if suggested_t in (
-                RelationshipEdgeType.FAMILY.value,
-                RelationshipEdgeType.MENTOR.value,
-                RelationshipEdgeType.ROMANTIC.value,
-            ):
-                boost = 2
-            return (-(vote_n + boost), -int(st["count"]), int(st["first_chapter"]), key)
-
-        typed.sort(key=sort_key)
-
-        used_quota: dict[str, int] = defaultdict(int)
-        folded: list[_FoldedEdge] = []
-        # Deduplicate undirected pair so multi-suggested does not double-claim.
-        seen_pairs: set[tuple[int, int]] = set()
-        for (a, b), suggested_t, vote_n, st in typed:
-            pair_key = (a, b)
-            if pair_key in seen_pairs:
-                continue
-            if used_quota[suggested_t] >= type_quota.get(suggested_t, 8):
-                continue
-            sample = (st.get("type_samples") or {}).get(suggested_t) or ""
-            clue_label = type_label.get(suggested_t, suggested_t)
-            preview = (
-                f"时间线共现×{int(st['count'])}"
-                f"（类型线索·{clue_label}×{int(vote_n)}，非已确认关系）"
-                + (f"：{sample}" if sample else "")
-                + " · 临时图"
-            )
-            folded.append(
-                _FoldedEdge(
-                    observation_id=self._pair_synthetic_id(a, b, cooccur_label),
-                    source_character_id=a,
-                    target_character_id=b,
-                    relation_type=cooccur_label,
-                    transition="establish",
-                    confidence=min(
-                        0.55, 0.22 + 0.03 * int(vote_n) + 0.02 * int(st["count"])
-                    ),
-                    valid_from_chapter=int(st["first_chapter"]),
-                    valid_to_chapter=None,
-                    logical_key=logical_relationship_key(a, b, cooccur_label),
-                    provenance=ProvenanceKind.MACHINE,
-                    evidence_preview=preview[:400],
-                    evidence_count=int(st["count"]),
-                    edge_kind=RelationshipEdgeKind.PROVISIONAL_COOCCURRENCE,
-                    suggested_type=suggested_t,
-                    intake_kind=RelationshipIntakeKind.COOCCURRENCE_CANDIDATE.value,
-                )
-            )
-            used_quota[suggested_t] += 1
-            seen_pairs.add(pair_key)
-
-        return folded, names
-
-    @staticmethod
-    def _degradation_mode(node_count: int, edge_count: int) -> GraphDegradationMode:
-        if node_count > HARD_NODE_CAP or edge_count > HARD_EDGE_CAP:
-            return GraphDegradationMode.FILTERS_REQUIRED
-        if node_count > NORMAL_NODE_CAP or edge_count > NORMAL_EDGE_CAP:
-            return GraphDegradationMode.LARGE
-        return GraphDegradationMode.NORMAL
-
-    def _fold_observations(
-        self,
-        observations: Iterable[RelationshipObservation],
-        *,
-        identity_map: dict[int, int],
-        override_fields: dict[str, dict[str, Any]],
-    ) -> list[_FoldedEdge]:
-        """Deterministic transition fold per logical relationship key (D-06)."""
-
-        by_key: dict[str, list[RelationshipObservation]] = defaultdict(list)
-        for obs in observations:
-            src = identity_map.get(obs.source_character_id, obs.source_character_id)
-            tgt = identity_map.get(obs.target_character_id, obs.target_character_id)
-            if src == tgt:
-                continue
-            key = logical_relationship_key(src, tgt, obs.relation_type)
-            by_key[key].append(obs)
-
-        folded: list[_FoldedEdge] = []
-        for key, chain in by_key.items():
-            chain.sort(
-                key=lambda o: (
-                    o.valid_from_chapter,
-                    o.valid_from_narrative_index,
-                    o.id,
-                )
-            )
-            current: _FoldedEdge | None = None
-            for obs in chain:
-                src = identity_map.get(obs.source_character_id, obs.source_character_id)
-                tgt = identity_map.get(obs.target_character_id, obs.target_character_id)
-                if obs.transition == "end":
-                    current = None
-                    continue
-                current = _FoldedEdge(
-                    observation_id=obs.id,
-                    source_character_id=src,
-                    target_character_id=tgt,
-                    relation_type=obs.relation_type,
-                    transition=obs.transition,
-                    confidence=float(obs.confidence),
-                    valid_from_chapter=obs.valid_from_chapter,
-                    valid_to_chapter=obs.valid_to_chapter,
-                    logical_key=key,
-                    provenance=ProvenanceKind.MACHINE,
-                    intake_kind=(
-                        getattr(obs, "intake_kind", None)
-                        or RelationshipIntakeKind.UNKNOWN.value
-                    ),
-                )
-
-            if current is None:
-                continue
-
-            # Apply latest eligible overrides for this logical key (overlay only).
-            patches = override_fields.get(current.logical_key, {})
-            # Also accept overrides keyed without type if type was changed.
-            if not patches:
-                # Try all override keys that share endpoints.
-                for okey, fields in override_fields.items():
-                    parts = okey.split(":")
-                    if (
-                        len(parts) == 3
-                        and parts[0] == str(current.source_character_id)
-                        and parts[1] == str(current.target_character_id)
-                    ):
-                        patches = fields
-                        break
-
-            provenance = ProvenanceKind.MACHINE
-            if patches:
-                provenance = ProvenanceKind.MANUAL
-                if "relation_type" in patches:
-                    value = patches["relation_type"]
-                    if isinstance(value, dict):
-                        value = value.get("relation_type", current.relation_type)
-                    current.relation_type = str(value)
-                if "transition" in patches:
-                    value = patches["transition"]
-                    if isinstance(value, dict):
-                        value = value.get("transition", current.transition)
-                    current.transition = str(value)
-                if "valid_from" in patches:
-                    value = patches["valid_from"]
-                    if isinstance(value, dict) and "valid_from_chapter" in value:
-                        current.valid_from_chapter = int(value["valid_from_chapter"])
-                if "valid_to" in patches:
-                    value = patches["valid_to"]
-                    if isinstance(value, dict):
-                        if value.get("valid_to_chapter") is None:
-                            current.valid_to_chapter = None
-                        else:
-                            current.valid_to_chapter = int(value["valid_to_chapter"])
-                current.provenance = provenance
-
-            if current.transition == "end":
-                continue
-            folded.append(current)
-
-        folded.sort(
-            key=lambda e: (
-                e.valid_from_chapter,
-                e.source_character_id,
-                e.target_character_id,
-                e.observation_id,
-            )
-        )
-        return folded
-
-    async def _identity_map(
-        self,
-        session: AsyncSession,
-        *,
-        owner_id: int,
-        novel_id: int,
-        version_id: int,
-    ) -> dict[int, int]:
-        """Latest-wins character merge map from append-only identity overrides."""
-
-        rows = list(
-            (
-                await session.scalars(
-                    select(CharacterIdentityOverride)
-                    .where(
-                        CharacterIdentityOverride.owner_id == owner_id,
-                        CharacterIdentityOverride.novel_id == novel_id,
-                        CharacterIdentityOverride.analysis_version_id == version_id,
-                    )
-                    .order_by(CharacterIdentityOverride.id)
-                )
-            ).all()
-        )
-        # Latest row by canonical target wins; needs_relink does not apply merges.
-        latest_by_merged: dict[int, CharacterIdentityOverride] = {}
-        for row in rows:
-            for mid in row.merged_character_ids or []:
-                latest_by_merged[int(mid)] = row
-        mapping: dict[int, int] = {}
-        for mid, row in latest_by_merged.items():
-            if row.status != "active":
-                continue
-            mapping[mid] = row.canonical_character_id
-            mapping[row.canonical_character_id] = row.canonical_character_id
-        return mapping
-
-    async def _active_relationship_overrides(
-        self,
-        session: AsyncSession,
-        *,
-        owner_id: int,
-        novel_id: int,
-        version_id: int,
-    ) -> dict[str, dict[str, Any]]:
-        """Latest-wins field patches per logical key (append-only supersession)."""
-
-        rows = list(
-            (
-                await session.scalars(
-                    select(RelationshipOverride)
-                    .where(
-                        RelationshipOverride.owner_id == owner_id,
-                        RelationshipOverride.novel_id == novel_id,
-                        RelationshipOverride.analysis_version_id == version_id,
-                    )
-                    .order_by(RelationshipOverride.id)
-                )
-            ).all()
-        )
-        # Highest id per (logical_key, field_name) wins; only status=active applies.
-        latest: dict[tuple[str, str], RelationshipOverride] = {}
-        for row in rows:
-            latest[(row.logical_relationship_key, row.field_name)] = row
-
-        result: dict[str, dict[str, Any]] = defaultdict(dict)
-        for (key, field), row in latest.items():
-            if row.status != "active":
-                continue
-            result[key][field] = deepcopy(row.value)
-        return dict(result)
-
-    async def _evidence_for_observations(
-        self,
-        session: AsyncSession,
-        *,
-        observation_ids: list[int],
-    ) -> dict[int, list[RelationshipEvidenceLink]]:
-        if not observation_ids:
-            return {}
-        rows = list(
-            (
-                await session.scalars(
-                    select(RelationshipEvidenceLink)
-                    .where(RelationshipEvidenceLink.observation_id.in_(observation_ids))
-                    .order_by(
-                        RelationshipEvidenceLink.observation_id,
-                        RelationshipEvidenceLink.sort_order,
-                        RelationshipEvidenceLink.id,
-                    )
-                )
-            ).all()
-        )
-        out: dict[int, list[RelationshipEvidenceLink]] = defaultdict(list)
-        for row in rows:
-            out[row.observation_id].append(row)
-        return dict(out)
 
 
 relationship_graph_query_service = RelationshipGraphQueryService()
