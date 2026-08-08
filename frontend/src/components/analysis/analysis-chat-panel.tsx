@@ -26,11 +26,13 @@ import {
 
 import { Button } from "@/components/ui/button";
 import {
-  jobStatusLabel,
   MessageBubble,
-  newClientMessageId,
   type CitationNavigateTarget,
-} from "@/components/reader/reader-chat-panel";
+} from "@/components/reader/chat/chat-message-bubble";
+import {
+  jobStatusLabel,
+  newClientMessageId,
+} from "@/lib/chat-shared";
 import {
   formatChapterRange,
   type StructureNodeSelection,

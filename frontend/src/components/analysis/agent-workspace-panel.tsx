@@ -46,7 +46,7 @@ import {
   CitationChip,
   MessageBubble,
   type CitationNavigateTarget,
-} from "@/components/reader/reader-chat-panel";
+} from "@/components/reader/chat/chat-message-bubble";
 import type { StructureNodeSelection } from "@/components/structure/structure-types";
 import {
   ApprovalRequestDialog,

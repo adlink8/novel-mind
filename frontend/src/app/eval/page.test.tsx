@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import EvalPage, {
+import EvalPage from "./page";
+import {
   QualityStatusBadge,
   DeprecationBanner,
   QualityJobsPanel,
-} from "./page";
+} from "@/components/eval-quality-panels";
 import type { DeprecationMeta, QualityJobPublic, EvalDataset, EvalRun } from "@/lib/api";
 
 const evalMocks = vi.hoisted(() => ({

@@ -19,7 +19,7 @@ import { useRouter } from "next/navigation";
 import {
   CitationChip,
   type CitationNavigateTarget,
-} from "@/components/reader/reader-chat-panel";
+} from "@/components/reader/chat/chat-message-bubble";
 import type { ArtifactView, CitationView } from "@/lib/api";
 
 export type ArtifactRendererProps = {

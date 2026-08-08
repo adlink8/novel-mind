@@ -45,7 +45,7 @@ import {
 import {
   MessageBubble,
   type CitationNavigateTarget,
-} from "@/components/reader/reader-chat-panel";
+} from "@/components/reader/chat/chat-message-bubble";
 import {
   agentApi,
   type ArtifactStatus,

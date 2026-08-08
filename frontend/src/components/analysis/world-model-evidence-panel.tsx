@@ -26,7 +26,7 @@ import { useRouter } from "next/navigation";
 import {
   CitationChip,
   type CitationNavigateTarget,
-} from "@/components/reader/reader-chat-panel";
+} from "@/components/reader/chat/chat-message-bubble";
 import type { WorldProjectionView, WorldAuthorityLabel } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
