@@ -139,20 +139,33 @@ def test_recovery_module_is_provider_free() -> None:
     assert "GatewayError" not in source
 
 
+# Phase 28-04 refactor split: the worker's call sites moved into _worker_*.py
+# mixins. The no-pointer/no-promotion guarantee (D-02/D-07) must cover them
+# just as it covered builder_worker.py before the split.
+WORKER_MODULES = (
+    "builder_worker.py",
+    "_worker_chapter.py",
+    "_worker_hierarchy.py",
+    "_worker_manifest.py",
+    "_worker_scan.py",
+)
+
+
 def test_worker_never_writes_active_pointer() -> None:
-    tree = ast.parse(_stripped_source("builder_worker.py"))
-    calls = _call_names(tree)
-    forbidden = FORBIDDEN_POINTER_FRAGMENTS - {
-        "current_version",
-        "promote",
-        "promotion",
-    }
-    assert forbidden.isdisjoint(calls), calls & forbidden
-    imports = _imports_of(tree)
-    assert not any("active_pointer" in imp for imp in imports)
-    # The worker's own forbidden-list constant and scanner may mention the
-    # fragment text, but it must never be *invoked*.
-    assert "set_active_pointer(" not in _stripped_source("builder_worker.py")
+    for name in WORKER_MODULES:
+        tree = ast.parse(_stripped_source(name))
+        calls = _call_names(tree)
+        forbidden = FORBIDDEN_POINTER_FRAGMENTS - {
+            "current_version",
+            "promote",
+            "promotion",
+        }
+        assert forbidden.isdisjoint(calls), f"{name}: {calls & forbidden}"
+        imports = _imports_of(tree)
+        assert not any("active_pointer" in imp for imp in imports)
+        # The worker's own forbidden-list constant and scanner may mention the
+        # fragment text, but it must never be *invoked*.
+        assert "set_active_pointer(" not in _stripped_source(name)
 
 
 def test_hierarchy_modules_never_write_canon_or_pointer() -> None:

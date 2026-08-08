@@ -13,313 +13,218 @@
     `reader_chat.validate_answer_against_manifest`（finalize 内）承担；本模块做
     schema、lineage 与 trail 的权威门，并复用现有 `CitedAnswerArtifact` /
     `ExternalEvidenceArtifact` wire 模型（不新增第二套事实或 citation authority）。
+
+拆分说明（refactor split）：本模块保留门面本体 —— ``evaluate_integrity`` 调度
+与全部 public/private 符号的显式 re-export。17 个 ``_evaluate_*`` 实现按功能域
+拆到同目录模块（``_integrity_narrative`` / ``_integrity_visual`` /
+``_integrity_derivative``），共享基座（``IntegrityDecision``、canonical hash、
+``_check_common_lineage``、公共 BLOCKED_* 常量）在叶模块 ``_integrity_core``。
+``__all__`` 显式声明全部符号，``from app.services.agent_runtime
+.structured_output_integrity import X`` 的 import surface 不变。
 """
 
 from __future__ import annotations
 
-import hashlib
-import json
-from dataclasses import dataclass
 from typing import Any
 
-from pydantic import ValidationError
-
 from app.models.agent_runtime import SkillRun
-from app.schemas.agent_runtime import (
-    BranchVisualBibleArtifact,
-    CanonForkProposalArtifact,
-    ChapterAnalysisArtifact,
-    CitedAnswerArtifact,
-    DerivativeEditProposalArtifact,
-    DraftArtifact,
-    ExportPreparationArtifact,
-    ExternalEvidenceArtifact,
-    IllustrationAnchorProposalArtifact,
-    IllustrationRevisionArtifact,
-    PromptArtifact,
-    SceneCandidateArtifact,
-    SceneSpecArtifact,
-    SkillEvaluationArtifact,
-    StoryArcArtifact,
-    VisualBibleArtifact,
-    WorldModelCandidateArtifact,
-)
-from app.schemas.key_scene import (
-    KeySceneGateError,
-    SceneCandidateSetContract,
-    validate_candidate_set_contract,
-)
-from app.schemas.scene_spec import (
-    PromptRevisionContract,
-    SceneSpecContract,
-    SceneSpecGateError,
-    SpecReviewState,
-    validate_prompt_revision_contract,
-    validate_scene_spec_contract,
-)
-from app.schemas.visual_bible import (
-    VisualAuthority,
-    VisualBibleGateError,
-    VisualBibleVersionContract,
-    VisualReviewState,
-    validate_version_contract,
-)
-from app.services.narrative_memory.arc_planner import (
-    OutlineCandidateArtifact,
-)
-from app.services.narrative_memory.builder_contracts import (
-    ChapterAnalysisArtifact as DomainChapterAnalysisArtifact,
-    assert_digests_never_evidence_refs,
-    hint_safe_at_cutoff,
-)
-from app.services.narrative_memory.global_builder import (
-    MainlineCandidateArtifact,
-)
-from app.services.qualification.report import QualificationReport
 
-# 受保护字段：normalizer 绝不合成，服务端也禁止出现在信封中（extra=forbid 兜底，
-# 这里给出明确的 blocked 原因）。owner/branch/evidence_refs 是 lineage 提供的
-# 合法字段，由 schema + lineage 校验单独检查。
-FORBIDDEN_PROTECTED_KEYS: tuple[str, ...] = (
-    "authority",
-    "cutoff",
-    "fork",
-    "approval",
-    "approval_state",
+from ._integrity_core import (
+    BLOCKED_LINEAGE_INPUT_HASH,
+    BLOCKED_LINEAGE_NOVEL,
+    BLOCKED_LINEAGE_OWNER,
+    BLOCKED_LINEAGE_SKILL,
+    BLOCKED_NO_EVIDENCE,
+    BLOCKED_PROTECTED_SYNTHESIS,
+    BLOCKED_SCHEMA,
+    BLOCKED_STALE_REPAIRED_HASH,
+    BLOCKED_STATUS,
+    BLOCKED_TRAIL_INCONSISTENT,
+    BLOCKED_UNKNOWN_TYPE,
+    FORBIDDEN_PROTECTED_KEYS,
+    IntegrityDecision,
+    _check_common_lineage,
+    _first_validation_error,
+    _strip_trail,
+    canonical_content_hash,
 )
-
-# 稳定 blocked 原因（可审计）。
-BLOCKED_SCHEMA = "integrity: envelope failed strict wire schema validation"
-BLOCKED_LINEAGE_OWNER = "integrity: lineage mismatch — owner_id must match the run"
-BLOCKED_LINEAGE_NOVEL = "integrity: lineage mismatch — novel_id must match the run"
-BLOCKED_LINEAGE_SKILL = (
-    "integrity: lineage mismatch — skill_version_id must match the run"
+from ._integrity_derivative import (
+    BLOCKED_ANCHOR_PROPOSAL_APPROVAL_BYPASS,
+    BLOCKED_ANCHOR_PROPOSAL_BRANCH,
+    BLOCKED_ANCHOR_PROPOSAL_PAYLOAD,
+    BLOCKED_ANCHOR_PROPOSAL_SOURCE_DRIFT,
+    BLOCKED_BRANCH_VISUAL_BIBLE_APPROVAL_BYPASS,
+    BLOCKED_BRANCH_VISUAL_BIBLE_BRANCH,
+    BLOCKED_BRANCH_VISUAL_BIBLE_PAYLOAD,
+    BLOCKED_BRANCH_VISUAL_BIBLE_SOURCE_DRIFT,
+    BLOCKED_CANON_FORK_APPROVAL_BYPASS,
+    BLOCKED_CANON_FORK_BRANCH,
+    BLOCKED_CANON_FORK_DELTA_APPROVAL_BYPASS,
+    BLOCKED_CANON_FORK_DELTA_HASH,
+    BLOCKED_CANON_FORK_PAYLOAD,
+    BLOCKED_CANON_FORK_SOURCE_DRIFT,
+    BLOCKED_DERIVATIVE_DRAFT_APPROVAL_BYPASS,
+    BLOCKED_DERIVATIVE_DRAFT_BRANCH,
+    BLOCKED_DERIVATIVE_DRAFT_EVIDENCE_MISMATCH,
+    BLOCKED_DERIVATIVE_DRAFT_PAYLOAD,
+    BLOCKED_DERIVATIVE_DRAFT_SUGGESTION,
+    BLOCKED_DERIVATIVE_EDIT_APPROVAL_BYPASS,
+    BLOCKED_DERIVATIVE_EDIT_BRANCH,
+    BLOCKED_DERIVATIVE_EDIT_CONTENT_HASH,
+    BLOCKED_DERIVATIVE_EDIT_PAYLOAD,
+    BLOCKED_DERIVATIVE_EDIT_SOURCE_DRIFT,
+    BLOCKED_EXPORT_PREPARATION_APPROVAL_BYPASS,
+    BLOCKED_EXPORT_PREPARATION_BRANCH,
+    BLOCKED_EXPORT_PREPARATION_EVIDENCE_MISMATCH,
+    BLOCKED_EXPORT_PREPARATION_PAYLOAD,
+    BLOCKED_EXPORT_PREPARATION_SOURCE_DRIFT,
+    BLOCKED_ILLUSTRATION_APPROVAL_BYPASS,
+    BLOCKED_ILLUSTRATION_BRANCH,
+    BLOCKED_ILLUSTRATION_PAYLOAD,
+    BLOCKED_ILLUSTRATION_SOURCE_DRIFT,
+    _branch_suggestion_keys,
+    _evaluate_branch_visual_bible,
+    _evaluate_canon_fork_proposal,
+    _evaluate_derivative_draft,
+    _evaluate_derivative_edit_proposal,
+    _evaluate_export_preparation,
+    _evaluate_illustration_anchor_proposal,
+    _evaluate_illustration_revision,
 )
-BLOCKED_LINEAGE_INPUT_HASH = (
-    "integrity: lineage mismatch — input_hash must match the run"
+from ._integrity_narrative import (
+    BLOCKED_CHAPTER_ANALYSIS_PAYLOAD,
+    BLOCKED_DIGEST_MISUSE,
+    BLOCKED_EVALUATION_REPORT,
+    BLOCKED_EVALUATION_REPORT_STALE,
+    BLOCKED_EVALUATION_SOURCE_SNAPSHOT,
+    BLOCKED_EXTERNAL_CANON,
+    BLOCKED_FUTURE_HINT,
+    BLOCKED_MAINLINE_CANON,
+    BLOCKED_OUTLINE_CANON,
+    _evaluate_chapter_analysis,
+    _evaluate_cited_answer,
+    _evaluate_external_evidence,
+    _evaluate_skill_evaluation,
+    _evaluate_story_arc,
+    _evaluate_world_model_candidate,
 )
-BLOCKED_STATUS = "integrity: artifact status must be candidate at finalize"
-BLOCKED_STALE_REPAIRED_HASH = (
-    "integrity: repaired_hash replay mismatch — payload changed after normalization"
-)
-BLOCKED_TRAIL_INCONSISTENT = "integrity: normalization trail inconsistent — no actions but raw_hash != repaired_hash"
-BLOCKED_PROTECTED_SYNTHESIS = "integrity: protected-field synthesis blocked"
-BLOCKED_NO_EVIDENCE = "integrity: cited answer without evidence_refs is not eligible (heuristic candidate)"
-BLOCKED_UNKNOWN_TYPE = "integrity: unknown artifact type (fail closed)"
-BLOCKED_EXTERNAL_CANON = (
-    "integrity: external evidence must be prohibited_from_canon=true"
-)
-# Phase 28 确定性边界（D-08/D-09）。
-BLOCKED_CHAPTER_ANALYSIS_PAYLOAD = (
-    "integrity: chapter analysis payload failed domain validation"
-)
-BLOCKED_DIGEST_MISUSE = (
-    "integrity: chapter digest cannot double as an EvidenceRef or retrieval-index input"
-)
-BLOCKED_FUTURE_HINT = (
-    "integrity: next_context_hint leaks facts beyond cutoff (future-fact hint)"
-)
-BLOCKED_OUTLINE_CANON = "integrity: outline candidate must remain candidate-only"
-BLOCKED_MAINLINE_CANON = "integrity: mainline candidate must remain candidate-only"
-# Phase 29 确定性评估边界（D-02/D-05）。
-BLOCKED_EVALUATION_REPORT = (
-    "integrity: skill evaluation report failed sealed qualification validation"
-)
-BLOCKED_EVALUATION_REPORT_STALE = (
-    "integrity: skill evaluation report checksum replay mismatch — payload changed"
-)
-BLOCKED_EVALUATION_SOURCE_SNAPSHOT = (
-    "integrity: skill evaluation report source snapshot mismatches envelope lineage"
-)
-# Phase 30 Visual Bible 确定性边界（D-30-01..D-30-04）。
-BLOCKED_VISUAL_BIBLE_PAYLOAD = (
-    "integrity: visual bible payload failed domain validation"
-)
-BLOCKED_VISUAL_BIBLE_APPROVAL_BYPASS = (
-    "integrity: visual bible approval bypass blocked — review_state must be candidate"
-)
-BLOCKED_VISUAL_BIBLE_EVIDENCE_MISMATCH = "integrity: visual bible canon claim evidence keys must be a subset of envelope evidence_refs"
-# Phase 31 Key Scene 确定性边界（D-31-01..D-31-05）。
-BLOCKED_SCENE_CANDIDATE_PAYLOAD = (
-    "integrity: scene candidate set payload failed domain validation"
-)
-BLOCKED_SCENE_CANDIDATE_APPROVAL_BYPASS = "integrity: scene candidate approval bypass blocked — review_state must be candidate"
-BLOCKED_SCENE_CANDIDATE_EVIDENCE_MISMATCH = "integrity: scene candidate evidence keys must be a subset of envelope evidence_refs"
-# Phase 32 Scene Spec / Prompt 确定性边界（D-32-01..D-32-04）。
-BLOCKED_SCENE_SPEC_PAYLOAD = "integrity: scene spec payload failed domain validation"
-BLOCKED_SCENE_SPEC_APPROVAL_BYPASS = (
-    "integrity: scene spec approval bypass blocked — review_state must be candidate"
-)
-BLOCKED_SCENE_SPEC_EVIDENCE_MISMATCH = (
-    "integrity: scene spec evidence keys must be a subset of envelope evidence_refs"
-)
-BLOCKED_SCENE_SPEC_SOURCE_DRIFT = (
-    "integrity: scene spec source_snapshot_hash drifts from envelope source_versions"
-)
-BLOCKED_PROMPT_PAYLOAD = "integrity: prompt revision payload failed domain validation"
-BLOCKED_PROMPT_APPROVAL_BYPASS = (
-    "integrity: prompt approval bypass blocked — review_state must be candidate"
-)
-BLOCKED_PROMPT_EVIDENCE_MISMATCH = "integrity: prompt scene spec evidence keys must be a subset of envelope evidence_refs"
-# Phase 33 IllustrationRevision 确定性边界（D-33-01..D-33-04）。
-BLOCKED_ILLUSTRATION_PAYLOAD = (
-    "integrity: illustration revision payload failed domain validation"
-)
-BLOCKED_ILLUSTRATION_APPROVAL_BYPASS = (
-    "integrity: illustration approval bypass blocked — review_state must be candidate"
-)
-BLOCKED_ILLUSTRATION_SOURCE_DRIFT = "integrity: illustration revision source_snapshot_hash drifts from envelope source_versions"
-BLOCKED_ILLUSTRATION_BRANCH = (
-    "integrity: illustration revision branch/authority_space mismatch — "
-    "derivative mode requires branch + fork, original mode forbids them"
-)
-# Phase 34 IllustrationAnchorProposal 确定性边界（D-34-01..D-34-04）。
-BLOCKED_ANCHOR_PROPOSAL_PAYLOAD = (
-    "integrity: illustration anchor proposal payload failed domain validation"
-)
-BLOCKED_ANCHOR_PROPOSAL_APPROVAL_BYPASS = (
-    "integrity: illustration anchor proposal bypass blocked — proposal_status "
-    "must be proposed"
-)
-BLOCKED_ANCHOR_PROPOSAL_SOURCE_DRIFT = (
-    "integrity: illustration anchor proposal source_snapshot_hash drifts from "
-    "envelope source_versions"
-)
-BLOCKED_ANCHOR_PROPOSAL_BRANCH = (
-    "integrity: illustration anchor proposal branch/authority_space mismatch — "
-    "derivative mode requires branch + fork, original mode forbids them"
-)
-# Phase 35 Canon Fork 确定性边界（D-35-01..D-35-04）。
-BLOCKED_CANON_FORK_PAYLOAD = (
-    "integrity: canon fork proposal payload failed domain validation"
-)
-BLOCKED_CANON_FORK_APPROVAL_BYPASS = (
-    "integrity: canon fork proposal bypass blocked — proposal_status must be proposed"
-)
-BLOCKED_CANON_FORK_DELTA_APPROVAL_BYPASS = (
-    "integrity: canon delta bypass blocked — delta_status must be proposed"
-)
-BLOCKED_CANON_FORK_SOURCE_DRIFT = (
-    "integrity: canon fork proposal source_snapshot_hash drifts from envelope "
-    "source_versions"
-)
-BLOCKED_CANON_FORK_BRANCH = (
-    "integrity: canon fork proposal branch mismatch — envelope branch must match "
-    "the run branch"
-)
-BLOCKED_CANON_FORK_DELTA_HASH = (
-    "integrity: canon delta content_hash does not replay from the delta content"
-)
-# Phase 36 DerivativeEditProposal 确定性边界（D-36-01..D-36-04）。
-BLOCKED_DERIVATIVE_EDIT_PAYLOAD = (
-    "integrity: derivative edit proposal payload failed domain validation"
-)
-BLOCKED_DERIVATIVE_EDIT_APPROVAL_BYPASS = (
-    "integrity: derivative edit proposal bypass blocked — proposal_status must "
-    "be proposed"
-)
-BLOCKED_DERIVATIVE_EDIT_SOURCE_DRIFT = (
-    "integrity: derivative edit proposal source_snapshot_hash drifts from "
-    "envelope source_versions"
-)
-BLOCKED_DERIVATIVE_EDIT_CONTENT_HASH = (
-    "integrity: derivative edit proposal content_hash does not replay from the "
-    "proposal content"
-)
-BLOCKED_DERIVATIVE_EDIT_BRANCH = (
-    "integrity: derivative edit proposal branch/authority_space mismatch — "
-    "envelope branch must match the run branch and derivative mode requires "
-    "branch + fork"
-)
-# Phase 37 Derivative Draft 确定性边界（D-37-02/D-37-05）。
-BLOCKED_DERIVATIVE_DRAFT_PAYLOAD = (
-    "integrity: derivative draft payload failed domain validation"
-)
-BLOCKED_DERIVATIVE_DRAFT_APPROVAL_BYPASS = (
-    "integrity: derivative draft approval bypass blocked — status must be "
-    "candidate at finalize"
-)
-BLOCKED_DERIVATIVE_DRAFT_BRANCH = (
-    "integrity: derivative draft branch/authority_space mismatch — envelope "
-    "branch must match the run branch and derivative mode requires branch + fork"
-)
-BLOCKED_DERIVATIVE_DRAFT_EVIDENCE_MISMATCH = (
-    "integrity: derivative draft citation/branch/divergence evidence keys must "
-    "be a subset of envelope evidence_refs"
-)
-BLOCKED_DERIVATIVE_DRAFT_SUGGESTION = (
-    "integrity: derivative draft BranchSuggestion must carry exactly the six "
-    "fields and enabled_by_default=false; an enabled default or a missing "
-    "conflict/delta/evidence field fails closed"
-)
-# Phase 38 Branch Visual Bible 确定性边界（D-38-03/D-38-04 / REQ-FORK-04）。
-BLOCKED_BRANCH_VISUAL_BIBLE_PAYLOAD = (
-    "integrity: branch visual bible revision payload failed domain validation"
-)
-BLOCKED_BRANCH_VISUAL_BIBLE_APPROVAL_BYPASS = (
-    "integrity: branch visual bible approval bypass blocked — review_state "
-    "must be candidate at finalize"
-)
-BLOCKED_BRANCH_VISUAL_BIBLE_BRANCH = (
-    "integrity: branch visual bible branch/authority_space mismatch — envelope "
-    "branch must match the run branch and derivative mode requires branch + fork"
-)
-BLOCKED_BRANCH_VISUAL_BIBLE_SOURCE_DRIFT = (
-    "integrity: branch visual bible source_snapshot_hash drifts from envelope "
-    "source_versions"
-)
-# Phase 39 Export Preparation 确定性边界（D-39-01/D-39-02 / REQ-FORK-05）。
-BLOCKED_EXPORT_PREPARATION_PAYLOAD = (
-    "integrity: export preparation payload failed domain validation"
-)
-BLOCKED_EXPORT_PREPARATION_APPROVAL_BYPASS = (
-    "integrity: export preparation approval bypass blocked — review_state "
-    "must be candidate at finalize"
-)
-BLOCKED_EXPORT_PREPARATION_BRANCH = (
-    "integrity: export preparation branch/authority_space mismatch — envelope "
-    "branch must match the run branch and derivative mode requires branch + fork"
-)
-BLOCKED_EXPORT_PREPARATION_SOURCE_DRIFT = (
-    "integrity: export preparation source_snapshot_hash drifts from envelope "
-    "source_versions"
-)
-BLOCKED_EXPORT_PREPARATION_EVIDENCE_MISMATCH = (
-    "integrity: export preparation evidence keys must be a subset of envelope "
-    "evidence_refs"
+from ._integrity_visual import (
+    BLOCKED_PROMPT_APPROVAL_BYPASS,
+    BLOCKED_PROMPT_EVIDENCE_MISMATCH,
+    BLOCKED_PROMPT_PAYLOAD,
+    BLOCKED_SCENE_CANDIDATE_APPROVAL_BYPASS,
+    BLOCKED_SCENE_CANDIDATE_EVIDENCE_MISMATCH,
+    BLOCKED_SCENE_CANDIDATE_PAYLOAD,
+    BLOCKED_SCENE_SPEC_APPROVAL_BYPASS,
+    BLOCKED_SCENE_SPEC_EVIDENCE_MISMATCH,
+    BLOCKED_SCENE_SPEC_PAYLOAD,
+    BLOCKED_SCENE_SPEC_SOURCE_DRIFT,
+    BLOCKED_VISUAL_BIBLE_APPROVAL_BYPASS,
+    BLOCKED_VISUAL_BIBLE_EVIDENCE_MISMATCH,
+    BLOCKED_VISUAL_BIBLE_PAYLOAD,
+    _evidence_prefix_matches,
+    _evaluate_prompt,
+    _evaluate_scene_candidate,
+    _evaluate_scene_spec,
+    _evaluate_visual_bible,
+    _spec_evidence_keys,
 )
 
-
-@dataclass(frozen=True)
-class IntegrityDecision:
-    """integrity gate 决策：ok=False 表示 blocked（零写入）。"""
-
-    ok: bool
-    blocked_reason: str | None = None
-
-
-def canonical_content_hash(content: dict[str, Any]) -> str:
-    """对 payload 做 canonical 序列化并求 SHA-256（与 artifacts.content_hash_of 口径一致）。
-
-    注意：repaired_hash 的口径与 agent-service normalizer 的 canonicalHash 相同——
-    sort_keys + 紧凑分隔符 + 非 ASCII 保持 UTF-8 原样。
-    """
-    canonical = json.dumps(
-        content, sort_keys=True, ensure_ascii=False, separators=(",", ":")
-    ).encode("utf-8")
-    return hashlib.sha256(canonical).hexdigest()
-
-
-def _strip_trail(envelope: dict[str, Any]) -> dict[str, Any]:
-    """剥离 normalization trail：repaired_hash 是对不含 trail 的 payload 计算的。"""
-    return {key: value for key, value in envelope.items() if key != "normalization"}
-
-
-def _first_validation_error(exc: ValidationError) -> str:
-    err = exc.errors()[0] if exc.errors() else {}
-    loc = ".".join(str(part) for part in err.get("loc", ()))
-    msg = err.get("msg") or err.get("type") or "validation error"
-    return f"{loc}: {msg}"
+__all__ = [
+    "FORBIDDEN_PROTECTED_KEYS",
+    "BLOCKED_SCHEMA",
+    "BLOCKED_LINEAGE_OWNER",
+    "BLOCKED_LINEAGE_NOVEL",
+    "BLOCKED_LINEAGE_SKILL",
+    "BLOCKED_LINEAGE_INPUT_HASH",
+    "BLOCKED_STATUS",
+    "BLOCKED_STALE_REPAIRED_HASH",
+    "BLOCKED_TRAIL_INCONSISTENT",
+    "BLOCKED_PROTECTED_SYNTHESIS",
+    "BLOCKED_NO_EVIDENCE",
+    "BLOCKED_UNKNOWN_TYPE",
+    "BLOCKED_EXTERNAL_CANON",
+    "BLOCKED_CHAPTER_ANALYSIS_PAYLOAD",
+    "BLOCKED_DIGEST_MISUSE",
+    "BLOCKED_FUTURE_HINT",
+    "BLOCKED_OUTLINE_CANON",
+    "BLOCKED_MAINLINE_CANON",
+    "BLOCKED_EVALUATION_REPORT",
+    "BLOCKED_EVALUATION_REPORT_STALE",
+    "BLOCKED_EVALUATION_SOURCE_SNAPSHOT",
+    "BLOCKED_VISUAL_BIBLE_PAYLOAD",
+    "BLOCKED_VISUAL_BIBLE_APPROVAL_BYPASS",
+    "BLOCKED_VISUAL_BIBLE_EVIDENCE_MISMATCH",
+    "BLOCKED_SCENE_CANDIDATE_PAYLOAD",
+    "BLOCKED_SCENE_CANDIDATE_APPROVAL_BYPASS",
+    "BLOCKED_SCENE_CANDIDATE_EVIDENCE_MISMATCH",
+    "BLOCKED_SCENE_SPEC_PAYLOAD",
+    "BLOCKED_SCENE_SPEC_APPROVAL_BYPASS",
+    "BLOCKED_SCENE_SPEC_EVIDENCE_MISMATCH",
+    "BLOCKED_SCENE_SPEC_SOURCE_DRIFT",
+    "BLOCKED_PROMPT_PAYLOAD",
+    "BLOCKED_PROMPT_APPROVAL_BYPASS",
+    "BLOCKED_PROMPT_EVIDENCE_MISMATCH",
+    "BLOCKED_ILLUSTRATION_PAYLOAD",
+    "BLOCKED_ILLUSTRATION_APPROVAL_BYPASS",
+    "BLOCKED_ILLUSTRATION_SOURCE_DRIFT",
+    "BLOCKED_ILLUSTRATION_BRANCH",
+    "BLOCKED_ANCHOR_PROPOSAL_PAYLOAD",
+    "BLOCKED_ANCHOR_PROPOSAL_APPROVAL_BYPASS",
+    "BLOCKED_ANCHOR_PROPOSAL_SOURCE_DRIFT",
+    "BLOCKED_ANCHOR_PROPOSAL_BRANCH",
+    "BLOCKED_CANON_FORK_PAYLOAD",
+    "BLOCKED_CANON_FORK_APPROVAL_BYPASS",
+    "BLOCKED_CANON_FORK_DELTA_APPROVAL_BYPASS",
+    "BLOCKED_CANON_FORK_SOURCE_DRIFT",
+    "BLOCKED_CANON_FORK_BRANCH",
+    "BLOCKED_CANON_FORK_DELTA_HASH",
+    "BLOCKED_DERIVATIVE_EDIT_PAYLOAD",
+    "BLOCKED_DERIVATIVE_EDIT_APPROVAL_BYPASS",
+    "BLOCKED_DERIVATIVE_EDIT_SOURCE_DRIFT",
+    "BLOCKED_DERIVATIVE_EDIT_CONTENT_HASH",
+    "BLOCKED_DERIVATIVE_EDIT_BRANCH",
+    "BLOCKED_DERIVATIVE_DRAFT_PAYLOAD",
+    "BLOCKED_DERIVATIVE_DRAFT_APPROVAL_BYPASS",
+    "BLOCKED_DERIVATIVE_DRAFT_BRANCH",
+    "BLOCKED_DERIVATIVE_DRAFT_EVIDENCE_MISMATCH",
+    "BLOCKED_DERIVATIVE_DRAFT_SUGGESTION",
+    "BLOCKED_BRANCH_VISUAL_BIBLE_PAYLOAD",
+    "BLOCKED_BRANCH_VISUAL_BIBLE_APPROVAL_BYPASS",
+    "BLOCKED_BRANCH_VISUAL_BIBLE_BRANCH",
+    "BLOCKED_BRANCH_VISUAL_BIBLE_SOURCE_DRIFT",
+    "BLOCKED_EXPORT_PREPARATION_PAYLOAD",
+    "BLOCKED_EXPORT_PREPARATION_APPROVAL_BYPASS",
+    "BLOCKED_EXPORT_PREPARATION_BRANCH",
+    "BLOCKED_EXPORT_PREPARATION_SOURCE_DRIFT",
+    "BLOCKED_EXPORT_PREPARATION_EVIDENCE_MISMATCH",
+    "IntegrityDecision",
+    "canonical_content_hash",
+    "_strip_trail",
+    "_first_validation_error",
+    "evaluate_integrity",
+    "_check_common_lineage",
+    "_evaluate_cited_answer",
+    "_evaluate_external_evidence",
+    "_evaluate_world_model_candidate",
+    "_evaluate_chapter_analysis",
+    "_evaluate_story_arc",
+    "_evaluate_skill_evaluation",
+    "_evaluate_visual_bible",
+    "_evaluate_scene_candidate",
+    "_spec_evidence_keys",
+    "_evidence_prefix_matches",
+    "_evaluate_scene_spec",
+    "_evaluate_prompt",
+    "_evaluate_illustration_revision",
+    "_evaluate_illustration_anchor_proposal",
+    "_evaluate_canon_fork_proposal",
+    "_evaluate_derivative_edit_proposal",
+    "_branch_suggestion_keys",
+    "_evaluate_derivative_draft",
+    "_evaluate_branch_visual_bible",
+    "_evaluate_export_preparation",
+]
 
 
 def evaluate_integrity(*, envelope: dict[str, Any], run: SkillRun) -> IntegrityDecision:
@@ -364,1191 +269,3 @@ def evaluate_integrity(*, envelope: dict[str, Any], run: SkillRun) -> IntegrityD
     if artifact_type == "export_preparation":
         return _evaluate_export_preparation(envelope, run)
     return IntegrityDecision(False, BLOCKED_UNKNOWN_TYPE)
-
-
-def _evaluate_cited_answer(
-    envelope: dict[str, Any], run: SkillRun
-) -> IntegrityDecision:
-    # 0. heuristic candidate-only 无 EvidenceRef 资格 → 不能进 cited-answer 网关
-    #    （schema 的 min_length=1 是兜底；这里给出明确的稳定 blocked 原因）。
-    if not envelope.get("evidence_refs"):
-        return IntegrityDecision(False, BLOCKED_NO_EVIDENCE)
-
-    # 1. 严格 wire schema（extra=forbid + 必需字段 + hash 格式 + trail 形状）。
-    try:
-        model = CitedAnswerArtifact.model_validate(envelope)
-    except ValidationError as exc:
-        return IntegrityDecision(
-            False, f"{BLOCKED_SCHEMA} ({_first_validation_error(exc)})"
-        )
-
-    # 2. run lineage：owner/novel/skill_version/input_hash 必须与 run 一致。
-    if model.owner_id != run.owner_id:
-        return IntegrityDecision(False, BLOCKED_LINEAGE_OWNER)
-    if model.novel_id != run.novel_id:
-        return IntegrityDecision(False, BLOCKED_LINEAGE_NOVEL)
-    if model.skill_version_id != run.skill_version_id:
-        return IntegrityDecision(False, BLOCKED_LINEAGE_SKILL)
-    if model.input_hash != run.input_hash:
-        return IntegrityDecision(False, BLOCKED_LINEAGE_INPUT_HASH)
-    if model.status != "candidate":
-        return IntegrityDecision(False, f"{BLOCKED_STATUS} (got {model.status!r})")
-
-    # 3. 完整性 trail 重放：repaired_hash 必须等于剥离 trail 后的 payload 的 hash。
-    recomputed = canonical_content_hash(_strip_trail(envelope))
-    if recomputed != model.normalization.repaired_hash:
-        return IntegrityDecision(False, BLOCKED_STALE_REPAIRED_HASH)
-    if not model.normalization.normalization_actions and (
-        model.normalization.raw_hash != model.normalization.repaired_hash
-    ):
-        return IntegrityDecision(False, BLOCKED_TRAIL_INCONSISTENT)
-
-    # 4. 受保护字段合成检查（authority/cutoff/fork/approval 绝不出现；
-    #    extra=forbid 已兜底，此处为纵深防御 + 明确原因）。
-    forbidden = [key for key in FORBIDDEN_PROTECTED_KEYS if key in envelope]
-    if forbidden:
-        return IntegrityDecision(
-            False, f"{BLOCKED_PROTECTED_SYNTHESIS}: {sorted(forbidden)}"
-        )
-
-    # 5. leaf-evidence 白名单校验由 finalize 的 validate_answer_against_manifest 承担。
-    return IntegrityDecision(True)
-
-
-def _evaluate_external_evidence(envelope: dict[str, Any]) -> IntegrityDecision:
-    # D-09：prohibited_from_canon 是服务端 Literal[True] 常量，wire 形状无法断言
-    # 其它值（T-25.3-03-02，Pitfall 6）；显式检查给出明确原因，schema 兜底。
-    if envelope.get("prohibited_from_canon") is not True:
-        return IntegrityDecision(False, BLOCKED_EXTERNAL_CANON)
-    try:
-        ExternalEvidenceArtifact.model_validate(envelope)
-    except ValidationError as exc:
-        return IntegrityDecision(
-            False, f"{BLOCKED_SCHEMA} ({_first_validation_error(exc)})"
-        )
-    return IntegrityDecision(True)
-
-
-def _evaluate_world_model_candidate(
-    envelope: dict[str, Any], run: SkillRun
-) -> IntegrityDecision:
-    """Phase 27 世界模型候选信封 integrity gate（D-01..D-06 / D-16）。
-
-    与 cited_answer 纪律一致：无证据的启发式候选不能进世界模型网关；lineage
-    （owner/novel/skill_version/input_hash）必须与 run 一致；status 恒为
-    candidate；trail 可重放；受保护字段（authority/cutoff/fork/approval）绝不
-    出现在信封中。candidates 内部 claim 的合法性由确定性 WorldModelGate 在
-    发布时裁决，本 gate 不越权。
-    """
-    # 0. heuristic candidate-only 无 EvidenceRef 资格 → 不能进世界模型网关。
-    if not envelope.get("evidence_refs"):
-        return IntegrityDecision(False, BLOCKED_NO_EVIDENCE)
-
-    # 1. 严格 wire schema（extra=forbid + 必需字段 + hash 格式 + trail 形状）。
-    try:
-        model = WorldModelCandidateArtifact.model_validate(envelope)
-    except ValidationError as exc:
-        return IntegrityDecision(
-            False, f"{BLOCKED_SCHEMA} ({_first_validation_error(exc)})"
-        )
-
-    # 2. run lineage：owner/novel/skill_version/input_hash 必须与 run 一致。
-    if model.owner_id != run.owner_id:
-        return IntegrityDecision(False, BLOCKED_LINEAGE_OWNER)
-    if model.novel_id != run.novel_id:
-        return IntegrityDecision(False, BLOCKED_LINEAGE_NOVEL)
-    if model.skill_version_id != run.skill_version_id:
-        return IntegrityDecision(False, BLOCKED_LINEAGE_SKILL)
-    if model.input_hash != run.input_hash:
-        return IntegrityDecision(False, BLOCKED_LINEAGE_INPUT_HASH)
-    if model.status != "candidate":
-        return IntegrityDecision(False, f"{BLOCKED_STATUS} (got {model.status!r})")
-
-    # 3. 完整性 trail 重放：repaired_hash 必须等于剥离 trail 后的 payload 的 hash。
-    recomputed = canonical_content_hash(_strip_trail(envelope))
-    if recomputed != model.normalization.repaired_hash:
-        return IntegrityDecision(False, BLOCKED_STALE_REPAIRED_HASH)
-    if not model.normalization.normalization_actions and (
-        model.normalization.raw_hash != model.normalization.repaired_hash
-    ):
-        return IntegrityDecision(False, BLOCKED_TRAIL_INCONSISTENT)
-
-    # 4. 受保护字段合成检查（authority/cutoff/fork/approval 绝不出现；
-    #    extra=forbid 已兜底，此处为纵深防御 + 明确原因）。
-    forbidden = [key for key in FORBIDDEN_PROTECTED_KEYS if key in envelope]
-    if forbidden:
-        return IntegrityDecision(
-            False, f"{BLOCKED_PROTECTED_SYNTHESIS}: {sorted(forbidden)}"
-        )
-
-    # 5. leaf-evidence 白名单校验由 finalize 的 _validate_artifact_evidence 承担。
-    return IntegrityDecision(True)
-
-
-def _check_common_lineage(
-    *, envelope: dict[str, Any], run: SkillRun, wire: Any
-) -> IntegrityDecision | None:
-    """共享 lineage/status/trail/protected 门（cited_answer 等复用）。
-
-    返回 None 表示通过；返回 IntegrityDecision 表示已阻断。
-    """
-    if wire.owner_id != run.owner_id:
-        return IntegrityDecision(False, BLOCKED_LINEAGE_OWNER)
-    if wire.novel_id != run.novel_id:
-        return IntegrityDecision(False, BLOCKED_LINEAGE_NOVEL)
-    if wire.skill_version_id != run.skill_version_id:
-        return IntegrityDecision(False, BLOCKED_LINEAGE_SKILL)
-    if wire.input_hash != run.input_hash:
-        return IntegrityDecision(False, BLOCKED_LINEAGE_INPUT_HASH)
-    if wire.status != "candidate":
-        return IntegrityDecision(False, f"{BLOCKED_STATUS} (got {wire.status!r})")
-
-    # 完整性 trail 重放：repaired_hash 必须等于剥离 trail 后的 payload 的 hash。
-    recomputed = canonical_content_hash(_strip_trail(envelope))
-    if recomputed != wire.normalization.repaired_hash:
-        return IntegrityDecision(False, BLOCKED_STALE_REPAIRED_HASH)
-    if not wire.normalization.normalization_actions and (
-        wire.normalization.raw_hash != wire.normalization.repaired_hash
-    ):
-        return IntegrityDecision(False, BLOCKED_TRAIL_INCONSISTENT)
-
-    # 受保护字段合成检查（authority/cutoff/fork/approval 绝不出现）。
-    forbidden = [key for key in FORBIDDEN_PROTECTED_KEYS if key in envelope]
-    if forbidden:
-        return IntegrityDecision(
-            False, f"{BLOCKED_PROTECTED_SYNTHESIS}: {sorted(forbidden)}"
-        )
-    return None
-
-
-def _evaluate_chapter_analysis(
-    envelope: dict[str, Any], run: SkillRun
-) -> IntegrityDecision:
-    """Phase 28 ChapterAnalysisArtifact 信封 integrity gate（D-08/D-16）。
-
-    与 cited_answer 纪律一致（evidence/lineage/status/trail/protected），并在
-    ``analysis`` 负载上做确定性 D-08 边界校验：
-      - analysis 用领域 ``builder_contracts.ChapterAnalysisArtifact`` 严格校验
-        （bounded max_length、chunk digest 唯一、hint/reason 互斥、digest 64-hex）；
-      - digests（chapter_digest + chunk_digests）绝不与 EvidenceRef 或检索索引输入
-        冲突（assert_digests_never_evidence_refs）；
-      - ``next_context_hint`` 只消歧、绝不泄漏未来事实（hint_safe_at_cutoff）。
-    任何失败 → 稳定 blocked，零写入。
-    """
-    # 0. heuristic candidate-only 无 EvidenceRef 资格 → 不能进章节分析网关。
-    if not envelope.get("evidence_refs"):
-        return IntegrityDecision(False, BLOCKED_NO_EVIDENCE)
-
-    # 1. 严格 wire schema（extra=forbid + 必需字段 + hash 格式 + trail 形状）。
-    try:
-        model = ChapterAnalysisArtifact.model_validate(envelope)
-    except ValidationError as exc:
-        return IntegrityDecision(
-            False, f"{BLOCKED_SCHEMA} ({_first_validation_error(exc)})"
-        )
-
-    # 2. 共享 lineage/status/trail/protected 门。
-    blocked = _check_common_lineage(envelope=envelope, run=run, wire=model)
-    if blocked is not None:
-        return blocked
-
-    # 3. analysis 负载：领域严格校验（D-08 bounded context/continuity）。
-    analysis_payload = envelope.get("analysis")
-    if not isinstance(analysis_payload, dict):
-        return IntegrityDecision(False, BLOCKED_CHAPTER_ANALYSIS_PAYLOAD)
-    try:
-        analysis = DomainChapterAnalysisArtifact.model_validate(analysis_payload)
-    except ValidationError as exc:
-        return IntegrityDecision(
-            False,
-            f"{BLOCKED_CHAPTER_ANALYSIS_PAYLOAD} ({_first_validation_error(exc)})",
-        )
-
-    # 4. digests 是压缩负载：绝不作为 EvidenceRef / 检索索引输入（D-08）。
-    digests = [analysis.chapter_digest, *analysis.chunk_digests]
-    try:
-        assert_digests_never_evidence_refs(
-            digests,
-            authority_content_hashes=list(envelope["evidence_refs"]),
-            retrieval_index_inputs=list(envelope["evidence_refs"]),
-        )
-    except ValueError as exc:
-        return IntegrityDecision(False, f"{BLOCKED_DIGEST_MISUSE}: {exc}")
-
-    # 5. next hint 只消歧、绝不泄漏未来事实（D-08）。
-    if analysis.next_context_hint and not hint_safe_at_cutoff(
-        analysis.next_context_hint, cutoff=analysis.cutoff
-    ):
-        return IntegrityDecision(False, BLOCKED_FUTURE_HINT)
-
-    return IntegrityDecision(True)
-
-
-def _evaluate_story_arc(envelope: dict[str, Any], run: SkillRun) -> IntegrityDecision:
-    """Phase 28 StoryArcArtifact 信封 integrity gate（D-05/D-07/D-09/D-16）。
-
-    Outline/Mainline 候选只以 candidate-only 进入：领域
-    ``OutlineCandidateArtifact`` / ``MainlineCandidateArtifact`` 强制
-    ``candidate_status == "candidate"``（Canon 提升尝试 → schema 校验失败）。
-    lineage/evidence/status/trail/protected 与其余信封纪律一致；任何失败 →
-    稳定 blocked，零写入。
-    """
-    # 0. heuristic candidate-only 无 EvidenceRef 资格 → 不能进故事弧网关。
-    if not envelope.get("evidence_refs"):
-        return IntegrityDecision(False, BLOCKED_NO_EVIDENCE)
-
-    # 1. 严格 wire schema。
-    try:
-        model = StoryArcArtifact.model_validate(envelope)
-    except ValidationError as exc:
-        return IntegrityDecision(
-            False, f"{BLOCKED_SCHEMA} ({_first_validation_error(exc)})"
-        )
-
-    # 2. 共享 lineage/status/trail/protected 门。
-    blocked = _check_common_lineage(envelope=envelope, run=run, wire=model)
-    if blocked is not None:
-        return blocked
-
-    # 3. Outline/Mainline 候选：领域严格校验（candidate-only，绝不进入 Canon）。
-    outline_payload = envelope.get("outline_candidate")
-    mainline_payload = envelope.get("mainline_candidate")
-    if not isinstance(outline_payload, dict) or not isinstance(mainline_payload, dict):
-        return IntegrityDecision(False, f"{BLOCKED_OUTLINE_CANON}: missing candidate")
-    try:
-        OutlineCandidateArtifact.model_validate(outline_payload)
-    except ValidationError as exc:
-        return IntegrityDecision(
-            False, f"{BLOCKED_OUTLINE_CANON} ({_first_validation_error(exc)})"
-        )
-    try:
-        MainlineCandidateArtifact.model_validate(mainline_payload)
-    except ValidationError as exc:
-        return IntegrityDecision(
-            False, f"{BLOCKED_MAINLINE_CANON} ({_first_validation_error(exc)})"
-        )
-
-    return IntegrityDecision(True)
-
-
-def _evaluate_skill_evaluation(
-    envelope: dict[str, Any], run: SkillRun
-) -> IntegrityDecision:
-    """Phase 29 SkillEvaluationArtifact 信封 integrity gate（D-02/D-05/D-16）。
-
-    与其余信封纪律一致（evidence/lineage/status/trail/protected），并在
-    ``report`` 上做确定性评估边界校验：
-      - report 必须是密封的 ``QualificationReport``（verdict 只允许
-        qualified_candidate / blocked，无 promotion 词）；
-      - report checksum 必须可重放（后端确定性评估 runner 产出，不可由
-        Agent/UI 更改）；
-      - report header 的 source snapshot / dataset version 必须与信封
-        ``source_versions`` 血缘绑定（可选但若提供则必须一致）。
-    任何失败 → 稳定 blocked，零写入；无 ApprovalRequest / Publisher / promotion。
-    """
-    # 0. heuristic candidate-only 无 EvidenceRef 资格 → 不能进评估网关。
-    if not envelope.get("evidence_refs"):
-        return IntegrityDecision(False, BLOCKED_NO_EVIDENCE)
-
-    # 1. 严格 wire schema。
-    try:
-        model = SkillEvaluationArtifact.model_validate(envelope)
-    except ValidationError as exc:
-        return IntegrityDecision(
-            False, f"{BLOCKED_SCHEMA} ({_first_validation_error(exc)})"
-        )
-
-    # 2. 共享 lineage/status/trail/protected 门（evaluated_run/evaluated_artifact
-    #    只允许冻结终态，由 wire schema 的 enum/shape 强制）。
-    blocked = _check_common_lineage(envelope=envelope, run=run, wire=model)
-    if blocked is not None:
-        return blocked
-
-    # 3. 密封 QualificationReport：two-value verdict + checksum 重放（D-05）。
-    report_payload = envelope.get("report")
-    if not isinstance(report_payload, dict):
-        return IntegrityDecision(False, BLOCKED_EVALUATION_REPORT)
-    try:
-        report = QualificationReport.model_validate(report_payload)
-    except ValidationError as exc:
-        return IntegrityDecision(
-            False,
-            f"{BLOCKED_EVALUATION_REPORT} ({_first_validation_error(exc)})",
-        )
-    if not report.checksum_valid:
-        return IntegrityDecision(False, BLOCKED_EVALUATION_REPORT_STALE)
-
-    # 4. dataset/source 血缘绑定：report header 与信封 source_versions 一致
-    #    （可选；若提供则必须匹配，D-02 纵深防御）。
-    source_versions = envelope.get("source_versions") or {}
-    snapshot = source_versions.get("source_snapshot_hash")
-    if snapshot is not None and snapshot != report.header.source_snapshot:
-        return IntegrityDecision(False, BLOCKED_EVALUATION_SOURCE_SNAPSHOT)
-    dataset_version = source_versions.get("dataset_version")
-    if dataset_version is not None and dataset_version != report.header.dataset_version:
-        return IntegrityDecision(False, BLOCKED_EVALUATION_SOURCE_SNAPSHOT)
-
-    return IntegrityDecision(True)
-
-
-def _evaluate_visual_bible(
-    envelope: dict[str, Any], run: SkillRun
-) -> IntegrityDecision:
-    """Phase 30 VisualBibleArtifact 信封 integrity gate（D-30-01..D-30-04）。
-
-    与其余信封纪律一致（evidence/lineage/status/trail/protected），并在
-    ``visual_bible`` 负载上做确定性域边界校验：
-      - ``visual_bible`` 必须是严格 ``VisualBibleVersionContract`` 且通过
-        ``validate_version_contract``（claim hash / manifest hash / evidence
-        refs 结构 / 唯一 stable ID / spoiler cutoff 全部服务端重算）；
-      - ``review_state`` 恒为 ``candidate``——Agent 声称任何非 candidate
-        review_state（approval bypass）→ blocked（approval 是服务端显式、
-        append-only 的 ``visual_bible:approve`` 迁移，D-30-04）；
-      - 每个 canon_fact claim 的 evidence_key 必须 ⊆ 信封顶层
-        ``evidence_refs``（leaf-evidence 资格门，D-30-02）。
-    任何失败 → 稳定 blocked，零写入；FastAPI 与确定性 validators 保留
-    permission / evidence / state-transition / publication 权威。
-    """
-    # 0. heuristic candidate-only 无 EvidenceRef 资格 → 不能进 Visual Bible 网关。
-    if not envelope.get("evidence_refs"):
-        return IntegrityDecision(False, BLOCKED_NO_EVIDENCE)
-
-    # 1. 严格 wire schema。
-    try:
-        model = VisualBibleArtifact.model_validate(envelope)
-    except ValidationError as exc:
-        return IntegrityDecision(
-            False, f"{BLOCKED_SCHEMA} ({_first_validation_error(exc)})"
-        )
-
-    # 2. 共享 lineage/status/trail/protected 门。
-    blocked = _check_common_lineage(envelope=envelope, run=run, wire=model)
-    if blocked is not None:
-        return blocked
-
-    # 3. visual_bible 负载：严格域契约 + approval bypass 门。
-    vb_payload = envelope.get("visual_bible")
-    if not isinstance(vb_payload, dict):
-        return IntegrityDecision(False, BLOCKED_VISUAL_BIBLE_PAYLOAD)
-    if vb_payload.get("review_state") != VisualReviewState.CANDIDATE.value:
-        return IntegrityDecision(False, BLOCKED_VISUAL_BIBLE_APPROVAL_BYPASS)
-    try:
-        version = VisualBibleVersionContract.model_validate(vb_payload)
-        validate_version_contract(version)
-    except (ValidationError, VisualBibleGateError) as exc:
-        return IntegrityDecision(
-            False,
-            f"{BLOCKED_VISUAL_BIBLE_PAYLOAD} ({exc})",
-        )
-
-    # 4. canon_fact claim 的 leaf evidence 必须 ⊆ 信封 evidence_refs（D-30-02）。
-    claim_keys = {
-        ref.evidence_key
-        for claim in version.claims
-        if claim.authority is VisualAuthority.CANON_FACT
-        for ref in claim.evidence_refs
-    }
-    envelope_keys = set(envelope.get("evidence_refs") or [])
-    if not claim_keys.issubset(envelope_keys):
-        return IntegrityDecision(False, BLOCKED_VISUAL_BIBLE_EVIDENCE_MISMATCH)
-
-    return IntegrityDecision(True)
-
-
-def _evaluate_scene_candidate(
-    envelope: dict[str, Any], run: SkillRun
-) -> IntegrityDecision:
-    """Phase 31 SceneCandidateArtifact 信封 integrity gate（D-31-01..D-31-05）。
-
-    与其余信封纪律一致（evidence/lineage/status/trail/protected），并在
-    ``scene_candidate_set`` 负载上做确定性域边界校验：
-      - ``scene_candidate_set`` 必须是严格 ``SceneCandidateSetContract`` 且通过
-        ``validate_candidate_set_contract``（候选证据血缘、spoiler cutoff、
-        heuristic-signal isolation、manifest hash 重放全部服务端重算，
-        D-31-02/D-31-03/D-31-05）；
-      - ``review_state`` 恒为 ``candidate``——Agent 声称任何非 candidate
-        review_state（approval bypass）→ blocked（用户选择/审查是服务端显式、
-        append-only 的 ``key_scene:approve`` 迁移，D-31-04）；
-      - 每个候选的 evidence key 必须 ⊆ 信封顶层 ``evidence_refs``（leaf-evidence
-        资格门，D-31-02）；speaker/dialogue heuristic 信号是诊断元数据
-        （D-31-05），结构性隔离由 ``validate_candidate_set_contract`` 强制。
-    任何失败 → 稳定 blocked，零写入；FastAPI 与确定性 validators 保留
-    permission / evidence / state-transition / publication 权威。
-    """
-    # 0. heuristic candidate-only 无 EvidenceRef 资格 → 不能进关键场景网关。
-    if not envelope.get("evidence_refs"):
-        return IntegrityDecision(False, BLOCKED_NO_EVIDENCE)
-
-    # 1. 严格 wire schema。
-    try:
-        model = SceneCandidateArtifact.model_validate(envelope)
-    except ValidationError as exc:
-        return IntegrityDecision(
-            False, f"{BLOCKED_SCHEMA} ({_first_validation_error(exc)})"
-        )
-
-    # 2. 共享 lineage/status/trail/protected 门。
-    blocked = _check_common_lineage(envelope=envelope, run=run, wire=model)
-    if blocked is not None:
-        return blocked
-
-    # 3. scene_candidate_set 负载：严格域契约 + approval bypass 门 + 证据血缘。
-    payload = envelope.get("scene_candidate_set")
-    if not isinstance(payload, dict):
-        return IntegrityDecision(False, BLOCKED_SCENE_CANDIDATE_PAYLOAD)
-    if payload.get("review_state") != "candidate":
-        return IntegrityDecision(False, BLOCKED_SCENE_CANDIDATE_APPROVAL_BYPASS)
-    try:
-        set_ = SceneCandidateSetContract.model_validate(payload)
-        validate_candidate_set_contract(set_)
-    except (ValidationError, KeySceneGateError) as exc:
-        return IntegrityDecision(
-            False,
-            f"{BLOCKED_SCENE_CANDIDATE_PAYLOAD} ({exc})",
-        )
-
-    # 4. 每个候选的 leaf evidence 必须 ⊆ 信封 evidence_refs（D-31-02）。
-    candidate_keys = {
-        ref.evidence_key
-        for candidate in set_.candidates
-        for ref in candidate.evidence_ranges
-    }
-    envelope_keys = set(envelope.get("evidence_refs") or [])
-    if not candidate_keys.issubset(envelope_keys):
-        return IntegrityDecision(False, BLOCKED_SCENE_CANDIDATE_EVIDENCE_MISMATCH)
-
-    return IntegrityDecision(True)
-
-
-def _spec_evidence_keys(spec: SceneSpecContract) -> set[str]:
-    """收集 spec 内全部 namespaced leaf evidence keys（detail + constraint）。"""
-    keys: set[str] = set()
-    for detail in spec.details:
-        keys.update(ref.evidence_key for ref in detail.evidence_refs)
-    for constraint in spec.negative_constraints:
-        keys.update(ref.evidence_key for ref in constraint.evidence_refs)
-    return keys
-
-
-def _evidence_prefix_matches(spec_key: str, envelope_keys: set[str]) -> bool:
-    """namespaced spec evidence key 必须前缀匹配某个信封 leaf evidence key。
-
-    编译器把 candidate 的原始 leaf evidence key 加 ``:{namespace}`` 后缀
-    （如 ``ev-ayla-hair:action``）；信封 evidence_refs 携带原始 key
-    （``ev-ayla-hair``）。前缀匹配确保每条 clause 的引用都能追溯到物化的
-    leaf 证据（D-32-02），未物化的编造引用 → fail closed。
-    """
-    return any(k == spec_key or spec_key.startswith(k + ":") for k in envelope_keys)
-
-
-def _evaluate_scene_spec(envelope: dict[str, Any], run: SkillRun) -> IntegrityDecision:
-    """Phase 32 SceneSpecArtifact 信封 integrity gate（D-32-01..D-32-04）。
-
-    与其余信封纪律一致（evidence/lineage/status/trail/protected），并在
-    ``scene_spec`` 负载上做确定性域边界校验：
-      - ``scene_spec`` 必须是严格 ``SceneSpecContract`` 且通过
-        ``validate_scene_spec_contract``（唯一 detail/constraint key、snapshot/
-        cutoff/VB-revision 血缘、content_hash 重放——Canon/Visual Bible 一致性
-        与未支持细节拒绝，D-32-02）；
-      - ``review_state`` 恒为 ``candidate``——Agent 声称任何非 candidate
-        review_state（approval bypass）→ blocked（用户审查/批准是服务端显式、
-        append-only 的 ``scene_spec:approve`` 迁移，只授权 Phase 33 消费，
-        D-32-04）；
-      - spec 的 source_snapshot_hash 必须与信封 ``source_versions`` 血缘绑定；
-      - 每个 detail/constraint 的 namespaced evidence key 必须前缀匹配信封
-        顶层 ``evidence_refs``（leaf-evidence 资格门，D-32-02）。
-    任何失败 → 稳定 blocked，零写入；FastAPI 与确定性 validators 保留
-    permission / evidence / state-transition / publication 权威。
-    """
-    # 0. heuristic candidate-only 无 EvidenceRef 资格 → 不能进 Scene Spec 网关。
-    if not envelope.get("evidence_refs"):
-        return IntegrityDecision(False, BLOCKED_NO_EVIDENCE)
-
-    # 1. 严格 wire schema。
-    try:
-        model = SceneSpecArtifact.model_validate(envelope)
-    except ValidationError as exc:
-        return IntegrityDecision(
-            False, f"{BLOCKED_SCHEMA} ({_first_validation_error(exc)})"
-        )
-
-    # 2. 共享 lineage/status/trail/protected 门。
-    blocked = _check_common_lineage(envelope=envelope, run=run, wire=model)
-    if blocked is not None:
-        return blocked
-
-    # 3. scene_spec 负载：严格域契约 + approval bypass 门。
-    payload = envelope.get("scene_spec")
-    if not isinstance(payload, dict):
-        return IntegrityDecision(False, BLOCKED_SCENE_SPEC_PAYLOAD)
-    if payload.get("review_state") != SpecReviewState.CANDIDATE.value:
-        return IntegrityDecision(False, BLOCKED_SCENE_SPEC_APPROVAL_BYPASS)
-    try:
-        spec = SceneSpecContract.model_validate(payload)
-        validate_scene_spec_contract(spec)
-    except (ValidationError, SceneSpecGateError) as exc:
-        return IntegrityDecision(
-            False,
-            f"{BLOCKED_SCENE_SPEC_PAYLOAD} ({exc})",
-        )
-
-    # 4. source snapshot 血缘绑定（D-32-03）。
-    source_versions = envelope.get("source_versions") or {}
-    snapshot = source_versions.get("source_snapshot_hash")
-    if snapshot is not None and snapshot != spec.source_snapshot_hash:
-        return IntegrityDecision(False, BLOCKED_SCENE_SPEC_SOURCE_DRIFT)
-
-    # 5. namespaced evidence keys 必须 ⊆ 信封 evidence_refs（D-32-02）。
-    envelope_keys = set(envelope.get("evidence_refs") or [])
-    spec_keys = _spec_evidence_keys(spec)
-    if not all(_evidence_prefix_matches(key, envelope_keys) for key in spec_keys):
-        return IntegrityDecision(False, BLOCKED_SCENE_SPEC_EVIDENCE_MISMATCH)
-
-    return IntegrityDecision(True)
-
-
-def _evaluate_prompt(envelope: dict[str, Any], run: SkillRun) -> IntegrityDecision:
-    """Phase 32 PromptArtifact 信封 integrity gate（D-32-01..D-32-04）。
-
-    与其余信封纪律一致（evidence/lineage/status/trail/protected），并在
-    ``prompt_revision`` / ``scene_spec`` 负载上做确定性域边界校验：
-      - ``prompt_revision`` 必须是严格 ``PromptRevisionContract`` 且对其派生自
-        的 ``scene_spec``（严格 ``SceneSpecContract`` + 域校验）通过
-        ``validate_prompt_revision_contract``（prompt scene_spec_hash 与 spec
-        一致、canonical sections 与 spec 确定性重放一致、input_hash/prompt_hash
-        可重放——provider-neutral、无 unsupported detail 渲染成 canon，
-        D-32-01/D-32-03）；
-      - ``review_state`` 恒为 ``candidate``——Agent 声称任何非 candidate
-        review_state（approval bypass）→ blocked（``scene_spec:approve`` 只授权
-        Phase 33 消费，D-32-04）；
-      - spec 的 source_snapshot_hash 必须与信封 ``source_versions`` 血缘绑定；
-      - spec 的 namespaced evidence keys 必须前缀匹配信封顶层 ``evidence_refs``
-        （leaf-evidence 资格门，D-32-02）。
-    任何失败 → 稳定 blocked，零写入；prompt 字符串永远不是权威（D-32-01）。
-    """
-    # 0. heuristic candidate-only 无 EvidenceRef 资格 → 不能进 Prompt 网关。
-    if not envelope.get("evidence_refs"):
-        return IntegrityDecision(False, BLOCKED_NO_EVIDENCE)
-
-    # 1. 严格 wire schema。
-    try:
-        model = PromptArtifact.model_validate(envelope)
-    except ValidationError as exc:
-        return IntegrityDecision(
-            False, f"{BLOCKED_SCHEMA} ({_first_validation_error(exc)})"
-        )
-
-    # 2. 共享 lineage/status/trail/protected 门。
-    blocked = _check_common_lineage(envelope=envelope, run=run, wire=model)
-    if blocked is not None:
-        return blocked
-
-    # 3. prompt + spec 负载：严格域契约 + approval bypass 门。
-    prompt_payload = envelope.get("prompt_revision")
-    spec_payload = envelope.get("scene_spec")
-    if not isinstance(prompt_payload, dict) or not isinstance(spec_payload, dict):
-        return IntegrityDecision(False, BLOCKED_PROMPT_PAYLOAD)
-    if prompt_payload.get("review_state") != SpecReviewState.CANDIDATE.value:
-        return IntegrityDecision(False, BLOCKED_PROMPT_APPROVAL_BYPASS)
-    try:
-        spec = SceneSpecContract.model_validate(spec_payload)
-        validate_scene_spec_contract(spec)
-        prompt = PromptRevisionContract.model_validate(prompt_payload)
-        validate_prompt_revision_contract(prompt, spec)
-    except (ValidationError, SceneSpecGateError) as exc:
-        return IntegrityDecision(
-            False,
-            f"{BLOCKED_PROMPT_PAYLOAD} ({exc})",
-        )
-
-    # 4. source snapshot 血缘绑定（D-32-03）。
-    source_versions = envelope.get("source_versions") or {}
-    snapshot = source_versions.get("source_snapshot_hash")
-    if snapshot is not None and snapshot != spec.source_snapshot_hash:
-        return IntegrityDecision(False, BLOCKED_SCENE_SPEC_SOURCE_DRIFT)
-
-    # 5. spec 的 namespaced evidence keys 必须 ⊆ 信封 evidence_refs（D-32-02）。
-    envelope_keys = set(envelope.get("evidence_refs") or [])
-    spec_keys = _spec_evidence_keys(spec)
-    if not all(_evidence_prefix_matches(key, envelope_keys) for key in spec_keys):
-        return IntegrityDecision(False, BLOCKED_PROMPT_EVIDENCE_MISMATCH)
-
-    return IntegrityDecision(True)
-
-
-def _evaluate_illustration_revision(
-    envelope: dict[str, Any], run: SkillRun
-) -> IntegrityDecision:
-    """Phase 33 IllustrationRevision 信封 integrity gate（D-33-01..D-33-04）。
-
-    与其余信封纪律一致（evidence/lineage/status/trail/protected），并在
-    ``illustration_revision`` 负载上做确定性域边界校验：
-      - ``illustration_revision`` 必须是严格 ``IllustrationRevisionPayload``
-        （revision/asset 血缘、SceneSpec/prompt/Visual Bible/source-snapshot
-        血缘、provider/model/generator 血缘、rights/consistency/budget 证据
-        全部必须、可重放）；
-      - ``review_state`` 恒为 ``candidate``——Agent 声称任何非 candidate
-        review_state（approval bypass / proposal_ready / published 伪造）→
-        blocked（只有 Phase 33 确定性 validator 才能推进状态；Phase 33 永不
-        创建 ApprovalRequest、不调用 publisher、不发 published 状态，
-        Phase 34 拥有 approval/publication）；
-      - 负载的 source_snapshot_hash 必须与信封 ``source_versions`` 血缘绑定；
-      - branch/authority_space 门：derivative 模式必须有 branch + fork，
-        original 模式禁止 branch/fork（wrong scope → blocked）；
-      - 信封 branch 必须与 run.branch 血缘一致（wrong branch/fork → blocked）。
-    任何失败 → 稳定 blocked，零写入；FastAPI 与 Phase 33 确定性 validator 保留
-    permission / evidence / state-transition / publication 权威。
-    """
-    # 0. heuristic candidate-only 无 EvidenceRef 资格 → 不能进插图网关。
-    if not envelope.get("evidence_refs"):
-        return IntegrityDecision(False, BLOCKED_NO_EVIDENCE)
-
-    # 1. 严格 wire schema。
-    try:
-        model = IllustrationRevisionArtifact.model_validate(envelope)
-    except ValidationError as exc:
-        return IntegrityDecision(
-            False, f"{BLOCKED_SCHEMA} ({_first_validation_error(exc)})"
-        )
-
-    # 2. 共享 lineage/status/trail/protected 门。
-    blocked = _check_common_lineage(envelope=envelope, run=run, wire=model)
-    if blocked is not None:
-        return blocked
-
-    # 3. illustration_revision 负载：严格域契约 + approval bypass 门。
-    payload = envelope.get("illustration_revision")
-    if not isinstance(payload, dict):
-        return IntegrityDecision(False, BLOCKED_ILLUSTRATION_PAYLOAD)
-    if payload.get("review_state") != "candidate":
-        return IntegrityDecision(False, BLOCKED_ILLUSTRATION_APPROVAL_BYPASS)
-    try:
-        revision = IllustrationRevisionArtifact.model_validate(
-            envelope
-        ).illustration_revision
-    except ValidationError as exc:
-        return IntegrityDecision(
-            False,
-            f"{BLOCKED_ILLUSTRATION_PAYLOAD} ({_first_validation_error(exc)})",
-        )
-
-    # 4. source snapshot 血缘绑定（D-33-01）。
-    source_versions = envelope.get("source_versions") or {}
-    snapshot = source_versions.get("source_snapshot_hash")
-    if snapshot is not None and snapshot != revision.source_snapshot_hash:
-        return IntegrityDecision(False, BLOCKED_ILLUSTRATION_SOURCE_DRIFT)
-
-    # 5. branch/authority_space 门（wrong branch/fork → fail closed）。
-    branch = envelope.get("branch")
-    if branch != run.branch:
-        return IntegrityDecision(False, BLOCKED_ILLUSTRATION_BRANCH)
-    if revision.authority_space == "derivative":
-        if not branch or not revision.fork:
-            return IntegrityDecision(False, BLOCKED_ILLUSTRATION_BRANCH)
-    else:  # original authority space
-        if branch or revision.fork:
-            return IntegrityDecision(False, BLOCKED_ILLUSTRATION_BRANCH)
-
-    return IntegrityDecision(True)
-
-
-def _evaluate_illustration_anchor_proposal(
-    envelope: dict[str, Any], run: SkillRun
-) -> IntegrityDecision:
-    """Phase 34 IllustrationAnchorProposal 信封 integrity gate（D-34-01..D-34-04）。
-
-    与其余信封纪律一致（evidence/lineage/status/trail/protected），并在
-    ``illustration_anchor_proposal`` 负载上做确定性域边界校验：
-      - 负载必须是严格 ``IllustrationAnchorProposalPayload``（proposal key、
-        authority space、chapter/精确 source span/hash、source snapshot、
-        proposal-ready 资产引用、presentation、requested action 全部必须；
-        approval_request_id / proposal_id 由服务端分配）；
-      - ``proposal_status`` 恒为 ``proposed``——Agent 声称任何非 proposed
-        proposal_status（approval bypass / pending_approval / valid / published
-        伪造）→ blocked（只有服务端 proposal/approval/publisher 能推进状态；
-        Phase 34 绝不静默发布）；
-      - 负载的 source_snapshot_hash 必须与信封 ``source_versions`` 血缘绑定；
-      - branch/authority_space 门：derivative 模式必须有 branch + fork，
-        original 模式禁止 branch/fork；信封 branch 必须与 run.branch 血缘一致。
-    任何失败 → 稳定 blocked，零写入；FastAPI 与确定性 publisher 保留
-    permission / evidence / state-transition / publication 权威。
-    """
-    # 0. heuristic candidate-only 无 EvidenceRef 资格 → 不能进锚点提议网关。
-    if not envelope.get("evidence_refs"):
-        return IntegrityDecision(False, BLOCKED_NO_EVIDENCE)
-
-    # 1. 严格 wire schema。
-    try:
-        model = IllustrationAnchorProposalArtifact.model_validate(envelope)
-    except ValidationError as exc:
-        return IntegrityDecision(
-            False, f"{BLOCKED_SCHEMA} ({_first_validation_error(exc)})"
-        )
-
-    # 2. 共享 lineage/status/trail/protected 门。
-    blocked = _check_common_lineage(envelope=envelope, run=run, wire=model)
-    if blocked is not None:
-        return blocked
-
-    # 3. illustration_anchor_proposal 负载：严格域契约 + approval bypass 门。
-    payload = envelope.get("illustration_anchor_proposal")
-    if not isinstance(payload, dict):
-        return IntegrityDecision(False, BLOCKED_ANCHOR_PROPOSAL_PAYLOAD)
-    if payload.get("proposal_status") != "proposed":
-        return IntegrityDecision(False, BLOCKED_ANCHOR_PROPOSAL_APPROVAL_BYPASS)
-    try:
-        IllustrationAnchorProposalArtifact.model_validate(
-            envelope
-        ).illustration_anchor_proposal
-    except ValidationError as exc:
-        return IntegrityDecision(
-            False,
-            f"{BLOCKED_ANCHOR_PROPOSAL_PAYLOAD} ({_first_validation_error(exc)})",
-        )
-
-    # 4. source snapshot 血缘绑定（D-34-01）。
-    source_versions = envelope.get("source_versions") or {}
-    snapshot = source_versions.get("source_snapshot_hash")
-    if snapshot is not None and snapshot != payload.get("source_snapshot_hash"):
-        return IntegrityDecision(False, BLOCKED_ANCHOR_PROPOSAL_SOURCE_DRIFT)
-
-    # 5. branch/authority_space 门（wrong branch/fork → fail closed）。
-    branch = envelope.get("branch")
-    if branch != run.branch:
-        return IntegrityDecision(False, BLOCKED_ANCHOR_PROPOSAL_BRANCH)
-    if payload.get("authority_space") == "derivative":
-        if not branch or not payload.get("fork"):
-            return IntegrityDecision(False, BLOCKED_ANCHOR_PROPOSAL_BRANCH)
-    else:  # original authority space
-        if branch or payload.get("fork"):
-            return IntegrityDecision(False, BLOCKED_ANCHOR_PROPOSAL_BRANCH)
-
-    return IntegrityDecision(True)
-
-
-def _evaluate_canon_fork_proposal(
-    envelope: dict[str, Any], run: SkillRun
-) -> IntegrityDecision:
-    """Phase 35 CanonForkProposal 信封 integrity gate（D-35-01..D-35-04）。
-
-    与其余信封纪律一致（evidence/lineage/status/trail/protected），并在
-    ``proposal`` / ``delta`` 负载上做确定性域边界校验：
-      - 负载必须是严格 ``CanonForkProposalArtifact``（proposal + delta 全部必须；
-        approval_request_id / fork_id 由服务端分配）；
-      - ``proposal_status`` / ``delta_status`` 恒为 ``proposed``——Agent 声称任何
-        非 proposed 状态（approval bypass / pending_approval / approved / published
-        伪造）→ blocked（只有服务端 proposal/approval/Fork materializer 能推进
-        状态；Phase 35 绝不物化 fork，D-35-03）；
-      - proposal 的 source_snapshot_hash 必须与信封 ``source_versions`` 血缘绑定；
-      - delta 的 content_hash 必须从 delta content 重放（drift → blocked）；
-      - branch 门：信封 branch 必须与 run.branch 血缘一致；proposal/delta 的
-        branch/fork 必须与信封一致。
-    任何失败 → 稳定 blocked，零写入；FastAPI 与确定性 Fork materializer 保留
-    permission / evidence / state-transition / publication 权威。
-    """
-    # 0. heuristic candidate-only 无 EvidenceRef 资格 → 不能进 fork 网关。
-    if not envelope.get("evidence_refs"):
-        return IntegrityDecision(False, BLOCKED_NO_EVIDENCE)
-
-    # 1. 严格 wire schema。
-    try:
-        model = CanonForkProposalArtifact.model_validate(envelope)
-    except ValidationError as exc:
-        return IntegrityDecision(
-            False, f"{BLOCKED_SCHEMA} ({_first_validation_error(exc)})"
-        )
-
-    # 2. 共享 lineage/status/trail/protected 门。
-    blocked = _check_common_lineage(envelope=envelope, run=run, wire=model)
-    if blocked is not None:
-        return blocked
-
-    # 3. proposal/delta 负载：严格域契约 + approval bypass 门。
-    proposal = envelope.get("proposal")
-    delta = envelope.get("delta")
-    if not isinstance(proposal, dict) or not isinstance(delta, dict):
-        return IntegrityDecision(False, BLOCKED_CANON_FORK_PAYLOAD)
-    if proposal.get("proposal_status") != "proposed":
-        return IntegrityDecision(False, BLOCKED_CANON_FORK_APPROVAL_BYPASS)
-    if delta.get("delta_status") != "proposed":
-        return IntegrityDecision(False, BLOCKED_CANON_FORK_DELTA_APPROVAL_BYPASS)
-    try:
-        CanonForkProposalArtifact.model_validate(envelope)
-    except ValidationError as exc:
-        return IntegrityDecision(
-            False,
-            f"{BLOCKED_CANON_FORK_PAYLOAD} ({_first_validation_error(exc)})",
-        )
-
-    # 4. source snapshot 血缘绑定（D-35-03）。
-    source_versions = envelope.get("source_versions") or {}
-    snapshot = source_versions.get("source_snapshot_hash")
-    if snapshot is not None and snapshot != proposal.get("source_snapshot_hash"):
-        return IntegrityDecision(False, BLOCKED_CANON_FORK_SOURCE_DRIFT)
-
-    # 5. delta content hash 重放（drift → blocked）。口径与 materializer 一致：
-    #    sha256(raw UTF-8 bytes)，绝不把内容当 JSON 序列化后再哈希。
-    delta_content = delta.get("content")
-    delta_hash = delta.get("content_hash")
-    if not isinstance(delta_content, str) or not isinstance(delta_hash, str):
-        return IntegrityDecision(False, BLOCKED_CANON_FORK_DELTA_HASH)
-    if hashlib.sha256(delta_content.encode("utf-8")).hexdigest() != delta_hash:
-        return IntegrityDecision(False, BLOCKED_CANON_FORK_DELTA_HASH)
-
-    # 6. branch 门：信封 branch 必须与 run.branch 血缘一致；proposal 的 branch
-    #    必须与信封一致（wrong branch → fail closed）。
-    branch = envelope.get("branch")
-    if branch != run.branch:
-        return IntegrityDecision(False, BLOCKED_CANON_FORK_BRANCH)
-    if proposal.get("branch") != branch:
-        return IntegrityDecision(False, BLOCKED_CANON_FORK_BRANCH)
-
-    return IntegrityDecision(True)
-
-
-def _evaluate_derivative_edit_proposal(
-    envelope: dict[str, Any], run: SkillRun
-) -> IntegrityDecision:
-    """Phase 36 DerivativeEditProposal 信封 integrity gate（D-36-01..D-36-04）。
-
-    与其余信封纪律一致（evidence/lineage/status/trail/protected），并在
-    ``proposal`` 负载上做确定性域边界校验：
-      - 负载必须是严格 ``DerivativeEditProposalPayload``（proposal_key、
-        authority_space、project/chapter scope、base_revision CAS 锚、content +
-        content_hash、source snapshot、evidence refs；approval_request_id /
-        artifact_id 由服务端分配）；
-      - ``proposal_status`` 恒为 ``proposed``——Agent 声称任何非 proposed 状态
-        （approval bypass / pending_approval / applied 伪造）→ blocked（只有服务端
-        proposal/approval/确定性 Revision Service 能推进状态；Phase 36 绝不直接
-        应用，D-36-02）；
-      - proposal 的 content_hash 必须从 content 重放（drift → blocked）；
-      - proposal 的 source_snapshot_hash 必须与信封 ``source_versions`` 血缘绑定；
-      - branch 门：信封 branch 必须与 run.branch 血缘一致；authority_space 恒为
-        derivative 且 branch/fork 绑定（derivative mode 必须有 branch + fork，
-        original 主线禁止 branch/fork）。
-    任何失败 → 稳定 blocked，零写入；FastAPI 与确定性 Revision Service 保留
-    permission / evidence / state-transition / apply 权威。
-    """
-    # 0. heuristic candidate-only 无 EvidenceRef 资格 → 不能进 derivative 编辑网关。
-    if not envelope.get("evidence_refs"):
-        return IntegrityDecision(False, BLOCKED_NO_EVIDENCE)
-
-    # 1. 严格 wire schema。
-    try:
-        model = DerivativeEditProposalArtifact.model_validate(envelope)
-    except ValidationError as exc:
-        return IntegrityDecision(
-            False, f"{BLOCKED_SCHEMA} ({_first_validation_error(exc)})"
-        )
-
-    # 2. 共享 lineage/status/trail/protected 门。
-    blocked = _check_common_lineage(envelope=envelope, run=run, wire=model)
-    if blocked is not None:
-        return blocked
-
-    # 3. proposal 负载：严格域契约 + approval bypass 门。
-    payload = envelope.get("proposal")
-    if not isinstance(payload, dict):
-        return IntegrityDecision(False, BLOCKED_DERIVATIVE_EDIT_PAYLOAD)
-    if payload.get("proposal_status") != "proposed":
-        return IntegrityDecision(False, BLOCKED_DERIVATIVE_EDIT_APPROVAL_BYPASS)
-    try:
-        DerivativeEditProposalArtifact.model_validate(envelope)
-    except ValidationError as exc:
-        return IntegrityDecision(
-            False,
-            f"{BLOCKED_DERIVATIVE_EDIT_PAYLOAD} ({_first_validation_error(exc)})",
-        )
-
-    # 4. content hash 重放（drift → blocked）。口径与 Revision Service 一致：
-    #    sha256 of canonical Markdown（markdown_checksum）。
-    from app.services.derivative_editor.chapters import markdown_checksum
-
-    content = payload.get("content")
-    content_hash = payload.get("content_hash")
-    if not isinstance(content, str) or not isinstance(content_hash, str):
-        return IntegrityDecision(False, BLOCKED_DERIVATIVE_EDIT_CONTENT_HASH)
-    if markdown_checksum(content) != content_hash:
-        return IntegrityDecision(False, BLOCKED_DERIVATIVE_EDIT_CONTENT_HASH)
-
-    # 5. source snapshot 血缘绑定（D-36-02）。
-    source_versions = envelope.get("source_versions") or {}
-    snapshot = source_versions.get("source_snapshot_hash")
-    if snapshot is not None and snapshot != payload.get("source_snapshot_hash"):
-        return IntegrityDecision(False, BLOCKED_DERIVATIVE_EDIT_SOURCE_DRIFT)
-
-    # 6. branch/authority_space 门（wrong branch/fork → fail closed）。
-    branch = envelope.get("branch")
-    if branch != run.branch:
-        return IntegrityDecision(False, BLOCKED_DERIVATIVE_EDIT_BRANCH)
-    if payload.get("branch") != branch:
-        return IntegrityDecision(False, BLOCKED_DERIVATIVE_EDIT_BRANCH)
-    if payload.get("authority_space") == "derivative":
-        if not branch or not payload.get("fork"):
-            return IntegrityDecision(False, BLOCKED_DERIVATIVE_EDIT_BRANCH)
-    else:
-        if branch or payload.get("fork"):
-            return IntegrityDecision(False, BLOCKED_DERIVATIVE_EDIT_BRANCH)
-
-    return IntegrityDecision(True)
-
-
-def _branch_suggestion_keys(suggestion: dict[str, Any]) -> set[str]:
-    """A BranchSuggestion must carry exactly the six frozen fields (D-37-05)."""
-    return set(suggestion.keys())
-
-
-def _evaluate_derivative_draft(
-    envelope: dict[str, Any], run: SkillRun
-) -> IntegrityDecision:
-    """Phase 37 DraftArtifact 信封 integrity gate（D-37-02/D-37-05）。
-
-    与其余信封纪律一致（evidence/lineage/status/trail/protected），并在
-    ``draft`` / ``continuity_report`` / ``branch_suggestions`` 负载上做确定性
-    域边界校验：
-      - ``status`` 恒为 ``candidate``——Agent 声称任何非 candidate 状态
-        （approval bypass / published 伪造）→ blocked（只有确定性 validator +
-        显式 allow_divergence → revalidation → 独立 publish_derivative_revision
-        approval 能推进状态；D-37-03/D-37-05）；
-      - draft 必须是严格 ``DraftPayload``（intent/draft_text/citation_keys/
-        divergence/branch_suggestions + fork/source snapshot/package/manifest/
-        draft/canon-delta hashes）；
-      - ``branch`` 门：信封 branch 必须与 run.branch 血缘一致；authority_space
-        恒为 ``derivative`` 且必须携带 fork（wrong branch/fork → blocked）；
-      - 每个 BranchSuggestion（draft 内 + 顶层）必须携带**恰好六字段**且
-        ``enabled_by_default=false``（D-37-05；suggestion 是 disabled-by-default
-        候选，不自动 fork、不授予/复用任何 approval）；
-      - draft 的 citation_keys ∪ suggestion evidence_refs ∪ divergence
-        affected_evidence 必须 ⊆ 信封顶层 ``evidence_refs``（leaf-evidence
-        资格门）。
-    任何失败 → 稳定 blocked，零写入；FastAPI 与确定性 validator / 确定性
-    revision publisher 保留 permission / evidence / state-transition /
-    publication 权威。
-    """
-    # 0. heuristic candidate-only 无 EvidenceRef 资格 → 不能进草稿网关。
-    if not envelope.get("evidence_refs"):
-        return IntegrityDecision(False, BLOCKED_NO_EVIDENCE)
-
-    # 1. 严格 wire schema。
-    try:
-        model = DraftArtifact.model_validate(envelope)
-    except ValidationError as exc:
-        return IntegrityDecision(
-            False, f"{BLOCKED_SCHEMA} ({_first_validation_error(exc)})"
-        )
-
-    # 2. 共享 lineage/status/trail/protected 门。
-    blocked = _check_common_lineage(envelope=envelope, run=run, wire=model)
-    if blocked is not None:
-        return blocked
-
-    # 3. branch/authority_space 门（wrong branch/fork → fail closed）。
-    branch = envelope.get("branch")
-    if branch != run.branch:
-        return IntegrityDecision(False, BLOCKED_DERIVATIVE_DRAFT_BRANCH)
-    draft = envelope.get("draft")
-    if not isinstance(draft, dict):
-        return IntegrityDecision(False, BLOCKED_DERIVATIVE_DRAFT_PAYLOAD)
-    if draft.get("authority_space") != "derivative":
-        return IntegrityDecision(False, BLOCKED_DERIVATIVE_DRAFT_BRANCH)
-    if not branch or not draft.get("fork"):
-        return IntegrityDecision(False, BLOCKED_DERIVATIVE_DRAFT_BRANCH)
-
-    # 4. BranchSuggestion 六字段 + enabled_by_default=false（D-37-05）。
-    expected_fields = {
-        "choice_text",
-        "branch_summary",
-        "triggering_conflict",
-        "canon_delta_hash",
-        "evidence_refs",
-        "enabled_by_default",
-    }
-    for source, items in (
-        ("draft.branch_suggestions", draft.get("branch_suggestions") or []),
-        ("branch_suggestions", envelope.get("branch_suggestions") or []),
-    ):
-        for index, suggestion in enumerate(items):
-            if not isinstance(suggestion, dict):
-                return IntegrityDecision(False, BLOCKED_DERIVATIVE_DRAFT_SUGGESTION)
-            if _branch_suggestion_keys(suggestion) != expected_fields:
-                return IntegrityDecision(False, BLOCKED_DERIVATIVE_DRAFT_SUGGESTION)
-            if suggestion.get("enabled_by_default") is not False:
-                return IntegrityDecision(False, BLOCKED_DERIVATIVE_DRAFT_SUGGESTION)
-
-    # 5. leaf evidence 资格门：citation/suggestion/divergence 必须 ⊆ 信封。
-    envelope_keys = set(envelope.get("evidence_refs") or [])
-    citation_keys = set(draft.get("citation_keys") or [])
-    suggestion_keys = {
-        ref
-        for items in (
-            draft.get("branch_suggestions") or [],
-            envelope.get("branch_suggestions") or [],
-        )
-        for suggestion in items
-        for ref in (suggestion.get("evidence_refs") or [])
-    }
-    divergence_keys = set(
-        (draft.get("divergence") or {}).get("affected_evidence") or []
-    )
-    all_keys = citation_keys | suggestion_keys | divergence_keys
-    if not all_keys.issubset(envelope_keys):
-        return IntegrityDecision(False, BLOCKED_DERIVATIVE_DRAFT_EVIDENCE_MISMATCH)
-
-    return IntegrityDecision(True)
-
-
-def _evaluate_branch_visual_bible(
-    envelope: dict[str, Any], run: SkillRun
-) -> IntegrityDecision:
-    """Phase 38 BranchVisualBibleArtifact 信封 integrity gate（D-38-03/D-38-04）。
-
-    与其余信封纪律一致（evidence/lineage/status/trail/protected），并在
-    ``revision``（BranchIllustrationRevision）负载上做确定性域边界校验：
-      - ``revision`` 必须是严格 ``BranchIllustrationRevisionPayload``
-        （visual version / source snapshot / frozen Scene Spec / candidate
-        asset / identity/source/generator lineage / divergence manifest /
-        consistency verdict / validator report 全部必须、可重放）；
-      - ``review_state`` 恒为 ``candidate``——Agent 声称任何非 candidate
-        review_state（approval bypass / approved / published 伪造）→ blocked
-        （只有确定性 validator + 独立 ``publish_derivative_visual`` Web
-        ApprovalRequest → review seam 能推进状态；D-38-03/D-38-04）；
-      - ``branch`` 门：信封 branch 必须与 run.branch 血缘一致；
-        ``authority_space`` 恒为 ``derivative`` 且必须携带 fork
-        （wrong branch/fork → blocked；Original Visual Bible 不可变）；
-      - 负载的 source_snapshot_hash 必须与信封 ``source_versions`` 血缘绑定。
-    任何失败 → 稳定 blocked，零写入；FastAPI 与确定性 review seam /
-    published_assets 保留 permission / evidence / state-transition /
-    publication 权威。
-    """
-    # 0. heuristic candidate-only 无 EvidenceRef 资格 → 不能进 branch visual 网关。
-    if not envelope.get("evidence_refs"):
-        return IntegrityDecision(False, BLOCKED_NO_EVIDENCE)
-
-    # 1. 严格 wire schema。
-    try:
-        model = BranchVisualBibleArtifact.model_validate(envelope)
-    except ValidationError as exc:
-        return IntegrityDecision(
-            False, f"{BLOCKED_SCHEMA} ({_first_validation_error(exc)})"
-        )
-
-    # 2. 共享 lineage/status/trail/protected 门。
-    blocked = _check_common_lineage(envelope=envelope, run=run, wire=model)
-    if blocked is not None:
-        return blocked
-
-    # 3. revision 负载：严格域契约 + approval bypass 门。
-    payload = envelope.get("revision")
-    if not isinstance(payload, dict):
-        return IntegrityDecision(False, BLOCKED_BRANCH_VISUAL_BIBLE_PAYLOAD)
-    if payload.get("review_state") != "candidate":
-        return IntegrityDecision(False, BLOCKED_BRANCH_VISUAL_BIBLE_APPROVAL_BYPASS)
-    try:
-        revision = BranchVisualBibleArtifact.model_validate(envelope).revision
-    except ValidationError as exc:
-        return IntegrityDecision(
-            False,
-            f"{BLOCKED_BRANCH_VISUAL_BIBLE_PAYLOAD} ({_first_validation_error(exc)})",
-        )
-
-    # 4. source snapshot 血缘绑定（D-38-01）。
-    source_versions = envelope.get("source_versions") or {}
-    snapshot = source_versions.get("source_snapshot_hash")
-    if (
-        snapshot is not None
-        and snapshot != revision.source_snapshot.source_snapshot_hash
-    ):
-        return IntegrityDecision(False, BLOCKED_BRANCH_VISUAL_BIBLE_SOURCE_DRIFT)
-
-    # 5. branch/authority_space 门（wrong branch/fork → fail closed）。
-    branch = envelope.get("branch")
-    if branch != run.branch:
-        return IntegrityDecision(False, BLOCKED_BRANCH_VISUAL_BIBLE_BRANCH)
-    if revision.authority_space != "derivative" or not branch or not revision.fork:
-        return IntegrityDecision(False, BLOCKED_BRANCH_VISUAL_BIBLE_BRANCH)
-
-    return IntegrityDecision(True)
-
-
-def _evaluate_export_preparation(
-    envelope: dict[str, Any], run: SkillRun
-) -> IntegrityDecision:
-    """Phase 39 ExportPreparationArtifact 信封 integrity gate（D-39-01/D-39-02）。
-
-    与其余信封纪律一致（evidence/lineage/status/trail/protected），并在
-    ``preparation``（ExportPreparationPayload）负载上做确定性域边界校验：
-      - ``preparation`` 必须是严格 ``ExportPreparationPayload``（project/fork
-        scope、source snapshot ref、base revision ref、content_hash、evidence
-        refs、generator_lineage、validator_report 全部必须、可重放）；
-      - ``review_state`` 恒为 ``candidate``——Agent 声称任何非 candidate
-        review_state（approval bypass / approved / published 伪造）→ blocked
-        （只有确定性 validator + 独立 ``approve_export`` Web ApprovalRequest
-        → materializer 能推进状态；D-39-01/D-39-02）；
-      - ``branch`` 门：信封 branch 必须与 run.branch 血缘一致；
-        ``authority_space`` 恒为 ``derivative`` 且必须携带 fork（wrong
-        branch/fork → blocked；Original Canon 不可变，REQ-FORK-05）；
-      - 负载的 source_snapshot.source_snapshot_hash 必须与信封
-        ``source_versions`` 血缘绑定；
-      - 负载的 evidence_refs 必须 ⊆ 信封顶层 ``evidence_refs``（leaf-evidence
-        资格门）。
-    任何失败 → 稳定 blocked，零写入；FastAPI 与确定性 materializer /
-    download 保留 permission / evidence / state-transition / publication 权威。
-    """
-    # 0. heuristic candidate-only 无 EvidenceRef 资格 → 不能进 export 网关。
-    if not envelope.get("evidence_refs"):
-        return IntegrityDecision(False, BLOCKED_NO_EVIDENCE)
-
-    # 1. 严格 wire schema。
-    try:
-        model = ExportPreparationArtifact.model_validate(envelope)
-    except ValidationError as exc:
-        return IntegrityDecision(
-            False, f"{BLOCKED_SCHEMA} ({_first_validation_error(exc)})"
-        )
-
-    # 2. 共享 lineage/status/trail/protected 门。
-    blocked = _check_common_lineage(envelope=envelope, run=run, wire=model)
-    if blocked is not None:
-        return blocked
-
-    # 3. preparation 负载：严格域契约 + approval bypass 门。
-    payload = envelope.get("preparation")
-    if not isinstance(payload, dict):
-        return IntegrityDecision(False, BLOCKED_EXPORT_PREPARATION_PAYLOAD)
-    if payload.get("review_state") != "candidate":
-        return IntegrityDecision(False, BLOCKED_EXPORT_PREPARATION_APPROVAL_BYPASS)
-    try:
-        preparation = ExportPreparationArtifact.model_validate(envelope).preparation
-    except ValidationError as exc:
-        return IntegrityDecision(
-            False,
-            f"{BLOCKED_EXPORT_PREPARATION_PAYLOAD} ({_first_validation_error(exc)})",
-        )
-
-    # 4. source snapshot 血缘绑定（D-39-01）。
-    source_versions = envelope.get("source_versions") or {}
-    snapshot = source_versions.get("source_snapshot_hash")
-    if (
-        snapshot is not None
-        and snapshot != preparation.source_snapshot.source_snapshot_hash
-    ):
-        return IntegrityDecision(False, BLOCKED_EXPORT_PREPARATION_SOURCE_DRIFT)
-
-    # 5. branch/authority_space 门（wrong branch/fork → fail closed）。
-    branch = envelope.get("branch")
-    if branch != run.branch:
-        return IntegrityDecision(False, BLOCKED_EXPORT_PREPARATION_BRANCH)
-    if (
-        preparation.authority_space != "derivative"
-        or not branch
-        or not preparation.fork
-    ):
-        return IntegrityDecision(False, BLOCKED_EXPORT_PREPARATION_BRANCH)
-
-    # 6. leaf evidence 资格门：preparation.evidence_refs ⊆ 信封 evidence_refs。
-    envelope_keys = set(envelope.get("evidence_refs") or [])
-    payload_keys = set(preparation.evidence_refs or [])
-    if not payload_keys.issubset(envelope_keys):
-        return IntegrityDecision(False, BLOCKED_EXPORT_PREPARATION_EVIDENCE_MISMATCH)
-
-    return IntegrityDecision(True)

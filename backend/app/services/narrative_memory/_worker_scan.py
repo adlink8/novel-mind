@@ -3,7 +3,8 @@
 Extracted from ``builder_worker.py``: this leaf module owns the deny-list
 constant and the ``scan_builder_package_for_forbidden_capabilities`` AST/import
 scanner used by the forbidden-capability contract tests (reader-chat imports,
-promotion/pointer fragments must never appear in builder_*.py). It is a leaf —
+promotion/pointer fragments must never appear in builder_*.py or
+_worker_*.py). It is a leaf —
 it imports only from the standard library, so the scanner can be re-exported
 from ``builder_worker`` without creating import cycles.
 """
@@ -35,7 +36,11 @@ def scan_builder_package_for_forbidden_capabilities(
 
     root = package_dir or Path(__file__).resolve().parent
     hits: list[str] = []
-    for path in sorted(root.glob("builder_*.py")):
+    # Phase 28-04 refactor split moved the builder's call sites into
+    # _worker_*.py mixins; scan them with the same deny-list coverage.
+    for path in sorted(
+        list(root.glob("builder_*.py")) + list(root.glob("_worker_*.py"))
+    ):
         source = path.read_text(encoding="utf-8")
         tree = ast.parse(source, filename=str(path))
         for node in ast.walk(tree):
