@@ -39,10 +39,10 @@ from app.services.queryplan.service import (
 from app.services.reader_chat.context import (
     ProgressSnapshot,
     SelectionValidationError,
-    _consumer_blocked_code,
     narrow_chapter_range,
     resolve_progress_snapshot,
 )
+from app.services.reader_chat.context_queryplan import _consumer_blocked_code
 from app.services.reader_chat.retrieval import build_source_snapshot
 
 
@@ -166,7 +166,9 @@ class AnalysisQueryPlanAdapter:
             run_world_projection_adapter,
         )
         from app.services.queryplan.evidence import effective_through_chapter
-        from app.services.reader_chat.context import _build_world_projection_resolver
+        from app.services.reader_chat.context_queryplan import (
+            _build_world_projection_resolver,
+        )
 
         try:
             plan = QueryPlanService.parse_consumer_request(payload)
