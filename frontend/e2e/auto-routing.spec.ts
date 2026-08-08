@@ -36,19 +36,24 @@ async function openAnalysisForNovel6(page: Page) {
 test.describe.configure({ mode: "serial" });
 
 test.beforeEach(async ({ page }) => {
-  await login(page, "e2e_login_test", "pass12345");
   // This spec drives the real backend and real AI against a hand-seeded
   // fixture (owner 2 / novel 6 / e2e_login_test). On a fresh/CI database the
-  // seeded novel does not exist; skip the whole serial group instead of
-  // failing selectOption on the novel picker.
-  const hasNovel6 = await page
-    .evaluate(async () => {
-      const res = await fetch("/api/novels");
-      if (!res.ok) return false;
-      const data = (await res.json()) as { items?: Array<{ id: number }> };
-      return Array.isArray(data.items) && data.items.some((n) => n.id === 6);
-    })
-    .catch(() => false);
+  // seeded user/novel do not exist; skip the whole serial group instead of
+  // failing on login or on the novel picker.
+  let hasNovel6 = false;
+  try {
+    await login(page, "e2e_login_test", "pass12345");
+    hasNovel6 = await page
+      .evaluate(async () => {
+        const res = await fetch("/api/novels");
+        if (!res.ok) return false;
+        const data = (await res.json()) as { items?: Array<{ id: number }> };
+        return Array.isArray(data.items) && data.items.some((n) => n.id === 6);
+      })
+      .catch(() => false);
+  } catch {
+    // seeded user absent (fresh DB) -> login failed; keep hasNovel6 false.
+  }
   test.skip(
     !hasNovel6,
     "requires hand-seeded owner 2 / novel 6 / e2e_login_test on the real backend"
