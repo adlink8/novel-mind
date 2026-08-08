@@ -227,6 +227,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 1
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.benchmark_commit || github.sha }}
 
       - uses: actions/setup-go@v5
         with:
@@ -576,13 +577,15 @@ jobs:
         run: npm run scan:packages
 
   # ---------------------------------------------------------------------------
-  # Browser: Playwright desktop + 390px (job timeout 15m — D-16)
+  # Browser: production build + Playwright desktop + 390px.
+  # Recent PR evidence showed the old 15m budget expiring during Playwright,
+  # so this job owns a realistic end-to-end budget instead of a false-red gate.
   # ---------------------------------------------------------------------------
   browser:
     name: Browser smoke
     needs: [guard]
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
@@ -623,6 +626,13 @@ jobs:
         run: |
           npm ci
           npx playwright install chromium --with-deps
+
+      - name: Frontend production build
+        working-directory: frontend
+        env:
+          BACKEND_URL: http://127.0.0.1:8010
+          NEXT_PUBLIC_API_URL: /api
+        run: npm run build
 
       - name: Playwright (desktop + 390px, retries=0)
         working-directory: frontend
@@ -668,6 +678,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 1
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.benchmark_commit || github.sha }}
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
@@ -770,6 +781,8 @@ jobs:
       - name: Resolve provider-capable runner authority
         id: authority
         uses: actions/github-script@v7
+        env:
+          BENCHMARK_SHA: ${{ needs.guard.outputs.benchmark_sha || github.sha }}
         with:
           github-token: ${{ secrets.NIGHTLY_RUNNER_READ_TOKEN || github.token }}
           script: |
@@ -811,7 +824,7 @@ jobs:
               } : null,
               registered_runner_count: runners.length,
               repository: `${context.repo.owner}/${context.repo.repo}`,
-              commit_sha: context.sha,
+              commit_sha: process.env.BENCHMARK_SHA,
               event_name: context.eventName,
               run_id: String(context.runId),
               checked_at: new Date().toISOString(),
@@ -944,6 +957,7 @@ jobs:
             --authority /tmp/nightly-control/authority.json \
             --provider-result "$PROVIDER_RESULT" \
             --provider-report-root /tmp/nightly-provider \
+            --commit-sha "${{ needs.guard.outputs.benchmark_sha || github.sha }}" \
             --output /tmp/nightly-final/rag-quality-report.json
           python - <<'PY' >> "$GITHUB_OUTPUT"
           import json
@@ -976,11 +990,12 @@ jobs:
     timeout-minutes: 10
     environment: quality-benchmark
     permissions:
-      contents: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 1
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.benchmark_commit || github.sha }}
 
       - uses: actions/setup-python@v5
         with:
@@ -1217,6 +1232,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 1
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.benchmark_commit || github.sha }}
 
       - uses: actions/setup-python@v5
         with:

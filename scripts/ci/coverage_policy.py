@@ -303,8 +303,20 @@ def _norm_git_path(name: str) -> str:
     """
     for prefix in ("backend/", "frontend/"):
         if name.startswith(prefix):
-            return name[len(prefix):]
+            return name[len(prefix) :]
     return name
+
+
+def _is_measured_source_path(name: str) -> bool:
+    """Return whether a changed path belongs to a coverage-owned source tree."""
+    normalized = _norm_git_path(name).replace("\\", "/")
+    if normalized.startswith("app/"):
+        return normalized.endswith(".py")
+    if normalized.startswith("src/"):
+        return normalized.endswith(
+            (".ts", ".tsx", ".js", ".jsx")
+        ) and not normalized.endswith((".d.ts", ".d.tsx"))
+    return False
 
 
 def _critical_subset(
@@ -316,7 +328,9 @@ def _critical_subset(
     side_root = REPO_ROOT / side
     critical_paths = {p.resolve() for p in resolve_side_globs(side_root, globs)}
     subset = {
-        name: fc for name, fc in files.items() if (side_root / name).resolve() in critical_paths
+        name: fc
+        for name, fc in files.items()
+        if (side_root / name).resolve() in critical_paths
     }
     return _aggregate(subset), len(subset)
 
@@ -366,9 +380,15 @@ def diff_coverage(
     covered = 0
     total = 0
     for name, lines in changed.items():
-        fc = files.get(_norm_git_path(name))
+        normalized = _norm_git_path(name)
+        fc = files.get(normalized)
         if fc is None:
-            continue  # unreported/uncovered file: not counted
+            # A changed production source file missing from both coverage reports
+            # is uncovered, not invisible. Tests, docs, migrations, and config are
+            # outside the measured source roots and remain excluded.
+            if _is_measured_source_path(name):
+                total += sum(1 for n in lines if n > 0)
+            continue
         for n in lines:
             if n <= 0:
                 continue
@@ -406,7 +426,9 @@ def main(argv: list[str] | None = None) -> int:
         description="Evaluate real coverage reports against .quality/coverage-policy.yml"
     )
     parser.add_argument("--policy", default=str(POLICY_PATH))
-    parser.add_argument("--backend-xml", default="backend/artifacts/backend-coverage.xml")
+    parser.add_argument(
+        "--backend-xml", default="backend/artifacts/backend-coverage.xml"
+    )
     parser.add_argument("--frontend-lcov", default="frontend/coverage/lcov.info")
     parser.add_argument(
         "--changed-lines",

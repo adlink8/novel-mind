@@ -7,7 +7,6 @@ import sys
 from pathlib import Path
 
 import pytest
-import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT))
@@ -79,9 +78,7 @@ def _lcov(
     for filename, hits in entries:
         lines = "".join(f"DA:{i + 1},{h}\n" for i, h in enumerate(hits))
         brf, brh = branches.get(filename, (0, 0))
-        records.append(
-            f"SF:{filename}\n{lines}BRF:{brf}\nBRH:{brh}\nend_of_record\n"
-        )
+        records.append(f"SF:{filename}\n{lines}BRF:{brf}\nBRH:{brh}\nend_of_record\n")
     path = tmp_path / "lcov.info"
     path.write_text("".join(records), encoding="utf-8")
     return path
@@ -94,7 +91,7 @@ def test_parse_cobertura_line_and_branch(tmp_path: Path):
     # Two classes: one fully covered, one fully uncovered, plus a branch line.
     xml = (
         '<?xml version="1.0" ?><coverage version="2.0"><packages><package>'
-        '<classes>'
+        "<classes>"
         '<class name="a" filename="app/a.py"><lines>'
         '<line number="1" hits="1"/><line number="2" hits="1"/>'
         '<line number="3" hits="0" branch="true"/>'
@@ -161,6 +158,26 @@ def test_diff_coverage_counts_only_hit_changed_lines(tmp_path: Path):
     changed = {"app/a.py": {1, 2}}
     pct, covered, total = cp.diff_coverage(files, changed)
     assert (pct, covered, total) == (50.0, 1, 2)
+
+
+def test_diff_coverage_counts_unreported_source_as_uncovered(tmp_path: Path):
+    path = _cobertura_xml(tmp_path, [("app/existing.py", [1])])
+    files = cp.parse_cobertura(path)
+    changed = {"backend/app/new_module.py": {1, 2, 3}}
+    pct, covered, total = cp.diff_coverage(files, changed)
+    assert (pct, covered, total) == (0.0, 0, 3)
+
+
+def test_diff_coverage_ignores_unmeasured_test_and_docs_paths(tmp_path: Path):
+    path = _cobertura_xml(tmp_path, [("app/existing.py", [1])])
+    files = cp.parse_cobertura(path)
+    changed = {
+        "backend/tests/test_new_module.py": {1, 2},
+        "docs/ci.md": {1, 2, 3},
+        "frontend/src/types/generated.d.ts": {1},
+    }
+    pct, covered, total = cp.diff_coverage(files, changed)
+    assert (pct, covered, total) == (0.0, 0, 0)
 
 
 # ── CLI gate ─────────────────────────────────────────────────────────────────
