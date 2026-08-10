@@ -20,6 +20,14 @@
  *
  * Invariant: `ready` is only entered via `transitionTo("ready")`, which asserts
  * every component is ready — "ready with a failed dependency" is unrepresentable.
+ *
+ * Plan 43-04 invariant: a failed full start or failed migration never leaves a
+ * half-started graph behind — the already-started components are stopped in
+ * reverse dependency order (best-effort) before the runtime reports `failed`,
+ * so a `failed` terminal from startup/migration owns no running processes
+ * (D-43-07, D-43-08). Crash-after-ready keeps the healthy components running
+ * and reports `degraded`; a degraded repair failure keeps the tracked
+ * components (they are never orphans — shutdown/retry still own them).
  */
 import {
   COMPONENT_DEPENDENCIES,
@@ -178,7 +186,7 @@ export class DesktopRuntime {
     this.flowActive = true;
     try {
       this.transitionTo("starting");
-      const started = await this.startComponents(RUNTIME_START_ORDER);
+      const started = await this.startComponents(RUNTIME_START_ORDER, true);
       if (!started) {
         this.transitionTo("failed");
         return this.snapshot();
@@ -191,6 +199,9 @@ export class DesktopRuntime {
         } catch (cause) {
           const redacted = toRedacted(cause, RUNTIME_ERROR_CODES.MIGRATION_FAILED);
           this.lastError = redacted;
+          // A failed migration never reports ready and never leaves the graph
+          // half-running: stop every started component first (D-43-06/D-43-07).
+          await this.bestEffortStop(RUNTIME_START_ORDER);
           this.transitionTo("failed");
           return this.snapshot();
         }
@@ -226,7 +237,15 @@ export class DesktopRuntime {
     }
   }
 
-  private async startComponents(order: readonly RuntimeComponent[]): Promise<boolean> {
+  /**
+   * Start components in dependency order. When `tearDownOnFailure` is true, a
+   * failure stops every already-started component in reverse dependency order
+   * before returning false (plan 43-04: no half-started graph behind `failed`).
+   */
+  private async startComponents(
+    order: readonly RuntimeComponent[],
+    tearDownOnFailure = false,
+  ): Promise<boolean> {
     for (const id of order) {
       const comp = this.components[id];
       if (comp.state === "ready") continue; // already running (idempotent recovery)
@@ -245,10 +264,40 @@ export class DesktopRuntime {
         comp.endpoint = null;
         comp.lastError = redacted;
         this.lastError = redacted;
+        if (tearDownOnFailure) {
+          await this.bestEffortStop(order);
+        }
         return false;
       }
     }
     return true;
+  }
+
+  /**
+   * Stop the given components in reverse dependency order, best-effort. Used to
+   * leave a clean `failed` terminal after a failed full start or migration. Only
+   * components that are actually running (ready/starting) are stopped — the
+   * component that failed keeps its `failed` state and redacted error so the
+   * failure stays visible. A running component that cannot be terminated stays
+   * `failed` — the runtime never claims a clean stop it did not achieve
+   * (D-43-07).
+   */
+  private async bestEffortStop(order: readonly RuntimeComponent[]): Promise<void> {
+    for (const id of [...order].reverse()) {
+      const comp = this.components[id];
+      if (comp.state !== "ready" && comp.state !== "starting") continue;
+      try {
+        await this.adapter.stop(id);
+        comp.state = "stopped";
+        comp.ready = false;
+        comp.endpoint = null;
+        comp.lastError = null;
+      } catch {
+        comp.state = "failed";
+        comp.ready = false;
+        comp.endpoint = null;
+      }
+    }
   }
 
   private async stopAll(): Promise<ShutdownReport> {

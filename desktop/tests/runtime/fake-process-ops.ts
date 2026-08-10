@@ -6,6 +6,21 @@
  * readiness timeout, kill failure) without touching real OS processes.
  */
 import type { ProcessOperations, SpawnedProcess, SpawnOptions } from "../../src/runtime/process-operations";
+import type { RuntimeComponent } from "../../src/runtime/types";
+
+/**
+ * Stable markers identifying each component's spawn in the dev adapter's
+ * launch config (command + args joined). `spawnedProcess(marker)` searches for
+ * the marker substring; these are the canonical markers for the five
+ * components as launched by DevelopmentProcessAdapter.
+ */
+export const DEV_ADAPTER_SPAWN_MARKERS: Record<RuntimeComponent, string> = {
+  postgres_pgvector: "pgvector/pgvector",
+  vector_store: "chromadb/chroma",
+  fastapi: "uvicorn",
+  agent_service: "start.mjs",
+  next: "next",
+};
 
 export interface SpawnRecord {
   command: string;

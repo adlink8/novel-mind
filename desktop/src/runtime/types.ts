@@ -98,6 +98,10 @@ export const RUNTIME_ERROR_CODES = {
   STOP_KILL_FAILED: "STOP_KILL_FAILED",
   MIGRATION_FAILED: "MIGRATION_FAILED",
   UNSUPPORTED_IN_PACKAGED: "UNSUPPORTED_IN_PACKAGED",
+  /** A renderer-requested recovery action is not allowed in the current state (T-43-04-02). */
+  RECOVERY_DENIED: "RECOVERY_DENIED",
+  /** The injected backup-restore capability failed; old data remains intact. */
+  BACKUP_RESTORE_FAILED: "BACKUP_RESTORE_FAILED",
   BUSY: "BUSY",
   INTERNAL: "INTERNAL",
 } as const;
