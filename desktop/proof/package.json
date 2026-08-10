@@ -13,10 +13,11 @@
     "start": "node src/main.ts"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
+    "@types/node": "^22.19.0",
     "electron": "^43.3.0",
     "electron-builder": "^26.15.3",
     "typescript": "^5.9.3",
-    "vitest": "^4.1.10",
-    "@types/node": "^22.19.0"
+    "vitest": "^4.1.10"
   }
 }

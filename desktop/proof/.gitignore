@@ -1,0 +1,5 @@
+# Phase 41 proof generated artifacts (never commit)
+node_modules/
+logs/
+test-results/
+playwright-report/
