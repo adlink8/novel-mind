@@ -1,0 +1,7 @@
+{
+  "novelId": "novel-001",
+  "events": [
+    { "at": "chapter-001", "event": "manuscript discovered", "impact": "opening" },
+    { "at": "chapter-002", "event": "library blackout", "impact": "turn" }
+  ]
+}

@@ -1,0 +1,5 @@
+{
+  "id": "outline-template-01",
+  "name": "Three-Act Outline",
+  "fields": ["incitingIncident", "midpoint", "climax", "resolution"]
+}
