@@ -106,12 +106,16 @@ try {
   Write-Step "  harness node: $harnessNode"
   Push-Location $desktopDir
   try {
-    if ($RequireAll) {
+    # Node child stderr (e.g. bundled-server proxy noise on a backend-less
+    # clean VM) must not become a terminating error under Stop preference.
+    $savedEap = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
       & $harnessNode $playwrightCliJs test --config tests/clean-vm/playwright.config.ts 2>&1 | ForEach-Object { Write-Host "  $_" }
-    } else {
-      & $harnessNode $playwrightCliJs test --config tests/clean-vm/playwright.config.ts 2>&1 | ForEach-Object { Write-Host "  $_" }
+      $playwrightExit = $LASTEXITCODE
+    } finally {
+      $ErrorActionPreference = $savedEap
     }
-    $playwrightExit = $LASTEXITCODE
   } finally {
     Pop-Location
   }
