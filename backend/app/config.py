@@ -137,6 +137,17 @@ class Settings(BaseSettings):
         default="", validation_alias="NOVELMIND_BOOTSTRAP_ADMIN_TOKEN"
     )
 
+    # ── 桌面本地会话认证（Phase 44-02 / D-44-04 / T-44-02-02）──
+    # Electron main 进程为本地 FastAPI 铸造 audience/expiry 绑定的短命会话令牌
+    # （iss=novelmind-desktop-main, aud=novelmind-desktop-local），HMAC 密钥通过
+    # 环境变量 NOVELMIND_LOCAL_AUTH_SECRET 注入到受管进程环境；未配置/无效 →
+    # desktop_local_auth 中间件 fail-closed（401），绝不降级放行。
+    # 浏览器开发模式仍走现有 JWT/cookie 认证：本配置只接受显式字符串，
+    # 留空即「本地会话认证不可用」（永远不是隐式绕过）。
+    local_auth_secret: str = Field(
+        default="", validation_alias="NOVELMIND_LOCAL_AUTH_SECRET"
+    )
+
     # pydantic-settings 配置：从 .env 文件加载，环境变量前缀为 NOVELMIND_
     model_config = {"env_file": ".env", "env_prefix": "NOVELMIND_"}
 
