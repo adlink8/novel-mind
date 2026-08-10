@@ -12,11 +12,9 @@
  * The Next standalone renderer is started by globalSetup; the shell window
  * loads it via NOVELMIND_SMOKE_RENDERER_URL.
  */
-import { test, expect, _electron as electron } from "@playwright/test";
+import { test, expect } from "@playwright/test";
 import type { ElectronApplication, Page } from "@playwright/test";
-import path from "node:path";
-
-const DESKTOP_DIR = path.resolve(__dirname, "..", "..");
+import { launchShell } from "./launch";
 
 /** Same fixture user the Phase 41 browser proof used (route-inventory.json). */
 const FIXTURE_USER = {
@@ -42,11 +40,8 @@ test.beforeAll(async () => {
     );
   }
   rendererUrl = envUrl;
-  electronApp = await electron.launch({
-    cwd: DESKTOP_DIR,
-    args: ["."],
-    env: { ...process.env, NOVELMIND_RENDERER_URL: rendererUrl },
-  });
+  // 45-03: packaged exe when NOVELMIND_PACKAGED_EXE is set, else dev Electron.
+  electronApp = await launchShell();
 
   const context = electronApp.context();
   // Catch-all registered first so the specific mocks below take precedence.

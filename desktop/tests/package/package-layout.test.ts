@@ -233,6 +233,25 @@ test.describe("win-unpacked artifact audit (runs after a real build)", () => {
     expect(sha256File(serverJs)).toBe(staged.pins.serverJsHash);
   });
 
+  test("unpacked next-standalone ships its dependencies (node_modules/next present)", () => {
+    test.skip(!existsSync(UNPACKED_DIR), "run scripts/build-windows.ps1 first");
+    // 45-03 UAT regression: electron-builder drops a top-level node_modules from
+    // extraResources unless it is copied through a dedicated matcher; without
+    // this the packaged Next server cannot start ("Cannot find module 'next'").
+    const nextDir = path.join(
+      UNPACKED_DIR,
+      "resources",
+      "next-standalone",
+      "node_modules",
+      "next",
+    );
+    expect(existsSync(nextDir)).toBe(true);
+    // server.js `require('next')` resolves via this package.json (the trimmed
+    // standalone tree ships only next/dist + package.json, no bin entry).
+    expect(existsSync(path.join(nextDir, "package.json"))).toBe(true);
+    expect(existsSync(path.join(nextDir, "dist"))).toBe(true);
+  });
+
   test("packaged exe is a GUI-subsystem binary (no console window)", () => {
     test.skip(!existsSync(UNPACKED_DIR), "run scripts/build-windows.ps1 first");
     const exe = ["NovelMind.exe", "electron.exe"]

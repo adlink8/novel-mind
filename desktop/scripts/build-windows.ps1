@@ -113,6 +113,13 @@ function Test-PackagedArtifact {
   if (-not (Test-Path $stagedServer)) { Fail "win-unpacked/resources/next-standalone/server.js missing" }
   if (-not (Test-Path (Join-Path $unpackedDir "resources\next-standalone\public"))) { Fail "staged public/ missing in win-unpacked" }
   if (-not (Test-Path (Join-Path $unpackedDir "resources\next-standalone\.next\static"))) { Fail "staged .next/static missing in win-unpacked" }
+  # The standalone tree's dependencies must ship too: electron-builder drops a
+  # top-level node_modules unless it is a dedicated extraResources matcher
+  # (45-03 UAT regression — see 45-03-SUMMARY.md). Without this gate the
+  # packaged Next server cannot start.
+  if (-not (Test-Path (Join-Path $unpackedDir "resources\next-standalone\node_modules\next"))) {
+    Fail "win-unpacked/resources/next-standalone/node_modules/next missing — extraResources dropped the standalone dependencies"
+  }
   $actualHash = Get-Sha256 $stagedServer
   if ($actualHash -ne $manifest.pins.serverJsHash) {
     Fail "win-unpacked server.js hash $actualHash != staged manifest $($manifest.pins.serverJsHash)"

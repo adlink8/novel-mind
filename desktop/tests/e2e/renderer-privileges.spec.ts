@@ -43,7 +43,7 @@ test.afterAll(async () => {
   await electronApp?.close();
 });
 
-test("the bridge exposes exactly the five declared capabilities and nothing else", async () => {
+test("the bridge exposes exactly the six declared capabilities and nothing else", async () => {
   const keys = await page.evaluate(
     (key) => {
       const bridge = (window as unknown as Record<string, unknown>)[key] as Record<string, unknown>;
@@ -53,6 +53,7 @@ test("the bridge exposes exactly the five declared capabilities and nothing else
   );
   expect(keys).toEqual([
     "getBootstrap",
+    "getLocalAuthToken",
     "getRuntimeStatus",
     "onRuntimeStatus",
     "openExternalLink",

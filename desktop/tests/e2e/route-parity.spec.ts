@@ -17,9 +17,8 @@
  *
  * T-42-03-01 renderer-privilege negatives live in renderer-privileges.spec.ts.
  */
-import { test, expect, _electron as electron } from "@playwright/test";
+import { test, expect } from "@playwright/test";
 import type { ElectronApplication, Page } from "@playwright/test";
-import path from "node:path";
 import {
   ALL_ROUTES,
   EXPECTED_ROUTE_COUNT,
@@ -27,8 +26,7 @@ import {
   concretePath,
   type RouteFixture,
 } from "../fixtures/routes";
-
-const DESKTOP_DIR = path.resolve(__dirname, "..", "..");
+import { launchShell } from "./launch";
 
 /** Same fixture user the Phase 41 browser proof used (route-inventory.json). */
 const FIXTURE_USER = {
@@ -50,11 +48,10 @@ test.beforeAll(async () => {
     );
   }
   rendererUrl = envUrl;
-  electronApp = await electron.launch({
-    cwd: DESKTOP_DIR,
-    args: ["."],
-    env: { ...process.env, NOVELMIND_RENDERER_URL: rendererUrl },
-  });
+  // 45-03: the same spec runs against the SHIPPED packaged exe when
+  // NOVELMIND_PACKAGED_EXE is set (win-unpacked/NovelMind.exe); otherwise the
+  // dev Electron binary (42-03 behavior).
+  electronApp = await launchShell();
 
   // Context routes are registered BEFORE firstWindow so the initial load and
   // every subsequent navigation see the same deterministic API surface.
