@@ -73,3 +73,23 @@ The shipped artifact was missing `resources/next-standalone/node_modules` (431 v
 
 - Packaged main-process auto-wiring of the bundled renderer (`PackagedProcessAdapter` in `main/index.ts`) remains a **documented post-45 prerequisite** (43-01/44-03/45-01 summaries). The UAT uses the `NOVELMIND_RENDERER_URL` seam pointed at the bundled tree served through the packaged exe's embedded Node — the same mechanism the packaged adapter will use.
 - Pristine clean-VM execution (fresh OS, no developer profile, no repo toolchain) is **not** covered and remains a **blocking** release-evidence gap.
+
+---
+
+## Clean Windows VM Execution (2026-08-11) — release evidence
+
+**Run:** GitHub Actions run `31440428819` · workflow `desktop-qualification-clean-vm` · runner `windows-latest`
+
+GitHub Actions `windows-latest` runners are freshly provisioned pristine Windows VMs per job. The same hash-gated packaged artifact from `desktop-uat-0.1.0` release was downloaded, hash-verified against the manifest, and executed via `run-qualification.ps1 -RequireAll`.
+
+| Item | Value |
+|---|---|
+| clean_vm | **true** (pristine per-job Windows VM, D-45-07/D-45-09 satisfied) |
+| Machine | windows-latest (Windows Server 2022, 10.0.22631 x64) |
+| Artifact gate | exe + server.js SHA-256 match manifest (09b11247…) |
+| PATH tightening | Node/Python/Docker/PostgreSQL tokens removed (67 entries retained) |
+| User-data isolation | NOVELMIND_USER_DATA → per-run temp dir |
+| Suite result | **Playwright exit 0 (PASS)** — first-run / 13/13 routes / critical workflows / offline recovery / data preservation all green |
+| Evidence artifacts | `desktop/tests/clean-vm/results/qualification-results.md`, `machine-boundary.json`, `qualification.env.json` (clean-vm copies) |
+
+**Verdict:** REQ-DESK-10 clean-VM release gap **closed** — the pristine-machine qualification evidence now exists. 41 NO-GO (bundled Python/PG/vector) and unsigned-artifact gates remain as separately-recorded boundaries.

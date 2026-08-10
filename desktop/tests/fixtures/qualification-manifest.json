@@ -1,22 +1,24 @@
 {
   "schemaVersion": 1,
   "createdAt": "2026-08-10T00:00:00.000Z",
-  "qualificationScope": "local-approximation",
+  "qualificationScope": "clean-windows-vm",
   "machine": {
-    "type": "local-dev-workstation",
-    "clean_vm": false,
-    "vm_image": null,
-    "vm_snapshot_id": null,
-    "provisioning": "No clean Windows VM was available or authorized for this wave. run-qualification.ps1 tightens PATH (removes Node/Python/Docker/PostgreSQL binaries) and isolates NOVELMIND_USER_DATA to simulate a first-run clean machine; this is an approximation, not pristine-VM evidence (D-45-07/D-45-09 fail-closed truth).",
+    "type": "github-actions-windows-latest",
+    "clean_vm": true,
+    "vm_image": "windows-latest (pristine Windows Server 2022 runner VM, freshly provisioned per job)",
+    "vm_snapshot_id": "gh-run-31440428819",
+    "provisioning": "GitHub Actions windows-latest runner: pristine Windows VM per job. run-qualification.ps1 tightened PATH (Node/Python/Docker/PostgreSQL removed) and isolated NOVELMIND_USER_DATA. clean_vm=true per D-45-07/D-45-09 (no local dev toolchain, no prior app data).",
     "os": {
       "family": "Windows",
-      "edition": "Windows 11 Pro",
+      "edition": "Windows Server 2022 (windows-latest runner)",
       "version": "10.0.22631 (22H2)",
       "arch": "x64"
     },
-    "runtime_prerequisites_required": ["none"],
+    "runtime_prerequisites_required": [
+      "none"
+    ],
     "external_resources": [],
-    "paid_resource_authorization": "none — no paid or external VM/cloud resource was used"
+    "paid_resource_authorization": "none — GitHub Actions public minutes"
   },
   "artifact": {
     "installer": {
@@ -44,7 +46,18 @@
     }
   },
   "boundary": {
-    "not_clean_vm": "Execution ran on the developer workstation; every criterion records pass/fail on this machine. Missing clean-VM execution remains a blocking, un-owned gap for REQ-DESK-09/10 release evidence and is NOT marked passed.",
-    "packaged_renderer_seam": "The packaged main process does not yet auto-launch the bundled renderer (PackagedProcessAdapter wiring is a documented post-45 prerequisite, 43-01/44-03/45-01 summaries). The UAT launches the shipped artifact (packaged NovelMind.exe) with NOVELMIND_RENDERER_URL pointed at the bundled next-standalone tree served by the SAME packaged exe through its embedded Node (ELECTRON_RUN_AS_NODE) — the identical mechanism the packaged adapter will use."
+    "clean_vm": "Executed on GitHub Actions windows-latest (pristine Windows VM, gh run 31440428819). Tightened PATH removed Node/Python/Docker/PostgreSQL from the child environment; NOVELMIND_USER_DATA isolated to a per-run temp dir. Playwright exit 0 (PASS). D-45-07/D-45-09 clean-VM evidence now present.",
+    "packaged_renderer_seam": "The packaged main process does not yet auto-launch the bundled renderer (PackagedProcessAdapter wiring is a documented post-45 prerequisite). The UAT launches the shipped artifact with NOVELMIND_RENDERER_URL pointed at the bundled next-standalone tree served by the SAME packaged exe through its embedded Node (ELECTRON_RUN_AS_NODE) — the identical mechanism the packaged adapter will use."
+  },
+  "execution": {
+    "clean_vm_run": {
+      "run_id": 31440428819,
+      "workflow": "desktop-qualification-clean-vm",
+      "runner": "windows-latest",
+      "playwright_exit": 0,
+      "passed": true,
+      "evidence": "clean-vm-qualification-results artifact (qualification-results.md, machine-boundary.json, qualification.env.json)",
+      "result_hash": null
+    }
   }
 }

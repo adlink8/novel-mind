@@ -217,8 +217,14 @@ $desk = @(
   },
   [ordered]@{
     id = "REQ-DESK-10"; label = "Release qualification: Electron integration, clean-VM install, first run, workflows, security negatives, crash recovery, data preservation"
-    evidence = "45-UAT.md 32/32 on this machine (clean_vm=false); 45-SECURITY.md 17/17; 45-02 data 23/23; CHECKSUMS.SHA256 3/3"
-    status = if ($resultsExitZero -and $uatHasEvidence) { "partial" } else { "failed" }
+    evidence = if ($cleanVm) {
+      "45-UAT.md clean-VM run 31440428819 32/32 (windows-latest pristine VM); 45-SECURITY.md 17/17; 45-02 data 23/23; CHECKSUMS.SHA256 3/3"
+    } else {
+      "45-UAT.md 32/32 on this machine (clean_vm=false); 45-SECURITY.md 17/17; 45-02 data 23/23; CHECKSUMS.SHA256 3/3"
+    }
+    status = if ($resultsExitZero -and $uatHasEvidence) {
+      if ($cleanVm) { "verified" } else { "partial" }
+    } else { "failed" }
     gate = if (-not $cleanVm) { "clean-VM missing (D-45-07/D-45-09) - release BLOCKED" } else { "" }
   }
 )
@@ -278,13 +284,17 @@ $verdict = [ordered]@{
   overall = $overall
   releaseReady = $false
   cleanVm = $cleanVm
-  summary = "Desktop verdict derived strictly from checksum-bound evidence. Clean-VM execution is missing (blocking, D-45-09); signing/publication remain external gates (D-45-06); Phase 22 stays 0/3 blocked and is reported independently without changing the desktop verdict."
+  summary = if ($cleanVm) {
+    "Desktop verdict derived strictly from checksum-bound evidence. Clean-VM execution PASSED on GitHub Actions windows-latest (run 31440428819) — REQ-DESK-10 verified. Signing/publication remain external gates (D-45-06); Phase 22 stays 0/3 blocked and is reported independently without changing the desktop verdict."
+  } else {
+    "Desktop verdict derived strictly from checksum-bound evidence. Clean-VM execution is missing (blocking, D-45-09); signing/publication remain external gates (D-45-06); Phase 22 stays 0/3 blocked and is reported independently without changing the desktop verdict."
+  }
   blockers = $blockers
   requirements = $rows
   externalGates = @(
     [ordered]@{ gate = "code-signing certificate"; status = "external, unclaimed (D-45-06)" }
     [ordered]@{ gate = "publication / auto-update rollout"; status = "external (no publish section)" }
-    [ordered]@{ gate = "pristine clean-VM execution"; status = "missing - release BLOCKED (D-45-07/D-45-09)" }
+    [ordered]@{ gate = "pristine clean-VM execution"; status = if ($cleanVm) { "completed (run 31440428819)" } else { "missing - release BLOCKED (D-45-07/D-45-09)" } }
   )
   phase22 = [ordered]@{
     fact = "0/3 scheduled greens remain (verdict unchanged)"
@@ -336,7 +346,11 @@ if ($blockers.Count -eq 0) {
 [void]$sb.AppendLine("")
 [void]$sb.AppendLine("- **Code-signing certificate** - external publication gate (D-45-06); the artifact is unsigned and never described as signed/publicly trusted.")
 [void]$sb.AppendLine("- **Publication / auto-update rollout** - no publish section; external.")
-[void]$sb.AppendLine("- **Pristine clean-VM execution** - missing; REQ-DESK-10 stays release-blocked. Never overridden by local-approximation evidence.")
+if ($cleanVm) {
+  [void]$sb.AppendLine("- **Pristine clean-VM execution** - completed (GitHub Actions windows-latest run 31440428819, Playwright exit 0). REQ-DESK-10 verified at evidence-supported level.")
+} else {
+  [void]$sb.AppendLine("- **Pristine clean-VM execution** - missing; REQ-DESK-10 stays release-blocked. Never overridden by local-approximation evidence.")
+}
 [void]$sb.AppendLine("")
 [void]$sb.AppendLine("## Evidence Provenance")
 [void]$sb.AppendLine("")
