@@ -17,6 +17,7 @@
  *   objects are ever exposed.
  * - The bootstrap payload carries no secrets, paths or process details.
  */
+import type { RuntimeBootstrap } from "./bootstrap-contract";
 
 /** Global key under which the bridge is exposed in the renderer main world. */
 export const DESKTOP_BRIDGE_KEY = "novelMindDesktop";
@@ -56,13 +57,18 @@ export interface DesktopRuntimeStatus {
 }
 
 /**
- * Minimal startup payload for the renderer. Explicitly NO env, NO process
- * details, NO absolute paths (T-42-01-02).
+ * Startup payload for the renderer. Explicitly NO env, NO process details,
+ * NO absolute paths (T-42-01-02). `runtime` carries the one-session bootstrap
+ * (44-01): dynamically allocated loopback endpoints and bounded session
+ * metadata only — never secrets, provider keys or process paths — and stays
+ * null until the managed runtime is fully ready (D-43-09).
  */
 export interface DesktopBootstrap {
   appVersion: string;
   bridgeVersion: 1;
   features: readonly string[];
+  /** One-session runtime bootstrap, or null until the runtime is ready. */
+  runtime: RuntimeBootstrap | null;
 }
 
 /** Result of a restart request. */

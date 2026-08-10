@@ -24,7 +24,12 @@ function makeBridge(overrides: Partial<DesktopBridge> = {}): DesktopBridge {
   return {
     getRuntimeStatus: async () => STATUS,
     requestRuntimeRestart: async () => ({ ok: true }),
-    getBootstrap: async () => ({ appVersion: "0.1.0", bridgeVersion: 1, features: ["desktop-shell"] }),
+    getBootstrap: async () => ({
+      appVersion: "0.1.0",
+      bridgeVersion: 1,
+      features: ["desktop-shell"],
+      runtime: null,
+    }),
     openExternalLink: async (url) =>
       url.startsWith("https://") ? { ok: true } : { ok: false, code: "REJECTED", reason: "not https" },
     onRuntimeStatus: (listener) => {
@@ -92,7 +97,12 @@ describe("electron mode (bridge present)", () => {
     });
     await expect(desktopCapabilities.getBootstrap()).resolves.toEqual({
       supported: true,
-      value: { appVersion: "0.1.0", bridgeVersion: 1, features: ["desktop-shell"] },
+      value: {
+        appVersion: "0.1.0",
+        bridgeVersion: 1,
+        features: ["desktop-shell"],
+        runtime: null,
+      },
     });
     await expect(desktopCapabilities.openExternalLink("https://example.com")).resolves.toEqual({
       supported: true,

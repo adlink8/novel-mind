@@ -102,7 +102,7 @@ export const BRIDGE_IPC_RESPONSES: Record<string, IpcResponseSchema> = {
     shape: "RestartRequestResult ({ok:true} | {ok:false,reason})",
   },
   "bridge:getBootstrap": {
-    shape: "DesktopBootstrap (appVersion/bridgeVersion/features)",
+    shape: "DesktopBootstrap (appVersion/bridgeVersion/features/runtime: RuntimeBootstrap|null)",
   },
   "bridge:openExternalLink": {
     shape: "OpenExternalLinkResult ({ok:true} | {ok:false,code,reason})",

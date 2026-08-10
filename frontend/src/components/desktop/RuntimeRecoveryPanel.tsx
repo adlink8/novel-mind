@@ -8,9 +8,12 @@
  *
  * Defense in depth: even though `RuntimeRecoveryState.recoveryActions` is
  * derived main-side from the allowlist, the panel re-checks every action with
- * `isActionAllowed(state, actionId, backupAvailable)` from the shared contract
- * before rendering its button — the renderer can never surface a free-form or
- * out-of-state action string.
+ * the local `isActionAllowed` mirror of the shared contract
+ * (`desktop/src/shared/runtime-status.ts`) before rendering its button — the
+ * renderer can never surface a free-form or out-of-state action string. The
+ * contract module is imported type-only: it transitively imports desktop
+ * runtime types, so a value import would leak desktop code into the web bundle
+ * (same boundary pattern as `frontend/src/lib/desktop/runtime-recovery.ts`).
  *
  * This is a pure presentational component: the parent supplies the state and
  * routes `onAction` to the desktop authority, which re-validates before
@@ -18,10 +21,9 @@
  */
 "use client";
 
-import {
-  isActionAllowed,
-  type RecoveryActionId,
-  type RuntimeRecoveryState,
+import type {
+  RecoveryActionId,
+  RuntimeRecoveryState,
 } from "../../../../desktop/src/shared/runtime-status";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -47,8 +49,7 @@ const STATE_TITLES: Record<RuntimeRecoveryState["state"], string> = {
   failed: "本地运行时启动失败",
 };
 
-function stateDescription(state: RuntimeRecoveryState["state"]): string {
-  switch (state) {
+function stateDescription(state: RuntimeRecoveryState["state"]): string {  switch (state) {
     case "starting":
       return "正在拉起本地服务，请稍候。";
     case "migrating":
@@ -63,6 +64,38 @@ function stateDescription(state: RuntimeRecoveryState["state"]): string {
       return "本地运行时未能就绪。你可以重试，或打开诊断信息查看原因。";
     case "ready":
       return "本地运行时就绪。";
+  }
+}
+
+/**
+ * Renderer-safe mirror of `isActionAllowed` in the shared contract
+ * (`desktop/src/shared/runtime-status.ts`). The contract module is imported
+ * type-only across the bundle boundary; the allowlist logic is reimplemented
+ * here verbatim so the renderer-side defense-in-depth check stays identical.
+ */
+function isActionAllowed(
+  state: RuntimeRecoveryState["state"],
+  actionId: RecoveryActionId,
+  backupAvailable: boolean,
+): boolean {
+  switch (state) {
+    case "stopped":
+      return actionId === "retry" || actionId === "openDiagnostics";
+    case "degraded":
+      return (
+        actionId === "retry" ||
+        actionId === "restart" ||
+        actionId === "openDiagnostics"
+      );
+    case "failed":
+      return (
+        actionId === "retry" ||
+        actionId === "openDiagnostics" ||
+        (backupAvailable && actionId === "restoreBackup")
+      );
+    default:
+      // starting / migrating / ready / stopping: no action is safe.
+      return false;
   }
 }
 

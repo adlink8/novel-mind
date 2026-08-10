@@ -36,6 +36,7 @@ import {
 } from "./ipc/register";
 import { DesktopRuntime } from "../runtime/desktop-runtime";
 import { DevelopmentProcessAdapter } from "../runtime/development-process-adapter";
+import { RuntimeBootstrapProvider } from "../runtime/bootstrap";
 import { nodeProcessOperations } from "../runtime/process-operations";
 import { RUNTIME_ERROR_CODES, RuntimeError } from "../runtime/types";
 
@@ -47,6 +48,8 @@ let shellReady = false;
 let resolvedRendererUrl: string | null = null;
 /** The runtime instance this process created (owned for shutdown). */
 let ownedRuntime: DesktopRuntime | null = null;
+/** One-session bootstrap producer bound to the owned runtime (44-01). */
+let bootstrapProvider: RuntimeBootstrapProvider | null = null;
 
 /**
  * The local service orchestrator behind ONE runtime interface (D-43-02). Wave 1
@@ -61,6 +64,14 @@ function runtimeInstance(): DesktopRuntime {
     });
   }
   return ownedRuntime;
+}
+
+/** Lazily-created session bootstrap producer (44-01). */
+function sessionBootstrapProvider(): RuntimeBootstrapProvider {
+  if (bootstrapProvider === null) {
+    bootstrapProvider = new RuntimeBootstrapProvider({ runtime: () => ownedRuntime });
+  }
+  return bootstrapProvider;
 }
 
 function resolveRendererUrl(raw: string): string {
@@ -126,14 +137,18 @@ function mainWindowProvider(): BrowserWindow | null {
 const capabilityHandlers: Record<string, BridgeHandler> = {
   [DESKTOP_IPC_CHANNELS.getRuntimeStatus]: (): DesktopRuntimeStatus => currentStatus(),
 
-  [DESKTOP_IPC_CHANNELS.getBootstrap]: (): DesktopBootstrap => ({
+  [DESKTOP_IPC_CHANNELS.getBootstrap]: async (): Promise<DesktopBootstrap> => ({
     appVersion: app.getVersion(),
     bridgeVersion: 1,
     features: ["desktop-shell"],
+    runtime: await sessionBootstrapProvider().get(),
   }),
 
   [DESKTOP_IPC_CHANNELS.requestRuntimeRestart]: (): RestartRequestResult => {
     if (!shellReady) return { ok: false, reason: "not-ready" };
+    // Invalidate the current session bootstrap: a relaunched runtime is a new
+    // session (44-01 restart invalidation).
+    bootstrapProvider?.invalidate();
     app.relaunch();
     app.exit(0);
     return { ok: true };
@@ -177,6 +192,8 @@ app.whenReady().then(async () => {
 
 app.on("will-quit", () => {
   unregisterBridgeIpcHandlers();
+  // A quitting runtime must never serve a session bootstrap again (44-01).
+  bootstrapProvider?.invalidate();
   // Owned runtime shutdown is best-effort on quit (D-43-07): never block exit
   // on a slow drain, but give the owned tree a chance to terminate cleanly.
   if (ownedRuntime !== null) {

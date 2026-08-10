@@ -11,6 +11,7 @@
  */
 
 import { getAccessToken } from "@/lib/api";
+import { endpointResolver } from "./runtime/endpoint-resolver";
 
 /** 智能体 SSE 帧形状（25.2-05 + 25.3-06 契约）：type 之外的字段随帧类型变化。 */
 export interface AgentRunFrame {
@@ -67,13 +68,24 @@ function dispatchFrame(
  * - 非 2xx → `throw`（Error 带 `status` 字段）；响应无 body → throw。
  * - 读流过程中 abort → 以 `DOMException("Aborted", "AbortError")` reject。
  * - 只派发服务端发来的帧，绝不客户端伪造 assistant 内容。
+ * - 桌面模式下由 endpoint-resolver 在运行时解析 agent 服务真实 loopback 端点
+ *   （D-44-01）：相对 `/agent/...` 路径会被拼上 agent 基地址；浏览器模式
+ *   保持相对路径走 next rewrite。
  */
 export async function streamAgentRun(
   url: string,
   body: unknown,
   { signal, onEvent, onError }: StreamAgentRunOptions
 ): Promise<void> {
-  const res = await fetch(url, {
+  const resolution = await endpointResolver.resolve();
+  const resolvedUrl =
+    resolution.kind === "desktop" &&
+    resolution.endpoints.agentBaseUrl !== "" &&
+    url.startsWith("/")
+      ? `${resolution.endpoints.agentBaseUrl}${url}`
+      : url;
+
+  const res = await fetch(resolvedUrl, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${getAccessToken() ?? ""}`,

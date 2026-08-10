@@ -291,7 +291,12 @@ describe("RuntimeGate — default shell source against a mocked bridge", () => {
     (window as unknown as Record<string, unknown>)["novelMindDesktop"] = {
       getRuntimeStatus: async () => ({ ...SHELL_READY, ready }),
       requestRuntimeRestart: async () => ({ ok: true }),
-      getBootstrap: async () => ({ appVersion: "0.1.0", bridgeVersion: 1, features: ["desktop-shell"] }),
+      getBootstrap: async () => ({
+        appVersion: "0.1.0",
+        bridgeVersion: 1,
+        features: ["desktop-shell"],
+        runtime: null,
+      }),
       openExternalLink: async () => ({ ok: true }),
       onRuntimeStatus: () => ({ unsubscribe: () => {} }),
     };
