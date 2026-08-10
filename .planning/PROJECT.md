@@ -31,6 +31,29 @@ three consecutive green observations.
    prompt compilation, consistent illustration generation, in-text anchors and export.
 3. **v1.4 Canon Fork derivatives (Phase 35–39):** isolated knowledge spaces, derivative
    editor, constrained generation, derivative visual consistency and audited export.
+4. **v1.5 Windows Desktop Runtime (Phase 41–45):** Electron desktop shell, secure preload,
+   managed local runtime/data lifecycle, Windows installer and desktop qualification while
+   preserving the verified React/Next product surface.
+
+## Current Milestone: v1.5 Windows Desktop Runtime
+
+**Goal:** ship NovelMind as a Windows-first local desktop suite without rewriting or weakening
+the verified novel-understanding, visual and derivative workflows.
+
+**Target features:**
+
+- Electron hosts the existing React/Next renderer and all 13 current routes; browser deployment
+  remains a development/test harness rather than the primary product distribution.
+- A deep `DesktopRuntime` module manages Next, FastAPI, Agent Service, PostgreSQL/vector
+  dependencies, health, migration, restart, shutdown and crash recovery behind a small interface.
+- A sandboxed renderer receives only a typed, capability-specific `DesktopBridge`; Node,
+  filesystem, shell and arbitrary IPC are never exposed to web content.
+- Windows packaging requires no Docker or user-installed Python/Node/database runtime, keeps
+  mutable data under `%APPDATA%/NovelMind`, and qualifies first-run, upgrade and recovery.
+
+**Working assumption:** application-managed bundled dependencies are the planning baseline.
+Phase 41 must prove their feasibility and may revise packaging internals without changing the
+local-desktop product contract.
 
 ## Authority Boundaries
 
@@ -69,4 +92,4 @@ These dimensions may disagree. A green build does not imply data coverage or mod
 - `IMPLEMENTATION-STATUS.md`: human-facing implementation facts, updated only after verified
   implementation changes.
 
-*Last updated: 2026-08-02.*
+*Last updated: 2026-08-09 for v1.5 Windows Desktop Runtime planning.*

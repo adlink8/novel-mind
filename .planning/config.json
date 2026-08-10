@@ -2,11 +2,11 @@
   "project": "NovelMind",
   "baseline_branch": "master",
   "baseline_commit": "29be2fa3928ada9e9211ffa08f3af0eec734bb95",
-  "active_milestone": "v1.1",
-  "active_phase": "22-ci-nightly-gap-closure",
-  "active_plan": "22-G2",
-  "status": "blocked",
-  "auto_start": ".planning/phases/22-ci-nightly-gap-closure/22-G2-PLAN.md",
+  "active_milestone": "v1.5",
+  "active_phase": "41-electron-architecture-and-packaging-proof",
+  "active_plan": "41-01",
+  "status": "planned",
+  "auto_start": ".planning/phases/41-electron-architecture-and-packaging-proof/41-01-PLAN.md",
   "gate_overrides": {
     "phase_22_to_26": {
       "authorized": true,

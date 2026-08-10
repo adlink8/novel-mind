@@ -73,6 +73,21 @@
 | REQ-FORK-05 | Export preserves content/assets/citations/version parity and passes end-to-end UAT/audit | Phase 39 | PLANNED |
 | REQ-FORK-06 | Branch suggestions are disabled-by-default candidate outputs bound to conflict, Canon delta and evidence; they cannot auto-fork or reuse divergence/publication approval | 37-03/05 | PLANNED |
 
+## v1.5 Windows Desktop Runtime
+
+| ID | Requirement | Owner | Status |
+|---|---|---|---|
+| REQ-DESK-01 | A Windows Electron application hosts all existing NovelMind routes and verified user workflows without a parallel UI rewrite | Phase 41–42 | PLANNED |
+| REQ-DESK-02 | The renderer is sandboxed with context isolation, no Node integration, restrictive CSP/navigation/window policies and sender-validated capability-specific IPC | Phase 42 | PLANNED |
+| REQ-DESK-03 | A small `DesktopRuntime` interface deterministically starts, observes, restarts and shuts down the local Next, FastAPI, Agent Service and persistence/vector process graph | Phase 43 | PLANNED |
+| REQ-DESK-04 | The installed application requires no Docker and no user-installed Node, Python, PostgreSQL or vector-service runtime | Phase 41/43/45 | PLANNED |
+| REQ-DESK-05 | Mutable application data, logs and backups live under a versioned `%APPDATA%/NovelMind` layout and survive compatible upgrade/uninstall paths | Phase 43–45 | PLANNED |
+| REQ-DESK-06 | Runtime endpoints and local authentication are injected at startup without fixed-port assumptions; credentials leave renderer storage and use OS-backed protection | Phase 44 | PLANNED |
+| REQ-DESK-07 | Startup, migration, dependency, port, crash and provider failures are visible, recoverable and never reported as successful empty states | Phase 43–45 | PLANNED |
+| REQ-DESK-08 | Provider-independent reading/editing/local-data workflows start without internet; provider-dependent actions expose honest unavailable/blocked states | Phase 44–45 | PLANNED |
+| REQ-DESK-09 | Windows installation provides a single-instance application, clean process-tree shutdown, no terminal windows and a reversible versioned upgrade path | Phase 45 | PLANNED |
+| REQ-DESK-10 | Release qualification covers Electron integration, clean-VM install, first run, all existing critical workflows, IPC/security negatives, crash recovery and data preservation | Phase 45 | PLANNED |
+
 ## Explicit Backlog
 
 | ID | Requirement | Status |

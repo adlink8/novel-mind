@@ -545,6 +545,226 @@ audit; **Test, Fix, and Confirm** every failed end-to-end checkpoint.
 - **39-05 Agent integration:** register `prepare-export`; Agent prepares a frozen manifest,
   user approves export, and deterministic exporter materializes the bundle.
 
+# v1.5 — Windows Desktop Runtime
+
+> This milestone adds a Windows-first Electron distribution around the verified React/Next
+> product surface. The web app remains a development/test harness, not the formal release
+> target. These phases do not restore web as the release target and do not rewrite verified
+> business UI; they prove and qualify the desktop host, transport and local runtime.
+>
+> Phase 40 remains the ad-hoc `chat_backfill` record in `STATE.md`, not a numbered roadmap
+> phase. Phase 22 remains independently blocked at 0/3 scheduled green observations; that
+> fact is preserved and does not prevent planning this milestone.
+
+## Phase Checklist
+
+- [ ] **Phase 41: Electron Architecture and Packaging Proof** - Prove the standalone Next/local-loopback and bundled no-Docker architecture before downstream work.
+- [ ] **Phase 42: Secure Desktop Shell** - Host the existing React/Next renderer behind a sandboxed, capability-limited Electron boundary.
+- [ ] **Phase 43: Managed Local Runtime and Data Lifecycle** - Manage the local process graph, app data, migrations, crash recovery and lifecycle.
+- [ ] **Phase 44: Desktop Transport, Credentials and Offline Behavior** - Establish dynamic local transport, OS-backed credentials, SSE and honest offline states.
+- [ ] **Phase 45: Windows Packaging, Migration and Desktop Qualification** - Qualify installer, upgrade/uninstall preservation, clean-VM behavior and release security gates.
+
+## REQ-DESK Primary Ownership
+
+Each v1 requirement has exactly one primary phase. Cross-stage entries below are validation
+only and do not create a second owner.
+
+| Requirement | Primary phase | Cross-stage validation (non-owning) |
+|---|---|---|
+| REQ-DESK-01 | Phase 42 | Phase 41 route proof; Phase 45 critical-workflow qualification |
+| REQ-DESK-02 | Phase 42 | Phase 45 IPC/security negative audit |
+| REQ-DESK-03 | Phase 43 | Phase 41 process-graph feasibility; Phase 45 lifecycle qualification |
+| REQ-DESK-04 | Phase 41 | Phase 43 managed adapters; Phase 45 clean-VM proof |
+| REQ-DESK-05 | Phase 43 | Phase 45 upgrade/uninstall preservation |
+| REQ-DESK-06 | Phase 44 | Phase 43 endpoint readiness; Phase 45 packaged startup qualification |
+| REQ-DESK-07 | Phase 43 | Phase 44 blocked/offline presentation; Phase 45 crash/recovery qualification |
+| REQ-DESK-08 | Phase 44 | Phase 45 clean-VM/offline qualification |
+| REQ-DESK-09 | Phase 45 | — |
+| REQ-DESK-10 | Phase 45 | — |
+
+## v1.5 Progress
+
+| Phase | Plans Complete | Status | Completed |
+|---|---:|---|---|
+| 41. Electron Architecture and Packaging Proof | 0/3 | Not started | - |
+| 42. Secure Desktop Shell | 0/3 | Not started | - |
+| 43. Managed Local Runtime and Data Lifecycle | 0/4 | Not started | - |
+| 44. Desktop Transport, Credentials and Offline Behavior | 0/3 | Not started | - |
+| 45. Windows Packaging, Migration and Desktop Qualification | 0/4 | Not started | - |
+
+### Phase 41: Electron Architecture and Packaging Proof
+
+**Goal:** establish a fail-closed architecture decision that the existing Next application can
+run as a Windows Electron local-loopback desktop product with bundled dependencies, before any
+comprehensive UI migration or downstream packaging work.
+
+**Depends on:** Phase 39; Phase 22's independent 0/3 blocked gate remains unchanged.
+
+**Requirements:** REQ-DESK-04
+
+**Success Criteria** (what must be TRUE):
+
+1. A proof harness builds and starts the existing Next `output:standalone` artifact through an
+   Electron local-loopback path and verifies all 13 current routes respond and render through
+   the existing React/Next surface.
+2. The proof records the real process, asset, port, environment and shutdown assumptions for
+   Next, FastAPI, Agent Service, PostgreSQL and vector storage, and marks bundled/no-Docker
+   feasibility for each dependency with explicit evidence or a blocker.
+3. The proof demonstrates that an installed target does not require Docker or a user-installed
+   Node, Python, PostgreSQL or vector-service runtime, or records the exact failed prerequisite.
+4. A fail-closed go/no-go artifact blocks Phase 42–45 readiness when standalone output,
+   local-loopback, 13-route coverage or bundled no-Docker feasibility fails; it does not trigger
+   a broad UI rewrite or silently downgrade a failed proof to a green plan.
+
+**Plans:**
+
+- **Wave 0**
+  1. **41-01 — Disposable Electron/local-runtime proof skeleton and fail-closed topology contract** — Blocked on: none.
+- **Wave 1**
+  1. **41-02 — Next standalone local-loopback proof and 13-route parity** — Blocked on: `41-01`.
+- **Wave 2**
+  1. **41-03 — Bundled-runtime feasibility and Phase 41 GO/NO-GO decision** — Blocked on: `41-02`.
+
+Phase 41 planning is ready; comprehensive UI migration remains gated on the Phase 41 decision.
+
+**UI hint:** yes
+
+### Phase 42: Secure Desktop Shell
+
+**Goal:** let users operate the verified React/Next renderer inside an Electron shell while
+exposing only an explicit, capability-specific desktop boundary.
+
+**Depends on:** Phase 41 fail-closed GO.
+
+**Requirements:** REQ-DESK-01, REQ-DESK-02
+
+**Success Criteria** (what must be TRUE):
+
+1. Users can open the desktop application and use all 13 existing routes and verified critical
+   workflows through the React/Next renderer without a parallel business-UI rewrite or a new
+   formal web-release target.
+2. Renderer security checks prove `contextIsolation: true`, `sandbox: true`,
+   `nodeIntegration: false`, and no renderer access to Node, filesystem, shell or arbitrary
+   process APIs.
+3. A restrictive CSP, allowlisted navigation policy and controlled window policy block
+   unexpected origins, redirects, popups and new windows while preserving the approved local
+   application flow.
+4. The preload exposes a typed capability-specific `DesktopBridge`; IPC rejects unknown
+   channels, invalid payloads and messages whose sender/webContents is not an approved renderer.
+
+**Plans:**
+
+- **Wave 0**
+  1. **42-01 — Electron main/preload shell skeleton** — Blocked on: `41-03`.
+- **Wave 1**
+  1. **42-02 — CSP, navigation, window, permissions and sender-validated IPC security boundary** — Blocked on: `42-01`.
+- **Wave 2**
+  1. **42-03 — Electron 13-route, critical-workflow and renderer-privilege parity gates** — Blocked on: `42-02`.
+
+**UI hint:** yes
+
+### Phase 43: Managed Local Runtime and Data Lifecycle
+
+**Goal:** give the desktop application a deterministic, observable local runtime and durable
+data lifecycle for all managed services without changing backend domain authority.
+
+**Depends on:** Phase 41 fail-closed GO and Phase 42's secure bridge boundary.
+
+**Requirements:** REQ-DESK-03, REQ-DESK-05, REQ-DESK-07
+
+**Success Criteria** (what must be TRUE):
+
+1. A small deep-module `DesktopRuntime` interface exposes only `ensureReady`, `status`,
+   `restart` and `shutdown`, with typed lifecycle/error states and deterministic readiness
+   semantics; it does not become a second domain or persistence authority.
+2. `PackagedProcessAdapter` and `DevelopmentProcessAdapter` manage the same contract for Next,
+   FastAPI, Agent Service, PostgreSQL and vector storage, including dependency ordering,
+   health checks, dynamic endpoints, clean process-tree shutdown and targeted restart.
+3. First run and upgrade use a versioned `%APPDATA%/NovelMind` layout for mutable data, logs,
+   migration state and backups; compatible upgrades preserve user data and migration failure
+   leaves a recoverable backup/state rather than partial silent success.
+4. A killed dependency, startup failure, port conflict or crash is visible as a typed degraded
+   or failed state, offers a bounded recovery/restart path, and never appears as a successful
+   empty novel/library state.
+
+**Plans:**
+
+- **Wave 0**
+  1. **43-01 — DesktopRuntime deep module and development/packaged adapter contract** — Blocked on: `42-02`.
+- **Wave 1**
+  1. **43-02 — Five-component process graph, dynamic ports, readiness, logging and Windows process-tree ownership** — Blocked on: `43-01`.
+  2. **43-03 — Versioned `%APPDATA%/NovelMind` layout, backup-first migration and recovery contract** — Blocked on: `43-01`.
+- **Wave 2**
+  1. **43-04 — Visible/recoverable runtime and data failure states with empty-success prevention** — Blocked on: `43-02`, `43-03`.
+
+### Phase 44: Desktop Transport, Credentials and Offline Behavior
+
+**Goal:** provide a secure desktop transport and honest connectivity model for local workflows,
+provider calls and streaming without moving factual or domain authority into Electron.
+
+**Depends on:** Phase 42 secure bridge and Phase 43 runtime endpoint/readiness contract.
+
+**Requirements:** REQ-DESK-06, REQ-DESK-08
+
+**Success Criteria** (what must be TRUE):
+
+1. Startup injects the actual local endpoints and auth material at runtime without fixed-port
+   assumptions; renderer code consumes typed capabilities rather than discovering services or
+   storing gateway/provider credentials in renderer storage.
+2. Local credentials use Electron `safeStorage`/the OS-backed protection boundary, are absent
+   from renderer-accessible storage and logs, and invalid/expired credentials fail closed with
+   a stable user-visible status.
+3. Agent and long-running local operations stream through the existing SSE contract with
+   reconnect/cancellation/error handling that preserves terminal failure states and does not
+   manufacture a successful result.
+4. Provider-independent reading, editing and local-data workflows start without internet;
+   provider-dependent actions show explicit unavailable/blocked states when offline or
+   misconfigured, while backend services remain the domain and authority boundary.
+
+**Plans:**
+
+- **Wave 0**
+  1. **44-01 — Dynamic endpoint/bootstrap contract and unified API/SSE resolver** — Blocked on: `43-04`.
+- **Wave 1**
+  1. **44-02 — OS-protected credentials and fail-closed local session authentication** — Blocked on: `44-01`.
+- **Wave 2**
+  1. **44-03 — SSE recovery and honest offline/provider capability behavior** — Blocked on: `44-02`.
+
+### Phase 45: Windows Packaging, Migration and Desktop Qualification
+
+**Goal:** qualify a reproducible Windows desktop release candidate that installs, upgrades,
+recovers and preserves data under real clean-machine conditions.
+
+**Depends on:** Phases 41–44 and the Phase 39 verified critical workflow/export baseline.
+
+**Requirements:** REQ-DESK-09, REQ-DESK-10
+
+**Success Criteria** (what must be TRUE):
+
+1. A Windows installer on a clean VM installs and first-runs without Docker or user-installed
+   Node, Python, PostgreSQL or vector-service runtime, opens only one application instance,
+   shows no console window and shuts down the managed process tree cleanly.
+2. A compatible versioned upgrade preserves `%APPDATA%/NovelMind` data, logs and backups;
+   uninstall behavior preserves user data according to the documented policy and a failed
+   upgrade has a reversible recovery path.
+3. Electron Playwright integration qualification covers first run, all existing critical
+   workflows, local runtime recovery, offline/blocked states and data preservation; the
+   security audit includes CSP/navigation/window, IPC sender and malformed-capability negatives.
+4. The release gate records clean-VM, migration, crash-recovery and qualification evidence;
+   code-signing certificate acquisition is an external publication gate and is not purchased
+   or represented as complete by this roadmap.
+
+**Plans:**
+
+- **Wave 0**
+  1. **45-01 — Windows installer build chain, bundled runtime, single instance and data/resource isolation** — Blocked on: `41-03`, `42-03`, `43-04`, `44-03`.
+- **Wave 1**
+  1. **45-02 — Version upgrade, failure recovery and data-preserving uninstall policy** — Blocked on: `45-01`.
+- **Wave 2**
+  1. **45-03 — Clean Windows VM install, first-run, workflow, offline-recovery and data-preservation UAT** — Blocked on: `45-02`.
+- **Wave 3**
+  1. **45-04 — Electron security audit, SBOM/evidence integrity and v1.5 closeout** — Blocked on: `45-03`.
+
 ## Supersession and Backlog Map
 
 | Old roadmap item | New owner |
@@ -567,3 +787,8 @@ milestone (26–29), the v1.3 milestone (30–34) and the v1.4 milestone (35–3
 roadmap through Phase 39 is delivered under the user-authorized execution overrides. The
 Phase 39 closeout audit gate honestly reports `blocked` (Phase 22 0/3 + REQ-SHIP-01 gaps)
 and never promotes; neither blocker is hidden or downgraded.
+
+Phase 40 remains the ad-hoc `chat_backfill` record in `STATE.md`, not a numbered roadmap
+phase. Phase 41 planning is ready. Phases 42–45 are planned and remain gated by their
+explicit plan dependencies and the preceding phase decisions; Phase 22's independent 0/3
+blocked state does not change.
