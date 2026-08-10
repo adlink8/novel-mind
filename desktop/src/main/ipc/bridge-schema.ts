@@ -92,6 +92,17 @@ export const BRIDGE_IPC_SCHEMAS: Record<string, IpcRequestSchema> = {
       },
     ],
   },
+  "bridge:getLocalAuthToken": {
+    name: "getLocalAuthToken",
+    args: [
+      {
+        name: "target",
+        kind: "string",
+        required: true,
+        maxLength: 32,
+      },
+    ],
+  },
 };
 
 export const BRIDGE_IPC_RESPONSES: Record<string, IpcResponseSchema> = {
@@ -106,5 +117,8 @@ export const BRIDGE_IPC_RESPONSES: Record<string, IpcResponseSchema> = {
   },
   "bridge:openExternalLink": {
     shape: "OpenExternalLinkResult ({ok:true} | {ok:false,code,reason})",
+  },
+  "bridge:getLocalAuthToken": {
+    shape: "short-lived audience-bound local session token string | null (never the HMAC secret)",
   },
 };

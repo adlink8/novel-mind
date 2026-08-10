@@ -16,6 +16,7 @@ import type {
   DesktopBootstrap,
   DesktopBridge,
   DesktopRuntimeStatus,
+  LocalAuthTarget,
   OpenExternalLinkResult,
   RestartRequestResult,
   RuntimeStatusListener,
@@ -54,7 +55,8 @@ function isDesktopBridge(value: unknown): value is DesktopBridge {
     typeof bridge.requestRuntimeRestart === "function" &&
     typeof bridge.getBootstrap === "function" &&
     typeof bridge.openExternalLink === "function" &&
-    typeof bridge.onRuntimeStatus === "function"
+    typeof bridge.onRuntimeStatus === "function" &&
+    typeof bridge.getLocalAuthToken === "function"
   );
 }
 
@@ -98,6 +100,20 @@ export const desktopCapabilities = {
     const bridge = resolveBridge();
     if (bridge === null) return unsupported();
     return { supported: true, value: await bridge.requestRuntimeRestart() };
+  },
+
+  /**
+   * Short-lived audience-bound local session token for the requested local
+   * service (44-03). Null (or unsupported) means no active runtime session —
+   * the caller fails closed. The returned token is session-scoped and expires
+   * in minutes; it is never a master credential and must not be persisted.
+   */
+  async getLocalAuthToken(
+    target: LocalAuthTarget,
+  ): Promise<DesktopCapability<string | null>> {
+    const bridge = resolveBridge();
+    if (bridge === null) return unsupported();
+    return { supported: true, value: await bridge.getLocalAuthToken(target) };
   },
 
   /** Subscribe to runtime status changes; null when no bridge is present. */

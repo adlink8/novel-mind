@@ -11,7 +11,14 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { streamAgentRun, type AgentRunFrame } from "./sse";
+import {
+  streamAgentRun,
+  runAgentStream,
+  isRunTerminal,
+  type AgentRunFrame,
+} from "./sse";
+import { endpointResolver } from "./runtime/endpoint-resolver";
+import type { DesktopBridge } from "../../../desktop/src/shared/bridge-contract";
 
 const ENCODER = new TextEncoder();
 
@@ -181,5 +188,328 @@ describe("streamAgentRun", () => {
     await expect(
       streamAgentRun("/agent/novels/11/runs", {}, { onEvent: vi.fn() })
     ).rejects.toThrow(/no readable body/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// runAgentStream (44-03): authoritative terminals, single reconnect, replay
+// dedupe and session rotation (T-44-03-01/02, D-44-05).
+// ---------------------------------------------------------------------------
+
+function runFrame(overrides: Partial<AgentRunFrame> = {}): AgentRunFrame {
+  return { type: "run_end", runId: "7", status: "completed", ...overrides };
+}
+
+/** Installs a scripted fetch that serves a sequence of SSE bodies. */
+function scriptedStream(
+  bodies: Array<{ status: number; chunks: string[]; hangAfter?: number }>,
+): ReturnType<typeof vi.fn> {
+  let i = 0;
+  const fetchMock = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
+    const spec = bodies[Math.min(i, bodies.length - 1)];
+    if (spec === undefined) throw new Error("no scripted response");
+    i += 1;
+    if (spec.status !== 200) {
+      return { ok: false, status: spec.status, body: null };
+    }
+    return { ok: true, status: 200, body: scriptedBody(spec.chunks, { signal: init?.signal ?? undefined, hangAfter: spec.hangAfter }) };
+  });
+  globalThis.fetch = fetchMock;
+  return fetchMock;
+}
+
+/** Body that emits the given chunks then rejects with a network TypeError
+ * (simulates a mid-stream drop after frames were delivered). */
+function dropBody(chunks: string[]): unknown {
+  let i = 0;
+  return {
+    getReader() {
+      return {
+        async read(): Promise<{ done: boolean; value?: Uint8Array }> {
+          if (i < chunks.length) {
+            return { done: false, value: ENCODER.encode(chunks[i++]) };
+          }
+          throw new TypeError("network dropped mid-stream");
+        },
+      };
+    },
+  };
+}
+
+function browserMode(): void {
+  delete (window as unknown as Record<string, unknown>)["novelMindDesktop"];
+  endpointResolver.invalidate();
+}
+
+function withAgentDesktopBridge(): void {
+  const bridge: DesktopBridge = {
+    getRuntimeStatus: async () => ({
+      ready: true,
+      appVersion: "0.1.0",
+      electronVersion: "43.3.0",
+      security: { sandbox: true, contextIsolation: true, nodeIntegration: false, webSecurity: true },
+    }),
+    requestRuntimeRestart: async () => ({ ok: true }),
+    getBootstrap: async () => ({
+      appVersion: "0.1.0",
+      bridgeVersion: 1,
+      features: ["desktop-shell"],
+      runtime: { status: "ready", session: makeSession() },
+      credentials: {
+        provider: "unavailable",
+        localAuth: "unavailable",
+        storageAvailable: false,
+      },
+    }),
+    openExternalLink: async (url: string) =>
+      url.startsWith("https://") ? { ok: true } : { ok: false, code: "REJECTED", reason: "not https" },
+    onRuntimeStatus: () => ({ unsubscribe: () => {} }),
+    getLocalAuthToken: async () => "sess-token",
+  };
+  (window as unknown as Record<string, unknown>)["novelMindDesktop"] = bridge;
+  endpointResolver.invalidate();
+}
+
+/** A ready bootstrap session (dynamic loopback ports). */
+function makeSession() {
+  const components = {
+    next: { host: "127.0.0.1" as const, port: 41003 },
+    fastapi: { host: "127.0.0.1" as const, port: 41001 },
+    agent_service: { host: "127.0.0.1" as const, port: 41002 },
+    postgres_pgvector: { host: "127.0.0.1" as const, port: 41000 },
+    vector_store: { host: "127.0.0.1" as const, port: 41004 },
+  };
+  return {
+    sessionId: "sess-abc",
+    issuedAt: "2026-08-10T00:00:00.000Z",
+    expiresAt: "2026-08-10T01:00:00.000Z",
+    components,
+    services: { api: components.fastapi, agent: components.agent_service, renderer: components.next },
+    capabilities: { agentStreaming: true },
+  };
+}
+
+describe("runAgentStream (44-03)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    browserMode();
+  });
+
+  afterEach(() => {
+    browserMode();
+  });
+
+  it("resolves with the authoritative terminal status from the server", async () => {
+    scriptedStream([
+      { status: 200, chunks: [`data: ${JSON.stringify(runFrame({ status: "completed" }))}\n\n`] },
+    ]);
+    const onEvent = vi.fn();
+    const terminal = await runAgentStream({
+      url: "/agent/novels/11/runs",
+      body: { question: "q" },
+      onEvent,
+    });
+    expect(terminal).toBe("completed");
+    expect(onEvent).toHaveBeenCalledWith(runFrame({ status: "completed" }));
+  });
+
+  it("keeps cancelled cancelled and failed failed across a mid-stream drop", async () => {
+    // First connection emits a delta then drops (network failure, no terminal);
+    // the single reconnect serves the authoritative cancelled terminal.
+    let i = 0;
+    const fetchMock = vi.fn().mockImplementation(async () => {
+      i += 1;
+      if (i === 1) {
+        return {
+          ok: true,
+          status: 200,
+          body: dropBody([`data: ${JSON.stringify({ type: "delta", text: "hi" })}\n\n`]),
+        };
+      }
+      return {
+        ok: true,
+        status: 200,
+        body: scriptedBody([`data: ${JSON.stringify(runFrame({ status: "cancelled" }))}\n\n`]),
+      };
+    });
+    globalThis.fetch = fetchMock;
+
+    const onEvent = vi.fn();
+    const terminal = await runAgentStream({
+      url: "/agent/novels/11/runs",
+      body: {},
+      signal: new AbortController().signal,
+      onEvent,
+    });
+    expect(terminal).toBe("cancelled");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not reconnect before any event frame (connection failure stays failed)", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(new TypeError("network down"))
+      .mockRejectedValueOnce(new TypeError("network down"));
+    globalThis.fetch = fetchMock;
+    await expect(
+      runAgentStream({ url: "/agent/novels/11/runs", body: {}, onEvent: vi.fn() }),
+    ).rejects.toThrow(/network down/);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not reconnect on a non-2xx response (401 stays failed)", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false, status: 401, body: null });
+    globalThis.fetch = fetchMock;
+    await expect(
+      runAgentStream({ url: "/agent/novels/11/runs", body: {}, onEvent: vi.fn() }),
+    ).rejects.toMatchObject({ status: 401 });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("propagates external cancellation as AbortError", async () => {
+    const ac = new AbortController();
+    scriptedStream([
+      {
+        status: 200,
+        chunks: [`data: ${JSON.stringify({ type: "delta", text: "x" })}\n\n`],
+        hangAfter: 1,
+      },
+    ]);
+    const onEvent = vi.fn();
+    const promise = runAgentStream({
+      url: "/agent/novels/11/runs",
+      body: {},
+      signal: ac.signal,
+      onEvent,
+    });
+    await vi.waitFor(() => expect(onEvent).toHaveBeenCalledTimes(1));
+    ac.abort();
+    await expect(promise).rejects.toMatchObject({ name: "AbortError" });
+  });
+
+  it("rejects with code session-rotated when the runtime session changes mid-stream", async () => {
+    withAgentDesktopBridge();
+    // Gate the first connection's failure so the test can rotate the session
+    // before the reconnect resolves.
+    let releaseDrop: () => void = () => {};
+    const dropped = new Promise<void>((resolve) => {
+      releaseDrop = () => resolve();
+    });
+    let i = 0;
+    const fetchMock = vi.fn().mockImplementation(async () => {
+      i += 1;
+      if (i === 1) {
+        // First connection: emit one delta frame, then block until the test
+        // releases the drop (session rotation happens in that window).
+        let reads = 0;
+        return {
+          ok: true,
+          status: 200,
+          body: {
+            getReader() {
+              return {
+                async read(): Promise<{ done: boolean; value?: Uint8Array }> {
+                  reads += 1;
+                  if (reads === 1) {
+                    return {
+                      done: false,
+                      value: ENCODER.encode(
+                        `data: ${JSON.stringify({ type: "delta", text: "x" })}\n\n`,
+                      ),
+                    };
+                  }
+                  await dropped;
+                  throw new TypeError("network dropped mid-stream");
+                },
+              };
+            },
+          },
+        };
+      }
+      return {
+        ok: true,
+        status: 200,
+        body: scriptedBody([`data: ${JSON.stringify(runFrame({ status: "failed" }))}\n\n`]),
+      };
+    });
+    globalThis.fetch = fetchMock;
+
+    const onEvent = vi.fn();
+    const promise = runAgentStream({
+      url: "/agent/novels/11/runs",
+      body: {},
+      signal: new AbortController().signal,
+      onEvent,
+    });
+    await vi.waitFor(() => expect(onEvent).toHaveBeenCalledTimes(1));
+    // Runtime restart rotates the session before the drop is released.
+    const bridge = (window as unknown as Record<string, unknown>)[
+      "novelMindDesktop"
+    ] as unknown as DesktopBridge;
+    const rotated = makeSession();
+    rotated.sessionId = "sess-rotated";
+    (bridge.getBootstrap as unknown) = async () => ({
+      appVersion: "0.1.0",
+      bridgeVersion: 1,
+      features: ["desktop-shell"],
+      runtime: { status: "ready", session: rotated },
+      credentials: {
+        provider: "unavailable",
+        localAuth: "unavailable",
+        storageAvailable: false,
+      },
+    });
+    releaseDrop();
+    await expect(promise).rejects.toMatchObject({ code: "session-rotated" });
+  });
+
+  it("drops replay frames with a duplicate event_id (no second materialization)", async () => {
+    const delta = {
+      type: "delta",
+      text: "a",
+      event_id: "evt-1",
+    };
+    scriptedStream([
+      {
+        status: 200,
+        chunks: [
+          `data: ${JSON.stringify(delta)}\n\n`,
+          `data: ${JSON.stringify({ ...delta, text: "b" })}\n\n`,
+          `data: ${JSON.stringify(runFrame({ status: "completed" }))}\n\n`,
+        ],
+      },
+    ]);
+    const onEvent = vi.fn();
+    const terminal = await runAgentStream({
+      url: "/agent/novels/11/runs",
+      body: {},
+      eventId: "run-1",
+      onEvent,
+    });
+    expect(terminal).toBe("completed");
+    expect(onEvent).toHaveBeenCalledTimes(2);
+    expect(onEvent.mock.calls[0]?.[0]).toMatchObject({ text: "a" });
+  });
+
+  it("treats a silent stream end without a terminal as failed (never success)", async () => {
+    scriptedStream([{ status: 200, chunks: [`data: ${JSON.stringify({ type: "delta", text: "x" })}\n\n`] }]);
+    const terminal = await runAgentStream({
+      url: "/agent/novels/11/runs",
+      body: {},
+      onEvent: vi.fn(),
+    });
+    expect(terminal).toBe("failed");
+  });
+
+  it("recognizes the three authoritative terminal frames", () => {
+    expect(isRunTerminal(runFrame({ status: "completed" }))).toBe(true);
+    expect(isRunTerminal(runFrame({ status: "cancelled" }))).toBe(true);
+    expect(isRunTerminal(runFrame({ status: "failed" }))).toBe(true);
+    expect(isRunTerminal({ type: "delta", text: "x" })).toBe(false);
+    expect(
+      isRunTerminal({ type: "run_end", runId: "7", status: "something-else" }),
+    ).toBe(false);
   });
 });

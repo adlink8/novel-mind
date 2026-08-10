@@ -296,9 +296,15 @@ describe("RuntimeGate — default shell source against a mocked bridge", () => {
         bridgeVersion: 1,
         features: ["desktop-shell"],
         runtime: null,
+        credentials: {
+          provider: "unavailable",
+          localAuth: "unavailable",
+          storageAvailable: false,
+        },
       }),
       openExternalLink: async () => ({ ok: true }),
       onRuntimeStatus: () => ({ unsubscribe: () => {} }),
+      getLocalAuthToken: async () => null,
     };
   }
 

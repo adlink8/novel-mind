@@ -40,6 +40,7 @@ import {
 } from "./governance/tool-registry-manifest.js";
 import { PolicyDenied, evaluate, loadSkillRules, type DomainActionRule } from "./policy/engine.js";
 import { SessionApprovals } from "./policy/session-approvals.js";
+import { requireLocalSession, extractEndUserToken } from "./middleware/desktop-local-auth.js";
 import type { SseFrame } from "./transport/sse.js";
 import {
   buildCitedAnswerEnvelope,
@@ -393,6 +394,54 @@ function resolveDeps(deps: ServerDeps = {}) {
 }
 
 /**
+ * Inbound authorization gate (44-03).
+ *
+ * - Local session auth configured (desktop): requires the audience/expiry-bound
+ *   session token first (loopback source + signature + claims, fail closed).
+ *   The renderer carries the session token in `X-Local-Auth-Token` (44-03
+ *   transport header) and the end-user JWT in `Authorization`; the end-user JWT
+ *   is then forwarded to FastAPI for owner isolation. Returns null after
+ *   writing a 401 when the session token is missing/invalid.
+ * - Not configured (browser dev): preserves the existing single-Bearer
+ *   end-user JWT flow.
+ */
+function verifyInboundSession(
+  req: IncomingMessage,
+  res: ServerResponse,
+  rawAuth: string | undefined,
+): string | null {
+  if (config.localAuthSecret) {
+    const sessionToken = req.headers["x-local-auth-token"];
+    if (typeof sessionToken !== "string" || sessionToken === "") {
+      res.writeHead(401, { "content-type": "application/json" });
+      res.end(
+        JSON.stringify({ error: { code: "unauthorized", message: "缺少本地会话认证" } }),
+      );
+      return null;
+    }
+    // Present the session token to the fail-closed guard as its Authorization
+    // input (loopback source and claims are still validated). The guard only
+    // reads headers.authorization and socket.remoteAddress.
+    const sessionReq = {
+      headers: { authorization: `Bearer ${sessionToken}` },
+      socket: req.socket,
+    } as IncomingMessage;
+    const verified = requireLocalSession(sessionReq, res, config.localAuthSecret);
+    if (verified === null) return null;
+    const endUser = extractEndUserToken(req);
+    return endUser ? `Bearer ${endUser}` : "";
+  }
+  if (typeof rawAuth !== "string" || !rawAuth.startsWith("Bearer ")) {
+    res.writeHead(401, { "content-type": "application/json" });
+    res.end(
+      JSON.stringify({ error: { code: "unauthorized", message: "缺少 Authorization 头" } }),
+    );
+    return null;
+  }
+  return rawAuth;
+}
+
+/**
  * 处理一次 run 请求。失败以状态码 + JSON error 结束（SSE 头未写时）；
  * 成功后以 text/event-stream 流式返回。
  */
@@ -403,12 +452,10 @@ async function handleRun(
   deps: ReturnType<typeof resolveDeps>,
   manifest: ToolRegistryEntry[],
 ): Promise<void> {
-  const authHeader = req.headers.authorization;
-  if (!authHeader) {
-    res.writeHead(401, { "content-type": "application/json" });
-    res.end(JSON.stringify({ error: { code: "unauthorized", message: "缺少 Authorization 头" } }));
-    return;
-  }
+  // 44-03: local session auth first (when configured), then the end-user JWT
+  // is forwarded for FastAPI owner checks.
+  const authHeader = verifyInboundSession(req, res, req.headers.authorization);
+  if (authHeader === null) return;
 
   let rawBody: unknown;
   try {

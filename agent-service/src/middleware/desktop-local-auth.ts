@@ -26,7 +26,13 @@ export const LOCAL_AUTH_ISSUER = "novelmind-desktop-main";
 export const LOCAL_AUTH_AGENT_AUDIENCE = "novelmind-agent-local";
 export const LOCAL_AUTH_LEEWAY_SECONDS = 60;
 
-const LOOPBACK_HOSTS = new Set(["127.0.0.1", "::1", "localhost"]);
+/**
+ * Loopback sources accepted for the session token. Includes the IPv4-mapped
+ * IPv6 form (`::ffff:127.0.0.1`): a dual-stack server bound to `::` presents
+ * IPv4 loopback connections that way, and rejecting it would break legitimate
+ * local requests (44-03 server wiring).
+ */
+const LOOPBACK_HOSTS = new Set(["127.0.0.1", "::1", "localhost", "::ffff:127.0.0.1"]);
 
 /** Decoded verification result (only stable fields; never the raw token). */
 export interface VerifiedLocalSession {
@@ -139,6 +145,27 @@ export function extractEndUserToken(req: IncomingMessage): string | null {
   if (typeof header !== "string" || !header.startsWith("Bearer ")) return null;
   const token = header.slice("Bearer ".length).trim();
   return token === "" ? null : token;
+}
+
+/**
+ * Build the local-session Authorization header value the renderer/transport
+ * attaches to agent requests. When local-auth is configured, the end-user JWT
+ * in the transport header is NOT the session credential the agent service
+ * verifies — main mints a separate short-lived `novelmind-agent-local` token
+ * which the renderer obtains through the bridge and prepends, so the final
+ * header is `Bearer <session-token> <end-user-jwt>`. When no session material
+ * exists (browser mode / no secret) the end-user JWT is passed through
+ * unchanged so existing browser dev semantics are preserved.
+ */
+export function buildLocalAuthHeader(
+  endUserToken: string | null,
+  localAuthToken: string | null,
+): string {
+  const endUser = endUserToken?.trim() ?? "";
+  if (localAuthToken !== null && localAuthToken !== "") {
+    return `Bearer ${localAuthToken} ${endUser}`;
+  }
+  return endUser ? `Bearer ${endUser}` : "";
 }
 
 /** Redacted label for diagnostics — never a token value. */

@@ -17,6 +17,7 @@ import type {
   DesktopBridge,
   DesktopBootstrap,
   DesktopRuntimeStatus,
+  LocalAuthTarget,
   OpenExternalLinkResult,
   RestartRequestResult,
   RuntimeStatusListener,
@@ -33,6 +34,7 @@ const CHANNELS = {
   getBootstrap: "bridge:getBootstrap",
   runtimeStatusChanged: "bridge:runtimeStatusChanged",
   openExternalLink: "bridge:openExternalLink",
+  getLocalAuthToken: "bridge:getLocalAuthToken",
 } as const;
 
 /** MUST MATCH `DESKTOP_BRIDGE_KEY` in the shared contract. */
@@ -50,6 +52,9 @@ const bridge: DesktopBridge = {
 
   openExternalLink: (url: string): Promise<OpenExternalLinkResult> =>
     ipcRenderer.invoke(CHANNELS.openExternalLink, url),
+
+  getLocalAuthToken: (target: LocalAuthTarget): Promise<string | null> =>
+    ipcRenderer.invoke(CHANNELS.getLocalAuthToken, target),
 
   onRuntimeStatus(listener: RuntimeStatusListener) {
     const handler = (_event: IpcRendererEvent, status: DesktopRuntimeStatus): void => {

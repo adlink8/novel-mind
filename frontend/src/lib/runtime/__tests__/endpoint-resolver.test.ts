@@ -63,7 +63,17 @@ function makeBridge(bootstrap: RuntimeBootstrap): DesktopBridge & { calls: () =>
     requestRuntimeRestart: async () => ({ ok: true }),
     getBootstrap: async () => {
       calls += 1;
-      return { appVersion: "0.1.0", bridgeVersion: 1, features: ["desktop-shell"], runtime: bootstrap };
+      return {
+        appVersion: "0.1.0",
+        bridgeVersion: 1,
+        features: ["desktop-shell"],
+        runtime: bootstrap,
+        credentials: {
+          provider: "unavailable",
+          localAuth: "unavailable",
+          storageAvailable: false,
+        },
+      };
     },
     openExternalLink: async (url: string) =>
       url.startsWith("https://") ? { ok: true } : { ok: false, code: "REJECTED", reason: "not https" },
@@ -71,6 +81,7 @@ function makeBridge(bootstrap: RuntimeBootstrap): DesktopBridge & { calls: () =>
       const id = window.setInterval(() => listener(STATUS), 1000);
       return { unsubscribe: () => window.clearInterval(id) };
     },
+    getLocalAuthToken: async () => null,
   };
   return Object.assign(bridge, { calls: () => calls });
 }

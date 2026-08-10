@@ -18,6 +18,7 @@
  * - The bootstrap payload carries no secrets, paths or process details.
  */
 import type { RuntimeBootstrap } from "./bootstrap-contract";
+import type { RedactedCredentialStatus } from "./credential-status";
 
 /** Global key under which the bridge is exposed in the renderer main world. */
 export const DESKTOP_BRIDGE_KEY = "novelMindDesktop";
@@ -35,6 +36,7 @@ export const DESKTOP_IPC_CHANNELS = {
   getBootstrap: "bridge:getBootstrap",
   runtimeStatusChanged: "bridge:runtimeStatusChanged",
   openExternalLink: "bridge:openExternalLink",
+  getLocalAuthToken: "bridge:getLocalAuthToken",
 } as const;
 
 /** Effective BrowserWindow security posture reported to the renderer. */
@@ -61,7 +63,9 @@ export interface DesktopRuntimeStatus {
  * NO absolute paths (T-42-01-02). `runtime` carries the one-session bootstrap
  * (44-01): dynamically allocated loopback endpoints and bounded session
  * metadata only — never secrets, provider keys or process paths — and stays
- * null until the managed runtime is fully ready (D-43-09).
+ * null until the managed runtime is fully ready (D-43-09). `credentials`
+ * carries ONLY the redacted credential status (44-02/44-03) — provider/local-auth
+ * state strings, never any value or blob fragment (T-44-02-01).
  */
 export interface DesktopBootstrap {
   appVersion: string;
@@ -69,6 +73,8 @@ export interface DesktopBootstrap {
   features: readonly string[];
   /** One-session runtime bootstrap, or null until the runtime is ready. */
   runtime: RuntimeBootstrap | null;
+  /** Redacted OS-credential status: state strings only, never values. */
+  credentials: RedactedCredentialStatus;
 }
 
 /** Result of a restart request. */
@@ -91,7 +97,23 @@ export interface RuntimeStatusSubscription {
 
 export type RuntimeStatusListener = (status: DesktopRuntimeStatus) => void;
 
-/** The complete capability surface the renderer may use. */
+/**
+ * The two local services that accept desktop session tokens. The renderer may
+ * request a token for either service; the token is audience-bound, short-lived
+ * and session-scoped (44-02 local-auth contract).
+ */
+export const LOCAL_AUTH_TARGETS = ["backend", "agent"] as const;
+export type LocalAuthTarget = (typeof LOCAL_AUTH_TARGETS)[number];
+
+/**
+ * The complete capability surface the renderer may use.
+ *
+ * `getLocalAuthToken` (44-03) hands the renderer the SHORT-LIVED, audience-bound
+ * session token it needs to authenticate the SSE/HTTP transport to the local
+ * managed services. It is never a master credential: the HMAC secret, provider
+ * keys and the credential store stay main-owned, and the token expires in
+ * minutes and is only valid on the loopback service of its audience.
+ */
 export interface DesktopBridge {
   /** Current runtime status (one-shot pull). */
   getRuntimeStatus(): Promise<DesktopRuntimeStatus>;
@@ -103,4 +125,10 @@ export interface DesktopBridge {
   openExternalLink(url: string): Promise<OpenExternalLinkResult>;
   /** Subscribe to runtime status changes; returns an unsubscribe handle. */
   onRuntimeStatus(listener: RuntimeStatusListener): RuntimeStatusSubscription;
+  /**
+   * Short-lived audience-bound local session token for the requested service,
+   * or null when no active runtime session exists (fail closed). Never the HMAC
+   * secret and never a provider key.
+   */
+  getLocalAuthToken(target: LocalAuthTarget): Promise<string | null>;
 }

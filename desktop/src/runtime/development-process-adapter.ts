@@ -32,6 +32,15 @@ export interface DevelopmentPaths {
   nodeCommand?: string;
   /** Absolute docker executable. Defaults to "docker" (resolved from PATH by the OS). */
   dockerCommand?: string;
+  /**
+   * Main-owned local-auth HMAC secret source (44-03). Injected into the agent
+   * service environment as NOVELMIND_LOCAL_AUTH_SECRET at spawn so the agent
+   * service enforces audience/expiry-bound local session tokens on every
+   * inbound run request. The value is read at spawn time — the secret rotates
+   * on runtime restart and the next launch picks up the fresh secret. The
+   * secret itself never leaves the main process (T-44-02-01).
+   */
+  localAuthSecret?: () => string | null;
 }
 
 /** DevelopmentPaths after defaults have been applied. */
@@ -40,6 +49,7 @@ interface ResolvedDevelopmentPaths {
   backendPython: string | undefined;
   nodeCommand: string;
   dockerCommand: string;
+  localAuthSecret: (() => string | null) | undefined;
 }
 
 const DEV_AGENT_GATEWAY_TOKEN = "dev-agent-gateway-token-local";
@@ -61,6 +71,7 @@ export class DevelopmentProcessAdapter extends BaseProcessAdapter {
       backendPython: paths?.backendPython,
       nodeCommand: paths?.nodeCommand ?? "node",
       dockerCommand: paths?.dockerCommand ?? "docker",
+      localAuthSecret: paths?.localAuthSecret,
     };
   }
 
@@ -149,14 +160,23 @@ export class DevelopmentProcessAdapter extends BaseProcessAdapter {
       fastapiEndpoint !== null
         ? `http://${fastapiEndpoint.host}:${fastapiEndpoint.port}`
         : "http://127.0.0.1:8010"; // dev fallback default (Makefile)
+    const env: Record<string, string> = {
+      NOVELMIND_GATEWAY_TOKEN: DEV_AGENT_GATEWAY_TOKEN,
+      FASTAPI_BASE_URL: baseUrl,
+    };
+    const secret = this.paths.localAuthSecret?.() ?? null;
+    // Fail-closed local session auth (44-03): when main owns local-auth
+    // material, the agent service MUST verify the audience-bound session token
+    // on every inbound request. No secret → the agent service's guard rejects
+    // (its fail-closed default), so desktop runs are never unauthenticated.
+    if (secret !== null && secret !== "") {
+      env["NOVELMIND_LOCAL_AUTH_SECRET"] = secret;
+    }
     return {
       command: this.paths.nodeCommand,
       args: ["start.mjs"],
       cwd: path.join(this.paths.repoRoot, "agent-service"),
-      env: {
-        NOVELMIND_GATEWAY_TOKEN: DEV_AGENT_GATEWAY_TOKEN,
-        FASTAPI_BASE_URL: baseUrl,
-      },
+      env,
       portVia: { kind: "env", name: "PORT" },
       probe: { transport: "http", path: "/health" },
     };

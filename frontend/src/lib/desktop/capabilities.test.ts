@@ -29,6 +29,11 @@ function makeBridge(overrides: Partial<DesktopBridge> = {}): DesktopBridge {
       bridgeVersion: 1,
       features: ["desktop-shell"],
       runtime: null,
+      credentials: {
+        provider: "unavailable",
+        localAuth: "unavailable",
+        storageAvailable: false,
+      },
     }),
     openExternalLink: async (url) =>
       url.startsWith("https://") ? { ok: true } : { ok: false, code: "REJECTED", reason: "not https" },
@@ -38,6 +43,7 @@ function makeBridge(overrides: Partial<DesktopBridge> = {}): DesktopBridge {
         unsubscribe: () => window.clearInterval(id),
       };
     },
+    getLocalAuthToken: async (target) => (target === "agent" ? "sess-token" : "sess-token"),
     ...overrides,
   };
 }
@@ -102,6 +108,11 @@ describe("electron mode (bridge present)", () => {
         bridgeVersion: 1,
         features: ["desktop-shell"],
         runtime: null,
+        credentials: {
+          provider: "unavailable",
+          localAuth: "unavailable",
+          storageAvailable: false,
+        },
       },
     });
     await expect(desktopCapabilities.openExternalLink("https://example.com")).resolves.toEqual({
@@ -111,6 +122,17 @@ describe("electron mode (bridge present)", () => {
     await expect(desktopCapabilities.openExternalLink("javascript:alert(1)")).resolves.toEqual({
       supported: true,
       value: { ok: false, code: "REJECTED", reason: "not https" },
+    });
+    await expect(desktopCapabilities.getLocalAuthToken("agent")).resolves.toEqual({
+      supported: true,
+      value: "sess-token",
+    });
+  });
+
+  it("getLocalAuthToken degrades to unsupported when the bridge is absent", async () => {
+    await expect(desktopCapabilities.getLocalAuthToken("agent")).resolves.toEqual({
+      supported: false,
+      reason: "bridge-unavailable",
     });
   });
 

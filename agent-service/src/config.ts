@@ -20,6 +20,13 @@ export const config = Object.freeze({
   novelmindGatewayToken: requireEnv("NOVELMIND_GATEWAY_TOKEN"),
   /** HTTP listen port for the agent service. */
   port: Number(process.env.PORT ?? 3100),
+  /**
+   * Local session auth (44-02/44-03). The owning Electron main injects the HMAC
+   * secret via NOVELMIND_LOCAL_AUTH_SECRET. When configured, EVERY inbound run
+   * request must present an audience/expiry-bound session token (fail closed).
+   * Token values are never logged (V6 / T-44-02-01).
+   */
+  localAuthSecret: process.env.NOVELMIND_LOCAL_AUTH_SECRET ?? "",
   /** 问答按需分析（chat_backfill）queued-run poller 配置。 */
   pollEnabled: process.env.POLL_ENABLED !== "0",
   pollIntervalMs: Number(process.env.POLL_INTERVAL_MS ?? 2000),

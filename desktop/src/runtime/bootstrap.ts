@@ -118,6 +118,15 @@ export class RuntimeBootstrapProvider {
     this.cached = null;
   }
 
+  /**
+   * The session id of the currently served session, or null when none exists.
+   * Main uses this to bind local-auth tokens to the same runtime session the
+   * renderer dials (44-03): no session → tokens() fails closed (null).
+   */
+  currentSessionId(): string | null {
+    return this.cached?.session.sessionId ?? null;
+  }
+
   private isCurrent(cached: CachedSession, snapshot: RuntimeSnapshot): boolean {
     if (cached.startedAt !== (snapshot.startedAt ?? "")) return false;
     if (this.now().getTime() >= Date.parse(cached.session.expiresAt)) return false;

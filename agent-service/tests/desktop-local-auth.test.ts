@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   LOCAL_AUTH_AGENT_AUDIENCE,
   LOCAL_AUTH_ISSUER,
+  buildLocalAuthHeader,
   describeLocalAuth,
   extractEndUserToken,
   requireLocalSession,
@@ -177,5 +178,22 @@ describe("extractEndUserToken / describeLocalAuth", () => {
     const label = describeLocalAuth(true);
     expect(label).toBe("configured");
     expect(label).not.toContain(TEST_SECRET);
+  });
+});
+
+describe("buildLocalAuthHeader (44-03 transport header)", () => {
+  it("prepends the session token and keeps the end-user JWT (space-separated)", () => {
+    const header = buildLocalAuthHeader("end-user-jwt", "local-sess-token");
+    expect(header).toBe("Bearer local-sess-token end-user-jwt");
+  });
+
+  it("passes the end-user JWT through when no session token exists (browser mode)", () => {
+    expect(buildLocalAuthHeader("end-user-jwt", null)).toBe("Bearer end-user-jwt");
+    expect(buildLocalAuthHeader("end-user-jwt", "")).toBe("Bearer end-user-jwt");
+  });
+
+  it("returns an empty header when neither credential exists", () => {
+    expect(buildLocalAuthHeader(null, null)).toBe("");
+    expect(buildLocalAuthHeader("", "")).toBe("");
   });
 });

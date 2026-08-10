@@ -18,7 +18,7 @@
  * (bundled Node via ELECTRON_RUN_AS_NODE) is proven in
  * `desktop/proof/bundled-node-evidence.json`.
  */
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, safeStorage } from "electron";
 import type { IpcMainInvokeEvent } from "electron";
 import {
   DESKTOP_IPC_CHANNELS,
@@ -39,6 +39,10 @@ import { DevelopmentProcessAdapter } from "../runtime/development-process-adapte
 import { RuntimeBootstrapProvider } from "../runtime/bootstrap";
 import { nodeProcessOperations } from "../runtime/process-operations";
 import { RUNTIME_ERROR_CODES, RuntimeError } from "../runtime/types";
+import { DesktopLocalAuth } from "../security/local-auth";
+import { CredentialStore, type SafeStorage } from "../security/credential-store";
+import { buildAppDataPaths, nodeDataFs } from "../data/app-data-layout";
+import { randomBytes } from "node:crypto";
 
 /** Dev default until the managed runtime resolves the renderer. */
 const DEV_RENDERER_DEFAULT = "http://127.0.0.1:3000";
@@ -50,6 +54,20 @@ let resolvedRendererUrl: string | null = null;
 let ownedRuntime: DesktopRuntime | null = null;
 /** One-session bootstrap producer bound to the owned runtime (44-01). */
 let bootstrapProvider: RuntimeBootstrapProvider | null = null;
+/**
+ * Main-owned local session auth (44-02). Tokens are audience/expiry/session
+ * bound; the HMAC secret is injected into owned process environments and never
+ * leaves main (T-44-02-01). Rotates on runtime restart so a prior-session token
+ * is rejected (T-44-02-03).
+ */
+let localAuth: DesktopLocalAuth | null = null;
+/**
+ * Main-owned OS-protected credential store (44-02/44-03). Encrypted blobs live
+ * only under the app-data secrets root; the renderer receives ONLY the redacted
+ * status (provider/local-auth state strings), never a value (T-44-02-01).
+ * Lazily created after `app` ready (safeStorage requires it).
+ */
+let credentialStore: CredentialStore | null = null;
 
 /**
  * The local service orchestrator behind ONE runtime interface (D-43-02). Wave 1
@@ -60,7 +78,16 @@ let bootstrapProvider: RuntimeBootstrapProvider | null = null;
 function runtimeInstance(): DesktopRuntime {
   if (ownedRuntime === null) {
     ownedRuntime = new DesktopRuntime({
-      adapter: new DevelopmentProcessAdapter(nodeProcessOperations()),
+      // The adapter injects the main-owned local-auth HMAC secret into the
+      // agent service environment at spawn (44-03): with a secret configured the
+      // agent service enforces audience/expiry-bound local session tokens on
+      // every inbound run request. The backend middleware stays opt-in in this
+      // wave (injecting there would 401 the renderer's user-JWT calls and the
+      // readiness probe) — see 44-03-SUMMARY deviation.
+      adapter: new DevelopmentProcessAdapter(nodeProcessOperations(), undefined, {
+        repoRoot: process.cwd(),
+        localAuthSecret: () => localAuthSecret(),
+      }),
     });
   }
   return ownedRuntime;
@@ -73,6 +100,52 @@ function sessionBootstrapProvider(): RuntimeBootstrapProvider {
   }
   return bootstrapProvider;
 }
+
+/**
+ * Lazily-created local session auth (44-02). Tokens are bound to the current
+ * runtime bootstrap session id (null → no active session → tokens() fails
+ * closed). The HMAC secret is handed to the owned process adapter so the agent
+ * service verifies the audience/expiry-bound tokens.
+ */
+function localAuthInstance(): DesktopLocalAuth {
+  if (localAuth === null) {
+    localAuth = new DesktopLocalAuth({
+      sessionId: () => sessionBootstrapProvider().currentSessionId(),
+    });
+  }
+  return localAuth;
+}
+
+/** The current local-auth HMAC secret, or null when not yet initialized. */
+function localAuthSecret(): string | null {
+  return localAuth === null ? null : localAuth.secret();
+}
+
+/**
+ * Lazily-created OS-protected credential store (44-03 wiring). Uses Electron's
+ * async `safeStorage` (Windows DPAPI) with a stable session-scoped OS key id;
+ * the renderer only ever sees the redacted status.
+ */
+function credentialStoreInstance(): CredentialStore {
+  if (credentialStore === null) {
+    const paths = buildAppDataPaths({ userDataDir: app.getPath("userData") });
+    const storage: SafeStorage = {
+      isEncryptionAvailable: () => safeStorage.isEncryptionAvailable(),
+      currentKeyId: () => credentialKeyNonce,
+      encryptString: (plainText: string) => safeStorage.encryptString(plainText),
+      decryptString: (encrypted: Buffer) => safeStorage.decryptString(encrypted),
+    };
+    credentialStore = new CredentialStore({ paths, fs: nodeDataFs(), safeStorage: storage });
+  }
+  return credentialStore;
+}
+
+/**
+ * Per-process nonce identifying the safeStorage key in effect this session.
+ * A blob written in a prior app session is detected as `rotation_needed`
+ * (see credential-store SafeStorage contract).
+ */
+const credentialKeyNonce = randomBytes(16).toString("hex");
 
 function resolveRendererUrl(raw: string): string {
   if (raw === undefined || raw === "") return DEV_RENDERER_DEFAULT;
@@ -142,6 +215,7 @@ const capabilityHandlers: Record<string, BridgeHandler> = {
     bridgeVersion: 1,
     features: ["desktop-shell"],
     runtime: await sessionBootstrapProvider().get(),
+    credentials: await credentialStoreInstance().status(),
   }),
 
   [DESKTOP_IPC_CHANNELS.requestRuntimeRestart]: (): RestartRequestResult => {
@@ -152,6 +226,27 @@ const capabilityHandlers: Record<string, BridgeHandler> = {
     app.relaunch();
     app.exit(0);
     return { ok: true };
+  },
+
+  // 44-03 local-session token bridge: the renderer asks for a SHORT-LIVED,
+  // audience-bound token for the local agent service (the only consumer in this
+  // wave). Null is returned when no active runtime session exists — fail closed,
+  // never a token minted for a session-less runtime. The HMAC secret and the
+  // credential store stay main-owned; the renderer holds only this expiring
+  // session token, never a master credential (D-44-02/D-44-03).
+  [DESKTOP_IPC_CHANNELS.getLocalAuthToken]: (
+    _event: IpcMainInvokeEvent,
+    ...args: unknown[]
+  ): string | null => {
+    const target = args[0];
+    if (target !== "backend" && target !== "agent") {
+      // Unknown target (compromised renderer): fail closed with the typed
+      // session-less result rather than minting for an unspecified service.
+      return null;
+    }
+    const tokens = localAuthInstance().tokens();
+    if (tokens === null) return null;
+    return target === "agent" ? tokens.agent : tokens.backend;
   },
 
   // Explicit external-link capability: the URL is validated main-side (HTTPS
