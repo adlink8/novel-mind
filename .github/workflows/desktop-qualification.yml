@@ -1,0 +1,103 @@
+name: desktop-qualification-clean-vm
+
+# Phase 45-03 release-blocking UAT on a pristine Windows VM.
+#
+# GitHub Actions `windows-latest` runners are freshly provisioned Windows
+# VMs per job — the clean-machine evidence the local approximation cannot
+# provide (clean_vm=false in qualification-manifest.json blocks REQ-DESK-10).
+#
+# The packaged dist (win-unpacked + NSIS installer) is built locally with
+# pinned SHA-256 evidence (qualification-manifest.json) and uploaded to a
+# GitHub Release; this workflow downloads the SAME artifact (hash-gated) so
+# the clean-VM run exercises the shipped bits, not a rebuild (Next generates
+# a random BUILD_ID per build, so a runner rebuild could never match the
+# manifest hashes).
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "GitHub Release tag holding the packaged dist artifacts"
+        required: true
+        default: "desktop-uat-0.1.0"
+      require_all:
+        description: "Fail-closed: require every UAT row to pass"
+        type: boolean
+        default: true
+
+jobs:
+  qualify-clean-vm:
+    name: Packaged UAT on clean Windows VM
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      # The qualification harness needs @playwright/test + chromium. Skip the
+      # electron binary download (postinstall) — the UAT exercises the SHIPPED
+      # exe's embedded Node, not node_modules electron.
+      - name: Install desktop dev dependencies (no electron binary)
+        working-directory: desktop
+        run: npm ci --ignore-scripts
+
+      - name: Install Playwright chromium
+        working-directory: desktop
+        run: npx playwright install chromium
+
+      - name: Download packaged dist from release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "${{ github.event.inputs.release_tag }}" --pattern "win-unpacked.zip" --dir desktop/dist --clobber
+          gh release download "${{ github.event.inputs.release_tag }}" --pattern "NovelMind-Setup-0.1.0-x64.exe" --dir desktop/dist --clobber
+          gh release download "${{ github.event.inputs.release_tag }}" --pattern "NovelMind-Setup-0.1.0-x64.exe.blockmap" --dir desktop/dist --clobber
+
+      - name: Extract win-unpacked
+        working-directory: desktop/dist
+        run: |
+          if (Test-Path win-unpacked) { Remove-Item -Recurse -Force win-unpacked }
+          Expand-Archive -Path win-unpacked.zip -DestinationPath . -Force
+          Write-Host "unpacked files: $((Get-ChildItem -Recurse win-unpacked | Measure-Object).Count)"
+
+      - name: Verify artifact hashes match the qualification manifest
+        working-directory: desktop
+        shell: pwsh
+        run: |
+          $manifest = (Get-Content tests/fixtures/qualification-manifest.json -Raw | ConvertFrom-Json)
+          $exeHash = (Get-FileHash -Algorithm SHA256 "dist/win-unpacked/NovelMind.exe").Hash.ToLowerInvariant()
+          if ($exeHash -ne $manifest.artifact.unpacked.exe_sha256) {
+            Write-Error "exe hash $exeHash != manifest $($manifest.artifact.unpacked.exe_sha256)"
+            exit 1
+          }
+          $serverHash = (Get-FileHash -Algorithm SHA256 "dist/win-unpacked/resources/next-standalone/server.js").Hash.ToLowerInvariant()
+          if ($serverHash -ne $manifest.artifact.unpacked.server_js_sha256) {
+            Write-Error "server.js hash $serverHash != manifest $($manifest.artifact.unpacked.server_js_sha256)"
+            exit 1
+          }
+          Write-Host "artifact gate PASS (exe + server.js match manifest)"
+
+      # The qualification manifest records clean_vm=false (local approximation).
+      # On this runner the run happens on a pristine Windows VM; the results
+      # artifact records the real machine identity (runner OS) so the manifest
+      # can be truthfully updated to clean_vm=true afterwards.
+      - name: Run packaged qualification UAT (clean Windows VM, RequireAll)
+        shell: pwsh
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File desktop/tests/clean-vm/run-qualification.ps1 `
+            -Manifest desktop/tests/fixtures/qualification-manifest.json `
+            -RequireAll
+
+      - name: Upload UAT results + machine boundary evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: clean-vm-qualification-results
+          path: |
+            desktop/tests/clean-vm/results/
+          if-no-files-found: error
