@@ -31,7 +31,11 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 60
     steps:
+      # The workflow file must live on the default branch for dispatch, but the
+      # code + packaged dist live on the feat/sync branch — checkout that ref.
       - uses: actions/checkout@v4
+        with:
+          ref: feat/sync-phase25.2-40-to-master
 
       - uses: actions/setup-node@v4
         with:
