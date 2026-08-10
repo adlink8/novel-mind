@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 import { AuthGate } from "@/components/auth-gate";
 import { AppShell } from "@/components/app-shell";
 import { AppThemeSync } from "@/components/app-theme-sync";
+import { RuntimeGate } from "@/components/desktop/RuntimeGate";
 import { THEME_BOOT_SCRIPT } from "@/components/reader/reader-preferences";
 
 export const metadata: Metadata = {
@@ -49,7 +50,13 @@ export default function RootLayout({
       </head>
       <body className="min-h-screen bg-background font-sans antialiased">
         <AppThemeSync />
-        <AuthGate><AppShell>{children}</AppShell></AuthGate>
+        <AuthGate>
+          <AppShell>
+            {/* Phase 43-04: desktop runtime gate — product routes render only when the
+                runtime is ready; browser mode degrades to plain children. */}
+            <RuntimeGate>{children}</RuntimeGate>
+          </AppShell>
+        </AuthGate>
       </body>
     </html>
   );
