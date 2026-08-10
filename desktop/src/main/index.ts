@@ -34,20 +34,65 @@ import {
   unregisterBridgeIpcHandlers,
   type BridgeHandler,
 } from "./ipc/register";
+import { DesktopRuntime } from "../runtime/desktop-runtime";
+import { DevelopmentProcessAdapter } from "../runtime/development-process-adapter";
+import { nodeProcessOperations } from "../runtime/process-operations";
+import { RUNTIME_ERROR_CODES, RuntimeError } from "../runtime/types";
 
-/** Dev default until Phase 43 wires the local service orchestrator. */
+/** Dev default until the managed runtime resolves the renderer. */
 const DEV_RENDERER_DEFAULT = "http://127.0.0.1:3000";
 
 let mainWindow: BrowserWindow | null = null;
 let shellReady = false;
+let resolvedRendererUrl: string | null = null;
+/** The runtime instance this process created (owned for shutdown). */
+let ownedRuntime: DesktopRuntime | null = null;
 
-function resolveRendererUrl(): string {
-  const raw = process.env.NOVELMIND_RENDERER_URL;
+/**
+ * The local service orchestrator behind ONE runtime interface (D-43-02). Wave 1
+ * (plan 43-02) wires the development adapter so the graph and readiness are
+ * exercised end-to-end; the packaged adapter replaces it when the bundled
+ * runtimes land in a later plan.
+ */
+function runtimeInstance(): DesktopRuntime {
+  if (ownedRuntime === null) {
+    ownedRuntime = new DesktopRuntime({
+      adapter: new DevelopmentProcessAdapter(nodeProcessOperations()),
+    });
+  }
+  return ownedRuntime;
+}
+
+function resolveRendererUrl(raw: string): string {
   if (raw === undefined || raw === "") return DEV_RENDERER_DEFAULT;
   if (!isApprovedAppUrl(raw)) {
     throw new Error(`NOVELMIND_RENDERER_URL must be a loopback http origin (got "${raw}")`);
   }
   return raw;
+}
+
+/**
+ * Resolves the renderer URL through the managed runtime when no explicit
+ * override is given. The env override is kept for hermetic shell tests and
+ * explicit dev tunnels; otherwise the next endpoint comes from the runtime
+ * snapshot — never a hard-coded port, never ready-with-a-failed-dependency.
+ */
+async function ensureRendererUrl(): Promise<string> {
+  const explicit = process.env.NOVELMIND_RENDERER_URL;
+  if (explicit !== undefined && explicit !== "") {
+    return resolveRendererUrl(explicit);
+  }
+  const snapshot = await runtimeInstance().ensureReady();
+  const next = snapshot.components.find((c) => c.id === "next");
+  if (snapshot.ready && next !== undefined && next.ready && next.endpoint !== null) {
+    const url = `http://${next.endpoint.host}:${next.endpoint.port}`;
+    if (isApprovedAppUrl(url)) return url;
+  }
+  // Never render the shell against an unready runtime (D-43-09).
+  throw new RuntimeError(
+    RUNTIME_ERROR_CODES.READY_INVARIANT_VIOLATION,
+    "renderer requires a fully ready runtime graph",
+  );
 }
 
 function currentSecurityPosture(): DesktopRuntimeStatus["security"] {
@@ -104,8 +149,9 @@ const capabilityHandlers: Record<string, BridgeHandler> = {
   ): Promise<OpenExternalLinkResult> => openExternalLink(typeof args[0] === "string" ? args[0] : ""),
 };
 
-app.whenReady().then(() => {
-  const rendererUrl = resolveRendererUrl();
+app.whenReady().then(async () => {
+  const rendererUrl = await ensureRendererUrl();
+  resolvedRendererUrl = rendererUrl;
   mainWindow = createMainWindow({ rendererUrl });
 
   // D-42-05: all bridge IPC flows through the sender/schema-validating
@@ -124,13 +170,18 @@ app.whenReady().then(() => {
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {
-      mainWindow = createMainWindow({ rendererUrl });
+      mainWindow = createMainWindow({ rendererUrl: resolvedRendererUrl ?? rendererUrl });
     }
   });
 });
 
 app.on("will-quit", () => {
   unregisterBridgeIpcHandlers();
+  // Owned runtime shutdown is best-effort on quit (D-43-07): never block exit
+  // on a slow drain, but give the owned tree a chance to terminate cleanly.
+  if (ownedRuntime !== null) {
+    void ownedRuntime.shutdown().catch(() => undefined);
+  }
 });
 
 app.on("window-all-closed", () => {

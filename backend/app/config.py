@@ -38,8 +38,7 @@ class Settings(BaseSettings):
         "http://127.0.0.1:3004",
         "http://127.0.0.1:3005",
         # Cloudflare Tunnel 公网域名（登录 Cookie / CSRF Origin 校验需要）
-        "https://novelmind.shuoyan.me",
-        "https://novelmind-api.shuoyan.me",
+        # 生产域名通过环境变量 NOVELMIND_CORS_ORIGINS 覆盖，此处仅保留开发来源
     ]
 
     # ── 数据库 ──
@@ -62,8 +61,8 @@ class Settings(BaseSettings):
     # Google Cloud Vertex AI（gcloud token，非 AI Studio 免费 key）
     gcp_project: str = "project-c5cbd608-1b00-454e-80f"
     gcp_location: str = "us-central1"
-    gcp_sdk_root: str = r"C:\Users\li\google-cloud-sdk"
-    gcp_sdk_py: str = r"C:\Users\li\google-cloud-sdk\lib\gcloud.py"
+    gcp_sdk_root: str = ""  # 留空；Vertex 集成需要时通过 NOVELMIND_GCP_SDK_ROOT 配置
+    gcp_sdk_py: str = ""  # 留空；Vertex 集成需要时通过 NOVELMIND_GCP_SDK_PY 配置
     vertex_model: str = "gemini-3.5-flash-lite"
     # 访问 Vertex/Google API 的出站代理（国内环境常需；留空则读 HTTPS_PROXY 环境变量）
     https_proxy: str = ""
@@ -77,6 +76,10 @@ class Settings(BaseSettings):
 
     # ── 文件存储 ──
     upload_dir: str = "./uploads"  # 小说上传文件存储目录
+    # 插图/衍生资产等「生成物」存储根目录。留空时服务回退到 CWD 下的 "storage"
+    # （保持现有行为）；打包桌面模式通过 NOVELMIND_STORAGE_DIR 重定向到
+    # %APPDATA%/NovelMind/data/storage，避免生成物写入安装目录。
+    storage_dir: str = ""
     max_upload_size: int = 50 * 1024 * 1024  # 最大上传大小: 50MB
     streaming_threshold: int = (
         5 * 1024 * 1024

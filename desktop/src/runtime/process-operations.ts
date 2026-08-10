@@ -13,7 +13,8 @@
  */
 import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync } from "node:fs";
-import { createConnection, createServer } from "node:net";
+import { createConnection } from "node:net";
+import { allocateLoopbackPort } from "./port-allocator";
 
 export interface SpawnedProcess {
   readonly pid: number;
@@ -139,21 +140,9 @@ export function nodeProcessOperations(): ProcessOperations {
         });
       }),
 
-    allocateLoopbackPort: () =>
-      new Promise<number>((resolve, reject) => {
-        const server = createServer();
-        server.once("error", reject);
-        server.listen(0, "127.0.0.1", () => {
-          const address = server.address();
-          server.close(() => {
-            if (address === null || typeof address === "string") {
-              reject(new Error("failed to allocate loopback port"));
-            } else {
-              resolve(address.port);
-            }
-          });
-        });
-      }),
+    // Delegate to the canonical port allocator (plan 43-02): OS-allocated
+    // loopback port, fixed ports rejected by construction.
+    allocateLoopbackPort: () => allocateLoopbackPort(),
 
     sleep: (ms) => new Promise<void>((resolve) => setTimeout(resolve, ms)),
   };

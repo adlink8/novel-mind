@@ -120,11 +120,25 @@ export class DevelopmentProcessAdapter extends BaseProcessAdapter {
   }
 
   private fastapiLaunch(): ComponentLaunch {
+    const pgEndpoint = this.endpoint("postgres_pgvector");
+    const vectorEndpoint = this.endpoint("vector_store");
+    const env: Record<string, string> = {};
+    if (pgEndpoint !== null) {
+      // Dynamic DB URL injected into the backend (config.py NOVELMIND_ prefix).
+      env["NOVELMIND_DATABASE_URL"] =
+        `postgresql+asyncpg://novelmind:novelmind@${pgEndpoint.host}:${pgEndpoint.port}/novelmind`;
+    }
+    if (vectorEndpoint !== null) {
+      // Dynamic Chroma host/port injected (vector_store.py env channel, 43-02).
+      env["NOVELMIND_VECTOR_HOST"] = vectorEndpoint.host;
+      env["NOVELMIND_VECTOR_PORT"] = String(vectorEndpoint.port);
+    }
     return {
       command: this.resolveBackendPython(),
       args: ["-m", "uvicorn", "app.main:app", "--host", "127.0.0.1"],
       portVia: { kind: "arg", flag: "--port" },
       cwd: path.join(this.paths.repoRoot, "backend"),
+      env,
       probe: { transport: "http", path: "/health" },
     };
   }
