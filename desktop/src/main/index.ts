@@ -42,7 +42,9 @@ import { RUNTIME_ERROR_CODES, RuntimeError } from "../runtime/types";
 import { DesktopLocalAuth } from "../security/local-auth";
 import { CredentialStore, type SafeStorage } from "../security/credential-store";
 import { buildAppDataPaths, nodeDataFs } from "../data/app-data-layout";
+import { enforceSingleInstance } from "./single-instance";
 import { randomBytes } from "node:crypto";
+import path from "node:path";
 
 /** Dev default until the managed runtime resolves the renderer. */
 const DEV_RENDERER_DEFAULT = "http://127.0.0.1:3000";
@@ -62,12 +64,35 @@ let bootstrapProvider: RuntimeBootstrapProvider | null = null;
  */
 let localAuth: DesktopLocalAuth | null = null;
 /**
- * Main-owned OS-protected credential store (44-02/44-03). Encrypted blobs live
+ * Lazily-created OS-protected credential store (44-02/44-03). Encrypted blobs live
  * only under the app-data secrets root; the renderer receives ONLY the redacted
  * status (provider/local-auth state strings), never a value (T-44-02-01).
  * Lazily created after `app` ready (safeStorage requires it).
  */
 let credentialStore: CredentialStore | null = null;
+
+/**
+ * Single-instance enforcement (45-01, D-45-02 / T-45-01-02) runs at module load,
+ * BEFORE any runtime graph or window exists. The lock is scoped to the app's
+ * userData directory, so a duplicate launch (same `%APPDATA%/NovelMind`) routes
+ * its intent to the existing window and exits without starting a second runtime
+ * graph.
+ *
+ * Test seam: NOVELMIND_USER_DATA overrides the userData root (mirrors
+ * `defaultAppDataRoot` in app-data-layout.ts) so the process-behavior suite can
+ * run deterministic isolated instances. It is set before the lock is requested,
+ * so the lock is correctly scoped to the overridden root.
+ */
+const userDataOverride = process.env.NOVELMIND_USER_DATA;
+if (userDataOverride !== undefined && userDataOverride !== "") {
+  app.setPath("userData", path.resolve(userDataOverride));
+}
+
+const singleInstance = enforceSingleInstance({ getMainWindow: () => mainWindow });
+if (!singleInstance.isPrimary) {
+  // A NovelMind instance is already running — exit immediately, no runtime, no window.
+  app.exit(0);
+}
 
 /**
  * The local service orchestrator behind ONE runtime interface (D-43-02). Wave 1
@@ -128,7 +153,13 @@ function localAuthSecret(): string | null {
  */
 function credentialStoreInstance(): CredentialStore {
   if (credentialStore === null) {
-    const paths = buildAppDataPaths({ userDataDir: app.getPath("userData") });
+    const paths = buildAppDataPaths({
+      userDataDir: app.getPath("userData"),
+      // Packaged mode: the installed (immutable) resources are the directory of
+      // the running exe. Passing installRoot makes the layout constructor fail
+      // closed if app-data ever overlaps the installation (D-45-03, D-43-05).
+      installRoot: app.isPackaged ? path.dirname(process.execPath) : undefined,
+    });
     const storage: SafeStorage = {
       isEncryptionAvailable: () => safeStorage.isEncryptionAvailable(),
       currentKeyId: () => credentialKeyNonce,
