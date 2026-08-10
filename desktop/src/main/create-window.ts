@@ -5,11 +5,16 @@
  * `contextIsolation`, `sandbox`, no node integration, `webSecurity` enabled,
  * and it only ever loads the approved local loopback app origin. Unapproved
  * navigation, redirects, popups, webviews, downloads and permission requests
- * are denied by default (D-42-03).
+ * are denied by default (D-42-03). The production CSP is injected on the
+ * session at window creation (D-42-07).
  */
 import { BrowserWindow } from "electron";
 import path from "node:path";
 import type { DesktopSecurityPosture } from "../shared/bridge-contract";
+import { isApprovedAppUrl } from "./security/approved-origin";
+import { applyCspToSession } from "./security/csp";
+import { applyNavigationPolicy } from "./security/navigation";
+import { applyPermissionPolicy } from "./security/permissions";
 
 /**
  * The security baseline every production window is created with (D-42-02).
@@ -42,20 +47,10 @@ export function securityPostureFor(win: BrowserWindow): DesktopSecurityPosture {
 
 /**
  * The only origin a production window may load or navigate to: loopback HTTP
- * (`127.0.0.1`, `localhost`, `[::1]`) on any port. Ports stay dynamic until
- * Phase 43 pins the packaged origin (D-41-05 dynamic-port contract).
+ * (`127.0.0.1`, `localhost`, `[::1]`) on any port. Delegates to the shared
+ * security/approved-origin predicate.
  */
-export function isApprovedAppUrl(raw: string): boolean {
-  let url: URL;
-  try {
-    url = new URL(raw);
-  } catch {
-    return false;
-  }
-  if (url.protocol !== "http:") return false;
-  const host = url.hostname;
-  return host === "127.0.0.1" || host === "localhost" || host === "::1";
-}
+export { isApprovedAppUrl } from "./security/approved-origin";
 
 export interface CreateMainWindowOptions {
   rendererUrl: string;
@@ -91,26 +86,14 @@ export function createMainWindow(opts: CreateMainWindowOptions): BrowserWindow {
 
   const ses = win.webContents.session;
 
-  // No permission requests (camera/mic/geolocation/notifications/...) are granted.
-  ses.setPermissionRequestHandler((_wc, _permission, callback) => callback(false));
-  ses.setPermissionCheckHandler(() => false);
+  // Deny-by-default permission policy (D-42-03).
+  applyPermissionPolicy(ses);
 
-  // Popups / new windows are denied (D-42-03).
-  win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+  // Popups, webviews, navigation, redirects and downloads denied by default (D-42-03).
+  applyNavigationPolicy(win);
 
-  // <webview> embedding is denied.
-  win.webContents.on("will-attach-webview", (event) => event.preventDefault());
-
-  // Hard navigation and redirects are only allowed within the approved loopback origin.
-  win.webContents.on("will-navigate", (event, targetUrl) => {
-    if (!isApprovedAppUrl(targetUrl)) event.preventDefault();
-  });
-  win.webContents.on("will-redirect", (event, targetUrl) => {
-    if (!isApprovedAppUrl(targetUrl)) event.preventDefault();
-  });
-
-  // Downloads are denied (D-42-03).
-  ses.on("will-download", (event) => event.preventDefault());
+  // Production CSP injected on approved-origin responses (D-42-07).
+  applyCspToSession(ses);
 
   void win.loadURL(opts.rendererUrl);
   return win;

@@ -12,7 +12,7 @@
  * - main process: full import — the main process is unsandboxed.
  *
  * Security contract (T-42-01-01 / T-42-01-02):
- * - Exactly four capabilities, one typed method per capability. No generic
+ * - Exactly five capabilities, one typed method per capability. No generic
  *   send/invoke/on surface, no filesystem, shell, environment or process
  *   objects are ever exposed.
  * - The bootstrap payload carries no secrets, paths or process details.
@@ -33,6 +33,7 @@ export const DESKTOP_IPC_CHANNELS = {
   requestRuntimeRestart: "bridge:requestRuntimeRestart",
   getBootstrap: "bridge:getBootstrap",
   runtimeStatusChanged: "bridge:runtimeStatusChanged",
+  openExternalLink: "bridge:openExternalLink",
 } as const;
 
 /** Effective BrowserWindow security posture reported to the renderer. */
@@ -69,6 +70,14 @@ export type RestartRequestResult =
   | { ok: true }
   | { ok: false; reason: "not-ready" | "denied" };
 
+/**
+ * Result of an explicit external-link request. The failure payload carries a
+ * stable redacted code — never a URL, path or environment detail.
+ */
+export type OpenExternalLinkResult =
+  | { ok: true }
+  | { ok: false; code: string; reason: string };
+
 /** Subscription handle returned by `onRuntimeStatus`. */
 export interface RuntimeStatusSubscription {
   unsubscribe: () => void;
@@ -84,6 +93,8 @@ export interface DesktopBridge {
   requestRuntimeRestart(): Promise<RestartRequestResult>;
   /** Minimal startup payload for the renderer. */
   getBootstrap(): Promise<DesktopBootstrap>;
+  /** Open a validated external HTTPS link in the OS default browser. */
+  openExternalLink(url: string): Promise<OpenExternalLinkResult>;
   /** Subscribe to runtime status changes; returns an unsubscribe handle. */
   onRuntimeStatus(listener: RuntimeStatusListener): RuntimeStatusSubscription;
 }

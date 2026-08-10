@@ -5,7 +5,7 @@
  * Sandbox contract:
  * - The BrowserWindow runs `sandbox: true` + `contextIsolation: true` +
  *   `nodeIntegration: false` (see src/main/create-window.ts).
- * - Exposes exactly the four DesktopBridge capabilities. No `ipcRenderer`, no
+ * - Exposes exactly the five DesktopBridge capabilities. No `ipcRenderer`, no
  *   filesystem, shell, env or process object ever crosses the boundary.
  * - This file must stay SELF-CONTAINED: a sandboxed preload cannot `require`
  *   local modules at runtime, so runtime values are inlined below and the
@@ -17,6 +17,7 @@ import type {
   DesktopBridge,
   DesktopBootstrap,
   DesktopRuntimeStatus,
+  OpenExternalLinkResult,
   RestartRequestResult,
   RuntimeStatusListener,
 } from "../shared/bridge-contract";
@@ -31,6 +32,7 @@ const CHANNELS = {
   requestRuntimeRestart: "bridge:requestRuntimeRestart",
   getBootstrap: "bridge:getBootstrap",
   runtimeStatusChanged: "bridge:runtimeStatusChanged",
+  openExternalLink: "bridge:openExternalLink",
 } as const;
 
 /** MUST MATCH `DESKTOP_BRIDGE_KEY` in the shared contract. */
@@ -45,6 +47,9 @@ const bridge: DesktopBridge = {
 
   getBootstrap: (): Promise<DesktopBootstrap> =>
     ipcRenderer.invoke(CHANNELS.getBootstrap),
+
+  openExternalLink: (url: string): Promise<OpenExternalLinkResult> =>
+    ipcRenderer.invoke(CHANNELS.openExternalLink, url),
 
   onRuntimeStatus(listener: RuntimeStatusListener) {
     const handler = (_event: IpcRendererEvent, status: DesktopRuntimeStatus): void => {
