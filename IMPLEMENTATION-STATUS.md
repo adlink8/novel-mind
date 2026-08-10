@@ -452,3 +452,28 @@ Key metrics:
 | agent-service | **1039 passed**；tsc 0 errors | `cd agent-service && npx vitest run` |
 | 前端 | **460 passed** | `cd frontend && npm test` |
 | 仍阻塞 | Phase 22 Nightly 3/3 未达成（0/3，最终发布门唯一未验证项） | `.planning/STATE.md` |
+
+---
+
+## 2026-08-11 快照（v1.5 Windows 桌面收口：证据级验证，非 release-ready；snapshot: HEAD d6bbb05 + 45-01/45-02/45-03）
+
+以下为 v1.5 桌面（Phase 41–45）的诚实收口记录。verdict 由
+`desktop/scripts/verify-release-evidence.ps1 -RequireAll` 基于校验和绑定的证据计算，
+`releaseReady=false`。**不得**将下述任何一项描述为已签署/已发布/clean-VM 通过。
+
+| 项 | 状态 | 证据 |
+|---|---|---|
+| v1.5 桌面收口 verdict | **release-blocked（releaseReady=false）**：仅在证据支持层级完成收口；clean-VM 缺失（D-45-07/D-45-09）使 REQ-DESK-10 保持发布阻塞 | `.planning/phases/45-windows-packaging-migration-and-desktop-qualification/45-VERIFICATION.md`（verifier 两遍 PASS + 删证据即 FAIL 的篡改测试） |
+| Windows 打包链 | **VERIFIED**：win-unpacked + NSIS 安装包，可复现构建（staged 1440 文件两遍一致），single-instance、无控制台、数据保留卸载；artifact 哈希与 manifest/CHECKSUMS 一致 | `desktop/dist/CHECKSUMS.SHA256` 3/3；45-01-SUMMARY.md；package 套件 21/21 |
+| 升级/恢复/卸载 | **VERIFIED**：备份优先可逆升级事务 + 默认数据保留卸载，fixture 校验和绑定；update 套件 23/23（两遍） | 45-02-SUMMARY.md |
+| 打包 UAT（本机近似） | **32/32 PASS**（win-unpacked 与 NSIS 安装版；`-RequireAll` 同）；13/13 路由、离线/杀服务 fail-closed、数据留存；**clean_vm=false，非 pristine-VM 证据** | 45-UAT.md + `desktop/tests/clean-vm/results/` |
+| Electron 安全负面审计 | **VERIFIED**：打包 release-security 套件 **17/17**（webPreferences 实读、CSP/导航/窗口/权限 deny-by-default、伪造 sender、未知/畸形/超大 payload、local-auth replay、脱敏、外部加载），dev IPC/policy 21/21 + credential/local-auth 16/16，合计 **54/54** | `.planning/phases/45-windows-packaging-migration-and-desktop-qualification/45-SECURITY.md` |
+| SBOM/证据完整性 | **VERIFIED**：`desktop/scripts/generate-sbom.ps1 -Verify` **12/12 PASS 两遍无漂移**；`runtime-manifest.json` 哈希 `cb8fa6c9…` 与 41-DECISION 一致（41 NO-GO 证据未被篡改）；staged 逐文件 re-hash 1440/34019789 字节；secret 扫描 0；记录 `unsigned=true` | `desktop/dist/release-sbom.json` |
+| 41 NO-GO 边界 | **未翻案**：41-DECISION 保持 NO-GO；仅打包已证明运行时（Electron 43.3.0 + embedded Node v24.18.1 + Next standalone）；Python/FastAPI、PostgreSQL/pgvector、vector store **未捆绑**（PREREQ-2/3/4，post-45），打包应用除 `next` 外全部 fail-closed | 41-DECISION.md + `desktop/dist/bundled-inventory.json` |
+| main 进程接线 | **未完成（post-45 前置）**：`PackagedProcessAdapter` 未接入 main 启动；UAT/安全套件经 `NOVELMIND_RENDERER_URL` seam 加载打包渲染器（同一机制） | 45-01/43-01/44-03 摘要 + 45-UAT.md Known Stubs |
+| 代码签名/发布 | **外部门（D-45-06）**：artifact 未签名（`signAndEditExecutable=false`），无 publish 段；证书获取与发布需显式授权，未执行 | electron-builder.yml + 45-SECURITY.md |
+| 仍阻塞 | Phase 22 Nightly 3/3 未达成（0/3，最终发布门唯一未验证项）；**pristine clean-VM 执行缺失（REQ-DESK-10 发布阻塞，D-45-07/D-45-09）** | `.planning/STATE.md` + 45-VERIFICATION.md |
+
+结论：v1.5 桌面在证据支持的层级收口（打包、升级、UAT 近似、安全负面、SBOM 全部通过并有
+校验和绑定证据），但**不是 release-ready**：clean-VM、签名/发布、bundled Python/PG/vector、
+main 进程打包适配器接线均为未满足的外部门或 post-45 前置，Phase 22 保持独立 0/3。

@@ -173,7 +173,17 @@ test("approved bridge calls return only schema-declared data", async () => {
     "ready",
     "security",
   ]);
-  expect(status.bootstrap).toEqual({ appVersion: "0.1.0", bridgeVersion: 1, features: ["desktop-shell"] });
+  expect(status.bootstrap).toEqual({
+    appVersion: "0.1.0",
+    bridgeVersion: 1,
+    features: ["desktop-shell"],
+    runtime: expect.anything(),
+    credentials: expect.objectContaining({
+      provider: expect.any(String),
+      localAuth: expect.any(String),
+      storageAvailable: expect.any(Boolean),
+    }),
+  });
   expect(Object.keys(status.status)).not.toContain("code");
 });
 
