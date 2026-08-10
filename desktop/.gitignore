@@ -1,0 +1,5 @@
+# Generated / dependency artifacts (never commit)
+node_modules/
+dist/
+test-results/
+playwright-report/

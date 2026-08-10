@@ -1,0 +1,23 @@
+{
+  "name": "novel-mind-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "NovelMind production Electron shell — secure main/preload/renderer boundary hosting the existing Next renderer (Phase 42, Plan 42-01).",
+  "main": "dist/main/index.js",
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "start": "npm run build && electron .",
+    "test:smoke": "playwright test tests/shell-smoke.spec.ts"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.61.1",
+    "@types/node": "^22.19.0",
+    "electron": "^43.3.0",
+    "electron-builder": "^26.15.3",
+    "typescript": "^5.9.3"
+  }
+}
