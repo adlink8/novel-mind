@@ -46,14 +46,64 @@ NovelMind 是一个 AI 辅助小说理解与同人创作平台：导入长篇 TX
 - UI 验收：登录、工作台、书架、评测和设置已在 1280px 桌面与 390px 移动端浏览器验证，无控制台错误
 - GSD：`.planning/` 是唯一 AI 状态目录；v0.3 当前为 gaps_found，评测质量闭环仍在验收
 
+## Agent Runtime & Security
+
+NovelMind includes an embedded, permissioned Agent/Skill runtime built around Pi SDK packages. The runtime is intentionally separated from deterministic application authority: the agent can orchestrate approved operations, but it is not treated as a source of truth, database administrator, or unrestricted coding agent.
+
+### Current trust boundary
+
+```text
+Next.js UI
+   │
+   ▼
+Node Agent Service (Pi SDK)
+   │  per-run auth / policy / budgets
+   ▼
+Allowlisted NovelMind domain tools
+   │
+   ▼
+FastAPI application authority
+   │
+   ├── ownership / authorization
+   ├── spoiler & evidence boundaries
+   └── PostgreSQL / pgvector / narrative memory
+```
+
+The current runtime exposes **7 read-only domain tools**:
+
+- `get_novel`
+- `get_chapter`
+- `search_novel_text`
+- `get_timeline`
+- `get_relationships`
+- `get_clues`
+- `get_narrative_memory`
+
+Security is designed to fail closed:
+
+- Pi default coding capabilities such as shell execution, arbitrary command execution, and general file editing are disabled in the current runtime.
+- Agent tools come from a single explicit allowlist; unknown tools are not exposed automatically.
+- Skill definitions must declare allowed tools, read/write permissions, budgets, approval requirements, and input/output schemas before loading.
+- Ambient/global Skill discovery is disabled; only project-controlled Skills are loaded.
+- Authorization, resource ownership, spoiler cutoffs, budgets, timeouts, and output limits remain enforced by the FastAPI side rather than trusted to model behavior.
+- Third-party Pi packages and future MCP integrations are expected to use explicit qualification, exact version/SHA pinning, permission manifests, controlled registration, and allowlists.
+- Higher-impact write capabilities are intentionally deferred and require explicit review/approval boundaries before they can be introduced.
+
+Because imported novels, retrieved evidence, model output, packages, and future external tools can all be untrusted inputs, the security model specifically treats **prompt injection, SSRF/unauthorized egress, secret leakage, authorization/tool-boundary bypass, dependency supply-chain compromise, and unsafe MCP/package registration** as high-value threat classes.
+
+See [SECURITY.md](SECURITY.md) for the vulnerability reporting process, trust model, in-scope vulnerability classes, and disclosure policy.
+
 ## Repository Layout
 
 ```text
 novel-mind/
+├── agent-service/        Pi SDK Agent/Skill runtime、工具注册与安全治理
 ├── backend/              FastAPI、ORM、迁移和测试
 ├── frontend/             Next.js 应用和前端测试
 ├── docs/                 面向维护者的工程与产品文档（含展示图片）
 ├── .planning/            AI 规划、状态和任务文档（GSD 工作流）
+├── SECURITY.md           安全模型、漏洞报告与披露策略
+├── LICENSE               MIT License
 ├── docker-compose.yml    PostgreSQL 和 Chroma 开发服务
 └── IMPLEMENTATION-STATUS.md
 ```
