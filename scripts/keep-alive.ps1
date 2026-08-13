@@ -3,13 +3,9 @@
 # Backend uses 8010 to avoid conflict with other tools (e.g. rag-api) on :8000.
 
 $ErrorActionPreference = "Continue"
-# Prefer the repo that contains this script; fall back only if incomplete.
+# 只从脚本所在位置推导仓库根目录（已移除硬编码本机路径，仓库公开可读）
 $Root = Split-Path $PSScriptRoot -Parent
-$CandidateRoots = @(
-    $Root,
-    "D:\ADLINK\Myproject\novel-mind",
-    "C:\Users\li\Desktop\Myproject\novel-mind"
-) | Select-Object -Unique
+$CandidateRoots = @($Root) | Select-Object -Unique
 
 function Resolve-BackendPython([string]$RepoRoot) {
     foreach ($rel in @("backend\.venv\Scripts\python.exe", "backend\venv\Scripts\python.exe")) {

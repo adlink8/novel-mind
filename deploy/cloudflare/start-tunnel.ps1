@@ -5,7 +5,6 @@ $cf = "$env:USERPROFILE\.cloudflared\bin\cloudflared.exe"
 $config = "$env:USERPROFILE\.cloudflared\config.novelmind-win.yml"
 if (-not (Test-Path $cf)) { throw "cloudflared not found: $cf" }
 if (-not (Test-Path $config)) { throw "config not found: $config" }
-Write-Host "Starting tunnel novelmind-win ..."
-Write-Host "  https://novelmind.shuoyan.me      -> 127.0.0.1:3005"
-Write-Host "  https://novelmind-api.shuoyan.me  -> 127.0.0.1:8010"
+# 隧道入口域名取自本地 config（不硬编码到仓库）
+Write-Host "Starting tunnel (config: $config) ..."
 & $cf tunnel --config $config run novelmind-win
