@@ -18,6 +18,7 @@ AI 模型配置 API 路由
 """
 
 import time
+import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -31,10 +32,27 @@ from app.schemas.ai_model import (
     AIModelConfigCreate,
     AIModelConfigUpdate,
     AIModelConfigResponse,
+    AIModelDiscoveryItem,
+    AIModelDiscoveryRequest,
+    AIModelDiscoveryResponse,
+    AIModelProviderProfile,
     AIModelTestResponse,
+)
+from app.services.provider_catalog import (
+    build_catalog_request,
+    canonical_provider,
+    normalize_catalog_response,
+    provider_profiles,
 )
 
 router = APIRouter()
+
+
+@router.get("/providers", response_model=list[AIModelProviderProfile])
+async def list_model_providers(current_user: User = Depends(require_user)):
+    """返回设置页支持的供应商协议；不包含任何用户凭据。"""
+    del current_user
+    return [AIModelProviderProfile(**item) for item in provider_profiles()]
 
 
 def _owned_model_query(model_id: int, current_user: User):
@@ -95,6 +113,45 @@ async def list_models(
     result = await db.execute(query.order_by(AIModelConfig.created_at.desc()))
     models = list(result.scalars().all())
     return [AIModelConfigResponse.model_validate(m) for m in models]
+
+
+@router.post("/discover", response_model=AIModelDiscoveryResponse)
+async def discover_models(
+    data: AIModelDiscoveryRequest,
+    current_user: User = Depends(require_user),
+):
+    """从经 SSRF 校验的提供商 URL 获取模型目录；密钥只用于本次请求。"""
+    del current_user  # 身份仅用于认证；发现结果不跨用户持久化。
+    try:
+        canonical_provider(data.provider)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail="不支持的模型提供商") from exc
+    base_url = await validate_ai_base_url(data.base_url)
+    if not base_url:
+        raise HTTPException(status_code=400, detail="模型发现需要 Base URL")
+
+    request_spec = build_catalog_request(
+        data.provider,
+        base_url=base_url,
+        api_key=data.api_key,
+    )
+    try:
+        async with httpx.AsyncClient(timeout=15.0, follow_redirects=False) as client:
+            response = await client.get(
+                request_spec.url,
+                headers=request_spec.headers,
+            )
+            response.raise_for_status()
+            models = [
+                AIModelDiscoveryItem(**item)
+                for item in normalize_catalog_response(data.provider, response.json())
+            ]
+    except (httpx.HTTPError, ValueError) as exc:
+        raise HTTPException(status_code=502, detail="无法从该地址获取模型列表") from exc
+
+    if not models:
+        raise HTTPException(status_code=422, detail="提供商未返回可用模型")
+    return AIModelDiscoveryResponse(models=models)
 
 
 @router.post("", response_model=AIModelConfigResponse)

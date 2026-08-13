@@ -185,6 +185,61 @@ describe("AnalysisUnifiedChat", () => {
     );
   });
 
+  it("keeps user and assistant bubbles aligned with readable responsive widths", async () => {
+    mocks.listMessages.mockResolvedValue({
+      data: {
+        items: [
+          {
+            id: 101,
+            conversation_id: 1,
+            sequence: 0,
+            role: "user",
+            body: "主角是谁？",
+            client_message_id: "cm-1",
+            reply_to_message_id: null,
+            selection: null,
+            citations: [],
+            generation_job: null,
+            created_at: "2026-07-15T00:00:00Z",
+          },
+          {
+            id: 102,
+            conversation_id: 1,
+            sequence: 1,
+            role: "assistant",
+            body: "主角是林默。",
+            client_message_id: null,
+            reply_to_message_id: 101,
+            selection: null,
+            citations: [],
+            generation_job: null,
+            created_at: "2026-07-15T00:00:01Z",
+          },
+        ],
+        total: 2,
+        skip: 0,
+        limit: 200,
+        after_sequence: 0,
+      },
+    });
+
+    renderChat();
+    await waitReady();
+
+    expect(screen.getByTestId("analysis-chat-bubble-101")).toHaveClass(
+      "w-fit",
+      "ml-auto",
+      "max-w-[85%]",
+      "sm:max-w-[70%]"
+    );
+    expect(screen.getByTestId("analysis-chat-bubble-102")).toHaveClass(
+      "w-fit",
+      "mr-auto",
+      "max-w-[92%]",
+      "sm:max-w-[80%]"
+    );
+  });
+
   it("sends ordinary questions through reader_chat with a chapter_range anchor", async () => {
     renderChat();
     await waitReady();

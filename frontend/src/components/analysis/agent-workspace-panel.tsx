@@ -61,6 +61,7 @@ import {
 } from "@/lib/api";
 import { streamAgentRun, type AgentRunFrame } from "@/lib/sse";
 import { cn } from "@/lib/utils";
+import { resolveReadingCutoffChapterNumber } from "@/lib/reader-progress";
 
 /** 工具调用摘要条目（tool_start 开、tool_end 闭）。 */
 type ToolCallState = {
@@ -419,16 +420,7 @@ export function AgentWorkspacePanel({
   // ---------- 派生渲染数据 ----------
 
   const cutoffChapterNumber = useMemo(() => {
-    const byProgress =
-      progressChapterId != null
-        ? chapters.find((c) => c.id === progressChapterId)?.chapter_number ?? null
-        : null;
-    if (byProgress != null) return byProgress;
-    if (!chapters.length) return null;
-    return chapters.reduce(
-      (min, c) => Math.min(min, c.chapter_number),
-      Number.POSITIVE_INFINITY
-    );
+    return resolveReadingCutoffChapterNumber(chapters, progressChapterId);
   }, [chapters, progressChapterId]);
 
   const boundaryLabel = fullBook

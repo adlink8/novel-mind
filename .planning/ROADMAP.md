@@ -30,6 +30,8 @@
 | v1.2 trusted novel understanding | 26–29 | **26/27/28/29 VERIFIED (2026-08-03)** | planned | blocked by Phase 22 3/3 |
 | v1.3 visual narrative | 30–34 | **30/31/32/33/34 VERIFIED (2026-08-04)** | planned | blocked by Phase 22 3/3 |
 | v1.4 Canon Fork derivatives | 35–39 | **35/36/37/38/39 VERIFIED (2026-08-05)** | planned | blocked by Phase 22 3/3 |
+| v1.5 Windows desktop runtime | 41–45 | evidence artifacts exist; state reconciliation required | partial | release/signing gates remain external |
+| v1.6 provider protocol unification | 46 | foundation implemented locally; follow-up planned | credentials not supplied | blocked pending live provider qualification |
 
 # Agent Runtime Foundation — Phase 25.2–25.3
 
@@ -586,11 +588,11 @@ only and do not create a second owner.
 
 | Phase | Plans Complete | Status | Completed |
 |---|---:|---|---|
-| 41. Electron Architecture and Packaging Proof | 0/3 | Not started | - |
-| 42. Secure Desktop Shell | 0/3 | Not started | - |
-| 43. Managed Local Runtime and Data Lifecycle | 0/4 | Not started | - |
-| 44. Desktop Transport, Credentials and Offline Behavior | 0/3 | Not started | - |
-| 45. Windows Packaging, Migration and Desktop Qualification | 0/4 | Not started | - |
+| 41. Electron Architecture and Packaging Proof | decision artifact only | **NO-GO preserved**; no SUMMARY/VERIFICATION rewrite | 2026-08-10 evidence |
+| 42. Secure Desktop Shell | 3/3 summaries | Implemented under explicit 42–45 override; no standalone phase VERIFICATION | 2026-08-10 artifacts |
+| 43. Managed Local Runtime and Data Lifecycle | 4/4 summaries | Implemented under explicit 42–45 override; no standalone phase VERIFICATION | 2026-08-10/11 artifacts |
+| 44. Desktop Transport, Credentials and Offline Behavior | 3/3 summaries | Implemented under explicit 42–45 override; no standalone phase VERIFICATION | 2026-08-10/11 artifacts |
+| 45. Windows Packaging, Migration and Desktop Qualification | 4/4 summaries | `45-VERIFICATION.md` says evidence-supported verified but release-ready false; stale clean-VM wording remains an audit boundary | 2026-08-11 artifacts |
 
 ### Phase 41: Electron Architecture and Packaging Proof
 
@@ -765,6 +767,67 @@ recovers and preserves data under real clean-machine conditions.
 - **Wave 3**
   1. **45-04 — Electron security audit, SBOM/evidence integrity and v1.5 closeout** — Blocked on: `45-03`.
 
+# v1.6 — Provider Protocol Unification and Live Qualification
+
+> This phase follows the user-confirmed Pi/Agent gateway and settings integration. The
+> current dirty worktree already contains a tested five-provider discovery foundation and
+> owner-bound Pi default-model resolution; Phase 46 plans only the remaining protocol,
+> authority and live-qualification gaps. It does not rewrite Phase 42–45 summaries, alter
+> the Phase 41 NO-GO record, satisfy Phase 22, or authorize paid provider calls.
+
+## Phase Checklist
+
+- [ ] **Phase 46: Provider Protocol Unification and Live Qualification** - Make all five configured provider formats complete, remove hardcoded runtime selection, and qualify real discovery plus Pi calls without exposing credentials.
+
+## REQ-PROVIDER Primary Ownership
+
+| Requirement | Primary plan | Cross-plan validation (non-owning) |
+|---|---|---|
+| REQ-PROVIDER-01 | 46-01 | 46-03 live catalog matrix |
+| REQ-PROVIDER-02 | 46-02 | 46-03 Pi run matrix; 46-04 lineage audit |
+| REQ-PROVIDER-03 | 46-03 | 46-04 closeout verdict |
+| REQ-PROVIDER-04 | 46-04 | 46-02 resolver provenance |
+
+### Phase 46: Provider Protocol Unification and Live Qualification
+
+**Goal:** establish one owner-scoped deployment authority and evidence-backed protocol matrix
+for OpenAI, Anthropic, Google AI Studio Gemini, Ollama and custom
+OpenAI-compatible services across model discovery, connection testing and Pi/Agent execution.
+
+**Depends on:** Phase 25.2 Agent gateway authority and Phase 44 credential/transport boundary.
+Phase 45 evidence is reusable; Phase 41 NO-GO and Phase 22 0/3 remain unchanged.
+
+**Requirements:** REQ-PROVIDER-01, REQ-PROVIDER-02, REQ-PROVIDER-03, REQ-PROVIDER-04
+
+**Success Criteria** (what must be TRUE):
+
+1. A single backend provider registry defines canonical IDs, aliases, credentials, catalog
+   pagination, generation transport and declared capabilities for all five settings choices;
+   create, update, discovery, test and invocation reject incompatible provider/config pairs.
+2. Pi/Agent and every in-scope text-generation consumer resolve an active owner-scoped
+   `AIModelConfig`; the legacy `ai_router.py` static catalog and global routing preference can
+   no longer select a runtime model, and missing/unsafe configuration fails closed.
+3. A credential-gated qualification matrix records discovery, direct test and Pi run evidence
+   per provider without storing secrets. A provider without an operator-supplied credential or
+   reachable local service is BLOCKED/PARTIAL, never simulated green.
+4. Provider/model/usage/error/cost lineage is persisted and surfaced from backend truth;
+   unknown capability or pricing remains explicit, and the closeout gate can independently
+   reproduce its verdict from redacted evidence.
+
+**Plans:**
+
+- **Wave 0**
+  1. **46-01 — Five-provider protocol registry, pagination and configuration validation** — no execution dependency.
+- **Wave 1**
+  1. **46-02 — Owner-scoped deployment authority and hardcoded router retirement** — Blocked on: `46-01`.
+- **Wave 2**
+  1. **46-03 — Credential-gated real provider and Pi qualification matrix** — Blocked on: `46-01`, `46-02`.
+- **Wave 3**
+  1. **46-04 — Usage/cost/capability truth, browser proof and closeout** — Blocked on: `46-03`.
+
+**UI hint:** yes — reuse the existing settings layout; add only backend-derived capability,
+qualification and failure states defined by `46-UI-SPEC.md`.
+
 ## Supersession and Backlog Map
 
 | Old roadmap item | New owner |
@@ -789,6 +852,11 @@ Phase 39 closeout audit gate honestly reports `blocked` (Phase 22 0/3 + REQ-SHIP
 and never promotes; neither blocker is hidden or downgraded.
 
 Phase 40 remains the ad-hoc `chat_backfill` record in `STATE.md`, not a numbered roadmap
-phase. Phase 41 planning is ready. Phases 42–45 are planned and remain gated by their
-explicit plan dependencies and the preceding phase decisions; Phase 22's independent 0/3
-blocked state does not change.
+phase. Phase 41's NO-GO decision remains authoritative. Phases 42–45 have execution summaries
+under the explicit override and Phase 45 has an evidence-supported verification artifact, but
+those artifacts do not rewrite Phase 41 and their stale clean-VM/release wording is not silently
+normalized here. Phase 22's independent 0/3 blocked state does not change.
+
+Phase 46 is planned only. Execution requires a separate user instruction. Cloud-provider
+qualification additionally requires operator-supplied credentials and may incur provider cost;
+absence of those inputs is a valid BLOCKED result, not permission to substitute mocks.

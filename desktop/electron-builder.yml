@@ -60,6 +60,7 @@ extraResources:
       - "!**/*.map"
 
 win:
+  icon: assets/novelmind-icon.ico
   # x64 only — the supported Windows matrix is Windows 10 and Windows 11 on x64
   # (see docs/desktop-installation.md). `dir` yields dist/win-unpacked for local
   # qualification and `nsis` yields the per-user installer.

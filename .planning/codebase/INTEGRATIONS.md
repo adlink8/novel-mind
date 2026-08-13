@@ -9,10 +9,7 @@ last_mapped_commit: b679b49
 ## APIs & External Services
 
 **Model Providers:**
-- Google Cloud Vertex AI - default chat path using the Vertex `generateContent` REST API and a cached `gcloud auth print-access-token` credential (`backend/app/config.py`, `backend/app/services/vertex_gemini.py`).
-  - SDK/Client: `httpx`; the Google Cloud CLI is invoked as a credential helper (`backend/requirements.txt`, `backend/app/services/vertex_gemini.py`).
-  - Auth/config: `NOVELMIND_GCP_PROJECT`, `NOVELMIND_GCP_LOCATION`, optional `NOVELMIND_HTTPS_PROXY`; credential values remain external to the repository (`backend/app/config.py`).
-- OpenAI, Anthropic and Google AI Studio compatible providers - selectable through LiteLLM and persisted user model configurations (`backend/app/services/ai_service.py`, `backend/app/models/ai_model.py`, `backend/app/api/models.py`).
+- OpenAI, Anthropic, Google AI Studio, Ollama and custom OpenAI-compatible providers - selectable through LiteLLM and persisted user model configurations (`backend/app/services/ai_service.py`, `backend/app/models/ai_model.py`, `backend/app/api/models.py`).
   - SDK/Client: `litellm>=1.83.10` (`backend/requirements.txt`, `backend/app/services/ai_service.py`).
   - Auth: `NOVELMIND_OPENAI_API_KEY`, `NOVELMIND_ANTHROPIC_API_KEY`, `NOVELMIND_GEMINI_API_KEY`, or encrypted per-user model keys (`backend/app/config.py`, `backend/app/models/ai_model.py`).
 - Ollama - optional local chat/embedding endpoint; embedding calls use `/api/embed` (`backend/app/config.py`, `backend/app/services/ai_service.py`).
@@ -56,7 +53,7 @@ last_mapped_commit: b679b49
 
 **Caching:**
 - No external cache service is detected in runtime manifests or Compose (`backend/requirements.txt`, `frontend/package.json`, `agent-service/package.json`, `docker-compose.yml`).
-- Vertex access tokens are cached in process, React Query caches frontend server state, and agent-service sessions/approvals are in-memory only (`backend/app/services/vertex_gemini.py`, `frontend/package.json`, `agent-service/src/server.ts`, `agent-service/src/policy/session-approvals.ts`).
+- React Query caches frontend server state, and agent-service sessions/approvals are in-memory only (`frontend/package.json`, `agent-service/src/server.ts`, `agent-service/src/policy/session-approvals.ts`).
 
 ## Authentication & Identity
 
@@ -96,7 +93,7 @@ last_mapped_commit: b679b49
 
 **Required env vars:**
 - Backend production: `NOVELMIND_DATABASE_URL`, `NOVELMIND_SECRET_KEY`, `NOVELMIND_ENCRYPTION_KEY`; provider-specific values are required only for the selected model path (`backend/app/config.py`).
-- Provider paths: `NOVELMIND_OPENAI_API_KEY`, `NOVELMIND_ANTHROPIC_API_KEY`, `NOVELMIND_GEMINI_API_KEY`, `NOVELMIND_GCP_PROJECT`, `NOVELMIND_GCP_LOCATION`, `NOVELMIND_HTTPS_PROXY`, `NOVELMIND_OLLAMA_BASE_URL` (`backend/app/config.py`, `backend/app/services/ai_service.py`, `backend/app/services/vertex_gemini.py`).
+- Provider paths: `NOVELMIND_OPENAI_API_KEY`, `NOVELMIND_ANTHROPIC_API_KEY`, `NOVELMIND_GEMINI_API_KEY`, `NOVELMIND_HTTPS_PROXY`, `NOVELMIND_OLLAMA_BASE_URL` (`backend/app/config.py`, `backend/app/services/ai_service.py`).
 - Agent-service: `NOVELMIND_GATEWAY_TOKEN` is mandatory; `FASTAPI_BASE_URL`, `PORT`, `POLL_ENABLED`, `POLL_INTERVAL_MS`, `POLL_CONCURRENCY`, `POLL_TIMEOUT_MS` control topology and polling (`agent-service/src/config.ts`).
 - Frontend server/build: `BACKEND_URL`, `AGENT_SERVICE_URL`; browser API prefix may use `NEXT_PUBLIC_API_URL` (`frontend/next.config.mjs`, `frontend/src/lib/api.ts`).
 - CI/live quality: `NOVELMIND_CI_DATABASE_URL`, `NOVELMIND_CI_DATABASE_SYNC_URL`, Chroma host/port variables, provider credentials and `RAG_SIGNING_SECRET` are referenced through workflow environments/secrets (`.github/workflows/ci.yml`, `backend/tests/integration/conftest.py`).

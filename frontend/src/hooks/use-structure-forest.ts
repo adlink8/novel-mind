@@ -42,6 +42,11 @@ import {
   type NmSourceLinkItem,
 } from "@/lib/narrative-memory-api";
 
+type ActualChapterRef = {
+  chapter_number: number;
+  title?: string | null;
+};
+
 export function useStructureForest(params: {
   novelId: string;
   /** 用户显式设置的剧透上限（关系/时间线点击）。 */
@@ -89,11 +94,13 @@ export function useStructureForest(params: {
   // eslint-disable-next-line react-hooks/refs -- render-sync mirrors state into the escaping shared ref
   selectedNodeRef.current = selectedNode;
 
-  const applyChapterForest = useCallback((chapterCountValue: number) => {
+  const applyChapterForest = useCallback(
+    (chapterCountValue: number, chapters?: ReadonlyArray<ActualChapterRef>) => {
     const forest = buildChapterFallbackTree(
       Math.max(1, chapterCountValue || 1),
       {
         titles: chapterTitlesRef.current,
+        chapters,
       }
     );
     setStructureSource("chapters");
@@ -109,7 +116,9 @@ export function useStructureForest(params: {
     const selection = def ? treeNodeToSelection(def) : null;
     selectedNodeRef.current = selection;
     setSelectedNode(selection);
-  }, []);
+    },
+    []
+  );
 
   const applyNmForest = useCallback(
     (
@@ -165,16 +174,20 @@ export function useStructureForest(params: {
       opts?: { preserveSelection?: boolean }
     ) => {
       const chapterCountValue = novelMeta?.chapter_count ?? 1;
+      let actualChapters: ActualChapterRef[] = [];
       try {
-        // 章节标题与 NM 版本并行取；标题只用于树标签，失败不阻断主流程
-        const [versionsRes, chaptersSettled] = await Promise.all([
+        // 两个依赖独立降级：NM 元数据失败不能抹掉已经取得的真实章节坐标。
+        const [versionsOutcome, chaptersOutcome] = await Promise.allSettled([
           narrativeMemoryApi.listVersions(id),
-          Promise.allSettled([novelsApi.getChapters(id)]),
+          novelsApi.getChapters(id),
         ]);
-        const [chaptersOutcome] = chaptersSettled;
         if (chaptersOutcome.status === "fulfilled") {
           const map: Record<number, string> = {};
-          for (const ch of chaptersOutcome.value.data ?? []) {
+          actualChapters = (chaptersOutcome.value.data ?? []).map((ch) => ({
+            chapter_number: ch.chapter_number,
+            title: ch.title,
+          }));
+          for (const ch of actualChapters) {
             if (typeof ch.chapter_number === "number" && ch.title) {
               map[ch.chapter_number] = ch.title;
             }
@@ -189,11 +202,15 @@ export function useStructureForest(params: {
             }))
           );
         }
+        if (versionsOutcome.status === "rejected") {
+          applyChapterForest(chapterCountValue, actualChapters);
+          return;
+        }
         const latest = pickLatestPreviewVersion(
-          versionsRes.data.versions ?? []
+          versionsOutcome.value.data.versions ?? []
         );
         if (!latest) {
-          applyChapterForest(chapterCountValue);
+          applyChapterForest(chapterCountValue, actualChapters);
           return;
         }
         const effectiveThrough =
@@ -213,7 +230,7 @@ export function useStructureForest(params: {
           chapterTitles: chapterTitlesRef.current,
         });
         if (!forest.length) {
-          applyChapterForest(chapterCountValue);
+          applyChapterForest(chapterCountValue, actualChapters);
           return;
         }
         const resolvedThrough =

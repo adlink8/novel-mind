@@ -37,6 +37,22 @@ describe("buildChapterFallbackTree", () => {
     expect(forest[0].children[0].label).toContain("序章");
   });
 
+  it("uses the real chapter numbers supplied by the book", () => {
+    const forest = buildChapterFallbackTree(2, {
+      chapters: [
+        { chapter_number: 17, title: "第17章" },
+        { chapter_number: 19, title: "第19章" },
+      ],
+    });
+
+    expect(forest[0].chapterStart).toBe(17);
+    expect(forest[0].chapterEnd).toBe(19);
+    expect(forest[0].children.map((node) => node.id)).toEqual([
+      "chapter:17",
+      "chapter:19",
+    ]);
+  });
+
   it("strips the leading chapter marker from raw heading titles", () => {
     const forest = buildChapterFallbackTree(2, {
       titles: { 1: "第1章 凯撒", 2: "第三章" },

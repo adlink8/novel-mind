@@ -7,6 +7,7 @@
 
 export * from "./client";
 export * from "./novels";
+export * from "./extensions";
 export * from "./analysis";
 export * from "./timeline";
 export * from "./characters";

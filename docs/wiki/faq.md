@@ -418,7 +418,7 @@ candidate-only，不能通过该设置直接切换为生产构建。
 |--------|------|------|---------|
 | `schema_repair_needed` | 164 | JSON 格式/类型错误 | 自动修复重试 |
 | `schema_or_business_invalid` | 67 | 修复后仍无效/业务规则错误 | 放弃该阶段 |
-| `VertexAPIError` | 1 | API 网络错误 | 放弃该阶段 |
+| 上游 API 错误 | 1 | 模型供应商网络错误 | 放弃该阶段 |
 
 
 ### 系统有哪些 LLM 防护？

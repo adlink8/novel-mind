@@ -28,6 +28,7 @@ import {
   type RestartRequestResult,
 } from "../shared/bridge-contract";
 import { createMainWindow, isApprovedAppUrl, securityPostureFor } from "./create-window";
+import type { CspMode } from "./security/csp";
 import { openExternalLink } from "./security/navigation";
 import {
   registerBridgeIpcHandlers,
@@ -186,6 +187,12 @@ function resolveRendererUrl(raw: string): string {
   return raw;
 }
 
+function rendererCspMode(): CspMode {
+  return !app.isPackaged && process.env.NOVELMIND_RENDERER_DEV_CSP === "1"
+    ? "development"
+    : "production";
+}
+
 /**
  * Resolves the renderer URL through the managed runtime when no explicit
  * override is given. The env override is kept for hermetic shell tests and
@@ -292,8 +299,9 @@ const capabilityHandlers: Record<string, BridgeHandler> = {
 
 app.whenReady().then(async () => {
   const rendererUrl = await ensureRendererUrl();
+  const cspMode = rendererCspMode();
   resolvedRendererUrl = rendererUrl;
-  mainWindow = createMainWindow({ rendererUrl });
+  mainWindow = createMainWindow({ rendererUrl, cspMode });
 
   // D-42-05: all bridge IPC flows through the sender/schema-validating
   // registration point; handlers are removed on quit (T-42-02-03).
@@ -311,7 +319,10 @@ app.whenReady().then(async () => {
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {
-      mainWindow = createMainWindow({ rendererUrl: resolvedRendererUrl ?? rendererUrl });
+      mainWindow = createMainWindow({
+        rendererUrl: resolvedRendererUrl ?? rendererUrl,
+        cspMode,
+      });
     }
   });
 });

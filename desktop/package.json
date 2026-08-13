@@ -10,7 +10,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
-    "start": "npm run build && electron .",
+    "start": "npm run build && node scripts/start-electron.cjs",
     "test:smoke": "playwright test tests/shell-smoke.spec.ts"
   },
   "devDependencies": {

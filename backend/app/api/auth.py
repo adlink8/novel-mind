@@ -2,9 +2,10 @@
 认证 API — 用户注册、登录、Token 管理
 """
 
+import ipaddress
 import secrets
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, select, text, update
@@ -16,6 +17,7 @@ from app.core.security import (
     create_access_token,
     hash_password,
     require_user,
+    validate_cookie_request_origin,
     validate_password_length,
     verify_password,
 )
@@ -73,6 +75,24 @@ class UserResponse(BaseModel):
     is_active: bool
 
 
+def _issue_session(user: User, response: Response) -> TokenResponse:
+    access_token = create_access_token(data={"sub": str(user.id)})
+    response.set_cookie(
+        key=AUTH_COOKIE_NAME,
+        value=access_token,
+        max_age=settings.access_token_expire_minutes * 60,
+        httponly=True,
+        secure=settings.auth_cookie_secure,
+        samesite="lax",
+        path="/",
+    )
+    return TokenResponse(
+        access_token=access_token,
+        user_id=user.id,
+        username=user.username,
+    )
+
+
 @router.post(
     "/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED
 )
@@ -82,6 +102,9 @@ async def register(data: RegisterRequest, db: AsyncSession = Depends(get_db)):
 
     检查用户名和邮箱是否已存在，对密码进行 bcrypt 哈希后存入数据库。
     """
+    if not settings.auth_enabled:
+        raise HTTPException(status_code=403, detail="注册功能已关闭")
+
     # 检查用户名是否已存在
     username = data.username.strip().lower()
     email = data.email.strip().lower()
@@ -156,6 +179,9 @@ async def login(
 
     验证用户名和密码，成功后返回 JWT Access Token。
     """
+    if not settings.auth_enabled:
+        raise HTTPException(status_code=403, detail="登录功能已关闭")
+
     result = await db.execute(
         select(User).where(User.username == data.username.strip().lower())
     )
@@ -167,21 +193,40 @@ async def login(
     if not user.is_active:
         raise HTTPException(status_code=401, detail="用户已被禁用")
 
-    access_token = create_access_token(data={"sub": str(user.id)})
-    response.set_cookie(
-        key=AUTH_COOKIE_NAME,
-        value=access_token,
-        max_age=settings.access_token_expire_minutes * 60,
-        httponly=True,
-        secure=settings.auth_cookie_secure,
-        samesite="lax",
-        path="/",
-    )
-    return TokenResponse(
-        access_token=access_token,
-        user_id=user.id,
-        username=user.username,
-    )
+    return _issue_session(user, response)
+
+
+@router.post("/local-auto-login", response_model=TokenResponse)
+async def local_auto_login(
+    request: Request,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+):
+    """Create a passwordless session for one configured local test user.
+
+    This development-only seam is disabled unless an explicit username is set,
+    rejects production mode, non-loopback clients and unapproved browser origins,
+    and never sends a password to the renderer.
+    """
+    username = settings.local_auto_login_username.strip().lower()
+    if not settings.debug or not username:
+        raise HTTPException(status_code=403, detail="本地自动登录未启用")
+
+    client_host = request.client.host if request.client else ""
+    try:
+        is_loopback = ipaddress.ip_address(client_host).is_loopback
+    except ValueError:
+        is_loopback = False
+    if not is_loopback:
+        raise HTTPException(status_code=403, detail="本地自动登录仅允许 loopback 客户端")
+
+    validate_cookie_request_origin(request)
+
+    user = await db.scalar(select(User).where(User.username == username))
+    if not user or not user.is_active:
+        raise HTTPException(status_code=404, detail="配置的本地测试用户不存在或已禁用")
+
+    return _issue_session(user, response)
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)

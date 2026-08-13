@@ -41,6 +41,7 @@ from app.api.agent_runs import router as agent_runs_router
 from app.api.agent_artifacts import router as agent_artifacts_router
 from app.api.agent_approvals import router as agent_approvals_router
 from app.api.agent_service_runs import service_router as agent_service_router
+from app.api.chapter_batches import router as chapter_batches_router
 from app.api.clues import router as clues_router
 from app.api.asset_audit import router as asset_audit_router
 from app.api.eval import router as eval_router
@@ -48,8 +49,10 @@ from app.api.gateway import router as gateway_router
 from app.api.knowledge import router as knowledge_router
 from app.api.narrative_memory import router as narrative_memory_router
 from app.api.reader_chat import router as reader_chat_router
+from app.api.user_preference_memory import router as user_preference_memory_router
 from app.api.relationships import router as relationships_router
 from app.api.settings import router as settings_router
+from app.api.tool_connectors import router as tool_connectors_router, run_router as tool_connector_run_router
 from app.api.usage import router as usage_router
 from app.api.visual_bible import router as visual_bible_router
 from app.api.key_scenes import router as key_scenes_router
@@ -270,6 +273,8 @@ app.include_router(
 app.include_router(fanfiction.router, prefix="/api/fanfiction", tags=["同人文"])
 app.include_router(models.router, prefix="/api/models", tags=["AI 模型"])
 app.include_router(settings_router, prefix="/api/settings", tags=["设置中心"])
+app.include_router(tool_connectors_router, prefix="/api/extensions", tags=["受限 Tool 扩展"])
+app.include_router(tool_connector_run_router, prefix="/api/agent-tools", tags=["受限 Tool 运行代理"])
 app.include_router(usage_router, prefix="/api/usage", tags=["用量统计"])
 app.include_router(rag.router, prefix="/api/novels", tags=["RAG 检索"])
 app.include_router(knowledge_router)
@@ -279,6 +284,11 @@ app.include_router(
     reader_chat_router,
     prefix="/api/novels",
     tags=["阅读器对话"],
+)
+app.include_router(
+    user_preference_memory_router,
+    prefix="/api/memory/preferences",
+    tags=["用户习惯记忆"],
 )
 app.include_router(
     agent_tools_router,
@@ -299,6 +309,11 @@ app.include_router(
     agent_runs_router,
     prefix="/api/agent",
     tags=["智能体运行时"],
+)
+app.include_router(
+    chapter_batches_router,
+    prefix="/api/agent",
+    tags=["章节分析批量编排"],
 )
 app.include_router(
     agent_artifacts_router,

@@ -139,7 +139,7 @@ Key metrics:
 | master CI | **全绿**（2026-07-22 起连续红 → PR #13 五类根因修复后恢复）；分支保护 `ci-gate` required + enforce_admins | run 30204817945 |
 | 已声明豁免 | pip-audit：chromadb PYSEC-2026-311（无修复版）；npm audit `--omit=dev`（brace-expansion 5.0.8 与 eslint 链不兼容）——解除条件见 ci.yml 注释 | `.github/workflows/ci.yml` |
 | 依赖升级 | echarts 5→6.1；sharp/postcss/hono overrides；生产依赖 npm audit 0 | PR #13 |
-| Vertex/Gemini | 实验态（无测试/无文档），仅 Timeline/Clue live 调用使用 | `vertex_gemini.py` |
+| 文本模型供应商 | OpenAI、Anthropic、Gemini AI Studio、Ollama、自定义 OpenAI-compatible 共用 LiteLLM 与设置页模型配置；Vertex 专用路径已移除 | `ai_service.py`、`provider_catalog.py` |
 
 ---
 

@@ -61,6 +61,8 @@ from app.models.character import Character, CharacterRelation
 from app.models.fanfiction import FanFiction
 from app.models.fanfiction_chapter import FanFictionChapter
 from app.models.ai_model import AIModelConfig
+from app.models.tool_connector import ToolConnector, ToolConnectorVersion
+from app.models.agent_settings import AgentSettings, AgentTaskModelBinding
 from app.models.ai_usage_log import AIUsageLog
 from app.models.app_setting import AppSetting
 from app.models.text_chunk import TextChunk
@@ -123,6 +125,7 @@ from app.models.reader_chat import (
     ReaderMessageSelection,
     ReaderModelCallAttempt,
 )
+from app.models.user_preference_memory import UserPreferenceMemory
 from app.models.clue import (
     ClueActivePointer,
     ClueAnalysisRun,
@@ -279,6 +282,11 @@ __all__ = [
     "FanFiction",
     "FanFictionChapter",
     "AIModelConfig",
+    "ToolConnector",
+    "ToolConnectorVersion",
+    "AgentSettings",
+    "AgentTaskModelBinding",
+    "UserPreferenceMemory",
     "AIUsageLog",
     "AppSetting",
     "TextChunk",

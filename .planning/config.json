@@ -2,11 +2,11 @@
   "project": "NovelMind",
   "baseline_branch": "master",
   "baseline_commit": "29be2fa3928ada9e9211ffa08f3af0eec734bb95",
-  "active_milestone": "v1.5",
-  "active_phase": "41-electron-architecture-and-packaging-proof",
-  "active_plan": "41-01",
-  "status": "planned",
-  "auto_start": ".planning/phases/41-electron-architecture-and-packaging-proof/41-01-PLAN.md",
+  "active_milestone": "v1.6",
+  "active_phase": "46-provider-protocol-unification-and-live-qualification",
+  "active_plan": "46-01",
+  "status": "in_progress",
+  "auto_start": ".planning/phases/46-provider-protocol-unification-and-live-qualification/46-01-PLAN.md",
   "gate_overrides": {
     "phase_22_to_26": {
       "authorized": true,
@@ -102,6 +102,13 @@
       "reason": "User authorized continuing phase execution through Phase 39 and skipping the Phase 22 3/3 gate (interactive confirmation, AskUserQuestion).",
       "preserve_phase_22_verdict": true,
       "upstream_verification_still_required": true
+    },
+    "phase_42_45_execution": {
+      "authorized": true,
+      "authorized_at": "2026-08-10",
+      "scope": "execution_phase_42-01_to_45-04",
+      "reason": "User explicitly authorized completing phases 42-45 (interactive confirmation) despite Phase 41-03 NO-GO; prerequisite #1 (bundled Node via ELECTRON_RUN_AS_NODE) proven; remaining prerequisites to be closed within 42-45.",
+      "preserve_phase_41_verdict": true
     }
   },
   "commit_docs": true,
@@ -132,6 +139,7 @@
     "backlog": "999.x"
   },
   "workflow": {
-    "_auto_chain_active": false
+    "_auto_chain_active": false,
+    "nyquist_validation": true
   }
 }

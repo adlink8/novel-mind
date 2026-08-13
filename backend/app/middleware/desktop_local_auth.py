@@ -34,7 +34,7 @@ LOCAL_AUTH_ALGORITHMS = ["HS256"]
 # 本地令牌由 main 进程每 5 分钟铸造；服务侧时钟允许 60 秒偏斜（leeway）。
 LOCAL_AUTH_LEEWAY_SECONDS = 60
 
-_LOOPBACK_HOSTS = frozenset({"127.0.0.1", "::1"})
+_LOOPBACK_HOSTS = frozenset({"127.0.0.1", "::1", "::ffff:127.0.0.1"})
 
 
 class DesktopLocalAuthMiddleware(BaseHTTPMiddleware):

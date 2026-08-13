@@ -151,6 +151,11 @@ async def get_current_user(
     如果请求未携带有效 Token，返回 None（允许匿名访问）。
     如果 Token 无效或过期，抛出 401 异常。
     """
+    if not settings.auth_enabled:
+        # Single-user desktop mode is deterministic: stale browser cookies or
+        # sessionStorage JWTs must not switch the configured workspace owner.
+        return await _get_default_workspace_user(db)
+
     token = (
         credentials.credentials
         if credentials
@@ -204,6 +209,24 @@ async def require_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
     return current_user
+
+
+async def _get_default_workspace_user(db: AsyncSession) -> User:
+    """Resolve the configured single-user workspace identity."""
+    username = settings.local_auto_login_username.strip().lower()
+    if not username:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="默认工作区用户未配置",
+        )
+    result = await db.execute(select(User).where(User.username == username))
+    user = result.scalar_one_or_none()
+    if not user or not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="默认工作区用户不存在或已被禁用",
+        )
+    return user
 
 
 def _constant_time_equal(left: str, right: str) -> bool:
@@ -272,6 +295,7 @@ async def require_agent_actor(
     request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_scheme),
     db: AsyncSession = Depends(get_db),
+    run_id: int | None = None,
 ) -> User | AgentActor:
     """agent_tools 门面认证：接受用户 JWT 或 per-run 内部令牌。
 
@@ -287,11 +311,33 @@ async def require_agent_actor(
         else request.cookies.get(AUTH_COOKIE_NAME)
     )
     if not token:
+        if not settings.auth_enabled:
+            return await _get_default_workspace_user(db)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="需要登录",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    if not settings.auth_enabled:
+        # Agent run tokens keep their explicit owner/novel binding. Any other
+        # renderer token (including a stale user JWT or desktop-local token
+        # already validated by middleware) resolves to the configured owner.
+        token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+        from app.models.agent_runtime import SkillRun
+
+        predicates = [
+            SkillRun.internal_token_hash == token_hash,
+            SkillRun.novel_id == novel_id,
+            SkillRun.status.in_(("queued", "running")),
+        ]
+        if run_id is not None:
+            predicates.append(SkillRun.id == run_id)
+        result = await db.execute(select(SkillRun).where(*predicates))
+        run = result.scalars().first()
+        if run is not None:
+            return AgentActor(id=run.owner_id, novel_id=run.novel_id)
+        return await _get_default_workspace_user(db)
+
     # 1) 先试用户 JWT（浏览器/直接 API）。
     # 注意：token 以 "ey" 开头不代表是有效 JWT——random internal_token 偶发
     # 以 "ey" 开头（~0.02%）。get_current_user 对无效/过期 JWT 抛 401，这里
@@ -308,13 +354,14 @@ async def require_agent_actor(
     token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
     from app.models.agent_runtime import SkillRun
 
-    result = await db.execute(
-        select(SkillRun).where(
-            SkillRun.internal_token_hash == token_hash,
-            SkillRun.novel_id == novel_id,
-            SkillRun.status.in_(("queued", "running")),
-        )
-    )
+    predicates = [
+        SkillRun.internal_token_hash == token_hash,
+        SkillRun.novel_id == novel_id,
+        SkillRun.status.in_(("queued", "running")),
+    ]
+    if run_id is not None:
+        predicates.append(SkillRun.id == run_id)
+    result = await db.execute(select(SkillRun).where(*predicates))
     run = result.scalars().first()
     if run is not None:
         return AgentActor(id=run.owner_id, novel_id=run.novel_id)

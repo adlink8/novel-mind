@@ -1,14 +1,14 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.5
-milestone_name: Windows Desktop Runtime
-status: executing
-last_updated: "2026-08-09T15:48:34.543Z"
-last_activity: 2026-08-09 -- Phase 41 planning complete
+milestone: v1.6
+milestone_name: Provider Protocol Unification
+status: in_progress
+last_updated: "2026-08-12T17:00:00+08:00"
+last_activity: 2026-08-12 -- Vertex-specific runtime removed; five-provider TDD and custom live connection verified
 progress:
-  total_phases: 5
+  total_phases: 1
   completed_phases: 0
-  total_plans: 17
+  total_plans: 4
   completed_plans: 0
   percent: 0
 ---
@@ -17,10 +17,10 @@ progress:
 
 ## Current Position
 
-Phase: 41 - Electron Architecture and Packaging Proof
-Plan: 0 of 3
-Status: Ready to execute
-Last activity: 2026-08-09 -- Phase 41 planning complete
+Phase: 46 - Provider Protocol Unification and Live Qualification
+Plan: 1 of 4 (in progress)
+Status: In progress; user authorized provider integration and chain testing
+Last activity: 2026-08-12 -- Vertex removal slice verified; Phase 46-01 pagination/capability work remains
 
 ## Truth Snapshot
 
@@ -29,8 +29,27 @@ Last activity: 2026-08-09 -- Phase 41 planning complete
 | implementation_readiness | **HIGH for 25.2–25.3** | Phase 21, 23–25.1 implemented; 25.2/25.3 verified; Phase 22 gaps active |
 | sample_data_coverage | PARTIAL | existing product fixtures; Phase 26–29 gold sets not built |
 | quality_qualification | BLOCKED | latest scheduled run failed; Nightly benchmark 0/3 green |
+| provider_integration | **FIVE-PROVIDER FOUNDATION VERIFIED / PARTIAL LIVE** | provider, settings and Pi contracts pass; configured custom OpenCode direct test returned `OK`; remaining provider/Pi live matrix is not complete |
 
 No single aggregate completion percentage is authoritative.
+
+## Phase 46 Planning Snapshot (2026-08-12)
+
+- Current dirty worktree foundation: five provider profiles and discovery adapters, SSRF-safe
+  `/api/models/discover`, owner/run-bound Pi gateway deployment resolution, settings discovery
+  and first-model default behavior. This is local implementation evidence, not a Phase 46
+  completion claim.
+- Vertex-specific provider profiles, native adapter, GCP settings, probes and live runners were
+  removed from current runtime. Two inactive legacy Vertex model rows were deleted; historical
+  archive/eval evidence remains unchanged.
+- Remaining authority gap: `backend/app/services/ai_router.py` and several consumers still
+  carry static/global routing behavior; Phase 46-02 owns their removal from runtime selection.
+- Remaining protocol gap: pagination/capability normalization and strict provider/config
+  validation are incomplete; Phase 46-01 owns them.
+- Remaining qualification gap: no real cloud-provider credential matrix has run. Phase 46-03
+  must record unavailable providers as BLOCKED/PARTIAL and must never commit credentials.
+- Historical truth is preserved: Phase 41 remains NO-GO; Phase 42–45 summaries and Phase 45
+  evidence exist but are not rewritten here; Phase 22 remains 0/3.
 
 ## Baseline Decisions
 
@@ -149,6 +168,7 @@ No single aggregate completion percentage is authoritative.
 | Phase 37 | VERIFIED | 5 | ✅ 2026-08-04 (user execution override) |
 | Phase 38 | VERIFIED | 5 | ✅ 2026-08-05 (user execution override) |
 | Phase 39 | VERIFIED | 5 | ✅ 2026-08-05 (user execution override) |
+| Phase 46 | PLANNED | 4 | ⏸ execution not authorized; live credentials not supplied |
 
 The earlier 55-plan structural verdict did not prove Issue #29 Agent-consumption coverage.
 The corrected 86-plan portfolio must cover REQ-AGENT-01..08, AgentVN-derived candidate-only
@@ -414,6 +434,9 @@ created.
 
 ## Execution Cursor
 
+Phase 46 is the active **planning** cursor (0/4). No Phase 46 execution, real cloud call,
+credential use, commit or push is authorized by this state update.
+
 Phase 22 execution is paused. Its recovery entry remains:
 
 `.planning/phases/22-ci-nightly-gap-closure/22-G2-PLAN.md`
@@ -448,6 +471,9 @@ If Phase 22 is resumed, use `$gsd-resume-work`; do not mark it complete early.
 - v1.2 trusted understanding: Phase 26–29.
 - v1.3 Visual Bible, key scenes and illustrations: Phase 30–34.
 - v1.4 Canon Fork and constrained derivatives: Phase 35–39 (**COMPLETE 2026-08-05**).
+- v1.5 Windows desktop runtime: Phase 41 NO-GO preserved; Phase 42–45 execution/evidence
+  artifacts exist under override and retain their documented release boundaries.
+- v1.6 provider protocol unification: Phase 46 (**PLANNED 0/4**).
 
 See `.planning/ROADMAP.md`.
 

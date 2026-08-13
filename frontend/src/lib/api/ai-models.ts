@@ -9,11 +9,8 @@ export type AIModelProvider =
   | "anthropic"
   | "ollama"
   | "custom"
-  | "vertex_google"
   | "gemini"
-  | "google"
-  | "vertex"
-  | "vertex_ai";
+  | "google";
 
 export interface AIModelConfig {
   id: number;
@@ -51,8 +48,34 @@ export interface AIModelTestResponse {
   error?: string;
 }
 
+export interface AIModelDiscoveryRequest {
+  provider: AIModelConfig["provider"];
+  base_url: string;
+  api_key?: string;
+}
+
+export interface AIModelDiscoveryItem {
+  id: string;
+  name: string;
+}
+
+export interface AIModelDiscoveryResponse {
+  models: AIModelDiscoveryItem[];
+}
+
+export interface AIModelProviderProfile {
+  id: AIModelConfig["provider"];
+  label: string;
+  default_base_url?: string;
+  credential_kind: "api_key" | "oauth_token" | "none" | string;
+  credential_required: boolean;
+}
+
 export const aiModelsApi = {
   list: () => api.get<AIModelConfig[]>("/models"),
+  providers: () => api.get<AIModelProviderProfile[]>("/models/providers"),
+  discover: (data: AIModelDiscoveryRequest) =>
+    api.post<AIModelDiscoveryResponse>("/models/discover", data),
   create: (data: AIModelConfigCreate) => api.post<AIModelConfig>("/models", data),
   test: (id: number) => api.post<AIModelTestResponse>(`/models/${id}/test`),
   setDefault: (id: number) => api.post(`/models/${id}/default`),

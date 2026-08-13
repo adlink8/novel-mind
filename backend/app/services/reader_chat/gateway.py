@@ -50,9 +50,18 @@ class ModelDeployment:
     supports_structured_output: bool
     input_price_per_million: Decimal | None
     output_price_per_million: Decimal | None
+    config_id: int | None = None
+    api_key: str | None = None
+    base_url: str | None = None
 
     @property
     def resolved_name(self) -> str:
+        if self.provider == "custom":
+            return (
+                self.model_id
+                if self.model_id.startswith("openai/")
+                else f"openai/{self.model_id}"
+            )
         return f"{self.provider}/{self.model_id}"
 
     @property
@@ -64,6 +73,7 @@ class ModelDeployment:
             "provider": self.provider,
             "model_id": self.model_id,
             "revision": self.revision,
+            "config_id": self.config_id,
             "supports_structured_output": self.supports_structured_output,
         }
 
@@ -140,7 +150,7 @@ def _response_usage(response: Any) -> dict[str, int]:
     if hasattr(raw, "model_dump"):
         raw = raw.model_dump()
     if not isinstance(raw, dict):
-        # Vertex returns SimpleNamespace(usage=SimpleNamespace(...))
+        # Some providers return SimpleNamespace(usage=SimpleNamespace(...)).
         raw = {
             "prompt_tokens": getattr(raw, "prompt_tokens", None),
             "completion_tokens": getattr(raw, "completion_tokens", None),
@@ -269,6 +279,8 @@ class ReaderChatGateway:
                     num_retries=0,
                     stream=False,
                     max_tokens=max_output_tokens,
+                    api_key=deployment.api_key,
+                    api_base=deployment.base_url,
                 )
             except Exception as exc:
                 latency_ms = int((time.perf_counter() - started) * 1000)

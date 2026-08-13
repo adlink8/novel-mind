@@ -99,7 +99,7 @@ def rebind_extraction_to_package(
 ) -> TimelineExtraction:
     """Script-owned rebind: LLM 只负责选 evidence_id，offsets/hash/chapter 由包权威覆写。
 
-    Vertex 很难逐字节复述 content_hash 与 offsets；若 evidence_id 属于本包，
+    模型很难逐字节复述 content_hash 与 offsets；若 evidence_id 属于本包，
     一律用 Phase 07 冻结字段替换。未知 evidence_id 丢弃；无有效证据的事件丢弃。
     """
     from app.schemas.timeline import EvidenceRef

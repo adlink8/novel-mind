@@ -469,6 +469,13 @@ class NovelService:
         db.add(novel)
         await db.flush()  # 获取 novel.id
 
+        # A novel is not runtime-available until its durable built-in Skill
+        # defaults exist.  The activation service reads the authoritative
+        # agent-service packages and is idempotent for imports/retries.
+        from app.services.agent_runtime.registry import ensure_builtin_skills
+
+        await ensure_builtin_skills(db, owner_id=owner_id, novel_id=novel.id)
+
         # 记录导入进度：开始保存章节
         self.set_import_status(novel.id, "saving", 60, "正在保存章节到数据库...")
 

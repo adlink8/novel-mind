@@ -40,7 +40,7 @@
 ```
 前端：     Next.js 16 (canary) + Tailwind CSS 3 + base-ui 1.5 + ECharts + react-query
 后端：     Python 3.12 + FastAPI + SQLAlchemy 2.0 async + PostgreSQL 16
-AI：       OpenAI / Anthropic / Google Vertex / Ollama（可配置模型路由）
+AI：       OpenAI / Anthropic / Gemini AI Studio / Ollama / OpenAI-compatible（可配置）
 向量库：   ChromaDB（本地嵌入）
 搜索：     BM25 + 向量混合搜索
 ```

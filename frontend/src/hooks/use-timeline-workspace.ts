@@ -245,7 +245,10 @@ export function useTimelineWorkspace(params: {
     setFullBook(preferFullBook);
     setLoading(true);
     try {
-      void structure.loadStructure(id, novelMeta, "");
+      // The structure load resolves the real chapter coordinates and updates
+      // selectedNodeRef. Do not issue the first timeline read against the
+      // temporary 1..N fallback created during the book switch.
+      await structure.loadStructure(id, novelMeta, "");
       // 读已有时间线（若有）— 选书即上数据，不点「开始分析」
       try {
         await loadTimeline(

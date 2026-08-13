@@ -57,7 +57,7 @@ test("loads the existing renderer in the shell window", async () => {
   expect(bodyLength).toBeGreaterThan(0);
 });
 
-test("exposes exactly the five bridge capabilities and nothing else", async () => {
+test("exposes exactly the six bridge capabilities and nothing else", async () => {
   const keys = await page.evaluate(
     (key) => {
       const bridge = (window as unknown as Record<string, unknown>)[key] as Record<string, unknown>;
@@ -67,6 +67,7 @@ test("exposes exactly the five bridge capabilities and nothing else", async () =
   );
   expect(keys).toEqual([
     "getBootstrap",
+    "getLocalAuthToken",
     "getRuntimeStatus",
     "onRuntimeStatus",
     "openExternalLink",
@@ -152,8 +153,26 @@ test("getBootstrap returns a minimal payload with no secrets, env, or paths", as
     >;
     return bridge.getBootstrap();
   }, DESKTOP_BRIDGE_KEY);
-  expect(bootstrap).toEqual({ appVersion: "0.1.0", bridgeVersion: 1, features: ["desktop-shell"] });
-  expect(Object.keys(bootstrap).sort()).toEqual(["appVersion", "bridgeVersion", "features"]);
+  // The credentials field carries ONLY redacted state strings, never values.
+  expect(bootstrap.credentials).toEqual({
+    provider: expect.stringMatching(/^(available|unavailable|decrypt_failed|rotation_needed)$/),
+    localAuth: expect.stringMatching(/^(available|unavailable|decrypt_failed|rotation_needed)$/),
+    storageAvailable: expect.any(Boolean),
+  });
+  expect(bootstrap).toEqual({
+    appVersion: "0.1.0",
+    bridgeVersion: 1,
+    features: ["desktop-shell"],
+    runtime: expect.anything(),
+    credentials: bootstrap.credentials,
+  });
+  expect(Object.keys(bootstrap).sort()).toEqual([
+    "appVersion",
+    "bridgeVersion",
+    "credentials",
+    "features",
+    "runtime",
+  ]);
 });
 
 test("onRuntimeStatus subscribes and unsubscribes cleanly", async () => {

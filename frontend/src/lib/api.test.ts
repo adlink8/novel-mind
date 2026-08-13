@@ -119,6 +119,11 @@ describe("API 客户端", () => {
   });
 
   describe("aiModelsApi", () => {
+    it("providers 调用 GET /models/providers", async () => {
+      await aiModelsApi.providers();
+      expect(mockGet).toHaveBeenCalledWith("/models/providers");
+    });
+
     it("list 调用 GET /models", async () => {
       await aiModelsApi.list();
       expect(mockGet).toHaveBeenCalledWith("/models");
@@ -128,6 +133,16 @@ describe("API 客户端", () => {
       const data = { name: "test", provider: "openai", model_id: "gpt-4o" };
       await aiModelsApi.create(data as any);
       expect(mockPost).toHaveBeenCalledWith("/models", data);
+    });
+
+    it("discover 调用 POST /models/discover", async () => {
+      const data = {
+        provider: "custom",
+        base_url: "https://models.example.com/v1",
+        api_key: "secret",
+      };
+      await aiModelsApi.discover(data);
+      expect(mockPost).toHaveBeenCalledWith("/models/discover", data);
     });
 
     it("test 调用 POST /models/:id/test", async () => {
@@ -213,6 +228,16 @@ describe("API 客户端", () => {
   });
 
   describe("authApi", () => {
+    it("localAutoLogin 建立本地测试会话并写入 token", async () => {
+      mockPost.mockResolvedValue({
+        data: { access_token: "local-tok", token_type: "bearer", user_id: 2 },
+      });
+      const res = await authApi.localAutoLogin();
+      expect(mockPost).toHaveBeenCalledWith("/auth/local-auto-login");
+      expect(getAccessToken()).toBe("local-tok");
+      expect(res.data.access_token).toBe("local-tok");
+    });
+
     it("login 成功后写入 access token", async () => {
       mockPost.mockResolvedValue({
         data: { access_token: "tok-1", token_type: "bearer", user_id: 1 },

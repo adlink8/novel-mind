@@ -36,6 +36,7 @@ from app.models.reader_chat import (
     ReaderMessageCitation,
     ReaderMessageSelection,
 )
+from app.services.user_preference_memory import extract_from_persisted_message
 from app.schemas.reader_chat import (
     ChapterRangeAnchor,
     ConversationCreate,
@@ -437,6 +438,7 @@ class ConversationService:
         await db.flush()
         await db.refresh(message)
         await db.refresh(job)
+        await extract_from_persisted_message(db, message.id)
 
         return MessageAccepted(
             message=await self._to_message_view(db, message),
@@ -500,6 +502,28 @@ class ConversationService:
             conversation_id=conversation_id,
             job_id=job_id,
         )
+        if (
+            job.status == GenerationJobStatus.PAUSED_DEPENDENCY.value
+            and str(job.status_reason or "").startswith("waiting_analysis:")
+        ):
+            # The GET path is also a bounded recovery checkpoint: a stale
+            # queued/running backfill cannot leave the public reader job
+            # waiting forever when no new poller event arrives.
+            from app.models.agent_runtime import SkillRun
+            from app.services.agent_runtime.reader_bridge import (
+                _reconcile_reader_chat_after_backfill_in_session,
+            )
+
+            trigger = await db.scalar(
+                select(SkillRun)
+                .where(
+                    SkillRun.origin == "chat_backfill",
+                    SkillRun.user_message_id == job.user_message_id,
+                )
+                .order_by(SkillRun.id.desc())
+            )
+            if trigger is not None:
+                await _reconcile_reader_chat_after_backfill_in_session(db, trigger)
         return self._to_job_view(job)
 
     async def cancel_job(

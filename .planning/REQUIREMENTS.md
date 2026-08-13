@@ -88,6 +88,15 @@
 | REQ-DESK-09 | Windows installation provides a single-instance application, clean process-tree shutdown, no terminal windows and a reversible versioned upgrade path | Phase 45 | PLANNED |
 | REQ-DESK-10 | Release qualification covers Electron integration, clean-VM install, first run, all existing critical workflows, IPC/security negatives, crash recovery and data preservation | Phase 45 | PLANNED |
 
+## v1.6 Provider Protocol Unification
+
+| ID | Requirement | Owner | Status |
+|---|---|---|---|
+| REQ-PROVIDER-01 | OpenAI、Anthropic、Gemini、Ollama 与自定义 OpenAI-compatible 使用同一版本化 provider profile/adapter 权威；模型目录分页、能力过滤、ID 规范化和创建/更新校验不得漂移 | Phase 46-01 | PLANNED |
+| REQ-PROVIDER-02 | Pi/Agent 网关与所有后端文本生成消费者只从当前 owner 的有效 `AIModelConfig` 解析 deployment；缺少、歧义、禁用或不安全配置时 fail closed，遗留硬编码模型池不再参与运行选择 | Phase 46-02 | PLANNED |
+| REQ-PROVIDER-03 | 五类供应商分别通过凭据隔离的目录发现、连接测试和 Pi 真实运行资格矩阵；没有可用凭据或服务时必须记录 BLOCKED/PARTIAL，不得以 mock 或单元测试冒充真实联通 | Phase 46-03 | PLANNED |
+| REQ-PROVIDER-04 | 每次实际调用保留 owner、provider、model、协议/能力、token、延迟、错误与可核验成本血缘；设置页只展示后端权威能力和诚实状态，未知价格/能力不得推测 | Phase 46-04 | PLANNED |
+
 ## Explicit Backlog
 
 | ID | Requirement | Status |

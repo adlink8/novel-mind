@@ -82,6 +82,11 @@ export interface LoginResponse {
 
 export const authApi = {
   me: () => api.get<AuthUser>("/auth/me"),
+  localAutoLogin: async () => {
+    const res = await api.post<LoginResponse>("/auth/local-auto-login");
+    setAccessToken(res.data.access_token);
+    return res;
+  },
   login: async (username: string, password: string) => {
     const res = await api.post<LoginResponse>("/auth/login", { username, password });
     setAccessToken(res.data.access_token);

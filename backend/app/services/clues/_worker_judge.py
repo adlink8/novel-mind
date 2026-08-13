@@ -168,7 +168,7 @@ async def _judge_and_persist(
                 "schema_hash": version.schema_hash,
             }
         )
-        # Clue packages carry multi-unit excerpts + system prompt; Vertex prompt
+        # Clue packages carry multi-unit excerpts + system prompt; provider prompt
         # tokens routinely exceed the old 12k headroom (observed ~16k on novel 91).
         # Under-reservation makes BudgetGate.settle raise after a successful call,
         # which the except path rewrites to outcome_unknown / paused_dependency.

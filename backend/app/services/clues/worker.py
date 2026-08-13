@@ -116,54 +116,21 @@ __all__ = [
 
 
 def production_runtime() -> ClueWorkerRuntime:
-    """Build production runtime with judge model frozen to the same deployment.
-
-    Budget/lineage used vertex while the judge previously fell back to
-    ``ai_router.route_task("extraction")`` → ``openai/gpt-4o-mini`` (no key),
-    producing ``provider_error:AuthenticationError`` and 0 clues. Wire the
-    judge to the selected provider/model explicitly (same pattern as reader_chat).
-    """
+    """Build production runtime with one configured LiteLLM deployment."""
     from app.config import settings
+    from app.services.ai_service import AIService
 
-    provider = (settings.chat_provider or "vertex_google").strip().lower()
-    use_vertex = (
-        provider
-        in (
-            "vertex_google",
-            "vertex",
-            "vertex_ai",
-            "gcp",
-            "google_cloud",
-        )
-        or not (settings.openai_api_key or "").strip()
+    configured_provider = (settings.chat_provider or "openai").strip().lower()
+    configured_model = (settings.default_chat_model or "gpt-4o-mini").strip()
+    judge_model = AIService.litellm_model_name(configured_provider, configured_model)
+    provider, model_id = (
+        judge_model.split("/", 1)
+        if "/" in judge_model
+        else ("openai", judge_model)
     )
-    if use_vertex:
-        model_id = (settings.vertex_model or "gemini-3.5-flash-lite").strip()
-        for prefix in (
-            "vertex_google/",
-            "vertex_ai/",
-            "vertex/",
-            "gcp/",
-            "google/",
-        ):
-            if model_id.lower().startswith(prefix):
-                model_id = model_id[len(prefix) :]
-                break
-        model_id = model_id or "gemini-3.5-flash-lite"
-        deployment = ClueModelDeployment(
-            "vertex_google",
-            model_id,
-            model_id,
-            Decimal("0.10"),
-            Decimal("0.40"),
-        )
-        judge_model = f"vertex_google/{model_id}"
-    else:
-        model_id = "gpt-4o-mini-2024-07-18"
-        deployment = ClueModelDeployment(
-            "openai", model_id, model_id, Decimal("0.15"), Decimal("0.60")
-        )
-        judge_model = f"openai/{model_id}"
+    deployment = ClueModelDeployment(
+        provider, model_id, model_id, Decimal("0.15"), Decimal("0.60")
+    )
     sessions = async_session_factory
     return ClueWorkerRuntime(
         sessions=sessions,

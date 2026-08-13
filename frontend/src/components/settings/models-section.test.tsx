@@ -13,9 +13,53 @@ const mocks = vi.hoisted(() => ({
   getTestResult: vi.fn<(id: number) => { success: boolean; message: string } | null>(
     () => null
   ),
+  discover: vi.fn().mockResolvedValue({
+    data: {
+      models: [
+        { id: "provider-model-a", name: "Provider Model A" },
+        { id: "provider-model-b", name: "Provider Model B" },
+      ],
+    },
+  }),
+  providers: vi.fn().mockResolvedValue({
+    data: [
+      {
+        id: "custom",
+        label: "OpenAI 兼容服务",
+        credential_kind: "api_key",
+        credential_required: false,
+      },
+      {
+        id: "anthropic",
+        label: "Anthropic",
+        default_base_url: "https://api.anthropic.com/v1",
+        credential_kind: "api_key",
+        credential_required: true,
+      },
+      {
+        id: "ollama",
+        label: "Ollama",
+        default_base_url: "http://127.0.0.1:11434",
+        credential_kind: "none",
+        credential_required: false,
+      },
+    ],
+  }),
   models: [] as AIModelConfig[],
   loading: false,
 }));
+
+vi.mock("@/lib/api", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/api")>();
+  return {
+    ...actual,
+    aiModelsApi: {
+      ...actual.aiModelsApi,
+      discover: mocks.discover,
+      providers: mocks.providers,
+    },
+  };
+});
 
 vi.mock("@/hooks/use-ai-models", () => ({
   useAIModels: () => ({
@@ -98,6 +142,83 @@ describe("ModelsSection", () => {
       expect(mocks.addModel).toHaveBeenCalledWith(
         expect.objectContaining({ name: "新模型", model_id: "gpt-4o-mini" })
       )
+    );
+  });
+
+  it("首个模型自动设为默认供 Pi Agent 使用", async () => {
+    mocks.models = [];
+    render(<ModelsSection chapter="贰" />);
+    fireEvent.click(screen.getAllByRole("button", { name: "添加模型" })[0]);
+    fireEvent.change(screen.getByPlaceholderText("例如：GPT-4o、Claude 3.5 Sonnet"), {
+      target: { value: "首个模型" },
+    });
+    fireEvent.change(
+      screen.getByPlaceholderText("例如：gpt-4o-mini、claude-3-5-sonnet-20241022"),
+      { target: { value: "provider-model-a" } }
+    );
+    fireEvent.click(screen.getByRole("button", { name: "添加模型" }));
+
+    await waitFor(() =>
+      expect(mocks.addModel).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model_id: "provider-model-a",
+          is_default: true,
+        })
+      )
+    );
+  });
+
+  it("通过 Base URL 获取模型列表并选择模型", async () => {
+    render(<ModelsSection chapter="叁" />);
+    fireEvent.click(screen.getByRole("button", { name: "添加模型" }));
+    await waitFor(() => expect(mocks.providers).toHaveBeenCalled());
+    fireEvent.change(
+      screen.getByPlaceholderText("自定义 API 地址，例如：https://api.example.com/v1"),
+      { target: { value: "https://models.example.com/v1" } }
+    );
+    fireEvent.change(screen.getByLabelText(/API Key/), {
+      target: { value: "provider-secret" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "获取模型列表" }));
+
+    await waitFor(() =>
+      expect(mocks.discover).toHaveBeenCalledWith({
+        provider: "custom",
+        base_url: "https://models.example.com/v1",
+        api_key: "provider-secret",
+      })
+    );
+    expect(await screen.findByRole("option", { name: "Provider Model A" })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("已发现模型"), {
+      target: { value: "provider-model-b" },
+    });
+    expect(
+      screen.getByPlaceholderText("例如：gpt-4o-mini、claude-3-5-sonnet-20241022")
+    ).toHaveValue("provider-model-b");
+  });
+
+  it("不再显示 Vertex 供应商", async () => {
+    render(<ModelsSection chapter="叁" />);
+    fireEvent.click(screen.getByRole("button", { name: "添加模型" }));
+    await waitFor(() => expect(mocks.providers).toHaveBeenCalled());
+
+    expect(screen.queryByRole("option", { name: /Vertex/i })).not.toBeInTheDocument();
+  });
+
+  it("从后端供应商协议自动填写 URL 和凭据提示", async () => {
+    render(<ModelsSection chapter="贰" />);
+    fireEvent.click(screen.getByRole("button", { name: "添加模型" }));
+
+    await waitFor(() => expect(mocks.providers).toHaveBeenCalled());
+    fireEvent.change(screen.getByLabelText("服务提供商"), {
+      target: { value: "anthropic" },
+    });
+
+    expect(screen.getByLabelText(/Base URL/)).toHaveValue("https://api.anthropic.com/v1");
+    expect(screen.getByLabelText(/API Key/)).toHaveAttribute(
+      "placeholder",
+      "Anthropic API Key"
     );
   });
 

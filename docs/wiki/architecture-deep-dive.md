@@ -165,7 +165,7 @@ Stage C - 全局 + 封存（global + manifest）──
 |--------|------|------|---------|
 | `schema_repair_needed` | 164 | JSON 格式/类型错误 | 自动修复重试（最多 3 次） |
 | `schema_or_business_invalid` | 67 | 修复后仍无效/业务规则错误 | 放弃该阶段 |
-| `VertexAPIError` | 1 | API 网络错误 | 放弃该阶段 |
+| 上游 API 错误 | 1 | 模型供应商网络错误 | 放弃该阶段 |
 
 **JSON Schema 错误的修复机制**：在 prompt 末尾追加 "Previous output failed schema validation. Fix field types and required keys." 后再次调用。
 

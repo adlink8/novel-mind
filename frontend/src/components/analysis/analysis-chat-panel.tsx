@@ -46,6 +46,7 @@ import {
   type MessageView,
 } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { resolveReadingCutoffChapterNumber } from "@/lib/reader-progress";
 import { WorldModelEvidencePanel } from "./world-model-evidence-panel";
 
 /**
@@ -114,17 +115,7 @@ export function AnalysisChatPanel({
 
   /** 阅读进度章号；无进度回落到第一章（与后端 resolve_chapter_cutoff 同语义）。 */
   const cutoffChapterNumber = useMemo(() => {
-    const byProgress =
-      progressChapterId != null
-        ? chapters.find((c) => c.id === progressChapterId)?.chapter_number ??
-          null
-        : null;
-    if (byProgress != null) return byProgress;
-    if (!chapters.length) return null;
-    return chapters.reduce(
-      (min, c) => Math.min(min, c.chapter_number),
-      Number.POSITIVE_INFINITY
-    );
+    return resolveReadingCutoffChapterNumber(chapters, progressChapterId);
   }, [chapters, progressChapterId]);
 
   const lastChapterNumber = useMemo(() => {

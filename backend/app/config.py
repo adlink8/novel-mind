@@ -53,18 +53,11 @@ class Settings(BaseSettings):
     openai_api_key: str = ""  # OpenAI API Key（sk-xxx）
     openai_base_url: str = "https://api.openai.com/v1"  # OpenAI 兼容 API 地址
     anthropic_api_key: str = ""  # Anthropic API Key（sk-ant-xxx）
-    gemini_api_key: str = ""  # Google AI Studio Key（仅 chat_provider=gemini 时使用）
-    # 聊天提供商：vertex_google（与「数据分析」一致，推荐）| gemini | openai | ...
-    chat_provider: str = "vertex_google"
-    # 默认聊天模型；Vertex 下为裸模型名或 vertex_google/gemini-3.5-flash-lite
-    default_chat_model: str = "vertex_google/gemini-3.5-flash-lite"
-    # Google Cloud Vertex AI（gcloud token，非 AI Studio 免费 key）
-    gcp_project: str = "project-c5cbd608-1b00-454e-80f"
-    gcp_location: str = "us-central1"
-    gcp_sdk_root: str = ""  # 留空；Vertex 集成需要时通过 NOVELMIND_GCP_SDK_ROOT 配置
-    gcp_sdk_py: str = ""  # 留空；Vertex 集成需要时通过 NOVELMIND_GCP_SDK_PY 配置
-    vertex_model: str = "gemini-3.5-flash-lite"
-    # 访问 Vertex/Google API 的出站代理（国内环境常需；留空则读 HTTPS_PROXY 环境变量）
+    gemini_api_key: str = ""  # Google AI Studio Key（chat_provider=gemini）
+    # 全局回退仅用于尚未绑定 owner 模型配置的后台任务。
+    chat_provider: str = "openai"
+    default_chat_model: str = "gpt-4o-mini"
+    # 访问外部 AI API 的出站代理；留空则读 HTTPS_PROXY 环境变量。
     https_proxy: str = ""
     ollama_base_url: str = "http://localhost:11434"  # 本地 Ollama 服务地址
 
@@ -105,10 +98,20 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 60 * 24 * 7  # Token 有效期: 7 天
     auth_cookie_secure: bool = False
 
+    # 桌面/本地单用户产品默认不启用交互式注册和密码登录。关闭时，普通用户
+    # API 绑定到 local_auto_login_username 指定的工作区用户；Agent 网关及
+    # per-run 内部令牌仍使用各自独立的认证链路。
+    auth_enabled: bool = Field(
+        default=False, validation_alias="NOVELMIND_AUTH_ENABLED"
+    )
+
     # 自定义 AI API 地址只允许访问管理员明确配置的主机。
     # 本地 Ollama 需显式加入，例如: localhost,127.0.0.1
-    ai_allowed_hosts: str = "api.openai.com,api.anthropic.com"
-    ai_allowed_private_hosts: str = ""
+    ai_allowed_hosts: str = (
+        "api.openai.com,api.anthropic.com,"
+        "generativelanguage.googleapis.com,opencode.ai"
+    )
+    ai_allowed_private_hosts: str = "127.0.0.1,localhost"
 
     # Phase 15: offline hierarchical retrieval experiment (default OFF).
     # Never enables a production Reader Chat consumer or active pointer path.
@@ -135,6 +138,14 @@ class Settings(BaseSettings):
     # 首个注册成为 admin，以保持开发便利。
     bootstrap_admin_token: str = Field(
         default="", validation_alias="NOVELMIND_BOOTSTRAP_ADMIN_TOKEN"
+    )
+
+    # ── 本地开发自动会话（仅 debug + loopback）──
+    # 指定本地测试库中的活跃用户名后，前端可通过受限端点建立会话，无需把
+    # 测试密码写入浏览器或源码。生产模式禁止启用；端点还会校验请求来源与
+    # 客户端地址均为已允许的本机 loopback。
+    local_auto_login_username: str = Field(
+        default="", validation_alias="NOVELMIND_LOCAL_AUTO_LOGIN_USERNAME"
     )
 
     # ── 桌面本地会话认证（Phase 44-02 / D-44-04 / T-44-02-02）──
@@ -170,6 +181,10 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def validate_production_secrets(self):
         if not self.debug:
+            if self.auth_enabled and self.local_auto_login_username:
+                raise ValueError(
+                    "NOVELMIND_LOCAL_AUTO_LOGIN_USERNAME is forbidden when debug=false"
+                )
             if self.secret_key == DEV_JWT_SECRET or len(self.secret_key) < 32:
                 raise ValueError(
                     "NOVELMIND_SECRET_KEY must be a unique value of at least 32 characters"

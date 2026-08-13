@@ -13,6 +13,7 @@ import path from "node:path";
 import type { DesktopSecurityPosture } from "../shared/bridge-contract";
 import { isApprovedAppUrl } from "./security/approved-origin";
 import { applyCspToSession } from "./security/csp";
+import type { CspMode } from "./security/csp";
 import { applyNavigationPolicy } from "./security/navigation";
 import { applyPermissionPolicy } from "./security/permissions";
 
@@ -54,6 +55,7 @@ export { isApprovedAppUrl } from "./security/approved-origin";
 
 export interface CreateMainWindowOptions {
   rendererUrl: string;
+  cspMode?: CspMode;
 }
 
 export function createMainWindow(opts: CreateMainWindowOptions): BrowserWindow {
@@ -67,6 +69,7 @@ export function createMainWindow(opts: CreateMainWindowOptions): BrowserWindow {
     width: 1280,
     height: 800,
     title: "NovelMind",
+    icon: path.join(process.cwd(), "assets", "novelmind-icon.png"),
     show: false,
     backgroundColor: "#0a0a0a",
     webPreferences: {
@@ -92,8 +95,9 @@ export function createMainWindow(opts: CreateMainWindowOptions): BrowserWindow {
   // Popups, webviews, navigation, redirects and downloads denied by default (D-42-03).
   applyNavigationPolicy(win);
 
-  // Production CSP injected on approved-origin responses (D-42-07).
-  applyCspToSession(ses);
+  // Production is the fail-closed default. The local launcher explicitly opts
+  // into the React development CSP; packaged builds never do.
+  applyCspToSession(ses, opts.cspMode ?? "production");
 
   void win.loadURL(opts.rendererUrl);
   return win;

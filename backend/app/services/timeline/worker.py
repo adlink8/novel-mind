@@ -7,7 +7,7 @@ progress/status finalization (``_update_progress`` / ``_finish_run``) and
 dependent analysis dispatch (``_dispatch_dependent_analysis``).
 
 拆分说明（refactor split）：runtime/transport 构造拆到 ``_worker_runtime.py``
-（``TimelineWorkerRuntime`` / ``_LiteLLMTransport`` / ``_VertexTransport`` /
+（``TimelineWorkerRuntime`` / ``_LiteLLMTransport`` /
 ``production_runtime`` / ``_load_prompt``），run 状态与 pre-flight 拆到
 ``_worker_prepare.py``（``TimelineWorkerError`` /
 ``TimelineCancellationRequested`` / ``_claim_run`` / ``_raise_if_cancel_requested`` /
@@ -64,7 +64,6 @@ from app.services.timeline._worker_reconcile import (
 from app.services.timeline._worker_runtime import (
     TimelineWorkerRuntime,
     _LiteLLMTransport,
-    _VertexTransport,
     _load_prompt,
     production_runtime,
 )
@@ -78,7 +77,6 @@ __all__ = [
     # runtime construction (re-exported from _worker_runtime)
     "TimelineWorkerRuntime",
     "_LiteLLMTransport",
-    "_VertexTransport",
     "production_runtime",
     "_load_prompt",
     # run state & pre-flight (re-exported from _worker_prepare)

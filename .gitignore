@@ -89,3 +89,6 @@ backups/*.dump
 .claude/
 .playwright-cli/
 
+# --- 本地会话凭据（不提交；/*.txt 已覆盖根目录 cookies.txt）---
+cookies.txt
+

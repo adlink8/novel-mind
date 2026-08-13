@@ -185,7 +185,7 @@ async def _reconcile_and_persist(runtime, budget, run, version) -> None:
                 source_attempt_id=cached.source_attempt_id,
                 artifact_checksum=cached.artifact_checksum,
             )
-    # Large full-book candidate sets (500+ chapters) blow Vertex/OpenAI structured
+    # Large full-book candidate sets (500+ chapters) can exceed structured-output
     # reconcile payloads. Prefer LLM only for small/medium windows; otherwise
     # deterministic pass-through so promotion and downstream rel/clue can run.
     _MAX_LLM_RECONCILE_EVENTS = 120

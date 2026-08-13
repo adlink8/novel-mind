@@ -7,10 +7,10 @@
  * removing the header, stripping it, or adding a permissive `<meta>` can never
  * relax this policy.
  *
- * Dev-mode note (research decision): the policy is scoped to the approved
- * loopback app origin only. Browser `dev` mode is a test harness with its own
- * (unlocked) session; the production window's policy is never widened for dev
- * convenience, and HMR traffic on other origins is never touched.
+ * Development mode is an explicit opt-in used only by the local Electron
+ * launcher. It adds `unsafe-eval` because React development diagnostics require
+ * it. Packaged applications and direct test launches remain on the production
+ * policy even if an inherited environment variable is present.
  */
 import type {
   HeadersReceivedResponse,
@@ -43,6 +43,17 @@ export const CSP_DIRECTIVES = [
   "worker-src 'self'",
 ].join("; ");
 
+export type CspMode = "development" | "production";
+
+const DEVELOPMENT_CSP_DIRECTIVES = CSP_DIRECTIVES.replace(
+  "script-src 'self' 'unsafe-inline'",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+);
+
+export function cspDirectivesForMode(mode: CspMode): string {
+  return mode === "development" ? DEVELOPMENT_CSP_DIRECTIVES : CSP_DIRECTIVES;
+}
+
 /**
  * Applies the production CSP by rewriting the `Content-Security-Policy`
  * response header of every HTTP(S) response served from an approved loopback
@@ -50,7 +61,8 @@ export const CSP_DIRECTIVES = [
  * through untouched. Registration is on the given session; a fresh session gets
  * a fresh registration, so tests and future windows are isolated.
  */
-export function applyCspToSession(ses: Session): void {
+export function applyCspToSession(ses: Session, mode: CspMode = "production"): void {
+  const directives = cspDirectivesForMode(mode);
   ses.webRequest.onHeadersReceived(
     (
       details: OnHeadersReceivedListenerDetails,
@@ -61,7 +73,7 @@ export function applyCspToSession(ses: Session): void {
         return;
       }
       const responseHeaders = { ...details.responseHeaders };
-      responseHeaders["Content-Security-Policy"] = [CSP_DIRECTIVES];
+      responseHeaders["Content-Security-Policy"] = [directives];
       responseHeaders["X-Content-Type-Options"] = ["nosniff"];
       callback({ responseHeaders });
     },

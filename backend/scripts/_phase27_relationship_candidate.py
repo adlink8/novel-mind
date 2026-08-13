@@ -80,7 +80,11 @@ async def main() -> int:
     candidate_version_id = args.candidate_version_id or await _clone_version(
         args.owner_id, args.novel_id, args.analysis_version_id
     )
-    model_name = f"vertex_google/{settings.vertex_model}"
+    from app.services.ai_service import AIService
+
+    model_name = AIService.litellm_model_name(
+        settings.chat_provider, settings.default_chat_model
+    )
     worker = RelationshipObservationWorker(
         judgment_service=RelationshipJudgmentService(model_name=model_name)
     )

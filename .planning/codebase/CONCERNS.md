@@ -176,7 +176,7 @@ No confirmed Critical issue was found in the inspected tree. “High” means re
 - Files: `backend/app/config.py`, `frontend/next.config.mjs`, `agent-service/src/config.ts`, `Makefile`
 - Why fragile: Backend defaults include machine-specific model and SDK paths, while frontend and agent-service default to fixed local ports. A developer can start a partially functional stack whose AI provider path silently differs from CI.
 - Safe modification: Move host-specific paths into documented environment profiles, keep safe portable defaults, and add a configuration diagnostic that reports capability availability without exposing credential values.
-- Test coverage: No direct backend tests reference the Vertex adapter or its machine-path settings.
+- Test coverage: Provider routing and settings contracts cover the supported generic adapters.
 
 ### API/service boundary erosion
 
@@ -275,10 +275,10 @@ No confirmed Critical issue was found in the inspected tree. “High” means re
 - Risk: Concurrency oversubscription and incomplete shutdown can appear only under realistic model latency.
 - Priority: Medium
 
-### Medium — Vertex/Gemini adapter and portable configuration
+### Medium — Provider adapter and portable configuration
 
-- What's not tested: Token acquisition subprocess failures, proxy behavior, schema conversion edge cases, configured SDK path absence, and provider error normalization.
-- Files: `backend/app/services/vertex_gemini.py`, `backend/app/config.py`, `backend/tests/`
+- What's not tested: proxy behavior, schema conversion edge cases, custom endpoint compatibility, and provider error normalization.
+- Files: `backend/app/services/ai_service.py`, `backend/app/config.py`, `backend/tests/`
 - Risk: The default chat provider can fail only in deployment, outside the otherwise broad automated suite.
 - Priority: Medium
 

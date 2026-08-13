@@ -4,7 +4,7 @@
 Commands: create-version | start | status | cancel | resume
 No promote / rollback / current / default / all-books options.
 
-Default transport: Vertex Gemini (same binding pattern as timeline.worker).
+Default transport: the configured LiteLLM provider/model.
 Use --noop for tests / dry wiring checks without provider calls.
 """
 
@@ -105,64 +105,29 @@ class _NoopTransport:
     async def complete(self, **kwargs: Any) -> Any:
         raise RuntimeError(
             "noop transport: refuse provider call "
-            f"(stage_key={kwargs.get('stage_key')!r}); pass without --noop for Vertex"
+            f"(stage_key={kwargs.get('stage_key')!r}); pass without --noop for a live provider"
         )
 
 
 class _LiteLLMNmTransport:
-    """OpenAI-compatible path when chat_provider is openai."""
-
-    def __init__(self, *, model: str) -> None:
-        self._model = model
-
-    async def complete(self, **kwargs: Any) -> dict[str, Any]:
-        import litellm
-
-        stage_key = str(kwargs.get("stage_key") or "")
-        payload = kwargs.get("payload") or {}
-        deployment = kwargs.get("deployment") or {}
-        model = str(deployment.get("model") or self._model)
-        messages = _build_messages(stage_key=stage_key, payload=payload, repair=bool(kwargs.get("repair")))
-        response = await litellm.acompletion(
-            model=model,
-            messages=messages,
-            temperature=0.0,
-            max_tokens=4096,
-            response_format={"type": "json_object"},
-            timeout=180,
-        )
-        usage = getattr(response, "usage", {}) or {}
-        if hasattr(usage, "model_dump"):
-            usage = usage.model_dump()
-        content = response.choices[0].message.content or "{}"
-        parsed = _parse_json_content(content)
-        parsed["usage"] = {
-            "input_tokens": int(usage.get("prompt_tokens") or usage.get("input_tokens") or 0),
-            "output_tokens": int(
-                usage.get("completion_tokens") or usage.get("output_tokens") or 0
-            ),
-        }
-        return _normalize_model_output(parsed, payload=payload, stage_key=stage_key)
-
-
-class _VertexNmTransport:
-    """Google Cloud Vertex structured calls (aligned with timeline.worker._VertexTransport).
-
-    NM gateway calls complete(stage_key=, payload=, deployment=, repair=) — not
-    litellm-style kwargs — so this adapter builds messages + schema here.
-    """
+    """Generic structured transport with narrative-memory payload enrichment."""
 
     def __init__(self, sessions, *, model: str) -> None:
         self._sessions = sessions
         self._model = model
 
     async def complete(self, **kwargs: Any) -> dict[str, Any]:
-        from app.services.vertex_gemini import acomplete
+        import litellm
+
+        from app.services.ai_service import AIService
 
         stage_key = str(kwargs.get("stage_key") or "")
         payload = kwargs.get("payload") or {}
         deployment = kwargs.get("deployment") or {}
-        model = str(deployment.get("model") or self._model)
+        provider = str(deployment.get("provider") or "openai")
+        model = AIService.litellm_model_name(
+            provider, str(deployment.get("model") or self._model)
+        )
         repair = bool(kwargs.get("repair"))
 
         # Enrich chapter stages with evidence text from frozen hierarchy.
@@ -170,21 +135,20 @@ class _VertexNmTransport:
             payload = await self._enrich_chapter_payload(payload)
 
         messages = _build_messages(stage_key=stage_key, payload=payload, repair=repair)
-        schema = _response_schema_for_stage(stage_key)
-        response = await acomplete(
-            messages,
-            model=str(model),
+        response = await litellm.acompletion(
+            model=model,
+            messages=messages,
             temperature=0.0,
             max_tokens=8192,
-            timeout=180.0,
-            response_json_schema=schema,
+            timeout=180,
+            response_format={"type": "json_object"},
         )
-        usage_obj = getattr(response, "usage", None)
+        usage_obj = getattr(response, "usage", {}) or {}
+        if hasattr(usage_obj, "model_dump"):
+            usage_obj = usage_obj.model_dump()
         usage = {
-            "input_tokens": int(getattr(usage_obj, "prompt_tokens", 0) or 0),
-            "output_tokens": int(getattr(usage_obj, "completion_tokens", 0) or 0),
-            "prompt_tokens": int(getattr(usage_obj, "prompt_tokens", 0) or 0),
-            "completion_tokens": int(getattr(usage_obj, "completion_tokens", 0) or 0),
+            "input_tokens": int(usage_obj.get("prompt_tokens") or usage_obj.get("input_tokens") or 0),
+            "output_tokens": int(usage_obj.get("completion_tokens") or usage_obj.get("output_tokens") or 0),
         }
         content = response.choices[0].message.content or "{}"
         try:
@@ -283,7 +247,7 @@ def _parse_json_content(content: str) -> dict[str, Any]:
 
 
 def _response_schema_for_stage(stage_key: str) -> dict[str, Any]:
-    # Vertex-friendly subset (no complex anyOf unions).
+    # Portable structured-output subset (no complex anyOf unions).
     if stage_key.startswith("chapter_state:"):
         return {
             "type": "object",
@@ -540,7 +504,7 @@ def _normalize_model_output(
                     "visible_from_chapter": ch_num,
                 }
             ]
-        # Coerce confidence to float (Vertex sometimes emits ints / omits fields).
+        # Coerce confidence to float when providers emit ints or omit fields.
         repaired_claims: list[dict[str, Any]] = []
         for idx, claim in enumerate(claims, start=1):
             if not isinstance(claim, dict):
@@ -742,32 +706,15 @@ def _production_transport_and_deployment(sessions, *, noop: bool):
         )
         return _NoopTransport(), deployment
 
-    provider = (settings.chat_provider or "vertex_google").strip().lower()
-    use_vertex = provider in (
-        "vertex_google",
-        "vertex",
-        "vertex_ai",
-        "gcp",
-        "google_cloud",
-    ) or not (settings.openai_api_key or "").strip()
-
-    if use_vertex:
-        model_id = (settings.vertex_model or "gemini-3.5-flash-lite").strip()
-        deployment = ModelDeploymentSnapshot(
-            provider="vertex_google",
-            model=model_id,
-            deployment=model_id,
-            revision="1",
-            supports_structured_output=True,
-            # Flash placeholder prices for budget ledger only
-            input_price_per_million="0.10",
-            output_price_per_million="0.40",
-        )
-        return _VertexNmTransport(sessions, model=model_id), deployment
-
-    model_id = "gpt-4o-mini-2024-07-18"
+    provider = (settings.chat_provider or "openai").strip().lower()
+    if provider not in {"openai", "anthropic", "gemini", "ollama", "custom"}:
+        raise ValueError(f"unsupported model provider: {provider}")
+    model_id = (settings.default_chat_model or "gpt-4o-mini").strip()
+    prefix = f"{provider}/"
+    if model_id.lower().startswith(prefix):
+        model_id = model_id[len(prefix) :]
     deployment = ModelDeploymentSnapshot(
-        provider="openai",
+        provider=provider,
         model=model_id,
         deployment=model_id,
         revision="1",
@@ -775,7 +722,7 @@ def _production_transport_and_deployment(sessions, *, noop: bool):
         input_price_per_million="0.15",
         output_price_per_million="0.60",
     )
-    return _LiteLLMNmTransport(model=model_id), deployment
+    return _LiteLLMNmTransport(sessions, model=model_id), deployment
 
 
 def _run_policy(deployment_lineage):

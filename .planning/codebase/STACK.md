@@ -55,7 +55,7 @@ last_mapped_commit: b679b49
 ## Key Dependencies
 
 **Critical:**
-- `litellm>=1.83.10` - common OpenAI/Anthropic/Gemini-compatible chat and embedding facade; Vertex traffic also has a direct Google REST path (`backend/requirements.txt`, `backend/app/services/ai_service.py`, `backend/app/services/vertex_gemini.py`).
+- `litellm>=1.83.10` - common OpenAI/Anthropic/Gemini/Ollama-compatible chat and embedding facade (`backend/requirements.txt`, `backend/app/services/ai_service.py`).
 - `chromadb==1.5.9` + `pgvector>=0.3` - vector retrieval clients; Chroma is deliberately exact-pinned to the CI service image (`backend/requirements.txt`, `backend/app/services/vector_store.py`, `.github/ci/service-lock.json`).
 - `sentence-transformers>=3.0` - default local BGE embeddings, with Torch supplied transitively (`backend/requirements.txt`, `backend/app/services/ai_service.py`).
 - `cryptography>=42.0`, `bcrypt>=4.0,<5.0`, `pyjwt>=2.8` - API-key encryption, password hashing and custom JWT sessions (`backend/requirements.txt`, `backend/app/core/crypto.py`, `backend/app/core/security.py`).

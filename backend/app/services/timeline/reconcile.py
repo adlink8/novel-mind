@@ -48,7 +48,7 @@ class ReconciliationCausalProposalModel(BaseModel):
 
 
 class StoryConstraintModel(BaseModel):
-    """Object form for Vertex/OpenAI structured output (tuple/prefixItems is rejected by Vertex)."""
+    """Portable object form for providers that reject tuple/prefixItems schemas."""
 
     model_config = ConfigDict(extra="forbid", strict=True)
 
