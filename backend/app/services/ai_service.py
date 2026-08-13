@@ -51,7 +51,7 @@ def _extract_token_usage(response) -> tuple[int, int]:
 
 
 def _provider_of(model: str) -> str:
-    """从 LiteLLM 模型标识推断提供商（vertex_google/gemini-x → vertex_google）。"""
+    """从 LiteLLM 模型标识推断提供商。"""
     return model.split("/", 1)[0] if "/" in (model or "") else "openai"
 
 
@@ -119,19 +119,14 @@ class AIService:
     """
 
     def __init__(self):
-        # 默认与「数据分析」一致：Google Cloud Vertex Gemini
-        self.default_model = (
-            settings.default_chat_model or "vertex_google/gemini-3.5-flash-lite"
-        )
-        self.default_provider = settings.chat_provider or "vertex_google"
+        self.default_model = settings.default_chat_model or "gpt-4o-mini"
+        self.default_provider = settings.chat_provider or "openai"
         _sync_provider_env_keys()
 
     def _resolve_api_key(self, model: str, api_key: str | None) -> str | None:
         if api_key:
             return api_key
         m = (model or "").lower()
-        if m.startswith(("vertex_google/", "vertex_ai/", "vertex/", "gcp/")):
-            return None  # Vertex 用 gcloud token，不用 API Key
         if m.startswith("gemini/") or m.startswith("google/"):
             return settings.gemini_api_key or None
         if m.startswith("claude") or m.startswith("anthropic/"):
@@ -158,11 +153,11 @@ class AIService:
 
         Args:
             messages: 消息列表，格式 [{"role": "user/assistant/system", "content": "..."}]
-            model: 模型标识（Vertex: vertex_google/gemini-3.5-flash-lite；或 LiteLLM 名）
+            model: LiteLLM 模型标识
             temperature: 生成温度（0-2，越高越随机）
             max_tokens: 最大输出 token 数
             stream: 是否流式输出（此方法建议使用 stream_chat 代替流式）
-            api_key: 可选，覆盖环境变量中的密钥（来自 AIModelConfig；Vertex 忽略）
+            api_key: 可选，覆盖环境变量中的密钥（来自 AIModelConfig）
             api_base: 可选，自定义 API 地址
             task_type: 任务类型（写入用量日志，默认 "analysis"）
 
@@ -172,34 +167,28 @@ class AIService:
         _sync_provider_env_keys()
         model = model or self.default_model
 
-        from app.services.vertex_gemini import acomplete as vertex_acomplete
-        from app.services.vertex_gemini import is_vertex_model
-
         start = time.perf_counter()
         try:
-            if is_vertex_model(model) and not stream:
-                response = await vertex_acomplete(
-                    messages,
-                    model=model,
-                    temperature=temperature,
-                    max_tokens=max_tokens,
-                    tools=_extra.get("tools"),
-                )
-            else:
-                kwargs: dict = {
-                    "model": model,
-                    "messages": messages,
-                    "temperature": temperature,
-                    "max_tokens": max_tokens,
-                    "stream": stream,
-                }
-                resolved_key = self._resolve_api_key(model, api_key)
-                if resolved_key:
-                    kwargs["api_key"] = resolved_key
-                if api_base:
-                    kwargs["api_base"] = api_base
+            kwargs: dict = {
+                "model": model,
+                "messages": messages,
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+                "stream": stream,
+            }
+            resolved_key = self._resolve_api_key(model, api_key)
+            if resolved_key:
+                kwargs["api_key"] = resolved_key
+            if api_base:
+                kwargs["api_base"] = api_base
+            if _extra.get("tools") is not None:
+                kwargs["tools"] = _extra["tools"]
+            if _extra.get("response_format") is not None:
+                kwargs["response_format"] = _extra["response_format"]
+            if _extra.get("extra_body") is not None:
+                kwargs["extra_body"] = _extra["extra_body"]
 
-                response = await litellm.acompletion(**kwargs)
+            response = await litellm.acompletion(**kwargs)
         except Exception:
             await _log_usage(
                 model_name=model,
@@ -352,39 +341,6 @@ class AIService:
         _sync_provider_env_keys()
         model = model or self.default_model
 
-        from app.services.vertex_gemini import acomplete as vertex_acomplete
-        from app.services.vertex_gemini import is_vertex_model
-
-        # Vertex 模型：复用自研 GCP SDK 客户端（非流式），按增量块 yield 保持
-        # 流式契约。litellm 不识别 `vertex_google/` 前缀（stream 路径会抛
-        # "LLM Provider NOT provided"），故不走 litellm 流式。
-        if is_vertex_model(model):
-            start = time.perf_counter()
-            status = "success"
-            try:
-                response = await vertex_acomplete(
-                    messages, model=model, tools=_extra.get("tools")
-                )
-                tool_calls = getattr(response.choices[0].message, "tool_calls", None)
-                if tool_calls:
-                    # 工具调用：yield 结构化 dict，gateway 转成 SSE delta.tool_calls。
-                    yield {"__tool_calls__": tool_calls}
-                text = response.choices[0].message.content or ""
-                for i in range(0, len(text), 16):
-                    yield text[i : i + 16]
-            except Exception:
-                status = "failed"
-                raise
-            finally:
-                await _log_usage(
-                    model_name=model,
-                    provider=_provider_of(model),
-                    task_type=task_type,
-                    latency_ms=int((time.perf_counter() - start) * 1000),
-                    status=status,
-                )
-            return
-
         kwargs: dict = {
             "model": model,
             "messages": messages,
@@ -395,24 +351,88 @@ class AIService:
             kwargs["api_key"] = resolved_key
         if api_base:
             kwargs["api_base"] = api_base
+        if _extra.get("tools") is not None:
+            kwargs["tools"] = _extra["tools"]
+        if _extra.get("response_format") is not None:
+            kwargs["response_format"] = _extra["response_format"]
+        if _extra.get("max_tokens") is not None:
+            kwargs["max_tokens"] = _extra["max_tokens"]
+        if _extra.get("temperature") is not None:
+            kwargs["temperature"] = _extra["temperature"]
+        if _extra.get("extra_body") is not None:
+            kwargs["extra_body"] = _extra["extra_body"]
+
+        # 请求上游在流末携带 usage（OpenAI 契约）；不支持的 provider 会忽略该选项，
+        # 此时 usage 保持 0——宁可记 0，绝不虚构。
+        kwargs.setdefault("stream_options", {"include_usage": True})
 
         start = time.perf_counter()
         status = "success"
+        pending_tool_calls: dict[int, dict] = {}
+        finish_reason: str | None = None
+        usage_in = 0
+        usage_out = 0
         try:
             response = await litellm.acompletion(**kwargs)
             async for chunk in response:
-                content = chunk.choices[0].delta.content
+                # usage chunk（choices 为空）与内容 chunk 分开处理。
+                chunk_usage = getattr(chunk, "usage", None)
+                if chunk_usage is not None:
+                    usage_in, usage_out = _extract_token_usage(chunk)
+                choices = getattr(chunk, "choices", None) or []
+                if not choices:
+                    continue
+                fr = getattr(choices[0], "finish_reason", None)
+                if fr:
+                    finish_reason = str(fr)
+                delta = choices[0].delta
+                content = getattr(delta, "content", None)
                 if content:
                     yield content
+                tool_calls = getattr(delta, "tool_calls", None)
+                if tool_calls:
+                    for tool_call in tool_calls:
+                        index = int(getattr(tool_call, "index", 0) or 0)
+                        function = getattr(tool_call, "function", None)
+                        current = pending_tool_calls.setdefault(
+                            index,
+                            {
+                                "id": None,
+                                "type": "function",
+                                "function": {"name": "", "arguments": ""},
+                            },
+                        )
+                        current["id"] = getattr(tool_call, "id", None) or current["id"]
+                        current["type"] = (
+                            getattr(tool_call, "type", None) or current["type"]
+                        )
+                        current["function"]["name"] += (
+                            getattr(function, "name", None) or ""
+                        )
+                        current["function"]["arguments"] += (
+                            getattr(function, "arguments", None) or ""
+                        )
+            if pending_tool_calls:
+                yield {
+                    "__tool_calls__": [
+                        pending_tool_calls[index]
+                        for index in sorted(pending_tool_calls)
+                    ]
+                }
+            # 真实 finish_reason 透传给调用方（stop/length/tool_calls/content_filter）——
+            # 截断与正常结束必须可区分，绝不伪造 stop。
+            if finish_reason:
+                yield {"__finish_reason__": finish_reason}
         except Exception:
             status = "failed"
             raise
         finally:
-            # 流式响应通常不携带 usage，token 记 0
             await _log_usage(
                 model_name=model,
                 provider=_provider_of(model),
                 task_type=task_type,
+                input_tokens=usage_in,
+                output_tokens=usage_out,
                 latency_ms=int((time.perf_counter() - start) * 1000),
                 status=status,
             )
@@ -424,24 +444,25 @@ class AIService:
         mid = (model_id or "").strip()
         if not mid:
             return mid
+        if p == "custom":
+            return mid if mid.startswith("openai/") else f"openai/{mid}"
         # 已是完整标识
         if "/" in mid:
             return mid
-        if p in ("", "custom"):
+        if p == "":
             return mid
         # openai 常用裸名 gpt-4o-mini
         if p == "openai" and not mid.startswith("openai/"):
             return mid
-        # Vertex 统一前缀
-        if p in ("vertex_google", "vertex", "vertex_ai", "gcp", "google_cloud"):
-            return f"vertex_google/{mid}"
+        if p not in {"openai", "anthropic", "gemini", "ollama"}:
+            raise ValueError(f"unsupported model provider: {provider}")
         return f"{p}/{mid}"
 
     async def test_connection(self, model_config) -> str:
         """
         测试模型连通性。
 
-        发送一条简单消息，验证 API Key / gcloud token 和 base_url 是否有效。
+        发送一条简单消息，验证 API Key 和 base_url 是否有效。
 
         Args:
             model_config: AIModelConfig ORM 对象（包含 provider、model_id、api_key、base_url）
