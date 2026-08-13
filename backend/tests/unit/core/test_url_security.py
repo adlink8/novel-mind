@@ -14,7 +14,7 @@ from fastapi import HTTPException
 
 pytestmark = pytest.mark.unit
 
-from app.config import settings
+from app.config import Settings, settings
 from app.core.url_security import validate_ai_base_url
 
 
@@ -29,6 +29,12 @@ def _allowed_hosts(monkeypatch):
 async def test_empty_url_returns_none():
     assert await validate_ai_base_url("") is None
     assert await validate_ai_base_url(None) is None
+
+
+def test_default_public_ai_hosts_include_opencode_go_gateway():
+    """The settings UI's supported OpenCode Go endpoint must pass the default SSRF gate."""
+    configured = Settings.model_fields["ai_allowed_hosts"].default
+    assert "opencode.ai" in {host.strip() for host in configured.split(",")}
 
 
 @pytest.mark.parametrize(

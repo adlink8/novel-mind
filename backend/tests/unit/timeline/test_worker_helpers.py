@@ -19,7 +19,6 @@ from app.models.user import User
 from app.services.timeline.model_gateway import ModelDeployment
 from app.services.timeline.worker import (
     _LiteLLMTransport,
-    _VertexTransport,
     _clip_status_reason,
     _load_persisted_candidates,
     _prices,
@@ -68,58 +67,6 @@ def test_prices_snapshots_deployment():
 # ---------------------------------------------------------------------------
 
 
-def _vertex_response():
-    usage = SimpleNamespace(prompt_tokens=10, completion_tokens=4)
-    return SimpleNamespace(
-        id="v1",
-        usage=usage,
-        choices=[SimpleNamespace(message=SimpleNamespace(content="```json\nok\n```"))],
-    )
-
-
-@pytest.mark.asyncio
-async def test_vertex_transport_strips_markdown_fence():
-    transport = _VertexTransport()
-    with mock.patch(
-        "app.services.vertex_gemini.acomplete",
-        new=mock.AsyncMock(return_value=_vertex_response()),
-    ) as acompl:
-        out = await transport.complete(
-            model="vertex_google/gemini-x",
-            messages=[{"role": "user", "content": "hi"}],
-            timeout=30,
-            response_format=SimpleNamespace(
-                model_json_schema=lambda: {"type": "object"}
-            ),
-            max_tokens=64,
-        )
-    assert out["content"] == "ok"
-    assert out["usage"]["input_tokens"] == 10
-    assert out["usage"]["output_tokens"] == 4
-    call = acompl.call_args
-    assert call.kwargs["temperature"] == 0.0
-    assert call.kwargs["response_json_schema"] == {"type": "object"}
-
-
-@pytest.mark.asyncio
-async def test_vertex_transport_defaults_when_metadata_missing():
-    transport = _VertexTransport()
-    bare = SimpleNamespace(
-        id=None,
-        usage=None,
-        choices=[SimpleNamespace(message=SimpleNamespace(content="plain text"))],
-    )
-    with mock.patch(
-        "app.services.vertex_gemini.acomplete",
-        new=mock.AsyncMock(return_value=bare),
-    ) as acompl:
-        out = await transport.complete(model="", messages=[], timeout=0)
-    assert out["content"] == "plain text"
-    assert out["id"] == "vertex-"
-    assert out["usage"]["input_tokens"] == 0
-    assert acompl.call_args.kwargs["max_tokens"] == 4096
-
-
 @pytest.mark.asyncio
 async def test_litellm_transport_normalizes_usage():
     transport = _LiteLLMTransport()
@@ -159,13 +106,13 @@ async def test_litellm_transport_plain_usage_namespace():
 # ---------------------------------------------------------------------------
 
 
-def test_production_runtime_vertex_by_default(monkeypatch):
-    monkeypatch.setattr("app.config.settings.chat_provider", "vertex_google")
-    monkeypatch.setattr("app.config.settings.vertex_model", "gemini-x")
+def test_production_runtime_uses_configured_litellm_provider(monkeypatch):
+    monkeypatch.setattr("app.config.settings.chat_provider", "gemini")
+    monkeypatch.setattr("app.config.settings.default_chat_model", "gemini-2.5-flash")
     runtime = production_runtime()
-    assert runtime.extraction_deployment.provider == "vertex_google"
-    assert runtime.extraction_deployment.model_id == "gemini-x"
-    assert runtime.extraction_deployment.supports_structured_output is True
+    assert runtime.extraction_deployment.provider == "gemini"
+    assert runtime.extraction_deployment.model_id == "gemini-2.5-flash"
+    assert isinstance(runtime.gateway.transport, _LiteLLMTransport)
     assert runtime.extraction_prompt
 
 

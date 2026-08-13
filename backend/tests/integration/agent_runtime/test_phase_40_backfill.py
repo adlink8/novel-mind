@@ -142,7 +142,12 @@ async def _seed_owner_novel(factory, *, suffix: str) -> dict[str, Any]:
 
 
 async def _create_backfill_run(
-    factory, *, owner_id: int, novel_id: int, skill_version_id: int
+    factory,
+    *,
+    owner_id: int,
+    novel_id: int,
+    skill_version_id: int,
+    backfill_dimension: str = "raw_text",
 ) -> int:
     async with factory() as session:
         r = (
@@ -152,7 +157,7 @@ async def _create_backfill_run(
                     "input, input_hash, frozen_manifest, budget_snapshot, origin, "
                     "backfill_dimension, internal_token_hash, created_at, updated_at) "
                     "VALUES (:o, :n, :sv, 'queued', :inp, :ih, '{}', '{}', 'chat_backfill', "
-                    "'raw_text', :th, now(), now()) RETURNING id"
+                    ":dimension, :th, now(), now()) RETURNING id"
                 ),
                 {
                     "o": owner_id,
@@ -161,6 +166,7 @@ async def _create_backfill_run(
                     "inp": '{"novel_id":1,"question":"q","dimension":"raw_text","branch":null}',
                     "ih": HEX64,
                     "th": hashlib.sha256(b"token").hexdigest(),
+                    "dimension": backfill_dimension,
                 },
             )
         ).scalar()
@@ -236,6 +242,90 @@ class TestClaimEndpoint:
             headers={"Authorization": f"Bearer {GW_TOKEN}"},
         )
         assert resp.status_code == 409
+
+    async def test_claim_token_can_finalize_only_its_exact_run(self, api_client, runtime_factory):
+        client, factory = api_client
+        seed_a = await _seed_owner_novel(factory, suffix="finalize_a")
+        seed_b = await _seed_owner_novel(factory, suffix="finalize_b")
+        run_a = await _create_backfill_run(
+            factory,
+            owner_id=seed_a["owner_id"],
+            novel_id=seed_a["novel_id"],
+            skill_version_id=seed_a["skill_version_id"],
+        )
+        run_same_scope = await _create_backfill_run(
+            factory,
+            owner_id=seed_a["owner_id"],
+            novel_id=seed_a["novel_id"],
+            skill_version_id=seed_a["skill_version_id"],
+            backfill_dimension="world_projection",
+        )
+        run_b = await _create_backfill_run(
+            factory,
+            owner_id=seed_b["owner_id"],
+            novel_id=seed_b["novel_id"],
+            skill_version_id=seed_b["skill_version_id"],
+        )
+        gateway_headers = {"Authorization": f"Bearer {GW_TOKEN}"}
+        claim_a = await client.post(
+            f"/api/agent/queued-runs/{run_a}/claim", headers=gateway_headers
+        )
+        claim_same_scope = await client.post(
+            f"/api/agent/queued-runs/{run_same_scope}/claim", headers=gateway_headers
+        )
+        claim_b = await client.post(
+            f"/api/agent/queued-runs/{run_b}/claim", headers=gateway_headers
+        )
+        assert claim_a.status_code == 200
+        assert claim_same_scope.status_code == 200
+        assert claim_b.status_code == 200
+        token_a = claim_a.json()["internal_token"]
+        token_same_scope = claim_same_scope.json()["internal_token"]
+        token_b = claim_b.json()["internal_token"]
+        finalize_payload = {"stop_reason": "other"}
+
+        wrong_owner = await client.post(
+            f"/api/agent/novels/{seed_a['novel_id']}/skill-runs/{run_a}/finalize",
+            headers={"Authorization": f"Bearer {token_b}"},
+            json=finalize_payload,
+        )
+        assert wrong_owner.status_code == 401
+
+        wrong_scope = await client.post(
+            f"/api/agent/novels/{seed_a['novel_id']}/skill-runs/{run_same_scope}/finalize",
+            headers={"Authorization": f"Bearer {token_a}"},
+            json=finalize_payload,
+        )
+        assert wrong_scope.status_code == 401
+
+        wrong_novel = await client.post(
+            f"/api/agent/novels/{seed_b['novel_id']}/skill-runs/{run_a}/finalize",
+            headers={"Authorization": f"Bearer {token_a}"},
+            json=finalize_payload,
+        )
+        assert wrong_novel.status_code == 401
+
+        wrong_run_token = await client.post(
+            f"/api/agent/novels/{seed_a['novel_id']}/skill-runs/{run_a}/finalize",
+            headers={"Authorization": f"Bearer {token_same_scope}"},
+            json=finalize_payload,
+        )
+        assert wrong_run_token.status_code == 401
+
+        wrong_token = await client.post(
+            f"/api/agent/novels/{seed_a['novel_id']}/skill-runs/{run_a}/finalize",
+            headers={"Authorization": "Bearer invalid-finalize-token"},
+            json=finalize_payload,
+        )
+        assert wrong_token.status_code == 401
+
+        valid = await client.post(
+            f"/api/agent/novels/{seed_a['novel_id']}/skill-runs/{run_a}/finalize",
+            headers={"Authorization": f"Bearer {token_a}"},
+            json=finalize_payload,
+        )
+        assert valid.status_code == 200, valid.text
+        assert valid.json()["status"] == "failed"
 
 
 class TestMaterializer:

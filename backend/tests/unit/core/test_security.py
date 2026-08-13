@@ -35,6 +35,12 @@ from app.core.security import (
 from app.models import User
 
 
+@pytest.fixture(autouse=True)
+def _enable_interactive_auth_for_security_unit_tests(monkeypatch):
+    """Keep legacy token-path assertions explicit while auth defaults off."""
+    monkeypatch.setattr(settings, "auth_enabled", True)
+
+
 # ── password helpers ──
 
 
@@ -189,6 +195,47 @@ async def test_get_current_user_no_token_returns_none(db_session):
     assert await get_current_user(request, None, db_session) is None
 
 
+async def test_get_current_user_uses_default_workspace_when_auth_disabled(
+    db_session, monkeypatch
+):
+    user = await _make_user(db_session, username="admin")
+    monkeypatch.setattr(settings, "auth_enabled", False)
+    monkeypatch.setattr(settings, "local_auto_login_username", "admin")
+
+    result = await get_current_user(_request(), None, db_session)
+
+    assert result.id == user.id
+
+
+async def test_get_current_user_ignores_stale_jwt_when_auth_disabled(
+    db_session, monkeypatch
+):
+    default_user = await _make_user(db_session, username="admin")
+    stale_user = await _make_user(db_session, username="old-user")
+    stale_token = create_access_token({"sub": str(stale_user.id)})
+    credentials = HTTPAuthorizationCredentials(
+        scheme="Bearer", credentials=stale_token
+    )
+    monkeypatch.setattr(settings, "auth_enabled", False)
+    monkeypatch.setattr(settings, "local_auto_login_username", "admin")
+
+    result = await get_current_user(_request(), credentials, db_session)
+
+    assert result.id == default_user.id
+
+
+async def test_get_current_user_fails_when_default_workspace_is_missing(
+    db_session, monkeypatch
+):
+    monkeypatch.setattr(settings, "auth_enabled", False)
+    monkeypatch.setattr(settings, "local_auto_login_username", "missing")
+
+    with pytest.raises(HTTPException) as exc:
+        await get_current_user(_request(), None, db_session)
+
+    assert exc.value.status_code == 503
+
+
 async def test_get_current_user_cookie_no_token_returns_none(db_session):
     await _make_user(db_session)
     req = _request("GET", {"Cookie": "other=1"})
@@ -314,6 +361,18 @@ async def test_require_agent_actor_no_token_401(db_session):
     with pytest.raises(HTTPException) as exc:
         await require_agent_actor(1, _request(), None, db_session)
     assert exc.value.status_code == 401
+
+
+async def test_require_agent_actor_uses_default_workspace_without_login(
+    db_session, monkeypatch
+):
+    user = await _make_user(db_session, username="admin")
+    monkeypatch.setattr(settings, "auth_enabled", False)
+    monkeypatch.setattr(settings, "local_auto_login_username", "admin")
+
+    actor = await require_agent_actor(1, _request(), None, db_session)
+
+    assert actor.id == user.id
 
 
 async def test_require_agent_actor_valid_jwt_returns_user(db_session, monkeypatch):

@@ -846,6 +846,10 @@ async def test_end_to_end_skill_run_and_replay(
     assert artifact1.skill_version_id == svid
     assert artifact1.input_hash == run1_hash
     assert run1_row is not None and run1_row.status == "completed"
+    assert run1_row.frozen_manifest["connector_versions"] == []
+    assert run1_row.frozen_manifest["evidence_refs"] == ["evidence:1"]
+    assert run1_row.frozen_manifest["manifest_checksum"] == "m" * 64
+    assert run1_row.frozen_manifest["question"] == FIXED_QUESTION
     first_content_hash = revision1.content_hash
     first_revision_count = await _count_revisions(runtime_factory, run_id=run1_id)
 
@@ -909,6 +913,76 @@ async def test_end_to_end_skill_run_and_replay(
     rev_payload = rev_resp.json()
     assert len(rev_payload["items"]) == 1
     assert rev_payload["items"][0]["content"]["input_hash"] == run1_hash
+
+
+@pytest.mark.parametrize(
+    ("field", "tampered_value"),
+    [
+        ("connector_versions", [{"connector_id": 999}]),
+        ("evidence_refs", ["evidence:tampered"]),
+    ],
+)
+async def test_finalize_rejects_frozen_manifest_field_drift(
+    runtime_factory,
+    migrated_postgres: str,
+    field: str,
+    tampered_value: list[Any],
+):
+    """accepted 后同名 manifest/evidence 变化必须 fail closed，且零写入。"""
+    seed = _seed_owner_novel(migrated_postgres, suffix=f"drift_{uuid.uuid4().hex[:6]}")
+    svid = await _register_skill(
+        runtime_factory,
+        owner_id=seed["owner_id"],
+        novel_id=seed["novel_id"],
+        contract=_skill_contract(novel_id=seed["novel_id"]),
+    )
+    frozen = {
+        "connector_versions": [{"connector_id": 1}],
+        "evidence_refs": ["evidence:1"],
+    }
+    async with runtime_factory() as session:
+        run = SkillRun(
+            owner_id=seed["owner_id"],
+            novel_id=seed["novel_id"],
+            skill_version_id=svid,
+            status="running",
+            input={"question": FIXED_QUESTION, "novel_id": seed["novel_id"]},
+            input_hash="a" * 64,
+            frozen_manifest=frozen,
+            budget_snapshot={"max_calls": 10},
+        )
+        session.add(run)
+        await session.commit()
+        run_id = run.id
+
+    loop = await stub_agent_loop(
+        runtime_factory,
+        owner_id=seed["owner_id"],
+        novel_id=seed["novel_id"],
+        question=FIXED_QUESTION,
+        skill_version_id=svid,
+        input_hash="a" * 64,
+    )
+    submitted_manifest = dict(loop["frozen_manifest"])
+    submitted_manifest[field] = tampered_value
+    outcome = await finalize_skill_run(
+        runtime_factory,
+        run_id=run_id,
+        stop_reason="stop",
+        envelope=loop["envelope"],
+        model_lineage=loop["model_lineage"],
+        source_versions=loop["source_versions"],
+        usage=loop["usage"],
+        frozen_manifest=submitted_manifest,
+    )
+    assert outcome.status == "failed"
+    assert outcome.error_code == ERROR_CODE_FAILED_VALIDATION
+    assert outcome.status_reason == "frozen manifest changed after freeze"
+    assert await _count_artifacts(runtime_factory, run_id=run_id) == 0
+    assert await _count_revisions(runtime_factory, run_id=run_id) == 0
+    async with runtime_factory() as session:
+        run_row = await session.get(SkillRun, run_id)
+    assert run_row is not None and run_row.frozen_manifest == frozen
 
 
 async def test_finalize_http_endpoint_happy_path(

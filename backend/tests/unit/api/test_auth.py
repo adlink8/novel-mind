@@ -12,6 +12,12 @@ from app.config import settings
 VALID_PASSWORD = "testpass123"
 
 
+@pytest.fixture(autouse=True)
+def _enable_interactive_auth_for_auth_endpoint_tests(monkeypatch):
+    """Legacy auth endpoint cases opt in; the product default is disabled."""
+    monkeypatch.setattr(settings, "auth_enabled", True)
+
+
 def _payload(username: str, password: str = VALID_PASSWORD, **extra) -> dict:
     data = {
         "username": username,
@@ -144,6 +150,80 @@ async def test_get_me_authenticated(auth_client: AsyncClient):
 async def test_get_me_anonymous_401(client: AsyncClient):
     resp = await client.get("/api/auth/me")
     assert resp.status_code == 401
+
+
+async def test_register_and_login_are_closed_when_auth_disabled(
+    client: AsyncClient, monkeypatch
+):
+    monkeypatch.setattr(settings, "auth_enabled", False)
+
+    register_resp = await client.post(
+        "/api/auth/register", json=_payload("closeduser")
+    )
+    login_resp = await client.post(
+        "/api/auth/login",
+        json={"username": "closeduser", "password": VALID_PASSWORD},
+    )
+
+    assert register_resp.status_code == 403
+    assert register_resp.json()["detail"] == "注册功能已关闭"
+    assert login_resp.status_code == 403
+    assert login_resp.json()["detail"] == "登录功能已关闭"
+
+
+async def test_local_auto_login_disabled_by_default(client: AsyncClient, monkeypatch):
+    monkeypatch.setattr(settings, "debug", True)
+    monkeypatch.setattr(settings, "local_auto_login_username", "")
+    resp = await client.post(
+        "/api/auth/local-auto-login",
+        headers={"Origin": "http://127.0.0.1:3001"},
+    )
+    assert resp.status_code == 403
+
+
+async def test_local_auto_login_issues_session_for_configured_user(
+    client: AsyncClient, monkeypatch
+):
+    await client.post("/api/auth/register", json=_payload("localreader"))
+    monkeypatch.setattr(settings, "debug", True)
+    monkeypatch.setattr(settings, "local_auto_login_username", "localreader")
+
+    resp = await client.post(
+        "/api/auth/local-auto-login",
+        headers={"Origin": "http://127.0.0.1:3001"},
+    )
+
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["username"] == "localreader"
+    assert resp.json()["access_token"]
+    assert "novelmind_session=" in resp.headers.get("set-cookie", "")
+
+
+async def test_local_auto_login_rejects_unapproved_origin(
+    client: AsyncClient, monkeypatch
+):
+    await client.post("/api/auth/register", json=_payload("originreader"))
+    monkeypatch.setattr(settings, "debug", True)
+    monkeypatch.setattr(settings, "local_auto_login_username", "originreader")
+
+    resp = await client.post(
+        "/api/auth/local-auto-login",
+        headers={"Origin": "https://attacker.example"},
+    )
+
+    assert resp.status_code == 403
+
+
+async def test_local_auto_login_rejects_production_mode(
+    client: AsyncClient, monkeypatch
+):
+    monkeypatch.setattr(settings, "debug", False)
+    monkeypatch.setattr(settings, "local_auto_login_username", "localreader")
+    resp = await client.post(
+        "/api/auth/local-auto-login",
+        headers={"Origin": "http://127.0.0.1:3001"},
+    )
+    assert resp.status_code == 403
 
 
 async def test_register_bootstrap_wrong_token_403(client: AsyncClient, monkeypatch):

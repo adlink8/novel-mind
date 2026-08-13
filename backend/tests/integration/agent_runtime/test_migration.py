@@ -103,6 +103,29 @@ def test_six_tables_and_key_constraints(empty_postgres: str, require_postgres: N
     engine.dispose()
 
 
+def test_skill_version_execution_mode_column_is_on_single_head(
+    empty_postgres: str, require_postgres: None
+):
+    """upgrade head adds the builtin/declarative manifest discriminator."""
+    run_alembic("upgrade", "head", database_url=empty_postgres)
+    engine = create_engine(empty_postgres)
+    with engine.connect() as conn:
+        columns = {
+            column["name"]: column for column in inspect(conn).get_columns("skill_versions")
+        }
+        assert columns["execution_mode"]["nullable"] is False
+        assert columns["execution_mode"]["default"] is not None
+
+    heads = run_alembic("heads", database_url=empty_postgres)
+    head_lines = [
+        line.strip()
+        for line in (heads.stdout + heads.stderr).splitlines()
+        if line.strip() and not line.strip().startswith("INFO")
+    ]
+    assert len([line for line in head_lines if line.split()[0] == "20260813_skillmode"]) == 1
+    engine.dispose()
+
+
 def test_downgrade_then_reupgrade_cycle(empty_postgres: str, require_postgres: None):
     """downgrade 回 34readerbookmark → 表消失 → re-upgrade 回 head 正常。"""
     run_alembic("upgrade", "head", database_url=empty_postgres)

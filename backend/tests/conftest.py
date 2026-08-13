@@ -24,6 +24,7 @@ from app.main import app as fastapi_app
 
 # 导入所有模型，确保 Base.metadata 包含所有表定义
 import app.models  # noqa: F401
+from app.config import settings
 
 # Primary classification markers (D-04). e2e is a scope combinator only.
 PRIMARY_MARKERS = frozenset({"unit", "integration", "contract", "live"})
@@ -34,6 +35,12 @@ MARKER_TIMEOUTS = {
     "contract": 15,
     "unit": 5,
 }
+
+
+@pytest.fixture(autouse=True)
+def _enable_interactive_auth_for_legacy_test_suite(monkeypatch):
+    """Existing tests opt into multi-user auth; the shipped product defaults off."""
+    monkeypatch.setattr(settings, "auth_enabled", True)
 # browser timeout (60s) is reserved for Playwright; not applied here.
 
 
