@@ -33,11 +33,14 @@ from app.schemas.agent_runtime import (
     SkillRunCreate,
     SkillRunFinalize,
     SkillRunView,
+    ConnectorRuntimeManifest,
 )
 from app.services.agent_runtime import registry as registry_service
 from app.services.agent_runtime.registry import canonical_input_hash
+from app.services.tool_connectors.policy import ConnectorPolicyError
+from app.services.tool_connectors.service import freeze_connector_versions
 
-router = APIRouter(dependencies=[Depends(require_user)])
+router = APIRouter(dependencies=[Depends(require_agent_actor)])
 
 
 def _view_from_run(row) -> dict[str, Any]:
@@ -62,7 +65,10 @@ async def accept_skill_run(
     agent-service 按 25.2-05 驱动（本端点绝不主动调用 agent-service）。
     """
     version = await registry_service.get_skill_version(
-        db, owner_id=current_user.id, skill_version_id=data.skill_version_id
+        db,
+        owner_id=current_user.id,
+        novel_id=novel.id,
+        skill_version_id=data.skill_version_id,
     )
     if version is None:
         raise HTTPException(status_code=404, detail="技能版本不存在")
@@ -80,6 +86,22 @@ async def accept_skill_run(
     ):
         raise HTTPException(status_code=422, detail="input.question 必须为非空字符串")
 
+    try:
+        runtime_manifest = registry_service.skill_runtime_manifest(version)
+        connector_versions = await freeze_connector_versions(
+            db, owner_id=current_user.id, allowed_tools=list(version.allowed_tools or [])
+        )
+        runtime_manifest = runtime_manifest.model_copy(
+            update={
+                "connector_versions": [
+                    ConnectorRuntimeManifest.model_validate(item)
+                    for item in connector_versions
+                ]
+            }
+        )
+    except (registry_service.SkillContractError, ConnectorPolicyError) as exc:
+        raise HTTPException(status_code=409, detail="技能版本契约校验失败") from exc
+
     input_hash = canonical_input_hash(input_payload)
     internal_token = secrets.token_urlsafe(32)
     token_hash = hashlib.sha256(internal_token.encode("utf-8")).hexdigest()
@@ -92,7 +114,7 @@ async def accept_skill_run(
         branch=data.branch,
         input=input_payload,
         input_hash=input_hash,
-        frozen_manifest={},
+        frozen_manifest={"connector_versions": connector_versions},
         budget_snapshot=dict(version.budget or {}),
         internal_token_hash=token_hash,
     )
@@ -102,7 +124,9 @@ async def accept_skill_run(
     await db.commit()
     await db.refresh(run)
     return SkillRunAccepted(
-        run=SkillRunView.model_validate(run), internal_token=internal_token
+        run=SkillRunView.model_validate(run),
+        internal_token=internal_token,
+        runtime_manifest=runtime_manifest,
     )
 
 
@@ -148,15 +172,24 @@ async def cancel_skill_run(
     db: AsyncSession = Depends(get_db),
     actor=Depends(require_agent_actor),
 ) -> SkillRunView:
-    """请求取消运行：置 cancel_requested；queued 的直接转 cancelled。"""
+    """请求取消运行并立即进入无写入的 cancelled 终态。"""
     run = await _get_run(db, run_id=run_id, owner_id=actor.id, novel_id=novel.id)
     if run.status in ("cancelled", "completed"):
         return SkillRunView.model_validate(run)
     run.cancel_requested = True
-    if run.status == "queued":
+    if run.status in ("queued", "running"):
+        was_running = run.status == "running"
         run.status = "cancelled"
-        run.status_reason = "cancelled_before_dispatch"
+        run.status_reason = (
+            "cancelled_during_execution" if was_running else "cancelled_before_dispatch"
+        )
         run.error_code = "user_cancel"
+        if run.origin == "chat_backfill":
+            from app.services.agent_runtime.reader_bridge import (
+                _reconcile_reader_chat_after_backfill_in_session,
+            )
+
+            await _reconcile_reader_chat_after_backfill_in_session(db, run)
     await db.commit()
     await db.refresh(run)
     return SkillRunView.model_validate(run)
@@ -228,17 +261,37 @@ async def finalize_skill_run_endpoint(
             usage=payload.usage,
             frozen_manifest=payload.frozen_manifest,
         )
-        # 问答按需分析（chat_backfill）：finalize 成功后由 background task 把
-        # 产物确定性物化到域表 candidate（绝不自动 promotion）。
+        # Pi-backed runs: finalize 成功后由 background task 做确定性物化。
+        # chat_backfill 只写 candidate 域表；reader_chat 投影回原 ReaderConversation。
         if outcome.status == "completed" and outcome.artifact_id is not None:
             run_row = await db.get(SkillRun, run_id)
-            if run_row is not None and run_row.origin == "chat_backfill":
+            if run_row is not None and run_row.origin in ("chat_backfill", "reader_chat"):
                 from app.services.agent_runtime.materialize import (
                     materialize_skill_run,
                 )
 
                 background_tasks.add_task(
                     materialize_skill_run, request_factory, run_id
+                )
+            elif run_row is not None and run_row.origin == "chapter_batch":
+                from app.services.agent_runtime.chapter_batch import (
+                    continue_chapter_batch_after_finalize,
+                )
+
+                background_tasks.add_task(
+                    continue_chapter_batch_after_finalize,
+                    request_factory,
+                    run_id,
+                )
+        elif outcome.status in ("failed", "cancelled"):
+            run_row = await db.get(SkillRun, run_id)
+            if run_row is not None and run_row.origin == "chat_backfill":
+                from app.services.agent_runtime.reader_bridge import (
+                    reconcile_reader_chat_after_backfill,
+                )
+
+                background_tasks.add_task(
+                    reconcile_reader_chat_after_backfill, run_id, sessions=request_factory
                 )
     except Exception as exc:  # noqa: BLE001 — 冻结码映射到 HTTP
         raise HTTPException(

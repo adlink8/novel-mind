@@ -314,7 +314,9 @@ class FoldQueryMixin:
                 names[cid] = mention if p.entity_id is None else names.get(cid, mention)
                 seen[cid] = mention
             ids = sorted(seen.keys())
-            ch = event.narrative_chapter_number
+            # 序章/未知章节（narrative_chapter_number=0）在可见性语义上归为第 1 章：
+            # RelationshipGraphNode.first_visible_chapter 契约要求 gt=0。
+            ch = max(1, event.narrative_chapter_number)
             for i in range(len(ids)):
                 for j in range(i + 1, len(ids)):
                     a, b = ids[i], ids[j]

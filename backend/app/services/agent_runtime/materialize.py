@@ -39,7 +39,11 @@ async def materialize_skill_run(
 ) -> str:
     async with sessions.begin() as session:
         run = await session.get(SkillRun, run_id)
-        if run is None or run.origin != "chat_backfill":
+        if run is None or run.origin not in (
+            "chat_backfill",
+            "reader_chat",
+            "chapter_batch",
+        ):
             return "skipped:not_backfill"
         if run.status_reason and run.status_reason.startswith("materialized:"):
             return run.status_reason
@@ -48,13 +52,37 @@ async def materialize_skill_run(
 
         artifact = await _latest_artifact(session, run_id)
         if artifact is None:
+            if run.origin == "chat_backfill":
+                from app.services.agent_runtime.reader_bridge import (
+                    _reconcile_reader_chat_after_backfill_in_session,
+                )
+
+                await _reconcile_reader_chat_after_backfill_in_session(session, run)
             return "no_artifact"
         revision = await _latest_revision(session, artifact.id)
         if revision is None:
+            if run.origin == "chat_backfill":
+                from app.services.agent_runtime.reader_bridge import (
+                    _reconcile_reader_chat_after_backfill_in_session,
+                )
+
+                await _reconcile_reader_chat_after_backfill_in_session(session, run)
             return "no_revision"
 
         artifact_type = artifact.type
         content = dict(revision.content or {})
+
+        if run.origin == "reader_chat":
+            from app.services.agent_runtime.reader_bridge import (
+                materialize_reader_chat_answer,
+            )
+
+            outcome = await materialize_reader_chat_answer(
+                session, run=run, content=content
+            )
+            if outcome.startswith("materialized:"):
+                run.status_reason = outcome
+            return outcome
 
         if not _LEAF_EVIDENCE_TYPES.get(artifact_type, False):
             run.status_reason = "skipped_digest_not_evidence"
@@ -81,12 +109,22 @@ async def materialize_skill_run(
                 exc,
             )
             run.status_reason = f"skipped:{type(exc).__name__}"
+            from app.services.agent_runtime.reader_bridge import (
+                _reconcile_reader_chat_after_backfill_in_session,
+            )
+
+            await _reconcile_reader_chat_after_backfill_in_session(session, run)
             return run.status_reason
 
         if outcome == "ok":
             run.status_reason = f"materialized:{artifact_type}"
         else:
             run.status_reason = outcome
+        from app.services.agent_runtime.reader_bridge import (
+            _reconcile_reader_chat_after_backfill_in_session,
+        )
+
+        await _reconcile_reader_chat_after_backfill_in_session(session, run)
         return run.status_reason
 
 

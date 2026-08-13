@@ -589,12 +589,13 @@ class ToolFacade:
 
     async def _get_evidence_span(self, *, db, novel, owner_id, params):
         svc = self._svc("get_evidence_span", _default_get_evidence_span)
+        raw_hash = params.get("content_hash")
         span = await svc(
             db,
             chapter_id=int(params["chapter_id"]),
             source_start=int(params["source_start"]),
             source_end=int(params["source_end"]),
-            content_hash=str(params["content_hash"]),
+            content_hash=str(raw_hash) if raw_hash is not None else None,
         )
         if span is None:
             raise NotFoundError("章节不存在")

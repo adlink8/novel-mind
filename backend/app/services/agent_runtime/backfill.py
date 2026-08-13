@@ -20,10 +20,16 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.agent_runtime import SkillRegistry, SkillRun, SkillVersion
+from app.models.novel import Novel
 from app.services.agent_runtime.registry import canonical_input_hash
+from app.services.key_scenes.boundaries import SceneBoundaryService
+from app.services.timeline.query import resolve_chapter_cutoff
 
 # 每次问答最多触发的 backfill skill 数量（成本上限）。
 MAX_BACKFILL_SKILLS = 2
+
+# 需要 source snapshot / cutoff 血缘锚定的 skill（契约要求程序产出哈希字段）。
+_SNAPSHOT_ANCHORED_SKILLS = frozenset({"detect-key-scenes"})
 
 # 维度→skill 映射（QueryDimension 词汇，queryplan/schemas.py）。
 # 值：(skill_name, materializes_domain_table)
@@ -123,6 +129,30 @@ async def create_backfill_runs(
     返回新建的 SkillRun 列表（未 commit；由调用方事务提交）。
     """
     created: list[SkillRun] = []
+    # 血缘锚定懒计算：只有契约要求程序产出哈希的 skill 才加载章节/进度。
+    snapshot_anchor: dict[str, Any] | None = None
+
+    async def _resolve_snapshot_anchor() -> dict[str, Any] | None:
+        nonlocal snapshot_anchor
+        if snapshot_anchor is not None:
+            return snapshot_anchor
+        novel = await db.get(Novel, novel_id)
+        if novel is None or novel.owner_id != owner_id:
+            return None
+        snapshot_hash_value, chapters = await SceneBoundaryService(
+            db
+        ).load_source_snapshot(owner_id=owner_id, novel_id=novel_id)
+        if not chapters:
+            return None
+        cutoff_value = await resolve_chapter_cutoff(db, novel)
+        if cutoff_value is None:
+            return None
+        snapshot_anchor = {
+            "source_snapshot": {"snapshot_hash": snapshot_hash_value},
+            "cutoff_chapter": int(cutoff_value),
+        }
+        return snapshot_anchor
+
     for skill_name, dimension in pick_backfill_skills(unavailable_dimensions):
         version = await _resolve_active_skill_version(
             db, owner_id=owner_id, novel_id=novel_id, skill_name=skill_name
@@ -149,6 +179,12 @@ async def create_backfill_runs(
             "dimension": dimension,
             "branch": None,
         }
+        if skill_name in _SNAPSHOT_ANCHORED_SKILLS:
+            anchor = await _resolve_snapshot_anchor()
+            if anchor is None:
+                # 无章节/无进度可锚定：诚实跳过，绝不产出无血缘 run。
+                continue
+            input_payload.update(anchor)
         if snapshot_hash:
             input_payload["source_snapshot"] = {"snapshot_hash": snapshot_hash}
         if cutoff:

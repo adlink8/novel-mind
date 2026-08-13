@@ -163,6 +163,11 @@ class SkillVersion(Base):
     output_schema: Mapped[dict] = mapped_column(
         JSONB, nullable=False, default=dict, server_default=text("'{}'")
     )
+    # builtin 版本必须与 agent-service 的本地 Skill 资产做 checksum 对齐；
+    # declarative_only 版本则只从 DB manifest 执行。
+    execution_mode: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="declarative_only", server_default="declarative_only"
+    )
     status: Mapped[str] = mapped_column(
         String(16), nullable=False, default="draft", server_default="draft"
     )

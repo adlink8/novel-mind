@@ -19,6 +19,7 @@ from app.services.queryplan.adapters import chapter_content_hash
 from app.services.queryplan.contracts import leaf_evidence_key
 from app.services.world_model.entity_queries import WorldEntityQueries
 from app.services.world_model.event_queries import WorldModelEventQueries
+from app.services.world_model.event_repository import WorldModelEventRepository
 from app.services.world_model.knowledge import EpistemicAspect, KnowledgeResultStatus
 from app.services.world_model.knowledge_queries import KnowledgeQueries
 
@@ -167,12 +168,14 @@ async def _default_get_evidence_span(
     chapter_id: int,
     source_start: int,
     source_end: int,
-    content_hash: str,
+    content_hash: str | None,
 ) -> dict[str, Any] | None:
-    """按 chapter+offsets+content_hash 物化 leaf 证据跨度（D-07/D-08）。
+    """按 chapter+offsets 物化 leaf 证据跨度（D-07/D-08）。
 
-    chapter 缺失 → None（404-hide）；offsets 非法 / hash 与原文切片不匹配 →
-    InvalidInputError（fail closed，绝不返回错误切片）。
+    chapter 缺失 → None（404-hide）；offsets 非法 → InvalidInputError
+    （fail closed，绝不返回错误切片）。``content_hash`` 可选：省略时服务端
+    从切片确定性计算并返回；提供时校验与切片一致，不匹配 → InvalidInputError
+    （防漂移，fail closed）。
     """
     chapter = await novel_service.get_chapter(db, chapter_id)
     if chapter is None:
@@ -183,21 +186,22 @@ async def _default_get_evidence_span(
             f"offsets [{source_start},{source_end}) 不是合法 half-open 区间"
         )
     excerpt = content[source_start:source_end]
-    if chapter_content_hash(excerpt) != content_hash:
+    computed_hash = chapter_content_hash(excerpt)
+    if content_hash is not None and computed_hash != content_hash:
         raise InvalidInputError("evidence content hash 与原文切片不匹配")
     return {
         "evidence_key": leaf_evidence_key(
             chapter_id=chapter_id,
             source_start=source_start,
             source_end=source_end,
-            content_hash=content_hash,
+            content_hash=computed_hash,
         ),
         "chapter_id": chapter_id,
         "chapter_number": chapter.chapter_number,
         "novel_id": chapter.novel_id,
         "source_start": source_start,
         "source_end": source_end,
-        "content_hash": content_hash,
+        "content_hash": computed_hash,
         "excerpt": excerpt,
     }
 
@@ -212,7 +216,7 @@ async def _resolve_world_model_version(
     """显式 version 直接返回；缺省取该 owner/novel 最新版本（无 → 404-hide）。"""
     if version_id is not None:
         return int(version_id)
-    versions = await WorldModelEventQueries(db).list_versions(
+    versions = await WorldModelEventRepository(db).list_versions(
         owner_id=owner_id, novel_id=novel_id
     )
     if not versions:

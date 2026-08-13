@@ -154,20 +154,21 @@ class GetWorldRulesRequest(StrictAgentToolModel):
 
 
 class GetEvidenceSpanRequest(StrictAgentToolModel):
-    """leaf 证据跨度（D-07/D-08）：按 chapter+offsets+content_hash 物化原文。
+    """leaf 证据跨度（D-07/D-08）：按 chapter+offsets 物化原文。
 
-    只返回冻结原文切片；offsets 非法或 content_hash 与切片不匹配 → 拒绝。
+    只返回冻结原文切片；offsets 非法 → 拒绝。``content_hash`` 可选：省略时
+    服务端计算并返回；提供时校验与切片一致，不匹配 → 拒绝（防漂移）。
     """
 
     chapter_id: int = Field(..., gt=0, description="章节 ID")
     source_start: int = Field(..., ge=0, description="切片起点（含，code-point）")
     source_end: int = Field(..., gt=0, description="切片终点（不含）")
-    content_hash: str = Field(
-        ...,
+    content_hash: str | None = Field(
+        default=None,
         min_length=64,
         max_length=64,
         pattern="^[0-9a-f]{64}$",
-        description="该切片内容的 SHA-256",
+        description="该切片内容的 SHA-256（可选；省略时服务端计算）",
     )
 
 

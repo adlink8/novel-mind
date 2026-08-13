@@ -22,6 +22,9 @@ from app.schemas.agent_runtime.skills import (
     SkillVersionRegister,
     SkillRegistryView,
     SkillVersionView,
+    SkillVersionStatusUpdate,
+    SkillRuntimeManifest,
+    ConnectorRuntimeManifest,
 )
 
 from app.schemas.agent_runtime.runs import (
@@ -29,7 +32,14 @@ from app.schemas.agent_runtime.runs import (
     SkillRunView,
     SkillRunAccepted,
     SkillRunFinalize,
+    ToolRunSummary,
     RouteSkillRequest,
+)
+
+from app.schemas.agent_runtime.chapter_batch import (
+    ChapterBatchCreate,
+    ChapterBatchChapterView,
+    ChapterBatchView,
 )
 
 from app.schemas.agent_runtime.artifacts import (
@@ -94,12 +104,19 @@ __all__ = [
     "SkillVersionRegister",
     "SkillRegistryView",
     "SkillVersionView",
+    "SkillVersionStatusUpdate",
+    "SkillRuntimeManifest",
+    "ConnectorRuntimeManifest",
     # SkillRun 族（runs）
     "SkillRunCreate",
     "SkillRunView",
     "SkillRunAccepted",
     "SkillRunFinalize",
+    "ToolRunSummary",
     "RouteSkillRequest",
+    "ChapterBatchCreate",
+    "ChapterBatchChapterView",
+    "ChapterBatchView",
     # 产物行（artifacts）
     "ArtifactView",
     "ArtifactRevisionView",

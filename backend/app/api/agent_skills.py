@@ -29,7 +29,9 @@ from app.schemas.agent_runtime import (
     SkillRegistryView,
     SkillVersionRegister,
     SkillVersionView,
+    SkillVersionStatusUpdate,
 )
+from app.schemas.agent_tools_catalog import ToolCapabilityCatalogView, ToolCapabilityView
 from app.services.agent_runtime import registry as registry_service
 from app.services.agent_runtime.registry import SkillContractError
 
@@ -41,25 +43,59 @@ def _view_from_registry(row) -> dict[str, Any]:
 
 
 def _view_from_version(row) -> dict[str, Any]:
-    return SkillVersionView.model_validate(row).model_dump(mode="json")
+    return registry_service.skill_version_view_payload(row)
 
 
 @router.get("/skills", response_model=dict)
 async def list_skills(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_user),
+    novel_id: int | None = Query(None, gt=0),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
 ) -> dict:
     """列出当前用户的技能目录。"""
+    scope_owner_id = current_user.id
+    if novel_id is not None:
+        novel = await db.scalar(select(Novel).where(Novel.id == novel_id))
+        if novel is None or (
+            novel.owner_id != current_user.id and not current_user.is_superuser
+        ):
+            raise HTTPException(status_code=404, detail="小说不存在")
+        from app.services.agent_runtime.registry import ensure_builtin_skills
+
+        await ensure_builtin_skills(db, owner_id=novel.owner_id, novel_id=novel.id)
+        await db.flush()
+        scope_owner_id = novel.owner_id
     items, total = await registry_service.list_skills(
-        db, owner_id=current_user.id, skip=skip, limit=limit
+        db,
+        owner_id=scope_owner_id,
+        novel_id=novel_id,
+        skip=skip,
+        limit=limit,
     )
     return {
         "items": [_view_from_registry(item) for item in items],
         "total": total,
         "skip": skip,
         "limit": limit,
+    }
+
+
+@router.get("/tools/catalog", response_model=ToolCapabilityCatalogView)
+async def get_tool_capability_catalog(
+    current_user: User = Depends(require_user),
+) -> dict[str, Any]:
+    """Owner-authenticated catalog; callers may only select these built-ins."""
+    del current_user  # authentication is the boundary; catalog is not owner data.
+    from app.services.agent_tools.catalog import list_tool_capabilities
+
+    items = [ToolCapabilityView.model_validate(item.__dict__) for item in list_tool_capabilities()]
+    return {
+        "items": items,
+        "total": len(items),
+        "http_tools": "not_enabled",
+        "execution_boundary": "builtin_declarative_only",
     }
 
 
@@ -88,7 +124,7 @@ async def register_skill(
         )
     except SkillContractError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return SkillVersionView.model_validate(version)
+    return _view_from_version(version)
 
 
 @router.get("/skills/{skill_name}/versions", response_model=dict)
@@ -96,19 +132,56 @@ async def list_skill_versions(
     skill_name: str,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_user),
+    novel_id: int | None = Query(None, gt=0),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
 ) -> dict:
     """列出某技能的版本（含 D-09 契约全文）。"""
     items, total = await registry_service.list_skill_versions(
-        db, owner_id=current_user.id, skill_name=skill_name, skip=skip, limit=limit
+        db,
+        owner_id=current_user.id,
+        skill_name=skill_name,
+        novel_id=novel_id,
+        skip=skip,
+        limit=limit,
     )
     return {
-        "items": [_view_from_version(item) for item in items],
+        "items": [
+            {
+                **_view_from_version(item),
+                "runtime_manifest": registry_service.skill_runtime_manifest(item).model_dump(
+                    mode="json"
+                ),
+            }
+            for item in items
+        ],
         "total": total,
         "skip": skip,
         "limit": limit,
     }
+
+
+@router.patch(
+    "/skills/{skill_name}/versions/{skill_version_id}",
+    response_model=SkillVersionView,
+)
+async def update_skill_version_status(
+    skill_name: str,
+    skill_version_id: int,
+    data: SkillVersionStatusUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+) -> dict[str, Any]:
+    row = await registry_service.set_skill_version_status(
+        db,
+        owner_id=current_user.id,
+        skill_name=skill_name,
+        skill_version_id=skill_version_id,
+        status=data.status,
+    )
+    if row is None:
+        raise HTTPException(status_code=404, detail="技能版本不存在")
+    return _view_from_version(row)
 
 
 @router.post("/novels/{novel_id}/route-skill", response_model=dict)

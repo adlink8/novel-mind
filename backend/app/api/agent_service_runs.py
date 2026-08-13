@@ -8,7 +8,9 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import secrets
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, text
@@ -24,15 +26,27 @@ service_router = APIRouter()
 _LEASE_WINDOW_MINUTES = 30
 
 
+def _json_object(value: Any) -> dict:
+    """Normalize async-driver JSON RETURNING values across PG and SQLite tests."""
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+        except json.JSONDecodeError:
+            return {}
+        return parsed if isinstance(parsed, dict) else {}
+    return dict(value or {})
+
+
 @service_router.get("/queued-runs", response_model=dict)
 async def list_queued_runs(
     db: AsyncSession = Depends(get_db),
     _: None = Depends(require_gateway_token),
     limit: int = Query(10, ge=1, le=50),
 ) -> dict:
-    """agent-service poller：列出 queued 的 chat_backfill 运行（service token）。
+    """agent-service poller：列出 queued 的 Pi-backed 运行（service token）。
 
-    返回 run 上下文（含 input / skill_version_id / input_hash / branch），
+    返回 chat_backfill、reader_chat 与 chapter_batch 的运行上下文（含 input /
+    skill_version_id / input_hash / branch），
     但不返回 internal_token（库中只存 hash）。claim 时铸造新 token。
     """
     rows = list(
@@ -40,7 +54,9 @@ async def list_queued_runs(
             await db.scalars(
                 select(SkillRun)
                 .where(
-                    SkillRun.origin == "chat_backfill",
+                    SkillRun.origin.in_(
+                        ("chat_backfill", "reader_chat", "chapter_batch")
+                    ),
                     SkillRun.status == "queued",
                 )
                 .order_by(SkillRun.id.asc())
@@ -56,10 +72,12 @@ async def list_queued_runs(
                 "owner_id": r.owner_id,
                 "novel_id": r.novel_id,
                 "skill_version_id": r.skill_version_id,
-                "input": dict(r.input or {}),
+                "input": _json_object(r.input),
                 "input_hash": r.input_hash,
                 "branch": r.branch,
                 "backfill_dimension": r.backfill_dimension,
+                "origin": r.origin,
+                "user_message_id": r.user_message_id,
             }
         )
     return {"items": items, "total": len(items)}
@@ -88,15 +106,16 @@ async def claim_queued_run(
             UPDATE skill_runs
             SET status = 'running',
                 internal_token_hash = :token_hash,
-                updated_at = now()
+                updated_at = CURRENT_TIMESTAMP
             WHERE id = :run_id
-              AND origin = 'chat_backfill'
+              AND origin IN ('chat_backfill', 'reader_chat', 'chapter_batch')
               AND (
                 status = 'queued'
                 OR (status = 'running' AND updated_at < :lease_cutoff)
               )
             RETURNING id, owner_id, novel_id, skill_version_id, input, input_hash,
-                      branch, backfill_dimension, frozen_manifest, budget_snapshot
+                      branch, backfill_dimension, origin, user_message_id,
+                      frozen_manifest, budget_snapshot
             """
         ),
         {
@@ -130,11 +149,13 @@ async def claim_queued_run(
         "novel_id": claimed["novel_id"],
         "skill_version_id": claimed["skill_version_id"],
         "skill_name": skill_name_value,
-        "input": dict(claimed["input"] or {}),
+        "input": _json_object(claimed["input"]),
         "input_hash": claimed["input_hash"],
         "branch": claimed["branch"],
         "backfill_dimension": claimed["backfill_dimension"],
-        "frozen_manifest": dict(claimed["frozen_manifest"] or {}),
-        "budget_snapshot": dict(claimed["budget_snapshot"] or {}),
+        "origin": claimed["origin"],
+        "user_message_id": claimed["user_message_id"],
+        "frozen_manifest": _json_object(claimed["frozen_manifest"]),
+        "budget_snapshot": _json_object(claimed["budget_snapshot"]),
         "internal_token": internal_token,
     }

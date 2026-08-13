@@ -144,9 +144,14 @@ async def finalize_skill_run(
                 status_reason=run.status_reason,
             )
 
-        # 冻结 manifest：首次落库；已存在且不一致 → 拒绝（防重放漂移）。
+        # 冻结 manifest：accepted 阶段可能已经写入 connector_versions；finalize
+        # 只允许补充尚未冻结的字段，同名字段变化一律拒绝（防重放漂移）。
         if frozen_manifest is not None:
-            if run.frozen_manifest and run.frozen_manifest != frozen_manifest:
+            try:
+                run.frozen_manifest = _merge_frozen_manifest(
+                    run.frozen_manifest, frozen_manifest
+                )
+            except ValueError:
                 run.status = "failed"
                 run.status_reason = "frozen manifest changed after freeze"
                 run.error_code = ERROR_CODE_FAILED_VALIDATION
@@ -155,8 +160,6 @@ async def finalize_skill_run(
                     error_code=ERROR_CODE_FAILED_VALIDATION,
                     status_reason=run.status_reason,
                 )
-            run.frozen_manifest = frozen_manifest
-
         # 预算 fail-closed：从技能版本 budget 策略校验实际用量。
         skill_version = await session.get(SkillVersion, run.skill_version_id)
         if skill_version is None:
@@ -235,6 +238,22 @@ async def finalize_skill_run(
             artifact_id=artifact.id,
             artifact_revision_id=revision.id,
         )
+
+
+def _merge_frozen_manifest(
+    accepted: dict[str, Any] | None,
+    submitted: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    """合并 accepted/finalize manifest，同时保持 accepted 字段不可变。"""
+    if submitted is None:
+        return dict(accepted) if accepted is not None else None
+
+    merged = dict(accepted or {})
+    for key, accepted_value in merged.items():
+        if key in submitted and submitted[key] != accepted_value:
+            raise ValueError(f"frozen manifest field changed: {key}")
+    merged.update(submitted)
+    return merged
 
 
 def _frozen_allowlist(run: SkillRun) -> set[str]:
