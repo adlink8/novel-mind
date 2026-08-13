@@ -1,6 +1,6 @@
 # propose-world-model-candidates（Phase 27 版本化世界模型候选技能 / D-01..D-06）
 
-给定一本小说（owner/novel/branch + 可选 version/cutoff），通过 6 个只读域工具
+给定一本小说（owner/novel/branch + 可选 version/cutoff），通过 7 个只读域工具
 收集证据，产出一条**血缘绑定**的 World Model Candidate Artifact。本技能只提案
 **候选投影**（typed world-model candidates），不写任何 Canon / 域状态；唯一
 输出通道是后端确定性 finalizer 持久化的 `WorldModelCandidateArtifact`
@@ -11,9 +11,9 @@ state-transition / publication 权威**——Agent 永远不能直接发布 Cano
 ## 版本与契约（镜像 skill.yaml / D-09）
 
 - `name: propose-world-model-candidates`，`version: 1.0.0`（Phase 27 绑定版本）。
-- `allowed_tools`（编排 allowlist，仅 6 个只读域工具）：`get_events`、
+- `allowed_tools`（编排 allowlist，仅 7 个只读域工具）：`get_events`、
   `get_character_state`、`get_character_knowledge`、`get_relationships`、
-  `get_world_rules`、`get_evidence_span`。
+  `get_world_rules`、`get_evidence_span`、`search_novel_text`。
 - **不得调用** allowlist 外的任何工具（含 `get_narrative_memory` 等）——
   发现即 fail closed（Pi 只能编排声明的 Domain Tool allowlist）。
 - `read_permissions: [canon, derivative, world_model]`；`write_permissions: []`
@@ -41,6 +41,13 @@ state-transition / publication 权威**——Agent 永远不能直接发布 Cano
 - `cutoff` / `version_id` 只是声明意图；最终 scope 由服务端强制
   （D-05：超过截止点 → beyond_cutoff；错误 owner/version → blocked）。
 
+### 收敛预算（硬约束，先于一切编排）
+- 本技能 per-run `max_calls=30`，**工具调用是稀缺预算**：
+  `search_novel_text` 最多 3 次；`get_evidence_span` 最多 6 次（只为最终
+  入选 claim 的引用物化）；其余世界模型工具合计不超过 8 次。
+- **claims 上限 5 条**（宁缺毋滥）；已有 ≥1 个物化 span + ≥1 条可写
+  claim 时，立即停止工具调用、输出最终 JSON。
+
 ### 第 2 步：Tool Calls（只读证据收集）
 - 每个工具调用都走 25.2-02 门面（`POST /api/agent-tools/{tool_name}`），携带
   运行内部令牌；响应是 JSON 安全 payload。
@@ -50,7 +57,9 @@ state-transition / publication 权威**——Agent 永远不能直接发布 Cano
   - 角色知识 → `get_character_knowledge`（subject，D-05）。
   - 世界规则/例外 → `get_world_rules`（D-04 例外 first-class）。
   - 关系 → `get_relationships`（人物关系图）。
-  - leaf 证据原文 → `get_evidence_span`（chapter+offsets+content_hash 物化）。
+  - 正文检索（候选区间发现，命中自带 chapter_id/offsets）→ `search_novel_text`。
+  - leaf 证据原文 → `get_evidence_span`（chapter+offsets 物化；`content_hash`
+    可选——省略时服务端计算返回，提供时校验匹配）。
 - 所有失败映射为冻结 agent-tool 错误码（forbidden/not_found/beyond_cutoff/
   budget_exceeded/timeout/output_too_large/invalid_input/upstream_error）。
 - 工具调用受技能 `budget` 的 per-run call/token 上限约束，超限 fail closed。
@@ -78,6 +87,42 @@ state-transition / publication 权威**——Agent 永远不能直接发布 Cano
 - `candidates.tool_runs` 记录本 run 使用的工具与调用次数（ToolRun 血缘）。
 - 候选只是提案；Gate 逐条裁决后才可能成为持久化投影（D-02 immutable
   candidates-only）。
+
+## 输出骨架（硬性契约，fail closed）
+
+- **禁止在不调用任何工具的情况下直接给出最终回答**：必须先调用本技能
+  allowlist 内的工具收集证据（至少 1 次成功调用），再输出最终 JSON。
+- 最终回答**必须且仅**是一个 JSON 对象（无 markdown、无解释文字、无 code
+  fence），顶层**必须**包含 `candidates` 对象，骨架如下：
+
+```json
+{
+  "candidates": {
+    "claims": [
+      {
+        "claim_kind": "world_rule",
+        "claim_key": "稳定的机器可读键",
+        "proposition": "候选主张的自然语言陈述",
+        "authority": "probable_inference",
+        "confidence": 0.6,
+        "disclosure_cutoff": 1,
+        "evidence_refs": ["仅填工具响应里实际返回的证据 key"],
+        "details": {}
+      }
+    ]
+  }
+}
+```
+
+- `claim_kind` ∈ event / causal_edge / character_state / character_knowledge /
+  world_rule / rule_exception / entity / entity_link；`authority` 四值见第 4 步，
+  绝不静默升级。
+- `evidence_refs` 只能引用**本 run `get_evidence_span` 实际返回**的
+  `evidence_key`（选择制：先 `search_novel_text` 发现区间，再
+  `get_evidence_span` 物化，最后按 key 引用）；编造或引用未物化的 key →
+  run 失败，零写入。
+- 若工具证据不足以提出任何候选：仍输出骨架 JSON（`claims` 可以为空数组），
+  在 `details` 中说明 abstain 原因；绝不输出散文。
 
 ### 第 5 步：共享 normalizer + 严格 validator（26-06 / D-16）
 - 模型结构化输出先经**共享 26-06 normalizer**：只允许声明式 alias、

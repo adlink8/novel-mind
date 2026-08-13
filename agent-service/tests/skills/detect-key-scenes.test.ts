@@ -45,13 +45,14 @@ const REGISTERED_DOMAIN_TOOLS = [
   "get_visual_bible",
 ] as const;
 
-/** Phase 31 编排 allowlist：5 个只读域工具。 */
+/** Phase 31 编排 allowlist：6 个只读域工具（含 search_novel_text 文本发现通道）。 */
 const EXPECTED_ALLOWED_TOOLS = [
   "get_events",
   "get_character_state",
   "get_relationships",
   "get_visual_bible",
   "get_evidence_span",
+  "search_novel_text",
 ] as const;
 
 /** Phase 31 唯一声明的审批动作（D-31-04：用户选择/审查后候选集才 frozen）。 */

@@ -93,7 +93,7 @@ describe("agent-service run API (POST /agent/novels/{novel_id}/runs)", () => {
   function installDefaultBackendMock() {
     fetchMock.mockClear(); // 清调用记录，避免跨测试累积干扰计数断言
     fetchMock.mockImplementation((url: string, init?: RequestInit) => {
-      if (url.endsWith("/versions") && init?.method === "GET") {
+      if (url.includes("/versions") && init?.method === "GET") {
         return Promise.resolve(
           new Response(JSON.stringify({ items: [{ id: 5, status: "active" }], total: 1 }), {
             status: 200,
@@ -437,7 +437,7 @@ describe("agent-service run API (POST /agent/novels/{novel_id}/runs)", () => {
           ),
         );
       }
-      if (String(url).endsWith("/versions") && init?.method === "GET") {
+      if (String(url).includes("/versions") && init?.method === "GET") {
         return Promise.resolve(
           new Response(JSON.stringify({ items: [{ id: 9, status: "active" }], total: 1 }), {
             status: 200,
@@ -484,7 +484,7 @@ describe("agent-service run API (POST /agent/novels/{novel_id}/runs)", () => {
     const createOpts = createSessionMock.mock.calls[0]?.[0] as { skill?: { name?: string } };
     expect(createOpts.skill?.name).toBe("detect-key-scenes");
     // 技能版本查询指向自动路由的 skill。
-    const versionCalls = fetchMock.mock.calls.filter((c) => String(c[0]).endsWith("/versions"));
+    const versionCalls = fetchMock.mock.calls.filter((c) => String(c[0]).includes("/versions"));
     expect(String(versionCalls[0][0])).toContain("detect-key-scenes");
     await res.body?.cancel();
   });
@@ -510,7 +510,7 @@ describe("agent-service run API (POST /agent/novels/{novel_id}/runs)", () => {
           ),
         );
       }
-      if (String(url).endsWith("/versions") && init?.method === "GET") {
+      if (String(url).includes("/versions") && init?.method === "GET") {
         return Promise.resolve(
           new Response(JSON.stringify({ items: [{ id: 33, status: "active" }], total: 1 }), {
             status: 200,
@@ -589,7 +589,7 @@ describe("agent-service run API (POST /agent/novels/{novel_id}/runs)", () => {
     expect(res.status).toBe(200);
     const createOpts = createSessionMock.mock.calls[0]?.[0] as { skill?: { name?: string } };
     expect(createOpts.skill?.name).toBe("answer-reading-question");
-    const versionCalls = fetchMock.mock.calls.filter((c) => String(c[0]).endsWith("/versions"));
+    const versionCalls = fetchMock.mock.calls.filter((c) => String(c[0]).includes("/versions"));
     expect(String(versionCalls[0][0])).toContain("answer-reading-question");
     await res.body?.cancel();
   });
@@ -608,5 +608,81 @@ describe("agent-service run API (POST /agent/novels/{novel_id}/runs)", () => {
     const routeCalls = fetchMock.mock.calls.filter((c) => String(c[0]).endsWith("/route-skill"));
     expect(routeCalls).toHaveLength(0);
     await res.body?.cancel();
+  });
+
+  it("DB declarative_only runtime manifest 驱动 Pi：不调用任意本地路径，prompt 进入 system prompt", async () => {
+    const runtimeManifest = {
+      owner_id: 7,
+      novel_id: 1,
+      skill_version_id: 91,
+      name: "chapter-notes",
+      version: "1.0.0",
+      description: "fixture",
+      prompt: "Use only supplied evidence.",
+      execution_mode: "declarative_only",
+      allowed_tools: ["get_novel"],
+      read_permissions: ["canon"],
+      write_permissions: [],
+      forbidden_spaces: ["canon:original"],
+      budget: { max_tokens: 800 },
+      approval_required_for: [],
+      input_schema: {
+        type: "object",
+        required: ["question"],
+        properties: { question: { type: "string" }, novel_id: { type: "integer" } },
+        additionalProperties: false,
+      },
+      output_schema: { type: "object" },
+      checksum: "20112e732d64ea984070e85f6be7a500f62da6fc2e6d13f904a0614c076ccca4",
+    };
+    fetchMock.mockClear();
+    fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+      if (url.includes("/versions") && init?.method === "GET") {
+        return Promise.resolve(new Response(JSON.stringify({
+          items: [{ id: 91, status: "active", runtime_manifest: runtimeManifest }],
+        }), { status: 200, headers: { "content-type": "application/json" } }));
+      }
+      if (url.endsWith("/skill-runs") && init?.method === "POST") {
+        return Promise.resolve(new Response(JSON.stringify({
+          run: { id: 91, owner_id: 7, novel_id: 1, skill_version_id: 91, input_hash: "a".repeat(64) },
+          internal_token: "tok-91",
+          runtime_manifest: runtimeManifest,
+        }), { status: 202, headers: { "content-type": "application/json" } }));
+      }
+      if (url.endsWith("/finalize") && init?.method === "POST") {
+        return Promise.resolve(new Response(JSON.stringify({}), { status: 200 }));
+      }
+      if (url.endsWith("/cancel") && init?.method === "POST") {
+        return Promise.resolve(new Response(JSON.stringify({}), { status: 200 }));
+      }
+      return Promise.resolve(new Response(JSON.stringify({ error: { code: "upstream_error" } }), { status: 502 }));
+    });
+    const session = fakeSession();
+    createSessionMock.mockReset();
+    createSessionMock.mockResolvedValue(session);
+    const localLoader = vi.fn(() => { throw new Error("custom skill must not load a local path"); });
+    server = createApp({
+      fetchImpl: fetchMock as unknown as typeof fetch,
+      loadSkillImpl: localLoader as unknown as (name: string) => never,
+      createSessionImpl: createSessionMock as unknown as (opts: unknown) => Promise<never>,
+    });
+    await new Promise<void>((resolve) => server.listen(0, resolve));
+    const addr = server.address();
+    const customPort = typeof addr === "object" && addr ? addr.port : 0;
+    const res = await fetch(`http://127.0.0.1:${customPort}/agent/novels/1/runs`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: AUTH },
+      body: JSON.stringify({ skill: "chapter-notes", question: "整理章节" }),
+    });
+    expect(res.status).toBe(200);
+    session.finish([{ role: "assistant", stopReason: "error", content: [] }]);
+    await collectSse(res);
+    expect(localLoader).not.toHaveBeenCalled();
+    const opts = createSessionMock.mock.calls[0]?.[0] as { skill: { name: string; instructions: string; executionMode?: string } };
+    expect(opts.skill).toMatchObject({
+      name: "chapter-notes",
+      instructions: "Use only supplied evidence.",
+      executionMode: "declarative_only",
+    });
   });
 });

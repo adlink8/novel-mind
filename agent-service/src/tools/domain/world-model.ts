@@ -96,18 +96,20 @@ export function buildWorldModelTools(auth: ToolAuth, runNovelId: number) {
       name: "get_evidence_span",
       label: "Get Evidence Span",
       description:
-        "按 chapter+offsets+content_hash 物化 leaf 证据跨度（D-07/D-08）。只返回冻结原文切片；hash 不匹配或超截止点拒绝。",
+        "按 chapter+offsets 物化 leaf 证据跨度（D-07/D-08）。content_hash 可选：省略时服务端计算并返回；提供时校验与切片匹配，不匹配或超截止点拒绝。只返回冻结原文切片。",
       parameters: Type.Object({
         novel_id: Type.Integer({ minimum: 1, description: "小说 ID" }),
         chapter_id: Type.Integer({ minimum: 1, description: "章节 ID" }),
         source_start: Type.Integer({ minimum: 0, description: "切片起点（含）" }),
         source_end: Type.Integer({ minimum: 1, description: "切片终点（不含）" }),
-        content_hash: Type.String({
-          minLength: 64,
-          maxLength: 64,
-          pattern: "^[0-9a-f]{64}$",
-          description: "该切片内容的 SHA-256",
-        }),
+        content_hash: Type.Optional(
+          Type.String({
+            minLength: 64,
+            maxLength: 64,
+            pattern: "^[0-9a-f]{64}$",
+            description: "该切片内容的 SHA-256（可选；省略时服务端计算）",
+          }),
+        ),
       }),
       execute: (toolCallId, params, signal) =>
         fastapiToolCall("get_evidence_span", params as unknown, signal, auth, runNovelId),

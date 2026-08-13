@@ -53,7 +53,7 @@ const REGISTERED_DOMAIN_TOOLS = [
   "get_evidence_span",
 ] as const;
 
-/** Phase 27 编排 allowlist：6 个只读世界模型/关系工具。 */
+/** Phase 27 编排 allowlist：7 个只读工具（含 search_novel_text 文本发现通道）。 */
 const EXPECTED_ALLOWED_TOOLS = [
   "get_events",
   "get_character_state",
@@ -61,6 +61,7 @@ const EXPECTED_ALLOWED_TOOLS = [
   "get_relationships",
   "get_world_rules",
   "get_evidence_span",
+  "search_novel_text",
 ] as const;
 
 /** D-09 必需字段集。 */

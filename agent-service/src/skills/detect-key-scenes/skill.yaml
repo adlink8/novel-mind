@@ -3,9 +3,9 @@
 #
 # Phase 31 版本化关键场景检测技能：
 #   - 本技能是 Phase 31 确定性域能力（boundaries/scoring/candidates/review）的
-#     Agent 消费边界（D-31-01..D-31-05）；允许的工具 allowlist 只含 5 个只读域工具
+#     Agent 消费边界（D-31-01..D-31-05）；允许的工具 allowlist 只含 6 个只读域工具
 #     （get_events / get_character_state / get_relationships / get_visual_bible /
-#     get_evidence_span），编排绝不越出该 allowlist（未知工具/白名单外调用 →
+#     get_evidence_span / search_novel_text），编排绝不越出该 allowlist（未知工具/白名单外调用 →
 #     fail closed）。
 #   - write_permissions 恒为空：Agent 不直接写任何域状态（不写 Canon、不写
 #     key-scene 候选集、不写 review 决策）。唯一输出通道是后端确定性 finalizer
@@ -30,7 +30,7 @@ description: >-
   Phase 31 版本化关键场景检测技能：给定小说（owner/novel/branch + cutoff +
   source snapshot + 可选 approved Visual Bible revision 血缘），通过 5 个只读域工具
   （get_events / get_character_state / get_relationships / get_visual_bible /
-  get_evidence_span）收集证据与候选信号，产出**血缘绑定**的 SceneCandidateArtifact：
+  get_evidence_span / search_novel_text）收集证据与候选信号，产出**血缘绑定**的 SceneCandidateArtifact：
   完整 SceneCandidateSetContract（ordered candidates / diversity keys /
   evidence refs / spoiler cutoff / salience reasons / advisory
   speaker_dialogue_signal）作为 candidate-only 官方输出。确定性
@@ -44,6 +44,7 @@ allowed_tools:
   - get_relationships
   - get_visual_bible
   - get_evidence_span
+  - search_novel_text
 read_permissions:
   - canon
   - world_model

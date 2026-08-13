@@ -26,6 +26,11 @@ export interface RunLineageContext {
   novelId: number;
   skillVersionId: number;
   inputHash: string;
+  chapterId?: number;
+  chapterNumber?: number;
+  cutoffChapter?: number;
+  /** run input 锚定的 source snapshot hash（detect-key-scenes 投影用）。 */
+  sourceSnapshotHash?: string;
 }
 
 /** 一次成功的只读工具调用结果（用于物化 evidence_refs）。 */
@@ -40,6 +45,7 @@ export function buildCitedAnswerEnvelope(
   ctx: RunLineageContext,
   skill: LoadedSkill,
   evidences: ToolEvidence[],
+  frozenEvidenceRefs?: string[],
 ): FinalizeEnvelope {
   if (!modelText || !modelText.trim()) {
     throw new Error("cited-answer: empty model output cannot be finalized");
@@ -50,7 +56,13 @@ export function buildCitedAnswerEnvelope(
     );
   }
 
-  const evidenceRefs = evidences.map((_, i) => `evidence:${i + 1}`);
+  const evidenceRefs =
+    frozenEvidenceRefs && frozenEvidenceRefs.length > 0
+      ? frozenEvidenceRefs.slice(0, evidences.length)
+      : evidences.map((_, i) => `evidence:${i + 1}`);
+  if (evidenceRefs.length === 0) {
+    throw new Error("cited-answer: frozen evidence manifest has no usable refs");
+  }
   const block = {
     block_id: "b1",
     text: modelText.slice(0, 4000),

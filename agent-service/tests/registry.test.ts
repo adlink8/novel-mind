@@ -102,6 +102,37 @@ describe("domain tool registry", () => {
     expect(Check(nm, { novel_id: 1, query: "人物关系" })).toBe(true);
     expect(Check(nm, { novel_id: 1 })).toBe(false);
   });
+
+  it("get_evidence_span：content_hash 可选，提供时仍校验 64-hex 格式", () => {
+    const tools = buildDomainTools("Bearer t", 1);
+    const byName = new Map(tools.map((t) => [t.name, t.parameters]));
+    const span = byName.get("get_evidence_span")!;
+
+    // 省略 content_hash → 接受（服务端计算返回，模型无需自行算 hash）
+    expect(
+      Check(span, { novel_id: 1, chapter_id: 2, source_start: 0, source_end: 40 }),
+    ).toBe(true);
+    // 提供合法 64-hex → 接受（服务端校验匹配，防漂移）
+    expect(
+      Check(span, {
+        novel_id: 1,
+        chapter_id: 2,
+        source_start: 0,
+        source_end: 40,
+        content_hash: "a".repeat(64),
+      }),
+    ).toBe(true);
+    // 提供非法格式 → 拒绝
+    expect(
+      Check(span, {
+        novel_id: 1,
+        chapter_id: 2,
+        source_start: 0,
+        source_end: 40,
+        content_hash: "not-a-hash",
+      }),
+    ).toBe(false);
+  });
 });
 
 describe("fastapi client (facade forwarding)", () => {

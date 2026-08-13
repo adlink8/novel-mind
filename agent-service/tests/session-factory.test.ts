@@ -3,7 +3,7 @@ import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import { DOMAIN_TOOL_NAMES } from "../src/tools/registry.js";
 import { loadSkill } from "../src/skills/loader.js";
 import { createControlledAgentDir } from "../src/agent/resource-loader.js";
-import { buildGatewayModel } from "../src/agent/provider.js";
+import { buildGatewayModel, createGatewayProvider } from "../src/agent/provider.js";
 import type { LoadedSkill } from "../src/skills/loader.js";
 
 /**
@@ -182,5 +182,30 @@ describe("gateway provider (D-15)", () => {
     expect(model.cost).toEqual({ input: 0, output: 0, cacheRead: 0, cacheWrite: 0 });
     expect(model.provider).toBe("novelmind");
     expect(model.id).toBe("reader-chat-default");
+  });
+
+  it("把运行令牌和 novel 绑定作为内部网关请求头发送", () => {
+    const provider = createGatewayProvider({
+      runToken: "run-owner-token",
+      novelId: 17,
+    });
+
+    expect(provider.headers).toEqual({
+      "X-NovelMind-Run-Token": "run-owner-token",
+      "X-NovelMind-Novel-ID": "17",
+    });
+  });
+
+  it("把运行上下文放入实际请求认证结果，而不只停留在 provider 元数据", async () => {
+    const provider = createGatewayProvider({
+      runToken: "run-owner-token",
+      novelId: 17,
+    });
+    const resolved = await provider.auth.apiKey?.resolve({} as never);
+
+    expect(resolved?.auth.headers).toEqual({
+      "X-NovelMind-Run-Token": "run-owner-token",
+      "X-NovelMind-Novel-ID": "17",
+    });
   });
 });

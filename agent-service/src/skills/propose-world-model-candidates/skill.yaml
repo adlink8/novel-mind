@@ -3,7 +3,7 @@
 #
 # Phase 27 版本化世界模型候选技能：
 #   - 本技能是 Phase 27 确定性能力的 Agent 消费边界（D-01）；允许的工具
-#     allowlist 只含 27-05 注册的 6 个只读域工具（含既有 get_relationships），
+#     allowlist 只含 27-05 注册的 7 个只读域工具（含既有 get_relationships 与 search_novel_text），
 #     编排绝不越出该 allowlist（未知工具/白名单外调用 → fail closed）。
 #   - write_permissions 恒为空：Agent 不直接写任何域状态（不写 Canon、不发布
 #     typed projection）。唯一输出通道是后端确定性 finalizer 持久化的
@@ -23,9 +23,9 @@ name: propose-world-model-candidates
 version: 1.0.0
 description: >-
   Phase 27 版本化世界模型候选技能：给定小说（owner/novel/branch + version/cutoff
-  可选），通过 6 个只读域工具（get_events / get_character_state /
+  可选），通过 7 个只读域工具（get_events / get_character_state /
   get_character_knowledge / get_relationships / get_world_rules /
-  get_evidence_span）收集证据，产出血缘绑定的 WorldModelCandidateArtifact
+  get_evidence_span / search_novel_text）收集证据，产出血缘绑定的 WorldModelCandidateArtifact
   （typed candidates）。Agent 只提案候选投影，绝不直接发布 Canon fact；确定性
   WorldModel Validator/Gate 单独发布 typed projections。未知工具/权限/血缘/
   schema drift 一律 fail closed。
@@ -36,6 +36,7 @@ allowed_tools:
   - get_relationships
   - get_world_rules
   - get_evidence_span
+  - search_novel_text
 read_permissions:
   - canon
   - derivative

@@ -138,3 +138,46 @@ export async function fastapiToolCall(
 
   return { content: [{ type: "text", text: bodyText }], details: {} };
 }
+
+/** Run-frozen restricted connector proxy; URL/version authority stays in FastAPI. */
+export async function fastapiConnectorToolCall(
+  toolName: string,
+  params: unknown,
+  signal: AbortSignal | undefined,
+  auth: string,
+  runNovelId: number,
+): Promise<{ content: [{ type: "text"; text: string }]; details: Record<string, never> }> {
+  const runSignal = signal ?? new AbortController().signal;
+  const ctrl = AbortSignal.any([runSignal, AbortSignal.timeout(TOOL_TIMEOUT_MS)]);
+  const connectorName = toolName.startsWith("connector:")
+    ? toolName.slice("connector:".length)
+    : "";
+  if (!/^[a-z0-9]+(?:[-_][a-z0-9]+)*$/.test(connectorName)) {
+    throw new AgentToolError(AGENT_TOOL_ERRORS.INVALID_INPUT, "invalid connector tool name");
+  }
+  let res: Response;
+  try {
+    res = await fetch(
+      `${config.fastApiBaseUrl}/api/agent-tools/connectors/${encodeURIComponent(connectorName)}?novel_id=${encodeURIComponent(String(runNovelId))}`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: auth },
+        body: JSON.stringify(params ?? {}),
+        signal: ctrl,
+      },
+    );
+  } catch (err) {
+    if (runSignal.aborted) throw err;
+    const reason = (err as Error)?.name ?? "";
+    if (reason === "TimeoutError" || reason === "AbortError") {
+      throw new AgentToolError(AGENT_TOOL_ERRORS.TIMEOUT, "connector tool timed out");
+    }
+    throw new AgentToolError(AGENT_TOOL_ERRORS.UPSTREAM_ERROR, "connector tool network error");
+  }
+  const bodyText = await res.text();
+  if (bodyText.length > TOOL_OUTPUT_BYTE_LIMIT) {
+    throw new AgentToolError(AGENT_TOOL_ERRORS.OUTPUT_TOO_LARGE, "connector response exceeds byte limit");
+  }
+  if (!res.ok) throw mapFacadeError(res.status, bodyText);
+  return { content: [{ type: "text", text: bodyText }], details: {} };
+}
