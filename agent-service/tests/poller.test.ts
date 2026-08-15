@@ -369,79 +369,6 @@ describe("createPoller", () => {
     );
   }
 
-  it("detect-key-scenes backfill finalizes scene_candidate envelope with evidence_refs", async () => {
-    // Slice A：模型只产出语义字段 + 从 get_evidence_span 结果里选择的
-    // evidence_key；全部哈希/血缘字段由 builder 投影注入。
-    const spanHash = "1".repeat(64);
-    const evidenceKey = `qp:1:0:40:${spanHash}`;
-    const { deps } = makePollerDeps({
-      lastText: JSON.stringify({
-        type: "scene_candidate",
-        schema_version: "scene-candidate.v1",
-        scene_candidate_set: {
-          candidates: [
-            {
-              evidence_key: evidenceKey,
-              coordinates: { cast: ["arin"], place: "courtyard" },
-              salience_reasons: [
-                { reason_code: "plot_turn", detail: "attack", score: 0.9 },
-              ],
-              score_total: 0.9,
-              score_breakdown: { action: 0.8 },
-            },
-          ],
-        },
-      }),
-      toolResults: [
-        {
-          role: "toolResult",
-          toolName: "get_evidence_span",
-          isError: false,
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify({
-                evidence_key: evidenceKey,
-                chapter_id: 1,
-                chapter_number: 1,
-                novel_id: 6,
-                source_start: 0,
-                source_end: 40,
-                content_hash: spanHash,
-                excerpt: "courtyard attack",
-              }),
-            },
-          ],
-        },
-      ],
-    });
-    const fetchMock = deps.fetchImpl as ReturnType<typeof vi.fn>;
-    installBackendMock(fetchMock, { skillName: "detect-key-scenes" });
-
-    const poller = createPoller(deps, [], { intervalMs: 10 });
-    const stop = poller.start();
-    await new Promise((r) => setTimeout(r, 50));
-    stop();
-
-    const finals = finalizeCalls(fetchMock);
-    expect(finals.length).toBe(1);
-    expect(finals[0].stop_reason).toBe("stop");
-    expect(finals[0].envelope.type).toBe("scene_candidate");
-    expect(finals[0].envelope.schema_version).toBe("scene-candidate.v1");
-    const set = finals[0].envelope.scene_candidate_set;
-    expect(set.version_key).toBe("ks-backfill-run-1");
-    expect(set.source_snapshot_hash).toBe("b".repeat(64));
-    expect(set.cutoff_chapter).toBe(1);
-    expect(set.schema_hash).toMatch(/^[0-9a-f]{64}$/);
-    expect(set.policy_hash).toMatch(/^[0-9a-f]{64}$/);
-    expect(set.manifest_hash).toMatch(/^[0-9a-f]{64}$/);
-    expect(set.candidates[0].source_hash).toBe(spanHash);
-    expect(set.candidates[0].evidence_ranges[0].evidence_key).toBe(evidenceKey);
-    expect(finals[0].envelope.evidence_refs).toEqual([evidenceKey]);
-    expect(finals[0].frozen_manifest.evidence_refs).toEqual(finals[0].envelope.evidence_refs);
-    expect(finals[0].envelope.normalization.repaired_hash).toMatch(/^[0-9a-f]{64}$/);
-  });
-
   it("propose-world-model-candidates backfill finalizes world_model_candidate envelope", async () => {
     // Slice B：claim 引用的 evidence_ref 必须来自运行时 get_evidence_span
     // 物化结果（选择制），编造的 key fail closed。
@@ -949,7 +876,12 @@ describe("guided 模式（build-visual-bible：确定性检索 + 单轮生成）
   const SPAN_KEY = `qp:1:0:40:${SPAN_HASH}`;
 
   /** guided 路径的 fetch mock：queued → claim → gateway chat → finalize。 */
-  function installGuidedMock(fetchMock: ReturnType<typeof vi.fn>, modelText: string) {
+  function installGuidedMock(
+    fetchMock: ReturnType<typeof vi.fn>,
+    modelText: string,
+    skillName = "build-visual-bible",
+    dimension = "relations",
+  ) {
     let queued = true;
     fetchMock.mockImplementation((url: string, init?: RequestInit) => {
       const method = init?.method ?? "GET";
@@ -959,7 +891,7 @@ describe("guided 模式（build-visual-bible：确定性检索 + 单轮生成）
               run_id: 1, owner_id: 2, novel_id: 6, skill_version_id: 9,
               input: { novel_id: 6, question: "死城的环境" },
               input_hash: "a".repeat(64), branch: null,
-              backfill_dimension: "relations", origin: "chat_backfill",
+              backfill_dimension: dimension, origin: "chat_backfill",
               user_message_id: null,
             }]
           : [];
@@ -969,14 +901,14 @@ describe("guided 模式（build-visual-bible：确定性检索 + 单轮生成）
       if (url.endsWith("/claim") && method === "POST") {
         return Promise.resolve(new Response(JSON.stringify({
           run_id: 1, owner_id: 2, novel_id: 6, skill_version_id: 9,
-          skill_name: "build-visual-bible",
+          skill_name: skillName,
           input: {
             novel_id: 6, question: "死城的环境",
             source_snapshot: { snapshot_hash: "b".repeat(64) },
             cutoff_chapter: 53,
           },
           input_hash: "a".repeat(64), branch: null,
-          backfill_dimension: "relations", origin: "chat_backfill",
+          backfill_dimension: dimension, origin: "chat_backfill",
           user_message_id: null, frozen_manifest: {}, budget_snapshot: {},
           internal_token: "tok-guided",
         }), { status: 200 }));
@@ -1083,5 +1015,36 @@ describe("guided 模式（build-visual-bible：确定性检索 + 单轮生成）
     expect(finals.length).toBe(1);
     expect(finals[0].stop_reason).toBe("error");
     expect(finals[0].envelope).toEqual({});
+  });
+
+  it("detect-key-scenes guided：编号映射为 evidence_key 并投影完整契约", async () => {
+    const modelText = JSON.stringify({
+      scene_candidate_set: {
+        candidates: [{
+          evidence_indices: [1],
+          coordinates: { cast: ["林守溪"], place: "城门", time: null, pov: null },
+          salience_reasons: [{ reason_code: "plot_turn", detail: "追杀", score: 0.9 }],
+          score_total: 0.9,
+        }],
+      },
+    });
+    const { deps } = makePollerDeps();
+    deps.guidedCallTool = guidedCallTool;
+    const fetchMock = deps.fetchImpl as ReturnType<typeof vi.fn>;
+    installGuidedMock(fetchMock, modelText, "detect-key-scenes", "raw_text");
+
+    const poller = createPoller(deps, [], { intervalMs: 10 });
+    const stop = poller.start();
+    await new Promise((r) => setTimeout(r, 80));
+    stop();
+
+    const finals = guidedFinalizeCalls(fetchMock);
+    expect(finals.length).toBe(1);
+    expect(finals[0].stop_reason).toBe("stop");
+    const set = finals[0].envelope.scene_candidate_set;
+    expect(set.review_state).toBe("candidate");
+    expect(set.candidates[0].evidence_ranges[0].evidence_key).toBe(SPAN_KEY);
+    expect(set.manifest_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(finals[0].envelope.evidence_refs).toEqual([SPAN_KEY]);
   });
 });

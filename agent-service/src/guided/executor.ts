@@ -26,11 +26,44 @@ import type { LoadedSkill } from "../skills/loader.js";
 
 type JsonObject = Record<string, unknown>;
 
-/** guided 模式 skill 注册表（tracer bullet：先只接 build-visual-bible）。 */
-const GUIDED_SKILLS: ReadonlySet<string> = new Set(["build-visual-bible"]);
+/** guided 模式的 per-skill 输出契约（system prompt 规则块 + 输出骨架）。 */
+interface GuidedSkillSpec {
+  analyzer: string;
+  rules: string[];
+  skeleton: string;
+}
+
+/**
+ * guided 模式 skill 注册表。wmc 刻意不在其中：其 claim 需要
+ * disclosure_cutoff 等血缘字段，而 wmc run input 当前不做快照锚定——
+ * 先锚定再接入，否则等于让模型猜 cutoff。
+ */
+const GUIDED_SKILLS: Record<string, GuidedSkillSpec> = {
+  "build-visual-bible": {
+    analyzer: "Visual Bible 分析器",
+    rules: [
+      "- entities：1-5 个，每项含 entity_key（英文 slug）、entity_type（character|place|item|faction|style）、description、authority（canon_fact|probable_inference|literary_interpretation|user_interpretation）；",
+      "- claims：1-8 条，每项含 entity_key（必须引用 entities 里的）、authority、description；",
+      "- canon_fact claim 必须带 evidence_indices（数字数组，只能取证据菜单里的编号）；interpretation 类 claim 必须带 author 和 rationale、不带 evidence_indices；",
+      "- 至少 1 条 canon_fact claim；",
+    ],
+    skeleton: '{"visual_bible": {"entities": [...], "claims": [...]}}',
+  },
+  "detect-key-scenes": {
+    analyzer: "关键场景检测器",
+    rules: [
+      "- candidates：1-5 个，每项含 evidence_indices（恰好 1 个菜单编号，选最能支撑该场景的摘录）、coordinates（cast/place/time/pov）、salience_reasons；",
+      "- salience_reasons[].reason_code 只能取：plot_turn|emotional_peak|character_salience|visual_expressiveness|arc_impact|quiet_emotional|dialogue_turn；score ∈ [0,1]；",
+      "- 可选 score_total、score_breakdown、diversity_key；",
+      "- 每个候选必须挂且仅挂 1 条证据（evidence_indices 长度恒为 1）；",
+    ],
+    skeleton:
+      '{"scene_candidate_set": {"candidates": [{"evidence_indices": [1], "coordinates": {...}, "salience_reasons": [...]}]}}',
+  },
+};
 
 export function isGuidedSkill(skillName: string): boolean {
-  return GUIDED_SKILLS.has(skillName);
+  return skillName in GUIDED_SKILLS;
 }
 
 /** 信封构建失败后的最大修复轮数（与 agentic 路径一致）。 */
@@ -53,19 +86,19 @@ export interface GuidedRunOptions {
   runLineage: RunLineageContext;
 }
 
-const GUIDED_SYSTEM_PROMPT = [
-  "你是 NovelMind 的 Visual Bible 分析器。根据用户问题和编号证据摘录，输出且仅输出一个 JSON 对象（不要 markdown 围栏、不要任何解释文字）。",
-  "规则：",
-  "- entities：1-5 个，每项含 entity_key（英文 slug）、entity_type（character|place|item|faction|style）、description、authority（canon_fact|probable_inference|literary_interpretation|user_interpretation）；",
-  "- claims：1-8 条，每项含 entity_key（必须引用 entities 里的）、authority、description；",
-  "- canon_fact claim 必须带 evidence_indices（数字数组，只能取证据菜单里的编号）；interpretation 类 claim 必须带 author 和 rationale、不带 evidence_indices；",
-  "- 至少 1 条 canon_fact claim；",
-  "- 绝不输出任何哈希、ID、evidence_key、cutoff 或血缘字段（由程序注入）。",
-].join("\n");
+function guidedSystemPrompt(spec: GuidedSkillSpec): string {
+  return [
+    `你是 NovelMind 的${spec.analyzer}。根据用户问题和编号证据摘录，输出且仅输出一个 JSON 对象（不要 markdown 围栏、不要任何解释文字）。`,
+    "规则：",
+    ...spec.rules,
+    "- 绝不输出任何哈希、ID、evidence_key、cutoff 或血缘字段（由程序注入）。",
+  ].join("\n");
+}
 
 function buildGuidedUserPrompt(
   question: string,
   retrieval: GuidedRetrieval,
+  spec: GuidedSkillSpec,
 ): string {
   const menuLines = retrieval.menu.map(
     (item) =>
@@ -77,7 +110,7 @@ function buildGuidedUserPrompt(
     "证据菜单（evidence_indices 只能从这里选编号）：",
     ...menuLines,
     "",
-    '输出骨架：{"visual_bible": {"entities": [...], "claims": [...]}}',
+        `输出骨架：${spec.skeleton}`,
   ].join("\n");
 }
 
@@ -158,9 +191,13 @@ export async function executeGuidedRun(opts: GuidedRunOptions): Promise<void> {
     },
   ];
 
+  const spec = GUIDED_SKILLS[opts.skill.name];
+  if (!spec) {
+    throw new Error(`guided run: skill ${opts.skill.name} has no guided spec`);
+  }
   const messages: ChatMessage[] = [
-    { role: "system", content: GUIDED_SYSTEM_PROMPT },
-    { role: "user", content: buildGuidedUserPrompt(opts.question, retrieval) },
+    { role: "system", content: guidedSystemPrompt(spec) },
+    { role: "user", content: buildGuidedUserPrompt(opts.question, retrieval, spec) },
   ];
 
   let envelopePayload: JsonObject | null = null;
@@ -174,7 +211,11 @@ export async function executeGuidedRun(opts: GuidedRunOptions): Promise<void> {
     );
     usage = completion.usage;
     try {
-      const translated = translateEvidenceIndices(completion.text, retrieval.keys);
+      const translated = translateEvidenceIndices(
+        completion.text,
+        retrieval.keys,
+        opts.skill.name,
+      );
       const built = buildAnalysisEnvelope(
         translated,
         opts.runLineage,

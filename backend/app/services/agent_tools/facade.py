@@ -371,13 +371,17 @@ class ToolFacade:
         self, *, db, novel: Novel, owner_id: int, params: dict
     ):
         svc = self._svc("search_novel_text", _default_search_novel_text)
+        top_k = int(params.get("top_k", 10))
+        # cutoff 后过滤会消耗命中配额：top_k=5 的前 5 名可能全部超 cutoff，
+        # 过滤后归零（rank 6+ 的城内命中被截断）。过取 4 倍再过滤再截断。
+        fetch_k = min(top_k * 4, 50)
         outcome = await svc(
             db,
             owner_id=owner_id,
             novel_id=novel.id,
             query=params["query"],
             mode=params.get("mode", "auto"),
-            top_k=int(params.get("top_k", 10)),
+            top_k=fetch_k,
         )
         # D-05 剧透边界：命中行必须按阅读 cutoff 过滤（与 get_timeline 同一
         # 纪律；持久化 full_book 开关除外）。未过滤的超 cutoff 命中既泄露原文
@@ -407,7 +411,7 @@ class ToolFacade:
             if row.get("chapter_id") is not None
             and chapter_number.get(row["chapter_id"], 0) <= int(cutoff)
         ]
-        return {**outcome, "results": filtered}
+        return {**outcome, "results": filtered[:top_k]}
 
     async def _get_timeline(self, *, db, novel: Novel, owner_id: int, params: dict):
         persisted_full_book = _persisted_full_book(novel)

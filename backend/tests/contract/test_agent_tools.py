@@ -362,6 +362,50 @@ async def test_search_results_beyond_cutoff_are_filtered():
     assert chapter_ids == [1, 2]
 
 
+async def test_search_overfetches_before_cutoff_filter():
+    """cutoff 后过滤会消耗配额：必须过取再过滤再截断回 top_k。
+
+    不过取时 top_k=5 前 5 名全超 cutoff → 过滤后归零（rank 6+ 的城内命中
+    被截断）；facade 应以 min(top_k*4, 50) 过取，过滤后截断回 top_k。
+    """
+    seen_top_k: list[int] = []
+
+    async def fake_search(db, *, owner_id, novel_id, query, mode, top_k):
+        seen_top_k.append(top_k)
+        return {
+            "results": [
+                {"chapter_id": 9, "chunk_id": 13, "content_snippet": "城外"},
+                {"chapter_id": 1, "chunk_id": 11, "content_snippet": "甲"},
+                {"chapter_id": 2, "chunk_id": 12, "content_snippet": "乙"},
+            ],
+            "resolved_mode": "chunks",
+            "fallback_reason": None,
+        }
+
+    class _FakeResult:
+        def __init__(self, rows):
+            self._rows = rows
+
+        def all(self):
+            return self._rows
+
+    class _FakeDb:
+        async def execute(self, stmt, params=None):
+            return _FakeResult([(1, 1), (2, 3), (9, 10)])
+
+    facade = _facade(service_overrides={"search_novel_text": fake_search})
+    outcome = await facade.execute(
+        "search_novel_text",
+        db=_FakeDb(),
+        novel=_novel(),
+        owner_id=1,
+        params={"query": "测试", "top_k": 1},
+    )
+
+    assert seen_top_k == [4]  # top_k=1 → 过取 4
+    assert [row["chapter_id"] for row in outcome["results"]] == [1]  # 截断回 1
+
+
 async def test_search_results_unfiltered_when_full_book_persisted():
     """持久化 full_book 开关开启时不过滤（与 get_timeline 同一纪律）。"""
 
