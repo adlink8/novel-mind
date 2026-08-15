@@ -1,0 +1,138 @@
+{
+  "description": "detect-key-scenes skill-local fixture（Phase 31 / REQ-VIS-02）：一个候选 + 一条 evidence range + advisory speaker_dialogue_signal（ambiguous with warnings）。review_state 恒为 candidate；approval 是服务端显式状态迁移。",
+  "input": {
+    "novel_id": 1,
+    "branch": null,
+    "version_key": "ks-ambiguity",
+    "cutoff_chapter": 2,
+    "source_snapshot": {
+      "snapshot_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+      "dataset_lineage": "novel-source.v1"
+    },
+    "approved_visual_bible_revision_id": null,
+    "approved_visual_bible_revision_hash": null,
+    "max_candidates": 4
+  },
+  "expected_output": {
+    "type": "scene_candidate",
+    "schema_version": "scene-candidate.v1",
+    "owner_id": 1,
+    "novel_id": 1,
+    "branch": null,
+    "producing_skill": "detect-key-scenes",
+    "producing_skill_version": "1.0.0",
+    "skill_version_id": 1,
+    "model_lineage": {
+      "provider": "fixture",
+      "model": "stub-model",
+      "revision": "stub-1"
+    },
+    "source_versions": {
+      "novel": "v1",
+      "source_snapshot_hash": "1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    "input_hash": "2222222222222222222222222222222222222222222222222222222222222222",
+    "evidence_refs": [
+      "ev-ambiguity-00000000000000000000000000000000000000000000000000001"
+    ],
+    "scene_candidate_set": {
+      "schema_version": "key-scene.v1",
+      "artifact_kind": "key_scene",
+      "owner_id": 1,
+      "novel_id": 1,
+      "version_key": "ks-ambiguity",
+      "revision_number": 1,
+      "parent_set_id": null,
+      "source_snapshot_id": "ss-1",
+      "source_snapshot_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+      "cutoff_chapter": 2,
+      "schema_hash": "3333333333333333333333333333333333333333333333333333333333333333",
+      "policy_hash": "4444444444444444444444444444444444444444444444444444444444444444",
+      "detector_id": "key-scene.v1",
+      "detector_version": "1.0.0",
+      "manifest_hash": "5555555555555555555555555555555555555555555555555555555555555555",
+      "approved_visual_bible_revision_id": null,
+      "approved_visual_bible_revision_hash": null,
+      "candidates": [
+        {
+          "candidate_key": "ks-ks-ambiguity-0",
+          "candidate_order": 0,
+          "scene_id": "scene-ch1-0-40",
+          "chapter_id": 1,
+          "chapter_number": 1,
+          "source_start": 0,
+          "source_end": 40,
+          "source_hash": "6666666666666666666666666666666666666666666666666666666666666666",
+          "coordinates": {
+            "cast": ["arin"],
+            "place": "hall",
+            "time": "evening",
+            "pov": "arin"
+          },
+          "spoiler_cutoff": 2,
+          "salience_reasons": [
+            {
+              "reason_code": "ambiguity_warning",
+              "detail": "conflicting visual evidence",
+              "score": 0.3
+            }
+          ],
+          "score_total": 0.3,
+          "score_breakdown": {
+            "action": 0.0,
+            "character_salience": 0.3
+          },
+          "diversity_key": "dk-quiet-1",
+          "detector_id": "key-scene.v1",
+          "detector_version": "1.0.0",
+          "policy_hash": "4444444444444444444444444444444444444444444444444444444444444444",
+          "evidence_ranges": [
+            {
+              "evidence_key": "ev-ambiguity-00000000000000000000000000000000000000000000000000001",
+              "source_snapshot_id": "ss-1",
+              "source_snapshot_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+              "chapter_id": 1,
+              "chapter_number": 1,
+              "source_start": 0,
+              "source_end": 40,
+              "content_hash": "6666666666666666666666666666666666666666666666666666666666666666",
+              "excerpt": "Arin walked into the hall. He sat down. Nothi",
+              "cutoff_chapter": 2
+            }
+          ],
+          "heuristic_signal": {
+            "availability": "ambiguous",
+            "speaker_offsets": [],
+            "dialogue_offsets": [
+              {
+                "offset_start": 28,
+                "offset_end": 34
+              }
+            ],
+            "confidence": 0.3,
+            "warnings": ["no_speaker_attribution"],
+            "detector_id": "key-scene.v1",
+            "detector_version": "1.0.0"
+          },
+          "review_state": "candidate"
+        }
+      ],
+      "review_state": "candidate"
+    },
+    "tool_runs": [
+      { "tool_name": "get_evidence_span", "calls": 1 },
+      { "tool_name": "get_events", "calls": 0 },
+      { "tool_name": "get_character_state", "calls": 0 },
+      { "tool_name": "get_relationships", "calls": 0 },
+      { "tool_name": "get_visual_bible", "calls": 0 }
+    ],
+    "status": "candidate",
+    "parent_revision": null,
+    "normalization": {
+      "raw_hash": "7777777777777777777777777777777777777777777777777777777777777777",
+      "repaired_hash": "7777777777777777777777777777777777777777777777777777777777777777",
+      "normalization_actions": [],
+      "warnings": []
+    }
+  }
+}

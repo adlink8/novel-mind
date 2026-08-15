@@ -1,0 +1,23 @@
+{
+  "prerequisite": "41-DECISION.md prerequisite #1: bundled Node executable",
+  "proven": true,
+  "electron": {
+    "version": "43.3.0",
+    "binary": "desktop/proof/node_modules/electron/dist/electron.exe",
+    "embedded_node_version": "v24.18.1",
+    "satisfies": "agent-service Node >=22.19 (YES)"
+  },
+  "method": "ELECTRON_RUN_AS_NODE=1 electron.exe <standalone server.js> --port <dynamic loopback>",
+  "evidence": {
+    "system_node_stripped_from_path": true,
+    "root_route_http": 200,
+    "dynamic_route_novels_1_http": 200,
+    "next_static_assets": "15/15 HTTP 200 (extracted from root HTML refs)",
+    "public_asset_offline_html": 200,
+    "shutdown": "process tree killed, no leftover electron processes"
+  },
+  "limitations": [
+    "Proves Electron-embedded Node starts the existing standalone tree;",
+    "full packaging (resource tree layout, no user runtime) remains Phase 41-03 NO-GO scope until bundled Python / native PG / vector-store prerequisites also land"
+  ]
+}

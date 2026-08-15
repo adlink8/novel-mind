@@ -1,0 +1,167 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ProposeIllustrationAnchorOutput",
+  "description": "IllustrationAnchorProposal 信封（D-34-01..D-34-04 / Phase 34）。镜像 backend app.schemas.agent_runtime.IllustrationAnchorProposalArtifact：type / schema_version / owner / novel / branch / producing skill+version / model lineage / source versions / input_hash / evidence_refs / tool_runs / status / parent_revision / normalization。`illustration_anchor_proposal` 负载携带完整 branch-aware 血缘（proposal key、authority space、chapter/精确 source span/hash、source snapshot、proposal-ready AssetRevision 引用、presentation、requested action、proposal_status 恒为 proposed）——只有服务端 proposal/approval/publisher 能推进 proposed → pending_approval → valid；Phase 34 绝不静默发布。artifact_id / revision_id / skill_run_id / approval_request_id / proposal_id 由后端确定性 finalizer/服务端在写入时分配，模型输出不含。",
+  "type": "object",
+  "required": [
+    "type",
+    "schema_version",
+    "owner_id",
+    "novel_id",
+    "producing_skill",
+    "producing_skill_version",
+    "skill_version_id",
+    "model_lineage",
+    "source_versions",
+    "input_hash",
+    "evidence_refs",
+    "illustration_anchor_proposal",
+    "tool_runs",
+    "status",
+    "normalization"
+  ],
+  "properties": {
+    "type": { "const": "illustration_anchor_proposal" },
+    "schema_version": { "const": "illustration-anchor-proposal.v1" },
+    "owner_id": { "type": "integer", "minimum": 1 },
+    "novel_id": { "type": "integer", "minimum": 1 },
+    "branch": { "type": ["string", "null"], "description": "衍生分支；原始主线为 null" },
+    "producing_skill": { "type": "string", "minLength": 1 },
+    "producing_skill_version": { "type": "string", "minLength": 1 },
+    "skill_version_id": { "type": "integer", "minimum": 1 },
+    "model_lineage": { "type": "object", "description": "agent runtime + 模型血缘（provider/model/revision）" },
+    "source_versions": { "type": "object", "description": "数据源版本（novel/chapter/source snapshot 血缘）" },
+    "input_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$", "description": "运行输入规范化 JSON 的 SHA-256（重放追溯）" },
+    "evidence_refs": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1,
+      "description": "leaf 证据引用，必须 ⊆ 冻结 manifest 白名单（D-07/D-08）"
+    },
+    "skill_run_id": { "type": ["integer", "null"], "minimum": 1, "description": "SkillRun ID（后端 run 创建时分配；模型输出不含）" },
+    "artifact_id": { "type": ["integer", "null"], "minimum": 1, "description": "Artifact ID（后端确定性 finalizer 写入时分配；模型输出不含）" },
+    "revision_id": { "type": ["integer", "null"], "minimum": 1, "description": "ArtifactRevision ID（后端确定性 finalizer 写入时分配；模型输出不含）" },
+    "illustration_anchor_proposal": {
+      "type": "object",
+      "description": "完整 IllustrationAnchorProposal 负载：branch-aware 血缘 + proposal-ready 资产引用 + 精确 source span。proposal_status 恒为 proposed——只有服务端 proposal/approval/publisher 能推进状态；Phase 34 绝不发布。",
+      "required": [
+        "schema_version",
+        "artifact_kind",
+        "proposal_key",
+        "authority_space",
+        "chapter_id",
+        "chapter_number",
+        "source_snapshot_id",
+        "source_snapshot_hash",
+        "range",
+        "excerpt",
+        "anchor_hash",
+        "chapter_content_hash",
+        "proposal_asset_revision_id",
+        "presentation",
+        "requested_action",
+        "proposal_status"
+      ],
+      "properties": {
+        "schema_version": { "const": "illustration-anchor-proposal.v1" },
+        "artifact_kind": { "const": "illustration_anchor_proposal" },
+        "proposal_key": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "authority_space": {
+          "type": "string",
+          "enum": ["original", "derivative"],
+          "description": "authority space：original 主线 / derivative 衍生分支"
+        },
+        "fork": { "type": ["string", "null"], "maxLength": 80, "description": "衍生 fork（仅 derivative 模式）" },
+        "chapter_id": { "type": "integer", "minimum": 1 },
+        "chapter_number": { "type": "integer", "minimum": 1 },
+        "source_snapshot_id": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "source_snapshot_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "range": {
+          "type": "object",
+          "description": "精确 source span（code-point offsets）+ 可选段落范围",
+          "required": ["source_start", "source_end"],
+          "properties": {
+            "source_start": { "type": "integer", "minimum": 0 },
+            "source_end": { "type": "integer", "minimum": 1 },
+            "paragraph_start": { "type": ["integer", "null"], "minimum": 1 },
+            "paragraph_end": { "type": ["integer", "null"], "minimum": 1 }
+          },
+          "additionalProperties": false
+        },
+        "excerpt": { "type": "string", "minLength": 1, "maxLength": 20000 },
+        "anchor_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "chapter_content_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "proposal_asset_revision_id": { "type": "integer", "minimum": 1, "description": "proposal-ready AssetRevision 引用（Phase 33 handoff，Agent 不直接写）" },
+        "presentation": {
+          "type": "object",
+          "required": ["caption", "alt_text", "citation"],
+          "properties": {
+            "caption": { "type": "string", "minLength": 1, "maxLength": 500 },
+            "alt_text": { "type": "string", "minLength": 1, "maxLength": 500 },
+            "citation": { "type": "string", "minLength": 1, "maxLength": 1000 }
+          },
+          "additionalProperties": false
+        },
+        "requested_action": {
+          "type": "string",
+          "enum": ["publish_illustration", "attach_illustration_to_text"],
+          "description": "请求的 Phase 34 action；服务端创建 pending Web ApprovalRequest（D-11），Agent/浏览器绝不发布"
+        },
+        "proposal_status": {
+          "type": "string",
+          "enum": ["proposed", "pending_approval", "valid"],
+          "description": "Phase 34 唯一官方状态机：finalize 写入时恒为 proposed；只有服务端 proposal/approval/publisher 能推进；绝不发布"
+        },
+        "approval_request_id": { "type": ["integer", "null"], "minimum": 1, "description": "服务端 Web ApprovalRequest ID（模型输出不含）" },
+        "proposal_id": { "type": ["integer", "null"], "minimum": 1, "description": "服务端 IllustrationAnchorProposal 行 ID（模型输出不含）" }
+      },
+      "additionalProperties": false
+    },
+    "tool_runs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["tool_name", "calls"],
+        "properties": {
+          "tool_name": { "type": "string", "minLength": 1 },
+          "calls": { "type": "integer", "minimum": 0 }
+        }
+      },
+      "description": "ToolRun 血缘：本 run 使用的 allowlist 工具与调用次数"
+    },
+    "status": {
+      "enum": ["candidate", "validated", "approved", "published", "rejected"],
+      "description": "产物状态；finalize 写入时恒为 candidate（无自动 promotion）"
+    },
+    "parent_revision": { "type": ["string", "null"], "description": "父修订引用；首个修订为 null" },
+    "normalization": {
+      "type": "object",
+      "description": "26-06 修复血缘 trail：repaired_hash 是对不含本 trail 的 repaired payload 的 canonical SHA-256；raw_hash 是原始模型输出的 canonical SHA-256；normalization_actions 每项含 path/action/after。",
+      "required": ["raw_hash", "repaired_hash", "normalization_actions", "warnings"],
+      "properties": {
+        "raw_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "repaired_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "normalization_actions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path", "action", "after"],
+            "properties": {
+              "path": { "type": "string", "minLength": 1 },
+              "action": {
+                "type": "string",
+                "enum": ["alias", "alias_dedup", "enum_canonicalize", "container_shape", "lineage_merge"]
+              },
+              "before": {},
+              "after": {},
+              "reason": { "type": "string" }
+            }
+          }
+        },
+        "warnings": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  },
+  "additionalProperties": false
+}

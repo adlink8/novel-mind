@@ -8,6 +8,8 @@ the same policy module instead of being duplicated by individual consumers.
 
 from __future__ import annotations
 
+from app.services.reader_chat.retrieval import SOURCE_PRIORITY
+
 RETRIEVAL_LAYERS: dict[str, str] = {
     "chunks": "enabled",
     "units": "enabled",
@@ -15,13 +17,10 @@ RETRIEVAL_LAYERS: dict[str, str] = {
     "narrative_memory": "disabled",
 }
 
-READER_CHAT_SOURCE_PRIORITY: dict[str, int] = {
-    "selection": 0,
-    "hierarchy": 1,
-    "knowledge": 2,
-    "timeline": 3,
-    "relationship_observation": 4,
-}
+# Single shared instance: Reader Chat's SOURCE_PRIORITY and the policy's
+# READER_CHAT_SOURCE_PRIORITY must be the SAME dict object (contract test
+# asserts identity) so ordering cannot drift between the two modules.
+READER_CHAT_SOURCE_PRIORITY: dict[str, int] = SOURCE_PRIORITY
 
 
 def reader_chat_source_priority(source_type: str) -> int:

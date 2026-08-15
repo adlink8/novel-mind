@@ -6,14 +6,15 @@
 - **D-37-02** Agent/LLM 只产严格 schema 的 candidate；确定性代码负责 evidence、scope、schema、预算、矛盾/一致性门和发布状态。Canonical refs: `REQ-CRE-06`, `docs/architecture/08-ai-model-layer.md`。
 - **D-37-03** 人物行为、既定事实、时间线和 clue 违规必须 fail closed；允许偏离只能作为显式 derivative override，不得回写原作空间。Canonical refs: `REQ-CRE-06`, `ROADMAP.md#Phase 37`。
 - **D-37-04** Phase 22 夜间资格保持 0/3；本阶段不把生成成功当作质量资格或生产 promotion。Canonical ref: `.planning/STATE.md`。
+- **D-37-05** `BranchSuggestion` 是 disabled-by-default 的候选输出，统一包含 `choice_text`、`branch_summary`、`triggering_conflict`、`canon_delta_hash`、`evidence_refs` 和 `enabled_by_default=false`。它只描述可供用户选择的分支建议，不自动 fork、不改变任何 Canon/branch state，也不能复用 `allow_divergence` approval；发布仍需独立的 `publish_derivative_revision` approval。Canonical ref: `REQ-FORK-06`。
 
 ## Agent Consumer Contract
 
 - Skill / mode: continue-derivative-story.
 - Inputs: frozen branch context package.
-- Official output: DraftArtifact; ContinuityReport, with SkillRun/ToolRun, runtime/model, source/input hash,
+- Official output: DraftArtifact; ContinuityReport; optional `BranchSuggestion[]`, with SkillRun/ToolRun, runtime/model, source/input hash,
   evidence and owner/novel/branch lineage where applicable.
-- Approval: separate publish and divergence approvals.
+- Approval: separate publish and divergence approvals; a BranchSuggestion never grants or reuses either approval.
 - Deterministic authority: continuity/evidence/branch/budget validators + deterministic publisher.
 - Forbidden: Original write or conflated approval; shell/filesystem/default coding tools, ambient packages and direct
   database access are always forbidden.

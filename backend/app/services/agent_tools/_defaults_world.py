@@ -1,0 +1,271 @@
+"""World-model domain default tool services for the agent-tools facade.
+
+Extracted from the agent-tools facade (Phase 27-05 world-model tools): this
+module owns the default service entry and JSON-serialization helpers for the
+read-only events / character-state / character-knowledge / world-rules /
+evidence-span tools. Query seams delegate to the world-model entity/event/
+knowledge queries with the facade-supplied version + server cutoff (D-05);
+the epistemic answer helpers here are the only serializers that know how to
+flatten pydantic claims/evidence into the tool contract payload.
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
+from app.services.agent_tools.errors import InvalidInputError, NotFoundError
+from app.services.novel_service import novel_service
+from app.services.queryplan.adapters import chapter_content_hash
+from app.services.queryplan.contracts import leaf_evidence_key
+from app.services.world_model.entity_queries import WorldEntityQueries
+from app.services.world_model.event_queries import WorldModelEventQueries
+from app.services.world_model.event_repository import WorldModelEventRepository
+from app.services.world_model.knowledge import EpistemicAspect, KnowledgeResultStatus
+from app.services.world_model.knowledge_queries import KnowledgeQueries
+
+
+def _epistemic_answer_to_json(answer) -> dict[str, Any]:
+    """把 EpistemicAnswer 序列化为 JSON 安全 payload（claims/evidence 是 pydantic）。"""
+    return {
+        "status": answer.status.value,
+        "subject": answer.subject,
+        "claims": [claim.model_dump(mode="json") for claim in answer.claims],
+        "evidence": [ref.model_dump(mode="json") for ref in answer.evidence],
+        "has_approval": answer.has_approval,
+        "message": answer.message,
+    }
+
+
+def _merge_state_answers(
+    *, subject: str, answers: list[Any], message: str
+) -> dict[str, Any]:
+    """合并 state/goal/motivation 三个 aspect 的查询结果（无编造，abstain 优先）。"""
+    claims = tuple(claim for answer in answers for claim in answer.claims)
+    evidence = tuple(ref for answer in answers for ref in answer.evidence)
+    approved = any(answer.has_approval for answer in answers)
+    if not claims:
+        status = KnowledgeResultStatus.ABSTAINED
+    elif approved:
+        status = KnowledgeResultStatus.ANSWERED
+    else:
+        status = KnowledgeResultStatus.CANDIDATE_ONLY
+    return {
+        "status": status.value,
+        "subject": subject,
+        "claims": [claim.model_dump(mode="json") for claim in claims],
+        "evidence": [ref.model_dump(mode="json") for ref in evidence],
+        "has_approval": approved,
+        "message": message,
+    }
+
+
+async def _default_get_events(
+    db,
+    *,
+    owner_id: int,
+    novel_id: int,
+    version_id: int,
+    cutoff: int,
+) -> dict[str, Any] | None:
+    """世界模型事件/因果投影（D-05 cutoff 过滤；无投影 → None → 404-hide）。"""
+    projection = await WorldModelEventQueries(db).query_cutoff_projection(
+        owner_id=owner_id,
+        novel_id=novel_id,
+        version_id=version_id,
+        cutoff=cutoff,
+    )
+    return projection.model_dump(mode="json") if projection is not None else None
+
+
+async def _default_get_character_state(
+    db,
+    *,
+    owner_id: int,
+    novel_id: int,
+    version_id: int,
+    subject: str,
+    cutoff: int,
+    pov: str | None,
+) -> dict[str, Any]:
+    """角色状态/目标/动机（aspect ∈ state/goal/motivation 合并，D-05）。"""
+    queries = KnowledgeQueries(db)
+    answers = [
+        await queries.query_character_knowledge(
+            owner_id=owner_id,
+            novel_id=novel_id,
+            version_id=version_id,
+            subject=subject,
+            cutoff=cutoff,
+            pov=pov,
+            aspect=aspect,
+        )
+        for aspect in (
+            EpistemicAspect.STATE,
+            EpistemicAspect.GOAL,
+            EpistemicAspect.MOTIVATION,
+        )
+    ]
+    return _merge_state_answers(
+        subject=subject,
+        answers=answers,
+        message="character state merged across state/goal/motivation (D-05)",
+    )
+
+
+async def _default_get_character_knowledge(
+    db,
+    *,
+    owner_id: int,
+    novel_id: int,
+    version_id: int,
+    subject: str,
+    cutoff: int,
+    pov: str | None,
+) -> dict[str, Any]:
+    """角色知识（aspect=knowledge；mistaken/hidden 保持显式标签，D-05）。"""
+    answer = await KnowledgeQueries(db).query_character_knowledge(
+        owner_id=owner_id,
+        novel_id=novel_id,
+        version_id=version_id,
+        subject=subject,
+        cutoff=cutoff,
+        pov=pov,
+        aspect=EpistemicAspect.KNOWLEDGE,
+    )
+    return _epistemic_answer_to_json(answer)
+
+
+async def _default_get_world_rules(
+    db,
+    *,
+    owner_id: int,
+    novel_id: int,
+    version_id: int,
+    cutoff: int,
+) -> dict[str, Any]:
+    """世界规则与规则例外（D-05 cutoff 过滤；例外是 first-class，D-04）。"""
+    queries = WorldEntityQueries(db)
+    rules = [
+        rule.model_dump(mode="json")
+        for rule in await queries.query_rules(
+            owner_id=owner_id, novel_id=novel_id, version_id=version_id
+        )
+        if rule.disclosure_cutoff <= cutoff
+    ]
+    exceptions = [
+        exc.model_dump(mode="json")
+        for exc in await queries.query_rule_exceptions(
+            owner_id=owner_id, novel_id=novel_id, version_id=version_id
+        )
+        if exc.disclosure_cutoff <= cutoff
+    ]
+    return {"rules": rules, "exceptions": exceptions}
+
+
+def _locate_chunk_offsets(content: str, chunk_text: str) -> tuple[int, int] | None:
+    """在章节原文中定位 chunk 内容，返回 half-open raw offsets。
+
+    先精确子串匹配；失败则做空白规范化回退——chunker 建索引时可能折叠
+    空白（换行/缩进），导致 chunk.content 不是原文的逐字节子串（E2E 实测
+    chunk 32642 仅规范化后匹配）。规范化命中后按非空白字符索引映射回原文
+    offsets，excerpt 始终是原文真实切片。多次命中取第一个（确定性）。
+    """
+    start = content.find(chunk_text)
+    if start >= 0:
+        return start, start + len(chunk_text)
+    norm_to_raw = [i for i, ch in enumerate(content) if not ch.isspace()]
+    normalized = "".join(content[i] for i in norm_to_raw)
+    norm_chunk = "".join(ch for ch in chunk_text if not ch.isspace())
+    if not norm_chunk:
+        return None
+    idx = normalized.find(norm_chunk)
+    if idx < 0:
+        return None
+    raw_start = norm_to_raw[idx]
+    raw_end = norm_to_raw[idx + len(norm_chunk) - 1] + 1
+    return raw_start, raw_end
+
+
+async def _default_get_evidence_span(
+    db,
+    *,
+    chapter_id: int,
+    source_start: int | None,
+    source_end: int | None,
+    content_hash: str | None,
+    chunk_id: int | None = None,
+) -> dict[str, Any] | None:
+    """按 chapter+offsets 物化 leaf 证据跨度（D-07/D-08）。
+
+    chapter 缺失 → None（404-hide）；offsets 非法 → InvalidInputError
+    （fail closed，绝不返回错误切片）。``content_hash`` 可选：省略时服务端
+    从切片确定性计算并返回；提供时校验与切片一致，不匹配 → InvalidInputError
+    （防漂移，fail closed）。
+
+    ``chunk_id`` 通道（search_novel_text 命中行直挂）：text_chunks 的
+    source_start/source_end 多数为 NULL，但 chunk.content 是章节原文子串，
+    服务端在原文中定位并确定性推导 offsets——模型无需自行数字符。
+    chunk 缺失 / 不属于该章节 → None（404-hide）；chunk 内容不在章节原文
+    中（索引漂移）→ InvalidInputError（fail closed）。
+    """
+    chapter = await novel_service.get_chapter(db, chapter_id)
+    if chapter is None:
+        return None
+    content = chapter.content
+    if chunk_id is not None:
+        from app.models.text_chunk import TextChunk
+
+        chunk = await db.get(TextChunk, chunk_id)
+        if chunk is None or chunk.chapter_id != chapter_id:
+            return None
+        located = _locate_chunk_offsets(content, chunk.content)
+        if located is None:
+            raise InvalidInputError("chunk 内容与章节原文不匹配（索引漂移）")
+        source_start, source_end = located
+    if (
+        source_start is None
+        or source_end is None
+        or source_start < 0
+        or source_end > len(content)
+        or source_end <= source_start
+    ):
+        raise InvalidInputError(
+            f"offsets [{source_start},{source_end}) 不是合法 half-open 区间"
+        )
+    excerpt = content[source_start:source_end]
+    computed_hash = chapter_content_hash(excerpt)
+    if content_hash is not None and computed_hash != content_hash:
+        raise InvalidInputError("evidence content hash 与原文切片不匹配")
+    return {
+        "evidence_key": leaf_evidence_key(
+            chapter_id=chapter_id,
+            source_start=source_start,
+            source_end=source_end,
+            content_hash=computed_hash,
+        ),
+        "chapter_id": chapter_id,
+        "chapter_number": chapter.chapter_number,
+        "novel_id": chapter.novel_id,
+        "source_start": source_start,
+        "source_end": source_end,
+        "content_hash": computed_hash,
+        "excerpt": excerpt,
+    }
+
+
+async def _resolve_world_model_version(
+    db,
+    *,
+    owner_id: int,
+    novel_id: int,
+    version_id: int | None,
+) -> int:
+    """显式 version 直接返回；缺省取该 owner/novel 最新版本（无 → 404-hide）。"""
+    if version_id is not None:
+        return int(version_id)
+    versions = await WorldModelEventRepository(db).list_versions(
+        owner_id=owner_id, novel_id=novel_id
+    )
+    if not versions:
+        raise NotFoundError("world-model projection not found in owner scope")
+    return versions[-1]

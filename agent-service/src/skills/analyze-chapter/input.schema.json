@@ -1,0 +1,46 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AnalyzeChapterInput",
+  "description": "analyze-chapter Phase 28 运行输入：novel_id + chapter_id（必填）；branch、cutoff 与 source_snapshot（D-07 冻结快照血缘）可选。锚定字段仅声明意图范围，最终 scope/cutoff 由服务端强制（D-08/D-12）。",
+  "type": "object",
+  "required": ["novel_id", "chapter_id"],
+  "properties": {
+    "novel_id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "目标小说 ID（必须与运行路径中的 novel_id 一致）"
+    },
+    "chapter_id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "目标章节 ID（必须与运行路径中的章节一致）"
+    },
+    "branch": {
+      "type": ["string", "null"],
+      "maxLength": 80,
+      "description": "衍生分支；原始主线为 null（owner/novel/branch 血缘绑定）"
+    },
+    "cutoff": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "截止章节（D-08 声明意图）；超过服务端截止点将被拒绝（beyond_cutoff）"
+    },
+    "source_snapshot": {
+      "type": "object",
+      "description": "D-07 冻结 source snapshot 血缘（可选；缺失时以 run 的 source_versions / frozen manifest 为准）",
+      "required": ["snapshot_hash"],
+      "properties": {
+        "snapshot_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "dataset_lineage": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

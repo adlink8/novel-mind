@@ -61,9 +61,19 @@ test("real API multi-session chat with citations, spoiler safety and refresh rep
 
   // Select first few characters of chapter text
   await page.evaluate(() => {
-    const el = document.querySelector('[data-testid="reader-page-text"]');
-    if (!el?.firstChild) throw new Error("no page text");
-    const text = el.firstChild as Text;
+    const root = document.querySelector('[data-testid="reader-page-text"]');
+    if (!root) throw new Error("no page text");
+    // Walk to the first text node (paragraph blocks are wrapped in divs).
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    let text: Text | null = null;
+    while (walker.nextNode()) {
+      const node = walker.currentNode as Text;
+      if (node.data.trim()) {
+        text = node;
+        break;
+      }
+    }
+    if (!text) throw new Error("no text node");
     const range = document.createRange();
     const end = Math.min(6, text.data.length);
     range.setStart(text, 0);

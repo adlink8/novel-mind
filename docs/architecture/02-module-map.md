@@ -124,6 +124,43 @@
 
 ---
 
+## Agent Service 模块（Phase 25.2/25.3）
+
+### agent-service（独立 Node 服务）
+
+| 属性 | 内容 |
+|---|---|
+| **职责** | Novel Agent Runtime：Pi SDK 会话编排、域工具代理、Skill 指令注入、MCP 外部工具隔离、审批策略引擎；通过 `/api/gateway` 服务到服务调用 FastAPI。2026-08-06 起 SSE run 支持**意图→skill 自动路由**（body.skill 缺省时调 FastAPI `route-skill`，Agent 自动选 skill，用户不暴露选择） |
+| **主要文件** | `agent-service/src/`（`config.ts`、`server.ts`、`agent/`、`tools/`、`skills/`、`governance/`、`policy/`、`mcp/`、`transport/`） |
+| **状态** | VERIFIED（223 vitest passed，tsc clean，2026-08-02） |
+| **上游** | FastAPI `/api/gateway`（Bearer 令牌，fail-closed 401） |
+| **下游** | `/api/agent`（skill-runs/artifacts/approval-requests）、`/api/agent-tools`（7 域工具） |
+| **文档** | `agent-service/qualification/` + `.planning/AGENT-RUNTIME-CONTRACT.md` |
+
+### 后端 Agent Runtime 模块
+
+| 属性 | 内容 |
+|---|---|
+| **职责** | SkillRegistry/SkillVersion/SkillRun/Artifact/ArtifactRevision/NovelAgentProfile/ApprovalRequest 持久化与权限权威；external_evidence 物化（`prohibited_from_canon=true`，不可发布）；最终 validator 拒绝 mcp:// 引用 |
+| **主要文件** | `backend/app/services/agent_runtime/`、`backend/app/api/agent.py`、`agent_tools.py`、`gateway.py`、`backend/app/models/agent_runtime.py` |
+| **状态** | VERIFIED（集成 24 + adversarial 56 + CI 37 passed，2026-08-02） |
+| **上游** | agent-service（经 gateway） |
+| **下游** | PostgreSQL（Alembic `20260801_2601` head） |
+| **文档** | `backend/app/services/agent_runtime/` + `.planning/AGENT-RUNTIME-CONTRACT.md` |
+
+### QueryPlan 检索与证据模块（Phase 26）
+
+| 属性 | 内容 |
+|---|---|
+| **职责** | 把读者/分析师问题解析为类型化检索计划（QueryPlan）；8 维度适配器带显式 availability 与 exact→heuristic→stable-reason 回退；确定性 fusion；leaf EvidenceRef 物化与不可变 Frozen Manifest；Reader/Analysis Chat 共享核心，保留不同 anchor |
+| **主要文件** | `backend/app/services/queryplan/`（schemas/parser/repository/adapters/fusion/evidence/service）、`backend/app/services/analysis_chat/query_adapter.py` |
+| **状态** | VERIFIED（queryplan unit 96 + integration 68 + adversarial，2026-08-02/03） |
+| **上游** | Reader Chat / Analysis Chat 消费者 |
+| **下游** | reader_chat gateway `business_validate_answer` + `validate_answer_against_manifest`（leaf-only） |
+| **文档** | `backend/app/services/queryplan/` + `.planning/phases/26-question-driven-retrieval-and-evidence/` |
+
+---
+
 ## 前端模块
 
 ### 页面层（App Router）

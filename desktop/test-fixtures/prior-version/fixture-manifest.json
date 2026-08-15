@@ -1,0 +1,55 @@
+{
+    "version":  1,
+    "schemaVersion":  1,
+    "runtimeVersion":  "0.1.0",
+    "createdAt":  "2026-08-01T00:00:00.000Z",
+    "fileCount":  9,
+    "totalBytes":  1946,
+    "files":  [
+                  {
+                      "path":  "data/analysis/analysis-novel-001.json",
+                      "sha256":  "69f184b76e6966c487bb51e2d841de0a4929941c597f462e29e9012581da3e8e",
+                      "size":  328
+                  },
+                  {
+                      "path":  "data/chapters/chapter-001.md",
+                      "sha256":  "1a8013c22e052f22551d16e07e8ca09f0ffc0f4579f6d21d7b7b3ceb567c4dec",
+                      "size":  371
+                  },
+                  {
+                      "path":  "data/chapters/chapter-002.md",
+                      "sha256":  "e3430b4e290d88869e9bd4cf11f206ac5264c0709dc52b1a26199ef25293addb",
+                      "size":  293
+                  },
+                  {
+                      "path":  "data/derivatives/timeline-novel-001.json",
+                      "sha256":  "31bd8811794c9622e2c6b61e3598c11b15e735417c68b21fa5d8a1d83882303c",
+                      "size":  206
+                  },
+                  {
+                      "path":  "data/library/novels.json",
+                      "sha256":  "740d927ffde9689bf955fd60c1606a7461c9cc6833e227dff5a11942d0aae4d5",
+                      "size":  323
+                  },
+                  {
+                      "path":  "data/visuals/cover-001.png",
+                      "sha256":  "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
+                      "size":  70
+                  },
+                  {
+                      "path":  "migration.json",
+                      "sha256":  "e23b876a20adfc766dc6f3901d7a0cf32c3cb3d1b01d535bb34ccb5937483b6a",
+                      "size":  153
+                  },
+                  {
+                      "path":  "resources/assets/default-cover.png",
+                      "sha256":  "63ef318d96b5d0d0ceba6e04a4e622b1158335cdc67c49e27839132c6f655058",
+                      "size":  68
+                  },
+                  {
+                      "path":  "resources/templates/outline-template.json",
+                      "sha256":  "441aa1f16f6fe509a440f3c37141ed183c891906c9cd846fe99f0e2defbff957",
+                      "size":  134
+                  }
+              ]
+}

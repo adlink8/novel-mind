@@ -1,0 +1,80 @@
+{
+  "description": "illustrate-scene skill-local fixture（Phase 33 / REQ-VIS-04）：已批准 PromptRevision 引用 + provider 能力 → IllustrationRevision（type=illustration_revision）。review_state 恒为 candidate；candidate → validated → proposal_ready 只由 Phase 33 确定性 validator 推进；无 ApprovalRequest / Publisher / published。",
+  "input": {
+    "novel_id": 1,
+    "branch": null,
+    "fork": null,
+    "scene_spec_revision_id": 10,
+    "prompt_revision_id": 20,
+    "visual_bible_version_id": 30,
+    "source_snapshot_id": "ss-1",
+    "job_key": "ill-main-1",
+    "provider": "mock",
+    "model": "mock-img-v1",
+    "width": 1024,
+    "height": 1024
+  },
+  "expected_output": {
+    "type": "illustration_revision",
+    "schema_version": "illustration-revision.v1",
+    "owner_id": 1,
+    "novel_id": 1,
+    "branch": null,
+    "producing_skill": "illustrate-scene",
+    "producing_skill_version": "1.0.0",
+    "skill_version_id": 1,
+    "model_lineage": {
+      "provider": "fixture",
+      "model": "stub-model",
+      "revision": "stub-1"
+    },
+    "source_versions": {
+      "novel": "v1",
+      "source_snapshot_hash": "1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    "input_hash": "2222222222222222222222222222222222222222222222222222222222222222",
+    "evidence_refs": [
+      "ev-ayla-hair"
+    ],
+    "illustration_revision": {
+      "schema_version": "illustration-revision.v1",
+      "artifact_kind": "illustration_revision",
+      "revision_key": "ill-main-1:rev1",
+      "revision_number": 1,
+      "asset_revision_id": 5,
+      "authority_space": "original",
+      "fork": null,
+      "scene_spec_hash": "3333333333333333333333333333333333333333333333333333333333333333",
+      "prompt_revision_id": 20,
+      "prompt_revision_hash": "4444444444444444444444444444444444444444444444444444444444444444",
+      "visual_bible_revision_id": 30,
+      "visual_bible_revision_hash": "5555555555555555555555555555555555555555555555555555555555555555",
+      "source_snapshot_id": "ss-1",
+      "source_snapshot_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+      "cutoff_chapter": 2,
+      "provider": "mock",
+      "provider_model": "mock-img-v1",
+      "provider_request_id": "mock-req-abc",
+      "config_hash": "6666666666666666666666666666666666666666666666666666666666666666",
+      "generator_version": "mock-img-v1",
+      "rights_status": "cleared",
+      "consistency_verdict": "pass",
+      "fixture_set_hash": "7777777777777777777777777777777777777777777777777777777777777777",
+      "budget_settled_calls": 1,
+      "budget_settled_cost_usd": "0.0448",
+      "review_state": "candidate"
+    },
+    "tool_runs": [
+      { "tool_name": "get_novel", "calls": 1 },
+      { "tool_name": "generate_image_candidate", "calls": 1 }
+    ],
+    "status": "candidate",
+    "parent_revision": null,
+    "normalization": {
+      "raw_hash": "8888888888888888888888888888888888888888888888888888888888888888",
+      "repaired_hash": "8888888888888888888888888888888888888888888888888888888888888888",
+      "normalization_actions": [],
+      "warnings": []
+    }
+  }
+}

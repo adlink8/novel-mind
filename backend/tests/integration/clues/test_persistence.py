@@ -275,6 +275,19 @@ def _insert_lifecycle(
     ).scalar()
 
 
+def _current_head(database_url: str) -> str:
+    """Discover the single current alembic head dynamically."""
+    heads = run_alembic("heads", database_url=database_url)
+    head_lines = [
+        line.strip()
+        for line in (heads.stdout + heads.stderr).splitlines()
+        if line.strip() and not line.strip().startswith("INFO")
+    ]
+    revision_tokens = [line.split()[0] for line in head_lines if line]
+    assert len(revision_tokens) == 1, f"expected a single head, got {revision_tokens}"
+    return revision_tokens[0]
+
+
 def test_migration_from_reader_chat_head_creates_clue_tables(
     empty_postgres: str, require_postgres: None
 ):
@@ -288,7 +301,7 @@ def test_migration_from_reader_chat_head_creates_clue_tables(
 
     run_alembic("upgrade", "head", database_url=empty_postgres)
     current = run_alembic("current", database_url=empty_postgres)
-    assert "18appsetting1" in (current.stdout + current.stderr)
+    assert _current_head(empty_postgres) in (current.stdout + current.stderr)
 
     engine = create_engine(empty_postgres)
     with engine.connect() as conn:

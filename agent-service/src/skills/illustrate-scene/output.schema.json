@@ -1,0 +1,154 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "IllustrateSceneOutput",
+  "description": "IllustrationRevision 信封（D-33-01..D-33-04 / Phase 33）。镜像 backend app.schemas.agent_runtime.IllustrationRevisionArtifact：type / schema_version / owner / novel / branch / producing skill+version / model lineage / source versions / input_hash / evidence_refs / tool_runs / status / parent_revision / normalization。`illustration_revision` 负载携带完整 branch-aware 血缘（revision key/number、域 AssetRevision 引用、SceneSpec/prompt/Visual Bible/source-snapshot 血缘、provider/model/generator 血缘、rights/consistency/budget 证据），其 `review_state` 恒为 candidate——只有 Phase 33 确定性 validator 能推进 candidate → validated → proposal_ready；Phase 33 绝不创建 ApprovalRequest、不调用 publisher、不发 published 状态（Phase 34 拥有 approval/publication）。artifact_id / revision_id / skill_run_id 由后端确定性 finalizer 在写入时分配，模型输出不含。",
+  "type": "object",
+  "required": [
+    "type",
+    "schema_version",
+    "owner_id",
+    "novel_id",
+    "producing_skill",
+    "producing_skill_version",
+    "skill_version_id",
+    "model_lineage",
+    "source_versions",
+    "input_hash",
+    "evidence_refs",
+    "illustration_revision",
+    "tool_runs",
+    "status",
+    "normalization"
+  ],
+  "properties": {
+    "type": { "const": "illustration_revision" },
+    "schema_version": { "const": "illustration-revision.v1" },
+    "owner_id": { "type": "integer", "minimum": 1 },
+    "novel_id": { "type": "integer", "minimum": 1 },
+    "branch": { "type": ["string", "null"], "description": "衍生分支；原始主线为 null" },
+    "producing_skill": { "type": "string", "minLength": 1 },
+    "producing_skill_version": { "type": "string", "minLength": 1 },
+    "skill_version_id": { "type": "integer", "minimum": 1 },
+    "model_lineage": { "type": "object", "description": "agent runtime + 模型血缘（provider/model/revision）" },
+    "source_versions": { "type": "object", "description": "数据源版本（novel/chapter/source snapshot 血缘）" },
+    "input_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$", "description": "运行输入规范化 JSON 的 SHA-256（重放追溯）" },
+    "evidence_refs": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1,
+      "description": "leaf 证据引用，必须 ⊆ 冻结 manifest 白名单（D-07/D-08）"
+    },
+    "skill_run_id": { "type": ["integer", "null"], "minimum": 1, "description": "SkillRun ID（后端 run 创建时分配；模型输出不含）" },
+    "artifact_id": { "type": ["integer", "null"], "minimum": 1, "description": "Artifact ID（后端确定性 finalizer 写入时分配；模型输出不含）" },
+    "revision_id": { "type": ["integer", "null"], "minimum": 1, "description": "ArtifactRevision ID（后端确定性 finalizer 写入时分配；模型输出不含）" },
+    "illustration_revision": {
+      "type": "object",
+      "description": "完整 IllustrationRevision 负载：branch-aware 血缘 + 候选资产引用 + 确定性 validator 信号。review_state 恒为 candidate——只有 Phase 33 确定性 validator 能推进状态；Phase 33 永不创建 ApprovalRequest / 调用 publisher / 发 published 状态。",
+      "required": [
+        "schema_version",
+        "artifact_kind",
+        "revision_key",
+        "revision_number",
+        "authority_space",
+        "scene_spec_hash",
+        "prompt_revision_hash",
+        "visual_bible_revision_hash",
+        "source_snapshot_id",
+        "source_snapshot_hash",
+        "cutoff_chapter",
+        "provider",
+        "provider_model",
+        "config_hash",
+        "generator_version",
+        "rights_status",
+        "consistency_verdict",
+        "fixture_set_hash",
+        "budget_settled_calls",
+        "review_state"
+      ],
+      "properties": {
+        "schema_version": { "const": "illustration-revision.v1" },
+        "artifact_kind": { "const": "illustration_revision" },
+        "revision_key": { "type": "string", "minLength": 1, "maxLength": 180 },
+        "revision_number": { "type": "integer", "minimum": 1 },
+        "asset_revision_id": { "type": ["integer", "null"], "minimum": 1, "description": "域 AssetRevision（候选资产）ID；由 durable worker 产出，Agent 不直接写" },
+        "authority_space": {
+          "type": "string",
+          "enum": ["original", "derivative"],
+          "description": "authority space：original 主线 / derivative 衍生分支"
+        },
+        "fork": { "type": ["string", "null"], "maxLength": 80, "description": "衍生 fork（仅 derivative 模式）" },
+        "scene_spec_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "prompt_revision_id": { "type": ["integer", "null"], "minimum": 1 },
+        "prompt_revision_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "visual_bible_revision_id": { "type": ["integer", "null"], "minimum": 1 },
+        "visual_bible_revision_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "source_snapshot_id": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "source_snapshot_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "cutoff_chapter": { "type": "integer", "minimum": 1 },
+        "provider": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "provider_model": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "provider_request_id": { "type": ["string", "null"], "maxLength": 160 },
+        "config_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "generator_version": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "rights_status": { "type": "string", "enum": ["unreviewed", "cleared", "pending", "denied"] },
+        "consistency_verdict": { "type": "string", "enum": ["pass", "concern", "fail", "unavailable"] },
+        "fixture_set_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "budget_settled_calls": { "type": "integer", "minimum": 0 },
+        "budget_settled_cost_usd": { "type": ["string", "null"], "pattern": "^\\d+(\\.\\d+)?$" },
+        "review_state": {
+          "type": "string",
+          "enum": ["candidate", "validated", "proposal_ready"],
+          "description": "Phase 33 唯一官方状态机：finalize 写入时恒为 candidate；只有确定性 validator 能推进；proposal_ready 只供 Phase 34 只读 handoff，Phase 33 绝不发 published"
+        }
+      },
+      "additionalProperties": false
+    },
+    "tool_runs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["tool_name", "calls"],
+        "properties": {
+          "tool_name": { "type": "string", "minLength": 1 },
+          "calls": { "type": "integer", "minimum": 0 }
+        }
+      },
+      "description": "ToolRun 血缘：本 run 使用的 allowlist 工具与调用次数"
+    },
+    "status": {
+      "enum": ["candidate", "validated", "approved", "published", "rejected"],
+      "description": "产物状态；finalize 写入时恒为 candidate（无自动 promotion）"
+    },
+    "parent_revision": { "type": ["string", "null"], "description": "父修订引用；首个修订为 null" },
+    "normalization": {
+      "type": "object",
+      "description": "26-06 修复血缘 trail：repaired_hash 是对不含本 trail 的 repaired payload 的 canonical SHA-256；raw_hash 是原始模型输出的 canonical SHA-256；normalization_actions 每项含 path/action/after。",
+      "required": ["raw_hash", "repaired_hash", "normalization_actions", "warnings"],
+      "properties": {
+        "raw_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "repaired_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "normalization_actions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path", "action", "after"],
+            "properties": {
+              "path": { "type": "string", "minLength": 1 },
+              "action": {
+                "type": "string",
+                "enum": ["alias", "alias_dedup", "enum_canonicalize", "container_shape", "lineage_merge"]
+              },
+              "before": {},
+              "after": {},
+              "reason": { "type": "string" }
+            }
+          }
+        },
+        "warnings": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  },
+  "additionalProperties": false
+}

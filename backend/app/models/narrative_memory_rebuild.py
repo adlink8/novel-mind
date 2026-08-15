@@ -137,6 +137,10 @@ class NarrativeMemoryRebuildPlan(TimestampMixin, Base):
             "length(plan_checksum) = 64",
             name="ck_memory_rebuild_plans_plan",
         ),
+        CheckConstraint(
+            "length(eligibility_report_checksum) = 64",
+            name="ck_memory_rebuild_plans_eligibility",
+        ),
         Index("idx_memory_rebuild_plans_scope", "owner_id", "novel_id"),
         Index(
             "idx_memory_rebuild_plans_versions",

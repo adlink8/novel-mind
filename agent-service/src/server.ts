@@ -20,12 +20,14 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { config } from "./config.js";
 import { createSseRunStream, piEventToFrame } from "./transport/sse.js";
 import {
+  ALLOWLISTED_SKILL_DIRS,
+  loadSkillFromManifest,
   loadSkill as defaultLoadSkill,
   validateRunInput as defaultValidateRunInput,
   validateRunOutput as defaultValidateRunOutput,
 } from "./skills/loader.js";
 import { createSession as defaultCreateSession } from "./agent/session-factory.js";
-import type { LoadedSkill } from "./skills/loader.js";
+import type { LoadedSkill, SkillRuntimeManifest } from "./skills/loader.js";
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import { verifyLockfile } from "./governance/lockfile.js";
 import { validatePermissionManifests } from "./governance/permission-manifest.js";
@@ -40,7 +42,22 @@ import {
 } from "./governance/tool-registry-manifest.js";
 import { PolicyDenied, evaluate, loadSkillRules, type DomainActionRule } from "./policy/engine.js";
 import { SessionApprovals } from "./policy/session-approvals.js";
+import { requireLocalSession, extractEndUserToken } from "./middleware/desktop-local-auth.js";
 import type { SseFrame } from "./transport/sse.js";
+import {
+  buildCitedAnswerEnvelope,
+  type RunLineageContext,
+} from "./structured-output/cited-answer-builder.js";
+import {
+  extractRuntimeToolEvidence,
+  type RuntimeToolRunSummary,
+  type ToolEvidence,
+} from "./tools/tool-evidence.js";
+import {
+  buildAnalysisEnvelope,
+  isAnalysisSkill,
+} from "./structured-output/analysis-envelope-builder.js";
+import { createPoller } from "./poller.js";
 
 /** 依赖注入点（测试用 mock；生产用默认实现）。 */
 export interface ServerDeps {
@@ -58,6 +75,13 @@ export interface RunRequest {
   input?: Record<string, unknown>;
   branch?: string;
 }
+
+type SkillVersionSummary = {
+  id: number;
+  status: string;
+  name?: string;
+  runtime_manifest?: SkillRuntimeManifest;
+};
 
 /** 启动治理链的可配置路径（测试注入 fixture 目录；生产默认 agent-service 工作目录）。 */
 export interface GovernancePaths {
@@ -111,6 +135,72 @@ function readJsonBody(req: IncomingMessage): Promise<unknown> {
 
 /** ask 轮询返回的决策 verdict。 */
 export type ApprovalVerdict = "approved" | "approved_for_session" | "denied";
+
+/**
+ * 意图→skill 自动路由（AGENT-RUNTIME-CONTRACT：The Agent selects versioned Skills）。
+ *
+ * body.skill 缺省时调用 FastAPI `POST /api/agent/novels/{novel_id}/route-skill`
+ * 按问题文本自动选 skill（服务端决策）。端点不可用/失败 → 保守回退
+ * answer-reading-question（不破坏既有默认行为）。
+ *
+ * 返回主 skill 及其锚定字段（input_anchor，服务端从已批准 PromptRevision 血缘
+ * 自动选锚；无锚 → null）。锚注入是**服务端决策**，不暴露给用户。
+ */
+async function routeSkillByIntent(
+  deps: ReturnType<typeof resolveDeps>,
+  base: string,
+  novelId: number,
+  question: string,
+  authHeader: string,
+): Promise<{ skill: string; inputAnchor: Record<string, unknown> | null }> {
+  try {
+    const res = await deps.fetchImpl(`${base}/api/agent/novels/${novelId}/route-skill`, {
+      method: "POST",
+      headers: { authorization: authHeader, "content-type": "application/json" },
+      body: JSON.stringify({ question }),
+    });
+    if (!res.ok) return { skill: "answer-reading-question", inputAnchor: null };
+    const body = (await res.json()) as {
+      skills?: string[];
+      input_anchor?: Record<string, unknown> | null;
+    };
+    const skill = body.skills?.[0];
+    return {
+      skill: typeof skill === "string" && skill ? skill : "answer-reading-question",
+      inputAnchor:
+        body.input_anchor && typeof body.input_anchor === "object"
+          ? body.input_anchor
+          : null,
+    };
+  } catch {
+    return { skill: "answer-reading-question", inputAnchor: null };
+  }
+}
+
+/**
+ * 自动路由可注入的锚定字段白名单（与 backend ``SKILL_INPUT_ANCHOR_FIELDS`` 对齐）。
+ *
+ * 防御 additionalProperties:false：只注入已知锚，绝不注入 question/novel_id 等
+ * 由 server 自己装配的字段，避免对生图/分析 skill 造成 schema 422。
+ */
+const AUTO_ANCHOR_KEYS = new Set([
+  "prompt_revision_id",
+  "visual_bible_version_id",
+  "scene_spec_revision_id",
+  "source_snapshot_id",
+  "job_key",
+]);
+
+/** 从服务端返回的锚定字段中挑选 schema 允许的锚（白名单 + 非空过滤）。 */
+function pickAnchorFields(anchor: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(anchor)) {
+    if (AUTO_ANCHOR_KEYS.has(key) && value !== null && value !== undefined) {
+      out[key] = value;
+    }
+  }
+  return out;
+}
 
 /** waitForApproval 短轮询选项。 */
 export interface WaitForApprovalOptions {
@@ -290,6 +380,54 @@ function resolveDeps(deps: ServerDeps = {}) {
 }
 
 /**
+ * Inbound authorization gate (44-03).
+ *
+ * - Local session auth configured (desktop): requires the audience/expiry-bound
+ *   session token first (loopback source + signature + claims, fail closed).
+ *   The renderer carries the session token in `X-Local-Auth-Token` (44-03
+ *   transport header) and the end-user JWT in `Authorization`; the end-user JWT
+ *   is then forwarded to FastAPI for owner isolation. Returns null after
+ *   writing a 401 when the session token is missing/invalid.
+ * - Not configured (browser dev): preserves the existing single-Bearer
+ *   end-user JWT flow.
+ */
+function verifyInboundSession(
+  req: IncomingMessage,
+  res: ServerResponse,
+  rawAuth: string | undefined,
+): string | null {
+  if (config.localAuthSecret) {
+    const sessionToken = req.headers["x-local-auth-token"];
+    if (typeof sessionToken !== "string" || sessionToken === "") {
+      res.writeHead(401, { "content-type": "application/json" });
+      res.end(
+        JSON.stringify({ error: { code: "unauthorized", message: "缺少本地会话认证" } }),
+      );
+      return null;
+    }
+    // Present the session token to the fail-closed guard as its Authorization
+    // input (loopback source and claims are still validated). The guard only
+    // reads headers.authorization and socket.remoteAddress.
+    const sessionReq = {
+      headers: { authorization: `Bearer ${sessionToken}` },
+      socket: req.socket,
+    } as IncomingMessage;
+    const verified = requireLocalSession(sessionReq, res, config.localAuthSecret);
+    if (verified === null) return null;
+    const endUser = extractEndUserToken(req);
+    return endUser ? `Bearer ${endUser}` : "";
+  }
+  if (typeof rawAuth !== "string" || !rawAuth.startsWith("Bearer ")) {
+    res.writeHead(401, { "content-type": "application/json" });
+    res.end(
+      JSON.stringify({ error: { code: "unauthorized", message: "缺少 Authorization 头" } }),
+    );
+    return null;
+  }
+  return rawAuth;
+}
+
+/**
  * 处理一次 run 请求。失败以状态码 + JSON error 结束（SSE 头未写时）；
  * 成功后以 text/event-stream 流式返回。
  */
@@ -300,12 +438,10 @@ async function handleRun(
   deps: ReturnType<typeof resolveDeps>,
   manifest: ToolRegistryEntry[],
 ): Promise<void> {
-  const authHeader = req.headers.authorization;
-  if (!authHeader) {
-    res.writeHead(401, { "content-type": "application/json" });
-    res.end(JSON.stringify({ error: { code: "unauthorized", message: "缺少 Authorization 头" } }));
-    return;
-  }
+  // 44-03: local session auth first (when configured), then the end-user JWT
+  // is forwarded for FastAPI owner checks.
+  const authHeader = verifyInboundSession(req, res, req.headers.authorization);
+  if (authHeader === null) return;
 
   let rawBody: unknown;
   try {
@@ -317,26 +453,112 @@ async function handleRun(
   }
   const body = (rawBody ?? {}) as Partial<RunRequest>;
   const question = typeof body.question === "string" ? body.question.trim() : "";
-  if (!question) {
+  const base = config.fastApiBaseUrl;
+
+  // 技能选择（AGENT-RUNTIME-CONTRACT）：客户端显式 body.skill 是高级覆盖；
+  // 缺省 → 服务端按问题意图自动路由（Agent 选 skill，用户不选）。
+  let skillName: string;
+  let inputAnchor: Record<string, unknown> | null = null;
+  if (typeof body.skill === "string" && body.skill) {
+    skillName = body.skill;
+  } else {
+    const routed = await routeSkillByIntent(deps, base, novelId, question, authHeader);
+    skillName = routed.skill;
+    inputAnchor = routed.inputAnchor;
+  }
+  const jsonHeaders: Record<string, string> = {
+    authorization: authHeader,
+    "content-type": "application/json",
+  };
+
+  // 1) 解析 active 技能版本（唯一 run 授权入口的输入）。
+  let activeVersionId: number;
+  let skill: LoadedSkill;
+  let activeVersion: SkillVersionSummary | undefined;
+  try {
+    const versionRes = await deps.fetchImpl(`${base}/api/agent/skills/${skillName}/versions?novel_id=${novelId}`, {
+      method: "GET",
+      headers: { authorization: authHeader },
+    });
+    if (!versionRes.ok) {
+      res.writeHead(502, { "content-type": "application/json" });
+      res.end(JSON.stringify({ error: { code: "upstream_error", message: "技能版本查询失败" } }));
+      return;
+    }
+    const { items } = (await versionRes.json()) as { items?: SkillVersionSummary[] };
+    activeVersion = (items ?? []).find((v) => {
+      if (v.status !== "active") return false;
+      if (!v.runtime_manifest) {
+        return (ALLOWLISTED_SKILL_DIRS as readonly string[]).includes(skillName);
+      }
+      return v.runtime_manifest.novel_id === novelId;
+    });
+    if (!activeVersion) {
+      const builtin = (ALLOWLISTED_SKILL_DIRS as readonly string[]).includes(skillName);
+      res.writeHead(builtin ? 422 : 404, { "content-type": "application/json" });
+      res.end(JSON.stringify({ error: {
+        code: builtin ? "invalid_input" : "not_found",
+        message: builtin ? "技能版本不可用（无 active 版本）" : "技能不存在或无 active DB manifest",
+      } }));
+      return;
+    }
+    activeVersionId = activeVersion.id;
+
+    // DB manifest 是自定义 Skill 的唯一内容来源；只有明确声明为 builtin
+    // 的技能才允许使用 agent-service 内置本地资产。
+    if (activeVersion.runtime_manifest) {
+      const runtimeManifest = activeVersion.runtime_manifest;
+      if (
+        runtimeManifest.owner_id <= 0 ||
+        runtimeManifest.novel_id !== novelId ||
+        runtimeManifest.skill_version_id !== activeVersion.id ||
+        runtimeManifest.name !== skillName
+      ) {
+        throw new Error("runtime manifest owner/novel scope mismatch");
+      }
+      if (runtimeManifest.execution_mode === "declarative_only") {
+        skill = loadSkillFromManifest(runtimeManifest);
+      } else {
+        skill = deps.loadSkillImpl(runtimeManifest.name);
+        if (skill.name !== runtimeManifest.name || skill.checksum !== runtimeManifest.checksum) {
+          throw new Error("builtin skill 与 DB runtime manifest checksum/contract 不一致");
+        }
+      }
+    } else if ((ALLOWLISTED_SKILL_DIRS as readonly string[]).includes(skillName)) {
+      // 兼容旧测试/旧 builtin API 响应；没有 DB manifest 时不能把未知名称当作
+      // 自定义 Skill 路径加载，仍只走现有本地 allowlist loader。
+      skill = deps.loadSkillImpl(skillName);
+    } else {
+      throw new Error("custom skill 缺少 DB runtime manifest");
+    }
+  } catch {
+    const statusCode = activeVersion && !activeVersion.runtime_manifest ? 404 : 502;
+    res.writeHead(statusCode, { "content-type": "application/json" });
+    res.end(JSON.stringify({ error: {
+      code: statusCode === 404 ? "not_found" : "upstream_error",
+      message: statusCode === 404 ? "技能不存在或校验失败" : "技能版本或 runtime manifest 校验失败",
+    } }));
+    return;
+  }
+
+  // DB manifest 已完成输入 schema 编译后，才构造并校验本次输入。
+  const isQaSkill = skill.name === "answer-reading-question";
+  const schemaHasQuestion = Boolean(
+    skill.inputSchema &&
+      typeof skill.inputSchema.properties === "object" &&
+      skill.inputSchema.properties !== null &&
+      "question" in (skill.inputSchema.properties as Record<string, unknown>),
+  );
+  if (isQaSkill && !question) {
     res.writeHead(422, { "content-type": "application/json" });
     res.end(JSON.stringify({ error: { code: "invalid_input", message: "input.question 必须为非空字符串" } }));
     return;
   }
-
-  const skillName = typeof body.skill === "string" && body.skill ? body.skill : "answer-reading-question";
-  let skill: LoadedSkill;
-  try {
-    skill = deps.loadSkillImpl(skillName);
-  } catch (err) {
-    res.writeHead(404, { "content-type": "application/json" });
-    res.end(JSON.stringify({ error: { code: "not_found", message: `技能不存在或校验失败: ${(err as Error).message}` } }));
-    return;
-  }
-
   const input: Record<string, unknown> = {
     novel_id: novelId,
-    question,
+    ...(isQaSkill || schemaHasQuestion ? { question } : {}),
     ...(typeof body.input === "object" && body.input !== null ? body.input : {}),
+    ...(inputAnchor ? pickAnchorFields(inputAnchor) : {}),
   };
   try {
     deps.validateRunInputImpl(skill, input);
@@ -346,41 +568,11 @@ async function handleRun(
     return;
   }
 
-  const base = config.fastApiBaseUrl;
-  const jsonHeaders: Record<string, string> = {
-    authorization: authHeader,
-    "content-type": "application/json",
-  };
-
-  // 1) 解析 active 技能版本（唯一 run 授权入口的输入）。
-  let activeVersionId: number;
-  try {
-    const versionRes = await deps.fetchImpl(`${base}/api/agent/skills/${skillName}/versions`, {
-      method: "GET",
-      headers: { authorization: authHeader },
-    });
-    if (!versionRes.ok) {
-      res.writeHead(502, { "content-type": "application/json" });
-      res.end(JSON.stringify({ error: { code: "upstream_error", message: "技能版本查询失败" } }));
-      return;
-    }
-    const { items } = (await versionRes.json()) as { items?: Array<{ id: number; status: string }> };
-    const active = (items ?? []).find((v) => v.status === "active");
-    if (!active) {
-      res.writeHead(422, { "content-type": "application/json" });
-      res.end(JSON.stringify({ error: { code: "invalid_input", message: "技能版本不可用（无 active 版本）" } }));
-      return;
-    }
-    activeVersionId = active.id;
-  } catch {
-    res.writeHead(502, { "content-type": "application/json" });
-    res.end(JSON.stringify({ error: { code: "upstream_error", message: "技能版本查询失败" } }));
-    return;
-  }
-
   // 2) FastAPI run-create：owner 校验 + commit-before-dispatch + per-run 内部令牌。
   let runId: string;
   let internalToken: string;
+  let runLineage: RunLineageContext | undefined;
+  let frozenConnectorVersions: SkillRuntimeManifest["connector_versions"] = [];
   try {
     const runRes = await deps.fetchImpl(`${base}/api/agent/novels/${novelId}/skill-runs`, {
       method: "POST",
@@ -405,11 +597,62 @@ async function handleRun(
       return;
     }
     const accepted = (await runRes.json()) as {
-      run: { id: number | string };
+      run: {
+        id: number | string;
+        owner_id: number;
+        novel_id: number;
+        skill_version_id: number;
+        input_hash: string;
+      };
       internal_token: string;
+      runtime_manifest?: SkillRuntimeManifest;
     };
+    if (accepted.runtime_manifest) {
+      const frozen = accepted.runtime_manifest;
+      if (
+        frozen.owner_id <= 0 ||
+        frozen.novel_id !== novelId ||
+        frozen.skill_version_id !== activeVersionId ||
+        frozen.name !== skill.name ||
+        accepted.run.owner_id !== frozen.owner_id ||
+        accepted.run.novel_id !== frozen.novel_id ||
+        accepted.run.skill_version_id !== frozen.skill_version_id
+      ) {
+        throw new Error("run runtime manifest owner/novel/skill scope mismatch");
+      }
+      if (activeVersion.runtime_manifest && activeVersion.runtime_manifest.checksum !== frozen.checksum) {
+        throw new Error("list/accepted runtime manifest checksum mismatch");
+      }
+      if (frozen.execution_mode === "declarative_only") {
+        // Rebuild from the run response: the accepted run response is the
+        // authoritative frozen content used by Pi, not the earlier list view.
+        skill = loadSkillFromManifest(frozen);
+      } else if (skill.checksum !== frozen.checksum) {
+        throw new Error("builtin skill 与 accepted DB runtime manifest checksum 不一致");
+      }
+      frozenConnectorVersions = frozen.connector_versions ?? [];
+      deps.validateRunInputImpl(skill, input);
+    } else if (!(ALLOWLISTED_SKILL_DIRS as readonly string[]).includes(skill.name)) {
+      throw new Error("custom skill 缺少 accepted DB runtime manifest");
+    }
     runId = String(accepted.run.id);
     internalToken = accepted.internal_token;
+    runLineage = {
+      runId: String(accepted.run.id),
+      ownerId: accepted.run.owner_id,
+      novelId: accepted.run.novel_id,
+      skillVersionId: accepted.run.skill_version_id,
+      inputHash: accepted.run.input_hash,
+      ...(Number.isInteger(input.chapter_id)
+        ? { chapterId: Number(input.chapter_id) }
+        : {}),
+      ...(Number.isInteger(input.chapter_number)
+        ? { chapterNumber: Number(input.chapter_number) }
+        : {}),
+      ...(Number.isInteger(input.cutoff_chapter)
+        ? { cutoffChapter: Number(input.cutoff_chapter) }
+        : {}),
+    };
   } catch {
     res.writeHead(502, { "content-type": "application/json" });
     res.end(JSON.stringify({ error: { code: "upstream_error", message: "run 创建失败" } }));
@@ -422,6 +665,7 @@ async function handleRun(
   try {
     session = await deps.createSessionImpl({
       auth: `Bearer ${internalToken}`,
+      novelId,
       skill,
       manifest,
     });
@@ -503,7 +747,9 @@ async function handleRun(
       });
     }
 
-    await session.prompt(question);
+    await session.prompt(
+      question || `使用 ${skillName} 技能执行任务，按技能描述完成分析/生成。`,
+    );
     const last = lastAssistantMessage(session.messages as unknown[]);
     const stopReason = last?.stopReason ?? "error";
 
@@ -514,7 +760,63 @@ async function handleRun(
       } catch {
         // 输出不合规仍走 finalize（FastAPI 有权威校验与错误码）。
       }
+      let runtimeToolRuns: RuntimeToolRunSummary[] = [];
+      let runtimeToolEvidences: ToolEvidence[] = [];
       try {
+        const snapshot = extractRuntimeToolEvidence(
+          session.messages as unknown[],
+          skill.allowedTools,
+        );
+        runtimeToolRuns = snapshot.toolRuns;
+        runtimeToolEvidences = snapshot.successfulEvidences;
+      } catch {
+        // 越界/畸形 runtime 结果不进入审计摘要；后端仍收到空摘要，避免
+        // 把未获 Skill 授权的调用伪装成合法 tool run。
+      }
+      try {
+        // 从会话工具调用提取成功证据（get_chapter/get_novel 等只读工具结果），
+        // 构造带 evidence_refs + normalization trail 的完整信封。
+        let envelopePayload: Record<string, unknown> | undefined;
+        let frozenManifest: Record<string, unknown> = { tool_runs: runtimeToolRuns };
+        if (runLineage && skill.name === "answer-reading-question") {
+          try {
+            const built = buildCitedAnswerEnvelope(
+              last?.text ?? "",
+              runLineage,
+              skill,
+              runtimeToolEvidences,
+            );
+            envelopePayload = built.envelope;
+            frozenManifest = { ...built.frozenManifest, tool_runs: runtimeToolRuns };
+          } catch {
+            // 证据不足（如 stub/测试会话无工具调用）：回退简化信封，由后端
+            // integrity 门最终裁决（fail closed）。
+            envelopePayload = last?.text
+              ? { type: "cited_answer", answer: { answer_blocks: [{ text: last.text }] } }
+              : {};
+          }
+        } else if (runLineage && isAnalysisSkill(skill.name)) {
+          // 分析/生图 skill：模型输出是结构化 JSON，按 skill 构造对应
+          // envelope.type（scene_candidate / world_model_candidate /
+          // visual_bible）。解析失败或无 leaf 证据 → 抛错（诚实失败，
+          // 绝不伪造 cited_answer 信封导致假 artifact）。
+          if (!last?.text) {
+            throw new Error(`SSE run: skill ${skill.name} returned no model output`);
+          }
+          const built = buildAnalysisEnvelope(
+            last.text,
+            runLineage,
+            skill,
+            null,
+            runtimeToolRuns,
+            runtimeToolEvidences,
+          );
+          envelopePayload = built.envelope;
+          frozenManifest = { ...built.frozenManifest, tool_runs: runtimeToolRuns };
+        } else {
+          // 未接线的 skill：诚实失败（不伪造 cited_answer envelope）。
+          throw new Error(`SSE run: no envelope builder for skill ${skill.name}`);
+        }
         const finalizeRes = await deps.fetchImpl(
           `${base}/api/agent/novels/${novelId}/skill-runs/${runId}/finalize`,
           {
@@ -522,12 +824,17 @@ async function handleRun(
             headers: jsonHeaders,
             body: JSON.stringify({
               stop_reason: "stop",
-              envelope: last?.text
-                ? { type: "cited_answer", answer: { answer_blocks: [{ text: last.text }] } }
-                : {},
+              envelope: envelopePayload,
               model_lineage: last?.provider && last?.model ? { provider: last.provider, model: last.model } : {},
-              source_versions: {},
+              source_versions:
+                (envelopePayload?.source_versions as Record<string, unknown> | undefined) ?? {},
               usage: last?.usage ?? {},
+              frozen_manifest: {
+                ...frozenManifest,
+                ...(frozenConnectorVersions.length > 0
+                  ? { connector_versions: frozenConnectorVersions }
+                  : {}),
+              },
             }),
           },
         );
@@ -547,6 +854,43 @@ async function handleRun(
       await postCancel();
       stream.send({ type: "run_end", runId, status: "cancelled" });
     } else {
+      // 上游/运行异常（stopReason 非 stop/aborted，如 "error"/"max_tokens"/"other"）：
+      // 必须调后端 finalize 落库（failed + 0 artifact），否则 run 会永久卡 queued。
+      // 不用 cancel——queued→cancelled 语义错误；finalize 对非 stop reason 写 failed。
+      // done=true（客户端断开）时跳过：onClose 已 postCancel（cancel-no-write），
+      // 再 finalize 会造成 cancel/finalize 双重状态迁移。
+      if (!done) {
+        try {
+          await deps.fetchImpl(
+            `${base}/api/agent/novels/${novelId}/skill-runs/${runId}/finalize`,
+            {
+              method: "POST",
+              headers: jsonHeaders,
+              body: JSON.stringify({
+                stop_reason: "error",
+                envelope: {},
+                model_lineage: last?.provider && last?.model ? { provider: last.provider, model: last.model } : {},
+                source_versions: {},
+                usage: last?.usage ?? {},
+                frozen_manifest: {
+                  tool_runs: (() => {
+                    try {
+                      return extractRuntimeToolEvidence(
+                        session.messages as unknown[],
+                        skill.allowedTools,
+                      ).toolRuns;
+                    } catch {
+                      return [];
+                    }
+                  })(),
+                },
+              }),
+            },
+          );
+        } catch {
+          // finalize 网络失败：run 状态以后端为准（尽力而为，不阻塞终帧）。
+        }
+      }
       stream.send({ type: "run_end", runId, status: "failed", error_code: "upstream_error" });
     }
   } catch (err) {
@@ -611,6 +955,14 @@ export function startServer(deps: ServerDeps = {}): Promise<ReturnType<typeof cr
     throw err; // 不可达（process.exit 恒不返回）；满足严格类型下 manifest 的 definite assignment
   }
   const server = createApp(deps, manifest);
+  // 问答按需分析（chat_backfill）：启动 queued-run poller（无 SSE 客户端场景）。
+  if (config.pollEnabled) {
+    const stopPoller = createPoller(
+      { fetchImpl: resolveDeps(deps).fetchImpl },
+      manifest,
+    ).start();
+    server.on("close", stopPoller);
+  }
   return new Promise((resolve) => {
     server.listen(config.port, () => resolve(server));
   });

@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { Chapter } from "@/lib/api";
 import { ReaderContent } from "./reader-content";
@@ -61,3 +61,94 @@ describe("ReaderContent keyboard paging", () => {
     expect(screen.queryByText(/第 \d+\/\d+ 页/)).not.toBeInTheDocument();
   });
 });
+
+describe("ReaderContent additional branches", () => {
+  it("无章节时展示选择提示", () => {
+    render(<ReaderContent chapter={null} />);
+    expect(screen.getByText("选择章节开始阅读")).toBeInTheDocument();
+  });
+
+  it("单页短章展示字数但不显示页码", () => {
+    render(<ReaderContent chapter={makeChapter("短文")} />);
+    expect(screen.getByText("2 字")).toBeInTheDocument();
+    expect(screen.queryByText(/第 \d+\/\d+ 页/)).not.toBeInTheDocument();
+  });
+
+  it("分页模式第一页上一页禁用、末页下一页禁用", () => {
+    render(
+      <ReaderContent
+        chapter={makeChapter("字".repeat(4000))}
+        readingMode="paged"
+      />
+    );
+    const prevBtn = screen.getByRole("button", { name: "上一页" });
+    expect(prevBtn).toBeDisabled();
+    expect(screen.getByRole("button", { name: "下一页" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "下一页" }));
+    // 第二页 → 上一页可用；末页无下一章 → 下一页禁用
+    expect(screen.getByRole("button", { name: "上一页" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "下一页" })).toBeDisabled();
+  });
+
+  it("翻页按钮触发 onNextChapter/onPrevChapter", () => {
+    const onNextChapter = vi.fn();
+    const onPrevChapter = vi.fn();
+    render(
+      <ReaderContent
+        chapter={makeChapter("字".repeat(4000))}
+        readingMode="paged"
+        hasNextChapter
+        hasPrevChapter
+        onNextChapter={onNextChapter}
+        onPrevChapter={onPrevChapter}
+      />
+    );
+    // 首页上一章按钮显示「上一章」
+    expect(screen.getByRole("button", { name: "上一章" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "上一章" }));
+    expect(onPrevChapter).toHaveBeenCalled();
+    // 翻到末页后「下一章」
+    fireEvent.click(screen.getByRole("button", { name: "下一页" }));
+    const nextChapterBtn = screen.getByRole("button", { name: "下一章" });
+    fireEvent.click(nextChapterBtn);
+    expect(onNextChapter).toHaveBeenCalled();
+  });
+
+  it("超大章节展示分页警告", () => {
+    render(
+      <ReaderContent chapter={makeChapter("字".repeat(21000))} readingMode="paged" />
+    );
+    expect(screen.getByText("本章体量较大，已自动分页显示")).toBeInTheDocument();
+  });
+
+  it("长页模式不渲染翻页按钮", () => {
+    render(
+      <ReaderContent chapter={makeChapter("字".repeat(4000))} readingMode="scroll" />
+    );
+    expect(screen.queryByRole("button", { name: /上一页|下一页/ })).not.toBeInTheDocument();
+  });
+
+  it("onChapterProgress 在换章时被调用", () => {
+    const onChapterProgress = vi.fn();
+    render(
+      <ReaderContent
+        chapter={makeChapter("字".repeat(1000))}
+        readingMode="paged"
+        onChapterProgress={onChapterProgress}
+      />
+    );
+    expect(onChapterProgress).toHaveBeenCalled();
+  });
+
+  it("citation highlight 渲染 <mark> 高亮", () => {
+    render(
+      <ReaderContent
+        chapter={makeChapter("雾城第一章内容".repeat(1000))}
+        readingMode="paged"
+        highlightRange={{ sourceStart: 3, sourceEnd: 5 }}
+      />
+    );
+    expect(screen.getAllByTestId("reader-citation-highlight").length).toBeGreaterThan(0);
+  });
+});
+

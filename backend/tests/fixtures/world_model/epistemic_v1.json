@@ -1,0 +1,766 @@
+{
+  "schema_version": "world-model-knowledge.v1",
+  "description": "Phase 27-02 shared character state/goal/motivation/knowledge corpus (REQ-WM-02). Each scenario is a self-contained gate submission with owner/novel/version/cutoff, POV/source, authority, known_at, disclosure_cutoff, lineage, transition and epistemic status. Mistaken beliefs, hidden knowledge and contradictions are explicit labels, never overwritten; Reader Chat is never a canon-fact source (D-06).",
+  "scenarios": {
+    "valid": {
+      "scope": {
+        "owner_id": 1,
+        "novel_id": 1,
+        "version_id": 1,
+        "source_snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "disclosure_cutoff": 8,
+        "approvals": ["user_interpretation", "canon_fact"]
+      },
+      "claims": [
+        {
+          "knowledge_key": "k-state-arrival",
+          "subject": "lin-an",
+          "aspect": "state",
+          "proposition": "林安在临安落脚",
+          "known_at": 1,
+          "disclosure_cutoff": 1,
+          "pov": "lin-an",
+          "pov_kind": "character",
+          "source_kind": "canon_source",
+          "authority": "probable_inference",
+          "confidence": 0.9,
+          "epistemic_status": "asserted",
+          "transition_from": null,
+          "lineage": ["k-state-arrival"],
+          "source_refs": [
+            {
+              "evidence_id": "ev-arrival",
+              "chapter_id": 1,
+              "chapter_number": 1,
+              "source_start": 0,
+              "source_end": 80,
+              "content_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+              "source_snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          ],
+          "gate_status": "pending",
+          "gate_reason": null,
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 1
+        },
+        {
+          "knowledge_key": "k-goal-throne",
+          "subject": "lin-an",
+          "aspect": "goal",
+          "proposition": "林安谋求城主之位",
+          "known_at": 2,
+          "disclosure_cutoff": 2,
+          "pov": "lin-an",
+          "pov_kind": "character",
+          "source_kind": "canon_source",
+          "authority": "probable_inference",
+          "confidence": 0.85,
+          "epistemic_status": "asserted",
+          "transition_from": null,
+          "lineage": ["k-goal-throne"],
+          "source_refs": [
+            {
+              "evidence_id": "ev-goal",
+              "chapter_id": 2,
+              "chapter_number": 2,
+              "source_start": 10,
+              "source_end": 120,
+              "content_hash": "2222222222222222222222222222222222222222222222222222222222222222",
+              "source_snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          ],
+          "gate_status": "pending",
+          "gate_reason": null,
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 1
+        },
+        {
+          "knowledge_key": "k-belief-ally",
+          "subject": "lin-an",
+          "aspect": "knowledge",
+          "proposition": "林安以为盟友忠诚",
+          "known_at": 2,
+          "disclosure_cutoff": 2,
+          "pov": "lin-an",
+          "pov_kind": "character",
+          "source_kind": "canon_source",
+          "authority": "probable_inference",
+          "confidence": 0.8,
+          "epistemic_status": "mistaken_belief",
+          "transition_from": null,
+          "lineage": ["k-belief-ally"],
+          "source_refs": [
+            {
+              "evidence_id": "ev-ally",
+              "chapter_id": 2,
+              "chapter_number": 2,
+              "source_start": 200,
+              "source_end": 260,
+              "content_hash": "3333333333333333333333333333333333333333333333333333333333333333",
+              "source_snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          ],
+          "gate_status": "pending",
+          "gate_reason": null,
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 1
+        },
+        {
+          "knowledge_key": "k-motive-revenge",
+          "subject": "lin-an",
+          "aspect": "motivation",
+          "proposition": "林安复仇之心未熄",
+          "known_at": 3,
+          "disclosure_cutoff": 3,
+          "pov": "omniscient",
+          "pov_kind": "omniscient",
+          "source_kind": "canon_source",
+          "authority": "literary_interpretation",
+          "confidence": 0.7,
+          "epistemic_status": "asserted",
+          "transition_from": null,
+          "lineage": ["k-motive-revenge"],
+          "source_refs": [
+            {
+              "evidence_id": "ev-motive",
+              "chapter_id": 3,
+              "chapter_number": 3,
+              "source_start": 40,
+              "source_end": 160,
+              "content_hash": "4444444444444444444444444444444444444444444444444444444444444444",
+              "source_snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          ],
+          "gate_status": "pending",
+          "gate_reason": null,
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 1
+        },
+        {
+          "knowledge_key": "k-state-court",
+          "subject": "lin-an",
+          "aspect": "state",
+          "proposition": "林安入主城主府",
+          "known_at": 4,
+          "disclosure_cutoff": 4,
+          "pov": "lin-an",
+          "pov_kind": "character",
+          "source_kind": "canon_source",
+          "authority": "probable_inference",
+          "confidence": 0.8,
+          "epistemic_status": "asserted",
+          "transition_from": "k-state-arrival",
+          "lineage": ["k-state-arrival", "k-state-court"],
+          "source_refs": [
+            {
+              "evidence_id": "ev-court",
+              "chapter_id": 4,
+              "chapter_number": 4,
+              "source_start": 10,
+              "source_end": 130,
+              "content_hash": "5555555555555555555555555555555555555555555555555555555555555555",
+              "source_snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          ],
+          "gate_status": "pending",
+          "gate_reason": null,
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 1
+        },
+        {
+          "knowledge_key": "k-truth-ally",
+          "subject": "lin-an",
+          "aspect": "knowledge",
+          "proposition": "盟友早已背叛",
+          "known_at": 5,
+          "disclosure_cutoff": 5,
+          "pov": "omniscient",
+          "pov_kind": "omniscient",
+          "source_kind": "canon_source",
+          "authority": "canon_fact",
+          "confidence": 0.95,
+          "epistemic_status": "asserted",
+          "transition_from": null,
+          "lineage": ["k-truth-ally"],
+          "source_refs": [
+            {
+              "evidence_id": "ev-truth",
+              "chapter_id": 5,
+              "chapter_number": 5,
+              "source_start": 300,
+              "source_end": 380,
+              "content_hash": "6666666666666666666666666666666666666666666666666666666666666666",
+              "source_snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          ],
+          "gate_status": "pending",
+          "gate_reason": null,
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 1
+        },
+        {
+          "knowledge_key": "k-hidden-inheritance",
+          "subject": "lin-an",
+          "aspect": "knowledge",
+          "proposition": "林安的真实身份是前朝遗孤",
+          "known_at": 3,
+          "disclosure_cutoff": 8,
+          "pov": "lin-an",
+          "pov_kind": "character",
+          "source_kind": "canon_source",
+          "authority": "probable_inference",
+          "confidence": 0.75,
+          "epistemic_status": "hidden_knowledge",
+          "transition_from": null,
+          "lineage": ["k-hidden-inheritance"],
+          "source_refs": [
+            {
+              "evidence_id": "ev-inheritance",
+              "chapter_id": 3,
+              "chapter_number": 3,
+              "source_start": 400,
+              "source_end": 470,
+              "content_hash": "7777777777777777777777777777777777777777777777777777777777777777",
+              "source_snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          ],
+          "gate_status": "pending",
+          "gate_reason": null,
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 1
+        },
+        {
+          "knowledge_key": "k-state-declare",
+          "subject": "lin-an",
+          "aspect": "state",
+          "proposition": "林安自立为城主",
+          "known_at": 6,
+          "disclosure_cutoff": 6,
+          "pov": "lin-an",
+          "pov_kind": "character",
+          "source_kind": "canon_source",
+          "authority": "probable_inference",
+          "confidence": 0.85,
+          "epistemic_status": "asserted",
+          "transition_from": "k-state-court",
+          "lineage": ["k-state-arrival", "k-state-court", "k-state-declare"],
+          "source_refs": [
+            {
+              "evidence_id": "ev-declare",
+              "chapter_id": 6,
+              "chapter_number": 6,
+              "source_start": 20,
+              "source_end": 150,
+              "content_hash": "8888888888888888888888888888888888888888888888888888888888888888",
+              "source_snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          ],
+          "gate_status": "pending",
+          "gate_reason": null,
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 1
+        }
+      ]
+    },
+    "mistaken_belief": {
+      "scope": {
+        "owner_id": 1,
+        "novel_id": 1,
+        "version_id": 2,
+        "source_snapshot_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "disclosure_cutoff": 6,
+        "approvals": ["canon_fact"]
+      },
+      "claims": [
+        {
+          "knowledge_key": "k-belief-withdrawn",
+          "subject": "lin-an",
+          "aspect": "knowledge",
+          "proposition": "林安相信叛军已撤",
+          "known_at": 2,
+          "disclosure_cutoff": 2,
+          "pov": "lin-an",
+          "pov_kind": "character",
+          "source_kind": "canon_source",
+          "authority": "probable_inference",
+          "confidence": 0.7,
+          "epistemic_status": "mistaken_belief",
+          "transition_from": null,
+          "lineage": ["k-belief-withdrawn"],
+          "source_refs": [
+            {
+              "evidence_id": "ev-belief",
+              "chapter_id": 2,
+              "chapter_number": 2,
+              "source_start": 0,
+              "source_end": 60,
+              "content_hash": "9999999999999999999999999999999999999999999999999999999999999999",
+              "source_snapshot_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            }
+          ],
+          "gate_status": "pending",
+          "gate_reason": null,
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 2
+        },
+        {
+          "knowledge_key": "k-truth-siege",
+          "subject": "lin-an",
+          "aspect": "knowledge",
+          "proposition": "叛军仍在围城",
+          "known_at": 5,
+          "disclosure_cutoff": 5,
+          "pov": "omniscient",
+          "pov_kind": "omniscient",
+          "source_kind": "canon_source",
+          "authority": "canon_fact",
+          "confidence": 0.95,
+          "epistemic_status": "asserted",
+          "transition_from": null,
+          "lineage": ["k-truth-siege"],
+          "source_refs": [
+            {
+              "evidence_id": "ev-siege",
+              "chapter_id": 5,
+              "chapter_number": 5,
+              "source_start": 100,
+              "source_end": 200,
+              "content_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1",
+              "source_snapshot_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            }
+          ],
+          "gate_status": "pending",
+          "gate_reason": null,
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 2
+        }
+      ]
+    },
+    "hidden_fact": {
+      "scope": {
+        "owner_id": 1,
+        "novel_id": 1,
+        "version_id": 3,
+        "source_snapshot_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "disclosure_cutoff": 9,
+        "approvals": []
+      },
+      "claims": [
+        {
+          "knowledge_key": "k-hidden-twin",
+          "subject": "lin-an",
+          "aspect": "knowledge",
+          "proposition": "林安有个双生兄弟",
+          "known_at": 2,
+          "disclosure_cutoff": 9,
+          "pov": "lin-an",
+          "pov_kind": "character",
+          "source_kind": "canon_source",
+          "authority": "probable_inference",
+          "confidence": 0.8,
+          "epistemic_status": "hidden_knowledge",
+          "transition_from": null,
+          "lineage": ["k-hidden-twin"],
+          "source_refs": [
+            {
+              "evidence_id": "ev-twin",
+              "chapter_id": 2,
+              "chapter_number": 2,
+              "source_start": 10,
+              "source_end": 90,
+              "content_hash": "1111111111111111111111111111111111111111111111111111111111111112",
+              "source_snapshot_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+            }
+          ],
+          "gate_status": "pending",
+          "gate_reason": null,
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 3
+        }
+      ]
+    },
+    "future_cutoff": {
+      "scope": {
+        "owner_id": 1,
+        "novel_id": 1,
+        "version_id": 4,
+        "source_snapshot_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "disclosure_cutoff": 3,
+        "approvals": []
+      },
+      "claims": [
+        {
+          "knowledge_key": "k-future-betrayal",
+          "subject": "lin-an",
+          "aspect": "knowledge",
+          "proposition": "林安将遭盟友背叛",
+          "known_at": 7,
+          "disclosure_cutoff": 7,
+          "pov": "omniscient",
+          "pov_kind": "omniscient",
+          "source_kind": "canon_source",
+          "authority": "probable_inference",
+          "confidence": 0.8,
+          "epistemic_status": "asserted",
+          "transition_from": null,
+          "lineage": ["k-future-betrayal"],
+          "source_refs": [
+            {
+              "evidence_id": "ev-future",
+              "chapter_id": 7,
+              "chapter_number": 7,
+              "source_start": 0,
+              "source_end": 80,
+              "content_hash": "2222222222222222222222222222222222222222222222222222222222222223",
+              "source_snapshot_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+            }
+          ],
+          "gate_status": "pending",
+          "gate_reason": null,
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 4
+        }
+      ]
+    },
+    "wrong_pov": {
+      "scope": {
+        "owner_id": 1,
+        "novel_id": 1,
+        "version_id": 5,
+        "source_snapshot_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "disclosure_cutoff": 3,
+        "approvals": []
+      },
+      "claims": [
+        {
+          "knowledge_key": "k-other-pov",
+          "subject": "mei-niang",
+          "aspect": "knowledge",
+          "proposition": "美娘知道林安的过去",
+          "known_at": 2,
+          "disclosure_cutoff": 2,
+          "pov": "mei-niang",
+          "pov_kind": "character",
+          "source_kind": "canon_source",
+          "authority": "probable_inference",
+          "confidence": 0.8,
+          "epistemic_status": "asserted",
+          "transition_from": null,
+          "lineage": ["k-other-pov"],
+          "source_refs": [
+            {
+              "evidence_id": "ev-mei",
+              "chapter_id": 2,
+              "chapter_number": 2,
+              "source_start": 0,
+              "source_end": 70,
+              "content_hash": "3333333333333333333333333333333333333333333333333333333333333334",
+              "source_snapshot_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+            }
+          ],
+          "gate_status": "pending",
+          "gate_reason": null,
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 5
+        }
+      ]
+    },
+    "wrong_owner": {
+      "scope": {
+        "owner_id": 1,
+        "novel_id": 1,
+        "version_id": 6,
+        "source_snapshot_hash": "1212121212121212121212121212121212121212121212121212121212121212",
+        "disclosure_cutoff": 2,
+        "approvals": []
+      },
+      "claims": [
+        {
+          "knowledge_key": "k-stolen",
+          "subject": "lin-an",
+          "aspect": "knowledge",
+          "proposition": "他人创作者写下的林安认知",
+          "known_at": 1,
+          "disclosure_cutoff": 1,
+          "pov": "lin-an",
+          "pov_kind": "character",
+          "source_kind": "canon_source",
+          "authority": "probable_inference",
+          "confidence": 0.8,
+          "epistemic_status": "asserted",
+          "transition_from": null,
+          "lineage": ["k-stolen"],
+          "source_refs": [
+            {
+              "evidence_id": "ev-stolen",
+              "chapter_id": 1,
+              "chapter_number": 1,
+              "source_start": 0,
+              "source_end": 50,
+              "content_hash": "4444444444444444444444444444444444444444444444444444444444444445",
+              "source_snapshot_hash": "1212121212121212121212121212121212121212121212121212121212121212"
+            }
+          ],
+          "gate_status": "pending",
+          "gate_reason": null,
+          "owner_id": 2,
+          "novel_id": 1,
+          "version_id": 6
+        }
+      ]
+    },
+    "chat_contamination": {
+      "scope": {
+        "owner_id": 1,
+        "novel_id": 1,
+        "version_id": 7,
+        "source_snapshot_hash": "3434343434343434343434343434343434343434343434343434343434343434",
+        "disclosure_cutoff": 3,
+        "approvals": ["canon_fact"]
+      },
+      "claims": [
+        {
+          "knowledge_key": "k-chat-canon",
+          "subject": "lin-an",
+          "aspect": "knowledge",
+          "proposition": "读者对话宣称林安是皇子",
+          "known_at": 2,
+          "disclosure_cutoff": 2,
+          "pov": "lin-an",
+          "pov_kind": "character",
+          "source_kind": "reader_chat",
+          "authority": "canon_fact",
+          "confidence": 0.99,
+          "epistemic_status": "candidate",
+          "transition_from": null,
+          "lineage": ["k-chat-canon"],
+          "source_refs": [
+            {
+              "evidence_id": "ev-chat",
+              "chapter_id": 2,
+              "chapter_number": 2,
+              "source_start": 0,
+              "source_end": 60,
+              "content_hash": "5555555555555555555555555555555555555555555555555555555555555556",
+              "source_snapshot_hash": "3434343434343434343434343434343434343434343434343434343434343434"
+            }
+          ],
+          "gate_status": "pending",
+          "gate_reason": null,
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 7
+        },
+        {
+          "knowledge_key": "k-chat-inference",
+          "subject": "lin-an",
+          "aspect": "knowledge",
+          "proposition": "对话推想林安的身份",
+          "known_at": 2,
+          "disclosure_cutoff": 2,
+          "pov": "lin-an",
+          "pov_kind": "character",
+          "source_kind": "user_conversation",
+          "authority": "probable_inference",
+          "confidence": 0.6,
+          "epistemic_status": "candidate",
+          "transition_from": null,
+          "lineage": ["k-chat-inference"],
+          "source_refs": [
+            {
+              "evidence_id": "ev-conv",
+              "chapter_id": 2,
+              "chapter_number": 2,
+              "source_start": 100,
+              "source_end": 160,
+              "content_hash": "6666666666666666666666666666666666666666666666666666666666666667",
+              "source_snapshot_hash": "3434343434343434343434343434343434343434343434343434343434343434"
+            }
+          ],
+          "gate_status": "pending",
+          "gate_reason": null,
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 7
+        }
+      ]
+    },
+    "transition_gap": {
+      "scope": {
+        "owner_id": 1,
+        "novel_id": 1,
+        "version_id": 8,
+        "source_snapshot_hash": "5656565656565656565656565656565656565656565656565656565656565656",
+        "disclosure_cutoff": 4,
+        "approvals": []
+      },
+      "claims": [
+        {
+          "knowledge_key": "k-state-b",
+          "subject": "lin-an",
+          "aspect": "state",
+          "proposition": "林安越过未取证节点直接继位",
+          "known_at": 3,
+          "disclosure_cutoff": 3,
+          "pov": "lin-an",
+          "pov_kind": "character",
+          "source_kind": "canon_source",
+          "authority": "probable_inference",
+          "confidence": 0.7,
+          "epistemic_status": "asserted",
+          "transition_from": "k-state-missing",
+          "lineage": ["k-state-b"],
+          "source_refs": [
+            {
+              "evidence_id": "ev-jump",
+              "chapter_id": 3,
+              "chapter_number": 3,
+              "source_start": 0,
+              "source_end": 70,
+              "content_hash": "7777777777777777777777777777777777777777777777777777777777777778",
+              "source_snapshot_hash": "5656565656565656565656565656565656565656565656565656565656565656"
+            }
+          ],
+          "gate_status": "pending",
+          "gate_reason": null,
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 8
+        }
+      ]
+    },
+    "abstention": {
+      "scope": {
+        "owner_id": 1,
+        "novel_id": 1,
+        "version_id": 9,
+        "source_snapshot_hash": "7878787878787878787878787878787878787878787878787878787878787878",
+        "disclosure_cutoff": 3,
+        "approvals": []
+      },
+      "claims": [
+        {
+          "knowledge_key": "k-known-later",
+          "subject": "lin-an",
+          "aspect": "knowledge",
+          "proposition": "林安在第三章才知道此事",
+          "known_at": 3,
+          "disclosure_cutoff": 3,
+          "pov": "lin-an",
+          "pov_kind": "character",
+          "source_kind": "canon_source",
+          "authority": "probable_inference",
+          "confidence": 0.8,
+          "epistemic_status": "asserted",
+          "transition_from": null,
+          "lineage": ["k-known-later"],
+          "source_refs": [
+            {
+              "evidence_id": "ev-later",
+              "chapter_id": 3,
+              "chapter_number": 3,
+              "source_start": 0,
+              "source_end": 60,
+              "content_hash": "8888888888888888888888888888888888888888888888888888888888888889",
+              "source_snapshot_hash": "7878787878787878787878787878787878787878787878787878787878787878"
+            }
+          ],
+          "gate_status": "pending",
+          "gate_reason": null,
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 9
+        }
+      ]
+    },
+    "contradiction": {
+      "scope": {
+        "owner_id": 1,
+        "novel_id": 1,
+        "version_id": 10,
+        "source_snapshot_hash": "9090909090909090909090909090909090909090909090909090909090909090",
+        "disclosure_cutoff": 5,
+        "approvals": []
+      },
+      "claims": [
+        {
+          "knowledge_key": "k-death-rumor",
+          "subject": "lin-an",
+          "aspect": "knowledge",
+          "proposition": "林安据传已死于乱军",
+          "known_at": 4,
+          "disclosure_cutoff": 4,
+          "pov": "lin-an",
+          "pov_kind": "character",
+          "source_kind": "canon_source",
+          "authority": "probable_inference",
+          "confidence": 0.6,
+          "epistemic_status": "asserted",
+          "transition_from": null,
+          "lineage": ["k-death-rumor"],
+          "source_refs": [
+            {
+              "evidence_id": "ev-rumor",
+              "chapter_id": 4,
+              "chapter_number": 4,
+              "source_start": 0,
+              "source_end": 60,
+              "content_hash": "9999999999999999999999999999999999999999999999999999999999999990",
+              "source_snapshot_hash": "9090909090909090909090909090909090909090909090909090909090909090"
+            }
+          ],
+          "gate_status": "pending",
+          "gate_reason": null,
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 10
+        },
+        {
+          "knowledge_key": "k-alive-fact",
+          "subject": "lin-an",
+          "aspect": "knowledge",
+          "proposition": "林安实际安然无恙",
+          "known_at": 4,
+          "disclosure_cutoff": 4,
+          "pov": "omniscient",
+          "pov_kind": "omniscient",
+          "source_kind": "canon_source",
+          "authority": "probable_inference",
+          "confidence": 0.9,
+          "epistemic_status": "contradiction",
+          "transition_from": null,
+          "lineage": ["k-alive-fact"],
+          "source_refs": [
+            {
+              "evidence_id": "ev-alive",
+              "chapter_id": 4,
+              "chapter_number": 4,
+              "source_start": 100,
+              "source_end": 170,
+              "content_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab",
+              "source_snapshot_hash": "9090909090909090909090909090909090909090909090909090909090909090"
+            }
+          ],
+          "gate_status": "pending",
+          "gate_reason": null,
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 10
+        }
+      ]
+    }
+  }
+}

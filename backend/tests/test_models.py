@@ -16,6 +16,8 @@ AI 模型配置 API 测试
 """
 
 import pytest
+import httpx
+from unittest.mock import patch
 
 pytestmark = pytest.mark.unit
 from httpx import AsyncClient
@@ -29,6 +31,42 @@ async def test_models_list_empty(auth_client: AsyncClient):
     data = response.json()
     assert isinstance(data, list)
     assert len(data) == 0
+
+
+@pytest.mark.asyncio
+async def test_list_supported_provider_profiles(auth_client: AsyncClient):
+    """设置页只返回当前支持的五种供应商协议，不再暴露 Vertex。"""
+    response = await auth_client.get("/api/models/providers")
+    assert response.status_code == 200
+    providers = {item["id"]: item for item in response.json()}
+    assert set(providers) == {
+        "openai",
+        "anthropic",
+        "gemini",
+        "ollama",
+        "custom",
+    }
+    assert providers["openai"]["default_base_url"] == "https://api.openai.com/v1"
+    assert providers["anthropic"]["credential_kind"] == "api_key"
+    assert providers["gemini"]["default_base_url"].endswith("/v1beta")
+    assert providers["ollama"]["credential_required"] is False
+    assert providers["custom"]["default_base_url"] is None
+
+
+@pytest.mark.asyncio
+async def test_vertex_provider_is_rejected_for_new_model_configs(
+    auth_client: AsyncClient,
+):
+    response = await auth_client.post(
+        "/api/models",
+        json={
+            "name": "legacy-vertex",
+            "provider": "vertex_google",
+            "model_id": "gemini-provider-a",
+        },
+    )
+
+    assert response.status_code == 422
 
 
 @pytest.mark.asyncio
@@ -57,6 +95,265 @@ async def test_create_model(auth_client: AsyncClient):
     assert data["is_active"] is True
     # api_key 不应暴露
     assert "api_key" not in data
+
+
+@pytest.mark.asyncio
+async def test_discover_openai_compatible_models_from_configured_url(
+    auth_client: AsyncClient,
+    monkeypatch,
+):
+    """设置页可以通过真实 Base URL 获取模型列表，且响应不回显密钥。"""
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "ai_allowed_private_hosts", "127.0.0.1")
+
+    class FakeResponse:
+        status_code = 200
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {
+                "object": "list",
+                "data": [
+                    {"id": "provider-model-a"},
+                    {"id": "provider-model-b"},
+                ],
+            }
+
+    class FakeAsyncClient:
+        last_url = None
+        last_headers = None
+
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return None
+
+        async def get(self, url, *, headers):
+            type(self).last_url = url
+            type(self).last_headers = headers
+            return FakeResponse()
+
+    with patch("httpx.AsyncClient", FakeAsyncClient):
+        response = await auth_client.post(
+            "/api/models/discover",
+            json={
+                "provider": "custom",
+                "base_url": "http://127.0.0.1:9999/v1",
+                "api_key": "provider-secret",
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "models": [
+            {"id": "provider-model-a", "name": "provider-model-a"},
+            {"id": "provider-model-b", "name": "provider-model-b"},
+        ]
+    }
+    assert FakeAsyncClient.last_url == "http://127.0.0.1:9999/v1/models"
+    assert FakeAsyncClient.last_headers == {
+        "Authorization": "Bearer provider-secret",
+        "Accept": "application/json",
+    }
+    assert "provider-secret" not in response.text
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("provider", "payload", "expected_path", "expected_headers", "expected_models"),
+    [
+        (
+            "openai",
+            {"data": [{"id": "gpt-provider-a", "owned_by": "openai"}]},
+            "/v1/models",
+            {"Authorization": "Bearer provider-secret"},
+            [{"id": "gpt-provider-a", "name": "gpt-provider-a"}],
+        ),
+        (
+            "custom",
+            {"data": [{"id": "compatible-model-a"}]},
+            "/v1/models",
+            {"Authorization": "Bearer provider-secret"},
+            [{"id": "compatible-model-a", "name": "compatible-model-a"}],
+        ),
+        (
+            "anthropic",
+            {"data": [{"id": "claude-provider-a", "display_name": "Claude A"}]},
+            "/v1/models",
+            {
+                "x-api-key": "provider-secret",
+                "anthropic-version": "2023-06-01",
+            },
+            [{"id": "claude-provider-a", "name": "Claude A"}],
+        ),
+        (
+            "gemini",
+            {
+                "models": [
+                    {
+                        "name": "models/gemini-provider-a",
+                        "displayName": "Gemini A",
+                        "supportedGenerationMethods": ["generateContent"],
+                    },
+                    {
+                        "name": "models/embedding-provider-a",
+                        "supportedGenerationMethods": ["embedContent"],
+                    },
+                ]
+            },
+            "/v1beta/models",
+            {"x-goog-api-key": "provider-secret"},
+            [{"id": "gemini-provider-a", "name": "Gemini A"}],
+        ),
+        (
+            "ollama",
+            {"models": [{"name": "qwen3:8b", "model": "qwen3:8b"}]},
+            "/api/tags",
+            {},
+            [{"id": "qwen3:8b", "name": "qwen3:8b"}],
+        ),
+    ],
+)
+async def test_discover_adapts_all_supported_provider_protocols(
+    auth_client: AsyncClient,
+    monkeypatch,
+    provider,
+    payload,
+    expected_path,
+    expected_headers,
+    expected_models,
+):
+    """五种设置页供应商都使用各自的目录路径、认证头和响应格式。"""
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "ai_allowed_private_hosts", "127.0.0.1")
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return payload
+
+    class FakeAsyncClient:
+        last_url = None
+        last_headers = None
+
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return None
+
+        async def get(self, url, *, headers):
+            type(self).last_url = url
+            type(self).last_headers = headers
+            return FakeResponse()
+
+    base_url = {
+        "gemini": "http://127.0.0.1:9999/v1beta",
+        "ollama": "http://127.0.0.1:9999",
+    }.get(provider, "http://127.0.0.1:9999/v1")
+    api_key = None if provider == "ollama" else "provider-secret"
+
+    with patch("httpx.AsyncClient", FakeAsyncClient):
+        response = await auth_client.post(
+            "/api/models/discover",
+            json={"provider": provider, "base_url": base_url, "api_key": api_key},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["models"] == expected_models
+    assert FakeAsyncClient.last_url.endswith(expected_path)
+    assert FakeAsyncClient.last_headers["Accept"] == "application/json"
+    for key, value in expected_headers.items():
+        assert FakeAsyncClient.last_headers[key] == value
+    if provider == "ollama":
+        assert "Authorization" not in FakeAsyncClient.last_headers
+
+
+@pytest.mark.asyncio
+async def test_discover_rejects_unknown_provider(auth_client: AsyncClient):
+    response = await auth_client.post(
+        "/api/models/discover",
+        json={
+            "provider": "unknown-provider",
+            "base_url": "https://api.openai.com/v1",
+            "api_key": "provider-secret",
+        },
+    )
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_discover_rejects_unsafe_url_before_outbound_request(
+    auth_client: AsyncClient,
+):
+    """模型发现不能访问 metadata、回环或其他未列入白名单的地址。"""
+    class UnexpectedAsyncClient:
+        def __init__(self, **kwargs):
+            raise AssertionError("不安全 URL 不应建立外部客户端")
+
+    with patch("httpx.AsyncClient", UnexpectedAsyncClient):
+        response = await auth_client.post(
+            "/api/models/discover",
+            json={
+                "provider": "custom",
+                "base_url": "http://169.254.169.254/latest/meta-data",
+                "api_key": "provider-secret",
+            },
+        )
+
+    assert response.status_code == 400
+    assert "provider-secret" not in response.text
+
+
+@pytest.mark.asyncio
+async def test_discover_provider_failure_is_safe(
+    auth_client: AsyncClient,
+    monkeypatch,
+):
+    """上游不可用时返回稳定错误，且不泄露连接密钥。"""
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "ai_allowed_private_hosts", "127.0.0.1")
+
+    class FailingAsyncClient:
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return None
+
+        async def get(self, url, *, headers):
+            raise httpx.ConnectError("provider-secret unavailable")
+
+    with patch("httpx.AsyncClient", FailingAsyncClient):
+        response = await auth_client.post(
+            "/api/models/discover",
+            json={
+                "provider": "custom",
+                "base_url": "http://127.0.0.1:9999/v1",
+                "api_key": "provider-secret",
+            },
+        )
+
+    assert response.status_code == 502
+    assert response.json()["detail"] == "无法从该地址获取模型列表"
+    assert "provider-secret" not in response.text
 
 
 @pytest.mark.asyncio

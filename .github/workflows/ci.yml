@@ -227,6 +227,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 1
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.benchmark_commit || github.sha }}
 
       - uses: actions/setup-go@v5
         with:
@@ -250,7 +251,7 @@ jobs:
     name: Unit & contract
     needs: [guard]
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
@@ -294,6 +295,26 @@ jobs:
       - name: Frontend unit/coverage
         working-directory: frontend
         run: npm run test:coverage
+
+      - name: Coverage policy evaluation (critical hard gate)
+        run: |
+          python -m pip install pyyaml
+          mkdir -p artifacts
+          CHANGED_LINES_ARGS=()
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git fetch --depth=1 origin "${{ github.event.pull_request.base.sha }}" || true
+            if git diff --name-only HEAD "${{ github.event.pull_request.base.sha }}" >/dev/null 2>&1; then
+              git diff --unified=0 "${{ github.event.pull_request.base.sha }}"...HEAD > artifacts/changed.diff || \
+                git diff --unified=0 "${{ github.event.pull_request.base.sha }}" HEAD > artifacts/changed.diff || true
+              if [ -s artifacts/changed.diff ]; then
+                CHANGED_LINES_ARGS=(--changed-lines artifacts/changed.diff)
+              fi
+            fi
+          fi
+          python scripts/ci/coverage_policy.py \
+            --backend-xml backend/artifacts/backend-coverage.xml \
+            --frontend-lcov frontend/coverage/lcov.info \
+            --critical-gate "${CHANGED_LINES_ARGS[@]}"
 
       - name: CI policy scripts (repo-root)
         run: |
@@ -514,13 +535,57 @@ jobs:
         run: docker compose -f docker-compose.ci.yml down -v || true
 
   # ---------------------------------------------------------------------------
-  # Browser: Playwright desktop + 390px (job timeout 15m — D-16)
+  # Agent service: install, test, typecheck, lockfile + package governance
+  # ---------------------------------------------------------------------------
+  agent:
+    name: Agent service
+    needs: [guard]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.benchmark_commit || github.sha }}
+
+      # agent-service requires Node >=22.19 (package.json engines); it cannot
+      # use the repo-wide Node 20 baseline.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: agent-service/package-lock.json
+
+      - name: Install agent-service
+        working-directory: agent-service
+        run: npm ci
+
+      - name: Typecheck
+        working-directory: agent-service
+        run: npx tsc --noEmit
+
+      - name: Unit tests
+        working-directory: agent-service
+        run: npm test
+
+      - name: Lockfile governance
+        working-directory: agent-service
+        run: npm run verify:lockfile
+
+      - name: Package scan
+        working-directory: agent-service
+        run: npm run scan:packages
+
+  # ---------------------------------------------------------------------------
+  # Browser: production build + Playwright desktop + 390px.
+  # Recent PR evidence showed the old 15m budget expiring during Playwright,
+  # so this job owns a realistic end-to-end budget instead of a false-red gate.
   # ---------------------------------------------------------------------------
   browser:
     name: Browser smoke
     needs: [guard]
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
@@ -561,6 +626,13 @@ jobs:
         run: |
           npm ci
           npx playwright install chromium --with-deps
+
+      - name: Frontend production build
+        working-directory: frontend
+        env:
+          BACKEND_URL: http://127.0.0.1:8010
+          NEXT_PUBLIC_API_URL: /api
+        run: npm run build
 
       - name: Playwright (desktop + 390px, retries=0)
         working-directory: frontend
@@ -606,6 +678,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 1
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.benchmark_commit || github.sha }}
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
@@ -708,6 +781,8 @@ jobs:
       - name: Resolve provider-capable runner authority
         id: authority
         uses: actions/github-script@v7
+        env:
+          BENCHMARK_SHA: ${{ needs.guard.outputs.benchmark_sha || github.sha }}
         with:
           github-token: ${{ secrets.NIGHTLY_RUNNER_READ_TOKEN || github.token }}
           script: |
@@ -749,7 +824,7 @@ jobs:
               } : null,
               registered_runner_count: runners.length,
               repository: `${context.repo.owner}/${context.repo.repo}`,
-              commit_sha: context.sha,
+              commit_sha: process.env.BENCHMARK_SHA,
               event_name: context.eventName,
               run_id: String(context.runId),
               checked_at: new Date().toISOString(),
@@ -882,6 +957,7 @@ jobs:
             --authority /tmp/nightly-control/authority.json \
             --provider-result "$PROVIDER_RESULT" \
             --provider-report-root /tmp/nightly-provider \
+            --commit-sha "${{ needs.guard.outputs.benchmark_sha || github.sha }}" \
             --output /tmp/nightly-final/rag-quality-report.json
           python - <<'PY' >> "$GITHUB_OUTPUT"
           import json
@@ -914,11 +990,12 @@ jobs:
     timeout-minutes: 10
     environment: quality-benchmark
     permissions:
-      contents: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 1
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.benchmark_commit || github.sha }}
 
       - uses: actions/setup-python@v5
         with:
@@ -1139,6 +1216,7 @@ jobs:
       - unit
       - openapi
       - integration
+      - agent
       - browser
       - codeql
       - workflow-lint
@@ -1154,6 +1232,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 1
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.benchmark_commit || github.sha }}
 
       - uses: actions/setup-python@v5
         with:
@@ -1168,6 +1247,7 @@ jobs:
           RESULT_UNIT: ${{ needs.unit.result }}
           RESULT_OPENAPI: ${{ needs.openapi.result }}
           RESULT_INTEGRATION: ${{ needs.integration.result }}
+          RESULT_AGENT: ${{ needs.agent.result }}
           RESULT_BROWSER: ${{ needs.browser.result }}
           RESULT_CODEQL: ${{ needs.codeql.result }}
           RESULT_WORKFLOW_LINT: ${{ needs.workflow-lint.result }}
@@ -1197,6 +1277,7 @@ jobs:
                   "unit": {"result": r("RESULT_UNIT")},
                   "openapi": {"result": r("RESULT_OPENAPI")},
                   "integration": {"result": r("RESULT_INTEGRATION")},
+                  "agent": {"result": r("RESULT_AGENT")},
                   "browser": {"result": r("RESULT_BROWSER")},
                   "codeql": {"result": r("RESULT_CODEQL")},
                   "workflow-lint": {"result": r("RESULT_WORKFLOW_LINT")},

@@ -1,0 +1,161 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ExportPreparationArtifact",
+  "description": "ExportPreparationArtifact 信封（D-39-01/D-39-02 / Phase 39）。镜像 backend app.schemas.agent_runtime.ExportPreparationArtifact：type / schema_version / owner / novel / branch / producing skill+version / model lineage / source versions / input_hash / evidence_refs / preparation（ExportPreparationPayload）/ tool_runs / status / parent_revision / normalization。`preparation` 携带完整 branch-aware 血缘的 ExportPreparationPayload（authority_space 恒为 derivative + fork、project/fork scope、source snapshot ref、base revision ref、content_hash、evidence_refs、generator_lineage、validator_report、review_state=candidate、approval_request_id/materialize_lineage 由服务端分配）。status 恒为 candidate（finalize 时）——只有确定性 validator + 独立 approve_export Web ApprovalRequest → materializer 能推进 approved。artifact_id / revision_id / skill_run_id / approval_request_id 由后端确定性 finalizer/服务端在写入时分配，模型输出不含。",
+  "type": "object",
+  "required": [
+    "type",
+    "schema_version",
+    "owner_id",
+    "novel_id",
+    "producing_skill",
+    "producing_skill_version",
+    "skill_version_id",
+    "model_lineage",
+    "source_versions",
+    "input_hash",
+    "evidence_refs",
+    "preparation",
+    "tool_runs",
+    "status",
+    "normalization"
+  ],
+  "properties": {
+    "type": { "const": "export_preparation" },
+    "schema_version": { "const": "export-preparation.v1" },
+    "owner_id": { "type": "integer", "minimum": 1 },
+    "novel_id": { "type": "integer", "minimum": 1 },
+    "branch": {
+      "type": ["string", "null"],
+      "description": "衍生分支；原始主线为 null（与 run.branch 血缘一致）"
+    },
+    "producing_skill": { "type": "string", "minLength": 1 },
+    "producing_skill_version": { "type": "string", "minLength": 1 },
+    "skill_version_id": { "type": "integer", "minimum": 1 },
+    "model_lineage": { "type": "object", "description": "agent runtime + 模型血缘（provider/model/revision）" },
+    "source_versions": { "type": "object", "description": "数据源版本（novel/source snapshot 血缘）" },
+    "input_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$", "description": "运行输入规范化 JSON 的 SHA-256（重放追溯）" },
+    "evidence_refs": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1,
+      "description": "leaf 证据引用，必须 ⊆ 冻结 manifest 白名单"
+    },
+    "skill_run_id": { "type": ["integer", "null"], "minimum": 1, "description": "SkillRun ID（后端 run 创建时分配；模型输出不含）" },
+    "artifact_id": { "type": ["integer", "null"], "minimum": 1, "description": "Artifact ID（后端确定性 finalizer 写入时分配；模型输出不含）" },
+    "revision_id": { "type": ["integer", "null"], "minimum": 1, "description": "ArtifactRevision ID（后端确定性 finalizer 写入时分配；模型输出不含）" },
+    "preparation": { "$ref": "#/definitions/export_preparation_payload" },
+    "tool_runs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["tool_name", "calls"],
+        "properties": {
+          "tool_name": { "type": "string", "minLength": 1 },
+          "calls": { "type": "integer", "minimum": 0 }
+        }
+      },
+      "description": "ToolRun 血缘：本 run 使用的 allowlist 工具与调用次数"
+    },
+    "status": {
+      "enum": ["candidate", "validated", "approved", "published", "rejected"],
+      "description": "产物状态；finalize 写入时恒为 candidate（无自动 promotion）"
+    },
+    "parent_revision": { "type": ["string", "null"], "description": "父修订引用；首个修订为 null" },
+    "normalization": {
+      "type": "object",
+      "description": "26-06 修复血缘 trail：repaired_hash 是对不含本 trail 的 repaired payload 的 canonical SHA-256；raw_hash 是原始模型输出的 canonical SHA-256；normalization_actions 每项含 path/action/after。",
+      "required": ["raw_hash", "repaired_hash", "normalization_actions", "warnings"],
+      "properties": {
+        "raw_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "repaired_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "normalization_actions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path", "action", "after"],
+            "properties": {
+              "path": { "type": "string", "minLength": 1 },
+              "action": {
+                "type": "string",
+                "enum": ["alias", "alias_dedup", "enum_canonicalize", "container_shape", "lineage_merge"]
+              },
+              "before": {},
+              "after": {},
+              "reason": { "type": "string" }
+            }
+          }
+        },
+        "warnings": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  },
+  "definitions": {
+    "export_preparation_payload": {
+      "type": "object",
+      "description": "ExportPreparationPayload 负载（D-39-01/D-39-02）：完整 branch-aware 血缘——project/fork scope、source snapshot ref、base revision ref、content_hash（冻结 manifest/snapshot hash 意图引用）、evidence_refs、generator_lineage、validator_report。authority_space 恒为 derivative + fork 必须；review_state 恒为 candidate（finalize 时）——只有确定性 validator + 独立 approve_export approval → materializer 能推进。approval_request_id / materialize_lineage 由服务端分配，模型输出不含。",
+      "required": [
+        "schema_version",
+        "artifact_kind",
+        "authority_space",
+        "fork",
+        "project_id",
+        "project_key",
+        "source_snapshot",
+        "base_revision",
+        "content_hash",
+        "evidence_refs",
+        "generator_lineage",
+        "validator_report",
+        "review_state"
+      ],
+      "properties": {
+        "schema_version": { "const": "export-preparation.v1" },
+        "artifact_kind": { "const": "export_preparation" },
+        "authority_space": { "const": "derivative" },
+        "fork": { "type": "string", "minLength": 1, "maxLength": 80, "description": "衍生 fork（derivative mode 必须提供）" },
+        "project_id": { "type": "integer", "minimum": 1 },
+        "project_key": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "source_snapshot": {
+          "type": "object",
+          "description": "source snapshot 血缘 ref（D-39-01：frozen fork 血缘只读）",
+          "required": ["source_snapshot_id", "source_snapshot_hash", "source_manifest_hash", "cutoff_chapter"],
+          "properties": {
+            "source_snapshot_id": { "type": "string", "minLength": 1, "maxLength": 160 },
+            "source_snapshot_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "source_manifest_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "cutoff_chapter": { "type": "integer", "minimum": 1 }
+          },
+          "additionalProperties": false
+        },
+        "base_revision": {
+          "type": "object",
+          "description": "project 冻结 fork 血缘 ref（revision/version/snapshot 对齐，D-39-01）",
+          "required": ["project_manifest_hash", "scope_hash", "cutoff_snapshot_hash", "text_version_hash"],
+          "properties": {
+            "project_manifest_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "scope_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "cutoff_snapshot_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "text_version_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+          },
+          "additionalProperties": false
+        },
+        "content_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$", "description": "候选声称的 frozen manifest/snapshot content hash（服务端重放；stale → fail closed）" },
+        "evidence_refs": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string" },
+          "description": "leaf 证据引用，必须 ⊆ 冻结 manifest 白名单"
+        },
+        "generator_lineage": { "type": "object", "description": "frozen provider/model/runtime 血缘（无 transport URL，SSRF metadata gate）" },
+        "validator_report": { "type": "object", "description": "确定性 parity/membership/hash/security/reproducibility 报告快照（candidate 派生，绝不由此物化）" },
+        "review_state": { "const": "candidate", "description": "finalize 写入时恒为 candidate——只有确定性 validator + approval → materializer 能推进" },
+        "approval_request_id": { "type": ["integer", "null"], "minimum": 1, "description": "ApprovalRequest ID（服务端 action 工具分配；模型输出不含）" },
+        "materialize_lineage": { "type": "object", "description": "approval/materialize 血缘（服务端确定性 materializer 分配；模型输出不含）" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

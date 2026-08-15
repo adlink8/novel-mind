@@ -130,6 +130,33 @@ async def test_create_and_run_to_terminal(worker: RagQualityWorker):
 
 
 @pytest.mark.asyncio
+async def test_explicit_retriever_is_used_at_worker_boundary(worker: RagQualityWorker):
+    """The durable worker must execute the supplied retrieval seam, not an oracle stub."""
+    snap, cases, g, j, cal, baseline, chunker = _fixtures()
+    calls = 0
+
+    def retrieve(case, snapshot, top_k):
+        nonlocal calls
+        calls += 1
+        return []
+
+    job = await worker.create_job(
+        owner_id=1,
+        snapshot=snap,
+        cases=cases[:1],
+        generator_lineage=g,
+        judge_lineage=j,
+        calibration_report=cal,
+        baseline=baseline,
+        health=default_healthy(),
+        chunker_lineage=chunker,
+    )
+    done = await worker.resume(job.job_id, owner_id=1, retrieve_fn=retrieve)
+    assert calls > 0
+    assert done.report is not None
+
+
+@pytest.mark.asyncio
 async def test_cross_owner_denied(worker: RagQualityWorker):
     snap, cases, g, j, cal, baseline, chunker = _fixtures()
     job = await worker.create_job(

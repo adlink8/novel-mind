@@ -22,6 +22,13 @@ Nightly greens; the explicit override unlocks planning only. Phase 25.2 Runtime 
 - D-12: Both consumers use reading-progress cutoff; whole-book requires the per-novel switch.
 - D-13: Execution starts only after Phase 22 three-green and passed Phase 25.2/25.3 verification; planning proceeds now.
 - D-14: No NM promotion/active-pointer/consumer cutover, no summary replacing raw authority, no second agent retrieval stack.
+- D-15: Each missing dimension follows one explicit fallback chain: exact/domain reader first; deterministic heuristic extraction second for candidate recall only; unresolved or insufficient coverage ends as a stable `partial`/`unavailable` reason. Heuristic output never becomes a fact, EvidenceRef or citation.
+- D-16: Model-produced structured output may receive only declared alias repair, enum canonicalization or unambiguous container-shape normalization. The repaired payload is strictly validated; no repair may synthesize evidence, owner, cutoff, authority, branch, fork or approval fields. Unsafe repair blocks with stable warnings and preserves raw/repaired hashes and normalization actions.
+
+## Phase 26 execution order
+
+- 26-00 → 26-01 → 26-02 → 26-03 → 26-04 → 26-06 → 26-05.
+- 26-06 is the shared structured-output integrity boundary consumed by the Phase 26 Skill; 26-05 may not introduce a local normalizer or bypass its strict post-repair validator.
 
 ## Agent Consumer Contract
 
@@ -31,6 +38,7 @@ Nightly greens; the explicit override unlocks planning only. Phase 25.2 Runtime 
   evidence and owner/novel/branch lineage where applicable.
 - Approval: read-only; no approval.
 - Deterministic authority: FastAPI evidence/citation/cutoff validator.
+- Structured-output authority: shared conservative normalizer followed by strict schema/lineage validation; raw model output remains immutable audit evidence.
 - Forbidden: uncited factual output or direct domain writes; shell/filesystem/default coding tools, ambient packages and direct
   database access are always forbidden.
 - Canonical contract: `.planning/AGENT-RUNTIME-CONTRACT.md`; consume Phase 25.2

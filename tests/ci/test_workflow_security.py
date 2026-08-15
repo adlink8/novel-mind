@@ -59,9 +59,9 @@ def test_job_timeouts_locked(workflow: dict, policy: dict) -> None:
     vw.assert_job_timeouts(workflow, policy)
     jobs = workflow["jobs"]
     assert jobs["static"]["timeout-minutes"] == 5
-    assert jobs["unit"]["timeout-minutes"] == 10
+    assert jobs["unit"]["timeout-minutes"] == 20
     assert jobs["integration"]["timeout-minutes"] == 15
-    assert jobs["browser"]["timeout-minutes"] == 15
+    assert jobs["browser"]["timeout-minutes"] == 30
     assert jobs["live"]["timeout-minutes"] == 45
     assert jobs["nightly-preflight"]["timeout-minutes"] == 5
     assert jobs["nightly"]["timeout-minutes"] == 60
@@ -86,7 +86,9 @@ def test_self_hosted_nightly_only(workflow: dict) -> None:
     assert "self-hosted" in str(runs)
 
 
-def test_nightly_control_plane_is_always_hosted_and_emits_terminal_artifact(workflow: dict) -> None:
+def test_nightly_control_plane_is_always_hosted_and_emits_terminal_artifact(
+    workflow: dict,
+) -> None:
     jobs = workflow["jobs"]
     preflight = jobs["nightly-preflight"]
     finalize = jobs["nightly-finalize"]
@@ -96,7 +98,10 @@ def test_nightly_control_plane_is_always_hosted_and_emits_terminal_artifact(work
     assert "provider_ready" in preflight["outputs"]
     assert "nightly-preflight.outputs.provider_ready == 'true'" in jobs["nightly"]["if"]
     assert "promotable" in finalize["outputs"]
-    assert "nightly-finalize.outputs.promotable == 'true'" in jobs["promote-baseline"]["if"]
+    assert (
+        "nightly-finalize.outputs.promotable == 'true'"
+        in jobs["promote-baseline"]["if"]
+    )
     finalize_blob = yaml.dump(finalize, sort_keys=False)
     preflight_blob = yaml.dump(preflight, sort_keys=False)
     assert "NIGHTLY_RUNNER_READ_TOKEN" in preflight_blob
@@ -133,6 +138,47 @@ def test_dispatch_requires_fixed_commit(workflow: dict) -> None:
     vw.assert_dispatch_guard(workflow)
     on = workflow.get("on") or workflow.get(True)
     assert "benchmark_commit" in on["workflow_dispatch"]["inputs"]
+
+
+def test_dispatch_uses_fixed_commit_for_authority_and_final_report(
+    workflow: dict,
+) -> None:
+    jobs = workflow["jobs"]
+    for job_name in ("workflow-lint", "codeql", "promote-baseline", "ci-gate"):
+        checkout = next(
+            step
+            for step in jobs[job_name]["steps"]
+            if str(step.get("uses") or "").startswith("actions/checkout")
+        )
+        assert "inputs.benchmark_commit" in str(checkout["with"]["ref"])
+    preflight_blob = yaml.dump(jobs["nightly-preflight"], sort_keys=False)
+    finalize_blob = yaml.dump(jobs["nightly-finalize"], sort_keys=False)
+    assert "BENCHMARK_SHA" in preflight_blob
+    assert "benchmark_sha || github.sha" in preflight_blob
+    assert "--commit-sha" in finalize_blob
+    assert "benchmark_sha || github.sha" in finalize_blob
+
+
+def test_baseline_materialization_has_no_unused_write_permission(
+    workflow: dict,
+) -> None:
+    assert workflow["jobs"]["promote-baseline"]["permissions"] == {"contents": "read"}
+
+
+def test_browser_gates_production_build_before_playwright(workflow: dict) -> None:
+    steps = workflow["jobs"]["browser"]["steps"]
+    build_index = next(
+        i
+        for i, step in enumerate(steps)
+        if step.get("name") == "Frontend production build"
+    )
+    browser_index = next(
+        i
+        for i, step in enumerate(steps)
+        if step.get("name") == "Playwright (desktop + 390px, retries=0)"
+    )
+    assert steps[build_index]["run"] == "npm run build"
+    assert build_index < browser_index
 
 
 def test_fork_pr_cannot_escalate(workflow: dict) -> None:

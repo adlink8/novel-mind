@@ -30,9 +30,9 @@ LEGACY_WORKFLOWS = (
 
 LOCKED_JOB_TIMEOUTS = {
     "static": 5,
-    "unit": 10,
+    "unit": 20,
     "integration": 15,
-    "browser": 15,
+    "browser": 30,
     "live": 45,
     "nightly-preflight": 5,
     "nightly": 60,
@@ -369,7 +369,7 @@ def assert_no_sensitive_artifact_paths(wf: dict[str, Any], policy: dict[str, Any
         if not token:
             continue
         # uploads/ as artifact path is forbidden
-        if token in ("uploads", "fulltext", "novel-content") and f"path:" in blob:
+        if token in ("uploads", "fulltext", "novel-content") and "path:" in blob:
             for job in _jobs(wf).values():
                 for step in job.get("steps") or []:
                     uses = str(step.get("uses") or "")

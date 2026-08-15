@@ -3,7 +3,7 @@ import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import { DOMAIN_TOOL_NAMES } from "../src/tools/registry.js";
 import { loadSkill } from "../src/skills/loader.js";
 import { createControlledAgentDir } from "../src/agent/resource-loader.js";
-import { buildGatewayModel } from "../src/agent/provider.js";
+import { buildGatewayModel, createGatewayProvider } from "../src/agent/provider.js";
 import type { LoadedSkill } from "../src/skills/loader.js";
 
 /**
@@ -76,10 +76,12 @@ describe("session factory", () => {
     vi.unstubAllGlobals();
   });
 
-  it("恒定传 noTools:\"all\" + 非空 tools allowlist + 7 个 customTools（真实 skill）", async () => {
+  it("恒定传 noTools:\"all\" + 非空 tools allowlist + customTools（真实 skill）", async () => {
     const skill = loadSkill("answer-reading-question");
     const dirs = createControlledAgentDir();
-    await createSession({ auth: "Bearer per-run-token", skill, modelRuntime: {} as never, dirs });
+    await createSession({
+      novelId: 1,
+      auth: "Bearer per-run-token", skill, modelRuntime: {} as never, dirs });
 
     expect(mocks.createAgentSession).toHaveBeenCalledTimes(1);
     const options = mocks.createAgentSession.mock.calls[0][0] as Record<string, unknown>;
@@ -95,7 +97,7 @@ describe("session factory", () => {
     }
     // 首技能白名单排除 get_narrative_memory（Open Question 4）
     expect(tools).not.toContain("get_narrative_memory");
-    // customTools 恰为 7 个域工具
+    // customTools 恰为全部域工具（DOMAIN_TOOL_NAMES 单一事实源）
     const customTools = options.customTools as Array<{ name: string }>;
     expect(customTools).toHaveLength(DOMAIN_TOOL_NAMES.length);
     expect(customTools.map((t) => t.name)).toEqual([...DOMAIN_TOOL_NAMES]);
@@ -108,7 +110,9 @@ describe("session factory", () => {
   it("ResourceLoader override 返回 exactly allowlist（A2：零 ambient）", async () => {
     const skill = loadSkill("answer-reading-question");
     const dirs = createControlledAgentDir();
-    await createSession({ auth: "Bearer t", skill, modelRuntime: {} as never, dirs });
+    await createSession({
+      novelId: 1,
+      auth: "Bearer t", skill, modelRuntime: {} as never, dirs });
 
     const options = mocks.createAgentSession.mock.calls[0][0] as Record<string, unknown>;
     const loader = options.resourceLoader as {
@@ -130,7 +134,9 @@ describe("session factory", () => {
   it("技能指令确定性注入 systemPrompt（含 NOVEL_AGENT 基础提示 + SKILL.md）", async () => {
     const skill = loadSkill("answer-reading-question");
     const dirs = createControlledAgentDir();
-    await createSession({ auth: "Bearer t", skill, modelRuntime: {} as never, dirs });
+    await createSession({
+      novelId: 1,
+      auth: "Bearer t", skill, modelRuntime: {} as never, dirs });
 
     const options = mocks.createAgentSession.mock.calls[0][0] as Record<string, unknown>;
     const loader = options.resourceLoader as {
@@ -146,7 +152,8 @@ describe("session factory", () => {
     const dirs = createControlledAgentDir();
     await expect(
       createSession({
-        auth: "Bearer t",
+      novelId: 1,
+      auth: "Bearer t",
         skill: fakeSkill(["get_novel", "bash"]),
         modelRuntime: {} as never,
         dirs,
@@ -158,7 +165,9 @@ describe("session factory", () => {
   it("空 allowed_tools → fail-closed 拒绝（tools allowlist 永不空）", async () => {
     const dirs = createControlledAgentDir();
     await expect(
-      createSession({ auth: "Bearer t", skill: fakeSkill([]), modelRuntime: {} as never, dirs }),
+      createSession({
+      novelId: 1,
+      auth: "Bearer t", skill: fakeSkill([]), modelRuntime: {} as never, dirs }),
     ).rejects.toThrow(/为空/);
     expect(mocks.createAgentSession).not.toHaveBeenCalled();
   });
@@ -173,5 +182,30 @@ describe("gateway provider (D-15)", () => {
     expect(model.cost).toEqual({ input: 0, output: 0, cacheRead: 0, cacheWrite: 0 });
     expect(model.provider).toBe("novelmind");
     expect(model.id).toBe("reader-chat-default");
+  });
+
+  it("把运行令牌和 novel 绑定作为内部网关请求头发送", () => {
+    const provider = createGatewayProvider({
+      runToken: "run-owner-token",
+      novelId: 17,
+    });
+
+    expect(provider.headers).toEqual({
+      "X-NovelMind-Run-Token": "run-owner-token",
+      "X-NovelMind-Novel-ID": "17",
+    });
+  });
+
+  it("把运行上下文放入实际请求认证结果，而不只停留在 provider 元数据", async () => {
+    const provider = createGatewayProvider({
+      runToken: "run-owner-token",
+      novelId: 17,
+    });
+    const resolved = await provider.auth.apiKey?.resolve({} as never);
+
+    expect(resolved?.auth.headers).toEqual({
+      "X-NovelMind-Run-Token": "run-owner-token",
+      "X-NovelMind-Novel-ID": "17",
+    });
   });
 });

@@ -110,38 +110,16 @@ class ClueLLMJudgeService:
     def resolve_model_name(self) -> str:
         if self._model_name:
             return self._model_name
-        # Prefer project chat settings over static ai_router pools that still
-        # default to openai/* without keys (AuthenticationError on Vertex-only envs).
+        # Prefer the configured provider/model over legacy static router pools.
         try:
             from app.config import settings
+            from app.services.ai_service import AIService
 
             provider = (settings.chat_provider or "").strip().lower()
-            if provider in (
-                "vertex_google",
-                "vertex",
-                "vertex_ai",
-                "gcp",
-                "google_cloud",
-            ):
-                raw = (
-                    settings.default_chat_model
-                    or settings.vertex_model
-                    or "gemini-3.5-flash-lite"
-                ).strip()
-                for prefix in (
-                    "vertex_google/",
-                    "vertex_ai/",
-                    "vertex/",
-                    "gcp/",
-                    "google/",
-                ):
-                    if raw.lower().startswith(prefix):
-                        raw = raw[len(prefix) :]
-                        break
-                bare = raw or "gemini-3.5-flash-lite"
-                return f"vertex_google/{bare}"
             if (settings.default_chat_model or "").strip():
-                return settings.default_chat_model.strip()
+                return AIService.litellm_model_name(
+                    provider, settings.default_chat_model.strip()
+                )
         except Exception:
             pass
         try:

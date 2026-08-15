@@ -7,6 +7,7 @@
     "node": ">=22.19.0"
   },
   "scripts": {
+    "build": "tsc && node scripts/sync-skills.mjs",
     "test": "vitest run",
     "verify:lockfile": "node scripts/verify-lockfile.mjs",
     "scan:packages": "node scripts/scan-packages.mjs"
@@ -18,6 +19,7 @@
     "@earendil-works/pi-storage-sqlite-node": "0.83.0",
     "ajv": "8.20.0",
     "ajv-formats": "3.0.1",
+    "pi-mcp-adapter": "2.17.0",
     "typebox": "1.3.7",
     "yaml": "2.9.0"
   },

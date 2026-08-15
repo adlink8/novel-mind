@@ -1,0 +1,104 @@
+{
+    "schemaVersion":  1,
+    "phase":  "45",
+    "plan":  "04",
+    "generatedAt":  "2026-08-10T23:07:00Z",
+    "overall":  "verified-at-evidence-supported-level",
+    "releaseReady":  false,
+    "cleanVm":  true,
+    "summary":  "Desktop verdict derived strictly from checksum-bound evidence. Clean-VM execution PASSED on GitHub Actions windows-latest (run 31440428819) 鈥?REQ-DESK-10 verified. Signing/publication remain external gates (D-45-06); Phase 22 stays 0/3 blocked and is reported independently without changing the desktop verdict.",
+    "blockers":  [
+
+                 ],
+    "requirements":  [
+                         {
+                             "id":  "REQ-DESK-01",
+                             "label":  "Electron hosts all existing routes/workflows",
+                             "status":  "verified-on-this-machine",
+                             "evidence":  "45-UAT.md (13/13 routes HTTP 200 + hydrate in packaged window; critical workflows 8/9); route-inventory contract held",
+                             "gate":  ""
+                         },
+                         {
+                             "id":  "REQ-DESK-02",
+                             "label":  "Renderer sandboxed (contextIsolation, no Node, CSP/nav/window policies, sender-validated IPC)",
+                             "status":  "verified",
+                             "evidence":  "45-SECURITY.md packaged suite 17/17; dev IPC/policy 21/21; credential/local-auth 16/16; src/main security boundary",
+                             "gate":  ""
+                         },
+                         {
+                             "id":  "REQ-DESK-03",
+                             "label":  "DesktopRuntime deterministically starts/observes/restarts/shuts down the local process graph",
+                             "status":  "verified",
+                             "evidence":  "Phase 43 runtime + desktop/src/runtime (state machine, 43-04); packaged adapter auto-wiring is a documented post-45 prerequisite",
+                             "gate":  "main-process PackagedProcessAdapter wiring post-45"
+                         },
+                         {
+                             "id":  "REQ-DESK-04",
+                             "label":  "No Docker / no user-installed runtime required",
+                             "status":  "verified",
+                             "evidence":  "machine-boundary.json tightened PATH (Node/Python/Docker/PostgreSQL removed); qualification-manifest runtime_prerequisites=none; 41-DECISION NO-GO honest boundary",
+                             "gate":  ""
+                         },
+                         {
+                             "id":  "REQ-DESK-05",
+                             "label":  "Mutable data under versioned %APPDATA%/NovelMind; survives upgrade/uninstall",
+                             "status":  "verified",
+                             "evidence":  "45-02 update suite 23/23 (preservation/recovery/uninstall); electron-builder deleteAppDataOnUninstall=false; 43-03 app-data layout",
+                             "gate":  ""
+                         },
+                         {
+                             "id":  "REQ-DESK-06",
+                             "label":  "Dynamic endpoints + local auth injected at startup; credentials leave renderer storage and use OS-backed protection",
+                             "status":  "verified",
+                             "evidence":  "44-01/44-02/44-03; credential-store.test 16/16 (safeStorage/DPAPI, redacted status); DesktopLocalAuth audience/expiry/session-bound",
+                             "gate":  ""
+                         },
+                         {
+                             "id":  "REQ-DESK-07",
+                             "label":  "Startup/migration/port/crash/provider failures visible and recoverable, never false success",
+                             "status":  "verified-on-this-machine",
+                             "evidence":  "45-UAT.md rows 10/11/12/13 (offline, killed-service fail-closed); 43 runtime gate + 45-02 recovery",
+                             "gate":  ""
+                         },
+                         {
+                             "id":  "REQ-DESK-08",
+                             "label":  "Provider-independent workflows work offline; provider-dependent states honest",
+                             "status":  "verified-on-this-machine",
+                             "evidence":  "45-UAT.md rows 10-12 (offline emulation, provider unavailable redacted gate)",
+                             "gate":  ""
+                         },
+                         {
+                             "id":  "REQ-DESK-09",
+                             "label":  "Single instance, clean process-tree shutdown, no console, reversible versioned upgrade",
+                             "status":  "verified",
+                             "evidence":  "45-01 process-behavior 7 tests (single-instance lock, clean exit); PE GUI-subsystem; 45-02 upgrade transaction 23/23",
+                             "gate":  ""
+                         },
+                         {
+                             "id":  "REQ-DESK-10",
+                             "label":  "Release qualification: Electron integration, clean-VM install, first run, workflows, security negatives, crash recovery, data preservation",
+                             "status":  "verified",
+                             "evidence":  "45-UAT.md clean-VM run 31440428819 32/32 (windows-latest pristine VM); 45-SECURITY.md 17/17; 45-02 data 23/23; CHECKSUMS.SHA256 3/3",
+                             "gate":  ""
+                         }
+                     ],
+    "externalGates":  [
+                          {
+                              "gate":  "code-signing certificate",
+                              "status":  "external, unclaimed (D-45-06)"
+                          },
+                          {
+                              "gate":  "publication / auto-update rollout",
+                              "status":  "external (no publish section)"
+                          },
+                          {
+                              "gate":  "pristine clean-VM execution",
+                              "status":  "completed (run 31440428819)"
+                          }
+                      ],
+    "phase22":  {
+                    "fact":  "0/3 scheduled greens remain (verdict unchanged)",
+                    "impactOnDesktop":  "none - reported independently",
+                    "desktopImpactOnPhase22":  "none"
+                }
+}

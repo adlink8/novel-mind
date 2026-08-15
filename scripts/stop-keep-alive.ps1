@@ -3,14 +3,8 @@ param(
     [switch]$StopServices
 )
 $ErrorActionPreference = "Continue"
+# 只从脚本所在位置推导仓库根目录（已移除硬编码本机路径，仓库公开可读）
 $Root = Split-Path $PSScriptRoot -Parent
-if (-not (Test-Path (Join-Path $Root "backend"))) {
-    if (Test-Path "D:\ADLINK\Myproject\novel-mind\backend") {
-        $Root = "D:\ADLINK\Myproject\novel-mind"
-    } else {
-        $Root = "C:\Users\li\Desktop\Myproject\novel-mind"
-    }
-}
 $PidFile = Join-Path $PSScriptRoot "keep-alive.pid"
 if (Test-Path $PidFile) {
     $id = (Get-Content $PidFile | Select-Object -First 1) -as [int]

@@ -14,7 +14,7 @@ pytestmark = pytest.mark.integration
 
 BACKEND = Path(__file__).resolve().parents[3]
 SCRIPT = BACKEND / "scripts" / "run_narrative_memory_qualification.py"
-PY = BACKEND / ".venv" / "Scripts" / "python.exe"
+PY = BACKEND / "venv" / "Scripts" / "python.exe"
 
 
 def test_dry_run_qualified_exit_0():

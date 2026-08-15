@@ -5,6 +5,7 @@
 """
 
 from datetime import datetime, timedelta, timezone
+import hashlib
 import uuid
 from typing import Optional
 
@@ -150,6 +151,11 @@ async def get_current_user(
     如果请求未携带有效 Token，返回 None（允许匿名访问）。
     如果 Token 无效或过期，抛出 401 异常。
     """
+    if not settings.auth_enabled:
+        # Single-user desktop mode is deterministic: stale browser cookies or
+        # sessionStorage JWTs must not switch the configured workspace owner.
+        return await _get_default_workspace_user(db)
+
     token = (
         credentials.credentials
         if credentials
@@ -203,3 +209,164 @@ async def require_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
     return current_user
+
+
+async def _get_default_workspace_user(db: AsyncSession) -> User:
+    """Resolve the configured single-user workspace identity."""
+    username = settings.local_auto_login_username.strip().lower()
+    if not username:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="默认工作区用户未配置",
+        )
+    result = await db.execute(select(User).where(User.username == username))
+    user = result.scalar_one_or_none()
+    if not user or not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="默认工作区用户不存在或已被禁用",
+        )
+    return user
+
+
+def _constant_time_equal(left: str, right: str) -> bool:
+    """常量时间比较，避免时序侧信道泄露令牌内容。"""
+    import secrets
+
+    return secrets.compare_digest(left.encode("utf-8"), right.encode("utf-8"))
+
+
+async def require_gateway_token(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_scheme),
+) -> None:
+    """
+    智能体网关的服务到服务认证（25.2-02 Open Question 2 决策落地）。
+
+    认证方式：agent-service 在请求头携带 ``Authorization: Bearer <token>``，
+    与 ``settings.novelmind_gateway_token`` 做常量时间比较。
+
+    安全属性（fail closed）:
+      - 环境变量未配置 → 401（网关不可用，绝不降级放行）；
+      - 缺失 / 非 Bearer / 不匹配 → 401，带 ``WWW-Authenticate: Bearer``；
+      - 令牌内容绝不写日志、绝不下发浏览器（V6 / T-25.2-02-04）。
+
+    备注（25.2-02 决策记录）:
+      - 工具门面（/api/agent-tools）走端用户 JWT（现有 require_user），
+        本依赖只用于网关；
+      - 长时运行超过 JWT 过期的 per-run 短命内部令牌，由 25.2-03 的
+        skill runtime 铸造，属 handoff 项，不在本阶段实现。
+    """
+    configured = settings.novelmind_gateway_token
+    if not configured:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="网关令牌未配置",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    if not credentials or credentials.scheme.lower() != "bearer":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="缺少网关令牌",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    if not _constant_time_equal(credentials.credentials, configured):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="无效的网关令牌",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+
+class AgentActor:
+    """internal_token 场景下的轻量调用方身份（agent-service 工具门面）。
+
+    携带 owner_id（=id）与 novel_id（skill_run 绑定），兼容 User 的
+    `id`/`is_superuser` 访问面，供 agent_tools 路由复用现有 owner 校验。
+    """
+
+    def __init__(self, *, id: int, novel_id: int, is_superuser: bool = False) -> None:
+        self.id = id
+        self.novel_id = novel_id
+        self.is_superuser = is_superuser
+
+
+async def require_agent_actor(
+    novel_id: int,
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_scheme),
+    db: AsyncSession = Depends(get_db),
+    run_id: int | None = None,
+) -> User | AgentActor:
+    """agent_tools 门面认证：接受用户 JWT 或 per-run 内部令牌。
+
+    - JWT：现有 `get_current_user` 语义（浏览器 / 直接 API 调用）；
+    - internal_token：25.2-03 per-run 短命令牌。按 sha256(token) 匹配
+      skill_runs.internal_token_hash，且 novel_id 必须与请求路径 novel_id 一致、
+      状态为 queued/running（活跃 run）。命中返回 AgentActor（owner_id 即
+      skill_run.owner_id，fail-closed：无活跃 run 一律 401）。
+    """
+    token = (
+        credentials.credentials
+        if credentials
+        else request.cookies.get(AUTH_COOKIE_NAME)
+    )
+    if not token:
+        if not settings.auth_enabled:
+            return await _get_default_workspace_user(db)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="需要登录",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    if not settings.auth_enabled:
+        # Agent run tokens keep their explicit owner/novel binding. Any other
+        # renderer token (including a stale user JWT or desktop-local token
+        # already validated by middleware) resolves to the configured owner.
+        token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+        from app.models.agent_runtime import SkillRun
+
+        predicates = [
+            SkillRun.internal_token_hash == token_hash,
+            SkillRun.novel_id == novel_id,
+            SkillRun.status.in_(("queued", "running")),
+        ]
+        if run_id is not None:
+            predicates.append(SkillRun.id == run_id)
+        result = await db.execute(select(SkillRun).where(*predicates))
+        run = result.scalars().first()
+        if run is not None:
+            return AgentActor(id=run.owner_id, novel_id=run.novel_id)
+        return await _get_default_workspace_user(db)
+
+    # 1) 先试用户 JWT（浏览器/直接 API）。
+    # 注意：token 以 "ey" 开头不代表是有效 JWT——random internal_token 偶发
+    # 以 "ey" 开头（~0.02%）。get_current_user 对无效/过期 JWT 抛 401，这里
+    # 捕获后继续尝试 internal-token 兜底，避免把内部令牌误判为坏 JWT。
+    if credentials is not None and token.startswith("ey"):
+        try:
+            user = await get_current_user(request, credentials, db)
+            if user is not None:
+                return user
+        except HTTPException:
+            # 无效/过期 JWT → 落到 internal_token 分支再判一次。
+            pass
+    # 2) internal_token（agent-service 工具门面）。
+    token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    from app.models.agent_runtime import SkillRun
+
+    predicates = [
+        SkillRun.internal_token_hash == token_hash,
+        SkillRun.novel_id == novel_id,
+        SkillRun.status.in_(("queued", "running")),
+    ]
+    if run_id is not None:
+        predicates.append(SkillRun.id == run_id)
+    result = await db.execute(select(SkillRun).where(*predicates))
+    run = result.scalars().first()
+    if run is not None:
+        return AgentActor(id=run.owner_id, novel_id=run.novel_id)
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="无效的认证凭证",
+        headers={"WWW-Authenticate": "Bearer"},
+    )

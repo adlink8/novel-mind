@@ -1,204 +1,293 @@
+"use client";
+
 /**
- * 创作中心 - app/writing/page.tsx
- * 占位页：真实创作流程（fanfictionApi）留待后续里程碑接入。
- * 视觉为一本摊开的 3D 书：封面内侧是宣言，三张书页即三步创作路径；
- * 草稿区以稿纸 + 朱砂「候」印章标记 Planned，不放虚假可点功能。
+ * 创作中心 - app/writing/page.tsx（Phase 36-02, D-36-01..D-36-03）
+ *
+ * 宿主页：显式选择原作 → 显式选择 Canon Fork（创建项目时）→ 进入
+ * MarkdownEditor。任何路径都不读取阅读进度 / 阅读页面，fork 永远由用户
+ * 显式选择（D-36-01）；所有项目都只属于 fanfiction_canon，页面不暴露
+ * Original Canon / User Interpretation 写入口（D-36-03）。
  */
 
-import Link from "next/link";
-import { ArrowRight, BookOpenText, Feather, GitBranch, Sparkles } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 
-import { ChapterOrnament } from "@/components/chapter-ornament";
-import { FlipBook, type FlipBookPage } from "@/components/flip-book";
+import { GitBranch, Loader2, Plus } from "lucide-react";
+
+import { MarkdownEditor } from "@/components/writing/markdown-editor";
+import { ExportPanel } from "@/components/writing/export-panel";
+import { VisualReviewPanel } from "@/components/writing/visual-review-panel";
 import { PageContainer, PageHeader } from "@/components/page-header";
-import { buttonVariants } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-
-const steps = [
-  {
-    id: "choose",
-    numeral: "壹",
-    title: "选择原作",
-    description: "从书架选择已经建立章节与语义索引的小说。",
-    icon: BookOpenText,
-  },
-  {
-    id: "branch",
-    numeral: "贰",
-    title: "确定分支",
-    description: "锁定一个事件、人物选择或未完成的叙事可能。",
-    icon: GitBranch,
-  },
-  {
-    id: "cowrite",
-    numeral: "叁",
-    title: "协作写作",
-    description: "让 AI 引用原文记忆，同时保留你的叙事决定权。",
-    icon: Sparkles,
-  },
-];
-
-/** 三步创作路径 = 三张书页（说明卡的书页形态） */
-const stepPages: FlipBookPage[] = steps.map((step, index) => ({
-  id: step.id,
-  front: (
-    <div className="flex h-full flex-col p-6 pr-12 xl:p-8 xl:pr-14">
-      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
-        创作路径 · Step {index + 1}
-      </p>
-      <div className="mt-6 flex-1">
-        <span className="grid size-11 place-items-center rounded-xl bg-secondary text-primary">
-          <step.icon className="size-5" />
-        </span>
-        <h3 className="mt-5 font-serif text-2xl font-semibold">{step.title}</h3>
-        <p className="mt-3 max-w-xs text-sm leading-7 text-muted-foreground">
-          {step.description}
-        </p>
-      </div>
-      <p className="text-right text-xs text-muted-foreground/60">{step.numeral}</p>
-    </div>
-  ),
-}));
-
-function HeroInsideCover({ compact = false }: { compact?: boolean }) {
-  return (
-    <div
-      className={cn(
-        "flex h-full flex-col justify-center",
-        compact ? "p-7" : "p-10 xl:p-12"
-      )}
-    >
-      <div
-        className={cn(
-          "inline-flex w-fit items-center gap-2 rounded-full border border-primary/25 bg-primary/10 tracking-wide text-primary",
-          compact ? "mb-5 px-3 py-1 text-[11px]" : "mb-6 px-3 py-1.5 text-xs"
-        )}
-      >
-        <Feather className={compact ? "size-3" : "size-3.5"} />
-        创作中心 · 建设中
-      </div>
-      <h1
-        className={cn(
-          "font-serif font-semibold tracking-[-0.02em] text-foreground",
-          compact
-            ? "text-[27px] leading-[1.2]"
-            : "text-4xl leading-[1.15] tracking-[-0.025em] xl:text-[2.7rem]"
-        )}
-      >
-        不是让 AI 替你写，
-        <br />
-        而是让故事记得更多。
-      </h1>
-      <p
-        className={cn(
-          "max-w-md text-muted-foreground",
-          compact ? "mt-3 text-[13px] leading-6" : "mt-4 text-sm leading-7"
-        )}
-      >
-        创作能力仍在建设中。当前可以先完成原作导入与检索评测，为后续分支创作建立可信上下文。
-      </p>
-      <div className={compact ? "mt-6" : "mt-7"}>
-        <Link
-          href="/novels"
-          className={cn(
-            buttonVariants({ size: "lg" }),
-            "rounded-full bg-primary text-white hover:bg-primary/90",
-            compact ? "h-10 w-fit px-5" : "h-11 px-6"
-          )}
-        >
-          前往书架 <ArrowRight className="ml-2 size-4" />
-        </Link>
-      </div>
-      <p
-        className={cn(
-          "text-muted-foreground/70",
-          compact ? "mt-6 text-[11px]" : "mt-8 text-xs"
-        )}
-      >
-        点右页边缘翻开创作路径
-      </p>
-    </div>
-  );
-}
-
-const insideBackCover = (
-  <div className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center">
-    <span className="font-serif text-2xl text-primary">❦</span>
-    <p className="font-serif text-xl font-semibold text-foreground">
-      每一个分支，都从原作的一页开始。
-    </p>
-    <p className="max-w-xs text-sm leading-6 text-muted-foreground">
-      草稿与分支管理将在创作管线接入后写进这本书。
-    </p>
-  </div>
-);
+import { novelsApi, type Novel } from "@/lib/api";
+import {
+  derivativeApi,
+  type CanonForkView,
+  type DerivativeChapterView,
+  type DerivativeProjectView,
+} from "@/lib/derivative-api";
 
 export default function WritingPage() {
+  const [novels, setNovels] = useState<Novel[]>([]);
+  const [novelId, setNovelId] = useState<number | null>(null);
+  const [projects, setProjects] = useState<DerivativeProjectView[]>([]);
+  const [forks, setForks] = useState<CanonForkView[]>([]);
+  const [project, setProject] = useState<DerivativeProjectView | null>(null);
+  const [chapters, setChapters] = useState<DerivativeChapterView[]>([]);
+  const [newProjectName, setNewProjectName] = useState("");
+  const [newProjectForkId, setNewProjectForkId] = useState<number | "">("");
+  const [creating, setCreating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState("加载书架中…");
+
+  // Phase 36-04 refresh recovery: remember the selected project per novel so a
+  // page reload restores the working project instead of always the first one.
+
+  const selectProject = useCallback((next: DerivativeProjectView | null) => {
+    setProject(next);
+    setChapters([]);
+    setError(null);
+    if (next) {
+      window.sessionStorage.setItem(
+        `novelmind:writing:project:${next.novel_id}`,
+        String(next.id)
+      );
+    }
+  }, []);
+
+  // 1. Load the owner's shelf.
+  useEffect(() => {
+    novelsApi
+      .list()
+      .then((res) => {
+        const items = res.data.items;
+        setNovels(items);
+        setStatus(items.length ? "选择一本原作开始创作" : "请先导入一本原作");
+        if (items[0]) setNovelId(items[0].id);
+      })
+      .catch(() => setStatus("书架加载失败，请稍后重试"));
+  }, []);
+
+  // 2. Explicit novel selection loads its derivative projects AND the explicit
+  //    fork candidates for the creation picker (D-36-01: never inferred).
+  useEffect(() => {
+    if (novelId == null) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- clear the previous novel's editor state before loading
+    setProjects([]);
+    setProject(null);
+    setChapters([]);
+    Promise.all([
+      derivativeApi.listProjects(novelId),
+      derivativeApi.listForks(novelId),
+    ])
+      .then(([projectRes, forkRes]) => {
+        const items = projectRes.data.items;
+        setProjects(items);
+        setForks(forkRes.data.forks);
+        setStatus(
+          items.length
+            ? "选择或创建 derivative project 开始写作"
+            : "还没有项目；用显式 fork 创建一个"
+        );
+        // Refresh recovery: restore the project selected before the reload when
+        // it still exists in this novel's owner-scoped list.
+        const remembered = window.sessionStorage.getItem(
+          `novelmind:writing:project:${novelId}`
+        );
+        selectProject(
+          items.find((item) => String(item.id) === remembered) ?? items[0] ?? null
+        );
+      })
+      .catch(() => setStatus("项目或 fork 加载失败，请稍后重试"));
+    // selectProject is a stable useCallback([]); the novel switch runs once.
+  }, [novelId, selectProject]);
+
+  // 3. Project selection loads its ordered chapter plan.
+  useEffect(() => {
+    if (!novelId || !project) return;
+    derivativeApi
+      .listChapters(novelId, project.id)
+      .then((res) => {
+        setChapters(res.data.items);
+        setStatus("草稿就绪，可以开始写作");
+      })
+      .catch(() => setStatus("章节计划加载失败，请稍后重试"));
+  }, [novelId, project]);
+
+  const createProject = async () => {
+    if (!novelId) return;
+    if (!newProjectName.trim()) {
+      setError("请填写项目名称");
+      return;
+    }
+    if (!newProjectForkId) {
+      setError("必须显式选择一个 Canon Fork（不会从阅读页面推断）");
+      return;
+    }
+    setCreating(true);
+    setError(null);
+    try {
+      const res = await derivativeApi.createProject(novelId, {
+        fork_id: Number(newProjectForkId),
+        name: newProjectName.trim(),
+      });
+      const created = res.data.project;
+      setProjects((current) => [created, ...current]);
+      selectProject(created);
+      setNewProjectName("");
+      setNewProjectForkId("");
+      setStatus("项目已创建并绑定到所选 fork");
+    } catch {
+      setError("创建项目失败，请确认 fork 仍可用后重试");
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleChaptersChange = useCallback((next: DerivativeChapterView[]) => {
+    setChapters(next);
+  }, []);
+
   return (
     <PageContainer className="space-y-8">
       <PageHeader
-        eyebrow="Writing studio"
+        eyebrow="Derivative studio"
         title="创作中心"
-        description="从可靠的原作记忆出发，规划故事分支、建立草稿并与 AI 协作续写。"
+        description="显式选择 Canon Fork 与 derivative project，规划章节并用 Markdown 编写只属于 Fanfiction Canon 的草稿。"
       />
 
-      {/* ── Hero：摊开的创作之书（平板/桌面对开 / 窄屏单页竖版） ── */}
-      <div className="hidden md:block">
-        <FlipBook
-          pages={stepPages}
-          tone="on-light"
-          ambient
-          ariaLabel="创作中心导览书"
-          className="mx-auto w-full max-w-[1080px]"
-          insideCover={<HeroInsideCover />}
-          insideBackCover={insideBackCover}
-        />
-      </div>
-      <div className="flex justify-center md:hidden">
-        <FlipBook
-          layout="single"
-          pages={stepPages}
-          tone="on-light"
-          ambient
-          ariaLabel="创作中心导览书"
-          className="w-full max-w-[430px]"
-          insideCover={<HeroInsideCover compact />}
-          insideBackCover={insideBackCover}
-        />
-      </div>
-
-      <ChapterOrnament />
-
-      {/* ── 草稿区：一张待写的稿纸，朱砂「候」印章标记 Planned ── */}
-      <section className="paper-surface relative overflow-hidden rounded-3xl p-6 sm:p-8">
-        {/* 稿纸横线 */}
-        <div aria-hidden className="pointer-events-none absolute inset-x-6 inset-y-5 space-y-[26px] sm:inset-x-8">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="h-px w-full bg-border/50" />
-          ))}
+      {error && (
+        <div
+          role="alert"
+          className="rounded-2xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-600"
+        >
+          {error}
         </div>
-        <div className="relative flex flex-col items-start justify-between gap-5 sm:flex-row sm:items-center">
-          <div>
-            <p className="font-serif text-xl font-semibold">
-              草稿区将在创作管线接入后开放
-            </p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              当前不会展示虚假样例或不可执行的按钮。
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <span
-              aria-hidden
-              className="grid size-11 rotate-3 place-items-center rounded-md border border-[#b03a2e]/50 bg-[#b03a2e]/90 font-serif text-lg font-semibold text-white shadow-sm"
-            >
-              候
-            </span>
-            <span className="rounded-full border border-border bg-secondary px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-              Planned
-            </span>
+      )}
+
+      <section className="rounded-3xl border border-border bg-secondary/40 p-5 sm:p-6">
+        <div className="grid gap-5 lg:grid-cols-[220px_minmax(0,1fr)]">
+          <aside className="space-y-4">
+            <label className="block text-xs font-semibold text-muted-foreground">
+              原作
+              <select
+                className="mt-2 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
+                value={novelId ?? ""}
+                onChange={(event) =>
+                  setNovelId(event.target.value ? Number(event.target.value) : null)
+                }
+              >
+                <option value="">选择原作</option>
+                {novels.map((novel) => (
+                  <option key={novel.id} value={novel.id}>
+                    {novel.title}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <div className="rounded-2xl border border-border/70 p-3">
+              <p className="text-xs font-semibold text-muted-foreground">新建项目</p>
+              <input
+                className="mt-2 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                value={newProjectName}
+                onChange={(event) => setNewProjectName(event.target.value)}
+                aria-label="新项目名称"
+                placeholder="项目名称"
+              />
+              <label className="mt-3 block text-xs font-semibold text-muted-foreground">
+                Canon Fork（显式选择）
+                <select
+                  className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                  value={newProjectForkId}
+                  onChange={(event) =>
+                    setNewProjectForkId(
+                      event.target.value ? Number(event.target.value) : ""
+                    )
+                  }
+                >
+                  <option value="">选择 fork</option>
+                  {forks.map((fork) => (
+                    <option key={fork.id} value={fork.id}>
+                      {fork.fork_key} · v{fork.source_version_key}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                type="button"
+                className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+                onClick={() => void createProject()}
+                disabled={creating || novelId == null}
+              >
+                {creating ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Plus className="size-4" />
+                )}
+                创建项目
+              </button>
+              {forks.length === 0 && (
+                <p className="mt-2 text-[11px] leading-4 text-muted-foreground">
+                  当前原作还没有 Canon Fork；先通过 Fork 合约创建一个再写草稿。
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2" aria-label="项目列表">
+              {projects.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  className={`flex w-full items-start gap-2 rounded-xl border px-3 py-2 text-left text-sm transition-colors ${
+                    project?.id === item.id
+                      ? "border-primary bg-primary/10"
+                      : "border-border hover:bg-secondary/60"
+                  }`}
+                  onClick={() => selectProject(item)}
+                >
+                  <GitBranch className="mt-0.5 size-4 shrink-0 text-primary" />
+                  <span className="min-w-0">
+                    <span className="block truncate font-semibold">{item.name}</span>
+                    <span className="block truncate font-mono text-[11px] text-muted-foreground">
+                      {item.fork_key} · {item.status}
+                    </span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </aside>
+
+          <div className="min-w-0">
+            {project ? (
+              <MarkdownEditor
+                novelId={novelId!}
+                project={project}
+                chapters={chapters}
+                onChaptersChange={handleChaptersChange}
+              />
+            ) : (
+              <div className="rounded-3xl border border-dashed border-border p-10 text-center text-sm text-muted-foreground">
+                <GitBranch className="mx-auto size-8 text-primary/60" />
+                <p className="mt-3">
+                  选择左侧项目，或用显式 Canon Fork 创建一个新的项目开始写作。
+                </p>
+              </div>
+            )}
           </div>
         </div>
+        <p className="mt-5 text-xs text-muted-foreground">{status}</p>
       </section>
+
+      {novelId != null ? (
+        <section className="rounded-3xl border border-border bg-secondary/40 p-5 sm:p-6">
+          <VisualReviewPanel novelId={novelId} />
+        </section>
+      ) : null}
+
+      {novelId != null && project ? (
+        <section className="rounded-3xl border border-border bg-secondary/40 p-5 sm:p-6">
+          <ExportPanel novelId={novelId} projectId={project.id} />
+        </section>
+      ) : null}
     </PageContainer>
   );
 }

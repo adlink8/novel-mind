@@ -1,0 +1,342 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SceneCandidateArtifact",
+  "description": "SceneCandidateArtifact 信封（D-31-01..D-31-05 / Phase 31）。镜像 backend app.schemas.agent_runtime.SceneCandidateArtifact：type / schema_version / owner / novel / branch / producing skill+version / model lineage / source versions / input_hash / evidence_refs / scene_candidate_set（完整 SceneCandidateSetContract）/ tool_runs / status / parent_revision / normalization。scene_candidate_set 是 **candidate-only** 候选集契约：review_state 恒为 candidate，score/diversity/density/spoiler 校验与用户选择（`key_scene:approve`）权威只属于确定性 validators 与 FastAPI（D-31-01/D-31-04）；speaker/dialogue heuristic 信号是诊断元数据（D-31-05），绝不进入 evidence_ranges / citation / Canon。artifact_id / revision_id / skill_run_id 由后端确定性 finalizer 在写入时分配，模型输出不含。",
+  "type": "object",
+  "required": [
+    "type",
+    "schema_version",
+    "owner_id",
+    "novel_id",
+    "producing_skill",
+    "producing_skill_version",
+    "skill_version_id",
+    "model_lineage",
+    "source_versions",
+    "input_hash",
+    "evidence_refs",
+    "scene_candidate_set",
+    "tool_runs",
+    "status",
+    "normalization"
+  ],
+  "properties": {
+    "type": {
+      "const": "scene_candidate"
+    },
+    "schema_version": {
+      "const": "scene-candidate.v1"
+    },
+    "owner_id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "novel_id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "branch": {
+      "type": ["string", "null"],
+      "description": "衍生分支；原始主线为 null"
+    },
+    "producing_skill": {
+      "type": "string",
+      "minLength": 1
+    },
+    "producing_skill_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "skill_version_id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "model_lineage": {
+      "type": "object",
+      "description": "agent runtime + 模型血缘（provider/model/revision）"
+    },
+    "source_versions": {
+      "type": "object",
+      "description": "数据源版本（novel/chapter/source snapshot 血缘）"
+    },
+    "input_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "运行输入规范化 JSON 的 SHA-256（重放追溯）"
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1,
+      "description": "leaf 证据引用，必须 ⊆ 冻结 manifest 白名单（D-31-02）"
+    },
+    "skill_run_id": {
+      "type": ["integer", "null"],
+      "minimum": 1,
+      "description": "SkillRun ID（后端 run 创建时分配；模型输出不含）"
+    },
+    "artifact_id": {
+      "type": ["integer", "null"],
+      "minimum": 1,
+      "description": "Artifact ID（后端确定性 finalizer 写入时分配；模型输出不含）"
+    },
+    "revision_id": {
+      "type": ["integer", "null"],
+      "minimum": 1,
+      "description": "ArtifactRevision ID（后端确定性 finalizer 写入时分配；模型输出不含）"
+    },
+    "scene_candidate_set": {
+      "type": "object",
+      "description": "完整 SceneCandidateSetContract：immutable candidate 信封（ordered candidates / diversity keys / evidence refs / spoiler cutoff / salience reasons / heuristic_signal + 全量 lineage hash）。review_state 恒为 candidate——frozen/approved 是显式、append-only 的服务端状态迁移（D-31-04），绝不由 Agent 声称。",
+      "required": [
+        "schema_version",
+        "artifact_kind",
+        "owner_id",
+        "novel_id",
+        "version_key",
+        "revision_number",
+        "source_snapshot_id",
+        "source_snapshot_hash",
+        "cutoff_chapter",
+        "schema_hash",
+        "policy_hash",
+        "detector_id",
+        "detector_version",
+        "manifest_hash",
+        "candidates",
+        "review_state"
+      ],
+      "properties": {
+        "schema_version": { "const": "key-scene.v1" },
+        "artifact_kind": { "const": "key_scene" },
+        "owner_id": { "type": "integer", "minimum": 1 },
+        "novel_id": { "type": "integer", "minimum": 1 },
+        "version_key": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "revision_number": { "type": "integer", "minimum": 1 },
+        "parent_set_id": { "type": ["integer", "null"], "minimum": 1 },
+        "source_snapshot_id": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "source_snapshot_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "cutoff_chapter": { "type": "integer", "minimum": 1 },
+        "schema_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "policy_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "detector_id": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "detector_version": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "manifest_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "approved_visual_bible_revision_id": { "type": ["integer", "null"], "minimum": 1 },
+        "approved_visual_bible_revision_hash": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" },
+        "candidates": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "items": {
+            "type": "object",
+            "required": [
+              "candidate_key",
+              "candidate_order",
+              "scene_id",
+              "chapter_id",
+              "chapter_number",
+              "source_start",
+              "source_end",
+              "source_hash",
+              "coordinates",
+              "spoiler_cutoff",
+              "salience_reasons",
+              "score_total",
+              "score_breakdown",
+              "diversity_key",
+              "detector_id",
+              "detector_version",
+              "policy_hash",
+              "evidence_ranges",
+              "review_state"
+            ],
+            "properties": {
+              "candidate_key": { "type": "string", "minLength": 1, "maxLength": 180 },
+              "candidate_order": { "type": "integer", "minimum": 0 },
+              "scene_id": { "type": "string", "minLength": 8, "maxLength": 200 },
+              "chapter_id": { "type": "integer", "minimum": 1 },
+              "chapter_number": { "type": "integer", "minimum": 1 },
+              "source_start": { "type": "integer", "minimum": 0 },
+              "source_end": { "type": "integer", "minimum": 1 },
+              "source_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+              "coordinates": {
+                "type": "object",
+                "properties": {
+                  "cast": { "type": "array", "items": { "type": "string" }, "maxItems": 64 },
+                  "place": { "type": ["string", "null"], "maxLength": 200 },
+                  "time": { "type": ["string", "null"], "maxLength": 200 },
+                  "pov": { "type": ["string", "null"], "maxLength": 200 }
+                }
+              },
+              "spoiler_cutoff": { "type": "integer", "minimum": 1 },
+              "salience_reasons": {
+                "type": "array",
+                "maxItems": 16,
+                "items": {
+                  "type": "object",
+                  "required": ["reason_code"],
+                  "properties": {
+                    "reason_code": {
+                      "type": "string",
+                      "enum": [
+                        "plot_turn",
+                        "emotional_peak",
+                        "character_salience",
+                        "visual_expressiveness",
+                        "arc_impact",
+                        "quiet_emotional",
+                        "dialogue_turn",
+                        "repetition_penalty",
+                        "diversity_quota",
+                        "ambiguity_warning",
+                        "detector_fallback",
+                        "evidence_boundary",
+                        "no_scene_boundaries",
+                        "malformed_range",
+                        "beyond_cutoff"
+                      ]
+                    },
+                    "detail": { "type": ["string", "null"], "maxLength": 400 },
+                    "score": { "type": ["number", "null"], "minimum": 0.0, "maximum": 1.0 }
+                  }
+                }
+              },
+              "score_total": { "type": "number", "minimum": 0.0 },
+              "score_breakdown": { "type": "object" },
+              "diversity_key": { "type": "string", "minLength": 1, "maxLength": 200 },
+              "detector_id": { "type": "string", "minLength": 1, "maxLength": 120 },
+              "detector_version": { "type": "string", "minLength": 1, "maxLength": 64 },
+              "policy_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+              "evidence_ranges": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 16,
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "evidence_key",
+                    "source_snapshot_id",
+                    "source_snapshot_hash",
+                    "chapter_id",
+                    "chapter_number",
+                    "source_start",
+                    "source_end",
+                    "content_hash",
+                    "cutoff_chapter"
+                  ],
+                  "properties": {
+                    "evidence_key": { "type": "string", "minLength": 1, "maxLength": 180 },
+                    "source_snapshot_id": { "type": "string", "minLength": 1, "maxLength": 160 },
+                    "source_snapshot_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+                    "chapter_id": { "type": "integer", "minimum": 1 },
+                    "chapter_number": { "type": "integer", "minimum": 1 },
+                    "source_start": { "type": "integer", "minimum": 0 },
+                    "source_end": { "type": "integer", "minimum": 1 },
+                    "content_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+                    "excerpt": { "type": ["string", "null"], "maxLength": 2000 },
+                    "cutoff_chapter": { "type": "integer", "minimum": 1 }
+                  }
+                }
+              },
+              "heuristic_signal": {
+                "type": ["object", "null"],
+                "description": "D-31-05 advisory speaker/dialogue 信号：诊断元数据，绝不进入 evidence_ranges / citation / Canon / 审批原因",
+                "required": ["availability", "detector_id", "detector_version"],
+                "properties": {
+                  "availability": { "enum": ["available", "ambiguous", "unavailable"] },
+                  "speaker_offsets": {
+                    "type": "array",
+                    "maxItems": 64,
+                    "items": {
+                      "type": "object",
+                      "required": ["offset_start", "offset_end"],
+                      "properties": {
+                        "offset_start": { "type": "integer", "minimum": 0 },
+                        "offset_end": { "type": "integer", "minimum": 1 },
+                        "speaker_key": { "type": ["string", "null"], "maxLength": 180 }
+                      }
+                    }
+                  },
+                  "dialogue_offsets": {
+                    "type": "array",
+                    "maxItems": 64,
+                    "items": {
+                      "type": "object",
+                      "required": ["offset_start", "offset_end"],
+                      "properties": {
+                        "offset_start": { "type": "integer", "minimum": 0 },
+                        "offset_end": { "type": "integer", "minimum": 1 }
+                      }
+                    }
+                  },
+                  "confidence": { "type": ["number", "null"], "minimum": 0.0, "maximum": 1.0 },
+                  "warnings": { "type": "array", "maxItems": 16, "items": { "type": "string" } },
+                  "detector_id": { "type": "string", "minLength": 1, "maxLength": 120 },
+                  "detector_version": { "type": "string", "minLength": 1, "maxLength": 64 }
+                }
+              },
+              "review_state": {
+                "const": "candidate",
+                "description": "candidate-only：approval/selection 是显式、append-only 的服务端状态迁移（D-31-04），Agent 声称任何其它 review_state（approval bypass）→ fail closed"
+              }
+            }
+          }
+        },
+        "review_state": {
+          "const": "candidate",
+          "description": "candidate-only：freeze/approval 是显式、append-only 的服务端状态迁移（D-31-04），Agent 声称任何其它 review_state（approval bypass）→ fail closed"
+        }
+      }
+    },
+    "tool_runs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["tool_name", "calls"],
+        "properties": {
+          "tool_name": { "type": "string", "minLength": 1 },
+          "calls": { "type": "integer", "minimum": 0 }
+        }
+      },
+      "description": "ToolRun 血缘：本 run 使用的 allowlist 工具与调用次数"
+    },
+    "status": {
+      "enum": ["candidate", "validated", "approved", "published", "rejected"],
+      "description": "产物状态；finalize 写入时恒为 candidate（无自动 promotion）"
+    },
+    "parent_revision": {
+      "type": ["string", "null"],
+      "description": "父修订引用；首个修订为 null"
+    },
+    "normalization": {
+      "type": "object",
+      "description": "26-06 修复血缘 trail：repaired_hash 是对不含本 trail 的 repaired payload 的 canonical SHA-256；raw_hash 是原始模型输出的 canonical SHA-256；normalization_actions 每项含 path/action/after。",
+      "required": ["raw_hash", "repaired_hash", "normalization_actions", "warnings"],
+      "properties": {
+        "raw_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "repaired_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "normalization_actions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path", "action", "after"],
+            "properties": {
+              "path": { "type": "string", "minLength": 1 },
+              "action": {
+                "type": "string",
+                "enum": ["alias", "alias_dedup", "enum_canonicalize", "container_shape", "lineage_merge"]
+              },
+              "before": {},
+              "after": {},
+              "reason": { "type": "string" }
+            }
+          }
+        },
+        "warnings": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  },
+  "additionalProperties": false
+}

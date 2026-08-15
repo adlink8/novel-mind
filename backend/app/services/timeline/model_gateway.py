@@ -290,7 +290,7 @@ class PostgresCallRepository:
                 actual_input = int(usage.get("input_tokens", 0))
                 actual_output = int(usage.get("output_tokens", 0))
                 actual_cost = Decimal(cost_usd or 0)
-                # Soft overage: Vertex 实际 token 常超 worst-case 预估。
+                # Soft overage: provider token usage may exceed the reservation estimate.
                 # 仅当累计 settled 将突破 ledger 全书策略上限时才 paused_budget；
                 # 不再因「单次预留低估」整书暂停（否则 2/515 章就会挂）。
                 over_reserve = (
@@ -482,7 +482,7 @@ def _response_content(response: Any) -> str:
 
 
 def _coerce_timeline_json_blob(content: str) -> str:
-    """Vertex 输出常在 story_time/evidence 上略松；校验前做最小安全修正。"""
+    """模型输出可能在 story_time/evidence 上略松；校验前做最小安全修正。"""
     text = (content or "").strip()
     if text.startswith("```"):
         text = text.removeprefix("```json").removeprefix("```JSON").removeprefix("```")
@@ -656,7 +656,7 @@ class TimelineModelGateway:
                         latency_ms=latency_ms,
                     )
                 )
-                # 保留根因片段，方便前端/运维区分：无 Key、Vertex 4xx、超时等
+                # 保留根因片段，方便前端/运维区分：无 Key、上游 4xx、超时等
                 detail = f"{type(exc).__name__}: {str(exc)[:180]}".replace("\n", " ")
                 raise ModelCallFailed(
                     f"provider call outcome is unknown ({detail})",
@@ -670,7 +670,7 @@ class TimelineModelGateway:
             ) / Decimal(1_000_000)
             try:
                 content = _response_content(response)
-                # TimelineExtraction 对 Vertex 做轻度 coerce；其它 schema 原样严格校验
+                # TimelineExtraction 做轻度 coerce；其它 schema 原样严格校验
                 if schema.__name__ == "TimelineExtraction":
                     content = _coerce_timeline_json_blob(content)
                     output = schema.model_validate_json(content, strict=False)
@@ -718,7 +718,7 @@ class TimelineModelGateway:
                         f"structured output failed local validation ({detail})",
                         attempts,
                     ) from exc
-                # 把校验错误摘要塞回 repair 提示，提高 Vertex 纠错成功率
+                # 把校验错误摘要塞回 repair 提示，提高模型纠错成功率
                 err_hint = str(exc)[:500].replace("\n", " ")
                 current_messages = current_messages + [
                     {

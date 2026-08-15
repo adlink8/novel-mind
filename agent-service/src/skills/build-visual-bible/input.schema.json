@@ -1,0 +1,60 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "BuildVisualBibleInput",
+  "description": "build-visual-bible Phase 30 运行输入：novel_id（必填）；branch、cutoff、source_snapshot（D-30 冻结快照血缘）与 reference_assets（read-only 参考资产元数据）可选。锚定字段仅声明意图范围，最终 scope/cutoff/evidence 由服务端强制（D-30-01/D-30-02，fail closed）。",
+  "type": "object",
+  "required": ["novel_id"],
+  "properties": {
+    "novel_id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "目标小说 ID（必须与运行路径中的 novel_id 一致）"
+    },
+    "branch": {
+      "type": ["string", "null"],
+      "maxLength": 80,
+      "description": "衍生分支；原始主线为 null（owner/novel/branch 血缘绑定）"
+    },
+    "cutoff": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "截止章节（D-30 声明意图）；超过服务端截止点将被拒绝（beyond_cutoff）"
+    },
+    "source_snapshot": {
+      "type": "object",
+      "description": "D-30 冻结 source snapshot 血缘（可选；缺失时以 run 的 source_versions / frozen manifest 为准）",
+      "required": ["snapshot_hash"],
+      "properties": {
+        "snapshot_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "dataset_lineage": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      }
+    },
+    "reference_assets": {
+      "type": "array",
+      "description": "read-only 参考资产元数据（D-30-04 rights/provenance 由服务端裁决；Agent 绝不通过 filesystem 工具读取）",
+      "items": {
+        "type": "object",
+        "required": ["asset_key", "asset_id", "mime_type", "bytes_hash"],
+        "properties": {
+          "asset_key": { "type": "string", "minLength": 1, "maxLength": 180 },
+          "asset_id": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "mime_type": { "type": "string", "minLength": 1, "maxLength": 100 },
+          "bytes_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "rights_status": {
+            "type": "string",
+            "enum": ["unreviewed", "cleared", "pending", "denied"]
+          },
+          "provenance": { "type": "object" }
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

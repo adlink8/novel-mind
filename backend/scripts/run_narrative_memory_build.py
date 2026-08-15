@@ -4,7 +4,7 @@
 Commands: create-version | start | status | cancel | resume
 No promote / rollback / current / default / all-books options.
 
-Default transport: Vertex Gemini (same binding pattern as timeline.worker).
+Default transport: the configured LiteLLM provider/model.
 Use --noop for tests / dry wiring checks without provider calls.
 """
 
@@ -105,64 +105,29 @@ class _NoopTransport:
     async def complete(self, **kwargs: Any) -> Any:
         raise RuntimeError(
             "noop transport: refuse provider call "
-            f"(stage_key={kwargs.get('stage_key')!r}); pass without --noop for Vertex"
+            f"(stage_key={kwargs.get('stage_key')!r}); pass without --noop for a live provider"
         )
 
 
 class _LiteLLMNmTransport:
-    """OpenAI-compatible path when chat_provider is openai."""
-
-    def __init__(self, *, model: str) -> None:
-        self._model = model
-
-    async def complete(self, **kwargs: Any) -> dict[str, Any]:
-        import litellm
-
-        stage_key = str(kwargs.get("stage_key") or "")
-        payload = kwargs.get("payload") or {}
-        deployment = kwargs.get("deployment") or {}
-        model = str(deployment.get("model") or self._model)
-        messages = _build_messages(stage_key=stage_key, payload=payload, repair=bool(kwargs.get("repair")))
-        response = await litellm.acompletion(
-            model=model,
-            messages=messages,
-            temperature=0.0,
-            max_tokens=4096,
-            response_format={"type": "json_object"},
-            timeout=180,
-        )
-        usage = getattr(response, "usage", {}) or {}
-        if hasattr(usage, "model_dump"):
-            usage = usage.model_dump()
-        content = response.choices[0].message.content or "{}"
-        parsed = _parse_json_content(content)
-        parsed["usage"] = {
-            "input_tokens": int(usage.get("prompt_tokens") or usage.get("input_tokens") or 0),
-            "output_tokens": int(
-                usage.get("completion_tokens") or usage.get("output_tokens") or 0
-            ),
-        }
-        return _normalize_model_output(parsed, payload=payload, stage_key=stage_key)
-
-
-class _VertexNmTransport:
-    """Google Cloud Vertex structured calls (aligned with timeline.worker._VertexTransport).
-
-    NM gateway calls complete(stage_key=, payload=, deployment=, repair=) — not
-    litellm-style kwargs — so this adapter builds messages + schema here.
-    """
+    """Generic structured transport with narrative-memory payload enrichment."""
 
     def __init__(self, sessions, *, model: str) -> None:
         self._sessions = sessions
         self._model = model
 
     async def complete(self, **kwargs: Any) -> dict[str, Any]:
-        from app.services.vertex_gemini import acomplete
+        import litellm
+
+        from app.services.ai_service import AIService
 
         stage_key = str(kwargs.get("stage_key") or "")
         payload = kwargs.get("payload") or {}
         deployment = kwargs.get("deployment") or {}
-        model = str(deployment.get("model") or self._model)
+        provider = str(deployment.get("provider") or "openai")
+        model = AIService.litellm_model_name(
+            provider, str(deployment.get("model") or self._model)
+        )
         repair = bool(kwargs.get("repair"))
 
         # Enrich chapter stages with evidence text from frozen hierarchy.
@@ -170,21 +135,20 @@ class _VertexNmTransport:
             payload = await self._enrich_chapter_payload(payload)
 
         messages = _build_messages(stage_key=stage_key, payload=payload, repair=repair)
-        schema = _response_schema_for_stage(stage_key)
-        response = await acomplete(
-            messages,
-            model=str(model),
+        response = await litellm.acompletion(
+            model=model,
+            messages=messages,
             temperature=0.0,
             max_tokens=8192,
-            timeout=180.0,
-            response_json_schema=schema,
+            timeout=180,
+            response_format={"type": "json_object"},
         )
-        usage_obj = getattr(response, "usage", None)
+        usage_obj = getattr(response, "usage", {}) or {}
+        if hasattr(usage_obj, "model_dump"):
+            usage_obj = usage_obj.model_dump()
         usage = {
-            "input_tokens": int(getattr(usage_obj, "prompt_tokens", 0) or 0),
-            "output_tokens": int(getattr(usage_obj, "completion_tokens", 0) or 0),
-            "prompt_tokens": int(getattr(usage_obj, "prompt_tokens", 0) or 0),
-            "completion_tokens": int(getattr(usage_obj, "completion_tokens", 0) or 0),
+            "input_tokens": int(usage_obj.get("prompt_tokens") or usage_obj.get("input_tokens") or 0),
+            "output_tokens": int(usage_obj.get("completion_tokens") or usage_obj.get("output_tokens") or 0),
         }
         content = response.choices[0].message.content or "{}"
         try:
@@ -283,7 +247,7 @@ def _parse_json_content(content: str) -> dict[str, Any]:
 
 
 def _response_schema_for_stage(stage_key: str) -> dict[str, Any]:
-    # Vertex-friendly subset (no complex anyOf unions).
+    # Portable structured-output subset (no complex anyOf unions).
     if stage_key.startswith("chapter_state:"):
         return {
             "type": "object",
@@ -468,10 +432,50 @@ def _build_messages(
     ]
 
 
+# Closed TypedValue value_kinds from the chapter-state contract. Gemini
+# occasionally emits out-of-contract values (entity_kind="person",
+# change="shift", value_kind="string"); downstream strict MemoryClaim
+# validation rejects those, so _normalize_model_output clamps them back into
+# the closed sets instead of failing schema/business-invalid after repairs.
+_VALUE_KINDS = frozenset({"text", "number", "boolean", "reference", "unknown"})
+
+
+def _clamp_enum(value: Any, enum_cls: type, default: str) -> str:
+    """Return ``value`` when it names a member of ``enum_cls``, else ``default``."""
+    text = str(value).strip() if value is not None else ""
+    return text if text in {member.value for member in enum_cls} else default
+
+
+def _clamp_typed_value(value: dict[str, Any]) -> dict[str, Any]:
+    """Clamp a raw TypedValue dict into a strict-valid TypedValue dict.
+
+    Out-of-contract value_kinds (e.g. ``"string"``) fall back to ``text``;
+    ``number``/``boolean`` are stringified by this CLI for durability, which
+    strict Number/Boolean validation rejects, so they clamp to ``text`` too.
+    """
+    vk = str(value.get("value_kind") or "text").strip().lower()
+    raw = value.get("value")
+    if raw is None or str(raw).strip() == "":
+        return {"value_kind": "unknown"}
+    if vk not in _VALUE_KINDS or vk in {"number", "boolean"}:
+        vk = "text"
+    if vk == "unknown":
+        return {"value_kind": "unknown"}
+    max_len = 180 if vk == "reference" else 500
+    return {"value_kind": vk, "value": str(raw)[:max_len]}
+
+
 def _normalize_model_output(
     parsed: dict[str, Any], *, payload: dict[str, Any], stage_key: str
 ) -> dict[str, Any]:
     """Ensure min-viable fields so rebind/validate can succeed or repair once."""
+    from app.services.narrative_memory.contracts import (
+        EntityKind,
+        EntityStateDimension,
+        EventKind,
+        StateChange,
+    )
+
     usage = parsed.get("usage") if isinstance(parsed.get("usage"), dict) else {}
     if stage_key.startswith("chapter_state:"):
         ch_num = int(payload.get("chapter_number") or 1)
@@ -500,7 +504,7 @@ def _normalize_model_output(
                     "visible_from_chapter": ch_num,
                 }
             ]
-        # Coerce confidence to float (Vertex sometimes emits ints / omits fields).
+        # Coerce confidence to float when providers emit ints or omit fields.
         repaired_claims: list[dict[str, Any]] = []
         for idx, claim in enumerate(claims, start=1):
             if not isinstance(claim, dict):
@@ -542,10 +546,7 @@ def _normalize_model_output(
                 elif prior.get("value_kind") == "text" and not prior.get("value"):
                     prior = {"value_kind": "unknown"}
                 else:
-                    prior = {
-                        "value_kind": str(prior.get("value_kind") or "text"),
-                        "value": str(prior.get("value") or "未知")[:500],
-                    }
+                    prior = _clamp_typed_value(prior)
                 current = payload_obj.get("current")
                 if not isinstance(current, dict) or not current.get("value"):
                     current = {
@@ -553,20 +554,26 @@ def _normalize_model_output(
                         "value": str(parsed.get("display_label") or f"状态{idx}")[:500],
                     }
                 else:
-                    current = {
-                        "value_kind": str(current.get("value_kind") or "text"),
-                        "value": str(current.get("value"))[:500],
-                    }
+                    current = _clamp_typed_value(current)
                 ek = str(payload_obj.get("entity_key") or "").strip() or f"character:entity-{idx}"
-                # Rebuild closed set only — drop model extras (prior on event etc.).
+                # Rebuild closed set only — drop model extras (prior on event etc.),
+                # and clamp enums so strict MemoryClaim validation can succeed.
                 payload_obj = {
                     "claim_kind": "entity_state",
-                    "entity_kind": str(payload_obj.get("entity_kind") or "character"),
+                    "entity_kind": _clamp_enum(
+                        payload_obj.get("entity_kind"), EntityKind, "character"
+                    ),
                     "entity_key": ek[:180],
-                    "dimension": str(payload_obj.get("dimension") or "condition"),
+                    "dimension": _clamp_enum(
+                        payload_obj.get("dimension"),
+                        EntityStateDimension,
+                        "condition",
+                    ),
                     "prior": prior,
                     "current": current,
-                    "change": str(payload_obj.get("change") or "establish"),
+                    "change": _clamp_enum(
+                        payload_obj.get("change"), StateChange, "establish"
+                    ),
                 }
             elif kind == "event_fact":
                 actors = payload_obj.get("actor_keys")
@@ -579,13 +586,12 @@ def _normalize_model_output(
                         "value": str(parsed.get("display_label") or f"事件{idx}")[:500],
                     }
                 else:
-                    outcome = {
-                        "value_kind": str(outcome.get("value_kind") or "text"),
-                        "value": str(outcome.get("value"))[:500],
-                    }
+                    outcome = _clamp_typed_value(outcome)
                 payload_obj = {
                     "claim_kind": "event_fact",
-                    "event_kind": str(payload_obj.get("event_kind") or "action"),
+                    "event_kind": _clamp_enum(
+                        payload_obj.get("event_kind"), EventKind, "action"
+                    ),
                     "actor_keys": [str(a)[:180] for a in actors if a][:20],
                     "object_keys": [
                         str(a)[:180]
@@ -700,32 +706,15 @@ def _production_transport_and_deployment(sessions, *, noop: bool):
         )
         return _NoopTransport(), deployment
 
-    provider = (settings.chat_provider or "vertex_google").strip().lower()
-    use_vertex = provider in (
-        "vertex_google",
-        "vertex",
-        "vertex_ai",
-        "gcp",
-        "google_cloud",
-    ) or not (settings.openai_api_key or "").strip()
-
-    if use_vertex:
-        model_id = (settings.vertex_model or "gemini-3.5-flash-lite").strip()
-        deployment = ModelDeploymentSnapshot(
-            provider="vertex_google",
-            model=model_id,
-            deployment=model_id,
-            revision="1",
-            supports_structured_output=True,
-            # Flash placeholder prices for budget ledger only
-            input_price_per_million="0.10",
-            output_price_per_million="0.40",
-        )
-        return _VertexNmTransport(sessions, model=model_id), deployment
-
-    model_id = "gpt-4o-mini-2024-07-18"
+    provider = (settings.chat_provider or "openai").strip().lower()
+    if provider not in {"openai", "anthropic", "gemini", "ollama", "custom"}:
+        raise ValueError(f"unsupported model provider: {provider}")
+    model_id = (settings.default_chat_model or "gpt-4o-mini").strip()
+    prefix = f"{provider}/"
+    if model_id.lower().startswith(prefix):
+        model_id = model_id[len(prefix) :]
     deployment = ModelDeploymentSnapshot(
-        provider="openai",
+        provider=provider,
         model=model_id,
         deployment=model_id,
         revision="1",
@@ -733,7 +722,7 @@ def _production_transport_and_deployment(sessions, *, noop: bool):
         input_price_per_million="0.15",
         output_price_per_million="0.60",
     )
-    return _LiteLLMNmTransport(model=model_id), deployment
+    return _LiteLLMNmTransport(sessions, model=model_id), deployment
 
 
 def _run_policy(deployment_lineage):

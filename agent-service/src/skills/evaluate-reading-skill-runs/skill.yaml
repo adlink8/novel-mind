@@ -1,0 +1,58 @@
+# evaluate-reading-skill-runs skill 契约（REQ-QA-01..03 / REQ-AGENT-03 / Phase 29）
+# 字段镜像 backend 注册入口（app.schemas.agent_runtime.SkillVersionRegister）。
+#
+# Phase 29 版本化阅读 QA 评估技能：
+#   - 本技能是 Phase 29 确定性评估能力的 Agent 消费边界（D-05：verdict 只允许
+#     qualified_candidate / blocked）；允许的工具 allowlist 只含 4 个只读域工具，
+#     全部用于读取冻结的数据集/证据记录（get_novel / get_evidence_span /
+#     get_narrative_memory / search_novel_text），编排绝不越出该 allowlist
+#     （未知工具/白名单外调用 → fail closed）。
+#   - 被评估的冻结 SkillRun / ToolRun / Artifact / FrozenManifest 记录经运行输入
+#     的引用（run_id / artifact_id / revision_id / content_hash + 各 lineage hash）
+#     绑定，绝不重跑可变 Agent 会话状态；确定性评估由后端
+#     qualification.runner.run_qualification 承担（不可变 runner，一次冻结）。
+#   - write_permissions 恒为空：Agent 不直接写任何域状态。唯一输出通道是后端
+#     确定性 finalizer 持久化的 SkillEvaluationArtifact（候选产物，无 promotion）。
+#   - approval_required_for 恒为空：本技能**无 ApprovalRequest、无 Publisher**，
+#     Agent/UI 无法审批、覆盖或变更裁决；verdict 权威只属于确定性评估 runner。
+#   - 版本由 `version` 钉住（当前 1.0.0）；每次 run 经 skill_version_id 绑定
+#     SkillVersion 血缘（run 绑定 owner/novel/branch、SkillRun、ToolRuns、
+#     input hash、source snapshot、model/runtime lineage、output Artifact
+#     revision）。
+#   - 模型结构化输出走共享 26-06 normalizer + 严格 post-repair validator；
+#     normalization_actions / raw_hash / repaired_hash / warnings 保留在官方
+#     SkillEvaluationArtifact 上。
+name: evaluate-reading-skill-runs
+version: 1.0.0
+description: >-
+  Phase 29 版本化阅读 QA 评估技能：给定 owner/novel/branch 范围内的冻结
+  SkillRun / ToolRun / Artifact / FrozenManifest 与 dataset 血缘引用
+  （dataset_version + source_snapshot_hash + content/input hashes），通过 4 个
+  只读域工具（get_novel / get_evidence_span / get_narrative_memory /
+  search_novel_text）读取冻结的数据集/证据记录，产出血缘绑定的
+  SkillEvaluationArtifact（verdict 只允许 qualified_candidate 或 blocked；
+  D-05 无 promotion）。评估冻结 Skill/model/source/Artifact/dataset 版本，绝不
+  重跑可变 Agent 状态；无审批、无发布、无域写入；未知工具/权限/血缘/schema
+  drift/错误 owner/approval bypass 一律 fail closed，无官方 Artifact 或域写入。
+allowed_tools:
+  - get_novel
+  - get_evidence_span
+  - get_narrative_memory
+  - search_novel_text
+read_permissions:
+  - canon
+  - narrative_memory
+  - qualification
+write_permissions: []
+forbidden_spaces:
+  - canon:original
+  - qualification:write
+  - derivative:write
+budget:
+  max_calls: 80
+  max_input_tokens: 60000
+  max_output_tokens: 12000
+  max_cost_usd: "5.00"
+approval_required_for: []
+input_schema: ./input.schema.json
+output_schema: ./output.schema.json

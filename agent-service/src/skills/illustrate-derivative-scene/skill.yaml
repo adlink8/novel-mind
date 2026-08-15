@@ -1,0 +1,87 @@
+# illustrate-derivative-scene skill 契约（REQ-FORK-04 / REQ-AGENT-02/03/04/07 / Phase 38）
+# 字段镜像 backend 注册入口（app.schemas.agent_runtime.SkillVersionRegister）。
+#
+# Phase 38 版本化 branch-aware derivative visual skill：
+#   - 本技能是 Phase 38 确定性 derivative visual 域能力（38-01 fork Visual
+#     Bible → 38-02 canonical derivative Scene Spec compiler → 38-03 candidate
+#     asset storage + cross-chapter consistency → 38-04 review seam +
+#     PublishedDerivativeVisualAsset）的 Agent 消费边界；允许的工具 allowlist
+#     含 7 个只读域工具 + 1 个 action 工具（publish_derivative_visual），编排
+#     绝不越出该 allowlist（未知工具/白名单外调用 → fail closed）。
+#   - 本技能消费只读 branch 上下文（owner/novel/branch/fork 血缘绑定）+ 已批准
+#     derivative Visual Bible fork version + frozen canonical Scene Spec + 已
+#     存储的 candidate asset 血缘，产出**候选-only** BranchVisualBibleArtifact
+#     （携带 BranchIllustrationRevision：完整 branch-aware 血缘，review_state
+#     恒为 candidate）。Agent 输出恒为候选——绝不发布。
+#   - **确定性发布属于后端**：action 工具 publish_derivative_visual 只为
+#     同一 candidate 创建 pending Web ApprovalRequest（action=
+#     publish_derivative_visual，payload_hash 绑定 candidate 冻结血缘：
+#     asset_id/content_hash/scene_spec_hash/divergence_manifest_hash/
+#     consistency_verdict/source_snapshot_hash/fork_id）。只有确定性 review
+#     seam（app.services.derivative_visual.review.review_candidate_asset →
+#     apply_derivative_asset_review）在独立 approval 被用户批准后原子校验
+#     approval action + 相同 hash 绑定 + fork scope + 合法 review 转移
+#     （blocked 候选转移集为空 → 绝不可能被批准）才把 candidate 物化为
+#     approved published asset。Agent/浏览器绝不发布。
+#   - **Original 视觉 authority 不可变**：无任何 Original 写路径；no Original
+#     Visual Bible 行可被 derivative 资产覆盖（REQ-FORK-04，D-38-02）。
+#   - write_permissions 恒为空：Agent 不直接写任何域状态（不写 Original Canon、
+#     不写 Visual Bible/Scene Spec/candidate/domain 表、不写 ApprovalRequest
+#     决策、不写 published 状态）。action 工具只创建 candidate + pending
+#     ApprovalRequest。
+#   - 版本由 `version` 钉住（当前 1.0.0）；每次 run 经 skill_version_id 绑定
+#     SkillVersion 血缘（run 绑定 owner/novel/branch/fork、SkillRun、ToolRuns、
+#     source/input hashes、model/runtime/generator lineage、Artifact revision）。
+#   - 模型结构化输出走共享 26-06 normalizer + 严格 post-repair validator；
+#     normalization_actions / raw_hash / repaired_hash / warnings 保留在官方
+#     BranchVisualBibleArtifact 上。Agent 只产出候选——绝不发布（D-38-03）。
+name: illustrate-derivative-scene
+version: 1.0.0
+description: >-
+  Phase 38 版本化 branch-aware derivative visual skill（REQ-FORK-04 /
+  REQ-AGENT-02/03/04/07）：给定 owner/novel/branch（+ fork，derivative mode）+
+  已批准 derivative Visual Bible fork version + frozen canonical derivative
+  Scene Spec + 已存储 candidate asset 血缘，通过 7 个只读域工具 +
+  `publish_derivative_visual` action 工具消费 Phase 38 确定性 derivative visual
+  域能力，产出候选 BranchVisualBibleArtifact（携带 BranchIllustrationRevision，
+  review_state 恒为 candidate，candidate-only）。Action 工具只创建 pending Web
+  ApprovalRequest（approval 权威在 FastAPI，D-11）；只有确定性 review seam
+  （app.services.derivative_visual.review.review_candidate_asset）在独立 approval
+  被用户批准后原子校验 approval action + 相同 hash 绑定 + fork scope + 合法
+  review 转移，才把 candidate 物化为 approved published asset（D-38-03/
+  D-38-04）。Agent/浏览器绝不发布；Original Visual Bible 不可变、绝不覆盖。
+  未知工具/权限/血缘/schema drift/错误 owner/branch/fork/approval bypass/
+  stale revision/取消 → 一律 fail closed，无官方 Artifact 或域写入。
+allowed_tools:
+  - get_novel
+  - get_chapter
+  - search_novel_text
+  - get_timeline
+  - get_relationships
+  - get_clues
+  - get_narrative_memory
+  - publish_derivative_visual
+read_permissions:
+  - canon
+  - fanfiction_canon
+  - visual_bible
+  - scene_spec
+write_permissions: []
+forbidden_spaces:
+  - canon:original
+  - user_interpretation
+  - derivative:autosave
+  - derivative:direct_write
+  - derivative_visual:write
+  - approval_request
+  - review_service
+  - published_assets
+budget:
+  max_calls: 40
+  max_input_tokens: 40000
+  max_output_tokens: 12000
+  max_cost_usd: "4.00"
+approval_required_for:
+  - publish_derivative_visual
+input_schema: ./input.schema.json
+output_schema: ./output.schema.json

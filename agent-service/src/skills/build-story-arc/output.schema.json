@@ -1,0 +1,404 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "StoryArcArtifact",
+  "description": "StoryArcArtifact 信封（D-05/D-07/D-09 / Phase 28）。镜像 backend app.schemas.agent_runtime.StoryArcArtifact：type / schema_version / owner / novel / branch / producing skill+version / model lineage / source versions / input_hash / evidence_refs / outline_candidate / mainline_candidate / tool_runs / status / parent_revision / normalization。outline_candidate（OutlineCandidateArtifact）与 mainline_candidate（MainlineCandidateArtifact）是**candidate-only**：保留 source snapshot/range、input hashes、不确定性、gaps/overlaps 与 candidate status，绝不进入 Canon（D-09）。artifact_id / revision_id 由后端确定性 finalizer 在写入时分配，不在本信封内。",
+  "type": "object",
+  "required": [
+    "type",
+    "schema_version",
+    "owner_id",
+    "novel_id",
+    "producing_skill",
+    "producing_skill_version",
+    "skill_version_id",
+    "model_lineage",
+    "source_versions",
+    "input_hash",
+    "evidence_refs",
+    "outline_candidate",
+    "mainline_candidate",
+    "tool_runs",
+    "status"
+  ],
+  "properties": {
+    "type": {
+      "const": "story_arc"
+    },
+    "schema_version": {
+      "const": "story-arc.v1"
+    },
+    "owner_id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "novel_id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "branch": {
+      "type": ["string", "null"],
+      "description": "衍生分支；原始主线为 null"
+    },
+    "producing_skill": {
+      "type": "string",
+      "minLength": 1
+    },
+    "producing_skill_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "skill_version_id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "model_lineage": {
+      "type": "object",
+      "description": "agent runtime + 模型血缘（provider/model/revision）"
+    },
+    "source_versions": {
+      "type": "object",
+      "description": "数据源版本（novel/chapter/叙事记忆等；source snapshot 血缘）"
+    },
+    "input_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "运行输入规范化 JSON 的 SHA-256（重放追溯）"
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1,
+      "description": "leaf 证据引用，必须 ⊆ 冻结 manifest 白名单（D-07/D-08）"
+    },
+    "outline_candidate": {
+      "type": "object",
+      "description": "OutlineCandidateArtifact：连续弧线候选 + 边界不确定性 + gaps/overlaps + 完整 lineage + candidate status（D-05/D-09，candidate-only，绝不进入 Canon）。",
+      "required": [
+        "schema_version",
+        "policy_version",
+        "owner_id",
+        "novel_id",
+        "version_id",
+        "source_snapshot_hash",
+        "hierarchy_build_id",
+        "hierarchy_checksum",
+        "input_hash",
+        "chapter_min",
+        "chapter_max",
+        "arcs",
+        "covered_ranges",
+        "candidate_status",
+        "lineage",
+        "checksum"
+      ],
+      "properties": {
+        "schema_version": { "const": "outline-candidate-artifact.v1" },
+        "policy_version": { "type": "string", "minLength": 1 },
+        "owner_id": { "type": "integer", "minimum": 1 },
+        "novel_id": { "type": "integer", "minimum": 1 },
+        "version_id": { "type": "integer", "minimum": 1 },
+        "source_snapshot_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "hierarchy_build_id": { "type": "string", "minLength": 1 },
+        "hierarchy_checksum": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "input_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "chapter_min": { "type": "integer", "minimum": 1 },
+        "chapter_max": { "type": "integer", "minimum": 1 },
+        "arcs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "stage_key",
+              "node_kind",
+              "chapter_start",
+              "chapter_end",
+              "chapter_numbers",
+              "coverage",
+              "uncertainty",
+              "confidence",
+              "input_hash"
+            ],
+            "properties": {
+              "stage_key": { "type": "string", "minLength": 1 },
+              "node_kind": { "const": "story_arc" },
+              "chapter_start": { "type": "integer", "minimum": 1 },
+              "chapter_end": { "type": "integer", "minimum": 1 },
+              "chapter_numbers": {
+                "type": "array",
+                "items": { "type": "integer", "minimum": 1 }
+              },
+              "coverage": { "enum": ["complete", "partial", "empty"] },
+              "uncertainty": { "enum": ["certain", "likely", "uncertain", "unknown"] },
+              "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+              "boundary_uncertainties": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["side", "chapter_number", "reason"],
+                  "properties": {
+                    "side": { "enum": ["start", "end"] },
+                    "chapter_number": { "type": "integer", "minimum": 1 },
+                    "reason": { "type": "string", "minLength": 1 },
+                    "detail": { "type": ["string", "null"], "maxLength": 300 }
+                  }
+                }
+              },
+              "evidence_lineage": { "type": "object" },
+              "input_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+            }
+          }
+        },
+        "covered_ranges": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": { "type": "integer", "minimum": 1 },
+            "minItems": 2,
+            "maxItems": 2
+          }
+        },
+        "gaps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["chapter_start", "chapter_end"],
+            "properties": {
+              "chapter_start": { "type": "integer", "minimum": 1 },
+              "chapter_end": { "type": "integer", "minimum": 1 },
+              "reason_codes": { "type": "array", "items": { "type": "string" } },
+              "terminal_states": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        },
+        "overlaps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["chapter_start", "chapter_end"],
+            "properties": {
+              "chapter_start": { "type": "integer", "minimum": 1 },
+              "chapter_end": { "type": "integer", "minimum": 1 }
+            }
+          }
+        },
+        "candidate_status": {
+          "const": "candidate",
+          "description": "candidate-only：生成绝不写入或提升到 Canon（D-09）"
+        },
+        "lineage": { "type": "object" },
+        "checksum": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "mainline_candidate": {
+      "type": "object",
+      "description": "MainlineCandidateArtifact：Volume/Global 候选投影 + 边界不确定性 + gaps/overlaps + 完整 lineage + candidate status（D-07/D-09，candidate-only，绝不进入 Canon）。",
+      "required": [
+        "schema_version",
+        "policy_version",
+        "owner_id",
+        "novel_id",
+        "version_id",
+        "source_snapshot_hash",
+        "hierarchy_build_id",
+        "hierarchy_checksum",
+        "input_hash",
+        "chapter_min",
+        "chapter_max",
+        "volumes",
+        "global_projection",
+        "covered_ranges",
+        "candidate_status",
+        "lineage",
+        "checksum"
+      ],
+      "properties": {
+        "schema_version": { "const": "mainline-candidate-artifact.v1" },
+        "policy_version": { "type": "string", "minLength": 1 },
+        "owner_id": { "type": "integer", "minimum": 1 },
+        "novel_id": { "type": "integer", "minimum": 1 },
+        "version_id": { "type": "integer", "minimum": 1 },
+        "source_snapshot_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "hierarchy_build_id": { "type": "string", "minLength": 1 },
+        "hierarchy_checksum": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "input_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "chapter_min": { "type": "integer", "minimum": 1 },
+        "chapter_max": { "type": "integer", "minimum": 1 },
+        "volumes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "stage_key",
+              "node_kind",
+              "chapter_start",
+              "chapter_end",
+              "arc_stage_keys",
+              "coverage",
+              "uncertainty",
+              "confidence",
+              "input_hash"
+            ],
+            "properties": {
+              "stage_key": { "type": "string", "minLength": 1 },
+              "node_kind": { "const": "volume" },
+              "chapter_start": { "type": "integer", "minimum": 1 },
+              "chapter_end": { "type": "integer", "minimum": 1 },
+              "arc_stage_keys": { "type": "array", "items": { "type": "string" } },
+              "coverage": { "enum": ["complete", "partial", "empty"] },
+              "uncertainty": { "enum": ["certain", "likely", "uncertain", "unknown"] },
+              "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+              "boundary_uncertainties": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["side", "chapter_number", "reason"],
+                  "properties": {
+                    "side": { "enum": ["start", "end"] },
+                    "chapter_number": { "type": "integer", "minimum": 1 },
+                    "reason": { "type": "string", "minLength": 1 },
+                    "detail": { "type": ["string", "null"], "maxLength": 300 }
+                  }
+                }
+              },
+              "input_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+            }
+          }
+        },
+        "global_projection": {
+          "type": "object",
+          "required": [
+            "stage_key",
+            "node_kind",
+            "chapter_start",
+            "chapter_end",
+            "child_stage_keys",
+            "coverage",
+            "uncertainty",
+            "confidence",
+            "input_hash"
+          ],
+          "properties": {
+            "stage_key": { "const": "global_story:book" },
+            "node_kind": { "const": "global_story" },
+            "chapter_start": { "type": "integer", "minimum": 1 },
+            "chapter_end": { "type": "integer", "minimum": 1 },
+            "child_stage_keys": { "type": "array", "items": { "type": "string" } },
+            "coverage": { "enum": ["complete", "partial", "empty"] },
+            "uncertainty": { "enum": ["certain", "likely", "uncertain", "unknown"] },
+            "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+            "boundary_uncertainties": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["side", "chapter_number", "reason"],
+                "properties": {
+                  "side": { "enum": ["start", "end"] },
+                  "chapter_number": { "type": "integer", "minimum": 1 },
+                  "reason": { "type": "string", "minLength": 1 },
+                  "detail": { "type": ["string", "null"], "maxLength": 300 }
+                }
+              }
+            },
+            "input_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+          }
+        },
+        "covered_ranges": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": { "type": "integer", "minimum": 1 },
+            "minItems": 2,
+            "maxItems": 2
+          }
+        },
+        "gaps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["chapter_start", "chapter_end"],
+            "properties": {
+              "chapter_start": { "type": "integer", "minimum": 1 },
+              "chapter_end": { "type": "integer", "minimum": 1 },
+              "reason_codes": { "type": "array", "items": { "type": "string" } },
+              "terminal_states": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        },
+        "overlaps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["chapter_start", "chapter_end"],
+            "properties": {
+              "chapter_start": { "type": "integer", "minimum": 1 },
+              "chapter_end": { "type": "integer", "minimum": 1 }
+            }
+          }
+        },
+        "candidate_status": {
+          "const": "candidate",
+          "description": "candidate-only：生成绝不写入或提升到 Canon（D-09）"
+        },
+        "lineage": { "type": "object" },
+        "checksum": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "tool_runs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["tool_name", "calls"],
+        "properties": {
+          "tool_name": { "type": "string", "minLength": 1 },
+          "calls": { "type": "integer", "minimum": 0 }
+        }
+      },
+      "description": "ToolRun 血缘：本 run 使用的 allowlist 工具与调用次数"
+    },
+    "status": {
+      "enum": ["candidate", "validated", "approved", "published", "rejected"],
+      "description": "产物状态；finalize 写入时恒为 candidate（无自动 promotion）"
+    },
+    "parent_revision": {
+      "type": ["string", "null"],
+      "description": "父修订引用；首个修订为 null"
+    },
+    "normalization": {
+      "type": "object",
+      "description": "26-06 修复血缘 trail：repaired_hash 是对不含本 trail 的 repaired payload 的 canonical SHA-256；raw_hash 是原始模型输出的 canonical SHA-256；normalization_actions 每项含 path/action/after。",
+      "required": ["raw_hash", "repaired_hash", "normalization_actions", "warnings"],
+      "properties": {
+        "raw_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "repaired_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "normalization_actions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path", "action", "after"],
+            "properties": {
+              "path": { "type": "string", "minLength": 1 },
+              "action": {
+                "type": "string",
+                "enum": ["alias", "alias_dedup", "enum_canonicalize", "container_shape", "lineage_merge"]
+              },
+              "before": {},
+              "after": {},
+              "reason": { "type": "string" }
+            }
+          }
+        },
+        "warnings": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

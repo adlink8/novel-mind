@@ -1,0 +1,197 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "BranchVisualBibleArtifact",
+  "description": "BranchVisualBibleArtifact 信封（D-38-03/D-38-04 / Phase 38）。镜像 backend app.schemas.agent_runtime.BranchVisualBibleArtifact：type / schema_version / owner / novel / branch / producing skill+version / model lineage / source versions / input_hash / evidence_refs / revision / tool_runs / status / parent_revision / normalization。`revision` 携带完整 branch-aware 血缘的 BranchIllustrationRevision（authority_space 恒为 derivative + fork、visual version ref、source snapshot ref、scene_spec_hash、candidate asset ref、identity/source/generator lineage、divergence_manifest_hash、consistency_verdict、validator_report、review_state=candidate、approval_request_id/publish_lineage 由服务端分配）。status 恒为 candidate（finalize 时）——只有确定性 validator + 独立 publish_derivative_visual Web ApprovalRequest → review seam 能推进 approved published。artifact_id / revision_id / skill_run_id / approval_request_id 由后端确定性 finalizer/服务端在写入时分配，模型输出不含。",
+  "type": "object",
+  "required": [
+    "type",
+    "schema_version",
+    "owner_id",
+    "novel_id",
+    "producing_skill",
+    "producing_skill_version",
+    "skill_version_id",
+    "model_lineage",
+    "source_versions",
+    "input_hash",
+    "evidence_refs",
+    "revision",
+    "tool_runs",
+    "status",
+    "normalization"
+  ],
+  "properties": {
+    "type": { "const": "branch_visual_bible" },
+    "schema_version": { "const": "branch-visual-bible.v1" },
+    "owner_id": { "type": "integer", "minimum": 1 },
+    "novel_id": { "type": "integer", "minimum": 1 },
+    "branch": {
+      "type": ["string", "null"],
+      "description": "衍生分支；原始主线为 null（与 run.branch 血缘一致）"
+    },
+    "producing_skill": { "type": "string", "minLength": 1 },
+    "producing_skill_version": { "type": "string", "minLength": 1 },
+    "skill_version_id": { "type": "integer", "minimum": 1 },
+    "model_lineage": { "type": "object", "description": "agent runtime + 模型血缘（provider/model/revision）" },
+    "source_versions": { "type": "object", "description": "数据源版本（novel/source snapshot/visual version 血缘）" },
+    "input_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$", "description": "运行输入规范化 JSON 的 SHA-256（重放追溯）" },
+    "evidence_refs": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1,
+      "description": "leaf 证据引用，必须 ⊆ 冻结 manifest 白名单"
+    },
+    "skill_run_id": { "type": ["integer", "null"], "minimum": 1, "description": "SkillRun ID（后端 run 创建时分配；模型输出不含）" },
+    "artifact_id": { "type": ["integer", "null"], "minimum": 1, "description": "Artifact ID（后端确定性 finalizer 写入时分配；模型输出不含）" },
+    "revision_id": { "type": ["integer", "null"], "minimum": 1, "description": "ArtifactRevision ID（后端确定性 finalizer 写入时分配；模型输出不含）" },
+    "revision": { "$ref": "#/definitions/branch_illustration_revision" },
+    "tool_runs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["tool_name", "calls"],
+        "properties": {
+          "tool_name": { "type": "string", "minLength": 1 },
+          "calls": { "type": "integer", "minimum": 0 }
+        }
+      },
+      "description": "ToolRun 血缘：本 run 使用的 allowlist 工具与调用次数"
+    },
+    "status": {
+      "enum": ["candidate", "validated", "approved", "published", "rejected"],
+      "description": "产物状态；finalize 写入时恒为 candidate（无自动 promotion）"
+    },
+    "parent_revision": { "type": ["string", "null"], "description": "父修订引用；首个修订为 null" },
+    "normalization": {
+      "type": "object",
+      "description": "26-06 修复血缘 trail：repaired_hash 是对不含本 trail 的 repaired payload 的 canonical SHA-256；raw_hash 是原始模型输出的 canonical SHA-256；normalization_actions 每项含 path/action/after。",
+      "required": ["raw_hash", "repaired_hash", "normalization_actions", "warnings"],
+      "properties": {
+        "raw_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "repaired_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "normalization_actions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path", "action", "after"],
+            "properties": {
+              "path": { "type": "string", "minLength": 1 },
+              "action": {
+                "type": "string",
+                "enum": ["alias", "alias_dedup", "enum_canonicalize", "container_shape", "lineage_merge"]
+              },
+              "before": {},
+              "after": {},
+              "reason": { "type": "string" }
+            }
+          }
+        },
+        "warnings": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  },
+  "definitions": {
+    "branch_illustration_revision": {
+      "type": "object",
+      "description": "BranchIllustrationRevision 负载（D-38-03/D-38-04）：完整 branch-aware 血缘——visual version ref、source snapshot ref、frozen scene_spec_hash、candidate asset ref、identity/source/generator lineage、divergence_manifest_hash、consistency_verdict、validator_report。authority_space 恒为 derivative + fork 必须；review_state 恒为 candidate（finalize 时）——只有确定性 validator + 独立 publish_derivative_visual approval → review seam 能推进。approval_request_id / publish_lineage 由服务端分配，模型输出不含。",
+      "required": [
+        "schema_version",
+        "artifact_kind",
+        "authority_space",
+        "fork",
+        "visual_version",
+        "source_snapshot",
+        "scene_spec_hash",
+        "candidate_asset",
+        "identity_lineage",
+        "source_refs",
+        "generator_lineage",
+        "divergence_manifest_hash",
+        "consistency_verdict",
+        "validator_report",
+        "review_state"
+      ],
+      "properties": {
+        "schema_version": { "const": "branch-illustration-revision.v1" },
+        "artifact_kind": { "const": "branch_illustration_revision" },
+        "authority_space": { "const": "derivative" },
+        "fork": { "type": "string", "minLength": 1, "maxLength": 80, "description": "衍生 fork（derivative mode 必须提供）" },
+        "visual_version": {
+          "type": "object",
+          "description": "已批准 derivative Visual Bible fork version ref",
+          "required": ["version_id", "version_key", "version_hash"],
+          "properties": {
+            "version_id": { "type": "integer", "minimum": 1 },
+            "version_key": { "type": "string", "minLength": 1, "maxLength": 160 },
+            "version_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+          },
+          "additionalProperties": false
+        },
+        "source_snapshot": {
+          "type": "object",
+          "description": "source snapshot 血缘 ref（D-38-01：Original Visual Bible snapshot 只读）",
+          "required": ["source_snapshot_id", "source_snapshot_hash", "source_manifest_hash", "cutoff_chapter"],
+          "properties": {
+            "source_snapshot_id": { "type": "string", "minLength": 1, "maxLength": 160 },
+            "source_snapshot_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "source_manifest_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "cutoff_chapter": { "type": "integer", "minimum": 1 }
+          },
+          "additionalProperties": false
+        },
+        "scene_spec_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "candidate_asset": {
+          "type": "object",
+          "description": "已存储 candidate asset ref（D-38-03 生成 asset_id + content checksum 重放）",
+          "required": ["candidate_asset_id", "asset_id", "asset_key", "content_hash", "mime_type"],
+          "properties": {
+            "candidate_asset_id": { "type": "integer", "minimum": 1 },
+            "asset_id": { "type": "string", "minLength": 1, "maxLength": 200 },
+            "asset_key": { "type": "string", "minLength": 1, "maxLength": 180 },
+            "content_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "mime_type": { "type": "string", "minLength": 1, "maxLength": 100 }
+          },
+          "additionalProperties": false
+        },
+        "identity_lineage": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["stable_id", "entity_key", "entity_type", "source_entity_hash"],
+            "properties": {
+              "stable_id": { "type": "string", "minLength": 1, "maxLength": 180 },
+              "entity_key": { "type": "string", "minLength": 1, "maxLength": 180 },
+              "entity_type": { "type": "string", "enum": ["character", "place", "item", "faction", "style"] },
+              "source_entity_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "source_refs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["asset_key", "asset_id", "source_asset_id", "source_bytes_hash"],
+            "properties": {
+              "asset_key": { "type": "string", "minLength": 1, "maxLength": 180 },
+              "asset_id": { "type": "string", "minLength": 1, "maxLength": 200 },
+              "source_asset_id": { "type": "string", "minLength": 1, "maxLength": 200 },
+              "source_bytes_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "generator_lineage": { "type": "object", "description": "frozen provider/model/prompt 血缘（无 transport URL，SSRF metadata gate）" },
+        "divergence_manifest_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "consistency_verdict": { "type": "string", "enum": ["pass", "concern", "fail", "unavailable"] },
+        "validator_report": { "type": "object", "description": "确定性 consistency 报告快照（candidate/needs_review/blocked 派生，绝不由此物化）" },
+        "review_state": { "const": "candidate", "description": "finalize 写入时恒为 candidate——只有确定性 validator + approval → review seam 能推进" },
+        "approval_request_id": { "type": ["integer", "null"], "minimum": 1, "description": "ApprovalRequest ID（服务端 action 工具分配；模型输出不含）" },
+        "publish_lineage": { "type": "object", "description": "approval/publish 血缘（服务端确定性 review seam 分配；模型输出不含）" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,56 @@
+# analyze-chapter skill 契约（D-08 / REQ-NM-01..06 / REQ-AGENT-02/03 / Phase 28）
+# 字段镜像 backend 注册入口（app.schemas.agent_runtime.SkillVersionRegister）。
+#
+# Phase 28 版本化章节分析技能：
+#   - 本技能是 Phase 28 确定性能力的 Agent 消费边界（D-08）；允许的工具
+#     allowlist 只含 8 个只读域工具（含叙事记忆候选通道 get_narrative_memory），
+#     编排绝不越出该 allowlist（未知工具/白名单外调用 → fail closed）。
+#   - write_permissions 恒为空：Agent 不直接写任何域状态（不写 Canon、不写叙事
+#     记忆）。唯一输出通道是后端确定性 finalizer 持久化的 ChapterAnalysisArtifact
+#     （candidate-only）；确定性 terminal-state/evidence 校验拥有
+#     permission/evidence/state-transition/publication 权威。
+#   - approval_required_for 恒为空：本技能不发起 ApprovalRequest、不调用
+#     Publisher、不执行 promotion / active-pointer / 任何域写入。
+#   - 版本由 `version` 钉住（当前 1.0.0）；每次 run 经 skill_version_id 绑定
+#     SkillVersion 血缘（run 绑定 owner/novel/branch、SkillRun、ToolRuns、
+#     input hash、source snapshot、model/runtime lineage、output Artifact
+#     revision）。
+#   - 模型结构化输出走共享 26-06 normalizer + 严格 post-repair validator；
+#     normalization_actions / raw_hash / repaired_hash / warnings 保留在官方
+#     ChapterAnalysisArtifact 上。
+name: analyze-chapter
+version: 1.0.0
+description: >-
+  Phase 28 版本化章节分析技能：给定小说与章节（owner/novel/branch + source snapshot
+  可选），通过 8 个只读域工具（get_chapter / get_evidence_span / get_events /
+  get_character_state / get_relationships / get_clues / get_world_rules /
+  get_narrative_memory）收集章节与叙事记忆证据，产出血缘绑定的
+  ChapterAnalysisArtifact（candidate-only）。chapter_digest / chunk_digests 是
+  压缩负载，绝不作为检索索引输入或 EvidenceRef；previous_context_summary /
+  next_context_hint / continuity_notes 受 max_length / cutoff / spoiler policy
+  约束。无审批、无发布、无域写入；未知工具/权限/血缘/schema drift 一律 fail closed。
+allowed_tools:
+  - get_chapter
+  - get_evidence_span
+  - get_events
+  - get_character_state
+  - get_relationships
+  - get_clues
+  - get_world_rules
+  - get_narrative_memory
+read_permissions:
+  - canon
+  - derivative
+  - narrative_memory
+write_permissions: []
+forbidden_spaces:
+  - canon:original
+  - derivative:write
+budget:
+  max_calls: 40
+  max_input_tokens: 60000
+  max_output_tokens: 12000
+  max_cost_usd: "3.00"
+approval_required_for: []
+input_schema: ./input.schema.json
+output_schema: ./output.schema.json

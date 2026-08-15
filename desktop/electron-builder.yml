@@ -1,0 +1,93 @@
+# NovelMind Windows packaging contract (Phase 45, Plan 45-01, Task 1/2).
+#
+# Builds the approved, hash-pinned runtime bundle: the Next standalone renderer
+# tree staged by `scripts/stage-runtime.ps1` is carried as `extraResources` under
+# `resources/next-standalone`, while the Electron shell itself (compiled `dist/`)
+# is packed into `app.asar`. This is a LOCAL, UNSIGNED QUALIFICATION artifact:
+# nothing here purchases a code-signing certificate and nothing here publishes
+# (no `publish`/auto-update section — signing/publication remain external gates,
+# D-45-06).
+#
+# Honest 41 NO-GO boundary (recorded in the 41-DECISION.md): only the proven
+# runtimes are packaged — Electron 43.3.0 with its embedded Node v24.18.1 and the
+# Next standalone tree. Bundled Python/FastAPI, PostgreSQL/pgvector and the
+# vector store are NOT packaged in this plan; they are recorded as prerequisites
+# for plans after 45 (41-DECISION.md PREREQ-2/3/4). The packaged app therefore
+# fails closed for every component except `next` (PackagedProcessAdapter).
+appId: com.novelmind.desktop
+productName: NovelMind
+copyright: Copyright © 2026 NovelMind
+directories:
+  output: dist
+  buildResources: build
+
+# Only the compiled Electron shell and package.json enter app.asar — listed
+# explicitly so build/generated artifacts (dist/staged, dist/win-unpacked,
+# dist/*.exe, dist/*.blockmap, checksums/inventory) can never bleed into the
+# bundle on a repeat build. Tests, proof, scripts and dependency trees stay out.
+files:
+  - dist/main/**/*
+  - dist/runtime/**/*
+  - dist/data/**/*
+  - dist/security/**/*
+  - dist/shared/**/*
+  - dist/preload/**/*
+  - package.json
+  - "!**/*.map"
+asar: true
+
+# The hash-verified Next standalone renderer tree (staged by stage-runtime.ps1)
+# is a real directory under `resources/` — it is never inside asar because
+# server.js chdirs to its own directory at startup.
+#
+# electron-builder's copy filter unconditionally drops a TOP-LEVEL node_modules
+# directory from every copy (app-builder-lib/out/util/filter.js: "filter the
+# root node_modules"). The standalone tree's dependencies therefore must be
+# copied through a dedicated matcher whose source root IS node_modules;
+# otherwise the packaged Next server fails to start with "Cannot find module
+# 'next'" (found by the 45-03 UAT, see 45-03-SUMMARY.md deviation).
+extraResources:
+  - from: dist/staged/next-standalone
+    to: next-standalone
+    filter:
+      - "**/*"
+      - "!**/*.map"
+      - "!node_modules{,/**/*}"
+  - from: dist/staged/next-standalone/node_modules
+    to: next-standalone/node_modules
+    filter:
+      - "**/*"
+      - "!**/*.map"
+
+win:
+  icon: assets/novelmind-icon.ico
+  # x64 only — the supported Windows matrix is Windows 10 and Windows 11 on x64
+  # (see docs/desktop-installation.md). `dir` yields dist/win-unpacked for local
+  # qualification and `nsis` yields the per-user installer.
+  target:
+    - target: dir
+      arch:
+        - x64
+    - target: nsis
+      arch:
+        - x64
+  # Unsigned local qualification: skip exe signing AND the rcedit resource edit.
+  # This keeps the build reproducible and offline (no winCodeSign download) and
+  # is part of the authorized unsigned-test boundary. Set this back to true only
+  # when a signing certificate is acquired (external publication gate, D-45-06).
+  signAndEditExecutable: false
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: NovelMind
+  # D-45-05: uninstall removes binaries but preserves user data by default.
+  deleteAppDataOnUninstall: false
+  artifactName: NovelMind-Setup-${version}-${arch}.${ext}
+
+# No auto-update/publish section: the packaged app never downloads a first-run
+# runtime and never phones a release server (D-45-01, no first-run download
+# prerequisite).

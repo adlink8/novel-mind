@@ -1,0 +1,70 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CompileSceneSpecInput",
+  "description": "compile-scene-spec Phase 32 运行输入：novel_id（必填）与确定性编译器按引用消费的输入锚——spec_key、candidate_set_id（frozen key-scene set）、candidate_key（approved candidate）、visual_bible_version_id（approved Visual Bible revision）、source_snapshot_id（D-32-03 血缘）；branch/revision_number/policy_hash/config_hash 可选。validated SceneCandidate 与 Visual Bible 版本由服务端确定性编译器读取（D-32-01/D-32-02），本技能只提供引用，绝不自行物化事实。锚定字段仅声明意图范围，最终 scope/cutoff/evidence/VB revision 由服务端强制（fail closed）。",
+  "type": "object",
+  "required": [
+    "novel_id",
+    "spec_key",
+    "candidate_set_id",
+    "candidate_key",
+    "visual_bible_version_id",
+    "source_snapshot_id"
+  ],
+  "properties": {
+    "novel_id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "目标小说 ID（必须与运行路径中的 novel_id 一致）"
+    },
+    "branch": {
+      "type": ["string", "null"],
+      "maxLength": 80,
+      "description": "衍生分支；原始主线为 null（owner/novel/branch 血缘绑定）"
+    },
+    "spec_key": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120,
+      "description": "SceneSpec 版本键（幂等重放溯源，D-32-03）"
+    },
+    "candidate_set_id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "frozen（approved）key-scene set ID；服务端重验 owner/novel/approved 血缘"
+    },
+    "candidate_key": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 180,
+      "description": "set 内被编译的 approved candidate key（D-32-02 唯一消费目标）"
+    },
+    "visual_bible_version_id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "已批准 Visual Bible 版本 ID；服务端重验 owner/novel/approved 血缘"
+    },
+    "source_snapshot_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "description": "source snapshot 血缘 ID（与 set 冻结时的快照一致）"
+    },
+    "revision_number": {
+      "type": ["integer", "null"],
+      "minimum": 1,
+      "description": "spec revision number（可选，默认 1）"
+    },
+    "policy_hash": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "compile policy hash（可选；服务端兜底默认 policy）"
+    },
+    "config_hash": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "prompt adapter config hash（可选；D-32-03 配置血缘）"
+    }
+  },
+  "additionalProperties": false
+}

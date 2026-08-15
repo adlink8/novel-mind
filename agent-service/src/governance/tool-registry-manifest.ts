@@ -100,8 +100,8 @@ export function schemaHash(schema: unknown): string {
 
 /** 25.2-05 域工具条目：7 个，provider "agent-service"、domain "novel-read"、permission "allow"。 */
 export function domainToolEntries(): ToolRegistryEntry[] {
-  // auth 仅为占位（execute 不在此处调用，永不触网）；schema 来自真实注册工具。
-  return buildDomainTools("manifest-auth-placeholder").map((tool) => ({
+  // auth/novelId 仅为占位（execute 不在此处调用，永不触网）；schema 来自真实注册工具。
+  return buildDomainTools("manifest-auth-placeholder", 0).map((tool) => ({
     tool_name: tool.name,
     provider_package: "agent-service",
     schema_hash: schemaHash(tool.parameters),

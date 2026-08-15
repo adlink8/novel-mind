@@ -1,0 +1,118 @@
+{
+  "input": {
+    "novel_id": 1,
+    "branch": "aurora-redemption",
+    "fork": "fork-aurora",
+    "project_id": 10,
+    "chapter_id": 100,
+    "chapter_number": 3,
+    "intent": "continuation",
+    "context_package_id": 7,
+    "source_snapshot_id": "novel:1:fork-aurora",
+    "source_snapshot_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+    "evidence_refs": ["chapter:1", "chapter:2"],
+    "requested_actions": ["allow_divergence", "publish_derivative_revision"]
+  },
+  "expected_output": {
+    "type": "derivative_draft",
+    "schema_version": "draft-artifact.v1",
+    "owner_id": 1,
+    "novel_id": 1,
+    "branch": "aurora-redemption",
+    "producing_skill": "continue-derivative-story",
+    "producing_skill_version": "1.0.0",
+    "skill_version_id": 1,
+    "model_lineage": {
+      "provider": "fixture",
+      "model": "stub-model",
+      "revision": "stub-1"
+    },
+    "source_versions": {
+      "novel": "v1",
+      "source_snapshot_hash": "1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    "input_hash": "2222222222222222222222222222222222222222222222222222222222222222",
+    "evidence_refs": ["chapter:1", "chapter:2"],
+    "draft": {
+      "schema_version": "derivative-candidate.v1",
+      "artifact_kind": "derivative_draft",
+      "authority_space": "derivative",
+      "intent": "continuation",
+      "draft_text": "Aurora follows the golden footprints deeper into the bamboo grove, her steps both light and steady.",
+      "summary": "Aurora trails the golden footprints into the bamboo grove.",
+      "citation_keys": ["chapter:1", "chapter:2"],
+      "divergence": {
+        "divergence_type": "character",
+        "reason": "the twist requires the hero to know the secret early",
+        "affected_evidence": ["chapter:1"],
+        "scope": "derivative"
+      },
+      "branch_suggestions": [
+        {
+          "choice_text": "Aurora follows the prints into the deep grove",
+          "branch_summary": "continue tracking the golden footprints deeper into the grove",
+          "triggering_conflict": "the footprints vanish at the grove's heart",
+          "canon_delta_hash": "3333333333333333333333333333333333333333333333333333333333333333",
+          "evidence_refs": ["chapter:1"],
+          "enabled_by_default": false
+        }
+      ],
+      "fork": "fork-aurora",
+      "source_snapshot_id": "novel:1:fork-aurora",
+      "source_snapshot_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+      "package_hash": "4444444444444444444444444444444444444444444444444444444444444444",
+      "manifest_hash": "5555555555555555555555555555555555555555555555555555555555555555",
+      "draft_hash": "6666666666666666666666666666666666666666666666666666666666666666",
+      "canon_delta_hash": "7777777777777777777777777777777777777777777777777777777777777777"
+    },
+    "continuity_report": {
+      "verdict": "needs_override",
+      "reason": "divergence_requires_override",
+      "detail": "explicit derivative divergence requires an override approval",
+      "violations": [
+        {
+          "code": "character_contradiction",
+          "severity": "error",
+          "field": "claims.declared-divergence",
+          "evidence_keys": ["chapter:1"],
+          "detail": "claim declared-divergence contradicts the frozen package without an explicit derivative override",
+          "claim_key": "declared-divergence"
+        }
+      ],
+      "branch_suggestions": [
+        {
+          "choice_text": "Aurora follows the prints into the deep grove",
+          "branch_summary": "continue tracking the golden footprints deeper into the grove",
+          "triggering_conflict": "the footprints vanish at the grove's heart",
+          "canon_delta_hash": "3333333333333333333333333333333333333333333333333333333333333333",
+          "evidence_refs": ["chapter:1"],
+          "enabled_by_default": false
+        }
+      ]
+    },
+    "branch_suggestions": [
+      {
+        "choice_text": "Aurora follows the prints into the deep grove",
+        "branch_summary": "continue tracking the golden footprints deeper into the grove",
+        "triggering_conflict": "the footprints vanish at the grove's heart",
+        "canon_delta_hash": "3333333333333333333333333333333333333333333333333333333333333333",
+        "evidence_refs": ["chapter:1"],
+        "enabled_by_default": false
+      }
+    ],
+    "tool_runs": [
+      { "tool_name": "get_novel", "calls": 1 },
+      { "tool_name": "get_chapter", "calls": 1 },
+      { "tool_name": "allow_divergence", "calls": 1 },
+      { "tool_name": "publish_derivative_revision", "calls": 1 }
+    ],
+    "status": "candidate",
+    "parent_revision": null,
+    "normalization": {
+      "raw_hash": "8888888888888888888888888888888888888888888888888888888888888888",
+      "repaired_hash": "9999999999999999999999999999999999999999999999999999999999999999",
+      "normalization_actions": [],
+      "warnings": []
+    }
+  }
+}

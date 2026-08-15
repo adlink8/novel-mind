@@ -1,0 +1,605 @@
+"""
+智能体工具门面契约测试（25.2-02 Domain Tool Contract）。
+
+覆盖：
+  - 冻结错误码表完整性（唯一事实源 errors.py，任何子类 code 必须 ∈ 表）
+  - 每工具类型化 Schema 校验（StrictPydantic，未知字段 / 非法值 → invalid_input）
+  - 每工具 × 领域错误的稳定错误码映射（stub 服务）
+  - beyond_cutoff / budget_exceeded / timeout / output_too_large 四个关键码
+  - get_narrative_memory 候选标注（release_status="candidate"，ADR-0002）
+  - full_book 只从持久化开关读取
+"""
+
+from __future__ import annotations
+
+import asyncio
+from datetime import datetime
+
+import pytest
+from pydantic import ValidationError
+
+from app.schemas.agent_tools import (
+    GetChapterRequest,
+    GetNarrativeMemoryRequest,
+    GetTimelineRequest,
+    SearchNovelTextRequest,
+)
+from app.services.agent_tools.errors import (
+    AGENT_TOOL_ERROR_CODES,
+    AgentToolError,
+    BeyondCutoffError,
+    BudgetExceededError,
+    ForbiddenError,
+    InvalidInputError,
+    NotFoundError,
+    OutputTooLargeError,
+    ToolTimeoutError,
+    UpstreamError,
+)
+from app.services.agent_tools.facade import TOOL_NAMES, ToolFacade
+
+pytestmark = pytest.mark.contract
+
+# 全部冻结错误码对应的异常类（errors.py 为唯一事实源）。
+ERROR_CLASSES = (
+    ForbiddenError,
+    NotFoundError,
+    BeyondCutoffError,
+    BudgetExceededError,
+    ToolTimeoutError,
+    OutputTooLargeError,
+    InvalidInputError,
+    UpstreamError,
+)
+
+_PARAMS_BY_TOOL = {
+    "get_novel": {},
+    "get_chapter": {"chapter_id": 1},
+    "search_novel_text": {"query": "测试"},
+    "get_timeline": {},
+    "get_relationships": {},
+    "get_clues": {},
+    "get_narrative_memory": {},
+    # Phase 27 世界模型工具（27-05）。
+    "get_events": {"version_id": 1},
+    "get_character_state": {"version_id": 1, "subject": "林安"},
+    "get_character_knowledge": {"version_id": 1, "subject": "林安"},
+    "get_world_rules": {"version_id": 1},
+    "get_evidence_span": {
+        "chapter_id": 1,
+        "source_start": 0,
+        "source_end": 5,
+        "content_hash": "a" * 64,
+    },
+    "get_visual_bible": {"version_id": 1},
+    # Phase 33 候选生成 action 工具（33-05）。
+    "generate_image_candidate": {
+        "prompt_revision_id": 1,
+        "job_key": "contract-job",
+    },
+    # Phase 34 锚点提议 action 工具（34-05）。
+    "publish_illustration": {
+        "branch": None,
+        "fork": None,
+        "chapter_id": 1,
+        "chapter_number": 1,
+        "proposal_key": "p",
+        "source_snapshot_id": "ss-1",
+        "source_snapshot_hash": "a" * 64,
+        "source_start": 0,
+        "source_end": 5,
+        "excerpt": "excerpt",
+        "anchor_hash": "a" * 64,
+        "chapter_content_hash": "a" * 64,
+        "asset_revision_id": 1,
+        "caption": "c",
+        "alt_text": "a",
+        "citation": "cite",
+    },
+    "attach_illustration_to_text": {
+        "branch": None,
+        "fork": None,
+        "chapter_id": 1,
+        "chapter_number": 1,
+        "proposal_key": "p",
+        "source_snapshot_id": "ss-1",
+        "source_snapshot_hash": "a" * 64,
+        "source_start": 0,
+        "source_end": 5,
+        "excerpt": "excerpt",
+        "anchor_hash": "a" * 64,
+        "chapter_content_hash": "a" * 64,
+        "asset_revision_id": 1,
+        "caption": "c",
+        "alt_text": "a",
+        "citation": "cite",
+    },
+    # Phase 35 canon fork 提议 action 工具（35-05）。
+    "create_canon_fork": {
+        "branch": None,
+        "fork": None,
+        "fork_key": "contract-fork",
+        "requested_cutoff_chapter": 2,
+        "full_book_requested": False,
+        "expected_source_snapshot_hash": "a" * 64,
+        "delta_key": "contract-delta",
+        "delta_content": "delta",
+        "delta_evidence_refs": ["chapter:1"],
+    },
+    # Phase 36 derivative 编辑提议 action 工具（36-05）。
+    "apply_derivative_edit": {
+        "project_id": 1,
+        "chapter_id": 1,
+        "chapter_number": 1,
+        "proposal_key": "p",
+        "base_revision": 1,
+        "content": "patch",
+        "source_snapshot_hash": "a" * 64,
+        "evidence_refs": ["chapter:1"],
+    },
+    # Phase 37 derivative generation action 工具（37-05）。
+    "allow_divergence": {
+        "branch": "deriv-branch",
+        "fork": "fork-1",
+        "project_id": 1,
+        "chapter_id": 1,
+        "candidate_id": 1,
+        "reason": "the twist requires the hero to know the secret early",
+        "affected_evidence": ["chapter:1"],
+        "draft_hash": "a" * 64,
+        "canon_delta_hash": "a" * 64,
+    },
+    "publish_derivative_revision": {
+        "branch": "deriv-branch",
+        "fork": "fork-1",
+        "override_id": 1,
+        "draft_hash": "a" * 64,
+        "canon_delta_hash": "a" * 64,
+    },
+    # Phase 38 branch-aware derivative visual action 工具（38-05）。
+    "publish_derivative_visual": {
+        "branch": "deriv-branch",
+        "fork": "fork-1",
+        "candidate_asset_id": 1,
+        "scene_spec_hash": "a" * 64,
+    },
+    # Phase 39 derivative export action 工具（39-05）。
+    "approve_export": {
+        "branch": "deriv-branch",
+        "fork": "fork-1",
+        "project_id": 1,
+        "artifact_id": 1,
+        "artifact_revision_id": 1,
+        "preparation_hash": "a" * 64,
+    },
+    "materialize_export": {
+        "branch": "deriv-branch",
+        "fork": "fork-1",
+        "project_id": 1,
+        "artifact_id": 1,
+        "artifact_revision_id": 1,
+        "approval_id": 1,
+        "preparation_hash": "a" * 64,
+    },
+}
+
+
+def _novel(reading_progress: dict | None = None) -> "object":
+    from app.models.novel import Novel
+
+    return Novel(
+        id=1,
+        owner_id=1,
+        title="契约测试小说",
+        chapter_count=10,
+        reading_progress=reading_progress or {},
+    )
+
+
+async def _fake_cutoff(db, novel) -> int:
+    return 3
+
+
+def _facade(**kwargs) -> ToolFacade:
+    return ToolFacade(cutoff_resolver=_fake_cutoff, **kwargs)
+
+
+# ────────────────────────── 错误码表完整性 ──────────────────────────
+
+
+def test_error_code_table_is_frozen_and_complete():
+    """冻结表必须精确包含 8 个契约错误码。"""
+    assert AGENT_TOOL_ERROR_CODES == (
+        "forbidden",
+        "not_found",
+        "beyond_cutoff",
+        "budget_exceeded",
+        "timeout",
+        "output_too_large",
+        "invalid_input",
+        "upstream_error",
+    )
+
+
+def test_every_error_class_code_is_in_frozen_table():
+    """每个 AgentToolError 子类的 code 必须 ∈ 冻结表（单一事实源）。"""
+    for cls in ERROR_CLASSES:
+        assert cls.code in AGENT_TOOL_ERROR_CODES
+        assert isinstance(
+            cls(  # noqa: E1120 - 仅验证可实例化
+                "msg"
+            ),
+            AgentToolError,
+        )
+
+
+def test_tool_names_are_exactly_the_23_contract_tools():
+    assert set(TOOL_NAMES) == {
+        "get_novel",
+        "get_chapter",
+        "search_novel_text",
+        "get_timeline",
+        "get_relationships",
+        "get_clues",
+        "get_narrative_memory",
+        # Phase 27 世界模型只读工具（27-05）。
+        "get_events",
+        "get_character_state",
+        "get_character_knowledge",
+        "get_world_rules",
+        "get_evidence_span",
+        # Phase 30 Visual Bible 只读工具（31-04）。
+        "get_visual_bible",
+        # Phase 33/34/35/36/37/38/39 候选 action 工具。
+        "generate_image_candidate",
+        "publish_illustration",
+        "attach_illustration_to_text",
+        "create_canon_fork",
+        "apply_derivative_edit",
+        "allow_divergence",
+        "publish_derivative_revision",
+        "publish_derivative_visual",
+        "approve_export",
+        "materialize_export",
+    }
+
+
+# ────────────────────────── 每工具 Schema 校验 ──────────────────────────
+
+
+def test_search_request_requires_query_and_rejects_unknown_fields():
+    with pytest.raises(ValidationError):
+        SearchNovelTextRequest.model_validate({})
+    with pytest.raises(ValidationError):
+        SearchNovelTextRequest.model_validate(
+            {"query": "q", "secret_param": "injected"}
+        )
+
+
+def test_chapter_request_requires_positive_chapter_id():
+    with pytest.raises(ValidationError):
+        GetChapterRequest.model_validate({"chapter_id": 0})
+    assert GetChapterRequest.model_validate({"chapter_id": 5}).chapter_id == 5
+
+
+def test_timeline_request_rejects_bare_full_book_param():
+    """full_book 裸参数必须被 Schema 拒绝（防剧透；只读持久化开关）。"""
+    with pytest.raises(ValidationError):
+        GetTimelineRequest.model_validate({"full_book": True})
+
+
+def test_narrative_memory_request_validates_view():
+    with pytest.raises(ValidationError):
+        GetNarrativeMemoryRequest.model_validate({"view": "promote"})
+    assert GetNarrativeMemoryRequest.model_validate({"view": "tree"}).view == "tree"
+
+
+# ────────────────────────── 每工具 × 领域错误 → 冻结码 ──────────────────────────
+
+
+@pytest.mark.parametrize("tool_name", TOOL_NAMES)
+@pytest.mark.parametrize("error_cls", ERROR_CLASSES)
+async def test_facade_maps_domain_errors_to_frozen_codes(tool_name, error_cls):
+    """每个工具 × 每个领域错误都必须映射到冻结错误码表。"""
+
+    async def boom(*args, **kwargs):
+        raise error_cls("boom")
+
+    facade = _facade(service_overrides={tool_name: boom})
+    with pytest.raises(AgentToolError) as excinfo:
+        await facade.execute(
+            tool_name,
+            db=object(),
+            novel=_novel(),
+            owner_id=1,
+            params=_PARAMS_BY_TOOL[tool_name],
+        )
+    assert excinfo.value.code == error_cls.code
+    assert excinfo.value.code in AGENT_TOOL_ERROR_CODES
+
+
+async def test_search_results_beyond_cutoff_are_filtered():
+    """search_novel_text 命中行必须按阅读 cutoff 过滤（D-05 剧透边界）。
+
+    E2E 实测：未过滤时搜索返回 cutoff 后章节（62/81/204 > cutoff 53）的命中，
+    模型拿这些 chapter 去物化 span 全部 beyond_cutoff 撞墙，预算烧穿；
+    且超 cutoff 原文片段本身就不该进入 agent transcript。
+    """
+
+    async def fake_search(db, *, owner_id, novel_id, query, mode, top_k):
+        return {
+            "results": [
+                {"chapter_id": 1, "chunk_id": 11, "content_snippet": "甲"},
+                {"chapter_id": 2, "chunk_id": 12, "content_snippet": "乙"},
+                {"chapter_id": 9, "chunk_id": 13, "content_snippet": "丙"},
+            ],
+            "resolved_mode": "chunks",
+            "fallback_reason": None,
+        }
+
+    class _FakeResult:
+        def __init__(self, rows):
+            self._rows = rows
+
+        def all(self):
+            return self._rows
+
+    class _FakeDb:
+        async def execute(self, stmt, params=None):
+            # chapter_id → chapter_number：1→1, 2→3, 9→10（cutoff=3）
+            return _FakeResult([(1, 1), (2, 3), (9, 10)])
+
+    facade = _facade(service_overrides={"search_novel_text": fake_search})
+    outcome = await facade.execute(
+        "search_novel_text",
+        db=_FakeDb(),
+        novel=_novel(),
+        owner_id=1,
+        params={"query": "测试"},
+    )
+
+    chapter_ids = [row["chapter_id"] for row in outcome["results"]]
+    assert chapter_ids == [1, 2]
+
+
+async def test_search_overfetches_before_cutoff_filter():
+    """cutoff 后过滤会消耗配额：必须过取再过滤再截断回 top_k。
+
+    不过取时 top_k=5 前 5 名全超 cutoff → 过滤后归零（rank 6+ 的城内命中
+    被截断）；facade 应以 min(top_k*4, 50) 过取，过滤后截断回 top_k。
+    """
+    seen_top_k: list[int] = []
+
+    async def fake_search(db, *, owner_id, novel_id, query, mode, top_k):
+        seen_top_k.append(top_k)
+        return {
+            "results": [
+                {"chapter_id": 9, "chunk_id": 13, "content_snippet": "城外"},
+                {"chapter_id": 1, "chunk_id": 11, "content_snippet": "甲"},
+                {"chapter_id": 2, "chunk_id": 12, "content_snippet": "乙"},
+            ],
+            "resolved_mode": "chunks",
+            "fallback_reason": None,
+        }
+
+    class _FakeResult:
+        def __init__(self, rows):
+            self._rows = rows
+
+        def all(self):
+            return self._rows
+
+    class _FakeDb:
+        async def execute(self, stmt, params=None):
+            return _FakeResult([(1, 1), (2, 3), (9, 10)])
+
+    facade = _facade(service_overrides={"search_novel_text": fake_search})
+    outcome = await facade.execute(
+        "search_novel_text",
+        db=_FakeDb(),
+        novel=_novel(),
+        owner_id=1,
+        params={"query": "测试", "top_k": 1},
+    )
+
+    assert seen_top_k == [4]  # top_k=1 → 过取 4
+    assert [row["chapter_id"] for row in outcome["results"]] == [1]  # 截断回 1
+
+
+async def test_search_results_unfiltered_when_full_book_persisted():
+    """持久化 full_book 开关开启时不过滤（与 get_timeline 同一纪律）。"""
+
+    async def fake_search(db, *, owner_id, novel_id, query, mode, top_k):
+        return {
+            "results": [{"chapter_id": 9, "chunk_id": 13, "content_snippet": "丙"}],
+            "resolved_mode": "chunks",
+            "fallback_reason": None,
+        }
+
+    facade = _facade(service_overrides={"search_novel_text": fake_search})
+    outcome = await facade.execute(
+        "search_novel_text",
+        db=object(),
+        novel=_novel(reading_progress={"timeline_full_book": True}),
+        owner_id=1,
+        params={"query": "测试"},
+    )
+
+    assert [row["chapter_id"] for row in outcome["results"]] == [9]
+
+
+async def test_facade_unknown_tool_maps_to_invalid_input():
+    facade = _facade()
+    with pytest.raises(AgentToolError) as excinfo:
+        await facade.execute(
+            "delete_novel", db=object(), novel=_novel(), owner_id=1, params={}
+        )
+    assert excinfo.value.code == "invalid_input"
+
+
+# ────────────────────────── 关键 fail-closed 码（stub 服务） ──────────────────────────
+
+
+async def test_beyond_cutoff_returns_stable_code_and_no_content_leak():
+    """get_chapter 请求截止点后的章节：beyond_cutoff + 响应体零正文。"""
+
+    async def fake_get_chapter(db, chapter_id):
+        from app.models.novel import Chapter
+
+        return Chapter(
+            id=chapter_id,
+            novel_id=1,
+            chapter_number=9,  # 超过 fake_cutoff=3
+            title="受保护章节",
+            content="这段受保护内容绝不允许出现在响应中",
+            word_count=10,
+            created_at=datetime.now(),
+            updated_at=datetime.now(),
+        )
+
+    facade = _facade(service_overrides={"get_chapter": fake_get_chapter})
+    with pytest.raises(AgentToolError) as excinfo:
+        await facade.execute(
+            "get_chapter",
+            db=object(),
+            novel=_novel(),
+            owner_id=1,
+            params={"chapter_id": 9},
+        )
+    assert excinfo.value.code == "beyond_cutoff"
+    assert "受保护内容" not in str(excinfo.value)  # 错误体不携带正文
+
+
+async def test_budget_hook_fail_closed_before_service_call():
+    """超预算：budget_exceeded 且底层服务【从未】被调用（fail closed）。"""
+    calls: list[str] = []
+
+    async def budget_hook(tool_name, params):
+        raise BudgetExceededError("per-run 预算已用尽")
+
+    async def fake_service(*args, **kwargs):
+        calls.append("called")
+
+    facade = ToolFacade(
+        budget_hook=budget_hook,
+        service_overrides={"get_novel": fake_service},
+    )
+    with pytest.raises(AgentToolError) as excinfo:
+        await facade.execute(
+            "get_novel", db=object(), novel=_novel(), owner_id=1, params={}
+        )
+    assert excinfo.value.code == "budget_exceeded"
+    assert calls == [], "budget hook 必须在校验/执行服务之前拦截"
+
+
+async def test_timeout_returns_stable_code():
+    """慢上游：超过 per-tool 超时 → timeout。"""
+
+    async def slow_service(*args, **kwargs):
+        await asyncio.sleep(0.5)
+
+    facade = ToolFacade(timeout=0.05, service_overrides={"get_novel": slow_service})
+    with pytest.raises(AgentToolError) as excinfo:
+        await facade.execute(
+            "get_novel", db=object(), novel=_novel(), owner_id=1, params={}
+        )
+    assert excinfo.value.code == "timeout"
+
+
+async def test_output_too_large_returns_stable_code():
+    """超大的 stub 响应：超过 64 KiB → output_too_large。"""
+
+    async def huge_service(*args, **kwargs):
+        from app.models.novel import Chapter
+
+        return Chapter(
+            id=1,
+            novel_id=1,
+            chapter_number=1,
+            title="巨章",
+            content="甲" * 70000,
+            word_count=70000,
+            created_at=datetime.now(),
+            updated_at=datetime.now(),
+        )
+
+    facade = _facade(
+        byte_cap=64 * 1024, service_overrides={"get_chapter": huge_service}
+    )
+    with pytest.raises(AgentToolError) as excinfo:
+        await facade.execute(
+            "get_chapter",
+            db=object(),
+            novel=_novel(),
+            owner_id=1,
+            params={"chapter_id": 1},
+        )
+    assert excinfo.value.code == "output_too_large"
+
+
+# ────────────────────────── NM 候选标注（ADR-0002） ──────────────────────────
+
+
+async def test_narrative_memory_envelope_is_candidate_labeled():
+    """get_narrative_memory 响应必须带 release_status="candidate"。"""
+
+    async def fake_nm(db, *, owner_id, novel_id, version_id, view, through_chapter):
+        return {"versions": []}
+
+    facade = _facade(service_overrides={"get_narrative_memory": fake_nm})
+    payload = await facade.execute(
+        "get_narrative_memory",
+        db=object(),
+        novel=_novel(),
+        owner_id=1,
+        params={},
+    )
+    assert payload["release_status"] == "candidate"
+    assert payload["publication_status"] == "candidate_preview"
+    assert payload["data"] == {"versions": []}
+
+
+# ────────────────────────── full_book 只读持久化开关 ──────────────────────────
+
+
+async def test_full_book_only_from_persisted_switch():
+    """full_book 授权只来自持久化开关，绝不来自请求参数。"""
+    received: list[bool] = []
+
+    async def record_timeline(
+        db,
+        *,
+        novel,
+        owner_id,
+        source,
+        ordering,
+        person,
+        include_causal,
+        request_full_book,
+        chapter_start,
+        chapter_end,
+    ):
+        received.append(request_full_book)
+        return None
+
+    # 开关关闭（默认）→ request_full_book 必须为 False。
+    facade = _facade(service_overrides={"get_timeline": record_timeline})
+    await facade.execute(
+        "get_timeline",
+        db=object(),
+        novel=_novel(reading_progress={"chapter_id": 1}),
+        owner_id=1,
+        params={},
+    )
+    assert received == [False, False]
+
+    # 开关打开（reading_progress.timeline_full_book=True）→ True。
+    facade = _facade(service_overrides={"get_timeline": record_timeline})
+    await facade.execute(
+        "get_timeline",
+        db=object(),
+        novel=_novel(reading_progress={"timeline_full_book": True}),
+        owner_id=1,
+        params={},
+    )
+    assert received == [False, False, True, True]

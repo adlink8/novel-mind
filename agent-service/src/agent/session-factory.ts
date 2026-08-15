@@ -25,6 +25,7 @@ import {
   type Skill,
 } from "@earendil-works/pi-coding-agent";
 import { buildDomainTools } from "../tools/registry.js";
+import { buildConnectorTools } from "../tools/connector-tools.js";
 import { domainToolEntries, type ToolRegistryEntry } from "../governance/tool-registry-manifest.js";
 import { skillInstructions } from "../skills/loader.js";
 import type { LoadedSkill } from "../skills/loader.js";
@@ -57,6 +58,8 @@ export function toPiSkill(skill: LoadedSkill): Skill {
 export interface CreateSessionOptions {
   /** 运行级授权：FastAPI 铸造的 per-run 内部令牌（工具门面转发，绝不落日志）。 */
   auth: string;
+  /** run 绑定的 novel_id：工具调用 query 强绑定（不信任模型填的 novel_id）。 */
+  novelId: number;
   /** 已 fail-closed 校验的激活技能（loader 产出）。 */
   skill: LoadedSkill;
   /**
@@ -74,6 +77,8 @@ export interface CreateSessionOptions {
    * （7 个域工具全启用）——与 25.2-05 行为一致。
    */
   manifest?: ToolRegistryEntry[];
+  /** 运行级、服务端生成的短 system context；不接受原始用户文本。 */
+  systemContext?: string;
 }
 
 /**
@@ -89,17 +94,20 @@ export async function createSession(opts: CreateSessionOptions): Promise<AgentSe
   const enabledToolNames = (opts.manifest ?? domainToolEntries())
     .filter((entry) => entry.enabled)
     .map((entry) => entry.tool_name);
+  const connectorVersions = opts.skill.connectorVersions ?? [];
+  const connectorNames = connectorVersions.map((connector) => connector.tool_name);
+  const enabledWithConnectors = [...enabledToolNames, ...connectorNames];
 
   // 防御纵深（T-25.2-05-05 三重门之一）：allowed_tools 必须 ⊆ 启用清单，
   // loader/manifest 之外的任何逃逸都在会话创建前拒绝。
   for (const tool of skill.allowedTools) {
-    if (!enabledToolNames.includes(tool)) {
+    if (!enabledWithConnectors.includes(tool)) {
       throw new Error(`skill ${skill.name} 的 allowed_tools 逃出启用清单: ${tool}`);
     }
   }
 
   // tools allowlist：skill 的 allowed_tools 在启用清单内的子集，恒定非空。
-  const tools = enabledToolNames.filter((name) => skill.allowedTools.includes(name));
+  const tools = enabledWithConnectors.filter((name) => skill.allowedTools.includes(name));
   if (tools.length === 0) {
     throw new Error(`skill ${skill.name} 的 allowed_tools 为空，无法注册任何工具（fail-closed）`);
   }
@@ -109,11 +117,19 @@ export async function createSession(opts: CreateSessionOptions): Promise<AgentSe
   // 技能指令确定性注入 systemPrompt（spike 07 seam）。
   const resourceLoader = await buildResourceLoader(
     [toPiSkill(skill)],
-    `${NOVEL_AGENT_SYSTEM_PROMPT}\n\n${skillInstructions(skill)}`,
+    [NOVEL_AGENT_SYSTEM_PROMPT, skillInstructions(skill), opts.systemContext]
+      .filter(Boolean)
+      .join("\n\n"),
     dirs,
   );
 
-  const modelRuntime = opts.modelRuntime ?? (await buildGatewayModelRuntime());
+  const runToken = auth.startsWith("Bearer ") ? auth.slice("Bearer ".length) : "";
+  if (!runToken) {
+    throw new Error("Agent 运行令牌缺失（fail-closed）");
+  }
+  const modelRuntime =
+    opts.modelRuntime ??
+    (await buildGatewayModelRuntime({ runToken, novelId: opts.novelId }));
 
   const { session } = await createAgentSession({
     cwd: dirs.cwd,
@@ -122,7 +138,10 @@ export async function createSession(opts: CreateSessionOptions): Promise<AgentSe
     sessionManager: SessionManager.inMemory(),
     noTools: "all",
     tools,
-    customTools: buildDomainTools(auth),
+    customTools: [
+      ...buildDomainTools(auth, opts.novelId),
+      ...buildConnectorTools(connectorVersions, auth, opts.novelId),
+    ],
     modelRuntime,
     model: buildGatewayModel(),
   });

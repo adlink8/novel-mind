@@ -1,0 +1,740 @@
+"""Owner-scoped derivative export API (Phase 39-01/39-02, D-39-03).
+
+Routes hang under ``/api/novels/{novel_id}/derivative-projects/{project_id}/export``:
+
+- ``POST .../prepare`` — freeze the owner-scoped derivative ``ExportSnapshot``
+  (published revisions + published assets + citations + version lineage) and
+  return the frozen manifest with the replayable export hash.
+- ``GET .../download?format=markdown|epub`` — one deterministic file download.
+  Every format is built by a serializer that consumes **only** the frozen
+  snapshot; ``X-Export-Manifest-Hash`` carries the export hash and the body
+  never invents a URL or silently drops a missing asset (D-39-01).
+- ``POST .../package`` (Phase 39-02) — a bounded provenance archive package:
+  manifest + provenance (asset ids/hashes/source refs, citation leaf hashes,
+  owner isolation evidence) + approved asset bytes + package-manifest whose
+  hash covers every content entry. ``X-Package-Manifest-Hash`` is the
+  server-side root of trust for the package index (D-39-03).
+- ``GET .../audit`` (Phase 39-02) — the three-dimension status report
+  (implementation_readiness / sample_data_coverage / quality_qualification)
+  bound to the frozen manifest hash. ``quality_qualification`` reflects the
+  real Phase 22 state (0/3 blocked -> blocked, verdict blocked); Phase 22 can
+  never be substituted by a Phase 39 pass.
+
+Every route starts from ``require_owned_novel`` so a mismatched owner/novel is
+an identical 404; the project/fork are resolved inside the current owner scope.
+Original/future scope, archived projects and any parity/provenance mismatch fail
+closed (D-39-02).
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Literal
+from urllib.parse import quote
+
+from fastapi import APIRouter, Depends, HTTPException, Response
+from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.api.dependencies import require_owned_novel
+from app.core.database import get_db
+from app.core.security import require_user
+from app.models import Novel, User
+from app.schemas.agent_tools import StrictAgentToolModel
+from app.services.derivative_export.audit import (
+    PHASE22_GREEN_REQUIRED,
+    DerivativeExportAuditEvidence,
+    DerivativeExportPhase22Evidence,
+    DerivativeExportShipmentEvidenceStatus,
+    DerivativeExportShipmentItem,
+    DerivativeExportShipmentRequirement,
+    build_derivative_export_audit,
+    build_derivative_export_shipment_baseline,
+    run_derivative_export_lineage_audit,
+)
+from app.services.derivative_export.epub import render_epub
+from app.services.derivative_export.manifest import (
+    DERIVATIVE_EXPORT_VERSION,
+    DerivativeExportManifest,
+    canonical_export_hash,
+    seal_derivative_export_manifest,
+)
+from app.services.derivative_export.markdown import render_markdown
+from app.services.derivative_export.materializer import (
+    ExportMaterializationError,
+    materialize_export,
+    request_approve_export,
+)
+from app.services.derivative_export.package import (
+    DERIVATIVE_EXPORT_PACKAGE_SCHEMA_VERSION,
+    build_derivative_export_package,
+)
+from app.services.derivative_export.preparation import (
+    EXPORT_PREPARATION_SCHEMA_VERSION,
+    prepare_export,
+)
+from app.services.derivative_export.snapshot import (
+    ExportSnapshotError,
+    ExportSnapshotService,
+    FrozenDerivativeExport,
+)
+from app.services.derivative_visual.assets import DerivativeAssetStorage
+
+router = APIRouter(dependencies=[Depends(require_user)])
+
+DERIVATIVE_EXPORT_PATH = "/{novel_id}/derivative-projects/{project_id}/export"
+
+DerivativeExportFormat = Literal["markdown", "epub"]
+
+_FORMAT_MEDIA_TYPES: dict[str, str] = {
+    "markdown": "text/markdown",
+    "epub": "application/epub+zip",
+    "package": "application/zip",
+}
+_FORMAT_EXTENSIONS: dict[str, str] = {
+    "markdown": "md",
+    "epub": "epub",
+    "package": "zip",
+}
+
+# Phase 22 truth binding (STATE.md Current Position): the audit's quality
+# dimension is derived from this real, preserved state — never a Phase 39 pass.
+PHASE22_TRUTH_SOURCE = ".planning/STATE.md"
+PHASE22_TRUTH = (
+    "Phase 22 is blocked at 0/3 scheduled green evidence; Phase 22 remains "
+    "unverified at 0/3 and must not be marked complete."
+)
+
+
+class DerivativeExportPrepareResponse(BaseModel):
+    """Frozen derivative export manifest read envelope (D-39-01)."""
+
+    manifest: DerivativeExportManifest
+    manifest_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    snapshot_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    export_version: str = DERIVATIVE_EXPORT_VERSION
+    chapter_count: int = Field(ge=0)
+    asset_count: int = Field(ge=0)
+    revision_count: int = Field(ge=0)
+    citation_count: int = Field(ge=0)
+    missing_asset_count: int = Field(ge=0)
+
+
+class DerivativeExportAgentPrepareRequest(StrictAgentToolModel):
+    """Deterministic preparation freeze intent (39-05, authenticated read-only)."""
+
+    branch: str | None = Field(
+        default=None, max_length=80, description="衍生分支；原始主线为 null"
+    )
+    fork: str | None = Field(
+        default=None,
+        max_length=80,
+        description="衍生 fork（仅 derivative mode；original 必须为 null）",
+    )
+    evidence_refs: list[str] = Field(
+        min_length=1,
+        description="run 引用的 leaf 证据键（必须属于冻结 manifest 白名单）",
+    )
+    generator_lineage: dict = Field(default_factory=dict)
+
+
+class DerivativeExportAgentPrepareResponse(BaseModel):
+    """Frozen candidate ExportPreparation payload read envelope (39-05)."""
+
+    preparation: dict
+    preparation_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    snapshot_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    manifest_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    schema_version: str = EXPORT_PREPARATION_SCHEMA_VERSION
+    export_version: str = DERIVATIVE_EXPORT_VERSION
+    project_id: int = Field(gt=0)
+    fork_id: int = Field(gt=0)
+    chapter_count: int = Field(ge=0)
+    asset_count: int = Field(ge=0)
+    revision_count: int = Field(ge=0)
+    citation_count: int = Field(ge=0)
+    candidate_only: bool = True
+
+
+class DerivativeExportAgentApproveRequest(StrictAgentToolModel):
+    """Server-authoritative approve_export request (39-05).
+
+    Binds the frozen candidate artifact revision + preparation_hash; project_id
+    comes from the URL path, novel_id from require_owned_novel.
+    """
+
+    branch: str | None = Field(
+        default=None, max_length=80, description="衍生分支；原始主线为 null"
+    )
+    fork: str | None = Field(
+        default=None,
+        max_length=80,
+        description="衍生 fork（仅 derivative mode；original 必须为 null）",
+    )
+    artifact_id: int = Field(
+        gt=0,
+        description="候选 ExportPreparationArtifact ID（服务端重验 owner/novel + candidate status）",
+    )
+    artifact_revision_id: int = Field(
+        gt=0,
+        description="候选 ArtifactRevision ID（approval payload 绑定；必须是当前修订）",
+    )
+    preparation_hash: str = Field(
+        min_length=64,
+        max_length=64,
+        pattern="^[0-9a-f]{64}$",
+        description="候选冻结 preparation hash（服务端从 artifact revision + 冻结 manifest 重放；stale → fail closed）",
+    )
+    approval_note: str | None = Field(
+        default=None, max_length=4000, description="供 approval 展示的显式批准备注"
+    )
+
+
+class DerivativeExportAgentMaterializeRequest(StrictAgentToolModel):
+    """Deterministic materialize_export request (39-05).
+
+    Consumes an approved approve_export approval bound to the frozen artifact
+    revision + preparation_hash; project_id from the URL path, novel_id from
+    require_owned_novel.
+    """
+
+    branch: str | None = Field(
+        default=None, max_length=80, description="衍生分支；原始主线为 null"
+    )
+    fork: str | None = Field(
+        default=None,
+        max_length=80,
+        description="衍生 fork（仅 derivative mode；original 必须为 null）",
+    )
+    artifact_id: int = Field(
+        gt=0,
+        description="候选 ExportPreparationArtifact ID（只接受 approved artifact）",
+    )
+    artifact_revision_id: int = Field(
+        gt=0,
+        description="候选 ArtifactRevision ID（approval payload 绑定；必须是当前修订）",
+    )
+    approval_id: int = Field(
+        gt=0,
+        description="已批准的 approve_export ApprovalRequest ID（服务端重验 action + status + preparation_hash）",
+    )
+    preparation_hash: str = Field(
+        min_length=64,
+        max_length=64,
+        pattern="^[0-9a-f]{64}$",
+        description="候选冻结 preparation hash（必须与 approve_export approval payload_hash 一致）",
+    )
+    reason: str | None = Field(
+        default=None,
+        max_length=4000,
+        description="确定性 materialize 理由（展示/审计）",
+    )
+
+
+# Storage seam (integration tests override the bytes backend, 34-04 pattern).
+_derivative_export_asset_storage: DerivativeAssetStorage | None = None
+
+
+def set_derivative_export_asset_storage(storage: DerivativeAssetStorage | None) -> None:
+    """Override the derivative asset bytes backend (used by integration tests)."""
+    global _derivative_export_asset_storage
+    _derivative_export_asset_storage = storage
+
+
+def _storage() -> DerivativeAssetStorage:
+    if _derivative_export_asset_storage is not None:
+        return _derivative_export_asset_storage
+    return DerivativeAssetStorage(DerivativeAssetStorage.default_storage_root())
+
+
+def _map_error(exc: ExportSnapshotError) -> HTTPException:
+    return HTTPException(
+        status_code=exc.status_code, detail=f"{exc.code}: {exc.detail}"
+    )
+
+
+async def _freeze(
+    db: AsyncSession, *, owner_id: int, novel_id: int, project_id: int
+) -> FrozenDerivativeExport:
+    try:
+        return await ExportSnapshotService(db, storage=_storage()).build(
+            owner_id=owner_id, novel_id=novel_id, project_id=project_id
+        )
+    except ExportSnapshotError as exc:
+        raise _map_error(exc) from exc
+
+
+def _export_filename(*, project_name: str, snapshot_hash: str, format: str) -> str:
+    import re
+
+    stem = (
+        re.sub(r"[^\w\-]+", "-", project_name, flags=re.UNICODE).strip("-")
+        or "derivative"
+    )
+    return f"{stem}-v{snapshot_hash[:8]}.{_FORMAT_EXTENSIONS[format]}"
+
+
+@router.post(
+    DERIVATIVE_EXPORT_PATH + "/prepare",
+    response_model=DerivativeExportPrepareResponse,
+)
+async def prepare_derivative_export(
+    project_id: int,
+    novel: Novel = Depends(require_owned_novel),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+) -> DerivativeExportPrepareResponse:
+    """Freeze the derivative export snapshot + manifest (owner-scoped)."""
+    frozen = await _freeze(
+        db,
+        owner_id=current_user.id,
+        novel_id=novel.id,
+        project_id=project_id,
+    )
+    snapshot = frozen.snapshot
+    manifest = seal_derivative_export_manifest(snapshot)
+    return DerivativeExportPrepareResponse(
+        manifest=manifest,
+        manifest_hash=manifest.manifest_hash,
+        snapshot_hash=snapshot.snapshot_hash,
+        export_version=DERIVATIVE_EXPORT_VERSION,
+        chapter_count=len(snapshot.chapters),
+        asset_count=len(snapshot.assets),
+        revision_count=len(snapshot.revisions),
+        citation_count=len(snapshot.citations),
+        missing_asset_count=len(snapshot.missing_assets),
+    )
+
+
+@router.get(DERIVATIVE_EXPORT_PATH + "/download")
+async def download_derivative_export(
+    project_id: int,
+    format: DerivativeExportFormat = "markdown",
+    novel: Novel = Depends(require_owned_novel),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """Deterministic Markdown/EPUB download from the frozen snapshot."""
+    frozen = await _freeze(
+        db,
+        owner_id=current_user.id,
+        novel_id=novel.id,
+        project_id=project_id,
+    )
+    snapshot = frozen.snapshot
+    reader = frozen.asset_reader()
+    try:
+        if format == "markdown":
+            content = render_markdown(snapshot, reader)
+        elif format == "epub":
+            content = render_epub(snapshot, reader)
+        else:  # pragma: no cover - Literal guards this branch
+            raise ExportSnapshotError(
+                "unsupported_format", f"unsupported export format: {format!r}"
+            )
+    except ExportSnapshotError as exc:
+        raise _map_error(exc) from exc
+
+    filename = _export_filename(
+        project_name=snapshot.project_name,
+        snapshot_hash=snapshot.snapshot_hash,
+        format=format,
+    )
+    disposition = f'attachment; filename="{quote(filename)}"'
+    return Response(
+        content=content,
+        media_type=_FORMAT_MEDIA_TYPES[format],
+        headers={
+            "Content-Disposition": disposition,
+            "X-Export-Manifest-Hash": snapshot.snapshot_hash,
+            "X-Export-Snapshot-Hash": snapshot.snapshot_hash,
+            "X-Export-Format": format,
+            "X-Export-Project-Id": str(snapshot.project_id),
+        },
+    )
+
+
+# ---------------------------------------------------------------------------
+# Phase 39-02: provenance package + three-dimension audit (D-39-03)
+# ---------------------------------------------------------------------------
+
+
+@router.post(DERIVATIVE_EXPORT_PATH + "/package")
+async def package_derivative_export(
+    project_id: int,
+    novel: Novel = Depends(require_owned_novel),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """Bounded provenance package: manifest + provenance + assets + package index.
+
+    ``X-Package-Manifest-Hash`` is the server-sealed package hash (covers every
+    content entry + metadata); a tampered package index no longer replays it.
+    Cross-owner / Original-space / stale-citation / rejected or missing asset /
+    unsafe path inputs fail closed with an explicit blocked error (D-39-03,
+    T-39-02-01/02).
+    """
+    frozen = await _freeze(
+        db,
+        owner_id=current_user.id,
+        novel_id=novel.id,
+        project_id=project_id,
+    )
+    snapshot = frozen.snapshot
+    try:
+        payload, package_manifest = build_derivative_export_package(
+            snapshot, frozen.asset_reader()
+        )
+    except ExportSnapshotError as exc:
+        raise _map_error(exc) from exc
+
+    filename = _export_filename(
+        project_name=snapshot.project_name,
+        snapshot_hash=snapshot.snapshot_hash,
+        format="package",
+    )
+    disposition = f'attachment; filename="{quote(filename)}"'
+    return Response(
+        content=payload,
+        media_type=_FORMAT_MEDIA_TYPES["package"],
+        headers={
+            "Content-Disposition": disposition,
+            "X-Export-Manifest-Hash": snapshot.snapshot_hash,
+            "X-Package-Manifest-Hash": package_manifest.package_hash,
+            "X-Package-Schema-Version": DERIVATIVE_EXPORT_PACKAGE_SCHEMA_VERSION,
+            "X-Export-Format": "package",
+            "X-Export-Project-Id": str(snapshot.project_id),
+        },
+    )
+
+
+def _phase22_evidence() -> DerivativeExportPhase22Evidence:
+    """Bound Phase 22 truth (0/3 blocked) — the quality dimension's input."""
+    return DerivativeExportPhase22Evidence(
+        green_observed=0,
+        green_required=PHASE22_GREEN_REQUIRED,
+        source=PHASE22_TRUTH_SOURCE,
+        source_hash=canonical_export_hash(
+            {"source": PHASE22_TRUTH_SOURCE, "truth": PHASE22_TRUTH}
+        ),
+    )
+
+
+def _implementation_evidence(
+    frozen: FrozenDerivativeExport,
+) -> tuple[tuple[DerivativeExportAuditEvidence, ...], bool, bool]:
+    """Honest runtime evidence: does the package machinery actually seal?"""
+    snapshot = frozen.snapshot
+    package_buildable = True
+    package_parity = True
+    build_detail = ""
+    try:
+        _payload, package_manifest = build_derivative_export_package(
+            snapshot, frozen.asset_reader()
+        )
+        build_detail = (
+            f"package sealed; package_hash={package_manifest.package_hash[:12]}..."
+        )
+    except ExportSnapshotError as exc:
+        # Preserve the failure as evidence — never a falsely-green report.
+        package_buildable = False
+        package_parity = False
+        build_detail = f"package blocked {exc.code}: {exc.detail}"
+    evidence = (
+        DerivativeExportAuditEvidence(
+            kind="package_buildable",
+            location="backend/app/services/derivative_export/package.py",
+            detail=build_detail,
+        ),
+        DerivativeExportAuditEvidence(
+            kind="package_manifest_hash_parity",
+            location="backend/app/services/derivative_export/package.py",
+            detail="package manifest hash replays every content entry",
+        ),
+        DerivativeExportAuditEvidence(
+            kind="module_importable",
+            location="backend/app/services/derivative_export/audit.py",
+            detail="derivative export audit module imports cleanly",
+        ),
+    )
+    return evidence, package_buildable, package_parity
+
+
+def _sample_data_evidence() -> tuple[tuple[DerivativeExportAuditEvidence, ...], bool]:
+    """Round-trip fixture evidence for the sample_data_coverage dimension."""
+    repo_root = Path(__file__).resolve().parents[3]
+    fixture_path = (
+        repo_root
+        / "backend"
+        / "tests"
+        / "fixtures"
+        / ("derivative_export_roundtrip_fixtures.py")
+    )
+    integration_path = (
+        repo_root / "backend" / "tests" / "integration" / ("test_derivative_export.py")
+    )
+    fixture_present = fixture_path.exists()
+    integration_present = integration_path.exists()
+    evidence = (
+        DerivativeExportAuditEvidence(
+            kind="roundtrip_fixtures_present",
+            location=str(fixture_path),
+            detail=f"exists={fixture_present}",
+        ),
+        DerivativeExportAuditEvidence(
+            kind="integration_suite_present",
+            location=str(integration_path),
+            detail=f"exists={integration_present}",
+        ),
+    )
+    return evidence, fixture_present and integration_present
+
+
+def _shipment_baseline_evidence() -> tuple[DerivativeExportShipmentItem, ...]:
+    """Honest REQ-SHIP-01 production baseline evidence (D-39-04).
+
+    ``docs/DEPLOYMENT.md#Production-Blockers`` explicitly records no TLS
+    ingress, no secret manager, no backup/restore drill and no monitoring and
+    alerting; only provider-key encryption/rotation compatibility exists. Cost
+    budget only has per-skill-run budget contracts (``SkillRun.budget_snapshot``),
+    no global cost-budget evidence. Missing production baseline evidence fails
+    closed (blocked) — the audit never invents green evidence.
+    """
+    return (
+        DerivativeExportShipmentItem(
+            requirement=DerivativeExportShipmentRequirement.TLS,
+            status=DerivativeExportShipmentEvidenceStatus.BLOCKED,
+            raw_evidence_link="docs/DEPLOYMENT.md#Production-Blockers",
+            detail="no TLS ingress or repeatable TLS deployment evidence",
+        ),
+        DerivativeExportShipmentItem(
+            requirement=DerivativeExportShipmentRequirement.SECRET_SOURCING_ROTATION,
+            status=DerivativeExportShipmentEvidenceStatus.UNVERIFIED,
+            raw_evidence_link=(
+                "docs/DEPLOYMENT.md#Security-Baseline-Already-Implemented"
+            ),
+            detail=(
+                "provider key encryption/rotation compatible; no secret-manager "
+                "evidence"
+            ),
+        ),
+        DerivativeExportShipmentItem(
+            requirement=DerivativeExportShipmentRequirement.BACKUP_RESTORE_DRILL,
+            status=DerivativeExportShipmentEvidenceStatus.BLOCKED,
+            raw_evidence_link="docs/DEPLOYMENT.md#Production-Blockers",
+            detail="no backup/restore drill evidence",
+        ),
+        DerivativeExportShipmentItem(
+            requirement=DerivativeExportShipmentRequirement.MONITORING_ALERT,
+            status=DerivativeExportShipmentEvidenceStatus.BLOCKED,
+            raw_evidence_link="docs/DEPLOYMENT.md#Production-Blockers",
+            detail="no monitoring/alerting evidence",
+        ),
+        DerivativeExportShipmentItem(
+            requirement=DerivativeExportShipmentRequirement.COST_BUDGET,
+            status=DerivativeExportShipmentEvidenceStatus.UNVERIFIED,
+            raw_evidence_link=(
+                "backend/app/models/agent_runtime.py:SkillRun.budget_snapshot"
+            ),
+            detail=(
+                "only per-skill-run budget contracts; no global cost-budget evidence"
+            ),
+        ),
+    )
+
+
+@router.get(DERIVATIVE_EXPORT_PATH + "/audit")
+async def audit_derivative_export(
+    project_id: int,
+    novel: Novel = Depends(require_owned_novel),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """Three-dimension status report + independent lineage and REQ-SHIP-01 gate.
+
+    ``implementation_readiness`` / ``sample_data_coverage`` /
+    ``quality_qualification`` are independent; the quality dimension reflects
+    the real Phase 22 state (blocked at 0/3 -> blocked verdict) and cannot be
+    substituted by a Phase 39 pass (D-39-03 / D-39-04).
+
+    Phase 39-04 (T-39-04-01/02): the report also carries the independently
+    recomputed lineage audit (source snapshot -> preparation artifact ->
+    approve_export approval -> materialized bundle -> download/audit event) and
+    the honest REQ-SHIP-01 production baseline. Every verdict keeps raw
+    evidence links; any orphaned artifact, lineage/hash mismatch, contamination,
+    Original mutation, unauthorized export, unverified EPUB, missing production
+    baseline evidence or Phase 22 blocker fails closed into ``blocked`` — the
+    only other verdict is ``qualified_candidate`` (never promotion).
+    """
+    frozen = await _freeze(
+        db,
+        owner_id=current_user.id,
+        novel_id=novel.id,
+        project_id=project_id,
+    )
+    snapshot = frozen.snapshot
+    manifest = seal_derivative_export_manifest(snapshot)
+    impl_evidence, package_buildable, package_parity = _implementation_evidence(frozen)
+    sample_evidence, sample_present = _sample_data_evidence()
+    lineage = await run_derivative_export_lineage_audit(
+        db,
+        owner_id=current_user.id,
+        novel_id=novel.id,
+        project_id=project_id,
+        snapshot_hash=snapshot.snapshot_hash,
+        manifest_hash=manifest.manifest_hash,
+        storage=_storage(),
+        epub_validated=False,
+        download_manifest_hash=snapshot.snapshot_hash,
+    )
+    shipment = build_derivative_export_shipment_baseline(_shipment_baseline_evidence())
+    report = build_derivative_export_audit(
+        manifest=manifest,
+        phase22=_phase22_evidence(),
+        implementation_evidence=impl_evidence,
+        sample_data_evidence=sample_evidence,
+        package_buildable=package_buildable,
+        package_manifest_hash_parity=package_parity,
+        sample_data_present=sample_present,
+        lineage=lineage,
+        shipment=shipment,
+    )
+    return report
+
+
+# ---------------------------------------------------------------------------
+# Phase 39-05: Agent preparation / approval / materialization routes (D-39-01)
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    DERIVATIVE_EXPORT_PATH + "/agent/prepare",
+    response_model=DerivativeExportAgentPrepareResponse,
+)
+async def agent_prepare_export(
+    project_id: int,
+    body: DerivativeExportAgentPrepareRequest,
+    novel: Novel = Depends(require_owned_novel),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+) -> DerivativeExportAgentPrepareResponse:
+    """Deterministic preparation freeze (authenticated, read-only).
+
+    Freezes the owner/novel/project-scoped approved-only snapshot + sealed
+    manifest + preparation_hash. This is the official candidate
+    ``ExportPreparationPayload`` the run may carry; it never writes any row and
+    the same DB state always returns the same preparation_hash.
+    """
+    try:
+        frozen = await prepare_export(
+            db,
+            owner_id=current_user.id,
+            novel_id=novel.id,
+            project_id=project_id,
+            branch=body.branch,
+            fork=body.fork,
+            evidence_refs=body.evidence_refs,
+            generator_lineage=dict(body.generator_lineage),
+            storage=_storage(),
+        )
+    except ExportSnapshotError as exc:
+        raise _map_error(exc) from exc
+    snapshot = frozen.snapshot
+    return DerivativeExportAgentPrepareResponse(
+        preparation=frozen.preparation_payload,
+        preparation_hash=frozen.preparation_hash,
+        snapshot_hash=snapshot.snapshot_hash,
+        manifest_hash=frozen.manifest.manifest_hash,
+        schema_version=EXPORT_PREPARATION_SCHEMA_VERSION,
+        export_version=DERIVATIVE_EXPORT_VERSION,
+        project_id=snapshot.project_id,
+        fork_id=snapshot.fork_id,
+        chapter_count=len(snapshot.chapters),
+        asset_count=len(snapshot.assets),
+        revision_count=len(snapshot.revisions),
+        citation_count=len(snapshot.citations),
+        candidate_only=True,
+    )
+
+
+def _map_materialize_error(exc: ExportMaterializationError) -> HTTPException:
+    return HTTPException(status_code=400, detail=f"{exc.code}: {exc.detail}")
+
+
+@router.post(DERIVATIVE_EXPORT_PATH + "/agent/approve")
+async def agent_approve_export(
+    project_id: int,
+    body: DerivativeExportAgentApproveRequest,
+    novel: Novel = Depends(require_owned_novel),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """Server-authoritative approve_export (39-05, candidate-only).
+
+    Binds the frozen candidate artifact revision + preparation_hash and creates
+    one pending ``approve_export`` Web ApprovalRequest. Never materializes.
+    """
+    try:
+        return await request_approve_export(
+            db,
+            owner_id=current_user.id,
+            novel_id=novel.id,
+            project_id=project_id,
+            artifact_id=body.artifact_id,
+            artifact_revision_id=body.artifact_revision_id,
+            preparation_hash=body.preparation_hash,
+            actor_id=current_user.id,
+            branch=body.branch,
+            fork=body.fork,
+            approval_note=body.approval_note,
+        )
+    except ExportMaterializationError as exc:
+        raise _map_materialize_error(exc) from exc
+
+
+@router.post(DERIVATIVE_EXPORT_PATH + "/agent/materialize")
+async def agent_materialize_export(
+    project_id: int,
+    body: DerivativeExportAgentMaterializeRequest,
+    novel: Novel = Depends(require_owned_novel),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """Deterministic materialize_export (39-05, approved-only).
+
+    Consumes an approved approve_export approval bound to the frozen artifact
+    revision + preparation_hash, promotes the candidate artifact to approved and
+    produces the reproducible bundle metadata. Download stays read-only.
+    """
+    try:
+        return await materialize_export(
+            db,
+            owner_id=current_user.id,
+            novel_id=novel.id,
+            project_id=project_id,
+            artifact_id=body.artifact_id,
+            artifact_revision_id=body.artifact_revision_id,
+            approval_id=body.approval_id,
+            preparation_hash=body.preparation_hash,
+            reason=body.reason,
+            actor_id=current_user.id,
+            branch=body.branch,
+            fork=body.fork,
+            storage=_storage(),
+        )
+    except ExportMaterializationError as exc:
+        raise _map_materialize_error(exc) from exc
+
+
+__all__ = [
+    "DERIVATIVE_EXPORT_PATH",
+    "DerivativeExportAgentApproveRequest",
+    "DerivativeExportAgentMaterializeRequest",
+    "DerivativeExportAgentPrepareRequest",
+    "DerivativeExportAgentPrepareResponse",
+    "DerivativeExportPrepareResponse",
+    "PHASE22_TRUTH",
+    "PHASE22_TRUTH_SOURCE",
+    "router",
+    "set_derivative_export_asset_storage",
+]

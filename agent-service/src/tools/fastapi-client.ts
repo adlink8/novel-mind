@@ -62,17 +62,37 @@ interface FacadeErrorEnvelope {
 function mapFacadeError(httpStatus: number, bodyText: string): AgentToolError {
   let code: string | undefined;
   let message: string | undefined;
+  let validationDetail: string | undefined;
   try {
     const parsed = JSON.parse(bodyText) as FacadeErrorEnvelope;
     if (parsed?.error?.code) {
       code = String(parsed.error.code);
       message = parsed.error.message;
+    } else if (httpStatus === 422 && Array.isArray(parsed?.detail)) {
+      // FastAPI 原生 RequestValidationError 信封：{detail: [{loc, msg}...]}。
+      // 浮现为 invalid_input + 字段明细（模型可据此自纠，而非盲目重试）。
+      validationDetail = parsed.detail
+        .map((item) => {
+          const loc = Array.isArray(item?.loc) ? item.loc.join(".") : "";
+          const msg = typeof item?.msg === "string" ? item.msg : "";
+          return `${loc}: ${msg}`.trim();
+        })
+        .filter((entry) => entry.length > 0)
+        .join("; ")
+        .slice(0, 500);
     }
   } catch {
     // 非 JSON 响应体（如网关 HTML 错误页）→ upstream_error。
   }
   if (code && KNOWN_CODES.has(code)) {
     return new AgentToolError(code, message ?? code, httpStatus);
+  }
+  if (validationDetail) {
+    return new AgentToolError(
+      AGENT_TOOL_ERRORS.INVALID_INPUT,
+      `invalid input: ${validationDetail}`,
+      httpStatus,
+    );
   }
   return new AgentToolError(AGENT_TOOL_ERRORS.UPSTREAM_ERROR, `upstream error (HTTP ${httpStatus})`, httpStatus);
 }
@@ -91,21 +111,27 @@ export async function fastapiToolCall(
   params: unknown,
   signal: AbortSignal | undefined,
   auth: string,
+  runNovelId: number,
 ): Promise<{ content: [{ type: "text"; text: string }]; details: Record<string, never> }> {
   const runSignal = signal ?? new AbortController().signal;
   // per-tool 硬超时与运行取消的并集：任一触发即中断 fetch。
   const ctrl = AbortSignal.any([runSignal, AbortSignal.timeout(TOOL_TIMEOUT_MS)]);
+  // novel_id 经查询参数注入（后端 require_owned_novel），且**始终使用 run 绑定的
+  // novel_id**（不信任模型在工具参数里填的 novel_id——模型可能猜测/填错，auth 校验
+  // 按 run.novel_id 强绑定）。body 只留工具自身参数。
+  const { novel_id: _ignored, ...toolParams } = (params ?? {}) as Record<string, unknown>;
+  const query = `?novel_id=${encodeURIComponent(String(runNovelId))}`;
 
   let res: Response;
   try {
-    res = await fetch(`${config.fastApiBaseUrl}/api/agent-tools/${name}`, {
+    res = await fetch(`${config.fastApiBaseUrl}/api/agent-tools/${name}${query}`, {
       method: "POST",
       headers: {
         "content-type": "application/json",
         // 原样透传：令牌只在请求头中流动，绝不写日志 / 错误信息。
         authorization: auth,
       },
-      body: JSON.stringify(params),
+      body: JSON.stringify(toolParams),
       signal: ctrl,
     });
   } catch (err) {
@@ -130,5 +156,48 @@ export async function fastapiToolCall(
     throw mapFacadeError(res.status, bodyText);
   }
 
+  return { content: [{ type: "text", text: bodyText }], details: {} };
+}
+
+/** Run-frozen restricted connector proxy; URL/version authority stays in FastAPI. */
+export async function fastapiConnectorToolCall(
+  toolName: string,
+  params: unknown,
+  signal: AbortSignal | undefined,
+  auth: string,
+  runNovelId: number,
+): Promise<{ content: [{ type: "text"; text: string }]; details: Record<string, never> }> {
+  const runSignal = signal ?? new AbortController().signal;
+  const ctrl = AbortSignal.any([runSignal, AbortSignal.timeout(TOOL_TIMEOUT_MS)]);
+  const connectorName = toolName.startsWith("connector:")
+    ? toolName.slice("connector:".length)
+    : "";
+  if (!/^[a-z0-9]+(?:[-_][a-z0-9]+)*$/.test(connectorName)) {
+    throw new AgentToolError(AGENT_TOOL_ERRORS.INVALID_INPUT, "invalid connector tool name");
+  }
+  let res: Response;
+  try {
+    res = await fetch(
+      `${config.fastApiBaseUrl}/api/agent-tools/connectors/${encodeURIComponent(connectorName)}?novel_id=${encodeURIComponent(String(runNovelId))}`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: auth },
+        body: JSON.stringify(params ?? {}),
+        signal: ctrl,
+      },
+    );
+  } catch (err) {
+    if (runSignal.aborted) throw err;
+    const reason = (err as Error)?.name ?? "";
+    if (reason === "TimeoutError" || reason === "AbortError") {
+      throw new AgentToolError(AGENT_TOOL_ERRORS.TIMEOUT, "connector tool timed out");
+    }
+    throw new AgentToolError(AGENT_TOOL_ERRORS.UPSTREAM_ERROR, "connector tool network error");
+  }
+  const bodyText = await res.text();
+  if (bodyText.length > TOOL_OUTPUT_BYTE_LIMIT) {
+    throw new AgentToolError(AGENT_TOOL_ERRORS.OUTPUT_TOO_LARGE, "connector response exceeds byte limit");
+  }
+  if (!res.ok) throw mapFacadeError(res.status, bodyText);
   return { content: [{ type: "text", text: bodyText }], details: {} };
 }

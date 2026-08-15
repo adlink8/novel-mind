@@ -1,0 +1,7 @@
+{
+  "novelId": "novel-001",
+  "generatedAt": "2026-07-01T12:00:00.000Z",
+  "structure": { "threeAct": { "setup": "book-1", "confrontation": "book-2", "resolution": "book-3" } },
+  "pacing": [ { "chapter": 1, "tension": 0.6 }, { "chapter": 2, "tension": 0.8 } ],
+  "characters": [ { "name": "Lin Zhe", "role": "protagonist" } ]
+}

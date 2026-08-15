@@ -1,0 +1,23 @@
+{
+  "name": "novel-mind-desktop-proof",
+  "version": "0.0.0",
+  "private": true,
+  "description": "DISPOSABLE proof-only harness for Phase 41 (Electron architecture / Windows packaging proof). No product UI, no backend domain logic.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "start": "node src/main.ts"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.1",
+    "@types/node": "^22.19.0",
+    "electron": "^43.3.0",
+    "electron-builder": "^26.15.3",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10"
+  }
+}

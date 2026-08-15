@@ -17,6 +17,7 @@ from app.core.security import require_user
 from app.models import Novel, User
 from app.schemas.novel import (
     NovelResponse,
+    NovelCreate,
     NovelListResponse,
     NovelUploadResponse,
     NovelUpdate,
@@ -33,6 +34,28 @@ from app.services.novel_service import novel_service
 from app.services.import_service import import_service
 
 router = APIRouter()
+
+
+@router.post("", response_model=NovelResponse, status_code=201)
+async def create_novel(
+    data: NovelCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """创建空小说并立即物化其默认内置 Skills。"""
+    novel = await novel_service.create_novel_record(
+        db,
+        data.title.strip(),
+        [],
+        author=data.author,
+        owner_id=current_user.id,
+    )
+    novel.description = data.description
+    novel.genre = data.genre
+    novel.cover_url = data.cover_url
+    await db.commit()
+    await db.refresh(novel)
+    return NovelResponse.model_validate(novel)
 
 
 @router.get("")
@@ -194,8 +217,15 @@ async def bulk_delete_novels(
 
 
 @router.get("/{novel_id}", response_model=NovelResponse)
-async def get_novel(novel: Novel = Depends(require_owned_novel)):
+async def get_novel(
+    novel: Novel = Depends(require_owned_novel),
+    db: AsyncSession = Depends(get_db),
+):
     """获取小说详情（含章节列表）"""
+    from app.services.agent_runtime.registry import ensure_builtin_skills
+
+    await ensure_builtin_skills(db, owner_id=novel.owner_id, novel_id=novel.id)
+    await db.flush()
     return NovelResponse.model_validate(novel)
 
 

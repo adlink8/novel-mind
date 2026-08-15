@@ -135,6 +135,7 @@ class NovelListResponse(BaseModel):
     chapter_count: int = 0
     word_count: int = 0
     status: str
+    reading_progress: Optional[dict] = None
     chunk_count: int = Field(
         default=0, description="检索分块数；0 表示尚未建立搜索索引"
     )

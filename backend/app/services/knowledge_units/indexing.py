@@ -15,6 +15,10 @@ from app.models.knowledge_unit import (
     NarrativeUnit,
 )
 from app.services.ai_service import ai_service
+from app.services.canon_fork.contamination import (
+    ORIGINAL_CANON,
+    original_index_guard,
+)
 from app.services.knowledge_units.materialize import stable_hash
 from app.services.vector_store import VectorStore, VectorStoreError, vector_store
 
@@ -45,10 +49,16 @@ class NarrativeIndexingService:
         *,
         snapshot_id: int,
         config: dict | None = None,
+        space: str = ORIGINAL_CANON,
     ) -> NarrativeIndexBuild:
         snapshot = await db.get(NarrativeSourceSnapshot, snapshot_id)
         if snapshot is None:
             raise CandidateIndexError("source snapshot not found")
+        # Shared derivative-write guard: the Original index may only be fed by
+        # Original Canon content (REQ-CRE-02 / D-35-02).
+        original_index_guard.assert_write_allowed(
+            space=space, owner_id=snapshot.owner_id, novel_id=snapshot.novel_id
+        )
         units = list(
             (
                 await db.scalars(
@@ -116,10 +126,16 @@ class NarrativeIndexingService:
         *,
         build_id: int,
         embedder: Callable[[list[str]], Awaitable[list[list[float]]]] | None = None,
+        space: str = ORIGINAL_CANON,
     ) -> CandidateBuildReport:
         build = await db.get(NarrativeIndexBuild, build_id)
         if build is None or build.status not in {"draft", "failed"}:
             raise CandidateIndexError("build is missing or not buildable")
+        # Shared derivative-write guard: the Original index may only be fed by
+        # Original Canon content (REQ-CRE-02 / D-35-02).
+        original_index_guard.assert_write_allowed(
+            space=space, owner_id=build.owner_id, novel_id=build.novel_id
+        )
         units = list(
             (
                 await db.scalars(

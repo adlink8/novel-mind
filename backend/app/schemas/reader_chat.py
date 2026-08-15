@@ -193,6 +193,19 @@ class GenerationJobView(StrictReaderChatModel):
     updated_at: datetime
 
 
+class BackfillRunView(StrictReaderChatModel):
+    """问答按需分析（chat_backfill）触发的 skill run 摘要（Phase 40）。
+
+    只暴露前端需要的字段；run 详情经 agent API 查询。仅用于展示
+    「后台分析中/已完成」状态。
+    """
+
+    run_id: int
+    skill_name: str
+    status: Literal["queued", "running", "cancelled", "completed", "failed"]
+    backfill_dimension: str | None = None
+
+
 class MessageView(StrictReaderChatModel):
     id: int
     conversation_id: int
@@ -205,7 +218,34 @@ class MessageView(StrictReaderChatModel):
     anchor: ChapterRangeAnchor | None = None
     citations: list[CitationView] = Field(default_factory=list)
     generation_job: GenerationJobView | None = None
+    queryplan: QueryPlanTraceView | None = None
+    backfill_runs: list[BackfillRunView] = Field(default_factory=list)
     created_at: datetime
+
+
+class QueryPlanTraceView(StrictReaderChatModel):
+    """Trace/citation-level exposure shared by Reader and Analysis Chat (26-04).
+
+    Mirrors the QueryPlan consumer view (trace id, availability, fallback and
+    leaf citation-jump targets). Only leaf/raw evidence appears in
+    ``citation_jump``; summaries, scores, routing metadata and chat text never
+    do (D-08).
+    """
+
+    trace_id: str = Field(min_length=32, max_length=64)
+    plan_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    intent: Literal["reader", "analysis"]
+    anchor_kind: Literal["selection", "chapter_range"] | None = None
+    cutoff_mode: str = Field(min_length=1, max_length=32)
+    through_chapter: int = Field(gt=0)
+    full_book_authorized: bool = False
+    availability: list[dict[str, str]] = Field(default_factory=list)
+    fallback: dict[str, Any] = Field(default_factory=dict)
+    manifest_checksum: str = Field(pattern=r"^[0-9a-f]{64}$")
+    allowed_evidence_ids: list[str] = Field(default_factory=list)
+    citation_jump: list[dict[str, Any]] = Field(default_factory=list)
+    abstained: bool = False
+    world_projection: dict[str, Any] | None = None
 
 
 class MessageAccepted(StrictReaderChatModel):

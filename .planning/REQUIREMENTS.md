@@ -26,6 +26,7 @@
 | REQ-AGENT-05 | Third-party packages load only from a pinned allowlist and lock manifest with declared permissions; tool-name/schema collisions fail closed at startup | 25.3-01/02 | PLANNED |
 | REQ-AGENT-06 | External MCP results are labeled `external_evidence` and never enter Canon, original-text evidence validation or core retrieval authority | 25.3-03 | PLANNED |
 | REQ-AGENT-07 | High-impact actions route through allow/ask/deny policy with Web Approval; Original Canon mutation and active-pointer moves are deterministic deny operations | 25.3-04 | PLANNED |
+| REQ-AGENT-08 | Model-produced structured outputs permit only conservative normalization, must pass strict post-repair validation, record repair lineage/warnings and never synthesize evidence or authority fields | 26-06 | PLANNED |
 
 ## v1.2 Trusted Understanding
 
@@ -35,6 +36,7 @@
 | REQ-QP-02 | Retrieval covers raw, event/causal, character state/goal/motivation/knowledge, relations, timeline, clues, world entities/rules and NM chapter/arc/global | 26-02 | PLANNED |
 | REQ-QP-03 | All factual citations materialize to hash/offset-verified leaf/raw EvidenceRef | 26-03 | PLANNED |
 | REQ-QP-04 | Reader and Analysis Chat share retrieval/citation authority with distinct anchors | 26-04 | PLANNED |
+| REQ-QP-05 | Missing domain readers follow an explicit deterministic fallback chain; heuristic extraction remains candidate-only and unresolved dimensions terminate as stable partial/unavailable reasons | 26-02 | PLANNED |
 | REQ-WM-01 | Event facts and causal edges are typed, versioned and evidence-gated | 27-01 | PLANNED |
 | REQ-WM-02 | Character state, goal, motivation and knowledge evolve by cutoff/POV | 27-02 | PLANNED |
 | REQ-WM-03 | World entity, rule, faction, place and item projections retain exceptions and lineage | 27-03 | PLANNED |
@@ -43,6 +45,8 @@
 | REQ-NM-02 | Semantic Arc/Volume/Global candidates continuously cover the source snapshot | 28-03 | PLANNED |
 | REQ-NM-03 | Timeline/relation/clue/character/world closure and one-click analysis expose dimension-specific progress | 28-04 | PLANNED |
 | REQ-NM-04 | NM remains candidate-only; no active pointer or consumer cutover | Phase 28 | LOCKED |
+| REQ-NM-05 | Chapter memory carries bounded previous context, non-authoritative next hints, continuity notes and non-indexed digests with source hash, cutoff and spoiler lineage | 28-02/05 | PLANNED |
+| REQ-NM-06 | Outline and mainline summaries are uncertainty-bearing candidate Artifacts with source lineage and never become Canon by generation alone | 28-03 | PLANNED |
 | REQ-QA-01 | Frozen reading QA spans local/cross-chapter/global/causal/knowledge/world/no-answer/spoiler buckets | 29-01 | PLANNED |
 | REQ-QA-02 | Retrieval, citation, faithfulness, relevance, abstention, latency and cost are evaluated by bucket | 29-02 | PLANNED |
 | REQ-QA-03 | Real browser UAT verifies citations, partial states and spoiler-safe Reader/Analysis Chat | 29-03 | PLANNED |
@@ -56,6 +60,7 @@
 | REQ-VIS-03 | Provider-neutral Scene Spec compiles to versioned prompts without unsupported canon details | Phase 32 | PLANNED |
 | REQ-VIS-04 | Illustration jobs are idempotent, budgeted, traceable and human-approved | Phase 33 | PLANNED |
 | REQ-VIS-05 | Approved images use hash-verified text anchors and survive responsive reading/export | Phase 34 | PLANNED |
+| REQ-VIS-06 | Speaker/dialogue textual heuristics expose offsets, confidence and warnings solely as scene-candidate recall/ranking signals, never as Canon or citation authority | 31-01/02 | PLANNED |
 
 ## v1.4 Canon Fork Derivatives
 
@@ -66,6 +71,31 @@
 | REQ-FORK-03 | Generation consumes an auditable cutoff state package and runs contradiction/character/timeline/clue checks | Phase 37 | PLANNED |
 | REQ-FORK-04 | Derivative Visual Bible/assets cannot mutate original visual authority | Phase 38 | PLANNED |
 | REQ-FORK-05 | Export preserves content/assets/citations/version parity and passes end-to-end UAT/audit | Phase 39 | PLANNED |
+| REQ-FORK-06 | Branch suggestions are disabled-by-default candidate outputs bound to conflict, Canon delta and evidence; they cannot auto-fork or reuse divergence/publication approval | 37-03/05 | PLANNED |
+
+## v1.5 Windows Desktop Runtime
+
+| ID | Requirement | Owner | Status |
+|---|---|---|---|
+| REQ-DESK-01 | A Windows Electron application hosts all existing NovelMind routes and verified user workflows without a parallel UI rewrite | Phase 41–42 | PLANNED |
+| REQ-DESK-02 | The renderer is sandboxed with context isolation, no Node integration, restrictive CSP/navigation/window policies and sender-validated capability-specific IPC | Phase 42 | PLANNED |
+| REQ-DESK-03 | A small `DesktopRuntime` interface deterministically starts, observes, restarts and shuts down the local Next, FastAPI, Agent Service and persistence/vector process graph | Phase 43 | PLANNED |
+| REQ-DESK-04 | The installed application requires no Docker and no user-installed Node, Python, PostgreSQL or vector-service runtime | Phase 41/43/45 | PLANNED |
+| REQ-DESK-05 | Mutable application data, logs and backups live under a versioned `%APPDATA%/NovelMind` layout and survive compatible upgrade/uninstall paths | Phase 43–45 | PLANNED |
+| REQ-DESK-06 | Runtime endpoints and local authentication are injected at startup without fixed-port assumptions; credentials leave renderer storage and use OS-backed protection | Phase 44 | PLANNED |
+| REQ-DESK-07 | Startup, migration, dependency, port, crash and provider failures are visible, recoverable and never reported as successful empty states | Phase 43–45 | PLANNED |
+| REQ-DESK-08 | Provider-independent reading/editing/local-data workflows start without internet; provider-dependent actions expose honest unavailable/blocked states | Phase 44–45 | PLANNED |
+| REQ-DESK-09 | Windows installation provides a single-instance application, clean process-tree shutdown, no terminal windows and a reversible versioned upgrade path | Phase 45 | PLANNED |
+| REQ-DESK-10 | Release qualification covers Electron integration, clean-VM install, first run, all existing critical workflows, IPC/security negatives, crash recovery and data preservation | Phase 45 | PLANNED |
+
+## v1.6 Provider Protocol Unification
+
+| ID | Requirement | Owner | Status |
+|---|---|---|---|
+| REQ-PROVIDER-01 | OpenAI、Anthropic、Gemini、Ollama 与自定义 OpenAI-compatible 使用同一版本化 provider profile/adapter 权威；模型目录分页、能力过滤、ID 规范化和创建/更新校验不得漂移 | Phase 46-01 | PLANNED |
+| REQ-PROVIDER-02 | Pi/Agent 网关与所有后端文本生成消费者只从当前 owner 的有效 `AIModelConfig` 解析 deployment；缺少、歧义、禁用或不安全配置时 fail closed，遗留硬编码模型池不再参与运行选择 | Phase 46-02 | PLANNED |
+| REQ-PROVIDER-03 | 五类供应商分别通过凭据隔离的目录发现、连接测试和 Pi 真实运行资格矩阵；没有可用凭据或服务时必须记录 BLOCKED/PARTIAL，不得以 mock 或单元测试冒充真实联通 | Phase 46-03 | PLANNED |
+| REQ-PROVIDER-04 | 每次实际调用保留 owner、provider、model、协议/能力、token、延迟、错误与可核验成本血缘；设置页只展示后端权威能力和诚实状态，未知价格/能力不得推测 | Phase 46-04 | PLANNED |
 
 ## Explicit Backlog
 
@@ -73,6 +103,7 @@
 |---|---|---|
 | REQ-999-PROMOTION | NM active pointer, production A/B, promotion and rollback | DEFERRED — explicit authorization required |
 | REQ-999-READER | Branch-only bookmarks/navigation/performance not needed by Phase 26–39 | BACKLOG — selective reimplementation only |
+| REQ-999-EMOTIONAL-MEMORY | Long-term emotional-memory projection inspired by AgentVN | DEFERRED — requires a separate epistemic schema, evaluation set and phase authorization |
 
 ## Requirements Status
 

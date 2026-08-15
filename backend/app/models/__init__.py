@@ -61,6 +61,8 @@ from app.models.character import Character, CharacterRelation
 from app.models.fanfiction import FanFiction
 from app.models.fanfiction_chapter import FanFictionChapter
 from app.models.ai_model import AIModelConfig
+from app.models.tool_connector import ToolConnector, ToolConnectorVersion
+from app.models.agent_settings import AgentSettings, AgentTaskModelBinding
 from app.models.ai_usage_log import AIUsageLog
 from app.models.app_setting import AppSetting
 from app.models.text_chunk import TextChunk
@@ -123,6 +125,7 @@ from app.models.reader_chat import (
     ReaderMessageSelection,
     ReaderModelCallAttempt,
 )
+from app.models.user_preference_memory import UserPreferenceMemory
 from app.models.clue import (
     ClueActivePointer,
     ClueAnalysisRun,
@@ -164,6 +167,94 @@ from app.models.narrative_memory_qualification import (
     NarrativeMemoryQualificationReport,
     NarrativeMemoryQualificationRun,
 )
+from app.models.agent_runtime import (
+    ApprovalRequest,
+    Artifact,
+    ArtifactRevision,
+    NovelAgentProfile,
+    SkillRegistry,
+    SkillRun,
+    SkillVersion,
+)
+from app.models.queryplan import QueryPlanTrace
+from app.models.world_model_event import (
+    WorldModelCausalEdge,
+    WorldModelConflict,
+    WorldModelEvent,
+)
+from app.models.world_model_knowledge import WorldModelKnowledge
+from app.models.world_model_entity import (
+    WorldModelAliasReview,
+    WorldModelEntity,
+    WorldModelEntityLink,
+    WorldModelRule,
+    WorldModelRuleException,
+)
+
+# 31-34 迁移在链上但模型未注册：补齐注册使 ORM metadata 与迁移链一致
+# （否则 alembic check 把四张既有表判为待删除的 drift）。
+from app.models.canon_space import CanonSpaceArtifact
+from app.models.canon_fork import CanonFork
+from app.models.derivative_project import DerivativeProject
+from app.models.derivative_chapter import DerivativeChapter
+from app.models.derivative_revision import DerivativeRevision
+from app.models.derivative_context import ContextPackageRecord
+from app.models.derivative_generation_job import (
+    DerivativeGenerationAttempt,
+    DerivativeGenerationCandidate,
+    DerivativeGenerationJob,
+)
+from app.models.derivative_override import DerivativeOverride
+from app.models.canon_contamination import CanonContaminationBlock
+from app.models.fanfiction_revision import FanFictionRevision
+from app.models.fanfiction_override import FanFictionOverride
+from app.models.reader_bookmark import ReaderBookmark
+from app.models.visual_bible import (
+    VisualBibleReviewEvent,
+    VisualBibleVersion,
+    VisualClaim,
+    VisualEntity,
+    VisualEvidenceRef,
+    VisualReferenceAsset,
+)
+from app.models.key_scene import (
+    SceneCandidate,
+    SceneCandidateSet,
+    SceneEvidenceRange,
+    SceneReviewDecision,
+)
+from app.models.scene_spec import (
+    SceneSpecDetail,
+    SceneSpecEvidenceRef,
+    SceneSpecNegativeConstraint,
+    SceneSpecUncertainty,
+    SceneSpecVersion,
+)
+from app.models.prompt_revision import (
+    PromptRevision,
+    PromptRevisionReviewEvent,
+)
+from app.models.illustration_job import (
+    IllustrationAttempt,
+    IllustrationBudgetLedger,
+    IllustrationBudgetReservation,
+    IllustrationJob,
+    IllustrationReviewEvent,
+)
+from app.models.illustration import (
+    AssetRevision,
+    ConsistencyReport,
+)
+from app.models.illustration_anchor import (
+    IllustrationAnchor,
+    IllustrationAnchorProposal,
+)
+from app.models.derivative_visual import (
+    DerivativeVisualAsset,
+    DerivativeVisualEntity,
+    DerivativeVisualReviewEvent,
+    DerivativeVisualVersion,
+)
 
 __all__ = [
     "Base",
@@ -191,6 +282,11 @@ __all__ = [
     "FanFiction",
     "FanFictionChapter",
     "AIModelConfig",
+    "ToolConnector",
+    "ToolConnectorVersion",
+    "AgentSettings",
+    "AgentTaskModelBinding",
+    "UserPreferenceMemory",
     "AIUsageLog",
     "AppSetting",
     "TextChunk",
@@ -272,4 +368,65 @@ __all__ = [
     "NarrativeMemoryQualificationRun",
     "NarrativeMemoryQualificationCaseResult",
     "NarrativeMemoryQualificationReport",
+    "SkillRegistry",
+    "SkillVersion",
+    "SkillRun",
+    "Artifact",
+    "ArtifactRevision",
+    "NovelAgentProfile",
+    "ApprovalRequest",
+    "QueryPlanTrace",
+    "WorldModelEvent",
+    "WorldModelCausalEdge",
+    "WorldModelConflict",
+    "WorldModelKnowledge",
+    "WorldModelEntity",
+    "WorldModelRule",
+    "WorldModelRuleException",
+    "WorldModelEntityLink",
+    "WorldModelAliasReview",
+    "CanonSpaceArtifact",
+    "CanonFork",
+    "DerivativeProject",
+    "DerivativeChapter",
+    "DerivativeRevision",
+    "ContextPackageRecord",
+    "DerivativeGenerationJob",
+    "DerivativeGenerationAttempt",
+    "DerivativeGenerationCandidate",
+    "DerivativeOverride",
+    "CanonContaminationBlock",
+    "FanFictionRevision",
+    "FanFictionOverride",
+    "ReaderBookmark",
+    "VisualBibleVersion",
+    "VisualEntity",
+    "VisualClaim",
+    "VisualEvidenceRef",
+    "VisualReferenceAsset",
+    "VisualBibleReviewEvent",
+    "SceneCandidateSet",
+    "SceneCandidate",
+    "SceneEvidenceRange",
+    "SceneReviewDecision",
+    "SceneSpecVersion",
+    "SceneSpecDetail",
+    "SceneSpecNegativeConstraint",
+    "SceneSpecEvidenceRef",
+    "SceneSpecUncertainty",
+    "PromptRevision",
+    "PromptRevisionReviewEvent",
+    "IllustrationJob",
+    "IllustrationAttempt",
+    "IllustrationBudgetLedger",
+    "IllustrationBudgetReservation",
+    "IllustrationReviewEvent",
+    "AssetRevision",
+    "ConsistencyReport",
+    "IllustrationAnchor",
+    "IllustrationAnchorProposal",
+    "DerivativeVisualVersion",
+    "DerivativeVisualEntity",
+    "DerivativeVisualAsset",
+    "DerivativeVisualReviewEvent",
 ]

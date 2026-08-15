@@ -1046,7 +1046,7 @@ async def test_api_router_mounted_and_cross_owner_404(
 ):
     from httpx import ASGITransport, AsyncClient
     from app.core.database import get_db
-    from app.core.security import require_user
+    from app.core.security import require_agent_actor, require_user
     from app.main import app
     from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
@@ -1091,6 +1091,9 @@ async def test_api_router_mounted_and_cross_owner_404(
 
     app.dependency_overrides[get_db] = _override_db
     app.dependency_overrides[require_user] = _as_other
+    # require_owned_novel depends on require_agent_actor (not require_user),
+    # so both must be overridden for the cross-owner path to reach the 404.
+    app.dependency_overrides[require_agent_actor] = _as_other
     try:
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -1102,6 +1105,7 @@ async def test_api_router_mounted_and_cross_owner_404(
             assert "Relationship Graph Novel" not in detail
 
         app.dependency_overrides[require_user] = _as_owner
+        app.dependency_overrides[require_agent_actor] = _as_owner
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             ok = await client.get(f"/api/relationships/{ids['novel_id']}/graph")
             assert ok.status_code == 200
@@ -1120,4 +1124,5 @@ async def test_api_router_mounted_and_cross_owner_404(
     finally:
         app.dependency_overrides.pop(get_db, None)
         app.dependency_overrides.pop(require_user, None)
+        app.dependency_overrides.pop(require_agent_actor, None)
         await aengine.dispose()

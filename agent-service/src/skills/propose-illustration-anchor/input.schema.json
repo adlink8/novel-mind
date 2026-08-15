@@ -1,0 +1,129 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ProposeIllustrationAnchorInput",
+  "description": "propose-illustration-anchor Phase 34 运行输入：novel_id（必填）与确定性锚点域按引用消费的输入锚——chapter_id/chapter_number、proposal_key、source_snapshot_id/source_snapshot_hash、精确 source span（source_start/source_end + 可选 paragraph）、excerpt/anchor_hash/chapter_content_hash、proposal-ready asset_revision_id（Phase 33 handoff）、presentation（caption/alt_text/citation）与 requested_actions（publish_illustration / attach_illustration_to_text，二者都要求 Web ApprovalRequest）。可选 branch/fork（derivative mode）。锚定字段仅声明意图范围，最终 scope/cutoff/proposal_ready/精确 hash/range 由服务端强制（fail closed，D-34-01）。",
+  "type": "object",
+  "required": [
+    "novel_id",
+    "chapter_id",
+    "chapter_number",
+    "proposal_key",
+    "source_snapshot_id",
+    "source_snapshot_hash",
+    "source_start",
+    "source_end",
+    "excerpt",
+    "anchor_hash",
+    "chapter_content_hash",
+    "asset_revision_id",
+    "presentation",
+    "requested_actions"
+  ],
+  "properties": {
+    "novel_id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "目标小说 ID（必须与运行路径中的 novel_id 一致）"
+    },
+    "branch": {
+      "type": ["string", "null"],
+      "maxLength": 80,
+      "description": "衍生分支；原始主线为 null（owner/novel/branch 血缘绑定）"
+    },
+    "fork": {
+      "type": ["string", "null"],
+      "maxLength": 80,
+      "description": "衍生 fork（仅 derivative mode；original 模式必须为 null）"
+    },
+    "chapter_id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "锚点目标章节 ID（服务端重验 owner/novel 血缘）"
+    },
+    "chapter_number": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "锚点目标章节号（必须与章节血缘一致）"
+    },
+    "proposal_key": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "description": "幂等重放提案键（D-34-01）"
+    },
+    "source_snapshot_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "description": "source snapshot 血缘 ID（与 Phase 33 冻结时一致）"
+    },
+    "source_snapshot_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "source snapshot 血缘 hash（64 hex）"
+    },
+    "source_start": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "精确 source span 起点（code-point offset，含）"
+    },
+    "source_end": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "精确 source span 终点（code-point offset，不含；必须大于 source_start）"
+    },
+    "paragraph_start": {
+      "type": ["integer", "null"],
+      "minimum": 1,
+      "description": "可选段落范围起点（reader/export 布局坐标）"
+    },
+    "paragraph_end": {
+      "type": ["integer", "null"],
+      "minimum": 1,
+      "description": "可选段落范围终点（reader/export 布局坐标；必须 >= paragraph_start）"
+    },
+    "excerpt": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 20000,
+      "description": "锚点覆盖的精确原文摘录（anchor_hash 必须从它重放）"
+    },
+    "anchor_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "D-34-01：excerpt 的 SHA-256；偏移/hash 不匹配即 stale，绝不静默移位"
+    },
+    "chapter_content_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "锚点冻结时的章节正文 SHA-256（服务端对当前正文重放）"
+    },
+    "asset_revision_id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "proposal-ready AssetRevision ID（Phase 33 handoff；服务端重验 proposal_ready + rights cleared）"
+    },
+    "presentation": {
+      "type": "object",
+      "description": "可访问 caption/alt/citation 契约（D-34-02）",
+      "required": ["caption", "alt_text", "citation"],
+      "properties": {
+        "caption": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "alt_text": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "citation": { "type": "string", "minLength": 1, "maxLength": 1000 }
+      },
+      "additionalProperties": false
+    },
+    "requested_actions": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": ["publish_illustration", "attach_illustration_to_text"]
+      },
+      "description": "请求的 Phase 34 action；每个 action 都创建 pending Web ApprovalRequest（D-11），Agent/浏览器绝不发布"
+    }
+  },
+  "additionalProperties": false
+}

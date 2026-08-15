@@ -1,0 +1,55 @@
+{
+  "tightenedPath": {
+    "entries": 67,
+    "excludedTokens": [
+      "node",
+      "npm",
+      "npx",
+      "python",
+      "python3",
+      "py",
+      "docker",
+      "docker-compose",
+      "podman",
+      "psql",
+      "postgres",
+      "pg_ctl",
+      "pg_dump",
+      "uvicorn",
+      "venv",
+      "Scripts",
+      "Pip",
+      "ChocolateyBin"
+    ]
+  },
+  "machine": {
+    "type": "local-dev-workstation",
+    "clean_vm": false,
+    "vm_image": null,
+    "vm_snapshot_id": null,
+    "provisioning": "No clean Windows VM was available or authorized for this wave. run-qualification.ps1 tightens PATH (removes Node/Python/Docker/PostgreSQL binaries) and isolates NOVELMIND_USER_DATA to simulate a first-run clean machine; this is an approximation, not pristine-VM evidence (D-45-07/D-45-09 fail-closed truth).",
+    "os": {
+      "family": "Windows",
+      "edition": "Windows 11 Pro",
+      "version": "10.0.22631 (22H2)",
+      "arch": "x64"
+    },
+    "runtime_prerequisites_required": [
+      "none"
+    ],
+    "external_resources": [],
+    "paid_resource_authorization": "none â€” no paid or external VM/cloud resource was used"
+  },
+  "limitations": [
+    "Local workstation, not a pristine Windows VM snapshot — developer-machine smoke, NOT clean-VM evidence (D-45-07).",
+    "Packaged adapter auto-wiring in the main process remains a documented post-45 prerequisite; the renderer is served from the bundled tree through the packaged exe's embedded Node via the NOVELMIND_RENDERER_URL seam."
+  ],
+  "provisionedAt": "2026-08-10T22:58:25Z",
+  "schemaVersion": 1,
+  "userDataIsolation": {
+    "override": "NOVELMIND_USER_DATA",
+    "dir": "C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\novelmind-qual\\run-5ee173c52b1d4787970b8aac011406ee",
+    "insideTemp": true
+  },
+  "machine_identity": "github-actions windows-latest pristine VM (run 31440428819)"
+}
