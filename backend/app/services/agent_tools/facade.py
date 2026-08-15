@@ -42,6 +42,8 @@ import logging
 from collections.abc import Awaitable, Callable
 from typing import Any
 
+from sqlalchemy import select
+
 from app.models import Novel
 from app.schemas.novel import ChapterResponse, NovelResponse
 from app.schemas.relationship import RelationshipVersionSource
@@ -369,7 +371,7 @@ class ToolFacade:
         self, *, db, novel: Novel, owner_id: int, params: dict
     ):
         svc = self._svc("search_novel_text", _default_search_novel_text)
-        return await svc(
+        outcome = await svc(
             db,
             owner_id=owner_id,
             novel_id=novel.id,
@@ -377,6 +379,35 @@ class ToolFacade:
             mode=params.get("mode", "auto"),
             top_k=int(params.get("top_k", 10)),
         )
+        # D-05 剧透边界：命中行必须按阅读 cutoff 过滤（与 get_timeline 同一
+        # 纪律；持久化 full_book 开关除外）。未过滤的超 cutoff 命中既泄露原文
+        # 片段进 transcript，又让模型拿去物化 span 时全部 beyond_cutoff 撞墙。
+        if _persisted_full_book(novel):
+            return outcome
+        cutoff = await self.cutoff_resolver(db, novel)
+        rows = list(outcome.get("results") or [])
+        if cutoff is None or not rows:
+            return outcome
+        chapter_ids = [r.get("chapter_id") for r in rows if r.get("chapter_id")]
+        if not chapter_ids:
+            return outcome
+        from app.models.novel import Chapter
+
+        numbers = (
+            await db.execute(
+                select(Chapter.id, Chapter.chapter_number).where(
+                    Chapter.id.in_(chapter_ids)
+                )
+            )
+        ).all()
+        chapter_number = {cid: num for cid, num in numbers}
+        filtered = [
+            row
+            for row in rows
+            if row.get("chapter_id") is not None
+            and chapter_number.get(row["chapter_id"], 0) <= int(cutoff)
+        ]
+        return {**outcome, "results": filtered}
 
     async def _get_timeline(self, *, db, novel: Novel, owner_id: int, params: dict):
         persisted_full_book = _persisted_full_book(novel)
@@ -590,12 +621,16 @@ class ToolFacade:
     async def _get_evidence_span(self, *, db, novel, owner_id, params):
         svc = self._svc("get_evidence_span", _default_get_evidence_span)
         raw_hash = params.get("content_hash")
+        raw_start = params.get("source_start")
+        raw_end = params.get("source_end")
+        raw_chunk = params.get("chunk_id")
         span = await svc(
             db,
             chapter_id=int(params["chapter_id"]),
-            source_start=int(params["source_start"]),
-            source_end=int(params["source_end"]),
+            source_start=int(raw_start) if raw_start is not None else None,
+            source_end=int(raw_end) if raw_end is not None else None,
             content_hash=str(raw_hash) if raw_hash is not None else None,
+            chunk_id=int(raw_chunk) if raw_chunk is not None else None,
         )
         if span is None:
             raise NotFoundError("章节不存在")

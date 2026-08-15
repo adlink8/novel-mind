@@ -318,6 +318,72 @@ async def test_facade_maps_domain_errors_to_frozen_codes(tool_name, error_cls):
     assert excinfo.value.code in AGENT_TOOL_ERROR_CODES
 
 
+async def test_search_results_beyond_cutoff_are_filtered():
+    """search_novel_text 命中行必须按阅读 cutoff 过滤（D-05 剧透边界）。
+
+    E2E 实测：未过滤时搜索返回 cutoff 后章节（62/81/204 > cutoff 53）的命中，
+    模型拿这些 chapter 去物化 span 全部 beyond_cutoff 撞墙，预算烧穿；
+    且超 cutoff 原文片段本身就不该进入 agent transcript。
+    """
+
+    async def fake_search(db, *, owner_id, novel_id, query, mode, top_k):
+        return {
+            "results": [
+                {"chapter_id": 1, "chunk_id": 11, "content_snippet": "甲"},
+                {"chapter_id": 2, "chunk_id": 12, "content_snippet": "乙"},
+                {"chapter_id": 9, "chunk_id": 13, "content_snippet": "丙"},
+            ],
+            "resolved_mode": "chunks",
+            "fallback_reason": None,
+        }
+
+    class _FakeResult:
+        def __init__(self, rows):
+            self._rows = rows
+
+        def all(self):
+            return self._rows
+
+    class _FakeDb:
+        async def execute(self, stmt, params=None):
+            # chapter_id → chapter_number：1→1, 2→3, 9→10（cutoff=3）
+            return _FakeResult([(1, 1), (2, 3), (9, 10)])
+
+    facade = _facade(service_overrides={"search_novel_text": fake_search})
+    outcome = await facade.execute(
+        "search_novel_text",
+        db=_FakeDb(),
+        novel=_novel(),
+        owner_id=1,
+        params={"query": "测试"},
+    )
+
+    chapter_ids = [row["chapter_id"] for row in outcome["results"]]
+    assert chapter_ids == [1, 2]
+
+
+async def test_search_results_unfiltered_when_full_book_persisted():
+    """持久化 full_book 开关开启时不过滤（与 get_timeline 同一纪律）。"""
+
+    async def fake_search(db, *, owner_id, novel_id, query, mode, top_k):
+        return {
+            "results": [{"chapter_id": 9, "chunk_id": 13, "content_snippet": "丙"}],
+            "resolved_mode": "chunks",
+            "fallback_reason": None,
+        }
+
+    facade = _facade(service_overrides={"search_novel_text": fake_search})
+    outcome = await facade.execute(
+        "search_novel_text",
+        db=object(),
+        novel=_novel(reading_progress={"timeline_full_book": True}),
+        owner_id=1,
+        params={"query": "测试"},
+    )
+
+    assert [row["chapter_id"] for row in outcome["results"]] == [9]
+
+
 async def test_facade_unknown_tool_maps_to_invalid_input():
     facade = _facade()
     with pytest.raises(AgentToolError) as excinfo:

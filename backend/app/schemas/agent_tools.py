@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class StrictAgentToolModel(BaseModel):
@@ -158,11 +158,24 @@ class GetEvidenceSpanRequest(StrictAgentToolModel):
 
     只返回冻结原文切片；offsets 非法 → 拒绝。``content_hash`` 可选：省略时
     服务端计算并返回；提供时校验与切片一致，不匹配 → 拒绝（防漂移）。
+
+    ``chunk_id`` 通道：携带 search_novel_text 命中行的 chunk_id 时，服务端
+    在章节原文中定位 chunk 内容并确定性推导 offsets，source_start/source_end
+    可省略（模型无需自行数字符）；未携带 chunk_id 时 offsets 必填。
     """
 
     chapter_id: int = Field(..., gt=0, description="章节 ID")
-    source_start: int = Field(..., ge=0, description="切片起点（含，code-point）")
-    source_end: int = Field(..., gt=0, description="切片终点（不含）")
+    source_start: int | None = Field(
+        default=None, ge=0, description="切片起点（含，code-point；chunk_id 缺省时必填）"
+    )
+    source_end: int | None = Field(
+        default=None, gt=0, description="切片终点（不含；chunk_id 缺省时必填）"
+    )
+    chunk_id: int | None = Field(
+        default=None,
+        gt=0,
+        description="text_chunks 行 ID（来自 search_novel_text 命中行）；提供时服务端推导 offsets",
+    )
     content_hash: str | None = Field(
         default=None,
         min_length=64,
@@ -170,6 +183,14 @@ class GetEvidenceSpanRequest(StrictAgentToolModel):
         pattern="^[0-9a-f]{64}$",
         description="该切片内容的 SHA-256（可选；省略时服务端计算）",
     )
+
+    @model_validator(mode="after")
+    def validate_offsets_or_chunk(self) -> "GetEvidenceSpanRequest":
+        if self.chunk_id is None and (
+            self.source_start is None or self.source_end is None
+        ):
+            raise ValueError("未携带 chunk_id 时 source_start/source_end 必填")
+        return self
 
 
 class GetVisualBibleRequest(StrictAgentToolModel):

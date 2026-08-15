@@ -324,7 +324,7 @@ def _service_stub(tool: str, handler):
         )
 
     async def stub_evidence_span(
-        db, *, chapter_id, source_start, source_end, content_hash
+        db, *, chapter_id, source_start, source_end, content_hash, chunk_id=None
     ):
         return await _call_handler(
             handler,

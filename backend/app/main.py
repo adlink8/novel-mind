@@ -240,9 +240,33 @@ async def request_validation_error_handler(
     if request.url.path.startswith("/api/agent-tools") or request.url.path.startswith(
         "/api/gateway"
     ):
+        # 字段级明细浮现给模型（agent-tools 的主要调用方）：泛化消息会让模型
+        # 盲目重试同一错误参数（E2E 实测 422 死循环烧穿 max_calls 预算）。
+        details: list[str] = []
+        for err in exc.errors()[:5]:
+            loc = ".".join(str(part) for part in err.get("loc", ()))
+            msg = str(err.get("msg", ""))
+            entry = f"{loc}: {msg}".strip(": ")
+            if entry:
+                details.append(entry)
+        message = "参数校验失败"
+        if details:
+            message = f"{message}（{'; '.join(details)}）"[:500]
+        # 诊断日志：记录失败请求体（工具参数，无密钥——令牌只在 header），
+        # 否则模型的参数错误形状完全不可观测。
+        try:
+            body = await request.body()
+            logger.warning(
+                "agent-tools 422 %s body=%s errors=%s",
+                request.url.path,
+                body[:300].decode("utf-8", errors="replace"),
+                details,
+            )
+        except Exception:
+            pass
         return JSONResponse(
             status_code=422,
-            content={"error": {"code": "invalid_input", "message": "参数校验失败"}},
+            content={"error": {"code": "invalid_input", "message": message}},
         )
     from fastapi.encoders import jsonable_encoder
 

@@ -162,13 +162,38 @@ async def _default_get_world_rules(
     return {"rules": rules, "exceptions": exceptions}
 
 
+def _locate_chunk_offsets(content: str, chunk_text: str) -> tuple[int, int] | None:
+    """在章节原文中定位 chunk 内容，返回 half-open raw offsets。
+
+    先精确子串匹配；失败则做空白规范化回退——chunker 建索引时可能折叠
+    空白（换行/缩进），导致 chunk.content 不是原文的逐字节子串（E2E 实测
+    chunk 32642 仅规范化后匹配）。规范化命中后按非空白字符索引映射回原文
+    offsets，excerpt 始终是原文真实切片。多次命中取第一个（确定性）。
+    """
+    start = content.find(chunk_text)
+    if start >= 0:
+        return start, start + len(chunk_text)
+    norm_to_raw = [i for i, ch in enumerate(content) if not ch.isspace()]
+    normalized = "".join(content[i] for i in norm_to_raw)
+    norm_chunk = "".join(ch for ch in chunk_text if not ch.isspace())
+    if not norm_chunk:
+        return None
+    idx = normalized.find(norm_chunk)
+    if idx < 0:
+        return None
+    raw_start = norm_to_raw[idx]
+    raw_end = norm_to_raw[idx + len(norm_chunk) - 1] + 1
+    return raw_start, raw_end
+
+
 async def _default_get_evidence_span(
     db,
     *,
     chapter_id: int,
-    source_start: int,
-    source_end: int,
+    source_start: int | None,
+    source_end: int | None,
     content_hash: str | None,
+    chunk_id: int | None = None,
 ) -> dict[str, Any] | None:
     """按 chapter+offsets 物化 leaf 证据跨度（D-07/D-08）。
 
@@ -176,12 +201,34 @@ async def _default_get_evidence_span(
     （fail closed，绝不返回错误切片）。``content_hash`` 可选：省略时服务端
     从切片确定性计算并返回；提供时校验与切片一致，不匹配 → InvalidInputError
     （防漂移，fail closed）。
+
+    ``chunk_id`` 通道（search_novel_text 命中行直挂）：text_chunks 的
+    source_start/source_end 多数为 NULL，但 chunk.content 是章节原文子串，
+    服务端在原文中定位并确定性推导 offsets——模型无需自行数字符。
+    chunk 缺失 / 不属于该章节 → None（404-hide）；chunk 内容不在章节原文
+    中（索引漂移）→ InvalidInputError（fail closed）。
     """
     chapter = await novel_service.get_chapter(db, chapter_id)
     if chapter is None:
         return None
     content = chapter.content
-    if source_start < 0 or source_end > len(content) or source_end <= source_start:
+    if chunk_id is not None:
+        from app.models.text_chunk import TextChunk
+
+        chunk = await db.get(TextChunk, chunk_id)
+        if chunk is None or chunk.chapter_id != chapter_id:
+            return None
+        located = _locate_chunk_offsets(content, chunk.content)
+        if located is None:
+            raise InvalidInputError("chunk 内容与章节原文不匹配（索引漂移）")
+        source_start, source_end = located
+    if (
+        source_start is None
+        or source_end is None
+        or source_start < 0
+        or source_end > len(content)
+        or source_end <= source_start
+    ):
         raise InvalidInputError(
             f"offsets [{source_start},{source_end}) 不是合法 half-open 区间"
         )

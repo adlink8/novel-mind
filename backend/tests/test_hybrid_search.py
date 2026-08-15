@@ -236,6 +236,27 @@ class TestHybridRerank:
         assert chunk3["score"] == pytest.approx(0.5)
 
     @pytest.mark.asyncio
+    async def test_hybrid_rerank_preserves_source_offsets(self):
+        """BM25 行的 source_start/source_end 必须穿透融合排序。
+
+        agent 证据链依赖它：模型按 search_novel_text 命中行的
+        (chapter_id, source_start, source_end) 直接调 get_evidence_span
+        物化 leaf 证据；rerank 逐字段重建 dict 时丢掉 offsets → 模型只能
+        瞎猜 offsets（E2E 实测 get_evidence_span 连续 422/404、搜索死循环）。
+        """
+        service = HybridSearchService()
+
+        bm25 = _make_bm25_result(chunk_id=1, score=0.8)
+        bm25["source_start"] = 120
+        bm25["source_end"] = 640
+
+        merged = await service._hybrid_rerank([bm25], [], top_k=10)
+
+        assert len(merged) == 1
+        assert merged[0]["source_start"] == 120
+        assert merged[0]["source_end"] == 640
+
+    @pytest.mark.asyncio
     async def test_hybrid_rerank_dedup(self):
         """同一 chunk_id 在 BM25 和向量中均出现时合并分数"""
         service = HybridSearchService()
