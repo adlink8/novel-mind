@@ -25,6 +25,11 @@ import {
   isAnalysisSkill,
 } from "./structured-output/analysis-envelope-builder.js";
 import { extractRuntimeToolEvidence } from "./tools/tool-evidence.js";
+import {
+  executeGuidedRun,
+  isGuidedSkill,
+} from "./guided/executor.js";
+import type { ToolCaller as GuidedToolCaller } from "./guided/retrieval.js";
 
 /** poller 依赖（与 server.ts resolveDeps 对齐）。 */
 export interface PollerDeps {
@@ -32,6 +37,8 @@ export interface PollerDeps {
   loadSkillImpl?: (name: string) => LoadedSkill;
   validateRunOutputImpl?: (skill: LoadedSkill, output: unknown) => void;
   createSessionImpl?: typeof createSession;
+  /** guided 模式的工具调用 seam（测试注入；默认走 FastAPI 门面）。 */
+  guidedCallTool?: GuidedToolCaller;
 }
 
 interface QueuedRunItem {
@@ -128,6 +135,7 @@ function resolvePollerDeps(deps: PollerDeps = {}) {
         /* 输出校验可选；后端 finalize 权威兜底。 */
       }),
     createSessionImpl: deps.createSessionImpl ?? createSession,
+    guidedCallTool: deps.guidedCallTool,
   };
 }
 
@@ -429,6 +437,49 @@ async function executeRun(
   }
 }
 
+/** 组装 guided 执行参数（复用 agentic 路径的 run 血缘构造纪律）。 */
+function buildGuidedOptions(
+  deps: ReturnType<typeof resolvePollerDeps>,
+  claimed: ClaimedRun,
+): Parameters<typeof executeGuidedRun>[0] {
+  const skill = deps.loadSkillImpl(claimed.skill_name ?? "");
+  const question = String(
+    (claimed.input ?? {}).question ?? (claimed.input ?? {}).query ?? "",
+  ).trim();
+  if (!question) {
+    throw new Error("backfill run input.question missing");
+  }
+  const runLineage: RunLineageContext = {
+    runId: String(claimed.run_id),
+    ownerId: claimed.owner_id,
+    novelId: claimed.novel_id,
+    skillVersionId: claimed.skill_version_id,
+    inputHash: claimed.input_hash,
+    ...(Number.isInteger(claimed.input.cutoff_chapter)
+      ? { cutoffChapter: Number(claimed.input.cutoff_chapter) }
+      : {}),
+    ...(typeof (claimed.input.source_snapshot as { snapshot_hash?: unknown } | undefined)
+        ?.snapshot_hash === "string"
+      ? {
+          sourceSnapshotHash: String(
+            (claimed.input.source_snapshot as { snapshot_hash: string }).snapshot_hash,
+          ),
+        }
+      : {}),
+  };
+  return {
+    fetchImpl: deps.fetchImpl,
+    ...(deps.guidedCallTool ? { callTool: deps.guidedCallTool } : {}),
+    runId: claimed.run_id,
+    novelId: claimed.novel_id,
+    internalToken: claimed.internal_token,
+    question,
+    branch: claimed.branch ?? null,
+    skill,
+    runLineage,
+  };
+}
+
 async function notifyCancel(
   fetchImpl: typeof fetch,
   novelId: number,
@@ -511,7 +562,13 @@ export function createPoller(
         try {
           const claimed = await claimRun(deps.fetchImpl, item.run_id);
           internalToken = claimed.internal_token;
-          await executeRun(deps, manifest, claimed);
+          // guided 模式（确定性检索 + 单轮生成）：模型不接触工具与原始
+          // ID/key；其余 skill 走 agentic 工具循环。
+          if (isGuidedSkill(claimed.skill_name ?? "")) {
+            await executeGuidedRun(buildGuidedOptions(deps, claimed));
+          } else {
+            await executeRun(deps, manifest, claimed);
+          }
         } catch (err) {
           if (err instanceof ClaimConflictError) return;
           const message = err instanceof Error ? err.message : "unknown execution error";

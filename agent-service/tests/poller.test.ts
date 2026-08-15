@@ -682,130 +682,6 @@ describe("createPoller", () => {
     expect(finals[0].stop_reason).toBe("error");
   });
 
-  it("build-visual-bible backfill finalizes visual_bible envelope", async () => {
-    // P1a：模型只产出语义 entities/claims + 从 get_evidence_span 结果里选择的
-    // evidence_keys；全部哈希/血缘字段（stable_id / claim_key / claim_hash /
-    // schema_hash / policy_hash / manifest_hash / source_snapshot_* / cutoff）
-    // 由 builder 投影确定性注入（与 detect-key-scenes 同一纪律）。
-    const spanHash = "1".repeat(64);
-    const evidenceKey = `qp:1:0:40:${spanHash}`;
-    const { deps } = makePollerDeps({
-      lastText: JSON.stringify({
-        type: "visual_bible",
-        schema_version: "visual-bible.v1",
-        visual_bible: {
-          entities: [
-            {
-              entity_key: "char-ayla",
-              entity_type: "character",
-              description: "amber hair",
-              authority: "canon_fact",
-            },
-          ],
-          claims: [
-            {
-              entity_key: "char-ayla",
-              authority: "canon_fact",
-              description: "amber braided hair",
-              evidence_keys: [evidenceKey],
-            },
-          ],
-        },
-      }),
-      toolResults: [
-        {
-          role: "toolResult",
-          toolName: "get_evidence_span",
-          isError: false,
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify({
-                evidence_key: evidenceKey,
-                chapter_id: 1,
-                chapter_number: 1,
-                novel_id: 6,
-                source_start: 0,
-                source_end: 40,
-                content_hash: spanHash,
-                excerpt: "amber braided hair",
-              }),
-            },
-          ],
-        },
-      ],
-    });
-    const fetchMock = deps.fetchImpl as ReturnType<typeof vi.fn>;
-    installBackendMock(fetchMock, { skillName: "build-visual-bible" });
-
-    const poller = createPoller(deps, [], { intervalMs: 10 });
-    const stop = poller.start();
-    await new Promise((r) => setTimeout(r, 50));
-    stop();
-
-    const finals = finalizeCalls(fetchMock);
-    expect(finals.length).toBe(1);
-    expect(finals[0].stop_reason).toBe("stop");
-    expect(finals[0].envelope.type).toBe("visual_bible");
-    expect(finals[0].envelope.schema_version).toBe("visual-bible.v1");
-    const version = finals[0].envelope.visual_bible;
-    expect(version.version_key).toBe("vb-backfill-run-1");
-    expect(version.source_snapshot_hash).toBe("b".repeat(64));
-    expect(version.cutoff_chapter).toBe(1);
-    expect(version.schema_hash).toMatch(/^[0-9a-f]{64}$/);
-    expect(version.policy_hash).toMatch(/^[0-9a-f]{64}$/);
-    expect(version.manifest_hash).toMatch(/^[0-9a-f]{64}$/);
-    expect(version.review_state).toBe("candidate");
-    expect(version.entities[0].stable_id).toBe("stable-char-ayla");
-    expect(version.entities[0].disclosure_cutoff).toBe(1);
-    expect(version.claims[0].claim_key).toBe("vb-backfill-run-1-0");
-    expect(version.claims[0].claim_hash).toMatch(/^[0-9a-f]{64}$/);
-    expect(version.claims[0].evidence_refs[0].evidence_key).toBe(evidenceKey);
-    expect(version.claims[0].evidence_refs[0].content_hash).toBe(spanHash);
-    expect(finals[0].envelope.evidence_refs).toEqual([evidenceKey]);
-    expect(finals[0].frozen_manifest.evidence_refs).toEqual(finals[0].envelope.evidence_refs);
-  });
-
-  it("build-visual-bible 引用未物化的 evidence_key → fail closed", async () => {
-    // P1a：编造的 evidence_key（无对应 get_evidence_span 工具结果）必须让
-    // run 进入 failed 终态，绝不写入信封。
-    const { deps } = makePollerDeps({
-      lastText: JSON.stringify({
-        type: "visual_bible",
-        schema_version: "visual-bible.v1",
-        visual_bible: {
-          entities: [
-            {
-              entity_key: "char-ayla",
-              entity_type: "character",
-              description: "amber hair",
-              authority: "canon_fact",
-            },
-          ],
-          claims: [
-            {
-              entity_key: "char-ayla",
-              authority: "canon_fact",
-              description: "fabricated evidence",
-              evidence_keys: ["qp:1:0:40:" + "9".repeat(64)],
-            },
-          ],
-        },
-      }),
-    });
-    const fetchMock = deps.fetchImpl as ReturnType<typeof vi.fn>;
-    installBackendMock(fetchMock, { skillName: "build-visual-bible" });
-
-    const poller = createPoller(deps, [], { intervalMs: 10 });
-    const stop = poller.start();
-    await new Promise((r) => setTimeout(r, 50));
-    stop();
-
-    const finals = finalizeCalls(fetchMock);
-    expect(finals.length).toBe(1);
-    expect(finals[0].stop_reason).toBe("error");
-  });
-
   it("analysis skill with non-JSON model output reaches a failed terminal state", async () => {
     const { deps } = makePollerDeps({ lastText: "这是一段普通文本，不是 JSON。" });
     const fetchMock = deps.fetchImpl as ReturnType<typeof vi.fn>;
@@ -1064,5 +940,148 @@ describe("createPoller", () => {
     expect(finalizes.length).toBe(1);
     const body = JSON.parse(String(finalizes[0][1]?.body ?? "{}"));
     expect(body.stop_reason).not.toBe("stop");
+  });
+});
+
+
+describe("guided 模式（build-visual-bible：确定性检索 + 单轮生成）", () => {
+  const SPAN_HASH = "c".repeat(64);
+  const SPAN_KEY = `qp:1:0:40:${SPAN_HASH}`;
+
+  /** guided 路径的 fetch mock：queued → claim → gateway chat → finalize。 */
+  function installGuidedMock(fetchMock: ReturnType<typeof vi.fn>, modelText: string) {
+    let queued = true;
+    fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+      const method = init?.method ?? "GET";
+      if (url.endsWith("/queued-runs") && method === "GET") {
+        const items = queued
+          ? [{
+              run_id: 1, owner_id: 2, novel_id: 6, skill_version_id: 9,
+              input: { novel_id: 6, question: "死城的环境" },
+              input_hash: "a".repeat(64), branch: null,
+              backfill_dimension: "relations", origin: "chat_backfill",
+              user_message_id: null,
+            }]
+          : [];
+        queued = false;
+        return Promise.resolve(new Response(JSON.stringify({ items, total: items.length }), { status: 200 }));
+      }
+      if (url.endsWith("/claim") && method === "POST") {
+        return Promise.resolve(new Response(JSON.stringify({
+          run_id: 1, owner_id: 2, novel_id: 6, skill_version_id: 9,
+          skill_name: "build-visual-bible",
+          input: {
+            novel_id: 6, question: "死城的环境",
+            source_snapshot: { snapshot_hash: "b".repeat(64) },
+            cutoff_chapter: 53,
+          },
+          input_hash: "a".repeat(64), branch: null,
+          backfill_dimension: "relations", origin: "chat_backfill",
+          user_message_id: null, frozen_manifest: {}, budget_snapshot: {},
+          internal_token: "tok-guided",
+        }), { status: 200 }));
+      }
+      if (url.includes("/api/gateway/v1/chat/completions")) {
+        return Promise.resolve(new Response(JSON.stringify({
+          choices: [{ message: { role: "assistant", content: modelText }, finish_reason: "stop" }],
+          usage: { input: 10, output: 5 },
+        }), { status: 200 }));
+      }
+      if (url.endsWith("/finalize") && method === "POST") {
+        return Promise.resolve(new Response(JSON.stringify({ artifact: { id: 7 } }), { status: 200 }));
+      }
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    });
+  }
+
+  /** guided 检索 fake：一次 search + 一次 span 物化。 */
+  const guidedCallTool = async (name: string, params: unknown) => {
+    if (name === "search_novel_text") {
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify({
+          results: [{ chunk_id: 11, chapter_id: 1, chapter_number: 51, score: 0.9 }],
+        }) }] as [{ type: "text"; text: string }],
+      };
+    }
+    if (name === "get_evidence_span") {
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify({
+          evidence_key: SPAN_KEY, chapter_id: 1, chapter_number: 51,
+          novel_id: 6, source_start: 0, source_end: 40,
+          content_hash: SPAN_HASH, excerpt: "死城景象摘录",
+        }) }] as [{ type: "text"; text: string }],
+      };
+    }
+    throw new Error(`unexpected ${name}`);
+  };
+
+  function guidedFinalizeCalls(fetchMock: ReturnType<typeof vi.fn>) {
+    return fetchMock.mock.calls
+      .filter(
+        (c) => String(c[0]).endsWith("/finalize") && (c[1] as RequestInit)?.method === "POST",
+      )
+      .map((c) => JSON.parse(String((c[1] as RequestInit)?.body ?? "{}")));
+  }
+
+  it("单轮生成 + 编号映射：finalize 信封携带真实 evidence_key", async () => {
+    const modelText = JSON.stringify({
+      visual_bible: {
+        entities: [{
+          entity_key: "place-dead-city", entity_type: "place",
+          description: "死城", authority: "canon_fact",
+        }],
+        claims: [{
+          entity_key: "place-dead-city", authority: "canon_fact",
+          description: "死城布满眼球状凸起", evidence_indices: [1],
+        }],
+      },
+    });
+    const { deps } = makePollerDeps();
+    deps.guidedCallTool = guidedCallTool;
+    const fetchMock = deps.fetchImpl as ReturnType<typeof vi.fn>;
+    installGuidedMock(fetchMock, modelText);
+
+    const poller = createPoller(deps, [], { intervalMs: 10 });
+    const stop = poller.start();
+    await new Promise((r) => setTimeout(r, 80));
+    stop();
+
+    const finals = guidedFinalizeCalls(fetchMock);
+    expect(finals.length).toBe(1);
+    expect(finals[0].stop_reason).toBe("stop");
+    const version = finals[0].envelope.visual_bible;
+    expect(version.review_state).toBe("candidate");
+    expect(version.claims[0].evidence_refs[0].evidence_key).toBe(SPAN_KEY);
+    expect(version.claims[0].evidence_refs[0].content_hash).toBe(SPAN_HASH);
+    expect(finals[0].envelope.evidence_refs).toEqual([SPAN_KEY]);
+  });
+
+  it("编号越界 → repair 一轮后仍越界 → failed 终态零写入", async () => {
+    const modelText = JSON.stringify({
+      visual_bible: {
+        entities: [{
+          entity_key: "place-dead-city", entity_type: "place",
+          description: "死城", authority: "canon_fact",
+        }],
+        claims: [{
+          entity_key: "place-dead-city", authority: "canon_fact",
+          description: "编造编号", evidence_indices: [9],
+        }],
+      },
+    });
+    const { deps } = makePollerDeps();
+    deps.guidedCallTool = guidedCallTool;
+    const fetchMock = deps.fetchImpl as ReturnType<typeof vi.fn>;
+    installGuidedMock(fetchMock, modelText);
+
+    const poller = createPoller(deps, [], { intervalMs: 10 });
+    const stop = poller.start();
+    await new Promise((r) => setTimeout(r, 120));
+    stop();
+
+    const finals = guidedFinalizeCalls(fetchMock);
+    expect(finals.length).toBe(1);
+    expect(finals[0].stop_reason).toBe("error");
+    expect(finals[0].envelope).toEqual({});
   });
 });
