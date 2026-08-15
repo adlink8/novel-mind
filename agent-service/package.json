@@ -7,6 +7,7 @@
     "node": ">=22.19.0"
   },
   "scripts": {
+    "build": "tsc && node scripts/sync-skills.mjs",
     "test": "vitest run",
     "verify:lockfile": "node scripts/verify-lockfile.mjs",
     "scan:packages": "node scripts/scan-packages.mjs"
