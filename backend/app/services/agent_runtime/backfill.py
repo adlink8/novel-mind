@@ -29,7 +29,13 @@ from app.services.timeline.query import resolve_chapter_cutoff
 MAX_BACKFILL_SKILLS = 2
 
 # 需要 source snapshot / cutoff 血缘锚定的 skill（契约要求程序产出哈希字段）。
-_SNAPSHOT_ANCHORED_SKILLS = frozenset({"detect-key-scenes", "build-visual-bible"})
+# 值 = snapshot hash 命名空间：各域物化器按自己的 kind 重放哈希
+# （stale_snapshot_lineage 检查），命名空间用错会在 materialize 时永远 stale
+# （E2E run 102 实测：visual-bible run 锚定 key_scene 哈希 → 全部 claim stale）。
+_SNAPSHOT_ANCHORED_SKILLS: dict[str, str] = {
+    "detect-key-scenes": "key_scene",
+    "build-visual-bible": "visual_bible",
+}
 
 # 维度→skill 映射（QueryDimension 词汇，queryplan/schemas.py）。
 # 值：(skill_name, materializes_domain_table)
@@ -135,16 +141,19 @@ async def create_backfill_runs(
     """
     created: list[SkillRun] = []
     # 血缘锚定懒计算：只有契约要求程序产出哈希的 skill 才加载章节/进度。
-    snapshot_anchor: dict[str, Any] | None = None
+    # 章节集只加载一次；各命名空间哈希从同一章节集重放（确定性）。
+    _chapters_cache: Any = None
+    _cutoff_cache: int | None = None
+    snapshot_anchors: dict[str, dict[str, Any]] = {}
 
-    async def _resolve_snapshot_anchor() -> dict[str, Any] | None:
-        nonlocal snapshot_anchor
-        if snapshot_anchor is not None:
-            return snapshot_anchor
+    async def _load_chapters_and_cutoff() -> tuple[Any, int] | None:
+        nonlocal _chapters_cache, _cutoff_cache
+        if _chapters_cache is not None and _cutoff_cache is not None:
+            return _chapters_cache, _cutoff_cache
         novel = await db.get(Novel, novel_id)
         if novel is None or novel.owner_id != owner_id:
             return None
-        snapshot_hash_value, chapters = await SceneBoundaryService(
+        _snapshot_hash, chapters = await SceneBoundaryService(
             db
         ).load_source_snapshot(owner_id=owner_id, novel_id=novel_id)
         if not chapters:
@@ -152,11 +161,39 @@ async def create_backfill_runs(
         cutoff_value = await resolve_chapter_cutoff(db, novel)
         if cutoff_value is None:
             return None
-        snapshot_anchor = {
+        _chapters_cache = chapters
+        _cutoff_cache = int(cutoff_value)
+        return _chapters_cache, _cutoff_cache
+
+    async def _resolve_snapshot_anchor(namespace: str) -> dict[str, Any] | None:
+        if namespace in snapshot_anchors:
+            return snapshot_anchors[namespace]
+        loaded = await _load_chapters_and_cutoff()
+        if loaded is None:
+            return None
+        chapters, cutoff_value = loaded
+        if namespace == "visual_bible":
+            from app.services.visual_bible.evidence import (
+                compute_source_snapshot_hash as compute_visual_hash,
+            )
+
+            snapshot_hash_value = compute_visual_hash(
+                owner_id=owner_id, novel_id=novel_id, chapters=chapters
+            )
+        else:
+            from app.services.key_scenes.boundaries import (
+                compute_source_snapshot_hash as compute_key_scene_hash,
+            )
+
+            snapshot_hash_value = compute_key_scene_hash(
+                owner_id=owner_id, novel_id=novel_id, chapters=chapters
+            )
+        anchor = {
             "source_snapshot": {"snapshot_hash": snapshot_hash_value},
-            "cutoff_chapter": int(cutoff_value),
+            "cutoff_chapter": cutoff_value,
         }
-        return snapshot_anchor
+        snapshot_anchors[namespace] = anchor
+        return anchor
 
     for skill_name, dimension in pick_backfill_skills(unavailable_dimensions):
         version = await _resolve_active_skill_version(
@@ -185,7 +222,7 @@ async def create_backfill_runs(
             "branch": None,
         }
         if skill_name in _SNAPSHOT_ANCHORED_SKILLS:
-            anchor = await _resolve_snapshot_anchor()
+            anchor = await _resolve_snapshot_anchor(_SNAPSHOT_ANCHORED_SKILLS[skill_name])
             if anchor is None:
                 # 无章节/无进度可锚定：诚实跳过，绝不产出无血缘 run。
                 continue

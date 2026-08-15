@@ -21,6 +21,9 @@ from app.services.key_scenes.boundaries import (
     ChapterRecord,
     compute_source_snapshot_hash,
 )
+from app.services.visual_bible.evidence import (
+    compute_source_snapshot_hash as compute_visual_snapshot_hash,
+)
 
 pytestmark = pytest.mark.unit
 
@@ -161,6 +164,40 @@ async def test_detect_key_scenes_run_input_carries_cutoff_chapter(
     assert runs[0].input.get("cutoff_chapter") == 1
 
 
+async def test_visual_bible_run_input_uses_visual_snapshot_namespace(
+    db_session: AsyncSession,
+):
+    """build-visual-bible 的 snapshot hash 必须是 visual_bible 命名空间。
+
+    key_scene 与 visual_bible 的 compute_source_snapshot_hash 只有 kind 不同，
+    但物化器按各自命名空间重放（stale_snapshot_lineage 检查）；用错命名空间
+    的 run 会在 materialize 时永远 stale（E2E run 102 实测）。
+    """
+    owner, novel, message_id = await _seed_novel_with_chapters(
+        db_session, with_skill=False
+    )
+    await _seed_visual_bible_skill(db_session, owner, novel)
+
+    runs = await create_backfill_runs(
+        db_session,
+        owner_id=owner.id,
+        novel_id=novel.id,
+        user_message_id=message_id,
+        question="慕师靖长什么样？",
+        unavailable_dimensions=["relations"],
+    )
+
+    assert len(runs) == 1
+    chapters = (
+        ChapterRecord(chapter_id=0, chapter_number=1, content=CHAPTER_1),
+        ChapterRecord(chapter_id=0, chapter_number=2, content=CHAPTER_2),
+    )
+    expected = compute_visual_snapshot_hash(
+        owner_id=owner.id, novel_id=novel.id, chapters=chapters
+    )
+    assert runs[0].input["source_snapshot"]["snapshot_hash"] == expected
+
+
 async def test_world_model_run_input_not_polluted_by_scene_snapshot(
     db_session: AsyncSession,
 ):
@@ -267,5 +304,12 @@ async def test_visual_bible_run_input_carries_snapshot_and_cutoff(
     assert len(runs) == 1
     snapshot = runs[0].input.get("source_snapshot")
     assert snapshot is not None, "run input 缺少 source_snapshot"
-    assert snapshot["snapshot_hash"] == _expected_snapshot_hash(owner.id, novel.id)
+    # visual_bible 命名空间（物化器按此重放；key_scene 哈希会永远 stale）
+    chapters = (
+        ChapterRecord(chapter_id=0, chapter_number=1, content=CHAPTER_1),
+        ChapterRecord(chapter_id=0, chapter_number=2, content=CHAPTER_2),
+    )
+    assert snapshot["snapshot_hash"] == compute_visual_snapshot_hash(
+        owner_id=owner.id, novel_id=novel.id, chapters=chapters
+    )
     assert runs[0].input.get("cutoff_chapter") == 1
