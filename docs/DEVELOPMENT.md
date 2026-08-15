@@ -8,6 +8,7 @@
 | Services | `backend/app/services/` |
 | ORM models | `backend/app/models/` |
 | Migrations | `backend/migrations/versions/` |
+| Agent Service | `agent-service/src/`（poller/skills/guided/structured-output/tools） |
 | Frontend routes | `frontend/src/app/` |
 | Frontend components | `frontend/src/components/` |
 | Human documentation | `README.md`, `IMPLEMENTATION-STATUS.md`, `docs/` |
@@ -38,6 +39,11 @@ cd backend
 ```
 
 当前 PostgreSQL 16 验证 head 为 `518675fa18f8`，三条命令均通过。
+
+## Agent Service 开发
+
+- 修改 `agent-service/src/**/*.ts` 后必须 `npm run build`：`tsc` 编译 + `scripts/sync-skills.mjs` 把 `src/skills/` 下的 SKILL.md / JSON / YAML 资源同步进 dist；`start.mjs` 运行的是 dist 产物，漏同步会加载旧 prompt。
+- 修改 builtin skill 的 SKILL.md / skill.yaml 属契约变更：必须先升 `skill.yaml` 版本号，再执行 `python backend/scripts/sync_builtin_skill_manifests.py` 重新生成 `backend/app/services/agent_runtime/builtin_manifests.json` 快照。`ensure_builtin_skills` 据此为已有小说生成新版本行；同版本号 checksum 漂移直接报 `SkillContractError`；版本行不可变，旧版本行保留，历史 run 血缘不受影响。
 
 ## Definition Of Done
 

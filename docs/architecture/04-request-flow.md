@@ -1,6 +1,6 @@
 # 04 — 请求与业务流
 
-描述 NovelMind 主要请求链路的完整流程，包括认证、小说导入、阅读、RAG 检索等。
+描述 NovelMind 主要请求链路的完整流程，包括认证、小说导入、阅读、读者问答（Skill Run 运行时）、RAG 检索等。
 
 ## 认证流程
 
@@ -137,6 +137,74 @@ sequenceDiagram
 
     Note: 阅读进度暂存于 Novel.reading_progress 字段
 ```
+
+---
+
+## 读者问答流程（嵌入式 Novel Agent 运行时）
+
+阅读器选中文字提问后，FastAPI 侧只组装并冻结上下文、入队 SkillRun；模型执行由 agent-service 的 queued-run poller **拉模式**完成（绝不 FastAPI→agent-service）。
+
+```mermaid
+sequenceDiagram
+    participant U as 用户
+    participant F as Next.js 阅读器
+    participant B as FastAPI (/api/reader-chat)
+    participant DB as PostgreSQL
+    participant AG as agent-service (poller)
+    participant GW as 模型网关
+
+    U->>F: 选中文字 → 问 AI
+    F->>B: POST /api/reader-chat/{novel_id}/conversations/{id}/ask
+    B->>B: validate_selection + 检索证据(剧透过筛) + 冻结 ContextManifest
+    B->>DB: INSERT ReaderGenerationJob + SkillRun(queued, origin='reader_chat')
+    B-->>F: 任务受理（前端轮询消息列表）
+
+    alt 证据维度不足（chat_backfill）
+        B->>DB: INSERT SkillRun(queued, origin='chat_backfill')（≤2 个，按维度映射去重）
+        B->>DB: job 挂起 paused_dependency: waiting_analysis:<维度>
+        Note over B,DB: 无映射维度 → 诚实失败 backfill_unavailable
+    end
+
+    AG->>B: GET /api/agent/queued-runs（定时轮询）
+    B-->>AG: queued runs
+    AG->>B: POST .../claim（原子 claim + lease 过期 reclaim）
+
+    alt agentic 模式（answer-reading-question 等）
+        AG->>B: 域工具调用（search_novel_text / get_evidence_span，owner/cutoff/预算门照常生效）
+        AG->>GW: pi 工具循环，模型自编排工具并输出结构化 JSON
+        Note over AG: 运行中预算熔断：max_calls 超限立即 abort
+    else guided 模式（build-visual-bible / detect-key-scenes）
+        AG->>B: 程序确定性检索（bigram 扇出）+ chunk_id 物化
+        AG->>GW: 单次网关补全（编号摘录菜单 → 语义 JSON，菜单绝不含 evidence_key）
+        AG->>AG: evidence_indices → evidence_key 翻译（越界 fail closed）
+    end
+
+    Note over AG: 模型只产语义字段；schema/policy/manifest/claim 哈希与<br/>snapshot/cutoff 血缘由投影层程序注入
+    AG->>B: POST finalize（envelope + frozen_manifest + usage）
+    B->>B: integrity 门 + 预算 fail-closed + 引用白名单校验
+    alt 校验通过
+        B->>DB: candidate-only Artifact + 域表 candidate 行<br/>（或 reader_chat 答案物化回 ReaderMessage/Citation）
+        Note over DB: backfill 物化完成(materialized:...) → reconcile 重建 manifest → 重入队 answer run
+    else 校验失败 / 取消
+        B->>DB: run failed/cancelled，零写入
+    end
+```
+
+**关键约束**：
+
+- 修复环有界（MAX_REPAIR_ROUNDS=2）：信封构建/校验失败把错误清单 + 已物化证据菜单喂回同一会话定向修正，超出 fail closed
+- 产物一律 candidate-only（如 visual_bible_versions、key_scene_sets 的 candidate 行）；只有用户在审查界面显式批准（append-only review 事件）后才成为可用权威
+- `waiting_analysis` 挂起有 30 分钟超时与恢复分类：backfill failed/cancelled/超时/物化失败均让 job 诚实失败，不永久停摆
+
+**来源**:
+- `backend/app/services/agent_runtime/reader_bridge.py` — reader chat ↔ SkillRun 桥接（入队/挂起/reconcile/答案物化）
+- `backend/app/services/agent_runtime/backfill.py` — `DIMENSION_TO_SKILL` 维度映射 + backfill run 创建（快照锚定按命名空间）
+- `backend/app/services/agent_runtime/finalize.py` — 确定性 finalizer（integrity 门、零写入纪律）
+- `agent-service/src/poller.ts` — 轮询/claim/agentic 执行/修复环/预算熔断
+- `agent-service/src/guided/executor.ts` — guided 模式编排（GUIDED_SKILLS 注册表、单次补全）
+- `agent-service/src/guided/retrieval.ts` — bigram 扇出检索 + chunk_id 物化 + 编号菜单
+- `agent-service/src/guided/translate.ts` — evidence_indices → evidence_key（fail closed）
+- `agent-service/src/structured-output/*-projection.ts` — 语义→契约投影（哈希/血缘程序注入）
 
 ---
 
