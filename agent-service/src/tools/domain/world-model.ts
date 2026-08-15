@@ -96,12 +96,19 @@ export function buildWorldModelTools(auth: ToolAuth, runNovelId: number) {
       name: "get_evidence_span",
       label: "Get Evidence Span",
       description:
-        "按 chapter+offsets 物化 leaf 证据跨度（D-07/D-08）。content_hash 可选：省略时服务端计算并返回；提供时校验与切片匹配，不匹配或超截止点拒绝。只返回冻结原文切片。",
+        "物化 leaf 证据跨度（D-07/D-08）。首选：携带 search_novel_text 命中行的 chapter_id + chunk_id（服务端在原文中定位 chunk、确定性推导 offsets，无需自行数字符）；备选：chapter_id + source_start/source_end 手动 offsets。content_hash 可选：省略时服务端计算并返回。只返回冻结原文切片。",
       parameters: Type.Object({
         novel_id: Type.Integer({ minimum: 1, description: "小说 ID" }),
-        chapter_id: Type.Integer({ minimum: 1, description: "章节 ID" }),
-        source_start: Type.Integer({ minimum: 0, description: "切片起点（含）" }),
-        source_end: Type.Integer({ minimum: 1, description: "切片终点（不含）" }),
+        chapter_id: Type.Integer({ minimum: 1, description: "数据库章节 ID（search 命中行的 chapter_id 字段原样传入；不是章节序号 chapter_number）" }),
+        chunk_id: Type.Optional(
+          Type.Integer({ minimum: 1, description: "search_novel_text 命中行的 chunk ID（提供时无需 offsets）" }),
+        ),
+        source_start: Type.Optional(
+          Type.Integer({ minimum: 0, description: "切片起点（含；chunk_id 缺省时必填）" }),
+        ),
+        source_end: Type.Optional(
+          Type.Integer({ minimum: 1, description: "切片终点（不含；chunk_id 缺省时必填）" }),
+        ),
         content_hash: Type.Optional(
           Type.String({
             minLength: 64,

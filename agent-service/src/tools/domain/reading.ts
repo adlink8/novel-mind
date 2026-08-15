@@ -34,7 +34,7 @@ export function buildReadingTools(auth: ToolAuth, runNovelId: number) {
         "获取章节正文全文。owner 校验 + 剧透截止点（beyond_cutoff）在服务端强制执行。",
       parameters: Type.Object({
         novel_id: Type.Integer({ minimum: 1, description: "小说 ID" }),
-        chapter_id: Type.Integer({ minimum: 1, description: "章节 ID" }),
+        chapter_id: Type.Integer({ minimum: 1, description: "数据库章节 ID（search 命中行的 chapter_id 字段原样传入；不是章节序号 chapter_number）" }),
       }),
       execute: (toolCallId, params, signal) =>
         fastapiToolCall("get_chapter", params as unknown, signal, auth, runNovelId),
@@ -47,8 +47,19 @@ export function buildReadingTools(auth: ToolAuth, runNovelId: number) {
       parameters: Type.Object({
         novel_id: Type.Integer({ minimum: 1, description: "小说 ID" }),
         query: Type.String({ minLength: 1, description: "搜索关键词" }),
-        limit: Type.Optional(
-          Type.Integer({ minimum: 1, maximum: 50, description: "返回上限" }),
+        top_k: Type.Optional(
+          Type.Integer({ minimum: 1, maximum: 50, description: "返回结果数量上限" }),
+        ),
+        mode: Type.Optional(
+          Type.Union(
+            [
+              Type.Literal("auto"),
+              Type.Literal("chunks"),
+              Type.Literal("units"),
+              Type.Literal("hybrid"),
+            ],
+            { description: "检索意图（默认 auto，由服务端 router 决策）" },
+          ),
         ),
       }),
       execute: (toolCallId, params, signal) =>
@@ -58,11 +69,21 @@ export function buildReadingTools(auth: ToolAuth, runNovelId: number) {
       name: "get_timeline",
       label: "Get Timeline",
       description:
-        "时间线事件视图。full_book 仅当用户持久化开关开启才被服务端采纳（防剧透）。",
+        "时间线事件视图。剧透截止点由服务端 resolve_chapter_cutoff 决定（防剧透）。",
       parameters: Type.Object({
         novel_id: Type.Integer({ minimum: 1, description: "小说 ID" }),
-        full_book: Type.Optional(
-          Type.Boolean({ description: "仅当持久化全量开关开启时被采纳" }),
+        ordering: Type.Optional(
+          Type.Union([Type.Literal("narrative"), Type.Literal("story")], {
+            description: "排序方式（默认 narrative）",
+          }),
+        ),
+        person: Type.Optional(Type.String({ description: "人物过滤" })),
+        causal: Type.Optional(Type.Boolean({ description: "是否包含因果边" })),
+        chapter_start: Type.Optional(
+          Type.Integer({ minimum: 1, description: "起始章节（含）" }),
+        ),
+        chapter_end: Type.Optional(
+          Type.Integer({ minimum: 1, description: "结束章节（含）" }),
         ),
       }),
       execute: (toolCallId, params, signal) =>
@@ -75,9 +96,22 @@ export function buildReadingTools(auth: ToolAuth, runNovelId: number) {
         "角色关系图。owner 校验 + 剧透截止点服务端强制执行。",
       parameters: Type.Object({
         novel_id: Type.Integer({ minimum: 1, description: "小说 ID" }),
-        full_book: Type.Optional(
-          Type.Boolean({ description: "仅当持久化全量开关开启时被采纳" }),
+        character_id: Type.Optional(
+          Type.Integer({ minimum: 1, description: "按角色过滤" }),
         ),
+        relation_type: Type.Optional(
+          Type.String({ description: "按关系类型过滤" }),
+        ),
+        through_chapter: Type.Optional(
+          Type.Integer({ minimum: 1, description: "可见性截止章节" }),
+        ),
+        version_id: Type.Optional(
+          Type.Integer({ minimum: 1, description: "显式版本 ID" }),
+        ),
+        include_provisional: Type.Optional(
+          Type.Boolean({ description: "是否包含 provisional 关系" }),
+        ),
+        source: Type.Optional(Type.String({ description: "按来源过滤" })),
       }),
       execute: (toolCallId, params, signal) =>
         fastapiToolCall("get_relationships", params as unknown, signal, auth, runNovelId),
@@ -89,9 +123,10 @@ export function buildReadingTools(auth: ToolAuth, runNovelId: number) {
         "线索信封（可见性按事件重放推导）。owner 校验服务端强制执行。",
       parameters: Type.Object({
         novel_id: Type.Integer({ minimum: 1, description: "小说 ID" }),
-        full_book: Type.Optional(
-          Type.Boolean({ description: "仅当持久化全量开关开启时被采纳" }),
+        character_id: Type.Optional(
+          Type.Integer({ minimum: 1, description: "按角色过滤" }),
         ),
+        status: Type.Optional(Type.String({ description: "按线索状态过滤" })),
       }),
       execute: (toolCallId, params, signal) =>
         fastapiToolCall("get_clues", params as unknown, signal, auth, runNovelId),
@@ -103,7 +138,17 @@ export function buildReadingTools(auth: ToolAuth, runNovelId: number) {
         "叙事记忆结构查询（版本/树/主张）。返回候选数据（release_status: candidate，ADR-0002）——绝不作为事实。",
       parameters: Type.Object({
         novel_id: Type.Integer({ minimum: 1, description: "小说 ID" }),
-        query: Type.String({ minLength: 1, description: "结构化查询语句" }),
+        version_id: Type.Optional(
+          Type.Integer({ minimum: 1, description: "显式版本 ID" }),
+        ),
+        view: Type.Optional(
+          Type.Union([Type.Literal("versions"), Type.Literal("tree")], {
+            description: "versions=版本列表；tree=指定版本的结构树",
+          }),
+        ),
+        through_chapter: Type.Optional(
+          Type.Integer({ minimum: 1, description: "可见性截止章节" }),
+        ),
       }),
       execute: (toolCallId, params, signal) =>
         fastapiToolCall("get_narrative_memory", params as unknown, signal, auth, runNovelId),

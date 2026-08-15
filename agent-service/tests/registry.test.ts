@@ -90,17 +90,20 @@ describe("domain tool registry", () => {
     expect(Check(chapter, { novel_id: 1, chapter_id: "two" })).toBe(false);
     expect(Check(chapter, { novel_id: 1 })).toBe(false);
 
-    // search_novel_text：query 必填非空字符串；limit 可选正整数
+    // search_novel_text：query 必填非空字符串；top_k/mode 可选（镜像后端
+    // SearchNovelTextRequest，extra="forbid"——limit 等漂移字段 → 后端 422）
     const search = byName.get("search_novel_text")!;
     expect(Check(search, { novel_id: 1, query: "竹林" })).toBe(true);
-    expect(Check(search, { novel_id: 1, query: "竹林", limit: 5 })).toBe(true);
+    expect(Check(search, { novel_id: 1, query: "竹林", top_k: 5 })).toBe(true);
+    expect(Check(search, { novel_id: 1, query: "竹林", mode: "auto" })).toBe(true);
     expect(Check(search, { novel_id: 1, query: "" })).toBe(false);
-    expect(Check(search, { novel_id: 1, query: "x", limit: 0 })).toBe(false);
+    expect(Check(search, { novel_id: 1, query: "x", top_k: 0 })).toBe(false);
 
-    // get_narrative_memory：query 必填
+    // get_narrative_memory：全部参数可选（版本/树/截止章视图）
     const nm = byName.get("get_narrative_memory")!;
-    expect(Check(nm, { novel_id: 1, query: "人物关系" })).toBe(true);
-    expect(Check(nm, { novel_id: 1 })).toBe(false);
+    expect(Check(nm, { novel_id: 1 })).toBe(true);
+    expect(Check(nm, { novel_id: 1, view: "tree", version_id: 2 })).toBe(true);
+    expect(Check(nm, { novel_id: 1, view: "bogus" })).toBe(false);
   });
 
   it("get_evidence_span：content_hash 可选，提供时仍校验 64-hex 格式", () => {
@@ -172,6 +175,37 @@ describe("fastapi client (facade forwarding)", () => {
     await expect(
       fastapiToolCall("get_chapter", { novel_id: 1, chapter_id: 99 }, undefined, AUTH, 1),
     ).rejects.toMatchObject({ code: "beyond_cutoff" });
+  });
+
+  it("FastAPI 原生 422（pydantic detail 数组）→ invalid_input 且带字段明细", async () => {
+    // 后端 StrictAgentToolModel extra="forbid" / 必填缺失时，FastAPI 返回
+    // 原生 RequestValidationError 信封（{detail: [...]}），没有 error.code。
+    // 若归一为 upstream_error，模型拿不到可操作信息只能盲目重试（E2E 实测
+    // get_evidence_span 连续 422 后模型放弃）；必须浮现 invalid_input +
+    // 字段明细，repair/重试才有方向。
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          detail: [
+            {
+              type: "missing",
+              loc: ["body", "source_start"],
+              msg: "Field required",
+            },
+          ],
+        }),
+        { status: 422 },
+      ),
+    );
+    const err = await fastapiToolCall(
+      "get_evidence_span",
+      { novel_id: 1, chapter_id: 7, source_end: 40 },
+      undefined,
+      AUTH,
+      1,
+    ).catch((e: unknown) => e);
+    expect(err).toMatchObject({ code: "invalid_input" });
+    expect((err as Error).message).toContain("source_start");
   });
 
   it("错误信封 code 集合恰为冻结的 AGENT_TOOL_ERRORS（单一事实源断言）", async () => {

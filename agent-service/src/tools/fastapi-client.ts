@@ -62,17 +62,37 @@ interface FacadeErrorEnvelope {
 function mapFacadeError(httpStatus: number, bodyText: string): AgentToolError {
   let code: string | undefined;
   let message: string | undefined;
+  let validationDetail: string | undefined;
   try {
     const parsed = JSON.parse(bodyText) as FacadeErrorEnvelope;
     if (parsed?.error?.code) {
       code = String(parsed.error.code);
       message = parsed.error.message;
+    } else if (httpStatus === 422 && Array.isArray(parsed?.detail)) {
+      // FastAPI 原生 RequestValidationError 信封：{detail: [{loc, msg}...]}。
+      // 浮现为 invalid_input + 字段明细（模型可据此自纠，而非盲目重试）。
+      validationDetail = parsed.detail
+        .map((item) => {
+          const loc = Array.isArray(item?.loc) ? item.loc.join(".") : "";
+          const msg = typeof item?.msg === "string" ? item.msg : "";
+          return `${loc}: ${msg}`.trim();
+        })
+        .filter((entry) => entry.length > 0)
+        .join("; ")
+        .slice(0, 500);
     }
   } catch {
     // 非 JSON 响应体（如网关 HTML 错误页）→ upstream_error。
   }
   if (code && KNOWN_CODES.has(code)) {
     return new AgentToolError(code, message ?? code, httpStatus);
+  }
+  if (validationDetail) {
+    return new AgentToolError(
+      AGENT_TOOL_ERRORS.INVALID_INPUT,
+      `invalid input: ${validationDetail}`,
+      httpStatus,
+    );
   }
   return new AgentToolError(AGENT_TOOL_ERRORS.UPSTREAM_ERROR, `upstream error (HTTP ${httpStatus})`, httpStatus);
 }
