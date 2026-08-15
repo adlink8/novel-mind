@@ -44,13 +44,14 @@ const REGISTERED_DOMAIN_TOOLS = [
   "get_evidence_span",
 ] as const;
 
-/** Phase 30 编排 allowlist：5 个只读域工具。 */
+/** 编排 allowlist：6 个只读域工具（含 search_novel_text 文本发现通道）。 */
 const EXPECTED_ALLOWED_TOOLS = [
   "get_novel",
   "get_chapter",
   "get_evidence_span",
   "get_character_state",
   "get_world_rules",
+  "search_novel_text",
 ] as const;
 
 /** Phase 30 唯一声明的审批动作（D-30-04：用户批准后成为 accepted authority）。 */
@@ -210,7 +211,7 @@ describe("build-visual-bible skill package", () => {
     it("loadSkill 通过全部 fail-closed 校验并返回 LoadedSkill", () => {
       const skill = loadSkill("build-visual-bible");
       expect(skill.name).toBe("build-visual-bible");
-      expect(skill.version).toBe("1.0.0");
+      expect(skill.version).toBe("1.1.5");
       expect(skill.allowedTools.sort()).toEqual([...EXPECTED_ALLOWED_TOOLS].sort());
       expect(skill.writePermissions).toEqual([]);
       expect(skill.approvalRequiredFor).toEqual(["visual_bible:approve"]);
@@ -382,7 +383,7 @@ describe("build-visual-bible skill package", () => {
       }
     });
 
-    it("allowed_tools 恰为 5 个 Phase 30 只读域工具", () => {
+    it("allowed_tools 恰为 6 个只读域工具（含 search_novel_text 文本发现通道）", () => {
       expect(manifest.allowed_tools.sort()).toEqual([...EXPECTED_ALLOWED_TOOLS].sort());
       // 全部是注册域工具（loader 会校验 ⊆ DOMAIN_TOOL_NAMES）。
       for (const tool of manifest.allowed_tools) {

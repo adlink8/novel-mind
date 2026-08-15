@@ -215,6 +215,11 @@ function buildRepairPrompt(reason: string, messages: readonly unknown[]): string
     "The previous structured output failed validation. Validation error:",
     reason.replace(/[\r\n]+/g, " ").slice(0, 500),
     ...menu,
+    // 修复轮不再消耗工具预算：E2E 实测修复轮继续工具循环会烧穿
+    // max_calls 熔断（工具调用计数跨修复轮累积）。
+    spanKeys.length > 0
+      ? "Do NOT call any more tools; reuse the materialized keys above."
+      : "You may call get_evidence_span at most 2 more times, then output immediately.",
     "Re-output the complete corrected JSON object only (no prose, no markdown fence).",
   ].join("\n");
 }
@@ -354,7 +359,14 @@ async function executeRun(
     // pi 会话让模型定向修正（最多 MAX_REPAIR_ROUNDS 轮）；超出再 fail closed。
     let envelopePayload: Record<string, unknown> | null = null;
     let frozenManifest: Record<string, unknown> = {};
-    let promptText: string = question;
+    // 分析 skill 的收尾指令：弱纪律模型容易陷入开放式工具循环（E2E 实测
+    // 60 次调用零输出烧穿预算）；明确「收集到证据 → 立即输出最终 JSON」
+    // 的终止条件。reader chat 问答路径不加（保持回答自然风格）。
+    let promptText: string = isAnalysisSkill(skillName)
+      ? `${question}
+
+[执行约束] 严格按技能说明的调用示例执行：search_novel_text 最多 4 次；命中后立即用返回行的 chapter_id + chunk_id 调 get_evidence_span 物化（不要自己算 offsets、不要传其他字段）；得到至少 1 个 evidence_key 后立刻输出最终 JSON，不再调用任何工具。`
+      : question;
     try {
       for (let round = 0; ; round += 1) {
         await session.prompt(promptText);
@@ -367,8 +379,15 @@ async function executeRun(
           frozenManifest = built.manifest;
           break;
         } catch (err) {
-          if (round >= MAX_REPAIR_ROUNDS) throw err;
           const reason = err instanceof Error ? err.message : String(err);
+          // 可观测性：repair/终态失败时记录模型输出片段（截断），否则信封
+          // 构建失败完全无法事后诊断。
+          const lastNow = lastAssistantMessage(session.messages as unknown[]);
+          const snippet = (lastNow?.text ?? "").replace(/[\r\n]+/g, " ").slice(0, 400);
+          console.warn(
+            `[agent-poller] run=${claimed.run_id} envelope build round=${round} failed: ${reason} | model output: ${snippet}`,
+          );
+          if (round >= MAX_REPAIR_ROUNDS) throw err;
           promptText = buildRepairPrompt(reason, session.messages as unknown[]);
         }
       }

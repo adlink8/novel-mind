@@ -298,7 +298,7 @@ export function projectSceneCandidateSet(
     // （而非后端 finalize 拒绝），poller repair loop 才能会话内修复。
     if (span.chapter_number < 1) {
       throw new Error(
-        `scene-projection: evidence span chapter_number ${span.chapter_number} must be >= 1 (fail closed)`,
+        `scene-projection: evidence span chapter_number ${span.chapter_number} must be >= 1 (fail closed) — chapter 0 is front-matter; materialize a span from a main-text chapter (chapter_number >= 1) via search_novel_text + get_evidence_span and select that evidence_key instead`,
       );
     }
     const modelCoordinates = isObject(raw.coordinates) ? raw.coordinates : {};

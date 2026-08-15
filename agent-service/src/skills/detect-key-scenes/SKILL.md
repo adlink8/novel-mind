@@ -11,7 +11,7 @@ state（D-31-01）；会话永远不是事实源。
 
 ## 版本与契约（镜像 skill.yaml / D-09）
 
-- `name: detect-key-scenes`，`version: 1.0.0`（Phase 31 绑定版本）。
+- `name: detect-key-scenes`，`version: 1.1.0`（契约更新：选择制证据 + 程序产出哈希）。
 - `allowed_tools`（编排 allowlist，6 个只读域工具）：`get_events`、
   `get_character_state`、`get_relationships`、`get_visual_bible`、
   `get_evidence_span`、`search_novel_text`。

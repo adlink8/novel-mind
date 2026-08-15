@@ -206,3 +206,66 @@ async def test_world_model_run_input_not_polluted_by_scene_snapshot(
 
     assert len(runs) == 1
     assert "source_snapshot" not in runs[0].input
+
+
+async def _seed_visual_bible_skill(
+    session: AsyncSession, owner: User, novel: Novel
+) -> None:
+    registry = SkillRegistry(
+        owner_id=owner.id,
+        novel_id=novel.id,
+        name="build-visual-bible",
+        status="active",
+    )
+    session.add(registry)
+    await session.flush()
+    session.add(
+        SkillVersion(
+            registry_id=registry.id,
+            owner_id=owner.id,
+            novel_id=novel.id,
+            name=registry.name,
+            version="1.0.0",
+            yaml_checksum="b" * 64,
+            allowed_tools=["get_evidence_span"],
+            read_permissions=[],
+            write_permissions=[],
+            forbidden_spaces=[],
+            budget={},
+            approval_required_for=[],
+            input_schema={},
+            output_schema={},
+            status="active",
+        )
+    )
+    await session.flush()
+
+
+async def test_visual_bible_run_input_carries_snapshot_and_cutoff(
+    db_session: AsyncSession,
+):
+    """relations 维度触发的 build-visual-bible run：input 必须锚定真实血缘。
+
+    VisualBibleVersionContract 的 source_snapshot_hash / cutoff_chapter 与
+    claim_hash / manifest_hash 都是程序产出字段（模型无法重放 sha256），
+    与 detect-key-scenes 同一纪律（Slice A 扩展）。
+    """
+    owner, novel, message_id = await _seed_novel_with_chapters(
+        db_session, with_skill=False
+    )
+    await _seed_visual_bible_skill(db_session, owner, novel)
+
+    runs = await create_backfill_runs(
+        db_session,
+        owner_id=owner.id,
+        novel_id=novel.id,
+        user_message_id=message_id,
+        question="慕师靖长什么样？",
+        unavailable_dimensions=["relations"],
+    )
+
+    assert len(runs) == 1
+    snapshot = runs[0].input.get("source_snapshot")
+    assert snapshot is not None, "run input 缺少 source_snapshot"
+    assert snapshot["snapshot_hash"] == _expected_snapshot_hash(owner.id, novel.id)
+    assert runs[0].input.get("cutoff_chapter") == 1

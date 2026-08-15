@@ -208,7 +208,7 @@ describe("propose-world-model-candidates skill package", () => {
     it("loadSkill 通过全部 fail-closed 校验并返回 LoadedSkill", () => {
       const skill = loadSkill("propose-world-model-candidates");
       expect(skill.name).toBe("propose-world-model-candidates");
-      expect(skill.version).toBe("1.0.0");
+      expect(skill.version).toBe("1.1.0");
       expect(skill.allowedTools.sort()).toEqual([...EXPECTED_ALLOWED_TOOLS].sort());
       expect(skill.writePermissions).toEqual([]);
       expect(skill.approvalRequiredFor).toEqual(["world_model:user_interpretation"]);

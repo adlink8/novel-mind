@@ -28,6 +28,7 @@ import {
   collectRuntimeSpans,
   projectSceneCandidateSet,
 } from "./scene-candidate-projection.js";
+import { projectVisualBibleVersion } from "./visual-bible-projection.js";
 import type { LoadedSkill } from "../skills/loader.js";
 import type { FinalizeEnvelope, RunLineageContext } from "./cited-answer-builder.js";
 import type { RuntimeToolRunSummary } from "../tools/tool-evidence.js";
@@ -298,6 +299,37 @@ export function buildAnalysisEnvelope(
     Object.assign(content, projected);
   }
 
+  // build-visual-bible：visual_bible 是运行时契约而非模型创作内容。
+  // 模型只产语义 entities/claims + 选择 evidence_keys；全部哈希/血缘由
+  // 投影确定性注入（与 detect-key-scenes 同一纪律，fail closed）。
+  if (skill.name === "build-visual-bible") {
+    if (!ctx.sourceSnapshotHash) {
+      throw new Error(
+        "analysis-envelope: build-visual-bible requires source snapshot lineage in run input",
+      );
+    }
+    if (!ctx.cutoffChapter) {
+      throw new Error(
+        "analysis-envelope: build-visual-bible requires cutoff lineage in run input",
+      );
+    }
+    const projected = projectVisualBibleVersion(
+      content,
+      {
+        ownerId: ctx.ownerId,
+        novelId: ctx.novelId,
+        runId: ctx.runId,
+        sourceSnapshotHash: ctx.sourceSnapshotHash,
+        cutoffChapter: ctx.cutoffChapter,
+      },
+      runtimeEvidences,
+    );
+    for (const key of Object.keys(content)) {
+      delete content[key];
+    }
+    Object.assign(content, projected);
+  }
+
   // propose-world-model-candidates 选择制证据门（Slice B）：claim 引用的
   // 每个 evidence_ref 都必须来自运行时 get_evidence_span 物化结果；模型编造
   // 的 key → fail closed（此前 finalize 白名单自引用，编造可静默通过）。
@@ -318,7 +350,9 @@ export function buildAnalysisEnvelope(
   const evidenceRefs = spec.collectEvidenceRefs(content, parsed, runtimeEvidences);
   if (evidenceRefs.length === 0) {
     throw new Error(
-      "analysis-envelope: no leaf evidence refs in model output (fail closed)",
+      "analysis-envelope: no leaf evidence refs in model output (fail closed) — " +
+        "at least one evidence-backed claim/candidate is required: pick " +
+        "evidence_key(s) from the materialized get_evidence_span results",
     );
   }
 

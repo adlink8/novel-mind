@@ -20,7 +20,7 @@
 #     normalization_actions / raw_hash / repaired_hash / warnings 保留在官方
 #     WorldModelCandidateArtifact 上。
 name: propose-world-model-candidates
-version: 1.0.0
+version: 1.1.0
 description: >-
   Phase 27 版本化世界模型候选技能：给定小说（owner/novel/branch + version/cutoff
   可选），通过 7 个只读域工具（get_events / get_character_state /

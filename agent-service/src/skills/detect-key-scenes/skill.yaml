@@ -25,7 +25,7 @@
 #     SceneCandidateArtifact 上。speaker/dialogue heuristic 信号（D-31-05）只是
 #     候选元数据，绝不进入 evidence_ranges / citation / Canon / 审批原因。
 name: detect-key-scenes
-version: 1.0.0
+version: 1.1.0
 description: >-
   Phase 31 版本化关键场景检测技能：给定小说（owner/novel/branch + cutoff +
   source snapshot + 可选 approved Visual Bible revision 血缘），通过 5 个只读域工具

@@ -1,6 +1,6 @@
 # build-visual-bible（Phase 30 版本化 Visual Bible 技能 / REQ-VIS-01 / REQ-AGENT-02/03/04）
 
-给定一本小说（owner/novel/branch 血缘绑定），通过 **5 个只读域工具**收集证据，
+给定一本小说（owner/novel/branch 血缘绑定），通过 **6 个只读域工具**收集证据，
 产出**血缘绑定**的 VisualBibleArtifact——携带完整 `VisualBibleVersionContract`
 （entities / claims / evidence refs / reference assets）。本技能只读，不写任何
 Canon / visual bible 版本 / review 事件；唯一输出通道是后端确定性 finalizer
@@ -10,10 +10,10 @@ Canon / active pointer（D-30-01）；会话永远不是事实源。
 
 ## 版本与契约（镜像 skill.yaml / D-09）
 
-- `name: build-visual-bible`，`version: 1.0.0`（Phase 30 绑定版本）。
-- `allowed_tools`（编排 allowlist，5 个只读域工具）：`get_novel`、
+- `name: build-visual-bible`，`version: 1.1.5`（契约更新：选择制证据 + 程序产出哈希 + 收敛预算 + 文本发现通道 + 正文证据约束 + 调用示例 + 文档一致性）。
+- `allowed_tools`（编排 allowlist，6 个只读域工具）：`get_novel`、
   `get_chapter`、`get_evidence_span`、`get_character_state`、
-  `get_world_rules`。
+  `get_world_rules`、`search_novel_text`。
 - **不得调用** allowlist 外任何工具；发现即 fail closed（Pi 只能编排声明的
   Domain Tool allowlist）。reference assets 经运行输入元数据提供
   （`read_permissions: [canon, visual_bible, reference_assets]`），**绝不**通过
@@ -34,6 +34,29 @@ Canon / active pointer（D-30-01）；会话永远不是事实源。
   Artifact revision。
 
 ## 执行流程（novel/cutoff/source → Tools → EvidenceRef → candidate → 确定性校验 → VisualBibleArtifact → 用户批准）
+
+### 收敛预算（硬约束，先于一切编排）
+- 本技能 per-run `max_calls=60`，**工具调用是稀缺预算**，按下限规划：
+  `search_novel_text` **最多 4 次**（文本发现主通道：不同关键词各一次
+  即可，命中相似就停手；`get_novel` 全书响应可能超限，**不要**用它逐章
+  找证据）；`get_chapter` **最多 4 次**（只读最相关章节）；
+  `get_evidence_span` **最多 8 次**（只为最终入选 claim 物化）；
+  `get_character_state` / `get_world_rules` 合计不超过 4 次。
+- **实体上限 5 个、claim 上限 8 条**（宁缺毋滥）；达到 1 个合格实体 +
+  1 条带证据的 canon_fact claim 即可收尾输出。
+- 任何时候只要已有 ≥1 个物化 span，就**立即停止搜索、输出最终 JSON**；
+  反复换章节/关键词读取 = 烧光预算 = run 失败。
+
+### 调用示例（照抄参数形状，不要发明字段）
+1. 文本发现：`search_novel_text({"novel_id": <id>, "query": "慕师靖 外貌", "top_k": 5})`
+   —— 命中行带 `chapter_id` / `chunk_id` / `content_snippet`。
+2. 证据物化：`get_evidence_span({"novel_id": <id>, "chapter_id": <命中行的 chapter_id>, "chunk_id": <命中行的 chunk_id>})`
+   —— **不要**自己算 source_start/source_end，不要传 chapter_number /
+   evidence_key / excerpt 等任何其他字段。
+3. 收尾输出（得到 ≥1 个 span 后立即输出，不再调用任何工具）：
+   ```json
+   {"visual_bible": {"entities": [{"entity_key": "char-x", "entity_type": "character", "description": "…", "authority": "canon_fact"}], "claims": [{"entity_key": "char-x", "authority": "canon_fact", "description": "…", "evidence_keys": ["<第 2 步返回的 evidence_key>"]}]}}
+   ```
 
 ### 第 1 步：范围归一化
 - 从运行输入读取 `novel_id`（与路径 novel 一致）；可选 `branch`、`cutoff`、
@@ -81,26 +104,35 @@ Canon / active pointer（D-30-01）；会话永远不是事实源。
 - 任何 unsafe / ambiguous 修复、受保护字段合成（evidence_refs/owner/cutoff/
   authority/branch/fork/approval/approval_state）→ 稳定 `blocked`，零写入。
 
-### 第 6 步：VisualBibleArtifact
-- 组装 Visual Bible 信封（字段镜像后端 `VisualBibleArtifact`，见
-  `output.schema.json` / D-30-01..D-30-04）：
-  - `type="visual_bible"`，`schema_version="visual-bible.v1"`
-  - `owner_id` / `novel_id` / `branch`
-  - `producing_skill="build-visual-bible"` / `producing_skill_version="1.0.0"` /
-    `skill_version_id`
-  - `model_lineage` 与 `source_versions`
-  - `input_hash`（来自 run）
-  - `evidence_refs`（必须 ⊆ frozen manifest 白名单）
-  - `visual_bible`：完整 `VisualBibleVersionContract`（schema_version、
-    artifact_kind、owner/novel、version_key、revision_number、
-    parent_version_id、source_snapshot_id/hash、cutoff_chapter、
-    schema/policy/prompt/model/config/manifest hash、style_profile、
-    constraints、entities、claims、reference_assets、
-    `review_state="candidate"`）
-  - `tool_runs`：`[{tool_name, calls}]`（ToolRun 血缘）
-  - `status="candidate"`，`parent_revision=null`
-  - `normalization`（raw_hash / repaired_hash / normalization_actions /
-    warnings，26-06 必需 trail）
+### 第 6 步：VisualBibleArtifact（模型只产语义，哈希一律程序产出）
+- **输出骨架（硬约束）**：模型输出必须是单个 JSON 对象（可 markdown fence
+  包裹），顶层为 `visual_bible`，只携带：
+  - `entities`（至少 1 个）每项只携带：`entity_key`（必填，稳定语义键）、
+    `entity_type`（character/place/item/faction/style）、`description`、
+    `authority`（四标签之一）；
+  - `claims`（至少 1 个）每项只携带：`entity_key`（必填，引用上面声明的
+    实体）、`authority`、`description`，以及：
+    - `canon_fact` claim 必须带 `evidence_keys`（**必填**：从本 run 的
+      `get_evidence_span` 工具结果里选择；引用未物化的 key → fail
+      closed）；
+    - interpretation 类 claim（probable_inference /
+      literary_interpretation / user_interpretation）必须带 `author` 与
+      `rationale`；
+  - 可选：`style_profile`（对象）、`constraints`（对象数组）。
+- **chapter_number 必须 ≥ 1**：chapter 0 是前言/声明页，其 span 不能作为
+  证据（投影 fail closed）；搜索命中前言页时换关键词物化正文章节的 span。
+- **至少 1 条 canon_fact claim**（带从物化 span 选择的 `evidence_keys`）：
+  纯 interpretation 输出没有任何 leaf 证据，会被信封层拒绝（fail
+  closed）；拿不准的写成 interpretation，但外观/衣着/场景等文本可直接
+  佐证的特征必须写成 canon_fact。
+- **绝不输出任何哈希/血缘字段**（`stable_id` / `claim_key` / `claim_hash` /
+  `schema_hash` / `policy_hash` / `manifest_hash` / `source_snapshot_id` /
+  `source_snapshot_hash` / `cutoff_chapter` / `disclosure_cutoff` /
+  `review_state` / `content_hash` 等）：这些由运行时投影确定性注入（模型
+  写出也会被忽略）；`claim_hash` / `manifest_hash` 是对 canonical payload
+  的重放哈希，只有程序能算。
+- 信封其余部分（`type="visual_bible"` / lineage / `tool_runs` /
+  `status="candidate"` / `normalization` trail）由运行时组装，模型不参与。
 - 调用后端 finalize 入口（stop_reason="stop"），由后端**确定性 finalizer**
   写入 candidate 产物 + 首个不可变修订并分配 artifact_id / revision_id。
   `skill_run_id` / `artifact_id` / `revision_id` 由服务端分配，本技能**不写任何

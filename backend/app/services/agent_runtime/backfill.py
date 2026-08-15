@@ -29,7 +29,7 @@ from app.services.timeline.query import resolve_chapter_cutoff
 MAX_BACKFILL_SKILLS = 2
 
 # 需要 source snapshot / cutoff 血缘锚定的 skill（契约要求程序产出哈希字段）。
-_SNAPSHOT_ANCHORED_SKILLS = frozenset({"detect-key-scenes"})
+_SNAPSHOT_ANCHORED_SKILLS = frozenset({"detect-key-scenes", "build-visual-bible"})
 
 # 维度→skill 映射（QueryDimension 词汇，queryplan/schemas.py）。
 # 值：(skill_name, materializes_domain_table)
@@ -39,6 +39,10 @@ DIMENSION_TO_SKILL: dict[str, tuple[str, bool]] = {
     # character_state / world_projection 主补足：世界模型候选（EpistemicGate→candidate）
     "character_state": ("propose-world-model-candidates", True),
     "world_projection": ("propose-world-model-candidates", True),
+    # knowledge（reader 证据 source_type）：wmc 的 claim_kind=character_knowledge
+    # 由 materializer 写入 knowledge 表；relationship_observation 无物化器，
+    # 刻意不映射（诚实 backfill_unavailable，而非 completed 零落库的假补足）。
+    "knowledge": ("propose-world-model-candidates", True),
     # 实体/外观补充：Visual Bible 候选版本
     "relations": ("build-visual-bible", True),
     # raw_text 0 命中：关键场景候选（带 leaf evidence_ranges）
@@ -55,6 +59,7 @@ DIMENSION_TO_SKILL: dict[str, tuple[str, bool]] = {
 _DIMENSION_PRIORITY = [
     "world_projection",
     "character_state",
+    "knowledge",
     "raw_text",
     "relations",
     "events_causality",

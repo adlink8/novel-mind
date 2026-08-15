@@ -74,6 +74,20 @@ class TestPickBackfillSkills:
         skills = [s for s, _ in chosen]
         assert skills.count("propose-world-model-candidates") == 1
 
+    def test_knowledge_maps_to_world_model_candidates(self):
+        # knowledge 维度（reader 证据 source_type）：wmc 的
+        # claim_kind=character_knowledge 由 materializer 写入 knowledge 表。
+        skill, materializes = DIMENSION_TO_SKILL["knowledge"]
+        assert skill == "propose-world-model-candidates"
+        assert materializes is True
+
+    def test_relationship_observation_stays_unmapped(self):
+        # relationship_observation 没有任何 skill 物化器（materializers.py 只覆盖
+        # key_scenes / world_model_knowledge / visual_bible）：瞎映射会产生
+        # completed 但零落库的假补足，保持诚实 backfill_unavailable。
+        assert "relationship_observation" not in DIMENSION_TO_SKILL
+        assert pick_backfill_skills(["relationship_observation"]) == []
+
     def test_unknown_dimensions_ignored(self):
         chosen = pick_backfill_skills(["not_a_dimension", "raw_text"])
         assert chosen == [("detect-key-scenes", "raw_text")]

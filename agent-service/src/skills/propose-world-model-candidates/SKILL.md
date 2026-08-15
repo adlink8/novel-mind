@@ -10,7 +10,7 @@ state-transition / publication 权威**——Agent 永远不能直接发布 Cano
 
 ## 版本与契约（镜像 skill.yaml / D-09）
 
-- `name: propose-world-model-candidates`，`version: 1.0.0`（Phase 27 绑定版本）。
+- `name: propose-world-model-candidates`，`version: 1.1.0`（契约更新：选择制证据）。
 - `allowed_tools`（编排 allowlist，仅 7 个只读域工具）：`get_events`、
   `get_character_state`、`get_character_knowledge`、`get_relationships`、
   `get_world_rules`、`get_evidence_span`、`search_novel_text`。

@@ -3,7 +3,7 @@
 #
 # Phase 30 版本化 Visual Bible 构建技能：
 #   - 本技能是 Phase 30 确定性域能力（evidence/authority/review）的 Agent 消费
-#     边界（D-30-01..D-30-04）；允许的工具 allowlist 只含 5 个只读域工具
+#     边界（D-30-01..D-30-04）；允许的工具 allowlist 只含 6 个只读域工具
 #     （get_novel / get_chapter / get_evidence_span / get_character_state /
 #     get_world_rules），编排绝不越出该 allowlist（未知工具/白名单外调用 →
 #     fail closed）。reference assets 作为运行输入元数据（read_permissions:
@@ -26,10 +26,10 @@
 #     normalization_actions / raw_hash / repaired_hash / warnings 保留在官方
 #     VisualBibleArtifact 上。
 name: build-visual-bible
-version: 1.0.0
+version: 1.1.5
 description: >-
   Phase 30 版本化 Visual Bible 构建技能：给定小说（owner/novel/branch +
-  cutoff + source snapshot + reference assets 元数据），通过 5 个只读域工具
+  cutoff + source snapshot + reference assets 元数据），通过 6 个只读域工具
   （get_novel / get_chapter / get_evidence_span / get_character_state /
   get_world_rules）收集证据，产出**血缘绑定**的 VisualBibleArtifact：
   完整 VisualBibleVersionContract（entities / claims / evidence refs /
@@ -42,6 +42,7 @@ allowed_tools:
   - get_novel
   - get_chapter
   - get_evidence_span
+  - search_novel_text
   - get_character_state
   - get_world_rules
 read_permissions:

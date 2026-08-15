@@ -177,9 +177,11 @@ function installBackendMock(
               ...(skillName === "analyze-chapter"
                 ? { chapter_id: 1, chapter_number: 1, cutoff_chapter: 10 }
                 : {}),
-              // Slice A：detect-key-scenes 的 run input 由后端锚定 source
-              // snapshot hash + cutoff（程序产出，模型不参与）。
-              ...(skillName === "detect-key-scenes"
+              // Slice A / P1a：detect-key-scenes 与 build-visual-bible 的
+              // run input 由后端锚定 source snapshot hash + cutoff
+              // （程序产出，模型不参与）。
+              ...(skillName === "detect-key-scenes" ||
+              skillName === "build-visual-bible"
                 ? {
                     source_snapshot: { snapshot_hash: "b".repeat(64) },
                     cutoff_chapter: 1,
@@ -681,59 +683,114 @@ describe("createPoller", () => {
   });
 
   it("build-visual-bible backfill finalizes visual_bible envelope", async () => {
+    // P1a：模型只产出语义 entities/claims + 从 get_evidence_span 结果里选择的
+    // evidence_keys；全部哈希/血缘字段（stable_id / claim_key / claim_hash /
+    // schema_hash / policy_hash / manifest_hash / source_snapshot_* / cutoff）
+    // 由 builder 投影确定性注入（与 detect-key-scenes 同一纪律）。
+    const spanHash = "1".repeat(64);
+    const evidenceKey = `qp:1:0:40:${spanHash}`;
     const { deps } = makePollerDeps({
       lastText: JSON.stringify({
         type: "visual_bible",
         schema_version: "visual-bible.v1",
         visual_bible: {
-          schema_version: "visual-bible.v1",
-          artifact_kind: "visual_bible",
-          owner_id: 2,
-          novel_id: 6,
-          version_key: "vb-main",
-          revision_number: 1,
-          source_snapshot_id: "ss-1",
-          source_snapshot_hash: "b".repeat(64),
-          cutoff_chapter: 1,
-          schema_hash: "c".repeat(64),
-          policy_hash: "d".repeat(64),
-          manifest_hash: "e".repeat(64),
           entities: [
             {
-              stable_id: "char-ayla",
               entity_key: "char-ayla",
               entity_type: "character",
               description: "amber hair",
               authority: "canon_fact",
-              disclosure_cutoff: 1,
             },
           ],
           claims: [
             {
-              claim_key: "char-ayla-hair",
-              entity_stable_id: "char-ayla",
+              entity_key: "char-ayla",
               authority: "canon_fact",
               description: "amber braided hair",
-              cutoff_chapter: 1,
-              claim_hash: "g".repeat(64),
-              evidence_refs: [
-                {
-                  evidence_key: "qp:1:0:40:1111111111111111111111111111111111111111111111111111111111111111",
-                  source_snapshot_id: "ss-1",
-                  source_snapshot_hash: "b".repeat(64),
-                  chapter_id: 1,
-                  chapter_number: 1,
-                  source_start: 0,
-                  source_end: 40,
-                  content_hash: "f".repeat(64),
-                  cutoff_chapter: 1,
-                },
-              ],
+              evidence_keys: [evidenceKey],
             },
           ],
-          review_state: "candidate",
         },
-        tool_runs: [{ tool_name: "get_visual_bible", calls: 1 }],
+      }),
+      toolResults: [
+        {
+          role: "toolResult",
+          toolName: "get_evidence_span",
+          isError: false,
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                evidence_key: evidenceKey,
+                chapter_id: 1,
+                chapter_number: 1,
+                novel_id: 6,
+                source_start: 0,
+                source_end: 40,
+                content_hash: spanHash,
+                excerpt: "amber braided hair",
+              }),
+            },
+          ],
+        },
+      ],
+    });
+    const fetchMock = deps.fetchImpl as ReturnType<typeof vi.fn>;
+    installBackendMock(fetchMock, { skillName: "build-visual-bible" });
+
+    const poller = createPoller(deps, [], { intervalMs: 10 });
+    const stop = poller.start();
+    await new Promise((r) => setTimeout(r, 50));
+    stop();
+
+    const finals = finalizeCalls(fetchMock);
+    expect(finals.length).toBe(1);
+    expect(finals[0].stop_reason).toBe("stop");
+    expect(finals[0].envelope.type).toBe("visual_bible");
+    expect(finals[0].envelope.schema_version).toBe("visual-bible.v1");
+    const version = finals[0].envelope.visual_bible;
+    expect(version.version_key).toBe("vb-backfill-run-1");
+    expect(version.source_snapshot_hash).toBe("b".repeat(64));
+    expect(version.cutoff_chapter).toBe(1);
+    expect(version.schema_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(version.policy_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(version.manifest_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(version.review_state).toBe("candidate");
+    expect(version.entities[0].stable_id).toBe("stable-char-ayla");
+    expect(version.entities[0].disclosure_cutoff).toBe(1);
+    expect(version.claims[0].claim_key).toBe("vb-backfill-run-1-0");
+    expect(version.claims[0].claim_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(version.claims[0].evidence_refs[0].evidence_key).toBe(evidenceKey);
+    expect(version.claims[0].evidence_refs[0].content_hash).toBe(spanHash);
+    expect(finals[0].envelope.evidence_refs).toEqual([evidenceKey]);
+    expect(finals[0].frozen_manifest.evidence_refs).toEqual(finals[0].envelope.evidence_refs);
+  });
+
+  it("build-visual-bible 引用未物化的 evidence_key → fail closed", async () => {
+    // P1a：编造的 evidence_key（无对应 get_evidence_span 工具结果）必须让
+    // run 进入 failed 终态，绝不写入信封。
+    const { deps } = makePollerDeps({
+      lastText: JSON.stringify({
+        type: "visual_bible",
+        schema_version: "visual-bible.v1",
+        visual_bible: {
+          entities: [
+            {
+              entity_key: "char-ayla",
+              entity_type: "character",
+              description: "amber hair",
+              authority: "canon_fact",
+            },
+          ],
+          claims: [
+            {
+              entity_key: "char-ayla",
+              authority: "canon_fact",
+              description: "fabricated evidence",
+              evidence_keys: ["qp:1:0:40:" + "9".repeat(64)],
+            },
+          ],
+        },
       }),
     });
     const fetchMock = deps.fetchImpl as ReturnType<typeof vi.fn>;
@@ -746,12 +803,7 @@ describe("createPoller", () => {
 
     const finals = finalizeCalls(fetchMock);
     expect(finals.length).toBe(1);
-    expect(finals[0].envelope.type).toBe("visual_bible");
-    expect(finals[0].envelope.schema_version).toBe("visual-bible.v1");
-    expect(finals[0].envelope.visual_bible.version_key).toBe("vb-main");
-    expect(finals[0].envelope.evidence_refs).toEqual([
-      "qp:1:0:40:1111111111111111111111111111111111111111111111111111111111111111",
-    ]);
+    expect(finals[0].stop_reason).toBe("error");
   });
 
   it("analysis skill with non-JSON model output reaches a failed terminal state", async () => {
