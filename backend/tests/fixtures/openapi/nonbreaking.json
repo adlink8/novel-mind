@@ -67,7 +67,14 @@
             "type": "string"
           },
           "provider": {
-            "description": "提供商: openai / anthropic / ollama / custom",
+            "description": "提供商: openai / anthropic / gemini / ollama / custom",
+            "enum": [
+              "openai",
+              "anthropic",
+              "gemini",
+              "ollama",
+              "custom"
+            ],
             "title": "Provider",
             "type": "string"
           },
@@ -83,10 +90,6 @@
             "description": "层级: quality / balanced / budget",
             "title": "Tier",
             "type": "string"
-          },
-          "extra_opt": {
-            "type": "string",
-            "title": "Extra Opt"
           }
         },
         "required": [
@@ -287,6 +290,13 @@
           "provider": {
             "anyOf": [
               {
+                "enum": [
+                  "openai",
+                  "anthropic",
+                  "gemini",
+                  "ollama",
+                  "custom"
+                ],
                 "type": "string"
               },
               {
@@ -321,6 +331,119 @@
           }
         },
         "title": "AIModelConfigUpdate",
+        "type": "object"
+      },
+      "AIModelDiscoveryItem": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "AIModelDiscoveryItem",
+        "type": "object"
+      },
+      "AIModelDiscoveryRequest": {
+        "description": "通过用户配置的提供商连接发现可用模型。",
+        "properties": {
+          "api_key": {
+            "anyOf": [
+              {
+                "maxLength": 4096,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Key"
+          },
+          "base_url": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Base Url",
+            "type": "string"
+          },
+          "provider": {
+            "enum": [
+              "openai",
+              "anthropic",
+              "gemini",
+              "ollama",
+              "custom"
+            ],
+            "title": "Provider",
+            "type": "string"
+          }
+        },
+        "required": [
+          "provider",
+          "base_url"
+        ],
+        "title": "AIModelDiscoveryRequest",
+        "type": "object"
+      },
+      "AIModelDiscoveryResponse": {
+        "properties": {
+          "models": {
+            "items": {
+              "$ref": "#/components/schemas/AIModelDiscoveryItem"
+            },
+            "title": "Models",
+            "type": "array"
+          }
+        },
+        "required": [
+          "models"
+        ],
+        "title": "AIModelDiscoveryResponse",
+        "type": "object"
+      },
+      "AIModelProviderProfile": {
+        "properties": {
+          "credential_kind": {
+            "title": "Credential Kind",
+            "type": "string"
+          },
+          "credential_required": {
+            "title": "Credential Required",
+            "type": "boolean"
+          },
+          "default_base_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Base Url"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "credential_kind",
+          "credential_required"
+        ],
+        "title": "AIModelProviderProfile",
         "type": "object"
       },
       "AIModelTestResponse": {
@@ -367,6 +490,182 @@
           "model_name"
         ],
         "title": "AIModelTestResponse",
+        "type": "object"
+      },
+      "AgentSettingsResponse": {
+        "additionalProperties": false,
+        "description": "The complete public Agent settings projection.",
+        "properties": {
+          "auto_create_candidate_artifacts": {
+            "title": "Auto Create Candidate Artifacts",
+            "type": "boolean"
+          },
+          "auto_deep_analysis": {
+            "title": "Auto Deep Analysis",
+            "type": "boolean"
+          },
+          "memory_enabled": {
+            "title": "Memory Enabled",
+            "type": "boolean"
+          },
+          "memory_retention_days": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memory Retention Days"
+          },
+          "notify_analysis_complete": {
+            "title": "Notify Analysis Complete",
+            "type": "boolean"
+          },
+          "show_analysis_progress": {
+            "title": "Show Analysis Progress",
+            "type": "boolean"
+          },
+          "task_model_bindings": {
+            "$ref": "#/components/schemas/AgentTaskModelBindings"
+          }
+        },
+        "required": [
+          "auto_deep_analysis",
+          "memory_enabled",
+          "show_analysis_progress",
+          "notify_analysis_complete",
+          "auto_create_candidate_artifacts",
+          "task_model_bindings"
+        ],
+        "title": "AgentSettingsResponse",
+        "type": "object"
+      },
+      "AgentSettingsUpdate": {
+        "additionalProperties": false,
+        "description": "Full replacement payload for the owner-scoped Agent config.",
+        "properties": {
+          "auto_create_candidate_artifacts": {
+            "title": "Auto Create Candidate Artifacts",
+            "type": "boolean"
+          },
+          "auto_deep_analysis": {
+            "title": "Auto Deep Analysis",
+            "type": "boolean"
+          },
+          "memory_enabled": {
+            "title": "Memory Enabled",
+            "type": "boolean"
+          },
+          "memory_retention_days": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memory Retention Days"
+          },
+          "notify_analysis_complete": {
+            "title": "Notify Analysis Complete",
+            "type": "boolean"
+          },
+          "show_analysis_progress": {
+            "title": "Show Analysis Progress",
+            "type": "boolean"
+          },
+          "task_model_bindings": {
+            "$ref": "#/components/schemas/AgentTaskModelBindings"
+          }
+        },
+        "required": [
+          "auto_deep_analysis",
+          "memory_enabled",
+          "show_analysis_progress",
+          "notify_analysis_complete",
+          "auto_create_candidate_artifacts",
+          "task_model_bindings"
+        ],
+        "title": "AgentSettingsUpdate",
+        "type": "object"
+      },
+      "AgentTaskModelBindings": {
+        "additionalProperties": false,
+        "description": "One optional owner-owned model ID per supported Agent task.",
+        "properties": {
+          "continuation": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Continuation"
+          },
+          "deep_analysis": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deep Analysis"
+          },
+          "embedding": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Embedding"
+          },
+          "illustration": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Illustration"
+          },
+          "qa": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qa"
+          },
+          "rag_eval": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rag Eval"
+          }
+        },
+        "title": "AgentTaskModelBindings",
         "type": "object"
       },
       "AllowDivergenceRequest": {
@@ -3623,6 +3922,199 @@
         "title": "CanonSpace",
         "type": "string"
       },
+      "ChapterBatchChapterView": {
+        "additionalProperties": false,
+        "properties": {
+          "chapter_id": {
+            "title": "Chapter Id",
+            "type": "integer"
+          },
+          "chapter_number": {
+            "title": "Chapter Number",
+            "type": "integer"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "queued",
+              "running",
+              "completed",
+              "failed",
+              "cancelled"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "chapter_id",
+          "chapter_number",
+          "status"
+        ],
+        "title": "ChapterBatchChapterView",
+        "type": "object"
+      },
+      "ChapterBatchCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "chapter_end": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chapter End"
+          },
+          "chapter_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "maxItems": 5000,
+                "minItems": 1,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chapter Ids"
+          },
+          "chapter_start": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chapter Start"
+          },
+          "concurrency_window": {
+            "default": 3,
+            "maximum": 32.0,
+            "minimum": 1.0,
+            "title": "Concurrency Window",
+            "type": "integer"
+          }
+        },
+        "title": "ChapterBatchCreate",
+        "type": "object"
+      },
+      "ChapterBatchView": {
+        "additionalProperties": false,
+        "properties": {
+          "batch_id": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Batch Id",
+            "type": "string"
+          },
+          "cancelled": {
+            "title": "Cancelled",
+            "type": "integer"
+          },
+          "chapters": {
+            "items": {
+              "$ref": "#/components/schemas/ChapterBatchChapterView"
+            },
+            "title": "Chapters",
+            "type": "array"
+          },
+          "completed": {
+            "title": "Completed",
+            "type": "integer"
+          },
+          "concurrency_window": {
+            "title": "Concurrency Window",
+            "type": "integer"
+          },
+          "created_run_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Created Run Ids",
+            "type": "array"
+          },
+          "cutoff_chapter": {
+            "title": "Cutoff Chapter",
+            "type": "integer"
+          },
+          "failed": {
+            "title": "Failed",
+            "type": "integer"
+          },
+          "novel_id": {
+            "title": "Novel Id",
+            "type": "integer"
+          },
+          "owner_id": {
+            "title": "Owner Id",
+            "type": "integer"
+          },
+          "pending": {
+            "title": "Pending",
+            "type": "integer"
+          },
+          "queued": {
+            "title": "Queued",
+            "type": "integer"
+          },
+          "running": {
+            "title": "Running",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "running",
+              "completed",
+              "failed",
+              "cancelled"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "batch_id",
+          "owner_id",
+          "novel_id",
+          "cutoff_chapter",
+          "concurrency_window",
+          "status",
+          "total",
+          "queued",
+          "running",
+          "completed",
+          "failed",
+          "cancelled",
+          "pending"
+        ],
+        "title": "ChapterBatchView",
+        "type": "object"
+      },
       "ChapterRange": {
         "additionalProperties": false,
         "description": "Structure-anchored chapter interval (chapter-number semantics, inclusive).\n\nMatches timeline API chapter_start/chapter_end semantics. Server narrows\nchapter_end to the reading cutoff before any context assembly.",
@@ -4234,6 +4726,65 @@
         ],
         "title": "ClueRunStatus",
         "type": "string"
+      },
+      "ConnectorRuntimeManifest": {
+        "additionalProperties": false,
+        "description": "Run-frozen connector contract; it carries no credentials or URL authority.",
+        "properties": {
+          "checksum": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Checksum",
+            "type": "string"
+          },
+          "connector_id": {
+            "exclusiveMinimum": 0.0,
+            "title": "Connector Id",
+            "type": "integer"
+          },
+          "method": {
+            "enum": [
+              "GET",
+              "POST"
+            ],
+            "title": "Method",
+            "type": "string"
+          },
+          "request_schema": {
+            "additionalProperties": true,
+            "title": "Request Schema",
+            "type": "object"
+          },
+          "response_schema": {
+            "additionalProperties": true,
+            "title": "Response Schema",
+            "type": "object"
+          },
+          "tool_name": {
+            "pattern": "^connector:[a-z0-9]+(?:[-_][a-z0-9]+)*$",
+            "title": "Tool Name",
+            "type": "string"
+          },
+          "version": {
+            "exclusiveMinimum": 0.0,
+            "title": "Version",
+            "type": "integer"
+          },
+          "version_id": {
+            "exclusiveMinimum": 0.0,
+            "title": "Version Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "tool_name",
+          "connector_id",
+          "version_id",
+          "version",
+          "checksum",
+          "method"
+        ],
+        "title": "ConnectorRuntimeManifest",
+        "type": "object"
       },
       "ConsistencyCompareResponse": {
         "additionalProperties": false,
@@ -9513,6 +10064,20 @@
             ],
             "title": "Name"
           },
+          "reasoning_content": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Content"
+          },
+          "reasoning_details": {
+            "title": "Reasoning Details"
+          },
           "role": {
             "enum": [
               "system",
@@ -9600,6 +10165,51 @@
             "title": "Model",
             "type": "string"
           },
+          "prompt_cache_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt Cache Key"
+          },
+          "prompt_cache_retention": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt Cache Retention"
+          },
+          "reasoning": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning"
+          },
+          "reasoning_effort": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Effort"
+          },
           "store": {
             "anyOf": [
               {
@@ -9640,6 +10250,18 @@
               }
             ],
             "title": "Temperature"
+          },
+          "thinking": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thinking"
           },
           "tool_choice": {
             "title": "Tool Choice"
@@ -10174,7 +10796,7 @@
       },
       "GetEvidenceSpanRequest": {
         "additionalProperties": false,
-        "description": "leaf 证据跨度（D-07/D-08）：按 chapter+offsets+content_hash 物化原文。\n\n只返回冻结原文切片；offsets 非法或 content_hash 与切片不匹配 → 拒绝。",
+        "description": "leaf 证据跨度（D-07/D-08）：按 chapter+offsets 物化原文。\n\n只返回冻结原文切片；offsets 非法 → 拒绝。``content_hash`` 可选：省略时\n服务端计算并返回；提供时校验与切片一致，不匹配 → 拒绝（防漂移）。",
         "properties": {
           "chapter_id": {
             "description": "章节 ID",
@@ -10183,12 +10805,19 @@
             "type": "integer"
           },
           "content_hash": {
-            "description": "该切片内容的 SHA-256",
-            "maxLength": 64,
-            "minLength": 64,
-            "pattern": "^[0-9a-f]{64}$",
-            "title": "Content Hash",
-            "type": "string"
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 64,
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "该切片内容的 SHA-256（可选；省略时服务端计算）",
+            "title": "Content Hash"
           },
           "source_end": {
             "description": "切片终点（不含）",
@@ -10206,8 +10835,7 @@
         "required": [
           "chapter_id",
           "source_start",
-          "source_end",
-          "content_hash"
+          "source_end"
         ],
         "title": "GetEvidenceSpanRequest",
         "type": "object"
@@ -13272,6 +13900,74 @@
         "title": "NovelBulkDeleteResponse",
         "type": "object"
       },
+      "NovelCreate": {
+        "description": "创建小说请求（手动录入元信息，非文件上传场景）",
+        "properties": {
+          "author": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "作者",
+            "title": "Author"
+          },
+          "cover_url": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "封面地址",
+            "title": "Cover Url"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "简介",
+            "title": "Description"
+          },
+          "genre": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "类型/流派",
+            "title": "Genre"
+          },
+          "title": {
+            "description": "小说标题",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "title": "NovelCreate",
+        "type": "object"
+      },
       "NovelExportManifest": {
         "additionalProperties": false,
         "description": "Frozen novel export manifest consumed by Markdown/HTML/EPUB adapters.\n\nOrdering is deterministic (chapters by number, anchors by source offset,\nassets by revision id) so the same DB state always freezes to the same\nmanifest hash.",
@@ -13422,6 +14118,18 @@
           "id": {
             "title": "Id",
             "type": "integer"
+          },
+          "reading_progress": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reading Progress"
           },
           "status": {
             "title": "Status",
@@ -17853,11 +18561,15 @@
           },
           "run": {
             "$ref": "#/components/schemas/SkillRunView"
+          },
+          "runtime_manifest": {
+            "$ref": "#/components/schemas/SkillRuntimeManifest"
           }
         },
         "required": [
           "run",
-          "internal_token"
+          "internal_token",
+          "runtime_manifest"
         ],
         "title": "SkillRunAccepted",
         "type": "object"
@@ -18056,6 +18768,13 @@
             ],
             "title": "Stop Reason"
           },
+          "tool_runs": {
+            "items": {
+              "$ref": "#/components/schemas/ToolRunSummary"
+            },
+            "title": "Tool Runs",
+            "type": "array"
+          },
           "updated_at": {
             "format": "date-time",
             "title": "Updated At",
@@ -18075,6 +18794,134 @@
           "updated_at"
         ],
         "title": "SkillRunView",
+        "type": "object"
+      },
+      "SkillRuntimeManifest": {
+        "additionalProperties": false,
+        "description": "run 接受时由服务端冻结的 canonical Skill 运行时清单。",
+        "properties": {
+          "allowed_tools": {
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Allowed Tools",
+            "type": "array"
+          },
+          "approval_required_for": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Approval Required For",
+            "type": "array"
+          },
+          "budget": {
+            "additionalProperties": true,
+            "title": "Budget",
+            "type": "object"
+          },
+          "checksum": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Checksum",
+            "type": "string"
+          },
+          "connector_versions": {
+            "items": {
+              "$ref": "#/components/schemas/ConnectorRuntimeManifest"
+            },
+            "title": "Connector Versions",
+            "type": "array"
+          },
+          "description": {
+            "default": "",
+            "title": "Description",
+            "type": "string"
+          },
+          "execution_mode": {
+            "default": "declarative_only",
+            "enum": [
+              "builtin",
+              "declarative_only"
+            ],
+            "title": "Execution Mode",
+            "type": "string"
+          },
+          "forbidden_spaces": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Forbidden Spaces",
+            "type": "array"
+          },
+          "input_schema": {
+            "additionalProperties": true,
+            "title": "Input Schema",
+            "type": "object"
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "novel_id": {
+            "exclusiveMinimum": 0.0,
+            "title": "Novel Id",
+            "type": "integer"
+          },
+          "output_schema": {
+            "additionalProperties": true,
+            "title": "Output Schema",
+            "type": "object"
+          },
+          "owner_id": {
+            "exclusiveMinimum": 0.0,
+            "title": "Owner Id",
+            "type": "integer"
+          },
+          "prompt": {
+            "maxLength": 12000,
+            "minLength": 1,
+            "title": "Prompt",
+            "type": "string"
+          },
+          "read_permissions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Read Permissions",
+            "type": "array"
+          },
+          "skill_version_id": {
+            "exclusiveMinimum": 0.0,
+            "title": "Skill Version Id",
+            "type": "integer"
+          },
+          "version": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Version",
+            "type": "string"
+          },
+          "write_permissions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Write Permissions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "owner_id",
+          "novel_id",
+          "skill_version_id",
+          "name",
+          "version",
+          "prompt",
+          "allowed_tools",
+          "checksum"
+        ],
+        "title": "SkillRuntimeManifest",
         "type": "object"
       },
       "SkillVersionRegister": {
@@ -18141,6 +18988,13 @@
             "title": "Output Schema",
             "type": "object"
           },
+          "prompt": {
+            "default": "Follow the declarative Skill contract and use only supplied input and evidence.",
+            "maxLength": 12000,
+            "minLength": 1,
+            "title": "Prompt",
+            "type": "string"
+          },
           "read_permissions": {
             "items": {
               "type": "string"
@@ -18170,6 +19024,25 @@
           "allowed_tools"
         ],
         "title": "SkillVersionRegister",
+        "type": "object"
+      },
+      "SkillVersionStatusUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "status": {
+            "enum": [
+              "draft",
+              "active",
+              "deprecated"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "SkillVersionStatusUpdate",
         "type": "object"
       },
       "SkillVersionView": {
@@ -18211,6 +19084,21 @@
             ],
             "title": "Description"
           },
+          "execution_mode": {
+            "default": "declarative_only",
+            "enum": [
+              "builtin",
+              "declarative_only"
+            ],
+            "title": "Execution Mode",
+            "type": "string"
+          },
+          "execution_status": {
+            "const": "declarative_only",
+            "default": "declarative_only",
+            "title": "Execution Status",
+            "type": "string"
+          },
           "forbidden_spaces": {
             "items": {
               "type": "string"
@@ -18244,6 +19132,11 @@
             "title": "Owner Id",
             "type": "integer"
           },
+          "prompt": {
+            "default": "",
+            "title": "Prompt",
+            "type": "string"
+          },
           "read_permissions": {
             "items": {
               "type": "string"
@@ -18254,6 +19147,11 @@
           "registry_id": {
             "title": "Registry Id",
             "type": "integer"
+          },
+          "runtime_note": {
+            "default": "已注册声明式 Skill；当前运行时不会执行 prompt 正文。",
+            "title": "Runtime Note",
+            "type": "string"
           },
           "status": {
             "enum": [
@@ -18861,6 +19759,361 @@
         "title": "TokenResponse",
         "type": "object"
       },
+      "ToolCapabilityCatalogView": {
+        "additionalProperties": false,
+        "properties": {
+          "execution_boundary": {
+            "const": "builtin_declarative_only",
+            "default": "builtin_declarative_only",
+            "title": "Execution Boundary",
+            "type": "string"
+          },
+          "http_tools": {
+            "const": "not_enabled",
+            "default": "not_enabled",
+            "title": "Http Tools",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ToolCapabilityView"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "ToolCapabilityCatalogView",
+        "type": "object"
+      },
+      "ToolCapabilityView": {
+        "additionalProperties": false,
+        "properties": {
+          "approval_required": {
+            "title": "Approval Required",
+            "type": "boolean"
+          },
+          "category": {
+            "enum": [
+              "read",
+              "candidate",
+              "action"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "user_configurable": {
+            "title": "User Configurable",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "category",
+          "approval_required",
+          "user_configurable"
+        ],
+        "title": "ToolCapabilityView",
+        "type": "object"
+      },
+      "ToolConnectorListResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ToolConnectorView"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "ToolConnectorListResponse",
+        "type": "object"
+      },
+      "ToolConnectorPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "base_url": {
+            "maxLength": 2048,
+            "minLength": 1,
+            "title": "Base Url",
+            "type": "string"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 4000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "enabled": {
+            "default": false,
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "method": {
+            "enum": [
+              "GET",
+              "POST"
+            ],
+            "title": "Method",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]*$",
+            "title": "Name",
+            "type": "string"
+          },
+          "path": {
+            "maxLength": 2048,
+            "minLength": 1,
+            "title": "Path",
+            "type": "string"
+          },
+          "request_schema": {
+            "additionalProperties": true,
+            "title": "Request Schema",
+            "type": "object"
+          },
+          "response_schema": {
+            "additionalProperties": true,
+            "title": "Response Schema",
+            "type": "object"
+          }
+        },
+        "required": [
+          "name",
+          "base_url",
+          "path",
+          "method",
+          "request_schema",
+          "response_schema"
+        ],
+        "title": "ToolConnectorPayload",
+        "type": "object"
+      },
+      "ToolConnectorStatusUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "status": {
+            "enum": [
+              "active",
+              "disabled"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "ToolConnectorStatusUpdate",
+        "type": "object"
+      },
+      "ToolConnectorView": {
+        "additionalProperties": false,
+        "properties": {
+          "base_url": {
+            "maxLength": 2048,
+            "minLength": 1,
+            "title": "Base Url",
+            "type": "string"
+          },
+          "connector_id": {
+            "title": "Connector Id",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 4000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "enabled": {
+            "default": false,
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "method": {
+            "enum": [
+              "GET",
+              "POST"
+            ],
+            "title": "Method",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]*$",
+            "title": "Name",
+            "type": "string"
+          },
+          "owner_id": {
+            "title": "Owner Id",
+            "type": "integer"
+          },
+          "path": {
+            "maxLength": 2048,
+            "minLength": 1,
+            "title": "Path",
+            "type": "string"
+          },
+          "request_schema": {
+            "additionalProperties": true,
+            "title": "Request Schema",
+            "type": "object"
+          },
+          "response_schema": {
+            "additionalProperties": true,
+            "title": "Response Schema",
+            "type": "object"
+          },
+          "status": {
+            "enum": [
+              "draft",
+              "validated",
+              "active",
+              "disabled"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          },
+          "version_id": {
+            "title": "Version Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "base_url",
+          "path",
+          "method",
+          "request_schema",
+          "response_schema",
+          "id",
+          "version_id",
+          "connector_id",
+          "version",
+          "owner_id",
+          "status",
+          "created_at"
+        ],
+        "title": "ToolConnectorView",
+        "type": "object"
+      },
+      "ToolDryRunRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "request": {
+            "additionalProperties": true,
+            "title": "Request",
+            "type": "object"
+          }
+        },
+        "title": "ToolDryRunRequest",
+        "type": "object"
+      },
+      "ToolDryRunResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "body": {
+            "title": "Body"
+          },
+          "headers": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Headers",
+            "type": "object"
+          },
+          "status_code": {
+            "title": "Status Code",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "status_code",
+          "headers",
+          "body"
+        ],
+        "title": "ToolDryRunResponse",
+        "type": "object"
+      },
+      "ToolRunSummary": {
+        "additionalProperties": false,
+        "description": "SkillRun 对外公开的 Pi runtime 工具调用摘要。\n\n只允许确定性计数，不承载 args、结果正文或错误正文；``errors`` 是\n``calls`` 的子集。实际事实仍由 agent-service 从 Pi toolResult 生成，\n此模型只负责公开投影时的严格形状校验。",
+        "properties": {
+          "calls": {
+            "minimum": 1.0,
+            "title": "Calls",
+            "type": "integer"
+          },
+          "errors": {
+            "minimum": 0.0,
+            "title": "Errors",
+            "type": "integer"
+          },
+          "tool_name": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Tool Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tool_name",
+          "calls",
+          "errors"
+        ],
+        "title": "ToolRunSummary",
+        "type": "object"
+      },
       "UncertaintyReason": {
         "enum": [
           "missing_evidence",
@@ -18870,6 +20123,84 @@
         ],
         "title": "UncertaintyReason",
         "type": "string"
+      },
+      "UserPreferenceMemoryList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/UserPreferenceMemoryView"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "UserPreferenceMemoryList",
+        "type": "object"
+      },
+      "UserPreferenceMemoryView": {
+        "properties": {
+          "confidence": {
+            "title": "Confidence",
+            "type": "number"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "explicit": {
+            "title": "Explicit",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "source_message_id": {
+            "title": "Source Message Id",
+            "type": "integer"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "source_message_id",
+          "kind",
+          "value",
+          "confidence",
+          "explicit",
+          "created_at",
+          "expires_at"
+        ],
+        "title": "UserPreferenceMemoryView",
+        "type": "object"
       },
       "UserResponse": {
         "description": "用户信息响应",
@@ -20593,6 +21924,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "requestBody": {
@@ -20655,6 +22002,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -20719,6 +22082,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "requestBody": {
@@ -20782,6 +22161,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "requestBody": {
@@ -20832,6 +22227,73 @@
         ]
       }
     },
+    "/api/agent-tools/connectors/{connector_name}": {
+      "post": {
+        "description": "Run-token-only proxy; the request cannot supply a URL or connector version.",
+        "operationId": "run_frozen_tool_connector_api_agent_tools_connectors__connector_name__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connector_name",
+            "required": true,
+            "schema": {
+              "title": "Connector Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "novel_id",
+            "required": true,
+            "schema": {
+              "title": "Novel Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ToolDryRunRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolDryRunResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Run Frozen Tool Connector",
+        "tags": [
+          "受限 Tool 运行代理"
+        ]
+      }
+    },
     "/api/agent-tools/create_canon_fork": {
       "post": {
         "description": "Phase 35 canon fork 提议 action（35-05，REQ-FORK-01 / REQ-AGENT-03/04/07）：\n创建**一个**候选 fork（candidate-only，D-35-03）。\n\n服务端 proposal gate 只接受冻结 fork manifest（server-derived cutoff + 精确\nsource snapshot）+ delta 意图（delta_key + delta_content）；创建候选 CanonFork\n（status=candidate）+ pending Web ApprovalRequest（action=create_canon_fork，\npayload_hash 确定性重放，D-11/D-15）。绝不物化 fork——确定性 Fork materializer\n在用户 Web 批准后原子校验 approval + payload + fork manifest + snapshot 重放 +\ndelta 血缘 + owner/novel/branch/fork scope 才把 fork 物化为 approved；Original\nCanon 不可变、active pointer 恒 false。",
@@ -20844,6 +22306,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -20908,6 +22386,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "requestBody": {
@@ -20970,6 +22464,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -21034,6 +22544,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "requestBody": {
@@ -21096,6 +22622,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -21160,6 +22702,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "requestBody": {
@@ -21222,6 +22780,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -21286,6 +22860,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "requestBody": {
@@ -21348,6 +22938,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -21412,6 +23018,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "requestBody": {
@@ -21474,6 +23096,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -21538,6 +23176,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "requestBody": {
@@ -21600,6 +23254,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -21664,6 +23334,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "requestBody": {
@@ -21726,6 +23412,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -21790,6 +23492,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "requestBody": {
@@ -21852,6 +23570,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -21916,6 +23650,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "requestBody": {
@@ -21978,6 +23728,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -22489,6 +24255,22 @@
               "title": "Limit",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -22546,6 +24328,22 @@
             "schema": {
               "title": "Artifact Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -22627,6 +24425,22 @@
               "title": "Limit",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -22664,6 +24478,224 @@
         ]
       }
     },
+    "/api/agent/novels/{novel_id}/chapter-batches": {
+      "post": {
+        "description": "Create or resume a bounded batch; repeated identical requests are idempotent.",
+        "operationId": "create_chapter_batch_api_agent_novels__novel_id__chapter_batches_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "novel_id",
+            "required": true,
+            "schema": {
+              "title": "Novel Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChapterBatchCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChapterBatchView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Chapter Batch",
+        "tags": [
+          "章节分析批量编排"
+        ]
+      }
+    },
+    "/api/agent/novels/{novel_id}/chapter-batches/{batch_id}": {
+      "get": {
+        "operationId": "chapter_batch_status_api_agent_novels__novel_id__chapter_batches__batch_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "novel_id",
+            "required": true,
+            "schema": {
+              "title": "Novel Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "batch_id",
+            "required": true,
+            "schema": {
+              "title": "Batch Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChapterBatchView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Chapter Batch Status",
+        "tags": [
+          "章节分析批量编排"
+        ]
+      }
+    },
+    "/api/agent/novels/{novel_id}/chapter-batches/{batch_id}/resume": {
+      "post": {
+        "operationId": "resume_chapter_batch_endpoint_api_agent_novels__novel_id__chapter_batches__batch_id__resume_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "novel_id",
+            "required": true,
+            "schema": {
+              "title": "Novel Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "batch_id",
+            "required": true,
+            "schema": {
+              "title": "Batch Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChapterBatchView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Resume Chapter Batch Endpoint",
+        "tags": [
+          "章节分析批量编排"
+        ]
+      }
+    },
     "/api/agent/novels/{novel_id}/route-skill": {
       "post": {
         "description": "意图→skill 自动路由（AGENT-RUNTIME-CONTRACT：Agent 选 skill，用户不选）。\n\nagent-service 在 body.skill 缺省时调用本端点：按问题文本（+ 可选维度可用性）\n启发式选 skill。只返回该 owner+novel 已注册 active 的 skill，其余诚实剔除；\n无 active 命中回退 answer-reading-question。路由是**服务端决策**——本响应\n只服务 agent-service/未来前端的自动分发，不作为对用户的技能建议。",
@@ -22676,6 +24708,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -22760,6 +24808,22 @@
               "title": "Limit",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -22808,6 +24872,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "requestBody": {
@@ -22855,7 +24935,7 @@
     },
     "/api/agent/novels/{novel_id}/skill-runs/{run_id}/cancel": {
       "post": {
-        "description": "请求取消运行：置 cancel_requested；queued 的直接转 cancelled。",
+        "description": "请求取消运行并立即进入无写入的 cancelled 终态。",
         "operationId": "cancel_skill_run_api_agent_novels__novel_id__skill_runs__run_id__cancel_post",
         "parameters": [
           {
@@ -22872,8 +24952,15 @@
             "name": "run_id",
             "required": true,
             "schema": {
-              "title": "Run Id",
-              "type": "integer"
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -22929,8 +25016,15 @@
             "name": "run_id",
             "required": true,
             "schema": {
-              "title": "Run Id",
-              "type": "integer"
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -22998,8 +25092,15 @@
             "name": "run_id",
             "required": true,
             "schema": {
-              "title": "Run Id",
-              "type": "integer"
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -23038,7 +25139,7 @@
     },
     "/api/agent/queued-runs": {
       "get": {
-        "description": "agent-service poller：列出 queued 的 chat_backfill 运行（service token）。\n\n返回 run 上下文（含 input / skill_version_id / input_hash / branch），\n但不返回 internal_token（库中只存 hash）。claim 时铸造新 token。",
+        "description": "agent-service poller：列出 queued 的 Pi-backed 运行（service token）。\n\n返回 chat_backfill、reader_chat 与 chapter_batch 的运行上下文（含 input /\nskill_version_id / input_hash / branch），\n但不返回 internal_token（库中只存 hash）。claim 时铸造新 token。",
         "operationId": "list_queued_runs_api_agent_queued_runs_get",
         "parameters": [
           {
@@ -23144,6 +25245,23 @@
         "description": "列出当前用户的技能目录。",
         "operationId": "list_skills_api_agent_skills_get",
         "parameters": [
+          {
+            "in": "query",
+            "name": "novel_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "exclusiveMinimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Novel Id"
+            }
+          },
           {
             "in": "query",
             "name": "skip",
@@ -23264,6 +25382,23 @@
           },
           {
             "in": "query",
+            "name": "novel_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "exclusiveMinimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Novel Id"
+            }
+          },
+          {
+            "in": "query",
             "name": "skip",
             "required": false,
             "schema": {
@@ -23316,6 +25451,99 @@
           }
         ],
         "summary": "List Skill Versions",
+        "tags": [
+          "智能体运行时"
+        ]
+      }
+    },
+    "/api/agent/skills/{skill_name}/versions/{skill_version_id}": {
+      "patch": {
+        "operationId": "update_skill_version_status_api_agent_skills__skill_name__versions__skill_version_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "skill_name",
+            "required": true,
+            "schema": {
+              "title": "Skill Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "skill_version_id",
+            "required": true,
+            "schema": {
+              "title": "Skill Version Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SkillVersionStatusUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkillVersionView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update Skill Version Status",
+        "tags": [
+          "智能体运行时"
+        ]
+      }
+    },
+    "/api/agent/tools/catalog": {
+      "get": {
+        "description": "Owner-authenticated catalog; callers may only select these built-ins.",
+        "operationId": "get_tool_capability_catalog_api_agent_tools_catalog_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolCapabilityCatalogView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Tool Capability Catalog",
         "tags": [
           "智能体运行时"
         ]
@@ -23607,6 +25835,28 @@
         "summary": "Rebuild Hierarchy",
         "tags": [
           "剧情分析"
+        ]
+      }
+    },
+    "/api/auth/local-auto-login": {
+      "post": {
+        "description": "Create a passwordless session for one configured local test user.\n\nThis development-only seam is disabled unless an explicit username is set,\nrejects production mode, non-loopback clients and unapproved browser origins,\nand never sends a password to the renderer.",
+        "operationId": "local_auto_login_api_auth_local_auto_login_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Local Auto Login",
+        "tags": [
+          "认证"
         ]
       }
     },
@@ -23927,6 +26177,22 @@
               ],
               "title": "Status"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -23971,6 +26237,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -24028,6 +26310,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -24102,6 +26400,22 @@
               "title": "To Version Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -24147,6 +26461,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -24194,6 +26524,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -24260,6 +26606,22 @@
               "title": "Expected Revision",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -24305,6 +26667,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -24352,6 +26730,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -24451,6 +26845,22 @@
               ],
               "title": "Status"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -24524,6 +26934,22 @@
               "title": "Full Book",
               "type": "boolean"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -24555,6 +26981,15 @@
         "tags": [
           "线索与伏笔"
         ]
+      }
+    },
+    "/api/contract-fixture/ping": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          }
+        }
       }
     },
     "/api/eval/datasets": {
@@ -25325,9 +27760,342 @@
         ]
       }
     },
+    "/api/extensions/tools": {
+      "get": {
+        "operationId": "list_tool_connectors_api_extensions_tools_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolConnectorListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Tool Connectors",
+        "tags": [
+          "受限 Tool 扩展"
+        ]
+      },
+      "post": {
+        "operationId": "create_tool_connector_api_extensions_tools_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ToolConnectorPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolConnectorView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Tool Connector",
+        "tags": [
+          "受限 Tool 扩展"
+        ]
+      }
+    },
+    "/api/extensions/tools/{connector_id}": {
+      "get": {
+        "operationId": "get_tool_connector_api_extensions_tools__connector_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connector_id",
+            "required": true,
+            "schema": {
+              "title": "Connector Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolConnectorView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Tool Connector",
+        "tags": [
+          "受限 Tool 扩展"
+        ]
+      },
+      "put": {
+        "operationId": "update_tool_connector_api_extensions_tools__connector_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connector_id",
+            "required": true,
+            "schema": {
+              "title": "Connector Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ToolConnectorPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolConnectorView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update Tool Connector",
+        "tags": [
+          "受限 Tool 扩展"
+        ]
+      }
+    },
+    "/api/extensions/tools/{connector_id}/dry-run": {
+      "post": {
+        "operationId": "dry_run_tool_connector_api_extensions_tools__connector_id__dry_run_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connector_id",
+            "required": true,
+            "schema": {
+              "title": "Connector Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ToolDryRunRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolDryRunResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Dry Run Tool Connector",
+        "tags": [
+          "受限 Tool 扩展"
+        ]
+      }
+    },
+    "/api/extensions/tools/{connector_id}/status": {
+      "patch": {
+        "operationId": "update_tool_connector_status_api_extensions_tools__connector_id__status_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connector_id",
+            "required": true,
+            "schema": {
+              "title": "Connector Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ToolConnectorStatusUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolConnectorView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update Tool Connector Status",
+        "tags": [
+          "受限 Tool 扩展"
+        ]
+      }
+    },
+    "/api/extensions/tools/{connector_id}/validate": {
+      "post": {
+        "operationId": "validate_tool_connector_api_extensions_tools__connector_id__validate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connector_id",
+            "required": true,
+            "schema": {
+              "title": "Connector Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolConnectorView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Validate Tool Connector",
+        "tags": [
+          "受限 Tool 扩展"
+        ]
+      }
+    },
     "/api/fanfiction": {
       "post": {
-        "description": "创建同人文（deferred，v1.4 Phase 31-33 实现）",
+        "description": "旧创建入口已废弃；不在此旁路创建任何记录。",
         "operationId": "create_fanfiction_api_fanfiction_post",
         "requestBody": {
           "content": {
@@ -25374,7 +28142,7 @@
     },
     "/api/fanfiction/{fanfiction_id}/continue": {
       "post": {
-        "description": "AI 续写（deferred，v1.4 Phase 31-33 实现）",
+        "description": "旧续写入口已废弃；续写必须走 route-skill→agent→candidate/approval 链。",
         "operationId": "continue_writing_api_fanfiction__fanfiction_id__continue_post",
         "parameters": [
           {
@@ -25432,7 +28200,7 @@
     },
     "/api/fanfiction/{novel_id}": {
       "get": {
-        "description": "获取小说的同人文列表（deferred，v1.4 Phase 31-33 实现）",
+        "description": "旧列表入口已废弃；使用 derivative project/chapter 查询入口。",
         "operationId": "list_fanfictions_api_fanfiction__novel_id__get",
         "parameters": [
           {
@@ -26058,6 +28826,89 @@
         ]
       }
     },
+    "/api/memory/preferences": {
+      "delete": {
+        "operationId": "delete_memories_api_memory_preferences_delete",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Delete Memories",
+        "tags": [
+          "用户习惯记忆"
+        ]
+      },
+      "get": {
+        "operationId": "list_memories_api_memory_preferences_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserPreferenceMemoryList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Memories",
+        "tags": [
+          "用户习惯记忆"
+        ]
+      }
+    },
+    "/api/memory/preferences/{memory_id}": {
+      "delete": {
+        "operationId": "delete_memory_api_memory_preferences__memory_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "memory_id",
+            "required": true,
+            "schema": {
+              "title": "Memory Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Delete Memory",
+        "tags": [
+          "用户习惯记忆"
+        ]
+      }
+    },
     "/api/models": {
       "get": {
         "description": "获取已配置的 AI 模型列表（仅返回激活状态的模型）",
@@ -26129,6 +28980,84 @@
           }
         ],
         "summary": "Create Model",
+        "tags": [
+          "AI 模型"
+        ]
+      }
+    },
+    "/api/models/discover": {
+      "post": {
+        "description": "从经 SSRF 校验的提供商 URL 获取模型目录；密钥只用于本次请求。",
+        "operationId": "discover_models_api_models_discover_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AIModelDiscoveryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIModelDiscoveryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Discover Models",
+        "tags": [
+          "AI 模型"
+        ]
+      }
+    },
+    "/api/models/providers": {
+      "get": {
+        "description": "返回设置页支持的供应商协议；不包含任何用户凭据。",
+        "operationId": "list_model_providers_api_models_providers_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AIModelProviderProfile"
+                  },
+                  "title": "Response List Model Providers Api Models Providers Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Model Providers",
         "tags": [
           "AI 模型"
         ]
@@ -26343,6 +29272,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -26400,6 +29345,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -26452,6 +29413,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -26532,6 +29509,22 @@
                 }
               ],
               "title": "Through Chapter"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -26615,6 +29608,22 @@
               ],
               "title": "Through Chapter"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -26689,6 +29698,22 @@
               ],
               "description": "Spoiler cutoff chapter; nodes with chapter_end beyond this are hidden",
               "title": "Through Chapter"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -26798,6 +29823,51 @@
           }
         ],
         "summary": "List Novels",
+        "tags": [
+          "小说管理"
+        ]
+      },
+      "post": {
+        "description": "创建空小说并立即物化其默认内置 Skills。",
+        "operationId": "create_novel_api_novels_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NovelCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NovelResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Novel",
         "tags": [
           "小说管理"
         ]
@@ -26958,6 +30028,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -27001,6 +30087,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -27047,6 +30149,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -27106,6 +30224,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -27155,6 +30289,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -27223,6 +30373,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -27263,6 +30429,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -27309,6 +30491,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -27377,6 +30575,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -27433,6 +30647,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -27611,6 +30841,22 @@
               "title": "Limit",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -27658,6 +30904,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -27716,6 +30978,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -27777,6 +31055,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -27864,6 +31158,22 @@
               "title": "Limit",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -27910,6 +31220,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -27977,6 +31303,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -28023,6 +31365,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -28077,6 +31435,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -28153,6 +31527,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -28218,6 +31608,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -28282,6 +31688,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -28373,6 +31795,22 @@
               "title": "Limit",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -28428,6 +31866,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -28487,6 +31941,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -28532,6 +32002,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -28600,6 +32086,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -28648,6 +32150,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -28693,6 +32211,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -28761,6 +32295,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -28817,6 +32367,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -28875,6 +32441,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -28923,6 +32505,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -28968,6 +32566,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -29036,6 +32650,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -29092,6 +32722,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -29160,6 +32806,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "requestBody": {
@@ -29218,6 +32880,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -29263,6 +32941,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -29331,6 +33025,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -29378,6 +33088,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -29433,6 +33159,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -29501,6 +33243,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -29555,6 +33313,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -29622,6 +33396,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -29699,6 +33489,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -29755,6 +33561,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -29819,6 +33641,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -29895,6 +33733,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -29992,6 +33846,22 @@
               "title": "Target Revision Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -30057,6 +33927,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -30133,6 +34019,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -30198,6 +34100,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -30266,6 +34184,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "requestBody": {
@@ -30331,6 +34265,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "requestBody": {
@@ -30395,6 +34345,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -30462,6 +34428,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -30532,6 +34514,22 @@
               "title": "Format",
               "type": "string"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -30587,6 +34585,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -30641,6 +34655,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -30724,6 +34754,22 @@
               ],
               "title": "Fork Id"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -30769,6 +34815,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -30837,6 +34899,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -30894,6 +34972,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -30948,6 +35042,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -31005,6 +35115,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -31115,6 +35241,22 @@
               ],
               "title": "Review State"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -31171,6 +35313,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -31229,6 +35387,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "requestBody": {
@@ -31286,6 +35460,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -31375,6 +35565,22 @@
               "title": "Spec Key",
               "type": "string"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -31422,6 +35628,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -31483,6 +35705,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -31547,6 +35785,22 @@
               "title": "Format",
               "type": "string"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -31592,6 +35846,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -31641,6 +35911,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -31689,6 +35975,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -31734,6 +36036,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -31801,6 +36119,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -31858,6 +36192,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -31912,6 +36262,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -31970,6 +36336,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -32025,6 +36407,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -32082,6 +36480,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -32150,6 +36564,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -32196,6 +36626,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -32252,6 +36698,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -32310,6 +36772,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -32364,6 +36842,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -32422,6 +36916,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -32478,6 +36988,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -32546,6 +37072,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -32600,6 +37142,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -32659,6 +37217,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -32707,6 +37281,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -32754,6 +37344,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -32812,6 +37418,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -32867,6 +37489,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -32924,6 +37562,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -33019,6 +37673,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -33066,6 +37736,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -33209,6 +37895,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -33256,6 +37958,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -33324,6 +38042,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -33380,6 +38114,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -33448,6 +38198,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -33504,6 +38270,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -33563,6 +38345,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "requestBody": {
@@ -33621,6 +38419,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -33666,6 +38480,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -33724,6 +38554,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -33792,6 +38638,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -33849,6 +38711,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -33905,6 +38783,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -33973,6 +38867,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -34029,6 +38939,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -34088,6 +39014,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -34133,6 +39075,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -34191,6 +39149,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -34259,6 +39233,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -34315,6 +39305,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -34422,6 +39428,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -34467,6 +39489,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -34535,6 +39573,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -34591,6 +39645,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -34658,6 +39728,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -34806,6 +39892,22 @@
               "title": "Include Provisional",
               "type": "boolean"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -34916,6 +40018,22 @@
               "title": "Full Book",
               "type": "boolean"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -34962,6 +40080,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -35019,6 +40153,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -35096,6 +40246,22 @@
               "title": "Target Version Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -35169,6 +40335,22 @@
             "schema": {
               "$ref": "#/components/schemas/RelationshipVersionSource",
               "default": "active"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -35255,6 +40437,22 @@
               "default": false,
               "title": "Enabled",
               "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -35395,6 +40593,78 @@
         "summary": "Novel Search",
         "tags": [
           "搜索"
+        ]
+      }
+    },
+    "/api/settings/agent": {
+      "get": {
+        "description": "Return the authenticated owner's Agent settings or typed defaults.",
+        "operationId": "get_agent_api_settings_agent_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentSettingsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Agent",
+        "tags": [
+          "设置中心"
+        ]
+      },
+      "put": {
+        "description": "Replace the authenticated owner's typed Agent settings.",
+        "operationId": "update_agent_api_settings_agent_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentSettingsUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentSettingsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update Agent",
+        "tags": [
+          "设置中心"
         ]
       }
     },
@@ -35562,6 +40832,22 @@
               ],
               "title": "Chapter End"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -35608,6 +40894,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -35665,6 +40967,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "requestBody": {
@@ -35720,6 +41038,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -35766,6 +41100,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -35822,6 +41172,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -35868,6 +41234,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -35925,6 +41307,22 @@
               "title": "Novel Id",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -35971,6 +41369,22 @@
             "schema": {
               "title": "Novel Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
             }
           }
         ],
@@ -36108,6 +41522,22 @@
               ],
               "title": "Chapter End"
             }
+          },
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
           }
         ],
         "responses": {
@@ -36166,15 +41596,6 @@
         "tags": [
           "用量统计"
         ]
-      }
-    },
-    "/api/contract-fixture/ping": {
-      "get": {
-        "responses": {
-          "200": {
-            "description": "Successful Response"
-          }
-        }
       }
     }
   }
