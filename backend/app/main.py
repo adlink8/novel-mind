@@ -24,6 +24,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from app.middleware.desktop_local_auth import DesktopLocalAuthMiddleware
 from app.api import (
     novels,
     analysis,
@@ -185,8 +186,6 @@ app.add_middleware(
 # 桌面本地会话认证（Phase 44-02 / D-44-04）：显式配置 NOVELMIND_LOCAL_AUTH_SECRET
 # 后，对本地桌面会话强制 audience/expiry 绑定的 Bearer 令牌；未配置时仅允许
 # 127.0.0.1/::1 回环来源（浏览器开发模式走现有 JWT/cookie，不被隐式绕过）。
-from app.middleware.desktop_local_auth import DesktopLocalAuthMiddleware
-
 app.add_middleware(DesktopLocalAuthMiddleware, secret=settings.local_auth_secret)
 
 
