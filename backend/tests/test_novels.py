@@ -429,6 +429,12 @@ async def test_update_reading_progress_success(auth_client: AsyncClient):
     detail = await auth_client.get(f"/api/novels/{novel_id}")
     assert detail.json()["reading_progress"]["chapter_id"] == chapter_id
 
+    # 分析页从列表响应选书；这里必须保留同一份阅读进度，不能回落到第一章。
+    listing = await auth_client.get("/api/novels")
+    listed = next(item for item in listing.json()["items"] if item["id"] == novel_id)
+    assert listed["reading_progress"]["chapter_id"] == chapter_id
+    assert listed["reading_progress"]["progress_percent"] == 65.5
+
 
 @pytest.mark.asyncio
 async def test_update_reading_progress_novel_not_found(auth_client: AsyncClient):

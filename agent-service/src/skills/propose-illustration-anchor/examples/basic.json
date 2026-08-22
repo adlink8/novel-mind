@@ -1,0 +1,91 @@
+{
+  "description": "propose-illustration-anchor skill-local fixture（Phase 34 / REQ-VIS-05）：精确 source span + proposal-ready AssetRevision → IllustrationAnchorProposal（type=illustration_anchor_proposal）。proposal_status 恒为 proposed；proposed → pending_approval → valid 只由服务端 proposal/approval/publisher 推进；publish_illustration / attach_illustration_to_text 要求 Web ApprovalRequest，绝不发布。",
+  "input": {
+    "novel_id": 11,
+    "branch": null,
+    "fork": null,
+    "chapter_id": 31,
+    "chapter_number": 1,
+    "proposal_key": "anchor-main-ayla-hair",
+    "source_snapshot_id": "ss-1",
+    "source_snapshot_hash": "4444444444444444444444444444444444444444444444444444444444444444",
+    "source_start": 27,
+    "source_end": 63,
+    "paragraph_start": 1,
+    "paragraph_end": 1,
+    "excerpt": "Ayla was a tall young woman with braided amber hair",
+    "anchor_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "chapter_content_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "asset_revision_id": 501,
+    "presentation": {
+      "caption": "Ayla, braided amber hair (Phase 33 proposal_ready candidate)",
+      "alt_text": "Portrait of Ayla with braided amber hair and green eyes",
+      "citation": "Chapter 1, lines 27-63"
+    },
+    "requested_actions": ["publish_illustration", "attach_illustration_to_text"]
+  },
+  "expected_output": {
+    "type": "illustration_anchor_proposal",
+    "schema_version": "illustration-anchor-proposal.v1",
+    "owner_id": 7,
+    "novel_id": 11,
+    "branch": null,
+    "producing_skill": "propose-illustration-anchor",
+    "producing_skill_version": "1.0.0",
+    "skill_version_id": 9,
+    "model_lineage": {
+      "provider": "fixture",
+      "model": "stub-model",
+      "revision": "stub-1"
+    },
+    "source_versions": {
+      "novel": "v1",
+      "source_snapshot_hash": "4444444444444444444444444444444444444444444444444444444444444444"
+    },
+    "input_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "evidence_refs": ["ev-ayla-hair"],
+    "tool_runs": [
+      { "tool_name": "get_chapter", "calls": 1 },
+      { "tool_name": "publish_illustration", "calls": 1 },
+      { "tool_name": "attach_illustration_to_text", "calls": 1 }
+    ],
+    "status": "candidate",
+    "parent_revision": null,
+    "illustration_anchor_proposal": {
+      "schema_version": "illustration-anchor-proposal.v1",
+      "artifact_kind": "illustration_anchor_proposal",
+      "proposal_key": "anchor-main-ayla-hair",
+      "authority_space": "original",
+      "fork": null,
+      "chapter_id": 31,
+      "chapter_number": 1,
+      "source_snapshot_id": "ss-1",
+      "source_snapshot_hash": "4444444444444444444444444444444444444444444444444444444444444444",
+      "range": {
+        "source_start": 27,
+        "source_end": 63,
+        "paragraph_start": 1,
+        "paragraph_end": 1
+      },
+      "excerpt": "Ayla was a tall young woman with braided amber hair",
+      "anchor_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "chapter_content_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "proposal_asset_revision_id": 501,
+      "presentation": {
+        "caption": "Ayla, braided amber hair (Phase 33 proposal_ready candidate)",
+        "alt_text": "Portrait of Ayla with braided amber hair and green eyes",
+        "citation": "Chapter 1, lines 27-63"
+      },
+      "requested_action": "publish_illustration",
+      "proposal_status": "proposed",
+      "approval_request_id": null,
+      "proposal_id": null
+    },
+    "normalization": {
+      "raw_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "repaired_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "normalization_actions": [],
+      "warnings": []
+    }
+  }
+}

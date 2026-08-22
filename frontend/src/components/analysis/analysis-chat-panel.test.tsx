@@ -293,8 +293,7 @@ describe("AnalysisChatPanel", () => {
     expect(mocks.createMessage).not.toHaveBeenCalled();
   });
 
-  it("navigates citations to the reader page chapter without touching progress", async () => {
-    mocks.listMessages.mockResolvedValue({
+  it("navigates citations to the reader page chapter without touching progress", async () => {    mocks.listMessages.mockResolvedValue({
       data: {
         items: [
           {
@@ -332,7 +331,90 @@ describe("AnalysisChatPanel", () => {
     );
     fireEvent.click(screen.getByTestId("reader-chat-citation"));
     expect(mocks.routerPush).toHaveBeenCalledWith(
-      "/novels/11?chapter=23&start=10&from=timeline"
+      "/novels/11?chapter=23&start=10&end=14&from=timeline"
     );
+  });
+
+  it("exposes the shared QueryPlan trace on assistant messages", async () => {
+    mocks.listMessages.mockResolvedValue({
+      data: {
+        items: [
+          {
+            id: 77,
+            conversation_id: 1,
+            sequence: 1,
+            role: "assistant",
+            body: "主线围绕雾中铃铛展开。",
+            client_message_id: null,
+            reply_to_message_id: 76,
+            selection: null,
+            citations: [
+              {
+                block_id: "b1",
+                evidence_key: "qp:23:10:14:abc",
+                context_evidence_ref_id: 7,
+                chapter_id: 23,
+                source_start: 10,
+                source_end: 14,
+              },
+            ],
+            generation_job: null,
+            queryplan: {
+              trace_id: "a".repeat(32),
+              plan_hash: "b".repeat(64),
+              intent: "analysis",
+              anchor_kind: "chapter_range",
+              cutoff_mode: "reading_progress",
+              through_chapter: 2,
+              full_book_authorized: false,
+              availability: [
+                { dimension: "relations", status: "available", reason: "reader_ok", provenance: "exact_reader_v1" },
+                { dimension: "character_state", status: "unavailable", reason: "dimension_unavailable", provenance: "deterministic_contract_v1" },
+              ],
+              fallback: { chain: ["exact_reader"] },
+              manifest_checksum: "c".repeat(64),
+              allowed_evidence_ids: ["qp:23:10:14:abc"],
+              citation_jump: [
+                {
+                  evidence_key: "qp:23:10:14:abc",
+                  chapter_id: 23,
+                  chapter_number: 3,
+                  source_start: 10,
+                  source_end: 14,
+                  excerpt: "主线围绕",
+                },
+              ],
+              abstained: false,
+            },
+            created_at: "2026-07-15T00:00:00Z",
+          },
+        ],
+        total: 1,
+        skip: 0,
+        limit: 200,
+        after_sequence: 0,
+      },
+    });
+    renderPanel();
+    await waitFor(() =>
+      expect(
+        screen.getByTestId("analysis-chat-queryplan-77")
+      ).toHaveTextContent("QueryPlan")
+    );
+    expect(screen.getByTestId("analysis-chat-queryplan-77")).toHaveTextContent(
+      "分析"
+    );
+    expect(
+      screen.getByTestId("analysis-chat-queryplan-77")
+    ).toHaveTextContent("结构区间锚点");
+    expect(
+      screen.getByTestId("analysis-chat-queryplan-77")
+    ).toHaveTextContent("已读至第 2 章");
+    expect(
+      screen.getByTestId("analysis-chat-queryplan-77")
+    ).toHaveTextContent("引用 1");
+    expect(
+      screen.getByTestId("analysis-chat-queryplan-77")
+    ).toHaveTextContent("部分维度不可用");
   });
 });

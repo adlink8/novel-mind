@@ -1,10 +1,10 @@
 # NovelMind Cloudflare Tunnel
 #
-# Hosts (tunnel: novelmind-win / 4dd3a4e7-e83d-4e8a-9c99-f2960359fb1f)
-# - https://novelmind.shuoyan.me     -> http://127.0.0.1:3005  (Next.js)
-# - https://novelmind-api.shuoyan.me -> http://127.0.0.1:8010  (FastAPI)
+# Hosts (tunnel: <tunnel-name> / <tunnel-id>)
+# - https://<fe-domain>     -> http://127.0.0.1:3005  (Next.js)
+# - https://<api-domain> -> http://127.0.0.1:8010  (FastAPI)
 #
-# Note: existing tunnel `my-pc` runs on another Linux host (xiaozhi.shuoyan.me).
+# Note: existing tunnel `my-pc` runs on another Linux host (<my-pc-domain>).
 # This Windows box uses a separate tunnel so configs do not conflict.
 #
 # Start local apps first:
@@ -18,4 +18,4 @@
 # Stop tunnel:
 #   powershell -File deploy/cloudflare/stop-tunnel.ps1
 #
-# CORS: backend .env must include https://novelmind.shuoyan.me
+# CORS: backend .env must include https://<fe-domain>

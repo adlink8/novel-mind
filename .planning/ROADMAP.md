@@ -1,6 +1,6 @@
 # NovelMind GSD Roadmap
 
-> Execution authority: `master`. Snapshot: `912ca6b`, 2026-08-01.
+> Execution authority: `master`. Snapshot: `29be2fa`, 2026-08-07.
 > Progress is reported in three independent dimensions:
 > `implementation_readiness`, `sample_data_coverage`, `quality_qualification`.
 
@@ -26,10 +26,12 @@
 | Milestone | Phases | implementation_readiness | sample_data_coverage | quality_qualification |
 |---|---|---|---|---|
 | v1.1 execution baseline | 21–25.1 | partial | partial | blocked by Phase 22 |
-| agent runtime foundation | 25.2–25.3 | planned | planned | planned |
-| v1.2 trusted novel understanding | 26–29 | planned | planned | planned |
-| v1.3 visual narrative | 30–34 | planned | planned | planned |
-| v1.4 Canon Fork derivatives | 35–39 | planned | planned | planned |
+| agent runtime foundation | 25.2–25.3 | **IMPLEMENTED & VERIFIED (2026-08-02)** | partial | blocked by Phase 22 3/3 |
+| v1.2 trusted novel understanding | 26–29 | **26/27/28/29 VERIFIED (2026-08-03)** | planned | blocked by Phase 22 3/3 |
+| v1.3 visual narrative | 30–34 | **30/31/32/33/34 VERIFIED (2026-08-04)** | planned | blocked by Phase 22 3/3 |
+| v1.4 Canon Fork derivatives | 35–39 | **35/36/37/38/39 VERIFIED (2026-08-05)** | planned | blocked by Phase 22 3/3 |
+| v1.5 Windows desktop runtime | 41–45 | evidence artifacts exist; state reconciliation required | partial | release/signing gates remain external |
+| v1.6 provider protocol unification | 46 | foundation implemented locally; follow-up planned | credentials not supplied | blocked pending live provider qualification |
 
 # Agent Runtime Foundation — Phase 25.2–25.3
 
@@ -37,6 +39,8 @@
 > authorized while Phase 22 is blocked; execution remains fail-closed.
 
 ## Phase 25.2 — Embedded Novel Agent Runtime
+
+**Status:** IMPLEMENTED & VERIFIED (2026-08-02, `25.2-VERIFICATION.md` passed at `6988ceb`)
 
 **Goal:** qualify the pinned Pi SDK in a standalone Node Agent Service and establish controlled
 Domain Tools, versioned Skills/SkillRuns, lineage-bound Artifacts and the Agent Workspace.
@@ -73,6 +77,8 @@ and responsive Agent Workspace behavior. Alembic chain:
 `24idxjournal1 → 26agentrun01`.
 
 ## Phase 25.3 — Pi Package Compatibility and Governance
+
+**Status:** IMPLEMENTED & VERIFIED (2026-08-02, `25.3-VERIFICATION.md` passed at `e4b1c95`)
 
 **Goal:** qualify controlled Pi ecosystem reuse without allowing packages, MCP or renderers to
 bypass NovelMind permissions, evidence, Canon, Artifact or approval boundaries.
@@ -119,21 +125,32 @@ Alembic chain continues `26agentrun01 → 27approval01`.
 | 35 | `create-canon-fork` → approved deterministic fork materialization |
 | 36 | Agent is a branch-scoped editor collaborator; deterministic Revision Service applies |
 | 37 | `continue-derivative-story` → DraftArtifact + ContinuityReport |
-| 38 | branch-aware visual Skills |
+| 38 | `illustrate-derivative-scene` → BranchVisualBibleArtifact + BranchIllustrationRevision |
 | 39 | `prepare-export` + deterministic exporter |
 
 ### Phase 25.2–39 Planning Artifact Status (2026-08-02)
 
-| Range | CONTEXT / RESEARCH / PATTERNS / VALIDATION | PLAN files | Planning verdict |
+| Range | CONTEXT / RESEARCH / PATTERNS / VALIDATION | PLAN files | Implementation status |
 |---|---:|---:|---|
-| Phase 25.2–25.3 | 8/8 | 15 | PLANNED |
-| Phase 26–29 | 16/16 + shared Agent contract | 21 | PLANNED |
-| Phase 30–34 | 20/20 + shared Agent contract | 24 | PLANNED |
-| Phase 35–39 | 20/20 + shared Agent contract | 25 | PLANNED |
+| Phase 25.2–25.3 | 8/8 | 15 | **VERIFIED 2026-08-02** |
+| Phase 26 | 7/7 + shared Agent contract | 7 | **VERIFIED 2026-08-02/03** |
+| Phase 27 | 5/5 + shared Agent contract | 5 | **VERIFIED 2026-08-03** |
+| Phase 28 | 5/5 + shared Agent contract | 5 | **VERIFIED 2026-08-03** |
+| Phase 29 | 5/5 + shared Agent contract | 5 | **VERIFIED 2026-08-03** |
+| Phase 30 | 5/5 + shared Agent contract | 5 | **VERIFIED 2026-08-03** |
+| Phase 31 | 4/4 + shared Agent contract | 4 | **VERIFIED 2026-08-03** |
+| Phase 32 | 5/5 + shared Agent contract | 5 | **VERIFIED 2026-08-03** |
+| Phase 33 | 5/5 + shared Agent contract | 5 | **VERIFIED 2026-08-04** |
+| Phase 34 | 5/5 + shared Agent contract | 5 | **VERIFIED 2026-08-04** |
+| Phase 35 | 5/5 + shared Agent contract | 5 | **VERIFIED 2026-08-04** |
+| Phase 36 | 5/5 + shared Agent contract | 5 | **VERIFIED 2026-08-04** |
+| Phase 37 | 5/5 + shared Agent contract | 5 | **VERIFIED 2026-08-04** |
+| Phase 38 | 5/5 + shared Agent contract | 5 | **VERIFIED 2026-08-05** |
+| Phase 39 | 5/5 + shared Agent contract | 5 | **VERIFIED 2026-08-05** |
 
-The corrected portfolio contains 85 plans: 10 reused Kimi foundation plans, five corrective
-foundation slices, 56 deterministic/domain-gate plans and 14 Agent-integration plans. This
-remains a planning verdict only.
+The corrected portfolio contains 86 plans: 10 reused Kimi foundation plans, five corrective
+foundation slices, 57 deterministic/domain/shared-integrity plans and 14 Agent-integration plans.
+Phase 25.2–39 are implemented and verified. **The full roadmap through Phase 39 is delivered.**
 
 ## Baseline Reconciliation — Phase 21–25.1
 
@@ -145,10 +162,28 @@ remains a planning verdict only.
 | 24 indexing journal, reconcile, retrieval router | IMPLEMENTED | merged on master; operational qualification remains Phase 29 |
 | 25 facet/API/provenance/cost honesty | IMPLEMENTED | master contracts and tests |
 | 25.1 Analysis Chat workspace/range anchor | IMPLEMENTED | default chat view and chapter-range wiring |
+| 25.2 Embedded Novel Agent Runtime | **VERIFIED 2026-08-02** | `25.2-VERIFICATION.md` passed; agent-service 223p, backend 195p |
+| 25.3 Pi Package Compatibility & Governance | **VERIFIED 2026-08-02** | `25.3-VERIFICATION.md` passed; MCP isolation, approval, renderer |
+| 26 Question-Driven Retrieval & Evidence | **VERIFIED 2026-08-02/03** | `26-VERIFICATION.md` passed; QueryPlan, adapters/fusion, evidence manifest, consumers, skill integration, structured-output integrity |
+| 27 Novel World Model | **VERIFIED 2026-08-03** | `27-VERIFICATION.md` passed; event/causal, epistemic history, entity/rule, authority, propose-world-model-candidates skill |
+| 28 Whole-Book Narrative Memory | **VERIFIED 2026-08-03** | `28-VERIFICATION.md` passed; failure/recovery, chapter terminality, arc/volume/global, closure, analyze-chapter/build-story-arc skills |
+| 29 Quality Qualification | **VERIFIED 2026-08-03** | `29-VERIFICATION.md` passed; gold set, bucket evaluation, browser UAT, three-dimension audit, evaluate-reading-skill-runs skill |
+| 30 Visual Bible | **VERIFIED 2026-08-03** | `30-VERIFICATION.md` passed; candidate contract, evidence materialization, workspace UI, review/versioning, build-visual-bible skill |
+| 31 Key Scene Detection | **VERIFIED 2026-08-03** | `31-VERIFICATION.md` passed; scene contract/boundaries, salience+diversity ranking, human review + frozen set, detect-key-scenes skill |
+| 32 Scene Spec and Prompt Compiler | **VERIFIED 2026-08-03** | `32-VERIFICATION.md` passed; SceneSpec contract, evidence-to-spec compiler, provider adapters, validation/preview, compile-scene-spec skill |
+| 33 Illustration Generation & Consistency | **VERIFIED 2026-08-04** | `33-VERIFICATION.md` passed; job/asset/budget contract, mock generation + storage, consistency scoring, review/compare/approval, illustrate-scene skill |
+| 34 In-Text Anchors, Reader and Export | **VERIFIED 2026-08-04** | `34-VERIFICATION.md` passed; anchor contract, responsive reader, anchor repair, Markdown/HTML/EPUB export, propose-illustration-anchor skill + publish |
+| 35 Triple Knowledge Spaces and Canon Fork | **VERIFIED 2026-08-04** | `35-VERIFICATION.md` passed; 3-space contract, fork snapshot/cutoff, isolated retrieval/citations, contamination guards, create-canon-fork skill + materializer |
+| 36 Derivative Project and Editor | **VERIFIED 2026-08-04** | `36-VERIFICATION.md` passed; project CRUD, chapter plan + Markdown editor, autosave CAS/history/diff/rollback, browser UAT + gate, edit-derivative-story skill |
+| 37 Constrained Generation | **VERIFIED 2026-08-04** | `37-VERIFICATION.md` passed; context package, constrained draft generation, consistency gates + BranchSuggestion, divergence override, continue-derivative-story skill |
+| 38 Derivative Visual Consistency | **VERIFIED 2026-08-05** | `38-VERIFICATION.md` passed; forked Visual Bible, derivative Scene Specs, candidate assets + cross-chapter consistency, review/version lineage + UI, illustrate-derivative-scene skill |
+| 39 Derivative Export Closeout | **VERIFIED 2026-08-05** | `39-VERIFICATION.md` passed; reproducible Markdown/EPUB export, provenance package, browser UAT, prepare-export skill + deterministic preparation/materialization, independent audit gate (no promotion path) |
 
-Phase 22 remains blocked and unverified. The user explicitly allowed Phase 26–39 planning;
-implementation is not unlocked. Phase 25.2 requires Phase 22 qualification; Phase 25.3
-requires Phase 25.2; Phase 26+ requires all dependencies declared by its Agent integration.
+Phase 22 remains blocked and unverified. The user authorized the Phase 25.2 through Phase 39
+execution overrides (2026-08-02/03/04/05); each phase proceeded on the passed upstream
+verification artifact. v1.2 milestone (Phases 26–29), v1.3 milestone (Phases 30–34) and the
+v1.4 milestone (Phases 35–39) are all implemented and verified. The full roadmap through
+Phase 39 is delivered under the overrides.
 
 ---
 
@@ -156,8 +191,7 @@ requires Phase 25.2; Phase 26+ requires all dependencies declared by its Agent i
 
 ### Phase 26: Question-Driven Retrieval and Evidence
 
-**Status:** PLANNED / EXECUTION BLOCKED — Phase 22 Nightly qualification remains 0/3 and
-Phase 25.2 and Phase 25.3 have no passed verification artifacts.
+**Status:** IMPLEMENTED & VERIFIED (2026-08-02/03, `26-VERIFICATION.md` passed at `cb071bc`)
 
 **Goal:** turn a reader/analyst question into a typed retrieval plan, fuse the required
 dimensions and materialize source-verified citations.
@@ -196,6 +230,9 @@ fallback; answer quality is reported separately, not inferred from implementatio
 
 - **26-05 Agent integration:** extend `answer-reading-question` over the validated QueryPlan,
   ToolRegistryManifest, Frozen Manifest and CitedAnswerArtifact contracts.
+- **26-06 Structured output integrity:** normalize only declared aliases/enums/container shapes,
+  strictly revalidate, preserve raw/repaired hashes and warnings, and block any repair that would
+  invent evidence, ownership, cutoff, authority, branch, fork or approval state.
 
 ## Phase 27 — World Model and Epistemic Layers
 
@@ -236,6 +273,8 @@ interpretive quality are measured independently.
 
 ## Phase 28 — Whole-Book Narrative Memory Convergence
 
+**Status:** IMPLEMENTED & VERIFIED (2026-08-03, `28-VERIFICATION.md` passed at `a7414c5`)
+
 **Goal:** converge every chapter and semantic arc into a candidate-only whole-book model.
 
 **Depends on:** Phase 26–27.
@@ -268,9 +307,13 @@ interpretive quality are measured independently.
 cross-dimension manifests agree, and candidate-only invariants hold.
 
 - **28-05 Agent integration:** register `analyze-chapter` and `build-story-arc`; persist
-  ChapterAnalysisArtifact/StoryArcArtifact with candidate-only terminal-state validation.
+  ChapterAnalysisArtifact/StoryArcArtifact with bounded context, continuity notes, non-indexed
+  digests and candidate-only terminal-state validation. Outline/mainline outputs remain
+  uncertainty-bearing candidates; progress reuses Agent SSE/Job notification over DB checkpoints.
 
 ## Phase 29 — Quality Qualification and v1.2 Closure
+
+**Status:** IMPLEMENTED & VERIFIED (2026-08-03, `29-VERIFICATION.md` passed at `efa4f77`)
 
 **Goal:** prove that question-driven understanding is useful, faithful and usable.
 
@@ -310,6 +353,8 @@ cross-dimension manifests agree, and candidate-only invariants hold.
 
 ## Phase 30 — Visual Bible
 
+**Status:** IMPLEMENTED & VERIFIED (2026-08-03, `30-VERIFICATION.md` passed at `67908b1`)
+
 **Goal:** create a versioned, evidence-linked visual identity system for characters, places,
 factions, items and style.
 
@@ -327,13 +372,16 @@ Confirm** after each plan with frozen entity fixtures.
 
 ## Phase 31 — Key Scene Detection
 
+**Status:** IMPLEMENTED & VERIFIED (2026-08-03, `31-VERIFICATION.md` passed at `fae6b68`)
+
 **Goal:** identify illustration-worthy scenes without reducing importance to embedding
 similarity.
 
 **Plans:** 31-01 scene boundary/candidate contract; 31-02 narrative salience and diversity
 ranking; 31-03 human review and frozen key-scene set.
 
-**Must-Haves:** evidence range, cast/place/time/POV, spoiler cutoff, diversity and reasons.
+**Must-Haves:** evidence range, cast/place/time/POV, spoiler cutoff, diversity and reasons;
+speaker/dialogue heuristics expose offsets/confidence/warnings only as candidate signals.
 
 **Verification:** precision/diversity/coverage review; **Test, Fix, and Confirm** against
 high-action, quiet-emotional and visually ambiguous scenes.
@@ -342,6 +390,8 @@ high-action, quiet-emotional and visually ambiguous scenes.
   from deterministic score/diversity/spoiler validation and user selection.
 
 ## Phase 32 — Scene Spec and Prompt Compiler
+
+**Status:** IMPLEMENTED & VERIFIED (2026-08-03, `32-VERIFICATION.md` passed at `ca06706`)
 
 **Goal:** compile evidence and Visual Bible constraints into provider-neutral Scene Specs
 and provider-specific prompts.
@@ -360,6 +410,8 @@ Confirm** via prompt diffs and adversarial unsupported details.
 
 ## Phase 33 — Illustration Generation and Consistency
 
+**Status:** IMPLEMENTED & VERIFIED (2026-08-04, `33-VERIFICATION.md` passed at `1b8a658`)
+
 **Goal:** generate reviewable illustration candidates with durable job, cost and consistency
 evidence.
 
@@ -376,6 +428,8 @@ human approval and provider-neutral API.
   proposal-ready IllustrationRevision and does not publish.
 
 ## Phase 34 — In-Text Anchors, Reader and Export
+
+**Status:** IMPLEMENTED & VERIFIED (2026-08-04, `34-VERIFICATION.md` passed at `68819ac`)
 
 **Goal:** place approved illustrations at stable text anchors and preserve them in reading and
 exports.
@@ -398,6 +452,8 @@ Fix, and Confirm** on changed offsets and unavailable images.
 
 ## Phase 35 — Triple Knowledge Spaces and Canon Fork
 
+**Status:** IMPLEMENTED & VERIFIED (2026-08-04, `35-VERIFICATION.md` passed at `5992c25`)
+
 **Goal:** enforce independent Original Canon, User Interpretation and Fanfiction Canon
 authorities.
 
@@ -415,6 +471,8 @@ contamination attempts.
 
 ## Phase 36 — Derivative Project and Editor
 
+**Status:** IMPLEMENTED & VERIFIED (2026-08-04, `36-VERIFICATION.md` passed at `a354a1e`)
+
 **Goal:** provide owner-scoped derivative projects, plans, chapters and versioned editing.
 
 **Plans:** 36-01 project/domain CRUD; 36-02 chapter plan and Markdown editor; 36-03 autosave,
@@ -431,6 +489,8 @@ conflict and rollback paths.
 
 ## Phase 37 — Constrained Generation
 
+**Status:** IMPLEMENTED & VERIFIED (2026-08-04, `37-VERIFICATION.md` passed at `b8594e3`)
+
 **Goal:** generate continuation/rewrites against an auditable story-state package.
 
 **Plans:** 37-01 context package compiler; 37-02 constrained draft generation;
@@ -443,15 +503,18 @@ no silent write-back to original canon.
 with intentional canon violations and allowed divergences.
 
 - **37-05 Agent integration:** register `continue-derivative-story`; separate ordinary draft
-  approval, divergence approval and deterministic derivative revision publication.
+  approval, disabled-by-default BranchSuggestion, divergence approval and deterministic
+  derivative revision publication; suggestions never auto-fork or reuse an approval.
 
 ## Phase 38 — Derivative Visual Consistency
+
+**Status:** IMPLEMENTED & VERIFIED (2026-08-05, `38-VERIFICATION.md` passed at `fad8978`)
 
 **Goal:** extend the Visual Bible and illustration pipeline without contaminating original
 visual authority.
 
 **Plans:** 38-01 forked Visual Bible; 38-02 derivative Scene Specs; 38-03 generation and
-cross-chapter consistency; 38-04 review/version lineage.
+cross-chapter consistency; 38-04 review/version lineage; 38-05 branch-aware Agent skill.
 
 **Must-Haves:** original references remain immutable; divergence is explicit; generated
 assets belong to derivative namespace.
@@ -459,15 +522,19 @@ assets belong to derivative namespace.
 **Verification:** namespace and identity consistency tests; **Test, Fix, and Confirm** mixed
 original/derivative asset scenarios.
 
-- **38-05 Agent integration:** register branch-aware visual Skill; publish only validated and
-  approved derivative assets without mutating Original visual authority.
+- **38-05 Agent integration:** register branch-aware visual Skill (`illustrate-derivative-
+  scene`); publish only validated and approved derivative assets without mutating Original
+  visual authority.
 
 ## Phase 39 — Export, UAT and v1.4 Audit
+
+**Status:** IMPLEMENTED & VERIFIED (2026-08-05, `39-VERIFICATION.md` passed at `c21c9e0`)
 
 **Goal:** ship a reproducible derivative package and independently audit the complete flow.
 
 **Plans:** 39-01 Markdown/EPUB derivative export; 39-02 manifest/assets/citation package;
-39-03 end-to-end browser UAT; 39-04 security, quality and milestone audit.
+39-03 end-to-end browser UAT; 39-04 security, quality and milestone audit; 39-05 Agent
+integration (prepare-export).
 
 **Must-Haves:** export-version parity, asset provenance, owner isolation, no original-space
 mutation and three-dimensional status report.
@@ -479,6 +546,287 @@ audit; **Test, Fix, and Confirm** every failed end-to-end checkpoint.
 
 - **39-05 Agent integration:** register `prepare-export`; Agent prepares a frozen manifest,
   user approves export, and deterministic exporter materializes the bundle.
+
+# v1.5 — Windows Desktop Runtime
+
+> This milestone adds a Windows-first Electron distribution around the verified React/Next
+> product surface. The web app remains a development/test harness, not the formal release
+> target. These phases do not restore web as the release target and do not rewrite verified
+> business UI; they prove and qualify the desktop host, transport and local runtime.
+>
+> Phase 40 remains the ad-hoc `chat_backfill` record in `STATE.md`, not a numbered roadmap
+> phase. Phase 22 remains independently blocked at 0/3 scheduled green observations; that
+> fact is preserved and does not prevent planning this milestone.
+
+## Phase Checklist
+
+- [ ] **Phase 41: Electron Architecture and Packaging Proof** - Prove the standalone Next/local-loopback and bundled no-Docker architecture before downstream work.
+- [ ] **Phase 42: Secure Desktop Shell** - Host the existing React/Next renderer behind a sandboxed, capability-limited Electron boundary.
+- [ ] **Phase 43: Managed Local Runtime and Data Lifecycle** - Manage the local process graph, app data, migrations, crash recovery and lifecycle.
+- [ ] **Phase 44: Desktop Transport, Credentials and Offline Behavior** - Establish dynamic local transport, OS-backed credentials, SSE and honest offline states.
+- [ ] **Phase 45: Windows Packaging, Migration and Desktop Qualification** - Qualify installer, upgrade/uninstall preservation, clean-VM behavior and release security gates.
+
+## REQ-DESK Primary Ownership
+
+Each v1 requirement has exactly one primary phase. Cross-stage entries below are validation
+only and do not create a second owner.
+
+| Requirement | Primary phase | Cross-stage validation (non-owning) |
+|---|---|---|
+| REQ-DESK-01 | Phase 42 | Phase 41 route proof; Phase 45 critical-workflow qualification |
+| REQ-DESK-02 | Phase 42 | Phase 45 IPC/security negative audit |
+| REQ-DESK-03 | Phase 43 | Phase 41 process-graph feasibility; Phase 45 lifecycle qualification |
+| REQ-DESK-04 | Phase 41 | Phase 43 managed adapters; Phase 45 clean-VM proof |
+| REQ-DESK-05 | Phase 43 | Phase 45 upgrade/uninstall preservation |
+| REQ-DESK-06 | Phase 44 | Phase 43 endpoint readiness; Phase 45 packaged startup qualification |
+| REQ-DESK-07 | Phase 43 | Phase 44 blocked/offline presentation; Phase 45 crash/recovery qualification |
+| REQ-DESK-08 | Phase 44 | Phase 45 clean-VM/offline qualification |
+| REQ-DESK-09 | Phase 45 | — |
+| REQ-DESK-10 | Phase 45 | — |
+
+## v1.5 Progress
+
+| Phase | Plans Complete | Status | Completed |
+|---|---:|---|---|
+| 41. Electron Architecture and Packaging Proof | decision artifact only | **NO-GO preserved**; no SUMMARY/VERIFICATION rewrite | 2026-08-10 evidence |
+| 42. Secure Desktop Shell | 3/3 summaries | Implemented under explicit 42–45 override; no standalone phase VERIFICATION | 2026-08-10 artifacts |
+| 43. Managed Local Runtime and Data Lifecycle | 4/4 summaries | Implemented under explicit 42–45 override; no standalone phase VERIFICATION | 2026-08-10/11 artifacts |
+| 44. Desktop Transport, Credentials and Offline Behavior | 3/3 summaries | Implemented under explicit 42–45 override; no standalone phase VERIFICATION | 2026-08-10/11 artifacts |
+| 45. Windows Packaging, Migration and Desktop Qualification | 4/4 summaries | `45-VERIFICATION.md` says evidence-supported verified but release-ready false; stale clean-VM wording remains an audit boundary | 2026-08-11 artifacts |
+
+### Phase 41: Electron Architecture and Packaging Proof
+
+**Goal:** establish a fail-closed architecture decision that the existing Next application can
+run as a Windows Electron local-loopback desktop product with bundled dependencies, before any
+comprehensive UI migration or downstream packaging work.
+
+**Depends on:** Phase 39; Phase 22's independent 0/3 blocked gate remains unchanged.
+
+**Requirements:** REQ-DESK-04
+
+**Success Criteria** (what must be TRUE):
+
+1. A proof harness builds and starts the existing Next `output:standalone` artifact through an
+   Electron local-loopback path and verifies all 13 current routes respond and render through
+   the existing React/Next surface.
+2. The proof records the real process, asset, port, environment and shutdown assumptions for
+   Next, FastAPI, Agent Service, PostgreSQL and vector storage, and marks bundled/no-Docker
+   feasibility for each dependency with explicit evidence or a blocker.
+3. The proof demonstrates that an installed target does not require Docker or a user-installed
+   Node, Python, PostgreSQL or vector-service runtime, or records the exact failed prerequisite.
+4. A fail-closed go/no-go artifact blocks Phase 42–45 readiness when standalone output,
+   local-loopback, 13-route coverage or bundled no-Docker feasibility fails; it does not trigger
+   a broad UI rewrite or silently downgrade a failed proof to a green plan.
+
+**Plans:**
+
+- **Wave 0**
+  1. **41-01 — Disposable Electron/local-runtime proof skeleton and fail-closed topology contract** — Blocked on: none.
+- **Wave 1**
+  1. **41-02 — Next standalone local-loopback proof and 13-route parity** — Blocked on: `41-01`.
+- **Wave 2**
+  1. **41-03 — Bundled-runtime feasibility and Phase 41 GO/NO-GO decision** — Blocked on: `41-02`.
+
+Phase 41 planning is ready; comprehensive UI migration remains gated on the Phase 41 decision.
+
+**UI hint:** yes
+
+### Phase 42: Secure Desktop Shell
+
+**Goal:** let users operate the verified React/Next renderer inside an Electron shell while
+exposing only an explicit, capability-specific desktop boundary.
+
+**Depends on:** Phase 41 fail-closed GO.
+
+**Requirements:** REQ-DESK-01, REQ-DESK-02
+
+**Success Criteria** (what must be TRUE):
+
+1. Users can open the desktop application and use all 13 existing routes and verified critical
+   workflows through the React/Next renderer without a parallel business-UI rewrite or a new
+   formal web-release target.
+2. Renderer security checks prove `contextIsolation: true`, `sandbox: true`,
+   `nodeIntegration: false`, and no renderer access to Node, filesystem, shell or arbitrary
+   process APIs.
+3. A restrictive CSP, allowlisted navigation policy and controlled window policy block
+   unexpected origins, redirects, popups and new windows while preserving the approved local
+   application flow.
+4. The preload exposes a typed capability-specific `DesktopBridge`; IPC rejects unknown
+   channels, invalid payloads and messages whose sender/webContents is not an approved renderer.
+
+**Plans:**
+
+- **Wave 0**
+  1. **42-01 — Electron main/preload shell skeleton** — Blocked on: `41-03`.
+- **Wave 1**
+  1. **42-02 — CSP, navigation, window, permissions and sender-validated IPC security boundary** — Blocked on: `42-01`.
+- **Wave 2**
+  1. **42-03 — Electron 13-route, critical-workflow and renderer-privilege parity gates** — Blocked on: `42-02`.
+
+**UI hint:** yes
+
+### Phase 43: Managed Local Runtime and Data Lifecycle
+
+**Goal:** give the desktop application a deterministic, observable local runtime and durable
+data lifecycle for all managed services without changing backend domain authority.
+
+**Depends on:** Phase 41 fail-closed GO and Phase 42's secure bridge boundary.
+
+**Requirements:** REQ-DESK-03, REQ-DESK-05, REQ-DESK-07
+
+**Success Criteria** (what must be TRUE):
+
+1. A small deep-module `DesktopRuntime` interface exposes only `ensureReady`, `status`,
+   `restart` and `shutdown`, with typed lifecycle/error states and deterministic readiness
+   semantics; it does not become a second domain or persistence authority.
+2. `PackagedProcessAdapter` and `DevelopmentProcessAdapter` manage the same contract for Next,
+   FastAPI, Agent Service, PostgreSQL and vector storage, including dependency ordering,
+   health checks, dynamic endpoints, clean process-tree shutdown and targeted restart.
+3. First run and upgrade use a versioned `%APPDATA%/NovelMind` layout for mutable data, logs,
+   migration state and backups; compatible upgrades preserve user data and migration failure
+   leaves a recoverable backup/state rather than partial silent success.
+4. A killed dependency, startup failure, port conflict or crash is visible as a typed degraded
+   or failed state, offers a bounded recovery/restart path, and never appears as a successful
+   empty novel/library state.
+
+**Plans:**
+
+- **Wave 0**
+  1. **43-01 — DesktopRuntime deep module and development/packaged adapter contract** — Blocked on: `42-02`.
+- **Wave 1**
+  1. **43-02 — Five-component process graph, dynamic ports, readiness, logging and Windows process-tree ownership** — Blocked on: `43-01`.
+  2. **43-03 — Versioned `%APPDATA%/NovelMind` layout, backup-first migration and recovery contract** — Blocked on: `43-01`.
+- **Wave 2**
+  1. **43-04 — Visible/recoverable runtime and data failure states with empty-success prevention** — Blocked on: `43-02`, `43-03`.
+
+### Phase 44: Desktop Transport, Credentials and Offline Behavior
+
+**Goal:** provide a secure desktop transport and honest connectivity model for local workflows,
+provider calls and streaming without moving factual or domain authority into Electron.
+
+**Depends on:** Phase 42 secure bridge and Phase 43 runtime endpoint/readiness contract.
+
+**Requirements:** REQ-DESK-06, REQ-DESK-08
+
+**Success Criteria** (what must be TRUE):
+
+1. Startup injects the actual local endpoints and auth material at runtime without fixed-port
+   assumptions; renderer code consumes typed capabilities rather than discovering services or
+   storing gateway/provider credentials in renderer storage.
+2. Local credentials use Electron `safeStorage`/the OS-backed protection boundary, are absent
+   from renderer-accessible storage and logs, and invalid/expired credentials fail closed with
+   a stable user-visible status.
+3. Agent and long-running local operations stream through the existing SSE contract with
+   reconnect/cancellation/error handling that preserves terminal failure states and does not
+   manufacture a successful result.
+4. Provider-independent reading, editing and local-data workflows start without internet;
+   provider-dependent actions show explicit unavailable/blocked states when offline or
+   misconfigured, while backend services remain the domain and authority boundary.
+
+**Plans:**
+
+- **Wave 0**
+  1. **44-01 — Dynamic endpoint/bootstrap contract and unified API/SSE resolver** — Blocked on: `43-04`.
+- **Wave 1**
+  1. **44-02 — OS-protected credentials and fail-closed local session authentication** — Blocked on: `44-01`.
+- **Wave 2**
+  1. **44-03 — SSE recovery and honest offline/provider capability behavior** — Blocked on: `44-02`.
+
+### Phase 45: Windows Packaging, Migration and Desktop Qualification
+
+**Goal:** qualify a reproducible Windows desktop release candidate that installs, upgrades,
+recovers and preserves data under real clean-machine conditions.
+
+**Depends on:** Phases 41–44 and the Phase 39 verified critical workflow/export baseline.
+
+**Requirements:** REQ-DESK-09, REQ-DESK-10
+
+**Success Criteria** (what must be TRUE):
+
+1. A Windows installer on a clean VM installs and first-runs without Docker or user-installed
+   Node, Python, PostgreSQL or vector-service runtime, opens only one application instance,
+   shows no console window and shuts down the managed process tree cleanly.
+2. A compatible versioned upgrade preserves `%APPDATA%/NovelMind` data, logs and backups;
+   uninstall behavior preserves user data according to the documented policy and a failed
+   upgrade has a reversible recovery path.
+3. Electron Playwright integration qualification covers first run, all existing critical
+   workflows, local runtime recovery, offline/blocked states and data preservation; the
+   security audit includes CSP/navigation/window, IPC sender and malformed-capability negatives.
+4. The release gate records clean-VM, migration, crash-recovery and qualification evidence;
+   code-signing certificate acquisition is an external publication gate and is not purchased
+   or represented as complete by this roadmap.
+
+**Plans:**
+
+- **Wave 0**
+  1. **45-01 — Windows installer build chain, bundled runtime, single instance and data/resource isolation** — Blocked on: `41-03`, `42-03`, `43-04`, `44-03`.
+- **Wave 1**
+  1. **45-02 — Version upgrade, failure recovery and data-preserving uninstall policy** — Blocked on: `45-01`.
+- **Wave 2**
+  1. **45-03 — Clean Windows VM install, first-run, workflow, offline-recovery and data-preservation UAT** — Blocked on: `45-02`.
+- **Wave 3**
+  1. **45-04 — Electron security audit, SBOM/evidence integrity and v1.5 closeout** — Blocked on: `45-03`.
+
+# v1.6 — Provider Protocol Unification and Live Qualification
+
+> This phase follows the user-confirmed Pi/Agent gateway and settings integration. The
+> current dirty worktree already contains a tested five-provider discovery foundation and
+> owner-bound Pi default-model resolution; Phase 46 plans only the remaining protocol,
+> authority and live-qualification gaps. It does not rewrite Phase 42–45 summaries, alter
+> the Phase 41 NO-GO record, satisfy Phase 22, or authorize paid provider calls.
+
+## Phase Checklist
+
+- [ ] **Phase 46: Provider Protocol Unification and Live Qualification** - Make all five configured provider formats complete, remove hardcoded runtime selection, and qualify real discovery plus Pi calls without exposing credentials.
+
+## REQ-PROVIDER Primary Ownership
+
+| Requirement | Primary plan | Cross-plan validation (non-owning) |
+|---|---|---|
+| REQ-PROVIDER-01 | 46-01 | 46-03 live catalog matrix |
+| REQ-PROVIDER-02 | 46-02 | 46-03 Pi run matrix; 46-04 lineage audit |
+| REQ-PROVIDER-03 | 46-03 | 46-04 closeout verdict |
+| REQ-PROVIDER-04 | 46-04 | 46-02 resolver provenance |
+
+### Phase 46: Provider Protocol Unification and Live Qualification
+
+**Goal:** establish one owner-scoped deployment authority and evidence-backed protocol matrix
+for OpenAI, Anthropic, Google AI Studio Gemini, Ollama and custom
+OpenAI-compatible services across model discovery, connection testing and Pi/Agent execution.
+
+**Depends on:** Phase 25.2 Agent gateway authority and Phase 44 credential/transport boundary.
+Phase 45 evidence is reusable; Phase 41 NO-GO and Phase 22 0/3 remain unchanged.
+
+**Requirements:** REQ-PROVIDER-01, REQ-PROVIDER-02, REQ-PROVIDER-03, REQ-PROVIDER-04
+
+**Success Criteria** (what must be TRUE):
+
+1. A single backend provider registry defines canonical IDs, aliases, credentials, catalog
+   pagination, generation transport and declared capabilities for all five settings choices;
+   create, update, discovery, test and invocation reject incompatible provider/config pairs.
+2. Pi/Agent and every in-scope text-generation consumer resolve an active owner-scoped
+   `AIModelConfig`; the legacy `ai_router.py` static catalog and global routing preference can
+   no longer select a runtime model, and missing/unsafe configuration fails closed.
+3. A credential-gated qualification matrix records discovery, direct test and Pi run evidence
+   per provider without storing secrets. A provider without an operator-supplied credential or
+   reachable local service is BLOCKED/PARTIAL, never simulated green.
+4. Provider/model/usage/error/cost lineage is persisted and surfaced from backend truth;
+   unknown capability or pricing remains explicit, and the closeout gate can independently
+   reproduce its verdict from redacted evidence.
+
+**Plans:**
+
+- **Wave 0**
+  1. **46-01 — Five-provider protocol registry, pagination and configuration validation** — no execution dependency.
+- **Wave 1**
+  1. **46-02 — Owner-scoped deployment authority and hardcoded router retirement** — Blocked on: `46-01`.
+- **Wave 2**
+  1. **46-03 — Credential-gated real provider and Pi qualification matrix** — Blocked on: `46-01`, `46-02`.
+- **Wave 3**
+  1. **46-04 — Usage/cost/capability truth, browser proof and closeout** — Blocked on: `46-03`.
+
+**UI hint:** yes — reuse the existing settings layout; add only backend-derived capability,
+qualification and failure states defined by `46-UI-SPEC.md`.
 
 ## Supersession and Backlog Map
 
@@ -496,6 +844,19 @@ audit; **Test, Fix, and Confirm** every failed end-to-end checkpoint.
 
 ## Next
 
-Resume Phase 22 G2/G3 and complete Phase 25.2 plus Phase 25.3 verification before executing Phase 26.
-Phase 26–39 planning artifacts are complete and must remain reviewable without being
-misreported as implementation or quality qualification.
+Phase 22 (CI/Nightly authority) remains the last unverified gate — 0/3 scheduled green.
+Phase 25.2 through Phase 39 are all verified (2026-08-02/03/04/05), completing the v1.2
+milestone (26–29), the v1.3 milestone (30–34) and the v1.4 milestone (35–39). The full
+roadmap through Phase 39 is delivered under the user-authorized execution overrides. The
+Phase 39 closeout audit gate honestly reports `blocked` (Phase 22 0/3 + REQ-SHIP-01 gaps)
+and never promotes; neither blocker is hidden or downgraded.
+
+Phase 40 remains the ad-hoc `chat_backfill` record in `STATE.md`, not a numbered roadmap
+phase. Phase 41's NO-GO decision remains authoritative. Phases 42–45 have execution summaries
+under the explicit override and Phase 45 has an evidence-supported verification artifact, but
+those artifacts do not rewrite Phase 41 and their stale clean-VM/release wording is not silently
+normalized here. Phase 22's independent 0/3 blocked state does not change.
+
+Phase 46 is planned only. Execution requires a separate user instruction. Cloud-provider
+qualification additionally requires operator-supplied credentials and may incur provider cost;
+absence of those inputs is a valid BLOCKED result, not permission to substitute mocks.

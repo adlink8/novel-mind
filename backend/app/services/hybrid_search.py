@@ -290,6 +290,7 @@ class HybridSearchService:
                 rank.label("rank"),
                 headline.label("headline"),
                 func.coalesce(Chapter.title, "").label("chapter_title"),
+                Chapter.chapter_number.label("chapter_number"),
                 func.coalesce(Novel.title, "").label("novel_title"),
             )
             .join(Novel, Novel.id == TextChunk.novel_id)
@@ -321,6 +322,9 @@ class HybridSearchService:
                 "novel_id": row.novel_id,
                 "novel_title": row.novel_title or "",
                 "chapter_id": row.chapter_id,
+                # chapter_number 同时返回：模型常把章节序号误当数据库
+                # chapter_id 传给 get_chapter/get_evidence_span（E2E 实测 404）。
+                "chapter_number": row.chapter_number,
                 "chapter_title": row.chapter_title or "",
                 "chunk_id": row.chunk_id,
                 "chunk_index": row.chunk_index,
@@ -349,13 +353,19 @@ class HybridSearchService:
                 by_id = {r.id: r for r in rows2}
                 for item in out:
                     r = by_id.get(item["chunk_id"])
-                    if r and r.hierarchy_node_id:
+                    if r is None:
+                        continue
+                    # source offsets 与 hierarchy 链接解耦：raw_fallback chunk
+                    # 同样携带（agent 按 offsets 直接物化 get_evidence_span）。
+                    if r.source_start is not None:
+                        item["source_start"] = r.source_start
+                    if r.source_end is not None:
+                        item["source_end"] = r.source_end
+                    if r.hierarchy_node_id:
                         item["hierarchy_node_id"] = r.hierarchy_node_id
                         item["hierarchy_build_id"] = r.hierarchy_build_id
                         item["hierarchy_level"] = r.hierarchy_level
                         item["hierarchy_parent_id"] = r.hierarchy_parent_id
-                        item["source_start"] = r.source_start
-                        item["source_end"] = r.source_end
         except Exception as e:
             logger.debug("hierarchy column attach skipped: %s", e)
         return out
@@ -454,10 +464,22 @@ class HybridSearchService:
                     "novel_id": r.get("novel_id"),
                     "novel_title": r.get("novel_title", ""),
                     "chapter_id": r.get("chapter_id"),
+                    "chapter_number": r.get("chapter_number"),
                     "chapter_title": r.get("chapter_title", ""),
                     "chunk_id": chunk_id,
                     "chunk_index": r.get("chunk_index", 0),
                     "content_snippet": r.get("content_snippet", r.get("content", "")),
+                    # 证据 offsets 穿透（agent 物化 leaf 证据的坐标）。
+                    **(
+                        {"source_start": r["source_start"]}
+                        if r.get("source_start") is not None
+                        else {}
+                    ),
+                    **(
+                        {"source_end": r["source_end"]}
+                        if r.get("source_end") is not None
+                        else {}
+                    ),
                     "bm25_score": norm_score,
                     "vector_score": 0.0,
                     "score": 0.0,

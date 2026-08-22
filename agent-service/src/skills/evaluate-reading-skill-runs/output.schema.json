@@ -1,0 +1,259 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SkillEvaluationArtifact",
+  "description": "SkillEvaluationArtifact 信封（REQ-QA-01..03 + REQ-AGENT-03 / Phase 29）。镜像 backend app.schemas.agent_runtime.SkillEvaluationArtifact：type / schema_version / owner / novel / branch / producing skill+version / model lineage / source versions / input_hash / evidence_refs / 被评估冻结 SkillRun+ToolRun 血缘（evaluated_run）/ 被评估冻结 Artifact 修订血缘（evaluated_artifact）/ 密封 QualificationReport（report，verdict 只允许 qualified_candidate 或 blocked，checksum 可重放）/ tool_runs / status / parent_revision / normalization。artifact_id / revision_id 由后端确定性 finalizer 在写入时分配，不在本信封内。评估冻结 Skill/model/source/Artifact/dataset 版本，绝不重跑可变 Agent 状态；无审批、无发布。",
+  "type": "object",
+  "required": [
+    "type",
+    "schema_version",
+    "owner_id",
+    "novel_id",
+    "producing_skill",
+    "producing_skill_version",
+    "skill_version_id",
+    "model_lineage",
+    "source_versions",
+    "input_hash",
+    "evidence_refs",
+    "evaluated_run",
+    "evaluated_artifact",
+    "report",
+    "tool_runs",
+    "status"
+  ],
+  "properties": {
+    "type": {
+      "const": "skill_evaluation"
+    },
+    "schema_version": {
+      "const": "skill-evaluation.v1"
+    },
+    "owner_id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "novel_id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "branch": {
+      "type": ["string", "null"],
+      "description": "衍生分支；原始主线为 null"
+    },
+    "producing_skill": {
+      "type": "string",
+      "minLength": 1
+    },
+    "producing_skill_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "skill_version_id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "model_lineage": {
+      "type": "object",
+      "description": "agent runtime + 模型血缘（provider/model/revision）"
+    },
+    "source_versions": {
+      "type": "object",
+      "description": "数据源版本（novel/dataset 等；source snapshot 血缘）"
+    },
+    "input_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "运行输入规范化 JSON 的 SHA-256（重放追溯）"
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1,
+      "description": "leaf 证据引用，必须 ⊆ 冻结 manifest 白名单（D-07/D-08）"
+    },
+    "evaluated_run": {
+      "type": "object",
+      "description": "被评估冻结 SkillRun + ToolRun 血缘：只允许 completed/failed（冻结）终态；绝不重跑可变 Agent 状态。",
+      "required": ["run_id", "status", "branch", "input_hash", "tool_runs"],
+      "properties": {
+        "run_id": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "被评估冻结 SkillRun id"
+        },
+        "status": {
+          "enum": ["completed", "failed"],
+          "description": "冻结 run 终态（running 是可变状态，绝不作为评估证据）"
+        },
+        "branch": {
+          "type": ["string", "null"]
+        },
+        "input_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "被评估 run 的输入 hash"
+        },
+        "tool_runs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["tool_name", "calls"],
+            "properties": {
+              "tool_name": { "type": "string", "minLength": 1 },
+              "calls": { "type": "integer", "minimum": 0 }
+            }
+          },
+          "description": "被评估 run 的 ToolRun 血缘"
+        }
+      },
+      "additionalProperties": false
+    },
+    "evaluated_artifact": {
+      "type": "object",
+      "description": "被评估冻结 Artifact 修订血缘（artifact/revision id + content hash）。",
+      "required": ["artifact_id", "revision_id", "type", "schema_version", "content_hash", "status"],
+      "properties": {
+        "artifact_id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "revision_id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "type": {
+          "type": "string",
+          "minLength": 1,
+          "description": "被评估产物类型（如 cited_answer / chapter_analysis / story_arc）"
+        },
+        "schema_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "content_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "被评估冻结修订内容 hash"
+        },
+        "status": {
+          "enum": ["candidate", "validated", "approved", "published", "rejected"],
+          "description": "被评估产物状态（只评估冻结状态，绝不 promotion）"
+        }
+      },
+      "additionalProperties": false
+    },
+    "report": {
+      "type": "object",
+      "description": "密封 QualificationReport（D-02/D-05）：verdict 只允许 qualified_candidate / blocked；checksum 可重放（后端确定性评估 runner 产出，不可由 Agent/UI 更改）。",
+      "required": [
+        "report_version",
+        "header",
+        "buckets",
+        "operations",
+        "manifest",
+        "blocked_reasons",
+        "verdict",
+        "checksum",
+        "disclaimer"
+      ],
+      "properties": {
+        "report_version": {
+          "const": "reading-qa-qualification.v1"
+        },
+        "header": {
+          "type": "object",
+          "description": "血缘绑定的 run header（db_fingerprint/dataset_version/source_snapshot/commit/model/prompt/schema_version/config/budget）"
+        },
+        "buckets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "description": "每桶 candidate/baseline metrics + worst cases + blocked reasons（D-03，绝不隐藏失败）"
+          }
+        },
+        "operations": {
+          "type": "object",
+          "description": "run 级 operations 指标（latency/cost/calls/reuse）"
+        },
+        "manifest": {
+          "type": ["object", "null"],
+          "description": "CandidateManifest 快照（可空）"
+        },
+        "blocked_reasons": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "verdict": {
+          "enum": ["qualified_candidate", "blocked"],
+          "description": "唯一合法裁决（D-05，无 promotion）"
+        },
+        "checksum": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "disclaimer": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "tool_runs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["tool_name", "calls"],
+        "properties": {
+          "tool_name": { "type": "string", "minLength": 1 },
+          "calls": { "type": "integer", "minimum": 0 }
+        }
+      },
+      "description": "ToolRun 血缘：本 run 使用的 allowlist 工具与调用次数"
+    },
+    "status": {
+      "enum": ["candidate", "validated", "approved", "published", "rejected"],
+      "description": "产物状态；finalize 写入时恒为 candidate（无自动 promotion）"
+    },
+    "parent_revision": {
+      "type": ["string", "null"],
+      "description": "父修订引用；首个修订为 null"
+    },
+    "normalization": {
+      "type": "object",
+      "description": "26-06 修复血缘 trail：repaired_hash 是对不含本 trail 的 repaired payload 的 canonical SHA-256；raw_hash 是原始模型输出的 canonical SHA-256；normalization_actions 每项含 path/action/after。",
+      "required": ["raw_hash", "repaired_hash", "normalization_actions", "warnings"],
+      "properties": {
+        "raw_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "repaired_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "normalization_actions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path", "action", "after"],
+            "properties": {
+              "path": { "type": "string", "minLength": 1 },
+              "action": {
+                "type": "string",
+                "enum": ["alias", "alias_dedup", "enum_canonicalize", "container_shape", "lineage_merge"]
+              },
+              "before": {},
+              "after": {},
+              "reason": { "type": "string" }
+            }
+          }
+        },
+        "warnings": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

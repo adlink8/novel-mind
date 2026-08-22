@@ -347,11 +347,22 @@ test("selection action binds offsets and opens chat", async ({ page }) => {
 
   // Programmatically select text inside reader page
   await page.evaluate(() => {
-    const el = document.querySelector('[data-testid="reader-page-text"]');
-    if (!el || !el.firstChild) return;
-    const range = document.createRange();
-    const text = el.firstChild as Text;
+    const root = document.querySelector('[data-testid="reader-page-text"]');
+    if (!root) return;
+    // Paragraph blocks are wrapped in divs; walk the DOM to the first text
+    // node that actually contains the selection target.
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    let text: Text | null = null;
+    while (walker.nextNode()) {
+      const node = walker.currentNode as Text;
+      if (node.data.includes("阿宁走进")) {
+        text = node;
+        break;
+      }
+    }
+    if (!text) return;
     const idx = text.data.indexOf("阿宁走进");
+    const range = document.createRange();
     range.setStart(text, idx);
     range.setEnd(text, idx + 4);
     const sel = window.getSelection();

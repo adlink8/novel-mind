@@ -3,13 +3,9 @@
 # Backend uses 8010 to avoid conflict with other tools (e.g. rag-api) on :8000.
 
 $ErrorActionPreference = "Continue"
-# Prefer the repo that contains this script; fall back only if incomplete.
+# 只从脚本所在位置推导仓库根目录（已移除硬编码本机路径，仓库公开可读）
 $Root = Split-Path $PSScriptRoot -Parent
-$CandidateRoots = @(
-    $Root,
-    "D:\ADLINK\Myproject\novel-mind",
-    "C:\Users\li\Desktop\Myproject\novel-mind"
-) | Select-Object -Unique
+$CandidateRoots = @($Root) | Select-Object -Unique
 
 function Resolve-BackendPython([string]$RepoRoot) {
     foreach ($rel in @("backend\.venv\Scripts\python.exe", "backend\venv\Scripts\python.exe")) {
@@ -35,13 +31,16 @@ if (-not $Py) {
 
 $BackendDir = Join-Path $Root "backend"
 $FrontendDir = Join-Path $Root "frontend"
+$AgentDir = Join-Path $Root "agent-service"
 $LogFile = Join-Path $PSScriptRoot "keep-alive.log"
 $PidFile = Join-Path $PSScriptRoot "keep-alive.pid"
 $IntervalSec = 8
 $BePort = 8010
 $FePort = 3005
+$AgPort = 3100
 $BeHealth = "http://127.0.0.1:$BePort/api/health"
 $FeUrl = "http://127.0.0.1:$FePort/"
+$AgHealth = "http://127.0.0.1:$AgPort/healthz"
 
 $env:NO_PROXY = "127.0.0.1,localhost"
 $env:no_proxy = "127.0.0.1,localhost"
@@ -92,6 +91,11 @@ function Test-IsNovelMindBackend([string]$Cmd) {
 function Test-IsNovelMindFrontend([string]$Cmd) {
     if (-not $Cmd) { return $false }
     return ($Cmd -match 'novel-mind[\\/]+frontend' -and ($Cmd -match 'next' -or $Cmd -match 'start-server'))
+}
+
+function Test-IsNovelMindAgent([string]$Cmd) {
+    if (-not $Cmd) { return $false }
+    return ($Cmd -match 'agent-service' -and ($Cmd -match 'node' -or $Cmd -match 'start.mjs'))
 }
 
 function Stop-ProcessTree([int]$ProcessId) {
@@ -160,6 +164,49 @@ rem Production mode: requires `npm run build` output in .next (rebuild after fro
 call npm run start -- --port $FePort --hostname 127.0.0.1 >> "$outLog" 2>&1
 "@
     Start-DetachedCmd -Title "novelmind-fe" -BatPath $bat -Body $body
+}
+
+function Start-AgentService {
+    Clear-ForeignPort -Port $AgPort -IsOurs { param($c) Test-IsNovelMindAgent $c }
+    $bat = Join-Path $AgentDir "_keep_agent.bat"
+    $outLog = Join-Path $AgentDir "runtime-agent.log"
+    $body = @"
+@echo off
+cd /d "$AgentDir"
+set NOVELMIND_GATEWAY_TOKEN=dev-agent-gateway-token-local
+set FASTAPI_BASE_URL=http://127.0.0.1:$BePort
+set PORT=$AgPort
+set NO_PROXY=127.0.0.1,localhost
+set no_proxy=127.0.0.1,localhost
+set HTTP_PROXY=
+set HTTPS_PROXY=
+set http_proxy=
+set https_proxy=
+node start.mjs >> "$outLog" 2>&1
+"@
+    Start-DetachedCmd -Title "novelmind-agent" -BatPath $bat -Body $body
+}
+
+function Ensure-AgentService {
+    $listener = Get-Listener -Port $AgPort
+    if ($listener -and (Test-HttpOk $AgHealth)) { return }
+    if ($listener) {
+        $cmd = Get-ProcessCommand -ProcessId $listener.OwningProcess
+        Write-Log "Agent unhealthy; restart PID $($listener.OwningProcess) $cmd"
+        Stop-ProcessTree -ProcessId $listener.OwningProcess
+        Start-Sleep -Milliseconds 600
+    } else {
+        Write-Log "Agent down"
+    }
+    Start-AgentService
+    for ($i = 0; $i -lt 20; $i++) {
+        Start-Sleep -Seconds 2
+        if (Test-HttpOk $AgHealth) {
+            Write-Log "Agent healthy"
+            return
+        }
+    }
+    Write-Log "Agent still unhealthy"
 }
 
 function Ensure-Backend {
@@ -240,6 +287,7 @@ try {
         try {
             Ensure-Backend
             Ensure-Frontend
+            Ensure-AgentService
         } catch {
             Write-Log "Loop error: $($_.Exception.Message)"
         }

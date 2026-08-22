@@ -26,11 +26,13 @@ import {
 
 import { Button } from "@/components/ui/button";
 import {
-  jobStatusLabel,
   MessageBubble,
-  newClientMessageId,
   type CitationNavigateTarget,
-} from "@/components/reader/reader-chat-panel";
+} from "@/components/reader/chat/chat-message-bubble";
+import {
+  jobStatusLabel,
+  newClientMessageId,
+} from "@/lib/chat-shared";
 import {
   formatChapterRange,
   type StructureNodeSelection,
@@ -44,6 +46,16 @@ import {
   type MessageView,
 } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { resolveReadingCutoffChapterNumber } from "@/lib/reader-progress";
+import { WorldModelEvidencePanel } from "./world-model-evidence-panel";
+
+/**
+ * 25.3-05：Analysis workspace 共享 artifact 预览入口——经类型键渲染器注册表
+ * （ARTIFACT_RENDERERS / resolveArtifactRenderer，pi-web-ui 模式借用，零 import）
+ * 解析产物正文；实现见 cited-answer-artifact.tsx。
+ */
+export { ArtifactPreview } from "./cited-answer-artifact";
+export { WorldModelEvidencePanel } from "./world-model-evidence-panel";
 
 export type AnalysisChapterRef = {
   id: number;
@@ -103,17 +115,7 @@ export function AnalysisChatPanel({
 
   /** 阅读进度章号；无进度回落到第一章（与后端 resolve_chapter_cutoff 同语义）。 */
   const cutoffChapterNumber = useMemo(() => {
-    const byProgress =
-      progressChapterId != null
-        ? chapters.find((c) => c.id === progressChapterId)?.chapter_number ??
-          null
-        : null;
-    if (byProgress != null) return byProgress;
-    if (!chapters.length) return null;
-    return chapters.reduce(
-      (min, c) => Math.min(min, c.chapter_number),
-      Number.POSITIVE_INFINITY
-    );
+    return resolveReadingCutoffChapterNumber(chapters, progressChapterId);
   }, [chapters, progressChapterId]);
 
   const lastChapterNumber = useMemo(() => {
@@ -182,6 +184,7 @@ export function AnalysisChatPanel({
       const res = await readerChatApi.listConversations(novelId, { limit: 50 });
       if (req !== listRequestRef.current) return;
       setConversations(res.data.items);
+      setError(null);
       setActiveId((prev) => {
         if (prev && res.data.items.some((c) => c.id === prev)) return prev;
         const firstActive = res.data.items.find((c) => c.status === "active");
@@ -204,6 +207,7 @@ export function AnalysisChatPanel({
         });
         if (req !== msgRequestRef.current) return;
         setMessages(res.data.items);
+        setError(null);
         const lastUser = [...res.data.items]
           .reverse()
           .find((m) => m.role === "user" && m.generation_job);
@@ -427,6 +431,7 @@ export function AnalysisChatPanel({
     const params = new URLSearchParams();
     params.set("chapter", String(target.chapter_id));
     params.set("start", String(target.source_start));
+    params.set("end", String(target.source_end));
     params.set("from", "timeline");
     router.push(`/novels/${novelId}?${params.toString()}`);
   };
@@ -519,12 +524,83 @@ export function AnalysisChatPanel({
               message={m}
               onCitationNavigate={handleCitationNavigate}
             />
+            {m.queryplan ? (
+              <p
+                data-testid={`analysis-chat-queryplan-${m.id}`}
+                className="px-1 text-[10px] leading-snug text-muted-foreground/70"
+              >
+                QueryPlan · {m.queryplan.intent === "reader" ? "读者" : "分析"}
+                {m.queryplan.anchor_kind === "selection"
+                  ? " · 选区锚点"
+                  : m.queryplan.anchor_kind === "chapter_range"
+                    ? " · 结构区间锚点"
+                    : " · 无锚点"}
+                {m.queryplan.full_book_authorized
+                  ? " · 全书模式"
+                  : ` · 已读至第 ${m.queryplan.through_chapter} 章`}
+                {m.queryplan.abstained
+                  ? " · 已弃权（证据不足）"
+                  : ` · 引用 ${m.queryplan.allowed_evidence_ids.length}`}
+                {m.queryplan.availability.some(
+                  (a) => a.status === "unavailable" || a.status === "partial"
+                )
+                  ? " · 部分维度不可用"
+                  : ""}
+              </p>
+            ) : null}
+            {m.queryplan?.world_projection ? (
+              <div className="px-1 pt-1">
+                <WorldModelEvidencePanel
+                  novelId={novelId}
+                  worldProjection={m.queryplan.world_projection}
+                  onCitationNavigate={handleCitationNavigate}
+                />
+              </div>
+            ) : null}
+            {m.backfill_runs && m.backfill_runs.length > 0 ? (
+              <div
+                data-testid={`analysis-chat-backfill-${m.id}`}
+                className="px-1 pt-1"
+              >
+                {m.backfill_runs.map((br) => {
+                  const active =
+                    br.status === "queued" || br.status === "running";
+                  const skillLabel =
+                    br.skill_name === "detect-key-scenes"
+                      ? "关键场景"
+                      : br.skill_name === "propose-world-model-candidates"
+                        ? "世界模型"
+                        : br.skill_name === "build-visual-bible"
+                          ? "视觉圣经"
+                          : br.skill_name === "build-story-arc"
+                            ? "故事弧"
+                            : br.skill_name === "analyze-chapter"
+                              ? "章节分析"
+                              : br.skill_name;
+                  return (
+                    <span
+                      key={br.run_id}
+                      className="mr-2 inline-flex items-center gap-1 rounded-md border border-muted bg-muted/40 px-2 py-0.5 text-[10px] text-muted-foreground"
+                    >
+                      {active ? (
+                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-400" />
+                      ) : null}
+                      {active ? "后台分析中" : "后台分析完成"} · {skillLabel}
+                      {br.backfill_dimension
+                        ? `（${br.backfill_dimension}）`
+                        : ""}
+                    </span>
+                  );
+                })}
+              </div>
+            ) : null}
           </div>
         ))}
         {activeJob && jobStatusLabel(activeJob) ? (
           <div
             data-testid="analysis-chat-job-status"
             data-status={activeJob.status}
+            aria-live="polite"
             className="rounded-lg border border-border/60 bg-muted/40 px-3 py-2 text-xs"
           >
             <div className="flex items-center justify-between gap-2">

@@ -1,0 +1,79 @@
+{
+  "input": {
+    "novel_id": 1,
+    "branch": "aurora-redemption",
+    "fork": "fork-aurora",
+    "project_id": 5,
+    "source_snapshot_id": "novel:1:fork-aurora",
+    "source_snapshot_hash": "2222222222222222222222222222222222222222222222222222222222222222",
+    "content_hash": "3333333333333333333333333333333333333333333333333333333333333333",
+    "evidence_refs": ["chapter:1", "chapter:2"],
+    "requested_action": ["approve_export", "materialize_export"]
+  },
+  "expected_output": {
+    "type": "export_preparation",
+    "schema_version": "export-preparation.v1",
+    "owner_id": 1,
+    "novel_id": 1,
+    "branch": "aurora-redemption",
+    "producing_skill": "prepare-export",
+    "producing_skill_version": "1.0.0",
+    "skill_version_id": 1,
+    "model_lineage": {
+      "provider": "fixture",
+      "model": "stub-model",
+      "revision": "stub-1"
+    },
+    "source_versions": {
+      "novel": "v1",
+      "source_snapshot_hash": "2222222222222222222222222222222222222222222222222222222222222222"
+    },
+    "input_hash": "4444444444444444444444444444444444444444444444444444444444444444",
+    "evidence_refs": ["chapter:1", "chapter:2"],
+    "preparation": {
+      "schema_version": "export-preparation.v1",
+      "artifact_kind": "export_preparation",
+      "authority_space": "derivative",
+      "fork": "fork-aurora",
+      "project_id": 5,
+      "project_key": "aurora-project",
+      "source_snapshot": {
+        "source_snapshot_id": "novel:1:fork-aurora",
+        "source_snapshot_hash": "2222222222222222222222222222222222222222222222222222222222222222",
+        "source_manifest_hash": "5555555555555555555555555555555555555555555555555555555555555555",
+        "cutoff_chapter": 8
+      },
+      "base_revision": {
+        "project_manifest_hash": "6666666666666666666666666666666666666666666666666666666666666666",
+        "scope_hash": "7777777777777777777777777777777777777777777777777777777777777777",
+        "cutoff_snapshot_hash": "8888888888888888888888888888888888888888888888888888888888888888",
+        "text_version_hash": "9999999999999999999999999999999999999999999999999999999999999999"
+      },
+      "content_hash": "3333333333333333333333333333333333333333333333333333333333333333",
+      "evidence_refs": ["chapter:1", "chapter:2"],
+      "generator_lineage": {
+        "provider": "mock",
+        "provider_model": "mock-1"
+      },
+      "validator_report": {
+        "evaluator_id": "derivative-export.preparation.v1",
+        "verdict": "candidate",
+        "reasons": ["deterministic_preparation_ok"]
+      },
+      "review_state": "candidate"
+    },
+    "tool_runs": [
+      { "tool_name": "get_novel", "calls": 1 },
+      { "tool_name": "get_chapter", "calls": 1 },
+      { "tool_name": "approve_export", "calls": 1 }
+    ],
+    "status": "candidate",
+    "parent_revision": null,
+    "normalization": {
+      "raw_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "repaired_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "normalization_actions": [],
+      "warnings": []
+    }
+  }
+}

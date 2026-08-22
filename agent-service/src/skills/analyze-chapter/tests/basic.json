@@ -1,0 +1,66 @@
+{
+  "input": {
+    "novel_id": 1,
+    "chapter_id": 2,
+    "branch": null,
+    "source_snapshot": {
+      "snapshot_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+      "dataset_lineage": "analyze-chapter-fixture-v1"
+    }
+  },
+  "expected_output": {
+    "type": "chapter_analysis",
+    "schema_version": "chapter-analysis.v1",
+    "owner_id": 1,
+    "novel_id": 1,
+    "branch": null,
+    "producing_skill": "analyze-chapter",
+    "producing_skill_version": "1.0.0",
+    "skill_version_id": 1,
+    "model_lineage": {
+      "provider": "fixture",
+      "model": "stub-model",
+      "revision": "stub-1"
+    },
+    "source_versions": {
+      "novel": "v1",
+      "chapter": {
+        "2": "2222222222222222222222222222222222222222222222222222222222222222"
+      }
+    },
+    "input_hash": "3333333333333333333333333333333333333333333333333333333333333333",
+    "evidence_refs": ["evidence:2"],
+    "analysis": {
+      "schema_version": "chapter-analysis-artifact.v1",
+      "chapter_id": 2,
+      "chapter_number": 2,
+      "source_snapshot_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+      "input_hash": "4444444444444444444444444444444444444444444444444444444444444444",
+      "cutoff": 2,
+      "max_length": 2000,
+      "spoiler_policy_version": "spoiler-policy.v1",
+      "chapter_digest": "5555555555555555555555555555555555555555555555555555555555555555",
+      "chunk_digests": [
+        "6666666666666666666666666666666666666666666666666666666666666666",
+        "7777777777777777777777777777777777777777777777777777777777777777"
+      ],
+      "previous_context_summary": "第一章：阿宁进入竹林。",
+      "next_context_hint": null,
+      "next_hint_reason_code": "hint_unsafe_future_spoiler",
+      "continuity_notes": "source_snapshot:1111;input:4444"
+    },
+    "tool_runs": [
+      { "tool_name": "get_chapter", "calls": 1 },
+      { "tool_name": "get_evidence_span", "calls": 1 },
+      { "tool_name": "get_events", "calls": 1 }
+    ],
+    "status": "candidate",
+    "parent_revision": null,
+    "normalization": {
+      "raw_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "repaired_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "normalization_actions": [],
+      "warnings": []
+    }
+  }
+}

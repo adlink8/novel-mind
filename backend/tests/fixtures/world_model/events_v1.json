@@ -1,0 +1,511 @@
+{
+  "schema_version": "world-model-event.v1",
+  "description": "Phase 27-01 shared event fact and causal edge corpus (REQ-WM-01). Each scenario is a self-contained gate submission with owner/novel/version/cutoff, evidence refs, effective intervals, authority, confidence and gate status. Causality is never co-occurrence; conflicts are preserved; authority is never implicitly upgraded.",
+  "scenarios": {
+    "valid": {
+      "scope": {
+        "owner_id": 1,
+        "novel_id": 1,
+        "version_id": 1,
+        "source_snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "disclosure_cutoff": 3,
+        "approvals": ["user_interpretation"]
+      },
+      "events": [
+        {
+          "claim_kind": "event",
+          "event_key": "e-arrival",
+          "title": "林安抵达临安城",
+          "description": "林安在第一章抵达临安城。",
+          "authority": "probable_inference",
+          "confidence": 0.9,
+          "effective": {"start": 1, "end": 1},
+          "disclosure_cutoff": 1,
+          "source_refs": [
+            {
+              "evidence_id": "ev-arrival",
+              "chapter_id": 1,
+              "chapter_number": 1,
+              "source_start": 0,
+              "source_end": 80,
+              "content_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+              "source_snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          ],
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 1
+        },
+        {
+          "claim_kind": "event",
+          "event_key": "e-order",
+          "title": "城防令颁布",
+          "description": "第二章官府颁布城防令。",
+          "authority": "probable_inference",
+          "confidence": 0.85,
+          "effective": {"start": 2, "end": 2},
+          "disclosure_cutoff": 2,
+          "source_refs": [
+            {
+              "evidence_id": "ev-order",
+              "chapter_id": 2,
+              "chapter_number": 2,
+              "source_start": 10,
+              "source_end": 120,
+              "content_hash": "2222222222222222222222222222222222222222222222222222222222222222",
+              "source_snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          ],
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 1
+        },
+        {
+          "claim_kind": "event",
+          "event_key": "e-revolt",
+          "title": "百姓举事",
+          "description": "第三章百姓因城防令举事。",
+          "authority": "probable_inference",
+          "confidence": 0.8,
+          "effective": {"start": 3, "end": 3},
+          "disclosure_cutoff": 3,
+          "source_refs": [
+            {
+              "evidence_id": "ev-revolt",
+              "chapter_id": 3,
+              "chapter_number": 3,
+              "source_start": 40,
+              "source_end": 160,
+              "content_hash": "3333333333333333333333333333333333333333333333333333333333333333",
+              "source_snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          ],
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 1
+        },
+        {
+          "claim_kind": "event",
+          "event_key": "e-treaty-reading",
+          "title": "条约解读",
+          "description": "第三章对停战条约的一种解读。",
+          "authority": "user_interpretation",
+          "confidence": 0.7,
+          "effective": {"start": 3, "end": 3},
+          "disclosure_cutoff": 3,
+          "source_refs": [
+            {
+              "evidence_id": "ev-treaty",
+              "chapter_id": 3,
+              "chapter_number": 3,
+              "source_start": 200,
+              "source_end": 260,
+              "content_hash": "4444444444444444444444444444444444444444444444444444444444444444",
+              "source_snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          ],
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 1
+        }
+      ],
+      "edges": [
+        {
+          "claim_kind": "causal_edge",
+          "edge_key": "edge-order-revolt",
+          "source_event_key": "e-order",
+          "target_event_key": "e-revolt",
+          "edge_type": "caused",
+          "authority": "probable_inference",
+          "confidence": 0.75,
+          "disclosure_cutoff": 3,
+          "source_refs": [
+            {
+              "evidence_id": "ev-revolt",
+              "chapter_id": 3,
+              "chapter_number": 3,
+              "source_start": 40,
+              "source_end": 160,
+              "content_hash": "3333333333333333333333333333333333333333333333333333333333333333",
+              "source_snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          ],
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 1
+        },
+        {
+          "claim_kind": "causal_edge",
+          "edge_key": "edge-arrival-order",
+          "source_event_key": "e-arrival",
+          "target_event_key": "e-order",
+          "edge_type": "triggered",
+          "authority": "probable_inference",
+          "confidence": 0.6,
+          "disclosure_cutoff": 2,
+          "source_refs": [
+            {
+              "evidence_id": "ev-order",
+              "chapter_id": 2,
+              "chapter_number": 2,
+              "source_start": 10,
+              "source_end": 120,
+              "content_hash": "2222222222222222222222222222222222222222222222222222222222222222",
+              "source_snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          ],
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 1
+        }
+      ]
+    },
+    "co_occurrence": {
+      "scope": {
+        "owner_id": 1,
+        "novel_id": 1,
+        "version_id": 2,
+        "source_snapshot_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "disclosure_cutoff": 2,
+        "approvals": []
+      },
+      "events": [
+        {
+          "claim_kind": "event",
+          "event_key": "e-cx-a",
+          "title": "雨夜街市",
+          "description": "第二章雨夜，街市亮灯。",
+          "authority": "probable_inference",
+          "confidence": 0.9,
+          "effective": {"start": 2, "end": 2},
+          "disclosure_cutoff": 2,
+          "source_refs": [
+            {
+              "evidence_id": "ev-street",
+              "chapter_id": 2,
+              "chapter_number": 2,
+              "source_start": 0,
+              "source_end": 60,
+              "content_hash": "5555555555555555555555555555555555555555555555555555555555555555",
+              "source_snapshot_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            }
+          ],
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 2
+        },
+        {
+          "claim_kind": "event",
+          "event_key": "e-cx-b",
+          "title": "城门紧闭",
+          "description": "第二章雨夜，城门紧闭。",
+          "authority": "probable_inference",
+          "confidence": 0.9,
+          "effective": {"start": 2, "end": 2},
+          "disclosure_cutoff": 2,
+          "source_refs": [
+            {
+              "evidence_id": "ev-street",
+              "chapter_id": 2,
+              "chapter_number": 2,
+              "source_start": 0,
+              "source_end": 60,
+              "content_hash": "5555555555555555555555555555555555555555555555555555555555555555",
+              "source_snapshot_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            }
+          ],
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 2
+        }
+      ],
+      "edges": [
+        {
+          "claim_kind": "causal_edge",
+          "edge_key": "edge-cx",
+          "source_event_key": "e-cx-a",
+          "target_event_key": "e-cx-b",
+          "edge_type": "caused",
+          "authority": "probable_inference",
+          "confidence": 0.6,
+          "disclosure_cutoff": 2,
+          "source_refs": [],
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 2
+        }
+      ]
+    },
+    "temporal_conflict": {
+      "scope": {
+        "owner_id": 1,
+        "novel_id": 1,
+        "version_id": 3,
+        "source_snapshot_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "disclosure_cutoff": 4,
+        "approvals": []
+      },
+      "events": [
+        {
+          "claim_kind": "event",
+          "event_key": "e-tc-a",
+          "title": "盟约缔结",
+          "description": "第一章两军缔结盟约。",
+          "authority": "probable_inference",
+          "confidence": 0.8,
+          "effective": {"start": 1, "end": 1},
+          "disclosure_cutoff": 1,
+          "source_refs": [
+            {
+              "evidence_id": "ev-treaty2",
+              "chapter_id": 1,
+              "chapter_number": 1,
+              "source_start": 0,
+              "source_end": 90,
+              "content_hash": "6666666666666666666666666666666666666666666666666666666666666666",
+              "source_snapshot_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+            }
+          ],
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 3
+        },
+        {
+          "claim_kind": "event",
+          "event_key": "e-tc-b",
+          "title": "盟约破裂",
+          "description": "第四章盟约破裂，战事再起。",
+          "authority": "probable_inference",
+          "confidence": 0.8,
+          "effective": {"start": 4, "end": 4},
+          "disclosure_cutoff": 4,
+          "source_refs": [
+            {
+              "evidence_id": "ev-break",
+              "chapter_id": 4,
+              "chapter_number": 4,
+              "source_start": 30,
+              "source_end": 140,
+              "content_hash": "7777777777777777777777777777777777777777777777777777777777777777",
+              "source_snapshot_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+            }
+          ],
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 3
+        }
+      ],
+      "edges": [
+        {
+          "claim_kind": "causal_edge",
+          "edge_key": "edge-tc",
+          "source_event_key": "e-tc-b",
+          "target_event_key": "e-tc-a",
+          "edge_type": "caused",
+          "authority": "probable_inference",
+          "confidence": 0.6,
+          "disclosure_cutoff": 4,
+          "source_refs": [
+            {
+              "evidence_id": "ev-treaty2",
+              "chapter_id": 1,
+              "chapter_number": 1,
+              "source_start": 0,
+              "source_end": 90,
+              "content_hash": "6666666666666666666666666666666666666666666666666666666666666666",
+              "source_snapshot_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+            }
+          ],
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 3
+        }
+      ]
+    },
+    "wrong_owner": {
+      "scope": {
+        "owner_id": 1,
+        "novel_id": 1,
+        "version_id": 4,
+        "source_snapshot_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "disclosure_cutoff": 2,
+        "approvals": []
+      },
+      "events": [
+        {
+          "claim_kind": "event",
+          "event_key": "e-stolen",
+          "title": "他人创作的事件",
+          "description": "声称属于另一个作者的事件。",
+          "authority": "probable_inference",
+          "confidence": 0.8,
+          "effective": {"start": 1, "end": 1},
+          "disclosure_cutoff": 1,
+          "source_refs": [
+            {
+              "evidence_id": "ev-fake",
+              "chapter_id": 1,
+              "chapter_number": 1,
+              "source_start": 0,
+              "source_end": 50,
+              "content_hash": "8888888888888888888888888888888888888888888888888888888888888888",
+              "source_snapshot_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+            }
+          ],
+          "owner_id": 2,
+          "novel_id": 1,
+          "version_id": 4
+        }
+      ],
+      "edges": []
+    },
+    "stale_evidence": {
+      "scope": {
+        "owner_id": 1,
+        "novel_id": 1,
+        "version_id": 5,
+        "source_snapshot_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "disclosure_cutoff": 2,
+        "approvals": []
+      },
+      "events": [
+        {
+          "claim_kind": "event",
+          "event_key": "e-stale",
+          "title": "旧快照事件",
+          "description": "引用已过时的来源快照。",
+          "authority": "probable_inference",
+          "confidence": 0.8,
+          "effective": {"start": 1, "end": 1},
+          "disclosure_cutoff": 1,
+          "source_refs": [
+            {
+              "evidence_id": "ev-old",
+              "chapter_id": 1,
+              "chapter_number": 1,
+              "source_start": 0,
+              "source_end": 70,
+              "content_hash": "9999999999999999999999999999999999999999999999999999999999999999",
+              "source_snapshot_hash": "1111111111111111111111111111111111111111111111111111111111111111"
+            }
+          ],
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 5
+        }
+      ],
+      "edges": []
+    },
+    "spoiler_cutoff": {
+      "scope": {
+        "owner_id": 1,
+        "novel_id": 1,
+        "version_id": 6,
+        "source_snapshot_hash": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "disclosure_cutoff": 2,
+        "approvals": []
+      },
+      "events": [
+        {
+          "claim_kind": "event",
+          "event_key": "e-spoiler",
+          "title": "未来转折",
+          "description": "第五章的秘密结局。",
+          "authority": "probable_inference",
+          "confidence": 0.9,
+          "effective": {"start": 5, "end": 5},
+          "disclosure_cutoff": 5,
+          "source_refs": [
+            {
+              "evidence_id": "ev-future",
+              "chapter_id": 5,
+              "chapter_number": 5,
+              "source_start": 0,
+              "source_end": 90,
+              "content_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1",
+              "source_snapshot_hash": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+            }
+          ],
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 6
+        }
+      ],
+      "edges": []
+    },
+    "authority_upgrade": {
+      "scope": {
+        "owner_id": 1,
+        "novel_id": 1,
+        "version_id": 7,
+        "source_snapshot_hash": "1212121212121212121212121212121212121212121212121212121212121212",
+        "disclosure_cutoff": 2,
+        "approvals": []
+      },
+      "events": [
+        {
+          "claim_kind": "event",
+          "event_key": "e-upgrade",
+          "title": "推定事实",
+          "description": "尝试将推断直接写成 canon_fact。",
+          "authority": "canon_fact",
+          "confidence": 0.9,
+          "effective": {"start": 1, "end": 1},
+          "disclosure_cutoff": 1,
+          "source_refs": [
+            {
+              "evidence_id": "ev-upgrade",
+              "chapter_id": 1,
+              "chapter_number": 1,
+              "source_start": 0,
+              "source_end": 60,
+              "content_hash": "abababababababababababababababababababababababababababababababab",
+              "source_snapshot_hash": "1212121212121212121212121212121212121212121212121212121212121212"
+            }
+          ],
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 7
+        }
+      ],
+      "edges": []
+    },
+    "user_interpretation_unapproved": {
+      "scope": {
+        "owner_id": 1,
+        "novel_id": 1,
+        "version_id": 8,
+        "source_snapshot_hash": "3434343434343434343434343434343434343434343434343434343434343434",
+        "disclosure_cutoff": 2,
+        "approvals": []
+      },
+      "events": [
+        {
+          "claim_kind": "event",
+          "event_key": "e-user-unapproved",
+          "title": "未确认的读者解读",
+          "description": "未获得确认的用户解读不得落库。",
+          "authority": "user_interpretation",
+          "confidence": 0.6,
+          "effective": {"start": 1, "end": 1},
+          "disclosure_cutoff": 1,
+          "source_refs": [
+            {
+              "evidence_id": "ev-user",
+              "chapter_id": 1,
+              "chapter_number": 1,
+              "source_start": 0,
+              "source_end": 55,
+              "content_hash": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+              "source_snapshot_hash": "3434343434343434343434343434343434343434343434343434343434343434"
+            }
+          ],
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 8
+        }
+      ],
+      "edges": []
+    }
+  }
+}

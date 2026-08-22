@@ -1,0 +1,139 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "EditDerivativeStoryOutput",
+  "description": "DerivativeEditProposalArtifact 信封（D-36-01..D-36-04 / Phase 36）。镜像 backend app.schemas.agent_runtime.DerivativeEditProposalArtifact：type / schema_version / owner / novel / branch / producing skill+version / model lineage / source versions / input_hash / evidence_refs / tool_runs / status / parent_revision / normalization。`proposal` 负载携带完整 branch-aware 血缘（proposal_key、project/chapter、base_revision、content + content_hash、source snapshot、evidence refs、validator_report）且 proposal_status 恒为 proposed——只有服务端 proposal/approval/确定性 Revision Service 能推进 candidate → pending_approval → applied；Phase 36 绝不直接应用 proposal 或触碰 Original Canon / user autosave / published 状态。artifact_id / revision_id / skill_run_id / approval_request_id 由后端确定性 finalizer/服务端在写入时分配，模型输出不含。",
+  "type": "object",
+  "required": [
+    "type",
+    "schema_version",
+    "owner_id",
+    "novel_id",
+    "producing_skill",
+    "producing_skill_version",
+    "skill_version_id",
+    "model_lineage",
+    "source_versions",
+    "input_hash",
+    "evidence_refs",
+    "proposal",
+    "tool_runs",
+    "status",
+    "normalization"
+  ],
+  "properties": {
+    "type": { "const": "derivative_edit_proposal" },
+    "schema_version": { "const": "derivative-edit-proposal.v1" },
+    "owner_id": { "type": "integer", "minimum": 1 },
+    "novel_id": { "type": "integer", "minimum": 1 },
+    "branch": { "type": ["string", "null"], "description": "衍生分支；原始主线为 null" },
+    "producing_skill": { "type": "string", "minLength": 1 },
+    "producing_skill_version": { "type": "string", "minLength": 1 },
+    "skill_version_id": { "type": "integer", "minimum": 1 },
+    "model_lineage": { "type": "object", "description": "agent runtime + 模型血缘（provider/model/revision）" },
+    "source_versions": { "type": "object", "description": "数据源版本（novel/source snapshot 血缘）" },
+    "input_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$", "description": "运行输入规范化 JSON 的 SHA-256（重放追溯）" },
+    "evidence_refs": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1,
+      "description": "leaf 证据引用，必须 ⊆ 冻结 manifest 白名单"
+    },
+    "skill_run_id": { "type": ["integer", "null"], "minimum": 1, "description": "SkillRun ID（后端 run 创建时分配；模型输出不含）" },
+    "artifact_id": { "type": ["integer", "null"], "minimum": 1, "description": "Artifact ID（后端确定性 finalizer 写入时分配；模型输出不含）" },
+    "revision_id": { "type": ["integer", "null"], "minimum": 1, "description": "ArtifactRevision ID（后端确定性 finalizer 写入时分配；模型输出不含）" },
+    "proposal": {
+      "type": "object",
+      "description": "完整 DerivativeEditProposal 负载：branch-aware 血缘 + project/chapter scope + base_revision CAS 锚 + 候选 Markdown patch（content + content_hash）+ source snapshot 血缘 + evidence refs。proposal_status 恒为 proposed——只有服务端 proposal/approval/确定性 Revision Service 能推进状态；Phase 36 绝不直接应用。",
+      "required": [
+        "schema_version",
+        "artifact_kind",
+        "proposal_key",
+        "authority_space",
+        "project_id",
+        "chapter_id",
+        "chapter_number",
+        "base_revision",
+        "content",
+        "content_hash",
+        "source_snapshot_id",
+        "source_snapshot_hash",
+        "proposal_status"
+      ],
+      "properties": {
+        "schema_version": { "const": "derivative-edit-proposal.v1" },
+        "artifact_kind": { "const": "derivative_edit_proposal" },
+        "proposal_key": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "authority_space": { "const": "derivative", "description": "Phase 36 恒为 derivative（Fanfiction Canon）——绝不写 Original Canon / User Interpretation" },
+        "branch": { "type": ["string", "null"], "maxLength": 80, "description": "衍生分支（与信封 branch 血缘一致）" },
+        "fork": { "type": ["string", "null"], "maxLength": 80, "description": "衍生 fork（仅 derivative 模式；branch 有值时必须提供）" },
+        "project_id": { "type": "integer", "minimum": 1 },
+        "chapter_id": { "type": "integer", "minimum": 1 },
+        "chapter_number": { "type": "integer", "minimum": 1 },
+        "base_revision": { "type": "integer", "minimum": 1, "description": "chapter 乐观并发 token（CAS 锚；stale base → 409 fail closed）" },
+        "content": { "type": "string", "minLength": 1, "maxLength": 50000, "description": "候选 Markdown patch（Fanfiction Canon draft）" },
+        "content_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$", "description": "content 的 SHA-256（服务端重放；drift → blocked）" },
+        "source_snapshot_id": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "source_snapshot_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "evidence_refs": { "type": "array", "items": { "type": "string" }, "description": "proposal 引用的 leaf 证据键" },
+        "proposal_status": {
+          "type": "string",
+          "enum": ["proposed", "pending_approval", "applied"],
+          "description": "Phase 36 唯一官方状态机：finalize 写入时恒为 proposed；只有服务端 proposal/approval/确定性 Revision Service 能推进；绝不直接应用"
+        },
+        "approval_request_id": { "type": ["integer", "null"], "minimum": 1, "description": "服务端 Web ApprovalRequest ID（模型输出不含）" },
+        "artifact_id": { "type": ["integer", "null"], "minimum": 1, "description": "服务端 Artifact ID（模型输出不含）" },
+        "validator_report": {
+          "type": ["object", "null"],
+          "description": "服务端确定性 validator report（apply 时产出；finalize 写入时为 null）"
+        }
+      },
+      "additionalProperties": false
+    },
+    "tool_runs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["tool_name", "calls"],
+        "properties": {
+          "tool_name": { "type": "string", "minLength": 1 },
+          "calls": { "type": "integer", "minimum": 0 }
+        }
+      },
+      "description": "ToolRun 血缘：本 run 使用的 allowlist 工具与调用次数"
+    },
+    "status": {
+      "enum": ["candidate", "validated", "approved", "published", "rejected"],
+      "description": "产物状态；finalize 写入时恒为 candidate（无自动 promotion）"
+    },
+    "parent_revision": { "type": ["string", "null"], "description": "父修订引用；首个修订为 null" },
+    "normalization": {
+      "type": "object",
+      "description": "26-06 修复血缘 trail：repaired_hash 是对不含本 trail 的 repaired payload 的 canonical SHA-256；raw_hash 是原始模型输出的 canonical SHA-256；normalization_actions 每项含 path/action/after。",
+      "required": ["raw_hash", "repaired_hash", "normalization_actions", "warnings"],
+      "properties": {
+        "raw_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "repaired_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "normalization_actions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path", "action", "after"],
+            "properties": {
+              "path": { "type": "string", "minLength": 1 },
+              "action": {
+                "type": "string",
+                "enum": ["alias", "alias_dedup", "enum_canonicalize", "container_shape", "lineage_merge"]
+              },
+              "before": {},
+              "after": {},
+              "reason": { "type": "string" }
+            }
+          }
+        },
+        "warnings": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  },
+  "additionalProperties": false
+}

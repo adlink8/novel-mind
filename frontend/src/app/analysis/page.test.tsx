@@ -6,6 +6,7 @@ import { TimelineStatus } from "@/components/timeline/timeline-status";
 
 const mocks = vi.hoisted(() => ({
   list: vi.fn(),
+  getChapters: vi.fn(),
   startOrResume: vi.fn(),
   getTimeline: vi.fn(),
   status: vi.fn(),
@@ -25,7 +26,7 @@ vi.mock("@/lib/api", async () => {
   ...actual,
   novelsApi: {
     list: mocks.list,
-    getChapters: vi.fn().mockResolvedValue({ data: [] }),
+    getChapters: mocks.getChapters,
   },
   timelineApi: {
     startOrResume: mocks.startOrResume,
@@ -175,6 +176,13 @@ async function expandEventList() {
 describe("global analysis timeline workspace", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.getChapters.mockResolvedValue({
+      data: [
+        { id: 11, novel_id: 11, chapter_number: 1, title: "第一章" },
+        { id: 12, novel_id: 11, chapter_number: 2, title: "第二章" },
+        { id: 13, novel_id: 11, chapter_number: 3, title: "第三章" },
+      ],
+    });
     mocks.list.mockResolvedValue({
       data: {
         items: [
@@ -322,6 +330,146 @@ describe("global analysis timeline workspace", () => {
     expect(screen.queryByText("旧版事件")).not.toBeInTheDocument();
   });
 
+  it("uses the selected book's real chapter range before the first timeline read", async () => {
+    mocks.list.mockResolvedValue({
+      data: {
+        items: [
+          {
+            id: 11,
+            title: "雾城",
+            author: null,
+            description: null,
+            genre: null,
+            word_count: 10,
+            chapter_count: 2,
+            status: "ready",
+            reading_progress: null,
+            created_at: "",
+            updated_at: "",
+          },
+        ],
+        total: 1,
+      },
+    });
+    mocks.getChapters.mockResolvedValue({
+      data: [
+        { id: 111, novel_id: 11, chapter_number: 17, title: "第17章" },
+        { id: 112, novel_id: 11, chapter_number: 19, title: "第19章" },
+      ],
+    });
+
+    render(<AnalysisPage />);
+    fireEvent.change(await screen.findByLabelText("选择小说"), {
+      target: { value: "11" },
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTestId("structure-scope-label")).toHaveTextContent(
+        "第 17–19 章"
+      )
+    );
+    await waitFor(() =>
+      expect(mocks.getTimeline).toHaveBeenCalledWith(
+        "11",
+        expect.objectContaining({ chapter_start: 17, chapter_end: 19 })
+      )
+    );
+    expect(mocks.getTimeline.mock.calls[0][1]).toEqual(
+      expect.objectContaining({ chapter_start: 17, chapter_end: 19 })
+    );
+  });
+
+  it("reloads the real chapter range when switching books", async () => {
+    mocks.list.mockResolvedValue({
+      data: {
+        items: [
+          {
+            id: 11,
+            title: "雾城",
+            author: null,
+            description: null,
+            genre: null,
+            word_count: 10,
+            chapter_count: 2,
+            status: "ready",
+            reading_progress: null,
+            created_at: "",
+            updated_at: "",
+          },
+          {
+            id: 12,
+            title: "龙境",
+            author: null,
+            description: null,
+            genre: null,
+            word_count: 10,
+            chapter_count: 2,
+            status: "ready",
+            reading_progress: null,
+            created_at: "",
+            updated_at: "",
+          },
+        ],
+        total: 2,
+      },
+    });
+    mocks.getChapters.mockImplementation(async (id: string) => ({
+      data:
+        id === "11"
+          ? [
+              { id: 111, novel_id: 11, chapter_number: 17, title: "第17章" },
+              { id: 112, novel_id: 11, chapter_number: 19, title: "第19章" },
+            ]
+          : [
+              { id: 121, novel_id: 12, chapter_number: 4, title: "第4章" },
+              { id: 122, novel_id: 12, chapter_number: 6, title: "第6章" },
+            ],
+    }));
+
+    render(<AnalysisPage />);
+    const picker = await screen.findByLabelText("选择小说");
+    fireEvent.change(picker, { target: { value: "11" } });
+    await waitFor(() =>
+      expect(screen.getByTestId("structure-scope-label")).toHaveTextContent(
+        "第 17–19 章"
+      )
+    );
+
+    fireEvent.change(picker, { target: { value: "12" } });
+    await waitFor(() =>
+      expect(screen.getByTestId("structure-scope-label")).toHaveTextContent(
+        "第 4–6 章"
+      )
+    );
+    expect(mocks.getTimeline.mock.calls.at(-1)?.[1]).toEqual(
+      expect.objectContaining({ chapter_start: 4, chapter_end: 6 })
+    );
+  });
+
+  it("keeps the real chapter range when narrative-memory metadata is unavailable", async () => {
+    mocks.getChapters.mockResolvedValue({
+      data: [
+        { id: 111, novel_id: 11, chapter_number: 17, title: "第17章" },
+        { id: 112, novel_id: 11, chapter_number: 19, title: "第19章" },
+      ],
+    });
+    mocks.nmListVersions.mockRejectedValue(new Error("narrative memory offline"));
+
+    render(<AnalysisPage />);
+    fireEvent.change(await screen.findByLabelText("选择小说"), {
+      target: { value: "11" },
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTestId("structure-scope-label")).toHaveTextContent(
+        "第 17–19 章"
+      )
+    );
+    expect(mocks.getTimeline.mock.calls[0][1]).toEqual(
+      expect.objectContaining({ chapter_start: 17, chapter_end: 19 })
+    );
+  });
+
   it("starts the timeline and clue pipelines from one analysis action", async () => {
     mocks.status.mockResolvedValue({
       data: { id: 3, novel_id: 11, status: "completed", progress: {}, cancel_requested: false, updated_at: "2026-07-13T04:00:00Z" },
@@ -336,6 +484,14 @@ describe("global analysis timeline workspace", () => {
 
   it("orders non-contiguous chapters by chapter, source offset and event id", async () => {
     // Structure scope uses chapter_count; must cover ch.9 for events to remain visible.
+    mocks.getChapters.mockResolvedValue({
+      data: Array.from({ length: 12 }, (_, index) => ({
+        id: 100 + index,
+        novel_id: 11,
+        chapter_number: index + 1,
+        title: `第${index + 1}章`,
+      })),
+    });
     mocks.list.mockResolvedValue({
       data: {
         items: [

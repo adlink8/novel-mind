@@ -1,0 +1,69 @@
+{
+  "schema_version": "visual-bible.v1",
+  "artifact_kind": "visual_bible",
+  "owner_id": 2,
+  "novel_id": 6,
+  "version_key": "vb-backfill-run-1",
+  "revision_number": 1,
+  "parent_version_id": null,
+  "source_snapshot_id": "vb-vb-backfill-run-1",
+  "source_snapshot_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "cutoff_chapter": 3,
+  "schema_hash": "28629924b9bd724066f0325f1ecd4a49a61975fd760cc001ce14bd20e195508b",
+  "policy_hash": "2bde107cf4e51fe4bc0d3ffb3251eee4de5f980306382ef07387a4ca739ce111",
+  "prompt_hash": null,
+  "model_hash": null,
+  "config_hash": null,
+  "manifest_hash": "ce1c2cd19ddcca51b800f65794f83e3c5f361e8e48f9e226318a76ee8f51ba75",
+  "style_profile": null,
+  "constraints": null,
+  "entities": [
+    {
+      "stable_id": "stable-char-mu-shijing",
+      "entity_key": "char-mu-shijing",
+      "entity_type": "character",
+      "description": "慕师靖：白狐裘、立如松。",
+      "authority": "canon_fact",
+      "disclosure_cutoff": 3
+    }
+  ],
+  "claims": [
+    {
+      "claim_key": "vb-backfill-run-1-0",
+      "entity_stable_id": "stable-char-mu-shijing",
+      "authority": "canon_fact",
+      "description": "慕师靖入城时披白狐裘。",
+      "author": null,
+      "rationale": null,
+      "cutoff_chapter": 3,
+      "claim_hash": "b4384d056537b97dca8c0a3a7084a538db10c39703941a1a59cb774ed3ab91d6",
+      "evidence_refs": [
+        {
+          "evidence_key": "qp:7:0:40:1111111111111111111111111111111111111111111111111111111111111111",
+          "source_snapshot_id": "vb-vb-backfill-run-1",
+          "source_snapshot_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "chapter_id": 7,
+          "chapter_number": 2,
+          "source_start": 0,
+          "source_end": 40,
+          "content_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+          "excerpt": "慕师靖披着白狐裘，立在城门口。",
+          "cutoff_chapter": 3
+        }
+      ]
+    },
+    {
+      "claim_key": "vb-backfill-run-1-1",
+      "entity_stable_id": "stable-char-mu-shijing",
+      "authority": "literary_interpretation",
+      "description": "白狐裘象征她与尘世的距离。",
+      "author": "reader-agent",
+      "rationale": "文本意象解读。",
+      "cutoff_chapter": 3,
+      "claim_hash": "aa4144857e08df567450f6e6a12c9eba1aeab3a8dcf67a2e6232e0eaee629937",
+      "evidence_refs": []
+    }
+  ],
+  "reference_assets": [],
+  "review_state": "candidate"
+}

@@ -1,0 +1,144 @@
+{
+  "description": "build-visual-bible skill-local fixture（Phase 30 / REQ-VIS-01）：一名角色 + 一个地点，canon_fact claim 带 leaf evidence、probable_inference claim 带 author/rationale；reference asset 未 cleared（candidate-only）。review_state 恒为 candidate；approval 是服务端显式状态迁移。",
+  "input": {
+    "novel_id": 1,
+    "branch": null,
+    "cutoff": 2,
+    "source_snapshot": {
+      "snapshot_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+      "dataset_lineage": "novel-source.v1"
+    },
+    "reference_assets": [
+      {
+        "asset_key": "ref-cover",
+        "asset_id": "obj-1",
+        "mime_type": "image/png",
+        "bytes_hash": "2222222222222222222222222222222222222222222222222222222222222222",
+        "rights_status": "unreviewed",
+        "provenance": { "source": "user-upload", "license": "pending" }
+      }
+    ]
+  },
+  "expected_output": {
+    "type": "visual_bible",
+    "schema_version": "visual-bible.v1",
+    "owner_id": 1,
+    "novel_id": 1,
+    "branch": null,
+    "producing_skill": "build-visual-bible",
+    "producing_skill_version": "1.0.0",
+    "skill_version_id": 1,
+    "model_lineage": {
+      "provider": "fixture",
+      "model": "stub-model",
+      "revision": "stub-1"
+    },
+    "source_versions": {
+      "novel": "v1",
+      "source_snapshot_hash": "1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    "input_hash": "3333333333333333333333333333333333333333333333333333333333333333",
+    "evidence_refs": [
+      "qp:1:0:10:4444444444444444444444444444444444444444444444444444444444444444"
+    ],
+    "visual_bible": {
+      "schema_version": "visual-bible.v1",
+      "artifact_kind": "visual_bible",
+      "owner_id": 1,
+      "novel_id": 1,
+      "version_key": "vb-main",
+      "revision_number": 1,
+      "parent_version_id": null,
+      "source_snapshot_id": "ss-1",
+      "source_snapshot_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+      "cutoff_chapter": 2,
+      "schema_hash": "5555555555555555555555555555555555555555555555555555555555555555",
+      "policy_hash": "6666666666666666666666666666666666666666666666666666666666666666",
+      "prompt_hash": "7777777777777777777777777777777777777777777777777777777777777777",
+      "model_hash": null,
+      "config_hash": null,
+      "manifest_hash": "8888888888888888888888888888888888888888888888888888888888888888",
+      "style_profile": null,
+      "constraints": null,
+      "entities": [
+        {
+          "stable_id": "char-ayla",
+          "entity_key": "char-ayla",
+          "entity_type": "character",
+          "description": "A tall young woman with braided amber hair.",
+          "authority": "canon_fact",
+          "disclosure_cutoff": 2
+        },
+        {
+          "stable_id": "place-hall",
+          "entity_key": "place-hall",
+          "entity_type": "place",
+          "description": "A cold stone hall with tall windows.",
+          "authority": "canon_fact",
+          "disclosure_cutoff": 2
+        }
+      ],
+      "claims": [
+        {
+          "claim_key": "char-ayla-hair",
+          "entity_stable_id": "char-ayla",
+          "authority": "canon_fact",
+          "description": "amber braided hair and green eyes",
+          "author": null,
+          "rationale": null,
+          "cutoff_chapter": 2,
+          "claim_hash": "9999999999999999999999999999999999999999999999999999999999999999",
+          "evidence_refs": [
+            {
+              "evidence_key": "qp:1:0:10:4444444444444444444444444444444444444444444444444444444444444444",
+              "source_snapshot_id": "ss-1",
+              "source_snapshot_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+              "chapter_id": 1,
+              "chapter_number": 1,
+              "source_start": 0,
+              "source_end": 10,
+              "content_hash": "4444444444444444444444444444444444444444444444444444444444444444",
+              "excerpt": "Ayla was a ",
+              "cutoff_chapter": 2
+            }
+          ]
+        },
+        {
+          "claim_key": "place-hall-mood",
+          "entity_stable_id": "place-hall",
+          "authority": "probable_inference",
+          "description": "The hall likely feels cold and forbidding.",
+          "author": "fixture-author",
+          "rationale": "The description emphasizes cold stone and pale light.",
+          "cutoff_chapter": 2,
+          "claim_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "evidence_refs": []
+        }
+      ],
+      "reference_assets": [
+        {
+          "asset_key": "ref-cover",
+          "asset_id": "obj-1",
+          "mime_type": "image/png",
+          "bytes_hash": "2222222222222222222222222222222222222222222222222222222222222222",
+          "rights_status": "unreviewed",
+          "provenance": { "source": "user-upload", "license": "pending" }
+        }
+      ],
+      "review_state": "candidate"
+    },
+    "tool_runs": [
+      { "tool_name": "get_novel", "calls": 1 },
+      { "tool_name": "get_chapter", "calls": 1 },
+      { "tool_name": "get_evidence_span", "calls": 1 }
+    ],
+    "status": "candidate",
+    "parent_revision": null,
+    "normalization": {
+      "raw_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "repaired_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "normalization_actions": [],
+      "warnings": []
+    }
+  }
+}

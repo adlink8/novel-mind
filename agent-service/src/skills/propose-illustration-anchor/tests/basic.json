@@ -1,0 +1,90 @@
+{
+  "description": "propose-illustration-anchor skill-local fixture（derivative mode，Phase 34 / REQ-VIS-05）：branch + fork 血缘绑定；attach_illustration_to_text action。proposal_status 恒为 proposed；绝不发布。",
+  "input": {
+    "novel_id": 22,
+    "branch": "deriv-branch",
+    "fork": "fork-1",
+    "chapter_id": 72,
+    "chapter_number": 4,
+    "proposal_key": "anchor-deriv-scar",
+    "source_snapshot_id": "ss-2",
+    "source_snapshot_hash": "9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a",
+    "source_start": 5,
+    "source_end": 41,
+    "paragraph_start": null,
+    "paragraph_end": null,
+    "excerpt": "a lean figure with a scar across his left brow",
+    "anchor_hash": "5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c",
+    "chapter_content_hash": "6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d",
+    "asset_revision_id": 608,
+    "presentation": {
+      "caption": "Derivative candidate: lean figure with scar (Phase 33 handoff)",
+      "alt_text": "Illustration of a lean figure with a scar across his left brow",
+      "citation": "Derivative branch, Chapter 4"
+    },
+    "requested_actions": ["attach_illustration_to_text"]
+  },
+  "expected_output": {
+    "type": "illustration_anchor_proposal",
+    "schema_version": "illustration-anchor-proposal.v1",
+    "owner_id": 7,
+    "novel_id": 22,
+    "branch": "deriv-branch",
+    "producing_skill": "propose-illustration-anchor",
+    "producing_skill_version": "1.0.0",
+    "skill_version_id": 12,
+    "model_lineage": {
+      "provider": "fixture",
+      "model": "stub-model",
+      "revision": "stub-1"
+    },
+    "source_versions": {
+      "novel": "v1",
+      "source_snapshot_hash": "9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a"
+    },
+    "input_hash": "e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7",
+    "evidence_refs": ["ev-deriv-scar"],
+    "tool_runs": [
+      { "tool_name": "get_chapter", "calls": 1 },
+      { "tool_name": "attach_illustration_to_text", "calls": 1 }
+    ],
+    "status": "candidate",
+    "parent_revision": null,
+    "illustration_anchor_proposal": {
+      "schema_version": "illustration-anchor-proposal.v1",
+      "artifact_kind": "illustration_anchor_proposal",
+      "proposal_key": "anchor-deriv-scar",
+      "authority_space": "derivative",
+      "fork": "fork-1",
+      "chapter_id": 72,
+      "chapter_number": 4,
+      "source_snapshot_id": "ss-2",
+      "source_snapshot_hash": "9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a",
+      "range": {
+        "source_start": 5,
+        "source_end": 41,
+        "paragraph_start": null,
+        "paragraph_end": null
+      },
+      "excerpt": "a lean figure with a scar across his left brow",
+      "anchor_hash": "5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c",
+      "chapter_content_hash": "6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d",
+      "proposal_asset_revision_id": 608,
+      "presentation": {
+        "caption": "Derivative candidate: lean figure with scar (Phase 33 handoff)",
+        "alt_text": "Illustration of a lean figure with a scar across his left brow",
+        "citation": "Derivative branch, Chapter 4"
+      },
+      "requested_action": "attach_illustration_to_text",
+      "proposal_status": "proposed",
+      "approval_request_id": null,
+      "proposal_id": null
+    },
+    "normalization": {
+      "raw_hash": "f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8",
+      "repaired_hash": "f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8",
+      "normalization_actions": [],
+      "warnings": []
+    }
+  }
+}

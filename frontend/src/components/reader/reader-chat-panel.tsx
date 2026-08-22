@@ -6,8 +6,10 @@ import {
   ArchiveRestore,
   ChevronDown,
   ChevronUp,
+  ImagePlus,
   LoaderCircle,
   MessageSquarePlus,
+  PenLine,
   Pencil,
   Send,
   Trash2,
@@ -21,12 +23,20 @@ import {
   isTerminalJobStatus,
   pollReaderChatJob,
   readerChatApi,
-  type CitationView,
   type ConversationListItem,
   type GenerationJobView,
   type MessageView,
   type SelectionCoordinate,
 } from "@/lib/api";
+import {
+  MessageBubble,
+  type CitationNavigateTarget,
+} from "@/components/reader/chat/chat-message-bubble";
+import {
+  newClientMessageId,
+  jobStatusLabel,
+} from "@/lib/chat-shared";
+import { AgentTurnInline, type AgentTurnItem } from "@/components/analysis/agent-turn-inline";
 import {
   loadReaderChatPresentation,
   saveReaderChatPresentation,
@@ -34,12 +44,8 @@ import {
 import { useDismissableLayer } from "@/lib/use-dismissable-layer";
 import { cn } from "@/lib/utils";
 
-export type CitationNavigateTarget = {
-  chapter_id: number;
-  source_start: number;
-  source_end: number;
-  evidence_key: string;
-};
+/** 智能体回合 id 计数器（模块级；换会话/关闭面板不重置）。 */
+let nextTurnId = 1;
 
 type Props = {
   novelId: string;
@@ -54,41 +60,10 @@ type Props = {
   pendingSelection: SelectionCoordinate | null;
   onClearSelection: () => void;
   onCitationNavigate: (target: CitationNavigateTarget) => void;
+  /** 智能体回合终态后回调（插图锚点发布后阅读页刷新章节插图）。 */
+  onAnchorRefresh?: () => void;
   className?: string;
 };
-
-/** Shared with the analysis chat panel (Phase 25.1) — same conversation base. */
-export function newClientMessageId(): string {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return crypto.randomUUID();
-  }
-  return `cm-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
-
-/** Shared with the analysis chat panel (Phase 25.1) — same job status copy. */
-export function jobStatusLabel(job: GenerationJobView | null | undefined): string | null {
-  if (!job) return null;
-  const reason = (job.status_reason || job.error_code || "").trim();
-  switch (job.status) {
-    case "queued":
-      return "排队中…";
-    case "running":
-      return "生成中…";
-    case "paused_budget":
-      return reason ? `预算已暂停：${reason}` : "预算已暂停";
-    case "paused_dependency":
-      return reason ? `模型/依赖不可用：${reason}` : "模型或依赖不可用（可点重试）";
-    case "cancelled":
-      return "已取消";
-    case "failed":
-    case "failed_validation":
-      return job.error_code ? `失败：${job.error_code}` : "生成失败";
-    case "completed":
-      return null;
-    default:
-      return job.status;
-  }
-}
 
 export function ReaderChatPanel({
   novelId,
@@ -101,6 +76,7 @@ export function ReaderChatPanel({
   pendingSelection,
   onClearSelection,
   onCitationNavigate,
+  onAnchorRefresh,
   className,
 }: Props) {
   const [conversations, setConversations] = useState<ConversationListItem[]>([]);
@@ -113,6 +89,8 @@ export function ReaderChatPanel({
   const [activeJob, setActiveJob] = useState<GenerationJobView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState<string | null>(null);
+  /** 已触发的智能体回合（session-local，不落 reader_chat 会话库）。 */
+  const [agentTurns, setAgentTurns] = useState<AgentTurnItem[]>([]);
   const pollAbortRef = useRef<AbortController | null>(null);
   const listRequestRef = useRef(0);
   const msgRequestRef = useRef(0);
@@ -132,10 +110,22 @@ export function ReaderChatPanel({
     closeOnEscape: false,
   });
 
+  // Desktop: move keyboard focus to the input when the expanded panel opens so
+  // keyboard users can start typing immediately (D-06 accessibility). Mobile is
+  // intentionally excluded — auto-focusing would pop the on-screen keyboard.
+  useEffect(() => {
+    if (!open || collapsed || layout !== "desktop") return;
+    const input = panelRef.current?.querySelector<HTMLTextAreaElement>(
+      '[data-testid="reader-chat-input"]'
+    );
+    input?.focus();
+  }, [open, collapsed, layout]);
+
   // Restore presentation-only active conversation id (lazy init alternative for novel change)
   const [hydratedNovel, setHydratedNovel] = useState<string | null>(null);
   if (hydratedNovel !== novelId) {
     setHydratedNovel(novelId);
+    setAgentTurns([]);
     const saved = loadReaderChatPresentation(novelId);
     if (saved.activeConversationId != null) {
       setActiveId(saved.activeConversationId);
@@ -159,6 +149,7 @@ export function ReaderChatPanel({
       const res = await readerChatApi.listConversations(novelId, { limit: 50 });
       if (req !== listRequestRef.current) return;
       setConversations(res.data.items);
+      setError(null);
       setActiveId((prev) => {
         if (prev && res.data.items.some((c) => c.id === prev)) return prev;
         const firstActive = res.data.items.find((c) => c.status === "active");
@@ -183,6 +174,10 @@ export function ReaderChatPanel({
         });
         if (req !== msgRequestRef.current) return;
         setMessages(res.data.items);
+        // Do NOT clear the error here: a failed conversations-list load may
+        // have set error, and a later successful message replay would silently
+        // erase the fail-closed state (reader-chat-quality UAT). The error is
+        // cleared only by a successful conversations-list load.
         // Surface non-terminal job from latest user message
         const lastUser = [...res.data.items]
           .reverse()
@@ -233,7 +228,10 @@ export function ReaderChatPanel({
   // When panel closes or conversation cleared, drop local message buffer.
   useEffect(() => {
     if (!open || activeId == null) {
-      queueMicrotask(() => setMessages([]));
+      queueMicrotask(() => {
+        setMessages([]);
+        setAgentTurns([]);
+      });
     }
   }, [open, activeId]);
 
@@ -425,6 +423,36 @@ export function ReaderChatPanel({
     } catch {
       setError("重试失败");
     }
+  };
+
+  /** 选中段落 → 生成插图（智能体回合；skill 缺省 = 后端自动路由）。 */
+  const handleGenerateIllustration = () => {
+    if (!pendingSelection) return;
+    const text = pendingSelection.selection_text.trim();
+    const excerpt = text.slice(0, 60) + (text.length > 60 ? "…" : "");
+    setError(null);
+    setAgentTurns((prev) => [
+      ...prev,
+      {
+        id: nextTurnId++,
+        question: `为选中的段落「${excerpt}」生成一幅插图`,
+        // 生图/锚点流程由后端自动路由决定；前端不选择 skill。
+      },
+    ]);
+  };
+
+  /** 续写入口：把续写意图交给智能体（路由决定具体技能）。 */
+  const handleContinue = () => {
+    const text = pendingSelection?.selection_text.trim() ?? "";
+    const excerpt = text ? `「${text.slice(0, 60)}${text.length > 60 ? "…" : ""}」` : "";
+    setError(null);
+    setAgentTurns((prev) => [
+      ...prev,
+      {
+        id: nextTurnId++,
+        question: excerpt ? `请接着这段故事续写：${excerpt}` : "请接着当前章节的剧情续写",
+      },
+    ]);
   };
 
   if (!open && !present) return null;
@@ -680,6 +708,7 @@ export function ReaderChatPanel({
               <div
                 data-testid="reader-chat-job-status"
                 data-status={activeJob.status}
+                aria-live="polite"
                 className="rounded-lg border border-border/60 bg-muted/40 px-3 py-2 text-xs"
               >
                 <div className="flex items-center justify-between gap-2">
@@ -722,6 +751,20 @@ export function ReaderChatPanel({
                 </div>
               </div>
             ) : null}
+
+            {/* 智能体回合（SSE 流式；skill 缺省 = 后端自动路由） */}
+            {agentTurns.map((turn) => (
+              <AgentTurnInline
+                key={turn.id}
+                novelId={novelId}
+                initialQuestion={turn.question}
+                skill={turn.skill}
+                input={turn.input}
+                onCitationNavigate={onCitationNavigate}
+                onDone={() => onAnchorRefresh?.()}
+                onError={(message) => setError(message)}
+              />
+            ))}
           </div>
 
           {pendingSelection ? (
@@ -729,11 +772,41 @@ export function ReaderChatPanel({
               data-testid="reader-chat-selection-preview"
               className="shrink-0 border-t border-border/50 bg-amber-50/80 px-3 py-1.5 text-xs text-amber-950"
             >
-              选区 [{pendingSelection.source_start}, {pendingSelection.source_end})：
-              <span className="ml-1 font-medium">
-                {pendingSelection.selection_text.slice(0, 48)}
-                {pendingSelection.selection_text.length > 48 ? "…" : ""}
-              </span>
+              <div className="flex items-start justify-between gap-2">
+                <p className="min-w-0">
+                  选区 [{pendingSelection.source_start}, {pendingSelection.source_end})：
+                  <span className="ml-1 font-medium">
+                    {pendingSelection.selection_text.slice(0, 48)}
+                    {pendingSelection.selection_text.length > 48 ? "…" : ""}
+                  </span>
+                </p>
+                <span className="flex shrink-0 gap-1">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-6 px-2 text-[10px]"
+                    data-testid="reader-chat-generate-image"
+                    aria-label="为选中段落生成插图"
+                    onClick={handleGenerateIllustration}
+                  >
+                    <ImagePlus className="size-3" />
+                    插图
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-6 px-2 text-[10px]"
+                    data-testid="reader-chat-continue"
+                    aria-label="续写"
+                    onClick={handleContinue}
+                  >
+                    <PenLine className="size-3" />
+                    续写
+                  </Button>
+                </span>
+              </div>
             </div>
           ) : (
             <div className="shrink-0 border-t border-border/50 px-3 py-1.5 text-xs text-muted-foreground">
@@ -801,87 +874,11 @@ export function ReaderChatPanel({
 
   if (layout === "mobile") {
     return (
-      <div className="fixed inset-x-0 bottom-[calc(4.75rem_+_env(safe-area-inset-bottom))] z-40 px-0 sm:px-2 md:bottom-6">
+      <div className="fixed inset-x-0 bottom-[calc(4.75rem_+_env(safe-area-inset-bottom))] z-40 overflow-hidden px-0 sm:px-2 md:bottom-6">
         {panelBody}
       </div>
     );
   }
 
   return panelBody;
-}
-
-/** Shared with the analysis chat panel (Phase 25.1) — same bubble + citation UI. */
-export function MessageBubble({
-  message,
-  onCitationNavigate,
-}: {
-  message: MessageView;
-  onCitationNavigate: (t: CitationNavigateTarget) => void;
-}) {
-  const isUser = message.role === "user";
-  return (
-    <div
-      data-testid={`reader-chat-msg-${message.id}`}
-      data-role={message.role}
-      className={cn(
-        "rounded-xl px-3 py-2",
-        isUser ? "ml-6 bg-primary/10" : "mr-4 border border-border/60 bg-background"
-      )}
-    >
-      <p className="whitespace-pre-wrap text-[13px] leading-relaxed">{message.body}</p>
-      {message.selection ? (
-        <p className="mt-1 text-[10px] text-muted-foreground">
-          选区 ch{message.selection.chapter_id} [{message.selection.source_start},
-          {message.selection.source_end})
-        </p>
-      ) : null}
-      {!isUser && message.citations.length > 0 ? (
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {message.citations.map((c) => (
-            <CitationChip
-              key={`${c.block_id}-${c.context_evidence_ref_id}`}
-              citation={c}
-              onNavigate={onCitationNavigate}
-            />
-          ))}
-        </div>
-      ) : null}
-      {message.body.includes("[suggestion:") ? (
-        <p
-          data-testid="reader-chat-suggestion-note"
-          className="mt-1 text-[10px] text-muted-foreground"
-        >
-          建议仅供展示，需显式确认后才能写入（本阶段无应用入口）
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
-function CitationChip({
-  citation,
-  onNavigate,
-}: {
-  citation: CitationView;
-  onNavigate: (t: CitationNavigateTarget) => void;
-}) {
-  return (
-    <button
-      type="button"
-      data-testid="reader-chat-citation"
-      data-source-start={citation.source_start}
-      data-chapter-id={citation.chapter_id}
-      className="rounded-full border border-primary/30 bg-primary/5 px-2 py-0.5 text-[11px] text-primary hover:bg-primary/10"
-      onClick={() =>
-        onNavigate({
-          chapter_id: citation.chapter_id,
-          source_start: citation.source_start,
-          source_end: citation.source_end,
-          evidence_key: citation.evidence_key,
-        })
-      }
-    >
-      引用 · ch{citation.chapter_id} @{citation.source_start}
-    </button>
-  );
 }

@@ -1,0 +1,253 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "VisualBibleArtifact",
+  "description": "VisualBibleArtifact 信封（D-30-01..D-30-04 / Phase 30）。镜像 backend app.schemas.agent_runtime.VisualBibleArtifact：type / schema_version / owner / novel / branch / producing skill+version / model lineage / source versions / input_hash / evidence_refs / visual_bible（完整 VisualBibleVersionContract）/ tool_runs / status / parent_revision / normalization。visual_bible 是 **candidate-only** 版本契约：review_state 恒为 candidate，authority/rights/approval 权威只属于确定性 validators 与 FastAPI（D-30-01/D-30-04）；`visual_bible:approve` 用户批准后版本才成为 accepted visual authority。artifact_id / revision_id / skill_run_id 由后端确定性 finalizer 在写入时分配，模型输出不含。",
+  "type": "object",
+  "required": [
+    "type",
+    "schema_version",
+    "owner_id",
+    "novel_id",
+    "producing_skill",
+    "producing_skill_version",
+    "skill_version_id",
+    "model_lineage",
+    "source_versions",
+    "input_hash",
+    "evidence_refs",
+    "visual_bible",
+    "tool_runs",
+    "status",
+    "normalization"
+  ],
+  "properties": {
+    "type": {
+      "const": "visual_bible"
+    },
+    "schema_version": {
+      "const": "visual-bible.v1"
+    },
+    "owner_id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "novel_id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "branch": {
+      "type": ["string", "null"],
+      "description": "衍生分支；原始主线为 null"
+    },
+    "producing_skill": {
+      "type": "string",
+      "minLength": 1
+    },
+    "producing_skill_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "skill_version_id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "model_lineage": {
+      "type": "object",
+      "description": "agent runtime + 模型血缘（provider/model/revision）"
+    },
+    "source_versions": {
+      "type": "object",
+      "description": "数据源版本（novel/chapter/source snapshot 血缘）"
+    },
+    "input_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "运行输入规范化 JSON 的 SHA-256（重放追溯）"
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1,
+      "description": "leaf 证据引用，必须 ⊆ 冻结 manifest 白名单（D-07/D-08）"
+    },
+    "skill_run_id": {
+      "type": ["integer", "null"],
+      "minimum": 1,
+      "description": "SkillRun ID（后端 run 创建时分配；模型输出不含）"
+    },
+    "artifact_id": {
+      "type": ["integer", "null"],
+      "minimum": 1,
+      "description": "Artifact ID（后端确定性 finalizer 写入时分配；模型输出不含）"
+    },
+    "revision_id": {
+      "type": ["integer", "null"],
+      "minimum": 1,
+      "description": "ArtifactRevision ID（后端确定性 finalizer 写入时分配；模型输出不含）"
+    },
+    "visual_bible": {
+      "type": "object",
+      "description": "完整 VisualBibleVersionContract：immutable candidate 信封（entities / claims / evidence refs / reference assets + 全量 lineage hash）。review_state 恒为 candidate——approval 是显式、可审计的服务端状态迁移，绝不由 Agent 声称（D-30-04）。",
+      "required": [
+        "schema_version",
+        "artifact_kind",
+        "owner_id",
+        "novel_id",
+        "version_key",
+        "revision_number",
+        "source_snapshot_id",
+        "source_snapshot_hash",
+        "cutoff_chapter",
+        "schema_hash",
+        "policy_hash",
+        "manifest_hash",
+        "entities",
+        "claims",
+        "review_state"
+      ],
+      "properties": {
+        "schema_version": { "const": "visual-bible.v1" },
+        "artifact_kind": { "const": "visual_bible" },
+        "owner_id": { "type": "integer", "minimum": 1 },
+        "novel_id": { "type": "integer", "minimum": 1 },
+        "version_key": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "revision_number": { "type": "integer", "minimum": 1 },
+        "parent_version_id": { "type": ["integer", "null"], "minimum": 1 },
+        "source_snapshot_id": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "source_snapshot_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "cutoff_chapter": { "type": "integer", "minimum": 1 },
+        "schema_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "policy_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "prompt_hash": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" },
+        "model_hash": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" },
+        "config_hash": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" },
+        "manifest_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "style_profile": { "type": ["object", "null"] },
+        "constraints": {
+          "type": ["array", "null"],
+          "items": { "type": "object" }
+        },
+        "entities": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["stable_id", "entity_key", "entity_type", "description", "authority", "disclosure_cutoff"],
+            "properties": {
+              "stable_id": { "type": "string", "minLength": 1, "maxLength": 180 },
+              "entity_key": { "type": "string", "minLength": 1, "maxLength": 180 },
+              "entity_type": { "enum": ["character", "place", "item", "faction", "style"] },
+              "description": { "type": "string", "minLength": 1, "maxLength": 8000 },
+              "authority": { "enum": ["canon_fact", "probable_inference", "literary_interpretation", "user_interpretation"] },
+              "disclosure_cutoff": { "type": "integer", "minimum": 1 }
+            }
+          }
+        },
+        "claims": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["claim_key", "entity_stable_id", "authority", "description", "cutoff_chapter", "claim_hash", "evidence_refs"],
+            "properties": {
+              "claim_key": { "type": "string", "minLength": 1, "maxLength": 180 },
+              "entity_stable_id": { "type": "string", "minLength": 1, "maxLength": 180 },
+              "authority": { "enum": ["canon_fact", "probable_inference", "literary_interpretation", "user_interpretation"] },
+              "description": { "type": "string", "minLength": 1, "maxLength": 4000 },
+              "author": { "type": ["string", "null"], "maxLength": 200 },
+              "rationale": { "type": ["string", "null"], "maxLength": 2000 },
+              "cutoff_chapter": { "type": "integer", "minimum": 1 },
+              "claim_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+              "evidence_refs": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["evidence_key", "source_snapshot_id", "source_snapshot_hash", "chapter_id", "chapter_number", "source_start", "source_end", "content_hash", "cutoff_chapter"],
+                  "properties": {
+                    "evidence_key": { "type": "string", "minLength": 1, "maxLength": 180 },
+                    "source_snapshot_id": { "type": "string", "minLength": 1, "maxLength": 160 },
+                    "source_snapshot_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+                    "chapter_id": { "type": "integer", "minimum": 1 },
+                    "chapter_number": { "type": "integer", "minimum": 1 },
+                    "source_start": { "type": "integer", "minimum": 0 },
+                    "source_end": { "type": "integer", "minimum": 1 },
+                    "content_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+                    "excerpt": { "type": ["string", "null"], "maxLength": 2000 },
+                    "cutoff_chapter": { "type": "integer", "minimum": 1 }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "reference_assets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["asset_key", "asset_id", "mime_type", "bytes_hash", "rights_status"],
+            "properties": {
+              "asset_key": { "type": "string", "minLength": 1, "maxLength": 180 },
+              "asset_id": { "type": "string", "minLength": 1, "maxLength": 200 },
+              "mime_type": { "type": "string", "minLength": 1, "maxLength": 100 },
+              "bytes_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+              "rights_status": { "enum": ["unreviewed", "cleared", "pending", "denied"] },
+              "provenance": { "type": "object" }
+            }
+          }
+        },
+        "review_state": {
+          "const": "candidate",
+          "description": "candidate-only：approval 是显式、append-only 的服务端状态迁移（D-30-04），Agent 声称任何其它 review_state（approval bypass）→ fail closed"
+        }
+      }
+    },
+    "tool_runs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["tool_name", "calls"],
+        "properties": {
+          "tool_name": { "type": "string", "minLength": 1 },
+          "calls": { "type": "integer", "minimum": 0 }
+        }
+      },
+      "description": "ToolRun 血缘：本 run 使用的 allowlist 工具与调用次数"
+    },
+    "status": {
+      "enum": ["candidate", "validated", "approved", "published", "rejected"],
+      "description": "产物状态；finalize 写入时恒为 candidate（无自动 promotion）"
+    },
+    "parent_revision": {
+      "type": ["string", "null"],
+      "description": "父修订引用；首个修订为 null"
+    },
+    "normalization": {
+      "type": "object",
+      "description": "26-06 修复血缘 trail：repaired_hash 是对不含本 trail 的 repaired payload 的 canonical SHA-256；raw_hash 是原始模型输出的 canonical SHA-256；normalization_actions 每项含 path/action/after。",
+      "required": ["raw_hash", "repaired_hash", "normalization_actions", "warnings"],
+      "properties": {
+        "raw_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "repaired_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "normalization_actions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path", "action", "after"],
+            "properties": {
+              "path": { "type": "string", "minLength": 1 },
+              "action": {
+                "type": "string",
+                "enum": ["alias", "alias_dedup", "enum_canonicalize", "container_shape", "lineage_merge"]
+              },
+              "before": {},
+              "after": {},
+              "reason": { "type": "string" }
+            }
+          }
+        },
+        "warnings": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  },
+  "additionalProperties": false
+}

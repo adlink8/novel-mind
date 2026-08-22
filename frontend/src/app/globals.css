@@ -33,6 +33,11 @@
    * shadcn/ui 组件通过 hsl(var(--变量名)) 引用
    * ============================================================ */
   :root {
+    /* 字体变量（原 next/font/google 注入；离线环境改用系统字体栈） */
+    --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "PingFang SC",
+      "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    --font-serif: ui-serif, Georgia, "Songti SC", "SimSun", "Noto Serif SC", serif;
+
     /* 页面背景和前景色 */
     --background: 42 35% 96%;
     --foreground: 28 20% 13%;

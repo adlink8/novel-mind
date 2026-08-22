@@ -27,6 +27,7 @@ from app.schemas.reader_chat import (
 )
 from app.services.agent_runtime import artifacts as artifact_service
 from app.services.agent_runtime.registry import canonical_input_hash
+from app.services.agent_runtime.structured_output_integrity import evaluate_integrity
 from app.services.reader_chat.budget import BudgetPolicy
 
 # agent_end 的取消 stop reason 集合 → cancelled 分支（0 写）。
@@ -35,6 +36,7 @@ CANCEL_STOP_REASONS: frozenset[str] = frozenset({"aborted", "cancel", "cancelled
 ERROR_CODE_FAILED_VALIDATION = "failed_validation"
 ERROR_CODE_BUDGET_EXCEEDED = "budget_exceeded"
 ERROR_CODE_INVALID_STOP_REASON = "invalid_stop_reason"
+ERROR_CODE_UPSTREAM_ERROR = "upstream_error"
 ERROR_CODE_UNKNOWN = "failed"
 
 
@@ -130,16 +132,26 @@ async def finalize_skill_run(
             run.status = "failed"
             run.stop_reason = stop_reason
             run.status_reason = f"unexpected stop reason {stop_reason!r}"
-            run.error_code = ERROR_CODE_INVALID_STOP_REASON
+            # 已知上游停止语义（provider error / 超长截断 / 其它）→ upstream_error；
+            # 只有真正协议外的值才映射 invalid_stop_reason。
+            if stop_reason in {"error", "max_tokens", "other"}:
+                run.error_code = ERROR_CODE_UPSTREAM_ERROR
+            else:
+                run.error_code = ERROR_CODE_INVALID_STOP_REASON
             return FinalizeOutcome(
                 status="failed",
-                error_code=ERROR_CODE_INVALID_STOP_REASON,
+                error_code=run.error_code,
                 status_reason=run.status_reason,
             )
 
-        # 冻结 manifest：首次落库；已存在且不一致 → 拒绝（防重放漂移）。
+        # 冻结 manifest：accepted 阶段可能已经写入 connector_versions；finalize
+        # 只允许补充尚未冻结的字段，同名字段变化一律拒绝（防重放漂移）。
         if frozen_manifest is not None:
-            if run.frozen_manifest and run.frozen_manifest != frozen_manifest:
+            try:
+                run.frozen_manifest = _merge_frozen_manifest(
+                    run.frozen_manifest, frozen_manifest
+                )
+            except ValueError:
                 run.status = "failed"
                 run.status_reason = "frozen manifest changed after freeze"
                 run.error_code = ERROR_CODE_FAILED_VALIDATION
@@ -148,8 +160,6 @@ async def finalize_skill_run(
                     error_code=ERROR_CODE_FAILED_VALIDATION,
                     status_reason=run.status_reason,
                 )
-            run.frozen_manifest = frozen_manifest
-
         # 预算 fail-closed：从技能版本 budget 策略校验实际用量。
         skill_version = await session.get(SkillVersion, run.skill_version_id)
         if skill_version is None:
@@ -168,10 +178,26 @@ async def finalize_skill_run(
                 status_reason=run.status_reason,
             )
 
+        # Structured Output Integrity 门禁（26-06 / REQ-AGENT-08 / D-16）：
+        # 唯一 finalizer 在任何写入之前执行严格 schema/lineage/trail 校验；
+        # blocked → run failed、零写入（不补默认值、不触发 approval/promotion）。
+        decision = evaluate_integrity(envelope=envelope, run=run)
+        if not decision.ok:
+            reason = decision.blocked_reason or "structured output integrity blocked"
+            run.status = "failed"
+            run.stop_reason = stop_reason
+            run.status_reason = reason[:160]
+            run.error_code = ERROR_CODE_FAILED_VALIDATION
+            return FinalizeOutcome(
+                status="failed",
+                error_code=ERROR_CODE_FAILED_VALIDATION,
+                status_reason=run.status_reason,
+            )
+
         # 引证合法性：每个 evidence_ref 必须属于冻结 manifest 白名单。
         allowed = _frozen_allowlist(run)
         try:
-            _validate_cited_answer(envelope, allowed)
+            _validate_artifact_evidence(envelope, allowed)
         except ValueError as exc:
             run.status = "failed"
             run.stop_reason = stop_reason
@@ -214,23 +240,46 @@ async def finalize_skill_run(
         )
 
 
+def _merge_frozen_manifest(
+    accepted: dict[str, Any] | None,
+    submitted: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    """合并 accepted/finalize manifest，同时保持 accepted 字段不可变。"""
+    if submitted is None:
+        return dict(accepted) if accepted is not None else None
+
+    merged = dict(accepted or {})
+    for key, accepted_value in merged.items():
+        if key in submitted and submitted[key] != accepted_value:
+            raise ValueError(f"frozen manifest field changed: {key}")
+    merged.update(submitted)
+    return merged
+
+
 def _frozen_allowlist(run: SkillRun) -> set[str]:
     """从 run 冻结 manifest 提取证据白名单；为空则 fail closed（任何引证都不合法）。"""
     manifest = dict(run.frozen_manifest or {})
     return {str(ref) for ref in manifest.get("evidence_refs") or []}
 
 
-def _validate_cited_answer(envelope: dict[str, Any], allowed: set[str]) -> None:
-    """把 Cited Answer 的 answer 部分构造成 ReaderAnswerEnvelope 并做白名单校验。"""
-    answer = envelope.get("answer")
-    if not isinstance(answer, dict):
-        raise ValueError("cited answer missing 'answer' payload")
-    reader_envelope = ReaderAnswerEnvelope.model_validate(answer)
-    validate_answer_against_manifest(reader_envelope, allowed)
+def _validate_artifact_evidence(envelope: dict[str, Any], allowed: set[str]) -> None:
+    """冻结 manifest 白名单校验（T-25.2-03-02 / Phase 27 扩展）。
+
+    - cited_answer：构造 ReaderAnswerEnvelope 校验 answer_blocks 内引用，
+      并校验顶层 evidence_refs；
+    - world_model_candidate 等其它类型：校验顶层 evidence_refs（claim 级
+      证据合法性由确定性 WorldModelGate 在发布时裁决，finalize 不越权）。
+    """
+    if envelope.get("type") == "cited_answer":
+        answer = envelope.get("answer")
+        if not isinstance(answer, dict):
+            raise ValueError("cited answer missing 'answer' payload")
+        reader_envelope = ReaderAnswerEnvelope.model_validate(answer)
+        validate_answer_against_manifest(reader_envelope, allowed)
     # 顶层 evidence_refs 同样必须属于白名单。
     for ref in envelope.get("evidence_refs") or []:
         if str(ref) not in allowed:
-            raise ValueError(f"cited answer: unknown evidence ref {ref!r}")
+            raise ValueError(f"unknown evidence ref {ref!r}")
 
 
 def expected_input_hash(input_data: dict[str, Any]) -> str:

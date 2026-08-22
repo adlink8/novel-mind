@@ -1,0 +1,170 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CreateCanonForkOutput",
+  "description": "CanonForkProposalArtifact 信封（D-35-01..D-35-04 / Phase 35）。镜像 backend app.schemas.agent_runtime.CanonForkProposalArtifact：type / schema_version / owner / novel / branch / producing skill+version / model lineage / source versions / input_hash / evidence_refs / tool_runs / status / parent_revision / normalization。`proposal` 负载携带完整 branch-aware 血缘（fork_key、source snapshot、scope/manifest hashes、cutoff、citation lineage）且 proposal_status 恒为 proposed；`delta` 负载携带候选 delta（delta_key、base_revision、content、content_hash、evidence_refs）且 delta_status 恒为 proposed——只有服务端 proposal/approval/Fork materializer 能推进 candidate → pending_approval → approved；Phase 35 绝不物化 fork 或触碰 Original Canon。artifact_id / revision_id / skill_run_id / approval_request_id / fork_id 由后端确定性 finalizer/服务端在写入时分配，模型输出不含。",
+  "type": "object",
+  "required": [
+    "type",
+    "schema_version",
+    "owner_id",
+    "novel_id",
+    "producing_skill",
+    "producing_skill_version",
+    "skill_version_id",
+    "model_lineage",
+    "source_versions",
+    "input_hash",
+    "evidence_refs",
+    "proposal",
+    "delta",
+    "tool_runs",
+    "status",
+    "normalization"
+  ],
+  "properties": {
+    "type": { "const": "canon_fork_proposal" },
+    "schema_version": { "const": "canon-fork-proposal.v1" },
+    "owner_id": { "type": "integer", "minimum": 1 },
+    "novel_id": { "type": "integer", "minimum": 1 },
+    "branch": { "type": ["string", "null"], "description": "衍生分支；原始主线为 null" },
+    "producing_skill": { "type": "string", "minLength": 1 },
+    "producing_skill_version": { "type": "string", "minLength": 1 },
+    "skill_version_id": { "type": "integer", "minimum": 1 },
+    "model_lineage": { "type": "object", "description": "agent runtime + 模型血缘（provider/model/revision）" },
+    "source_versions": { "type": "object", "description": "数据源版本（novel/source snapshot 血缘）" },
+    "input_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$", "description": "运行输入规范化 JSON 的 SHA-256（重放追溯）" },
+    "evidence_refs": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1,
+      "description": "leaf 证据引用，必须 ⊆ 冻结 manifest 白名单（D-07/D-08）"
+    },
+    "skill_run_id": { "type": ["integer", "null"], "minimum": 1, "description": "SkillRun ID（后端 run 创建时分配；模型输出不含）" },
+    "artifact_id": { "type": ["integer", "null"], "minimum": 1, "description": "Artifact ID（后端确定性 finalizer 写入时分配；模型输出不含）" },
+    "revision_id": { "type": ["integer", "null"], "minimum": 1, "description": "ArtifactRevision ID（后端确定性 finalizer 写入时分配；模型输出不含）" },
+    "proposal": {
+      "type": "object",
+      "description": "完整 CanonForkProposal 负载：branch-aware 血缘 + 冻结 fork manifest（source snapshot、cutoff、scope/manifest hashes、citation lineage、authorization）。proposal_status 恒为 proposed——只有服务端 proposal/approval/Fork materializer 能推进状态；Phase 35 绝不物化 fork。",
+      "required": [
+        "schema_version",
+        "artifact_kind",
+        "fork_key",
+        "source_version_key",
+        "source_snapshot_id",
+        "source_snapshot_hash",
+        "through_chapter",
+        "full_book_authorized",
+        "cutoff_snapshot_hash",
+        "scope_hash",
+        "manifest_hash",
+        "citation_lineage",
+        "authorization",
+        "proposal_status"
+      ],
+      "properties": {
+        "schema_version": { "const": "canon-fork-proposal.v1" },
+        "artifact_kind": { "const": "canon_fork_proposal" },
+        "fork_key": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "branch": { "type": ["string", "null"], "maxLength": 80, "description": "衍生分支（与信封 branch 血缘一致）" },
+        "fork": { "type": ["string", "null"], "maxLength": 80, "description": "衍生 fork（仅 derivative 模式）" },
+        "source_version_key": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "source_snapshot_id": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "source_snapshot_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "through_chapter": { "type": "integer", "minimum": 1 },
+        "full_book_authorized": { "type": "boolean" },
+        "cutoff_snapshot_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "scope_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "manifest_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "citation_lineage": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "object" },
+          "description": "冻结 source leaf 引用血缘（必须 ⊆ source snapshot / cutoff）"
+        },
+        "authorization": { "type": "object", "description": "服务端 cutoff 授权记录（auditable）" },
+        "proposal_status": {
+          "type": "string",
+          "enum": ["proposed", "pending_approval", "approved"],
+          "description": "Phase 35 唯一官方状态机：finalize 写入时恒为 proposed；只有服务端 proposal/approval/Fork materializer 能推进；绝不物化"
+        },
+        "approval_request_id": { "type": ["integer", "null"], "minimum": 1, "description": "服务端 Web ApprovalRequest ID（模型输出不含）" },
+        "fork_id": { "type": ["integer", "null"], "minimum": 1, "description": "服务端 CanonFork 行 ID（模型输出不含）" }
+      },
+      "additionalProperties": false
+    },
+    "delta": {
+      "type": "object",
+      "description": "完整 CanonDeltaArtifact 负载：候选 derivative 内容 + base revision（fork manifest hash）+ content hash + evidence refs。delta_status 恒为 proposed——只有服务端 materializer 在批准后物化；绝不自动发布。",
+      "required": [
+        "schema_version",
+        "artifact_kind",
+        "delta_key",
+        "base_revision",
+        "content",
+        "content_hash",
+        "delta_status"
+      ],
+      "properties": {
+        "schema_version": { "const": "canon-delta.v1" },
+        "artifact_kind": { "const": "canon_delta" },
+        "delta_key": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "base_revision": { "type": "string", "pattern": "^[0-9a-f]{64}$", "description": "delta 派生自的 frozen fork manifest_hash（stale base → fail closed）" },
+        "content": { "type": "string", "minLength": 1, "maxLength": 50000, "description": "候选 derivative 内容" },
+        "content_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$", "description": "content 的 SHA-256（服务端重放；drift → blocked）" },
+        "evidence_refs": { "type": "array", "items": { "type": "string" }, "description": "delta 引用的 leaf 证据键" },
+        "delta_status": {
+          "type": "string",
+          "enum": ["proposed", "pending_approval", "approved"],
+          "description": "Phase 35 delta 官方状态机：finalize 写入时恒为 proposed；只有服务端 materializer 能推进"
+        }
+      },
+      "additionalProperties": false
+    },
+    "tool_runs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["tool_name", "calls"],
+        "properties": {
+          "tool_name": { "type": "string", "minLength": 1 },
+          "calls": { "type": "integer", "minimum": 0 }
+        }
+      },
+      "description": "ToolRun 血缘：本 run 使用的 allowlist 工具与调用次数"
+    },
+    "status": {
+      "enum": ["candidate", "validated", "approved", "published", "rejected"],
+      "description": "产物状态；finalize 写入时恒为 candidate（无自动 promotion）"
+    },
+    "parent_revision": { "type": ["string", "null"], "description": "父修订引用；首个修订为 null" },
+    "normalization": {
+      "type": "object",
+      "description": "26-06 修复血缘 trail：repaired_hash 是对不含本 trail 的 repaired payload 的 canonical SHA-256；raw_hash 是原始模型输出的 canonical SHA-256；normalization_actions 每项含 path/action/after。",
+      "required": ["raw_hash", "repaired_hash", "normalization_actions", "warnings"],
+      "properties": {
+        "raw_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "repaired_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "normalization_actions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path", "action", "after"],
+            "properties": {
+              "path": { "type": "string", "minLength": 1 },
+              "action": {
+                "type": "string",
+                "enum": ["alias", "alias_dedup", "enum_canonicalize", "container_shape", "lineage_merge"]
+              },
+              "before": {},
+              "after": {},
+              "reason": { "type": "string" }
+            }
+          }
+        },
+        "warnings": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  },
+  "additionalProperties": false
+}

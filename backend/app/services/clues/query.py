@@ -477,6 +477,10 @@ async def build_clue_version_view(
         first_cue_chapter = (
             int(clue.first_cue_chapter) if clue.first_cue_chapter is not None else None
         )
+        # 序章/未知章节（0）在可见性语义上归为第 1 章：
+        # ClueVisibleItem.first_cue_chapter 契约要求 gt=0。
+        if first_cue_chapter == 0:
+            first_cue_chapter = 1
         # Spoiler-safe payoff span: only expose when payoff chapter ≤ cutoff.
         payoff_chapter: int | None = None
         for ev in events:

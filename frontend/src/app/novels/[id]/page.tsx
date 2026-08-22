@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ChapterSidebar } from "@/components/reader/chapter-sidebar";
 import { ReaderContent } from "@/components/reader/reader-content";
 import { ReaderChatPanel } from "@/components/reader/reader-chat-panel";
+import { ReaderBookmarks } from "@/components/reader/reader-bookmarks";
 import { ProgressBar } from "@/components/reader/progress-bar";
 import { SearchPanel } from "@/components/reader/search-panel";
 import {
@@ -19,14 +20,16 @@ import {
   novelsApi,
   type Novel,
   type Chapter,
+  type ReaderBookmark,
   type SelectionCoordinate,
 } from "@/lib/api";
+import { clampReaderChatWidth } from "@/lib/reader-selection";
+import { loadProgress, saveProgress } from "@/lib/reader-progress";
+import { useReaderChatLayout } from "@/hooks/use-reader-chat-layout";
 import {
-  clampReaderChatWidth,
-  loadReaderChatPresentation,
-  READER_CHAT_WIDTH_DEFAULT,
-  saveReaderChatPresentation,
-} from "@/lib/reader-selection";
+  illustrationAnchorApi,
+  type IllustrationAnchorView,
+} from "@/lib/illustration-anchor";
 import {
   ArrowLeft,
   BookOpenText,
@@ -40,41 +43,6 @@ import {
 import { BookLoader } from "@/components/book-loader";
 
 const AUTO_SCROLL_BASE_PX_PER_SECOND = 80;
-
-function getStorageKey(novelId: string): string {
-  return `novelmind:reading:${novelId}`;
-}
-
-function loadProgress(
-  novelId: string
-): { chapterId: number; chapterPercent?: number } | null {
-  try {
-    const raw = localStorage.getItem(getStorageKey(novelId));
-    if (raw) return JSON.parse(raw);
-  } catch {
-    /* ignore */
-  }
-  return null;
-}
-
-function saveProgress(
-  novelId: string,
-  chapterId: number,
-  chapterPercent: number
-): void {
-  try {
-    localStorage.setItem(
-      getStorageKey(novelId),
-      JSON.stringify({
-        chapterId,
-        chapterPercent,
-        updatedAt: Date.now(),
-      })
-    );
-  } catch {
-    /* ignore */
-  }
-}
 
 function resolveChapterFromQuery(
   chapterList: Chapter[],
@@ -98,11 +66,17 @@ function NovelReaderInner() {
   const novelId = String(params.id);
   const chapterQuery = searchParams.get("chapter");
   const fromTimeline = searchParams.get("from") === "timeline";
+  // Citation deep-link: `?chapter=<id>&start=<cp>&end=<cp>&from=timeline` must
+  // land on the exact source text after the chapter loads (Phase 29-03 / D-06).
+  const highlightStartParam = searchParams.get("start");
+  const highlightEndParam = searchParams.get("end");
 
   const [novel, setNovel] = useState<Novel | null>(null);
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [currentChapterId, setCurrentChapterId] = useState<number>(0);
   const [chapterContent, setChapterContent] = useState<Chapter | null>(null);
+  /** Phase 34-02: published illustration anchors for the current chapter. */
+  const [chapterAnchors, setChapterAnchors] = useState<IllustrationAnchorView[]>([]);
   // 桌面（≥1280）默认展开目录，窄屏默认收起
   // 惰性初始，避免 effect 同步 setState
   const [sidebarOpen, setSidebarOpen] = useState(() => {
@@ -110,6 +84,7 @@ function NovelReaderInner() {
     return window.innerWidth >= 1280;
   });
   const [searchOpen, setSearchOpen] = useState(false);
+  const [bookmarksOpen, setBookmarksOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [chapterPercent, setChapterPercent] = useState(0);
@@ -128,89 +103,27 @@ function NovelReaderInner() {
   /** 时间线定位模式：不写入阅读进度，避免污染「上次读到」 */
   const [progressWritable, setProgressWritable] = useState(!fromTimeline);
   const jumpedChapterIdRef = useRef<number | null>(null);
+  /** 书签跳转：跨章时在 loadChapter 中恢复到的章内百分比（一次性） */
+  const bookmarkJumpRef = useRef<number | null>(null);
 
-  // Phase 10 reader chat — presentation only in localStorage; truth is PostgreSQL
-  const [chatOpen, setChatOpen] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return Boolean(loadReaderChatPresentation(novelId).open);
-  });
-  const [chatCollapsed, setChatCollapsed] = useState(() => {
-    if (typeof window === "undefined") return false;
-    const saved = loadReaderChatPresentation(novelId).collapsed;
-    // 无存档时，较窄桌面（<1536px）默认收成轨道：目录 + 面板同开会挤窄正文
-    return saved ?? window.innerWidth < 1536;
-  });
-  const [chatWidthPx, setChatWidthPx] = useState(() => {
-    if (typeof window === "undefined") return READER_CHAT_WIDTH_DEFAULT;
-    const saved = loadReaderChatPresentation(novelId).panelWidthPx;
-    return clampReaderChatWidth(saved ?? READER_CHAT_WIDTH_DEFAULT);
-  });
-  const chatResizeRef = useRef<{ startX: number; startW: number } | null>(null);
+  const {
+    isDesktop,
+    chatOpen,
+    setChatOpen,
+    chatCollapsed,
+    setChatCollapsed,
+    chatWidthPx,
+    setChatWidthPx,
+    onChatResizePointerDown,
+    onChatResizePointerMove,
+    onChatResizePointerUp,
+  } = useReaderChatLayout(novelId);
   const [pendingSelection, setPendingSelection] =
     useState<SelectionCoordinate | null>(null);
   const [highlightRange, setHighlightRange] = useState<{
     sourceStart: number;
     sourceEnd: number;
   } | null>(null);
-  const [isDesktop, setIsDesktop] = useState(() => {
-    if (typeof window === "undefined") return true;
-    return window.innerWidth >= 1280;
-  });
-
-  useEffect(() => {
-    const onResize = () => setIsDesktop(window.innerWidth >= 1280);
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
-
-  // Persist chat presentation width (desktop).
-  useEffect(() => {
-    const prev = loadReaderChatPresentation(novelId);
-    saveReaderChatPresentation(novelId, {
-      ...prev,
-      open: chatOpen,
-      collapsed: chatCollapsed,
-      panelWidthPx: chatWidthPx,
-    });
-  }, [novelId, chatOpen, chatCollapsed, chatWidthPx]);
-
-  const onChatResizePointerDown = useCallback(
-    (e: React.PointerEvent<HTMLDivElement>) => {
-      e.preventDefault();
-      chatResizeRef.current = { startX: e.clientX, startW: chatWidthPx };
-      const target = e.currentTarget;
-      target.setPointerCapture(e.pointerId);
-      document.body.style.cursor = "col-resize";
-      document.body.style.userSelect = "none";
-    },
-    [chatWidthPx]
-  );
-
-  const onChatResizePointerMove = useCallback(
-    (e: React.PointerEvent<HTMLDivElement>) => {
-      const drag = chatResizeRef.current;
-      if (!drag) return;
-      // Dragging the left handle: move left → wider panel.
-      const delta = drag.startX - e.clientX;
-      setChatWidthPx(clampReaderChatWidth(drag.startW + delta));
-    },
-    []
-  );
-
-  const onChatResizePointerUp = useCallback(
-    (e: React.PointerEvent<HTMLDivElement>) => {
-      if (!chatResizeRef.current) return;
-      chatResizeRef.current = null;
-      try {
-        e.currentTarget.releasePointerCapture(e.pointerId);
-      } catch {
-        /* ignore */
-      }
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
-    },
-    []
-  );
 
   useEffect(() => {
     saveReaderPreferences(preferences);
@@ -318,16 +231,49 @@ function NovelReaderInner() {
         const res = await novelsApi.getChapter(novelId, String(currentChapterId));
         setChapterContent(res.data);
 
+        // Phase 34-02: published reader-visible anchors for this chapter. The
+        // reader re-verifies each anchor hash against the current text before
+        // rendering an approved asset; a fetch failure degrades to no anchors.
+        try {
+          const anchorsRes = await illustrationAnchorApi.list(novelId);
+          setChapterAnchors(
+            anchorsRes.data.items.filter(
+              (a) => a.chapter_id === currentChapterId
+            )
+          );
+        } catch {
+          setChapterAnchors([]);
+        }
+
+        // Citation deep-link (from Analysis Chat / timeline): highlight the
+        // exact code-point range once the target chapter is loaded.
+        if (fromTimeline && highlightStartParam != null && highlightEndParam != null) {
+          const s = Number(highlightStartParam);
+          const e = Number(highlightEndParam);
+          if (Number.isFinite(s) && Number.isFinite(e) && e > s && e <= (res.data.content?.length ?? 0)) {
+            setHighlightRange({ sourceStart: s, sourceEnd: e });
+            window.setTimeout(() => setHighlightRange(null), 8000);
+          }
+        }
+
         // 同章且有存档 → 恢复章内位置；新章/时间线定位章 → 从头开始
         const saved = loadProgress(novelId);
         const sameChapter = saved?.chapterId === currentChapterId;
         const pct = sameChapter ? (saved.chapterPercent ?? 0) : 0;
+        // 书签跳转优先于存档：一次性恢复书签所在章内位置
+        const jumpPct = bookmarkJumpRef.current;
+        const targetPercent =
+          jumpPct != null ? Math.min(100, Math.max(0, jumpPct)) : pct;
         const shouldRestore =
-          sameChapter &&
-          pct > 0 &&
-          (progressWritable || jumpedChapterIdRef.current !== currentChapterId);
-        setChapterPercent(pct);
-        setRestorePercent(shouldRestore ? pct : 0);
+          jumpPct != null
+            ? targetPercent > 0
+            : sameChapter &&
+              pct > 0 &&
+              (progressWritable ||
+                jumpedChapterIdRef.current !== currentChapterId);
+        if (jumpPct != null) bookmarkJumpRef.current = null;
+        setChapterPercent(targetPercent);
+        setRestorePercent(shouldRestore ? targetPercent : 0);
 
         // 不恢复时换章立刻顶到开头（instant）；布局后再顶一次，避免沿用上一章滚位
         if (!shouldRestore) {
@@ -363,7 +309,7 @@ function NovelReaderInner() {
     }
 
     loadChapter();
-  }, [currentChapterId, novelId, progressWritable]);
+  }, [currentChapterId, novelId, progressWritable, fromTimeline, highlightStartParam, highlightEndParam]);
 
   const persistProgress = useCallback(
     (chapterId: number, percent: number) => {
@@ -416,11 +362,43 @@ function NovelReaderInner() {
     }
   }, [currentChapterId, handleSelectChapter]);
 
+  /** 书签跳转：跨章则切章并在加载后恢复到书签位置；同章直接滚动 */
+  const handleNavigateBookmark = useCallback(
+    (bookmark: ReaderBookmark) => {
+      if (bookmark.chapter_id === currentChapterId) {
+        const el = scrollRef.current;
+        if (el) {
+          const max = el.scrollHeight - el.clientHeight;
+          if (max > 0) {
+            el.scrollTop = (Math.min(100, Math.max(0, bookmark.position_percent)) / 100) * max;
+          }
+        }
+        return;
+      }
+      bookmarkJumpRef.current = bookmark.position_percent;
+      handleSelectChapter(bookmark.chapter_id);
+    },
+    [currentChapterId, handleSelectChapter]
+  );
+
   const handleAskSelection = useCallback((payload: SelectionCoordinate) => {
     setPendingSelection(payload);
     setChatOpen(true);
     setChatCollapsed(false);
-  }, []);
+  }, [setPendingSelection, setChatOpen, setChatCollapsed]);
+
+  /** 智能体回合结束后刷新当前章节已发布插图锚点（可能有新发布）。 */
+  const refreshChapterAnchors = useCallback(async () => {
+    if (!currentChapterId) return;
+    try {
+      const anchorsRes = await illustrationAnchorApi.list(novelId);
+      setChapterAnchors(
+        anchorsRes.data.items.filter((a) => a.chapter_id === currentChapterId)
+      );
+    } catch {
+      setChapterAnchors([]);
+    }
+  }, [novelId, currentChapterId]);
 
   /** 沉浸模式：点按正文切换控制层；选中文本或点击交互控件时不触发 */
   const handleImmersiveSurfaceTap = useCallback(
@@ -592,6 +570,15 @@ function NovelReaderInner() {
           </div>
 
           <div className="flex items-center gap-2">
+            <ReaderBookmarks
+              novelId={novelId}
+              chapters={chapters}
+              open={bookmarksOpen}
+              onOpenChange={setBookmarksOpen}
+              onNavigate={handleNavigateBookmark}
+              currentChapterId={currentChapterId}
+              currentPercent={chapterPercent}
+            />
             <ReaderPreferencesPanel
               preferences={preferences}
               onChange={handlePreferencesChange}
@@ -669,6 +656,7 @@ function NovelReaderInner() {
               hasPrevChapter={currentIndex > 0}
               onAskSelection={handleAskSelection}
               highlightRange={highlightRange}
+              anchors={chapterAnchors}
               readingMode={preferences.mode}
               initialProgress={restorePercent}
               fontSize={preferences.fontSize}
@@ -719,6 +707,7 @@ function NovelReaderInner() {
                 pendingSelection={pendingSelection}
                 onClearSelection={() => setPendingSelection(null)}
                 onCitationNavigate={handleCitationNavigate}
+                onAnchorRefresh={() => void refreshChapterAnchors()}
               />
             </div>
           ) : null}
@@ -838,6 +827,7 @@ function NovelReaderInner() {
           pendingSelection={pendingSelection}
           onClearSelection={() => setPendingSelection(null)}
           onCitationNavigate={handleCitationNavigate}
+          onAnchorRefresh={() => void refreshChapterAnchors()}
         />
       ) : null}
 

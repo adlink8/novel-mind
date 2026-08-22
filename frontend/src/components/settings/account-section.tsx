@@ -5,6 +5,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { LoaderCircle, LogOut, UserRound } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -12,6 +13,7 @@ import { authApi, type AuthUser } from "@/lib/api";
 import { SettingsSection } from "./settings-section";
 
 export function AccountSection({ chapter }: { chapter: string }) {
+  const router = useRouter();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [userLoading, setUserLoading] = useState(true);
   const [logoutLoading, setLogoutLoading] = useState(false);
@@ -39,13 +41,14 @@ export function AccountSection({ chapter }: { chapter: string }) {
     setLogoutError(null);
     try {
       await authApi.logout();
-      // Full navigation so AuthGate re-validates session.
-      window.location.assign("/");
+      // Push + refresh so AuthGate re-validates the session on the next request.
+      router.push("/");
+      router.refresh();
     } catch {
       setLogoutError("退出失败，请重试");
       setLogoutLoading(false);
     }
-  }, []);
+  }, [router]);
 
   return (
     <SettingsSection chapter={chapter} title="账户">

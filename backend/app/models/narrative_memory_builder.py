@@ -141,6 +141,11 @@ class NarrativeMemoryBuildRun(TimestampMixin, Base):
     boundary_plan_checksum: Mapped[str | None] = mapped_column(
         String(64), nullable=True
     )
+    source_snapshot_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    resume_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    last_error_code: Mapped[str | None] = mapped_column(String(80), nullable=True)
 
 
 class NarrativeMemoryBuildStage(TimestampMixin, Base):
@@ -172,6 +177,11 @@ class NarrativeMemoryBuildStage(TimestampMixin, Base):
             f"status IN ({_quoted(BUILD_STAGE_STATUSES)})",
             name="ck_memory_build_stages_status",
         ),
+        CheckConstraint(
+            "terminal_state IS NULL OR terminal_state IN"
+            " ('completed','isolated','blocked')",
+            name="ck_memory_build_stages_terminal",
+        ),
         Index("idx_memory_build_stages_run", "run_id"),
         Index("idx_memory_build_stages_status", "run_id", "status"),
     )
@@ -191,6 +201,11 @@ class NarrativeMemoryBuildStage(TimestampMixin, Base):
     )
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="pending")
     status_reason: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    reason_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    terminal_state: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    idempotency_key: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    source_checksum: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    model_lineage: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     package_checksum: Mapped[str | None] = mapped_column(String(64), nullable=True)
     cache_key: Mapped[str | None] = mapped_column(String(128), nullable=True)
     artifact_checksum: Mapped[str | None] = mapped_column(String(64), nullable=True)
@@ -235,6 +250,15 @@ class NarrativeMemoryBuildBudgetLedger(TimestampMixin, Base):
         Integer, nullable=False, default=0, server_default="0"
     )
     settled_cost_usd: Mapped[Decimal] = mapped_column(
+        Numeric(18, 8), nullable=False, default=0, server_default="0"
+    )
+    cache_hits: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    cache_input_tokens: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    cache_cost_usd: Mapped[Decimal] = mapped_column(
         Numeric(18, 8), nullable=False, default=0, server_default="0"
     )
 
@@ -381,3 +405,35 @@ class NarrativeMemoryBuildReport(TimestampMixin, Base):
         nullable=False,
         server_default=func.now(),
     )
+
+
+class NarrativeMemoryBuildCheckpoint(TimestampMixin, Base):
+    """Append-only recovery checkpoint journal (Phase 28-01, D-04).
+
+    Every durable stage transition — terminal state, cancel, budget pause,
+    retry, or cache decision — is journaled here. Rows are never mutated or
+    deleted; crash recovery replays them to reconstruct the run's trajectory.
+    """
+
+    __tablename__ = "narrative_memory_build_checkpoints"
+    __table_args__ = (
+        CheckConstraint(
+            "terminal_state IN ('completed','isolated','blocked')",
+            name="ck_memory_build_checkpoint_terminal",
+        ),
+        Index("idx_memory_build_checkpoints_run", "run_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    run_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("narrative_memory_build_runs.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    stage_key: Mapped[str] = mapped_column(String(180), nullable=False)
+    terminal_state: Mapped[str] = mapped_column(String(24), nullable=False)
+    reason_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    attempt_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    checkpoint: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)

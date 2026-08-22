@@ -1,0 +1,88 @@
+# continue-derivative-story skill 契约（REQ-FORK-03 / REQ-FORK-06 / REQ-AGENT-02/03/04/07 / Phase 37）
+# 字段镜像 backend 注册入口（app.schemas.agent_runtime.SkillVersionRegister）。
+#
+# Phase 37 版本化 constrained derivative generation 技能：
+#   - 本技能是 Phase 37 确定性域能力（D-37-01..D-37-05：context package →
+#     budgeted candidate runner → 确定性 contradiction/consistency gate →
+#     显式 divergence override → immutable PublishedDerivativeRevision）的
+#     Agent 消费边界；允许的工具 allowlist 含 7 个只读域工具 + 2 个 action 工具
+#     （allow_divergence / publish_derivative_revision），编排绝不越出该
+#     allowlist（未知工具/白名单外调用 → fail closed）。
+#   - 本技能消费只读 branch 上下文（owner/novel/branch/fork 血缘绑定）+ 冻结
+#     context package 血缘 → 通过 action 工具请求**显式 divergence approval**
+#     （allow_divergence，payload_hash 绑定 exact draft_hash + canon_delta_hash）
+#     与**独立 publish approval**（publish_derivative_revision，绑定与前者
+#     完全相同的 draft_hash + canon_delta_hash）；Agent 输出恒为 candidate-only
+#     DraftArtifact + ContinuityReport + disabled-by-default BranchSuggestion[]。
+#   - **确定性发布属于后端**：只有确定性 revision publisher
+#     （app.services.derivative_generation.overrides.consume_publish_approval →
+#     approve_override）在独立 publish approval 批准后原子校验 approval action +
+#     相同 hash 绑定 + allow_divergence 已批准 + 完整 revalidation + 冻结候选
+#     血缘 + owner/novel/branch/fork scope，才把 approved override 物化为
+#     append-only Fanfiction Canon derivative_revision。Agent/浏览器绝不发布。
+#   - write_permissions 恒为空：Agent 不直接写任何域状态（不写 Original Canon、
+#     不写 generation/override/domain 表、不写 ApprovalRequest 决策、不写
+#     published 状态）。action 工具只创建 override + pending ApprovalRequest。
+#   - BranchSuggestion 是 disabled-by-default 候选输出（六字段：
+#     choice_text / branch_summary / triggering_conflict / canon_delta_hash /
+#     evidence_refs / enabled_by_default=false）：绝不自动 fork、不改变任何
+#     Canon/branch 状态、不能复用 allow_divergence approval（D-37-05）。
+#   - 版本由 `version` 钉住（当前 1.0.0）；每次 run 经 skill_version_id 绑定
+#     SkillVersion 血缘（run 绑定 owner/novel/branch/fork、SkillRun、ToolRuns、
+#     source/input hashes、model/runtime lineage、Artifact revision）。
+#   - 模型结构化输出走共享 26-06 normalizer + 严格 post-repair validator；
+#     normalization_actions / raw_hash / repaired_hash / warnings 保留在官方
+#     DraftArtifact 上。Agent 只产出候选——绝不发布（D-37-02/D-37-05）。
+name: continue-derivative-story
+version: 1.0.0
+description: >-
+  Phase 37 版本化 constrained derivative generation 技能（REQ-FORK-03 /
+  REQ-FORK-06 / REQ-AGENT-02/03/04/07）：给定 owner/novel/branch（可选 fork 用于
+  derivative mode）+ 冻结 context package 血缘 + 派生 continuation 意图
+  （project_id / chapter_id / intent / source snapshot 血缘 / evidence refs），
+  通过 7 个只读域工具 + 2 个 action 工具（allow_divergence /
+  publish_derivative_revision）消费 Phase 37 确定性生成域能力，产出候选
+  DraftArtifact + ContinuityReport + disabled-by-default BranchSuggestion[]
+  （candidate-only）。Action 工具只创建 override + pending Web ApprovalRequest
+  （approval 权威在 FastAPI，D-11）；只有确定性 revision publisher
+  （backend app.services.derivative_generation.overrides.consume_publish_approval）
+  在独立 publish approval 批准后原子校验 approval action + 相同 hash 绑定 +
+  allow_divergence 已批准 + 完整 revalidation + 冻结候选血缘 +
+  owner/novel/branch/fork scope，才把 approved override 物化为 append-only
+  Fanfiction Canon derivative_revision（D-37-03/D-37-04）。Agent/浏览器绝不发布；
+  Original Canon 不可变、绝不 promotion。BranchSuggestion 六字段 +
+  enabled_by_default=false，candidate-only、绝不自动 fork、不复用 divergence
+  approval（D-37-05）。未知工具/权限/血缘/schema drift/错误 owner/branch/fork/
+  approval bypass/stale revision/取消 → 一律 fail closed，无官方 Artifact 或域写入。
+allowed_tools:
+  - get_novel
+  - get_chapter
+  - search_novel_text
+  - get_timeline
+  - get_relationships
+  - get_clues
+  - get_narrative_memory
+  - allow_divergence
+  - publish_derivative_revision
+read_permissions:
+  - canon
+  - fanfiction_canon
+write_permissions: []
+forbidden_spaces:
+  - canon:original
+  - user_interpretation
+  - derivative:autosave
+  - derivative:direct_write
+  - derivative_generation:write
+  - approval_request
+  - revision_service
+budget:
+  max_calls: 40
+  max_input_tokens: 40000
+  max_output_tokens: 12000
+  max_cost_usd: "4.00"
+approval_required_for:
+  - allow_divergence
+  - publish_derivative_revision
+input_schema: ./input.schema.json
+output_schema: ./output.schema.json

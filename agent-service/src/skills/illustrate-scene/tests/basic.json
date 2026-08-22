@@ -1,0 +1,78 @@
+{
+  "description": "illustrate-scene skill-local test fixture（Phase 33 / REQ-VIS-04）：derivative 模式派生（branch + fork）下的 IllustrationRevision。review_state 恒为 candidate；Phase 33 无 ApprovalRequest / Publisher / published。",
+  "input": {
+    "novel_id": 1,
+    "branch": "derivative-branch",
+    "fork": "fork-42",
+    "scene_spec_revision_id": 10,
+    "prompt_revision_id": 20,
+    "visual_bible_version_id": 30,
+    "source_snapshot_id": "ss-1",
+    "job_key": "ill-deriv-1",
+    "provider": "mock",
+    "model": "mock-img-v1"
+  },
+  "expected_output": {
+    "type": "illustration_revision",
+    "schema_version": "illustration-revision.v1",
+    "owner_id": 1,
+    "novel_id": 1,
+    "branch": "derivative-branch",
+    "producing_skill": "illustrate-scene",
+    "producing_skill_version": "1.0.0",
+    "skill_version_id": 1,
+    "model_lineage": {
+      "provider": "fixture",
+      "model": "stub-model",
+      "revision": "stub-1"
+    },
+    "source_versions": {
+      "novel": "v1",
+      "source_snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "input_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "evidence_refs": [
+      "ev-mara-bow"
+    ],
+    "illustration_revision": {
+      "schema_version": "illustration-revision.v1",
+      "artifact_kind": "illustration_revision",
+      "revision_key": "ill-deriv-1:rev1",
+      "revision_number": 1,
+      "asset_revision_id": 9,
+      "authority_space": "derivative",
+      "fork": "fork-42",
+      "scene_spec_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "prompt_revision_id": 20,
+      "prompt_revision_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "visual_bible_revision_id": 30,
+      "visual_bible_revision_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "source_snapshot_id": "ss-1",
+      "source_snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "cutoff_chapter": 3,
+      "provider": "mock",
+      "provider_model": "mock-img-v1",
+      "provider_request_id": "mock-req-deriv",
+      "config_hash": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "generator_version": "mock-img-v1",
+      "rights_status": "cleared",
+      "consistency_verdict": "concern",
+      "fixture_set_hash": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      "budget_settled_calls": 1,
+      "budget_settled_cost_usd": "0.0448",
+      "review_state": "candidate"
+    },
+    "tool_runs": [
+      { "tool_name": "get_chapter", "calls": 1 },
+      { "tool_name": "generate_image_candidate", "calls": 1 }
+    ],
+    "status": "candidate",
+    "parent_revision": null,
+    "normalization": {
+      "raw_hash": "13579bdf13579bdf13579bdf13579bdf13579bdf13579bdf13579bdf13579bdf",
+      "repaired_hash": "13579bdf13579bdf13579bdf13579bdf13579bdf13579bdf13579bdf13579bdf",
+      "normalization_actions": [],
+      "warnings": []
+    }
+  }
+}

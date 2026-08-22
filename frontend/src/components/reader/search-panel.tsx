@@ -51,6 +51,8 @@ export function SearchPanel({
   const inputRef = useRef<HTMLInputElement>(null);
   const layerRef = useRef<HTMLElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** 竞态保护：慢的旧请求回来时丢弃，不覆盖最新查询结果。 */
+  const searchSeqRef = useRef(0);
 
   // Backdrop owns outside click; Escape still via shared layer.
   const { present, closing } = useDismissableLayer({
@@ -87,18 +89,21 @@ export function SearchPanel({
 
       setLoading(true);
       setError(null);
+      const seq = ++searchSeqRef.current;
       try {
         const res = await searchApi.inNovel(novelId, q, 10);
+        if (seq !== searchSeqRef.current) return; // 过期响应：丢弃
         setResults(res.data.results);
         setHasSearched(true);
       } catch (err: any) {
+        if (seq !== searchSeqRef.current) return; // 过期响应：丢弃
         const msg = err?.response?.data?.detail
           || err?.message
           || "搜索失败，请重试";
         setError(msg);
         setResults([]);
       } finally {
-        setLoading(false);
+        if (seq === searchSeqRef.current) setLoading(false);
       }
     },
     [novelId]

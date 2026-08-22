@@ -139,4 +139,341 @@ Key metrics:
 | master CI | **全绿**（2026-07-22 起连续红 → PR #13 五类根因修复后恢复）；分支保护 `ci-gate` required + enforce_admins | run 30204817945 |
 | 已声明豁免 | pip-audit：chromadb PYSEC-2026-311（无修复版）；npm audit `--omit=dev`（brace-expansion 5.0.8 与 eslint 链不兼容）——解除条件见 ci.yml 注释 | `.github/workflows/ci.yml` |
 | 依赖升级 | echarts 5→6.1；sharp/postcss/hono overrides；生产依赖 npm audit 0 | PR #13 |
-| Vertex/Gemini | 实验态（无测试/无文档），仅 Timeline/Clue live 调用使用 | `vertex_gemini.py` |
+| 文本模型供应商 | OpenAI、Anthropic、Gemini AI Studio、Ollama、自定义 OpenAI-compatible 共用 LiteLLM 与设置页模型配置；Vertex 专用路径已移除 | `ai_service.py`、`provider_catalog.py` |
+
+---
+
+## 2026-08-02 快照（Phase 25.2/25.3 实现并验证；snapshot: master @ 2f20a40）
+
+以下事实覆盖上文旧节中的对应记录（25.2/25.3 = Novel Agent Runtime 基础）：
+
+| 项 | 当前值 | 证据 |
+|---|---|---|
+| 25.2 Embedded Novel Agent Runtime | **VERIFIED 2026-08-02** | `25.2-VERIFICATION.md` passed（source_commit `6988ceb`） |
+| 25.3 Pi Package Compatibility & Governance | **VERIFIED 2026-08-02** | `25.3-VERIFICATION.md` passed（source_commit `e4b1c95`） |
+| 后端测试 | **195 passed**（CI 37 + agent_runtime 集成 24 + adversarial 56 + contract 83） | 2026-08-02 本机全量；unit 452 passed |
+| agent-service（Node） | **223 passed / 10 files**；tsc clean | `cd agent-service && npx vitest run` |
+| 前端测试 | **281 passed / 36 files** | `cd frontend && npm run test -q` |
+| 执行门禁 | `scripts/check_agent_runtime_execution_gate.py` PASS | gate 9/9 CI 测试 |
+| Agent 域工具 | 7 个类型化只读工具（get_novel/get_chapter/search/timeline/relationships/clues/narrative_memory），禁默认编码工具 | `backend/app/api/agent_tools.py` |
+| Agent API | `/api/agent`（skill-runs/artifacts/approval-requests）+ `/api/agent-tools` + `/api/gateway` 已挂载 | `backend/app/main.py` |
+| Skill/Artifact 持久化 | SkillRegistry/SkillVersion/SkillRun/Artifact/ArtifactRevision/NovelAgentProfile/ApprovalRequest；Alembic `27approval01` head | `backend/app/models/agent_runtime.py` + `backend/migrations/versions/` |
+| MCP 隔离 | `pi-mcp-adapter@2.17.0` **ADOPT（external-tools-only）**；结果仅 `external_evidence`（`prohibited_from_canon=true`），禁止入 Canon | `agent-service/src/mcp/` + `backend/app/schemas/agent_runtime.py` |
+| Web renderer 可行性 | CitedAnswerArtifact 渲染器 + external_evidence 显示纪律；**零 `@earendil-works/pi-web-ui` 依赖**（pattern-only） | `frontend/src/components/analysis/cited-answer-artifact.tsx` + `25.3-05-FEASIBILITY.md` |
+| Web 审批 | SSE `approval_request` 帧 + approve/reject UX；FastAPI 保持唯一决策权威 | `agent-service/src/transport/sse.ts` + `frontend/src/components/analysis/approval-request-dialog.tsx` |
+| 已知环境限制 | `test_openapi_contract.py` 在 pytest 下挂起（subprocess→litellm/tiktoken 下载）；Next 16 canary dev server 编译失败（e2e 受限）；前端遗留 29 个 typecheck 错误（`creative-project-editor.tsx`/`reader-chat-budget-section.tsx`，`FanFictionChapter` 类型缺失，与 25.2/25.3 无关） | 2026-08-02 本机 |
+| 仍阻塞 | Phase 22 Nightly 3/3 未达成（0/3）；Phase 26 执行需 Phase 22 3/3 + 26-01 bootstrap gate | `.planning/STATE.md` |
+
+---
+
+## 2026-08-02/03 快照（Phase 26 实现并验证；snapshot: master @ cb071bc）
+
+以下事实覆盖上文旧节中的对应记录（Phase 26 = Question-Driven Retrieval and Evidence）：
+
+| 项 | 当前值 | 证据 |
+|---|---|---|
+| Phase 26 | **VERIFIED 2026-08-02/03** | `26-VERIFICATION.md` passed（source_commit `cb071bc`） |
+| 后端测试 | **920 passed**（unit 548 + integration/queryplan 68 + adversarial 129 + agent_runtime 60 + ci 37 + contract 78） | 独立测试子代理 2026-08-02/03 |
+| agent-service | **282 passed / 11 files**；tsc 0 errors | `cd agent-service && npx vitest run` |
+| QueryPlan | 严格契约 + 确定性 fail-closed parser + durable QueryPlanTrace（幂等重放） | `backend/app/services/queryplan/` + migration `20260801_2601` |
+| 检索适配器/融合 | 8 维度显式 availability、exact→heuristic→stable-reason 回退链、确定性 fusion | `queryplan/adapters.py` + `fusion.py` |
+| 证据物化 | leaf EvidenceRef（Unicode offset+hash）、immutable content-addressed Frozen Manifest、陈旧 hash 拒绝 | `queryplan/evidence.py` + `service.py` |
+| 共享消费者 | Reader/Analysis Chat 共享 QueryPlan 核心，保留 selection vs chapter_range anchor，暴露 trace/citation | `analysis_chat/query_adapter.py` + `test_chat_consumers.py` |
+| Agent 集成 | 版本化 answer-reading-question Skill（6 只读工具 allowlist），CitedAnswerArtifact 唯一官方输出，无 Approval/Publisher | `agent-service/src/skills/answer-reading-question/` + `test_phase_26_skill.py` |
+| 结构化输出完整性 | 保守 normalizer + 严格 post-repair 校验，零受保护字段合成，normalization trail/raw_hash/repaired_hash | `agent-service/src/structured-output/` + `structured_output_integrity.py` |
+| Alembic | 单 head `20260801_2601`；upgrade/downgrade 可逆；alembic check 零 drift | `alembic heads` |
+| 已知环境限制 | 同前：openapi subprocess 挂起、Next dev server 编译失败（e2e 受限）、live provider UAT 需 key、前端遗留 29 typecheck 错误（FanFictionChapter，与 Phase 26 无关） | 2026-08-02/03 本机 |
+| 仍阻塞 | Phase 22 Nightly 3/3 未达成（0/3）；Phase 27 执行需 Phase 22 3/3 + 26-VERIFICATION（已存在）或进一步 override | `.planning/STATE.md` |
+
+---
+
+## 2026-08-03 快照（Phase 27/28 实现并验证；snapshot: master @ a7414c5）
+
+以下事实覆盖上文旧节中的对应记录：
+
+| 项 | 当前值 | 证据 |
+|---|---|---|
+| Phase 27 Novel World Model | **VERIFIED 2026-08-03** | `27-VERIFICATION.md` passed（source_commit `0616920`） |
+| Phase 28 Whole-Book Narrative Memory | **VERIFIED 2026-08-03** | `28-VERIFICATION.md` passed（source_commit `a7414c5`） |
+| 后端测试（Phase 27/28 相关） | unit 650 + narrative_memory 157 + adversarial 223 + agent_runtime 96 + ci 37 = **1352 passed**（28 全量） | 独立测试子代理 2026-08-03 |
+| agent-service | **433 passed / 14 files**；tsc 0 errors | `cd agent-service && npx vitest run` |
+| World Model | 事件/因果边（证据门控）、角色 epistemic 历史（cutoff/POV）、实体/规则/例外、四 label authority + disclosure | `backend/app/services/world_model/` + migrations 2701/2702/2703 |
+| Narrative Memory | failure/recovery checkpoints、章节终态 + frozen manifest、语义弧/卷/全局、跨维度闭合 + 一键分析 | `backend/app/services/narrative_memory/` + migration `20260801_2801` |
+| Agent skills | answer-reading-question、propose-world-model-candidates、analyze-chapter、build-story-arc（4 skills） | `agent-service/src/skills/` |
+| Alembic | 单 head `20260801_2801` | `alembic heads` |
+| 已知环境限制 | 同前 + `test_qualification_command_pg.py` 3 失败为既有 `.venv` 路径硬编码；narrative_memory 集成套件在 Windows 需分批串行跑 | 2026-08-03 本机 |
+| 仍阻塞 | Phase 22 Nightly 3/3 未达成（0/3）；Phase 29 执行需 Phase 22 3/3 + 28-VERIFICATION（已存在）或进一步 override | `.planning/STATE.md` |
+
+---
+
+## 2026-08-03 快照（Phase 29 实现并验证，v1.2 里程碑完成；snapshot: master @ efa4f77）
+
+以下事实覆盖上文旧节中的对应记录：
+
+| 项 | 当前值 | 证据 |
+|---|---|---|
+| Phase 29 Quality Qualification | **VERIFIED 2026-08-03** | `29-VERIFICATION.md` passed（source_commit `efa4f77`） |
+| v1.2 里程碑（26–29） | **完成**（实现 + 验证） | 26/27/28/29 VERIFICATION 均 passed |
+| 后端测试 | **1197 passed**（unit 683 + integration/qualification 90 + adversarial 239 + agent_runtime 115 + ci 37） | 独立测试子代理 2026-08-03 |
+| agent-service | **491 passed / 15 files**；tsc 0 errors | `cd agent-service && npx vitest run` |
+| Reading QA | 八桶 gold set（local/cross-chapter/global/causal/character/world/no-answer/spoiler）+ 分桶评测 + 三维审计 | `backend/app/services/qualification/` + `backend/evals/reading_qa_v1.json` |
+| Browser UAT | 服务端契约 28p + e2e specs（33 tests）；citation jump/accessibility/spoiler-safe | `test_browser_contract.py` + `frontend/e2e/reader-chat-quality.spec.ts` |
+| Agent skills | 5 skills：answer-reading-question、propose-world-model-candidates、analyze-chapter、build-story-arc、evaluate-reading-skill-runs | `agent-service/src/skills/` |
+| Alembic | 单 head `20260801_2801`（Phase 29 无新 migration） | `alembic heads` |
+| 已知环境限制 | 同前：e2e Next dev server 编译失败、openapi subprocess 挂起、`.venv` 路径 3 失败、live UAT 需 provider key、前端 29 typecheck 遗留 | 2026-08-03 本机 |
+| 仍阻塞 | Phase 22 Nightly 3/3 未达成（0/3）；Phase 30 执行需 Phase 22 3/3 + 29-VERIFICATION（已存在）或进一步 override | `.planning/STATE.md` |
+
+---
+
+## 2026-08-03 快照（Phase 30 实现并验证；snapshot: master @ 67908b1）
+
+以下事实覆盖上文旧节中的对应记录：
+
+| 项 | 当前值 | 证据 |
+|---|---|---|
+| Phase 30 Visual Bible | **VERIFIED 2026-08-03** | `30-VERIFICATION.md` passed（source_commit `67908b1`） |
+| 后端测试 | **1212 passed**（unit 732 + visual_bible unit 49 + integration 22 + adversarial 239 + agent_runtime 133 + ci 37） | 独立测试子代理 2026-08-03 |
+| agent-service | **543 passed / 16 files**；tsc 0 errors | `cd agent-service && npx vitest run` |
+| 前端 | **315 passed / 39 files** | `cd frontend && npx vitest run` |
+| Visual Bible | candidate 契约（6 模型）、证据物化 + owner-scoped API、工作区 UI、review/versioning envelope、build-visual-bible skill | `backend/app/models/visual_bible.py` + `backend/app/services/visual_bible/` + `frontend/src/components/visual-bible/` |
+| Agent skills | 6 skills：answer-reading-question、propose-world-model-candidates、analyze-chapter、build-story-arc、evaluate-reading-skill-runs、build-visual-bible | `agent-service/src/skills/` |
+| Alembic | 单 head `20260801_visual_bible` | `alembic heads` |
+| 已知环境限制 | 同前：e2e Next dev server 编译失败、openapi subprocess 挂起、live UAT 需 provider key、前端 29 typecheck 遗留 | 2026-08-03 本机 |
+| 仍阻塞 | Phase 22 Nightly 3/3 未达成（0/3）；Phase 31 执行需 Phase 22 3/3 + 30-VERIFICATION（已存在）或进一步 override | `.planning/STATE.md` |
+
+---
+
+## 2026-08-03 快照（Phase 31 实现并验证；snapshot: master @ fae6b68）
+
+以下事实覆盖上文旧节中的对应记录：
+
+| 项 | 当前值 | 证据 |
+|---|---|---|
+| Phase 31 Key Scene Detection | **VERIFIED 2026-08-03** | `31-VERIFICATION.md` passed（source_commit `fae6b68`） |
+| 后端测试 | **1355 passed**（unit 786 + key_scenes unit 54 + integration 26 + adversarial 245 + agent_runtime 151 + visual_bible 22 + ci 37） | 独立测试子代理 2026-08-03 |
+| agent-service | **597 passed / 17 files**；tsc 0 errors | `cd agent-service && npx vitest run` |
+| 前端 | **330 passed / 40 files** | `cd frontend && npx vitest run` |
+| Key Scene Detection | scene 契约/边界、多信号显著性 + 多样性排序、人工审查 + 冻结 set、detect-key-scenes skill（工具 13） | `backend/app/models/key_scene.py` + `backend/app/services/key_scenes/` + `frontend/src/components/key-scenes/` |
+| Agent skills | 7 skills：answer-reading-question、propose-world-model-candidates、analyze-chapter、build-story-arc、evaluate-reading-skill-runs、build-visual-bible、detect-key-scenes | `agent-service/src/skills/` |
+| Alembic | 单 head `20260801_key_scene` | `alembic heads` |
+| 已知环境限制 | 同前：e2e Next dev server 编译失败、openapi subprocess 挂起、CI PG 残留 composite type（需 schema reset）、live UAT 需 provider key、前端 29 typecheck 遗留 | 2026-08-03 本机 |
+| 仍阻塞 | Phase 22 Nightly 3/3 未达成（0/3）；Phase 32 执行需 Phase 22 3/3 + 31-VERIFICATION（已存在）或进一步 override | `.planning/STATE.md` |
+
+---
+
+## 2026-08-03 快照（Phase 32 实现并验证；snapshot: master @ ca06706）
+
+以下事实覆盖上文旧节中的对应记录：
+
+| 项 | 当前值 | 证据 |
+|---|---|---|
+| Phase 32 Scene Spec and Prompt Compiler | **VERIFIED 2026-08-03** | `32-VERIFICATION.md` passed（source_commit `ca06706`） |
+| 后端测试 | **1443 passed**（unit 875 + scene_spec 66 + prompt_compiler 48 + adversarial 245 + agent_runtime 172 + ci 37） | 独立测试子代理 2026-08-03 |
+| agent-service | **655 passed / 18 files**；tsc 0 errors | `cd agent-service && npx vitest run` |
+| 前端 | **348 passed / 41 files** | `cd frontend && npx vitest run` |
+| Scene Spec / Prompt | SceneSpec/PromptRevision 契约、evidence-to-spec 编译器、provider 适配器、validation/preview/review、compile-scene-spec skill | `backend/app/services/scene_spec/` + `backend/app/services/prompt_compiler/` + `frontend/src/components/scene-spec/` |
+| Agent skills | 8 skills：+compile-scene-spec | `agent-service/src/skills/` |
+| Alembic | 单 head `20260801_prompt_review_events` | `alembic heads` |
+| 已知环境限制 | 同前：e2e Next dev server 编译失败、openapi subprocess 挂起、`test_postgres_migrations.py` 过期 head pin、live UAT 需 provider key、前端 29 typecheck 遗留 | 2026-08-03 本机 |
+| 仍阻塞 | Phase 22 Nightly 3/3 未达成（0/3）；Phase 33 执行需 Phase 22 3/3 + 32-VERIFICATION（已存在）或进一步 override | `.planning/STATE.md` |
+
+---
+
+## 2026-08-04 快照（Phase 33 实现并验证；snapshot: master @ 1b8a658）
+
+以下事实覆盖上文旧节中的对应记录：
+
+| 项 | 当前值 | 证据 |
+|---|---|---|
+| Phase 33 Illustration Generation & Consistency | **VERIFIED 2026-08-04** | `33-VERIFICATION.md` passed（source_commit `1b8a658`） |
+| 后端测试 | **1485 passed**（unit 927 + illustrations unit 52 + integration 30 + adversarial 251 + agent_runtime 188 + ci 37） | 独立测试子代理 2026-08-03/04 |
+| agent-service | **714 passed / 19 files**；tsc 0 errors | `cd agent-service && npx vitest run` |
+| 前端 | **367 passed / 42 files** | `cd frontend && npx vitest run` |
+| Illustration | job/asset/budget 契约、mock 生成 + durable worker + 存储、identity/style 一致性评分、review/compare/approval 工作流、illustrate-scene skill（工具 14） | `backend/app/services/illustrations/` + `frontend/src/components/illustrations/` |
+| Agent skills | 9 skills：+illustrate-scene | `agent-service/src/skills/` |
+| Alembic | 单 head `20260801_illustration_jobs` | `alembic heads` |
+| 已知环境限制 | 同前：e2e Next dev server 编译失败、openapi subprocess 挂起、live UAT 需 provider key、前端 29 typecheck 遗留 | 2026-08-04 本机 |
+| 仍阻塞 | Phase 22 Nightly 3/3 未达成（0/3）；Phase 34 执行需 Phase 22 3/3 + 33-VERIFICATION（已存在）或进一步 override | `.planning/STATE.md` |
+
+---
+
+## 2026-08-04 快照（Phase 34 实现并验证，v1.3 里程碑完成；snapshot: master @ 68819ac）
+
+以下事实覆盖上文旧节中的对应记录：
+
+| 项 | 当前值 | 证据 |
+|---|---|---|
+| Phase 34 In-Text Anchors, Reader and Export | **VERIFIED 2026-08-04** | `34-VERIFICATION.md` passed（source_commit `68819ac`） |
+| v1.3 里程碑（30–34） | **完成**（实现 + 验证） | 30/31/32/33/34 VERIFICATION 均 passed |
+| 后端测试 | **1607 passed**（unit 1002 + anchors 91 + export 24 + adversarial 251 + agent_runtime 202 + ci 37） | 独立测试子代理 2026-08-04 |
+| agent-service | **776 passed / 20 files**；tsc 0 errors | `cd agent-service && npx vitest run` |
+| 前端 | **386 passed / 44 files** | `cd frontend && npx vitest run` |
+| Illustration Anchors | hash-verified 锚点契约、响应式 reader 呈现、锚点修复、Markdown/HTML/EPUB 导出、propose-illustration-anchor skill + 确定性发布 | `backend/app/services/illustration_anchors/` + `backend/app/services/export/` + `frontend/src/components/reader/` |
+| Agent skills | 10 skills：+propose-illustration-anchor | `agent-service/src/skills/` |
+| Alembic | 单 head `20260801_illustration_anchors` | `alembic heads` |
+| 已知环境限制 | 同前：e2e Next dev server 编译失败、openapi subprocess 挂起、live UAT 需 provider key、前端 29 typecheck 遗留 | 2026-08-04 本机 |
+| 仍阻塞 | Phase 22 Nightly 3/3 未达成（0/3）；Phase 35 执行需 Phase 22 3/3 + 34-VERIFICATION（已存在）或进一步 override | `.planning/STATE.md` |
+
+---
+
+## 2026-08-04 快照（Phase 35 实现并验证；snapshot: master @ 5992c25）
+
+以下事实覆盖上文旧节中的对应记录：
+
+| 项 | 当前值 | 证据 |
+|---|---|---|
+| Phase 35 Triple Knowledge Spaces and Canon Fork | **VERIFIED 2026-08-04** | `35-VERIFICATION.md` passed（source_commit `5992c25`） |
+| 后端测试 | **1720 passed**（unit 1052 + canon_fork unit 50 + integration 43 + adversarial 329 + agent_runtime 219 + ci 37） | 独立测试子代理 2026-08-04 |
+| agent-service | **825 passed / 21 files**；tsc 0 errors | `cd agent-service && npx vitest run` |
+| 前端 | **386 passed / 44 files** | `cd frontend && npx vitest run` |
+| Canon Fork | 三空间不可混用契约、fork snapshot/cutoff、检索/引用隔离、负向污染 guard、create-canon-fork skill + 确定性 materializer | `backend/app/services/canon_fork/` + `backend/app/models/canon_space.py` |
+| Agent skills | 11 skills：+create-canon-fork | `agent-service/src/skills/` |
+| Alembic | 单 head `20260801_canon_contamination04` | `alembic heads` |
+| 已知环境限制 | 同前：e2e Next dev server 编译失败、openapi subprocess 挂起、live UAT 需 provider key、前端 29 typecheck 遗留 | 2026-08-04 本机 |
+| 仍阻塞 | Phase 22 Nightly 3/3 未达成（0/3）；Phase 36 执行继续在 35-39 override 下 | `.planning/STATE.md` |
+
+---
+
+## 2026-08-04 快照（Phase 36 实现并验证；snapshot: master @ a354a1e）
+
+以下事实覆盖上文旧节中的对应记录：
+
+| 项 | 当前值 | 证据 |
+|---|---|---|
+| Phase 36 Derivative Project and Editor | **VERIFIED 2026-08-04** | `36-VERIFICATION.md` passed（source_commit `a354a1e`） |
+| 后端测试 | **1855 passed**（unit 1063 + derivative 全套 125 + adversarial 391 + agent_runtime 239 + ci 37） | 独立测试子代理 2026-08-04 |
+| agent-service | **875 passed / 22 files**；tsc 0 errors | `cd agent-service && npx vitest run` |
+| 前端 | **404 passed / 46 files** | `cd frontend && npx vitest run` |
+| Derivative Editor | owner-scoped 项目 CRUD、章节规划 + Markdown 编辑器、autosave CAS/history/diff/rollback、浏览器 UAT + gate、edit-derivative-story skill + 确定性 Revision Service | `backend/app/services/derivative_editor/` + `frontend/src/components/writing/` |
+| Agent skills | 12 skills：+edit-derivative-story | `agent-service/src/skills/` |
+| Alembic | 单 head `20260801_derivative_agent_edit01` | `alembic heads` |
+| 已知环境限制 | 同前：e2e Next dev server 编译失败、openapi subprocess 挂起、`test_agent_tools.py` contract 32 既有失败、前端 29 typecheck 遗留 | 2026-08-04 本机 |
+| 仍阻塞 | Phase 22 Nightly 3/3 未达成（0/3）；Phase 37 执行继续在 35-39 override 下 | `.planning/STATE.md` |
+
+---
+
+## 2026-08-04 快照（Phase 37 实现并验证；snapshot: master @ b8594e3）
+
+以下事实覆盖上文旧节中的对应记录：
+
+| 项 | 当前值 | 证据 |
+|---|---|---|
+| Phase 37 Constrained Generation | **VERIFIED 2026-08-04** | `37-VERIFICATION.md` passed（source_commit `b8594e3`） |
+| 后端测试 | **2059 passed**（unit 1171 + derivative_generation 108 + 集成 30 + adversarial 451 + agent_runtime 263 + ci 37） | 独立测试子代理 2026-08-04 |
+| agent-service | **927 passed / 23 files**；tsc 0 errors | `cd agent-service && npx vitest run` |
+| 前端 | **404 passed / 46 files** | `cd frontend && npx vitest run` |
+| Constrained Generation | context package 编译器、约束草稿生成 runner、一致性 gates + BranchSuggestion、显式分歧 override、continue-derivative-story skill | `backend/app/services/derivative_generation/` |
+| Agent skills | 13 skills：+continue-derivative-story | `agent-service/src/skills/` |
+| Alembic | 单 head `20260802_derivative_override01` | `alembic heads` |
+| 已知环境限制 | 同前：e2e Next dev server 编译失败、openapi subprocess 挂起、agent_runtime 需 `-o timeout=600`、前端 29 typecheck 遗留 | 2026-08-04 本机 |
+| 仍阻塞 | Phase 22 Nightly 3/3 未达成（0/3）；Phase 38 执行继续在 35-39 override 下 | `.planning/STATE.md` |
+
+---
+
+## 2026-08-05 快照（Phase 38 实现并验证；snapshot: master @ fad8978）
+
+以下事实覆盖上文旧节中的对应记录：
+
+| 项 | 当前值 | 证据 |
+|---|---|---|
+| Phase 38 Derivative Visual Consistency | **VERIFIED 2026-08-05** | `38-VERIFICATION.md` passed（source_commit `fad8978`） |
+| 后端测试 | **2157 passed**（unit 1214 + derivative 10-file 集成 121 + adversarial 500 + agent_runtime 285 + ci 37） | 独立测试子代理 2026-08-05 |
+| agent-service | **974 passed / 24 files**；tsc 0 errors | `cd agent-service && npx vitest run` |
+| 前端 | **416 passed / 47 files** | `cd frontend && npm test` |
+| Derivative Visual Consistency | fork Visual Bible schema/lineage/不可变 Original 边界、derivative Scene Spec compiler + 8 gates、candidate 资产存储 + 跨章一致性 + PublishedDerivativeVisualAsset DTO/query、review seam/UI 面板、illustrate-derivative-scene skill + publish_derivative_visual action | `backend/app/services/derivative_visual/` + `frontend/src/components/writing/visual-review-panel.tsx` |
+| Agent skills | 14 skills：+illustrate-derivative-scene；facade TOOL_NAMES 20→21 | `agent-service/src/skills/` |
+| Alembic | 单 head `20260802_derivative_asset01` | `alembic heads` |
+| 已知环境限制 | 同前：e2e Next dev server 编译失败（38-04 e2e 6 用例 route-mock 可解析）、openapi subprocess 挂起、agent_runtime 需 `-o timeout=600`、前端 39 typecheck 遗留（新增文件 0 错误） | 2026-08-05 本机 |
+| 已修复 stale 断言 | `test_derivative_visual_schema` downgrade 目标改为 `20260802_derivative_override01`；`test_derivative_editor_gate` no-publish 检查限定浏览器编辑器表面（排除 approval-gated agent-tools action 域） | commit `fad8978`，7p/8p 复验通过 |
+| 仍阻塞 | Phase 22 Nightly 3/3 未达成（0/3）；Phase 39 执行继续在 35-39 override 下 | `.planning/STATE.md` |
+
+---
+
+## 2026-08-05 快照（Phase 39 实现并验证；snapshot: master @ c21c9e0）
+
+以下事实覆盖上文旧节中的对应记录：
+
+| 项 | 当前值 | 证据 |
+|---|---|---|
+| Phase 39 Derivative Export Closeout | **VERIFIED 2026-08-05** | `39-VERIFICATION.md` passed（source_commit `c21c9e0`） |
+| 后端测试 | **2229 passed**（unit 1258 + derivative export 集成/security 76 + adversarial 550 + agent_runtime 308 + ci 37） | 独立测试子代理 2026-08-05 |
+| agent-service | **1020 passed**；tsc 0 errors | `cd agent-service && npx vitest run` |
+| 前端 | **429 passed / 48 files** | `cd frontend && npm test` |
+| Derivative Export Closeout | 可重现 Markdown/EPUB export（frozen ExportSnapshot）、bounded provenance package、export browser UAT 面板、prepare-export skill + approve_export/materialize_export action、独立 audit gate（lineage 10 项 + REQ-SHIP-01 基线，qualified_candidate/blocked 无 promotion path） | `backend/app/services/derivative_export/` + `frontend/src/components/writing/export-panel.tsx` |
+| Agent skills | 15 skills：+prepare-export；facade TOOL_NAMES 21→23 | `agent-service/src/skills/` |
+| Alembic | 单 head `20260802_derivative_asset01` | `alembic heads` |
+| 已知环境限制 | 同前：e2e Next dev server 编译失败（39-03 e2e 36 用例 route-mock 可解析）、EPUB 无 validator 显式 unverified 不标绿、openapi subprocess 挂起、agent_runtime 需 `-o timeout=600`、前端 typecheck 遗留（新增文件 0 错误） | 2026-08-05 本机 |
+| audit gate 诚实状态 | Phase 39 milestone 已交付并验证；Phase 22 0/3 + REQ-SHIP-01 基线（TLS/secret/backup/monitoring/cost budget）缺证据 → 最终 verdict 恒 blocked，永不 promotion | `39-VERIFICATION.md` |
+| 里程碑 | **v1.4 (35–39) 完成**；v1.2 (26–29) + v1.3 (30–34) + v1.4 (35–39) 全 roadmap 交付 | `.planning/STATE.md` |
+| 仍阻塞 | Phase 22 Nightly 3/3 未达成（0/3，最终发布门唯一未验证项） | `.planning/STATE.md` |
+
+## 2026-08-05 快照（Phase 40 chat_backfill 按需分析；snapshot: master @ 8ba59d3）
+
+以下事实覆盖上文旧节中的对应记录：
+
+| 项 | 当前值 | 证据 |
+|---|---|---|
+| Phase 40 问答按需分析（chat_backfill） | **已实现 2026-08-05**（用户扩展决策：问答证据不足→后台按需触发分析 skill→物化域表 candidate） | 本轮实现 + 测试 |
+| 触发链路 | reader_chat worker 产出 abstain（`uncertainty.reason_code=no_evidence`）后按 QueryDimension 映射触发对应 skill（world_projection/character_state→propose-world-model-candidates、raw_text→detect-key-scenes、relations→build-visual-bible、events/timeline→build-story-arc），每次最多 2 个；SkillRun 增 `origin=chat_backfill` + `backfill_dimension` + `user_message_id` + 部分唯一索引防在途重复 | `backend/app/services/agent_runtime/backfill.py` + `worker.py` |
+| poller 端点 | `GET /api/agent/queued-runs` + `POST /api/agent/queued-runs/{id}/claim`（gateway token 认证、原子 queued→running + lease reclaim + 铸造 internal_token）；finalize/cancel 放宽为 `require_agent_actor` | `backend/app/api/agent.py` |
+| agent-service poller | `poller.ts`：轮询 + claim + 复用 session.prompt + finalize（internal token 认证），并发上限、lease reclaim、conflict 静默；`startServer` 启停 | `agent-service/src/poller.ts` |
+| 物化 | `materialize.py`：finalize 成功后 background task 按 artifact.type 记录物化结果；digest 类型（chapter_analysis/story_arc）诚实 skipped，不自动 promotion（域表 candidate 写入依赖既有 gate 前提） | `backend/app/services/agent_runtime/materialize.py` |
+| 前端 | MessageView 增 `backfill_runs`，analysis-chat-panel 渲染「后台分析中/完成」chip | `conversations.py` + `analysis-chat-panel.tsx` |
+| Alembic | 单 head `085fffd58ee9`（down=当前 head `20260802_derivative_asset01`） | `alembic heads` |
+| 后端测试 | 新增 11p unit（backfill 映射/去重）+ 6p integration（poller 端点/claim/materializer，CI PG）；既有 agent 回归 295p + agent_runtime 37p 无回归 | `pytest` |
+| agent-service | **1028 passed**；tsc 0 errors（新增 poller 2p） | `cd agent-service && npx vitest run` |
+| 前端 | **428 passed / 47 files**；tsc 干净 | `cd frontend && npm test` |
+| 端到端验证 | poller 自动发现 queued run → claim（queued→running）→ 执行（Gemini 分析，耗时 >3min 因模型调用，链路本身正常） | 本机实测 |
+| 物化闭环（第二层） | **已实现 2026-08-05**：skill 产物真正写进域表 candidate 行（key_scene_sets/candidates/evidence_ranges、world_model_knowledge、visual_bible_versions），并接线检索（reader_chat.fetch_knowledge_evidence + queryplan world_projection resolver）让下一轮问答可见 candidate 证据（带 candidate:True 标记） | materializers.py + retrieval.py + context.py |
+| 边界诚实说明 | 物化只写域表 candidate（review_state/epistemic_status=candidate，gate_status=passed 仅表示确定性 gate 通过）；**candidate → available/published 仍需现有用户审批**（key_scene:approve / VisualBibleReview / EpistemicGate approval），符合「无自动 promotion」契约；digest 类型（analyze-chapter/story-arc）诚实 skipped 不写域表 | 本轮设计 |
+| 仍阻塞 | Phase 22 Nightly 3/3 未达成（0/3，最终发布门唯一未验证项） | `.planning/STATE.md` |
+
+---
+
+## 2026-08-06 快照（Agent 自动路由闭环 + 统一 AI 助手；snapshot: master @ 8c21c5c）
+
+以下事实覆盖上文旧节中的对应记录：
+
+| 项 | 当前值 | 证据 |
+|---|---|---|
+| Agent 自动路由闭环 | **已实现 2026-08-06**：question→intent→skill 启发式路由，无命中回退 answer-reading-question；**契约恢复**：AGENT-RUNTIME-CONTRACT「The Agent selects versioned Skills」——用户不选 skill，AI 自动路由 | commit `e9f4acd` + `8c21c5c` |
+| 意图路由服务 | `backend/app/services/agent_runtime/skill_router.py`：5 类意图（画图/关系/性格/关键场景/续写）+ 维度可用性补充信号；`route_question_to_skill` 最多 2 skill，同一 skill 去重；无任何命中回退 `answer-reading-question` | `skill_router.py` |
+| route-skill 端点 | `POST /api/agent/novels/{id}/route-skill`：按 owner+novel 过滤 active skill，返回 `{skills, primary, question_hash, input_anchor}`；无 active 命中回退 answer-reading-question；路由是服务端决策，不作为对用户的技能建议 | `backend/app/api/agent.py:159` |
+| 锚点自动补全 | `resolve_skill_input_anchors`：生图 skill（illustrate-scene）自动从最新**已批准** PromptRevision 血缘解析 prompt_revision_id/visual_bible_version_id/scene_spec_revision_id/source_snapshot_id + 幂等 job_key（`auto-<uuid>`）；无已批准 PromptRevision 或血缘不完整→诚实失败不伪造锚 | `skill_router.py:134` |
+| SSE 自动路由 | agent-service `server.ts`：SSE run body.skill 缺省→调 route-skill 自动路由；显式 body.skill 仅高级覆盖；锚字段只注入 schema 允许的字段（additionalProperties:false 防 422） | `agent-service/src/server.ts:425` |
+| 统一 AI 助手 | 分析页 `AnalysisUnifiedChat`（统一对话窗口，取代 chat/agent 双 tab）+ 阅读页侧边栏 AI 助手（reader-chat-panel 扩展：对话/选区画图/续写快捷入口）；**前端不暴露 skill**，Agent 自动路由 | `frontend/src/components/analysis/analysis-unified-chat.tsx` + `frontend/src/components/reader/reader-chat-panel.tsx` |
+| 真实生图 | 腾讯混元 hunyuan-image via ZCodeProxy（illustration_provider=mock\|hunyuan）；asset 281KB JPEG 端到端验证通过 | commit `8f54bae` + `backend/.env` |
+| 书签 | reader_bookmarks 模型基础上移植 | commit `32cac91` |
+| 插图 URL 修复 | 插图 asset bytes URL 双重 `/api` 前缀 → 404 修复 | commit `200a152` |
+| 端口固化 | 后端 8010 / 前端 3005 / agent 3100 / ZCodeProxy 3001（Makefile + `scripts/keep-alive.ps1`） | commit `7175168` |
+| 端到端验证 | 自动路由 5 意图 + SSE 自动执行 + 真实生图 + 锚点 + 前端 200 | 本机实测 2026-08-06 |
+| 部署注意 | agent-service 启动必须注入 `NOVELMIND_GATEWAY_TOKEN=dev-agent-gateway-token-local`（backend/.env:39 定义；Makefile `dev-agent` 已注入） | `backend/.env` + `Makefile` |
+| 后端测试 | **1305 passed** | 独立测试子代理 2026-08-06 |
+| agent-service | **1039 passed**；tsc 0 errors | `cd agent-service && npx vitest run` |
+| 前端 | **460 passed** | `cd frontend && npm test` |
+| 仍阻塞 | Phase 22 Nightly 3/3 未达成（0/3，最终发布门唯一未验证项） | `.planning/STATE.md` |
+
+---
+
+## 2026-08-11 快照（v1.5 Windows 桌面收口：证据级验证，非 release-ready；snapshot: HEAD d6bbb05 + 45-01/45-02/45-03）
+
+以下为 v1.5 桌面（Phase 41–45）的诚实收口记录。verdict 由
+`desktop/scripts/verify-release-evidence.ps1 -RequireAll` 基于校验和绑定的证据计算，
+`releaseReady=false`。**不得**将下述任何一项描述为已签署/已发布/clean-VM 通过。
+
+| 项 | 状态 | 证据 |
+|---|---|---|
+| v1.5 桌面收口 verdict | **release-blocked（releaseReady=false）**：仅在证据支持层级完成收口；clean-VM 缺失（D-45-07/D-45-09）使 REQ-DESK-10 保持发布阻塞 | `.planning/phases/45-windows-packaging-migration-and-desktop-qualification/45-VERIFICATION.md`（verifier 两遍 PASS + 删证据即 FAIL 的篡改测试） |
+| Windows 打包链 | **VERIFIED**：win-unpacked + NSIS 安装包，可复现构建（staged 1440 文件两遍一致），single-instance、无控制台、数据保留卸载；artifact 哈希与 manifest/CHECKSUMS 一致 | `desktop/dist/CHECKSUMS.SHA256` 3/3；45-01-SUMMARY.md；package 套件 21/21 |
+| 升级/恢复/卸载 | **VERIFIED**：备份优先可逆升级事务 + 默认数据保留卸载，fixture 校验和绑定；update 套件 23/23（两遍） | 45-02-SUMMARY.md |
+| 打包 UAT（本机近似） | **32/32 PASS**（win-unpacked 与 NSIS 安装版；`-RequireAll` 同）；13/13 路由、离线/杀服务 fail-closed、数据留存；**clean_vm=false，非 pristine-VM 证据** | 45-UAT.md + `desktop/tests/clean-vm/results/` |
+| Electron 安全负面审计 | **VERIFIED**：打包 release-security 套件 **17/17**（webPreferences 实读、CSP/导航/窗口/权限 deny-by-default、伪造 sender、未知/畸形/超大 payload、local-auth replay、脱敏、外部加载），dev IPC/policy 21/21 + credential/local-auth 16/16，合计 **54/54** | `.planning/phases/45-windows-packaging-migration-and-desktop-qualification/45-SECURITY.md` |
+| SBOM/证据完整性 | **VERIFIED**：`desktop/scripts/generate-sbom.ps1 -Verify` **12/12 PASS 两遍无漂移**；`runtime-manifest.json` 哈希 `cb8fa6c9…` 与 41-DECISION 一致（41 NO-GO 证据未被篡改）；staged 逐文件 re-hash 1440/34019789 字节；secret 扫描 0；记录 `unsigned=true` | `desktop/dist/release-sbom.json` |
+| 41 NO-GO 边界 | **未翻案**：41-DECISION 保持 NO-GO；仅打包已证明运行时（Electron 43.3.0 + embedded Node v24.18.1 + Next standalone）；Python/FastAPI、PostgreSQL/pgvector、vector store **未捆绑**（PREREQ-2/3/4，post-45），打包应用除 `next` 外全部 fail-closed | 41-DECISION.md + `desktop/dist/bundled-inventory.json` |
+| main 进程接线 | **未完成（post-45 前置）**：`PackagedProcessAdapter` 未接入 main 启动；UAT/安全套件经 `NOVELMIND_RENDERER_URL` seam 加载打包渲染器（同一机制） | 45-01/43-01/44-03 摘要 + 45-UAT.md Known Stubs |
+| 代码签名/发布 | **外部门（D-45-06）**：artifact 未签名（`signAndEditExecutable=false`），无 publish 段；证书获取与发布需显式授权，未执行 | electron-builder.yml + 45-SECURITY.md |
+| 仍阻塞 | Phase 22 Nightly 3/3 未达成（0/3，最终发布门唯一未验证项）；**pristine clean-VM 执行缺失（REQ-DESK-10 发布阻塞，D-45-07/D-45-09）** | `.planning/STATE.md` + 45-VERIFICATION.md |
+
+结论：v1.5 桌面在证据支持的层级收口（打包、升级、UAT 近似、安全负面、SBOM 全部通过并有
+校验和绑定证据），但**不是 release-ready**：clean-VM、签名/发布、bundled Python/PG/vector、
+main 进程打包适配器接线均为未满足的外部门或 post-45 前置，Phase 22 保持独立 0/3。

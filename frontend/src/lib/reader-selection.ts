@@ -92,7 +92,18 @@ export function rangeToChapterUtf16(
 ): { startUtf16: number; endUtf16: number; selectedText: string } | null {
   if (!root.contains(range.commonAncestorContainer)) return null;
 
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  // Phase 34-02: skip text nodes inside reader illustration figures so inline
+  // images (captions/alt are not part of the chapter text) never shift the
+  // UTF-16 coordinate accumulation.
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode(node: Node) {
+      const el = (node as Text).parentElement;
+      if (el && el.closest("[data-reader-illustration]")) {
+        return NodeFilter.FILTER_REJECT;
+      }
+      return NodeFilter.FILTER_ACCEPT;
+    },
+  });
   let utf16Cursor = 0;
   let startUtf16: number | null = null;
   let endUtf16: number | null = null;

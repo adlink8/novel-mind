@@ -17,6 +17,10 @@
 ### D-31-04 — Explicit human set
 - Human review creates an append-only decision and a frozen key-scene set; rejected candidates remain auditable.
 
+### D-31-05 — Advisory speaker/dialogue heuristic
+- A speaker/dialogue textual heuristic is an advisory signal for candidate recall and ranking only. It carries source-relative `speaker_offsets` and `dialogue_offsets`, a `confidence` value, and explicit `warnings`.
+- These heuristic offsets are diagnostic candidate metadata, not `SceneEvidenceRange` or citation refs; the signal must never become Canon, a factual claim, a citation authority, or an approval/publish reason. Missing or ambiguous attribution remains unavailable/warned rather than silently promoted.
+
 ## Agent Consumer Contract
 
 - Skill / mode: detect-key-scenes.
@@ -45,7 +49,7 @@
 
 ## Canonical References
 
-- Issue #29; `.planning/REQUIREMENTS.md` `REQ-VIS-02`; `.planning/ROADMAP.md` Phase 31.
+- Issue #29; `.planning/REQUIREMENTS.md` `REQ-VIS-02`, `REQ-VIS-06`; `.planning/ROADMAP.md` Phase 31.
 - `backend/app/services/chunking/` for chapter→scene→evidence source ranges.
 - `backend/app/services/narrative_memory/` for candidate/manifests/lineage.
 - `backend/app/services/reader_chat/retrieval.py` and `schemas/reader_chat.py` for cutoff/evidence packaging.

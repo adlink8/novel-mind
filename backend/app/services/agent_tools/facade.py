@@ -17,8 +17,21 @@
      - ``get_narrative_memory`` 响应带 ``release_status: "candidate"``（ADR-0002）。
   3. **``full_book`` 只从持久化的每本小说开关读取**
      （``novel.reading_progress["timeline_full_book"]``），绝不接受裸请求参数。
-  4. 门面**只读**（D-22）：不 import 任何领域写入/变异模块，也不构造 LLM 调用
-     （由 adversarial 静态 gate 强制）。
+  4. 门面对既有领域**只读**（D-22）：不 import 任何领域写入/变异模块。Phase 33
+     （33-05）新增唯一 action 工具 ``generate_image_candidate``——它只创建
+     **候选**生成作业（服务端 generation gate + 确定性 idempotency key，
+     D-33-01..D-33-03），绝不写 Canon / 域表 / ApprovalRequest / published
+     状态；候选资产由 durable worker 产出，审批/发布属于 Phase 34。
+     ``generate_image_candidate`` 的作业创建复用 illustrations 域确定性服务，
+     不越出候选边界。
+
+拆分说明（refactor split）：本模块保留门面本体 —— 冻结工具名表、budget hook
+类型/默认实现、``ToolFacade`` 统一执行门面（字节上限/超时/budget/错误码映射）
+与全局单例。23 个 ``_default_*`` 服务入口按功能域拆到同目录模块
+（``_defaults_reading`` / ``_defaults_analysis`` / ``_defaults_world`` /
+``_defaults_visual`` / ``_defaults_derivative`` / ``_defaults_export``），
+JSON-safe 视图助手在 ``_tool_views`` 叶模块；本模块显式 re-export 全部同名
+符号，``from app.services.agent_tools.facade import X`` 的 import surface 不变。
 """
 
 from __future__ import annotations
@@ -28,6 +41,8 @@ import json
 import logging
 from collections.abc import Awaitable, Callable
 from typing import Any
+
+from sqlalchemy import select
 
 from app.models import Novel
 from app.schemas.novel import ChapterResponse, NovelResponse
@@ -46,19 +61,83 @@ from app.services.agent_tools.errors import (
     ToolTimeoutError,
     UpstreamError,
 )
-from app.services.clues.query import build_clue_envelope
-from app.services.narrative_memory.structure_query import (
-    StructureQueryError,
-    list_versions,
-    load_structure_tree,
+from app.services.narrative_memory.structure_query import StructureQueryError
+from app.services.timeline.query import resolve_chapter_cutoff
+
+# ────────────────────────── 按功能域的默认服务入口（拆分后 re-export） ──────────────────────────
+from ._defaults_analysis import (
+    _default_get_clues,
+    _default_get_narrative_memory,
+    _default_get_relationships,
+    _default_get_timeline,
 )
-from app.services.novel_service import novel_service
-from app.services.relationships.query import relationship_graph_query_service
-from app.services.timeline.query import build_version_view, resolve_chapter_cutoff
+from ._defaults_derivative import (
+    _default_allow_divergence,
+    _default_apply_derivative_edit,
+    _default_create_canon_fork,
+    _default_publish_derivative_revision,
+    _default_publish_derivative_visual,
+)
+from ._defaults_export import _default_approve_export, _default_materialize_export
+from ._defaults_reading import (
+    _default_get_chapter,
+    _default_get_novel,
+    _default_search_novel_text,
+)
+from ._defaults_visual import (
+    _default_attach_illustration_to_text,
+    _default_generate_image_candidate,
+    _default_get_visual_bible,
+    _default_publish_illustration,
+)
+from ._defaults_world import (
+    _default_get_character_knowledge,
+    _default_get_character_state,
+    _default_get_events,
+    _default_get_evidence_span,
+    _default_get_world_rules,
+    _resolve_world_model_version,
+)
 
 logger = logging.getLogger(__name__)
 
-# 冻结的 7 个只读工具名（25.2-03 skill.yaml 的 allowed_tools 白名单镜像此表）。
+# 冻结的 16 个域工具名（25.2-03 skill.yaml 的 allowed_tools 白名单镜像此表；
+# 27-05 起加入 Phase 27 世界模型工具 get_events / get_character_state /
+# get_character_knowledge / get_world_rules / get_evidence_span；31-04 起加入
+# Phase 30 Visual Bible 只读工具 get_visual_bible；33-05 起加入 Phase 33
+# 候选生成 action 工具 generate_image_candidate——它只创建候选生成作业，
+# 绝不写 Canon / 域表 / ApprovalRequest / published 状态（D-33-01..D-33-03）；
+# 34-05 起加入 Phase 34 锚点提议 action 工具 publish_illustration /
+# attach_illustration_to_text——它们只创建候选 proposal + pending Web
+# ApprovalRequest（D-11/D-15），确定性 publisher 拥有 approved publication；
+# 35-05 起加入 Phase 35 canon fork 提议 action 工具 create_canon_fork——它只
+# 创建候选 fork + pending Web ApprovalRequest（D-11/D-15），确定性 Fork
+# materializer 拥有 approved fork 物化。
+# 36-05 起加入 Phase 36 derivative 编辑提议 action 工具 apply_derivative_edit——
+# 它只创建候选 DerivativeEditProposal + pending Web ApprovalRequest（D-11/D-15），
+# 确定性 Revision Service（apply_agent_edit）拥有 approved proposal 应用。
+# 37-05 起加入 Phase 37 derivative generation action 工具 allow_divergence /
+# publish_derivative_revision——前者只为 blocked/needs_override 候选创建显式
+# divergence override + pending Web ApprovalRequest；后者只在 allow_divergence
+# approval 批准 + 完整 revalidation 通过后为同一候选创建**独立** publish
+# ApprovalRequest（绑定相同 draft_hash + canon_delta_hash）。两者都绝不发布——
+# 确定性 revision publisher（consume_publish_approval -> approve_override）拥有
+# approved Fanfiction Canon 物化，绝不写 Original Canon。
+# 38-05 起加入 Phase 38 branch-aware derivative visual action 工具
+# publish_derivative_visual——它只为已存储 candidate asset 创建 pending Web
+# ApprovalRequest（payload_hash 绑定候选冻结血缘：asset_id/content_hash/
+# scene_spec_hash/divergence_manifest_hash/consistency_verdict/source_snapshot_hash/
+# fork_id；blocked candidate / wrong owner/branch/fork → fail closed）。绝不发布——
+# 确定性 review seam（review_candidate_asset -> apply_derivative_asset_review）拥有
+# approved published asset 物化，绝不写 Original Visual Bible。
+# 39-05 起加入 Phase 39 derivative export action 工具 approve_export /
+# materialize_export——前者为已 finalize 候选 ExportPreparationArtifact 创建
+# pending Web ApprovalRequest（payload_hash 绑定 artifact revision + 确定性
+# preparation_hash；wrong owner/branch/fork/stale hash → fail closed）；后者是
+# 确定性 materializer：只接受 approved artifact + preparation_hash 匹配的
+# approve_export ApprovalRequest，把候选 artifact 推进为 approved 并产出可复现
+# bundle（frozen manifest 复算），绝不写 Original Canon / 域表 / Artifact 状态 /
+# bundle（download 只读）。
 TOOL_NAMES: tuple[str, ...] = (
     "get_novel",
     "get_chapter",
@@ -67,6 +146,22 @@ TOOL_NAMES: tuple[str, ...] = (
     "get_relationships",
     "get_clues",
     "get_narrative_memory",
+    "get_events",
+    "get_character_state",
+    "get_character_knowledge",
+    "get_world_rules",
+    "get_evidence_span",
+    "get_visual_bible",
+    "generate_image_candidate",
+    "publish_illustration",
+    "attach_illustration_to_text",
+    "create_canon_fork",
+    "apply_derivative_edit",
+    "allow_divergence",
+    "publish_derivative_revision",
+    "publish_derivative_visual",
+    "approve_export",
+    "materialize_export",
 )
 
 # per-tool 默认字节上限（agent-service 侧同样硬编码 64 KiB，见 RESEARCH Code Examples）。
@@ -92,150 +187,33 @@ def _persisted_full_book(novel: Novel) -> bool:
     return bool((novel.reading_progress or {}).get("timeline_full_book", False))
 
 
-# ────────────────────────── 默认服务入口（按工具） ──────────────────────────
-
-
-async def _default_get_novel(db, novel_id: int):
-    return await novel_service.get_novel(db, novel_id)
-
-
-async def _default_get_chapter(db, chapter_id: int):
-    return await novel_service.get_chapter(db, chapter_id)
-
-
-async def _default_search_novel_text(
-    db,
-    *,
-    owner_id: int,
-    novel_id: int,
-    query: str,
-    mode: str,
-    top_k: int,
-) -> Any:
-    from app.services.knowledge_units.search import production_retrieval_strategy
-
-    strategy = production_retrieval_strategy()
-    outcome = await strategy.resolve_novel(
-        db,
-        owner_id=owner_id,
-        novel_id=novel_id,
-        domain_profile="fiction",
-        query=query,
-        mode=mode,
-        top_k=top_k,
-    )
-    return {
-        "results": outcome.rows,
-        "resolved_mode": outcome.resolved_mode,
-        "fallback_reason": outcome.fallback_reason,
-    }
-
-
-async def _default_get_timeline(
-    db,
-    *,
-    novel: Novel,
-    owner_id: int,
-    source: TimelineVersionSource,
-    ordering: TimelineOrdering,
-    person: str | None,
-    include_causal: bool,
-    request_full_book: bool,
-    chapter_start: int | None,
-    chapter_end: int | None,
-):
-    return await build_version_view(
-        db,
-        novel=novel,
-        owner_id=owner_id,
-        source=source,
-        ordering=ordering,
-        person=person,
-        include_causal=include_causal,
-        request_full_book=request_full_book,
-        chapter_start=chapter_start,
-        chapter_end=chapter_end,
-    )
-
-
-async def _default_get_relationships(
-    db,
-    *,
-    novel: Novel,
-    owner_id: int,
-    source: RelationshipVersionSource,
-    version_id: int | None,
-    through_chapter: int | None,
-    request_full_book: bool,
-    character_id: int | None,
-    relation_type: str | None,
-    include_provisional: bool,
-):
-    return await relationship_graph_query_service.build_graph(
-        db,
-        novel=novel,
-        owner_id=owner_id,
-        source=source,
-        version_id=version_id,
-        through_chapter=through_chapter,
-        request_full_book=request_full_book,
-        character_id=character_id,
-        relation_type=relation_type,
-        include_provisional=include_provisional,
-    )
-
-
-async def _default_get_clues(
-    db,
-    *,
-    novel: Novel,
-    owner_id: int,
-    request_full_book: bool,
-    character_id: int | None,
-    status_filter: str | None,
-) -> dict[str, Any]:
-    return await build_clue_envelope(
-        db,
-        novel=novel,
-        owner_id=owner_id,
-        request_full_book=request_full_book,
-        character_id=character_id,
-        status_filter=status_filter,
-    )
-
-
-async def _default_get_narrative_memory(
-    db,
-    *,
-    owner_id: int,
-    novel_id: int,
-    version_id: int | None,
-    view: str,
-    through_chapter: int | None,
-) -> Any:
-    if view == "versions":
-        return await list_versions(db, owner_id=owner_id, novel_id=novel_id)
-    if view == "tree":
-        if version_id is None:
-            raise InvalidInputError("narrative_memory tree 视图需要 version_id")
-        return await load_structure_tree(
-            db,
-            owner_id=owner_id,
-            novel_id=novel_id,
-            version_id=version_id,
-            through_chapter=through_chapter,
-        )
-    raise InvalidInputError(f"不支持的 narrative_memory 视图: {view!r}")
-
-
 # ────────────────────────── 门面本体 ──────────────────────────
 
 
 class ToolFacade:
-    """7 个只读工具的统一执行门面。
+    """12 个只读工具 + 11 个候选 action 工具的统一执行门面。
 
     所有强制点（字节上限 / 超时 / budget hook / 错误码映射）都在
-    ``execute`` 内完成；owner / cutoff 逻辑复用现有服务。
+    ``execute`` 内完成；owner / cutoff 逻辑复用现有服务。Phase 33 的
+    ``generate_image_candidate`` 只创建候选作业（candidate-only）；Phase 34
+    ``publish_illustration`` / ``attach_illustration_to_text`` 只创建候选
+    proposal + pending Web ApprovalRequest；Phase 35 ``create_canon_fork`` 只
+    创建候选 fork + pending Web ApprovalRequest；Phase 36
+    ``apply_derivative_edit`` 只创建候选 DerivativeEditProposal + pending Web
+    ApprovalRequest——确定性 Revision Service 拥有 approved proposal 应用。
+    Phase 37 ``allow_divergence`` / ``publish_derivative_revision`` 只创建
+    divergence override / 独立 publish ApprovalRequest（相同 hash 绑定）——
+    确定性 revision publisher（``consume_publish_approval``）拥有 approved
+    Fanfiction Canon 物化。Phase 38 ``publish_derivative_visual`` 只为已存储
+    candidate 创建 pending publish ApprovalRequest（绑定候选冻结血缘）——
+    确定性 review seam 拥有 approved published asset 物化，绝不写 Original
+    Visual Bible。Phase 39 ``approve_export`` 只为已 finalize 候选
+    ExportPreparationArtifact 创建 pending approve_export ApprovalRequest
+    （绑定 artifact revision + preparation_hash）；``materialize_export`` 是
+    确定性 materializer——只接受 approved artifact + preparation_hash 匹配的
+    approve_export approval，把候选 artifact 推进为 approved 并产出可复现
+    bundle（frozen manifest 复算），绝不写 Original Canon / 域表 / approval
+    lineage（download 只读）。
     """
 
     def __init__(
@@ -262,6 +240,44 @@ class ToolFacade:
             "get_relationships": self._get_relationships,
             "get_clues": self._get_clues,
             "get_narrative_memory": self._get_narrative_memory,
+            # Phase 27 世界模型只读工具（27-05）。
+            "get_events": self._get_events,
+            "get_character_state": self._get_character_state,
+            "get_character_knowledge": self._get_character_knowledge,
+            "get_world_rules": self._get_world_rules,
+            "get_evidence_span": self._get_evidence_span,
+            # Phase 30 Visual Bible 只读工具（31-04）。
+            "get_visual_bible": self._get_visual_bible,
+            # Phase 33 候选生成 action 工具（33-05）：只创建候选作业。
+            "generate_image_candidate": self._generate_image_candidate,
+            # Phase 34 锚点提议 action 工具（34-05）：只创建候选 proposal +
+            # pending Web ApprovalRequest；确定性 publisher 拥有 publication。
+            "publish_illustration": self._publish_illustration,
+            "attach_illustration_to_text": self._attach_illustration_to_text,
+            # Phase 35 canon fork 提议 action 工具（35-05）：只创建候选 fork +
+            # pending Web ApprovalRequest；确定性 Fork materializer 拥有 approved
+            # fork 物化。
+            "create_canon_fork": self._create_canon_fork,
+            # Phase 36 derivative 编辑提议 action 工具（36-05）：只创建候选
+            # proposal + pending Web ApprovalRequest；确定性 Revision Service
+            # 拥有 approved proposal 应用。
+            "apply_derivative_edit": self._apply_derivative_edit,
+            # Phase 37 derivative generation action 工具（37-05）：只创建
+            # divergence override / 独立 publish ApprovalRequest（相同 hash 绑定）；
+            # 确定性 revision publisher 拥有 approved Fanfiction Canon 物化。
+            "allow_divergence": self._allow_divergence,
+            "publish_derivative_revision": self._publish_derivative_revision,
+            # Phase 38 branch-aware derivative visual action 工具（38-05）：只创建
+            # pending publish ApprovalRequest（绑定候选冻结血缘）；确定性 review
+            # seam 拥有 approved published asset 物化，绝不写 Original Visual Bible。
+            "publish_derivative_visual": self._publish_derivative_visual,
+            # Phase 39 derivative export action 工具（39-05）：approve_export 只
+            # 创建 pending approve_export ApprovalRequest（绑定 artifact revision +
+            # preparation_hash）；materialize_export 是确定性 materializer——只
+            # 接受 approved artifact + preparation_hash 匹配的 approval，把候选
+            # artifact 推进为 approved 并产出可复现 bundle，绝不写 Original Canon。
+            "approve_export": self._approve_export,
+            "materialize_export": self._materialize_export,
         }
 
     # ── 公共入口 ──
@@ -355,14 +371,47 @@ class ToolFacade:
         self, *, db, novel: Novel, owner_id: int, params: dict
     ):
         svc = self._svc("search_novel_text", _default_search_novel_text)
-        return await svc(
+        top_k = int(params.get("top_k", 10))
+        # cutoff 后过滤会消耗命中配额：top_k=5 的前 5 名可能全部超 cutoff，
+        # 过滤后归零（rank 6+ 的城内命中被截断）。过取 4 倍再过滤再截断。
+        fetch_k = min(top_k * 4, 50)
+        outcome = await svc(
             db,
             owner_id=owner_id,
             novel_id=novel.id,
             query=params["query"],
             mode=params.get("mode", "auto"),
-            top_k=int(params.get("top_k", 10)),
+            top_k=fetch_k,
         )
+        # D-05 剧透边界：命中行必须按阅读 cutoff 过滤（与 get_timeline 同一
+        # 纪律；持久化 full_book 开关除外）。未过滤的超 cutoff 命中既泄露原文
+        # 片段进 transcript，又让模型拿去物化 span 时全部 beyond_cutoff 撞墙。
+        if _persisted_full_book(novel):
+            return outcome
+        cutoff = await self.cutoff_resolver(db, novel)
+        rows = list(outcome.get("results") or [])
+        if cutoff is None or not rows:
+            return outcome
+        chapter_ids = [r.get("chapter_id") for r in rows if r.get("chapter_id")]
+        if not chapter_ids:
+            return outcome
+        from app.models.novel import Chapter
+
+        numbers = (
+            await db.execute(
+                select(Chapter.id, Chapter.chapter_number).where(
+                    Chapter.id.in_(chapter_ids)
+                )
+            )
+        ).all()
+        chapter_number = {cid: num for cid, num in numbers}
+        filtered = [
+            row
+            for row in rows
+            if row.get("chapter_id") is not None
+            and chapter_number.get(row["chapter_id"], 0) <= int(cutoff)
+        ]
+        return {**outcome, "results": filtered[:top_k]}
 
     async def _get_timeline(self, *, db, novel: Novel, owner_id: int, params: dict):
         persisted_full_book = _persisted_full_book(novel)
@@ -477,6 +526,246 @@ class ToolFacade:
             "data": data,
         }
 
+    # ── Phase 27 世界模型只读工具（27-05） ──
+
+    async def _resolve_world_cutoff(self, db, novel, params) -> int:
+        """服务端截止点权威（D-05/D-07）：显式 cutoff 超限 → beyond_cutoff。
+
+        full_book 只读持久化开关（_persisted_full_book）；显式 cutoff 提供时
+        超过服务端截止点被拒绝，绝不越权到整本书。
+        """
+        persisted_full_book = _persisted_full_book(novel)
+        server_cutoff = (
+            None if persisted_full_book else await self.cutoff_resolver(db, novel)
+        )
+        explicit = params.get("cutoff")
+        if explicit is not None:
+            if server_cutoff is not None and int(explicit) > int(server_cutoff):
+                raise BeyondCutoffError(
+                    f"cutoff {explicit} 超出服务端截止点 {server_cutoff}"
+                )
+            return int(explicit)
+        return int(server_cutoff or 0)
+
+    async def _get_events(self, *, db, novel, owner_id, params):
+        svc = self._svc("get_events", _default_get_events)
+        version_id = await _resolve_world_model_version(
+            db,
+            owner_id=owner_id,
+            novel_id=novel.id,
+            version_id=params.get("version_id"),
+        )
+        cutoff = await self._resolve_world_cutoff(db, novel, params)
+        payload = await svc(
+            db,
+            owner_id=owner_id,
+            novel_id=novel.id,
+            version_id=version_id,
+            cutoff=cutoff,
+        )
+        if payload is None:
+            raise NotFoundError("world-model events not found in scope")
+        return payload
+
+    async def _get_character_state(self, *, db, novel, owner_id, params):
+        svc = self._svc("get_character_state", _default_get_character_state)
+        version_id = await _resolve_world_model_version(
+            db,
+            owner_id=owner_id,
+            novel_id=novel.id,
+            version_id=params.get("version_id"),
+        )
+        cutoff = await self._resolve_world_cutoff(db, novel, params)
+        return await svc(
+            db,
+            owner_id=owner_id,
+            novel_id=novel.id,
+            version_id=version_id,
+            subject=str(params["subject"]),
+            cutoff=cutoff,
+            pov=params.get("pov"),
+        )
+
+    async def _get_character_knowledge(self, *, db, novel, owner_id, params):
+        svc = self._svc("get_character_knowledge", _default_get_character_knowledge)
+        version_id = await _resolve_world_model_version(
+            db,
+            owner_id=owner_id,
+            novel_id=novel.id,
+            version_id=params.get("version_id"),
+        )
+        cutoff = await self._resolve_world_cutoff(db, novel, params)
+        return await svc(
+            db,
+            owner_id=owner_id,
+            novel_id=novel.id,
+            version_id=version_id,
+            subject=str(params["subject"]),
+            cutoff=cutoff,
+            pov=params.get("pov"),
+        )
+
+    async def _get_world_rules(self, *, db, novel, owner_id, params):
+        svc = self._svc("get_world_rules", _default_get_world_rules)
+        version_id = await _resolve_world_model_version(
+            db,
+            owner_id=owner_id,
+            novel_id=novel.id,
+            version_id=params.get("version_id"),
+        )
+        cutoff = await self._resolve_world_cutoff(db, novel, params)
+        return await svc(
+            db,
+            owner_id=owner_id,
+            novel_id=novel.id,
+            version_id=version_id,
+            cutoff=cutoff,
+        )
+
+    async def _get_evidence_span(self, *, db, novel, owner_id, params):
+        svc = self._svc("get_evidence_span", _default_get_evidence_span)
+        raw_hash = params.get("content_hash")
+        raw_start = params.get("source_start")
+        raw_end = params.get("source_end")
+        raw_chunk = params.get("chunk_id")
+        span = await svc(
+            db,
+            chapter_id=int(params["chapter_id"]),
+            source_start=int(raw_start) if raw_start is not None else None,
+            source_end=int(raw_end) if raw_end is not None else None,
+            content_hash=str(raw_hash) if raw_hash is not None else None,
+            chunk_id=int(raw_chunk) if raw_chunk is not None else None,
+        )
+        if span is None:
+            raise NotFoundError("章节不存在")
+        if span.get("novel_id") != novel.id:
+            raise NotFoundError("章节不存在")
+        cutoff = await self.cutoff_resolver(db, novel)
+        if cutoff is not None and int(span["chapter_number"]) > int(cutoff):
+            raise BeyondCutoffError(
+                f"章节 {span['chapter_number']} 超出当前阅读进度截止点 {cutoff}"
+            )
+        return span
+
+    async def _get_visual_bible(self, *, db, novel, owner_id, params):
+        svc = self._svc("get_visual_bible", _default_get_visual_bible)
+        payload = await svc(
+            db,
+            owner_id=owner_id,
+            novel_id=novel.id,
+            version_id=params.get("version_id"),
+            approved_only=bool(params.get("approved_only", False)),
+        )
+        if payload is None:
+            raise NotFoundError("visual bible version not found in scope")
+        return payload
+
+    async def _generate_image_candidate(self, *, db, novel, owner_id, params):
+        """创建候选生成作业（服务端 generation gate，candidate-only，D-33-01）。"""
+        svc = self._svc("generate_image_candidate", _default_generate_image_candidate)
+        return await svc(
+            db,
+            owner_id=owner_id,
+            novel_id=novel.id,
+            params=params,
+        )
+
+    async def _publish_illustration(self, *, db, novel, owner_id, params):
+        """创建候选锚点 proposal + pending Web ApprovalRequest（candidate-only，D-34-01）。"""
+        svc = self._svc("publish_illustration", _default_publish_illustration)
+        return await svc(
+            db,
+            owner_id=owner_id,
+            novel_id=novel.id,
+            params=params,
+        )
+
+    async def _attach_illustration_to_text(self, *, db, novel, owner_id, params):
+        """把锚点绑定到精确文本跨度（candidate-only；attach action 也要求 Web Approval）。"""
+        svc = self._svc(
+            "attach_illustration_to_text", _default_attach_illustration_to_text
+        )
+        return await svc(
+            db,
+            owner_id=owner_id,
+            novel_id=novel.id,
+            params=params,
+        )
+
+    async def _create_canon_fork(self, *, db, novel, owner_id, params):
+        """创建候选 canon fork + pending Web ApprovalRequest（candidate-only，D-35-03）。"""
+        svc = self._svc("create_canon_fork", _default_create_canon_fork)
+        return await svc(
+            db,
+            owner_id=owner_id,
+            novel_id=novel.id,
+            params=params,
+        )
+
+    async def _apply_derivative_edit(self, *, db, novel, owner_id, params):
+        """创建候选 derivative edit + pending Web ApprovalRequest（candidate-only，D-36-02）。"""
+        svc = self._svc("apply_derivative_edit", _default_apply_derivative_edit)
+        return await svc(
+            db,
+            owner_id=owner_id,
+            novel_id=novel.id,
+            params=params,
+        )
+
+    async def _allow_divergence(self, *, db, novel, owner_id, params):
+        """创建显式 divergence override + pending Web ApprovalRequest（candidate-only，D-37-03）。"""
+        svc = self._svc("allow_divergence", _default_allow_divergence)
+        return await svc(
+            db,
+            owner_id=owner_id,
+            novel_id=novel.id,
+            params=params,
+        )
+
+    async def _publish_derivative_revision(self, *, db, novel, owner_id, params):
+        """创建独立 publish ApprovalRequest（相同 hash 绑定；candidate-only，37-05）。"""
+        svc = self._svc(
+            "publish_derivative_revision", _default_publish_derivative_revision
+        )
+        return await svc(
+            db,
+            owner_id=owner_id,
+            novel_id=novel.id,
+            params=params,
+        )
+
+    async def _publish_derivative_visual(self, *, db, novel, owner_id, params):
+        """创建独立 publish ApprovalRequest（绑定候选冻结血缘；candidate-only，38-05）。"""
+        svc = self._svc("publish_derivative_visual", _default_publish_derivative_visual)
+        return await svc(
+            db,
+            owner_id=owner_id,
+            novel_id=novel.id,
+            params=params,
+        )
+
+    async def _approve_export(self, *, db, novel, owner_id, params):
+        """创建独立 approve_export ApprovalRequest（绑定 artifact revision +
+        preparation_hash；candidate-only，39-05）。"""
+        svc = self._svc("approve_export", _default_approve_export)
+        return await svc(
+            db,
+            owner_id=owner_id,
+            novel_id=novel.id,
+            params=params,
+        )
+
+    async def _materialize_export(self, *, db, novel, owner_id, params):
+        """确定性 materializer：只接受 approved artifact + preparation_hash 匹配的
+        approve_export approval，产出可复现 bundle（approved-only，39-05）。"""
+        svc = self._svc("materialize_export", _default_materialize_export)
+        return await svc(
+            db,
+            owner_id=owner_id,
+            novel_id=novel.id,
+            params=params,
+        )
+
 
 def _json_default(obj: Any) -> str:
     """兜底序列化：datetime / Decimal 等非 JSON 原生类型转字符串。"""
@@ -487,3 +776,53 @@ def _json_default(obj: Any) -> str:
 
 # 全局单例：API 路由与测试共用；测试可用独立实例注入 stub。
 tool_facade = ToolFacade()
+
+
+# ---------------------------------------------------------------------------
+# Lazy re-export of JSON-safe helper symbols (keeps the historical module
+# surface; these are no longer referenced inside facade.py itself).
+# ---------------------------------------------------------------------------
+
+_HELPER_EXPORTS = {
+    # world-model serializers (moved to _defaults_world)
+    "_epistemic_answer_to_json",
+    "_merge_state_answers",
+    # candidate proposal / job views (moved to _tool_views leaf)
+    "_agent_edit_proposal_view_for_tool",
+    "_anchor_proposal_view_for_tool",
+    "_fork_proposal_view_for_tool",
+    "_job_view_for_tool",
+}
+
+
+def __getattr__(name: str) -> Any:
+    if name in {"_epistemic_answer_to_json", "_merge_state_answers"}:
+        from ._defaults_world import (  # noqa: PLC0415
+            _epistemic_answer_to_json,
+            _merge_state_answers,
+        )
+
+        return {
+            "_epistemic_answer_to_json": _epistemic_answer_to_json,
+            "_merge_state_answers": _merge_state_answers,
+        }[name]
+    if name in {
+        "_agent_edit_proposal_view_for_tool",
+        "_anchor_proposal_view_for_tool",
+        "_fork_proposal_view_for_tool",
+        "_job_view_for_tool",
+    }:
+        from ._tool_views import (  # noqa: PLC0415
+            _agent_edit_proposal_view_for_tool,
+            _anchor_proposal_view_for_tool,
+            _fork_proposal_view_for_tool,
+            _job_view_for_tool,
+        )
+
+        return {
+            "_agent_edit_proposal_view_for_tool": _agent_edit_proposal_view_for_tool,
+            "_anchor_proposal_view_for_tool": _anchor_proposal_view_for_tool,
+            "_fork_proposal_view_for_tool": _fork_proposal_view_for_tool,
+            "_job_view_for_tool": _job_view_for_tool,
+        }[name]
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

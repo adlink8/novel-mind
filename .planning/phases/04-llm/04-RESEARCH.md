@@ -2,7 +2,7 @@
 
 ## Local Reference Findings
 
-The local `C:\Users\li\Desktop\数据分析` project already implements the key pattern this phase should port:
+The local `C:\Users\<user>\Desktop\数据分析` project already implements the key pattern this phase should port:
 
 ```text
 structured events

@@ -1,0 +1,65 @@
+# build-visual-bible skill 契约（REQ-VIS-01 / REQ-AGENT-02/03/04 / Phase 30）
+# 字段镜像 backend 注册入口（app.schemas.agent_runtime.SkillVersionRegister）。
+#
+# Phase 30 版本化 Visual Bible 构建技能：
+#   - 本技能是 Phase 30 确定性域能力（evidence/authority/review）的 Agent 消费
+#     边界（D-30-01..D-30-04）；允许的工具 allowlist 只含 6 个只读域工具
+#     （get_novel / get_chapter / get_evidence_span / get_character_state /
+#     get_world_rules），编排绝不越出该 allowlist（未知工具/白名单外调用 →
+#     fail closed）。reference assets 作为运行输入元数据（read_permissions:
+#     reference_assets）提供，绝不通过默认 coding / filesystem 工具读取。
+#   - write_permissions 恒为空：Agent 不直接写任何域状态（不写 Canon、不写
+#     visual bible 版本、不写 review 事件）。唯一输出通道是后端确定性
+#     finalizer 持久化的 VisualBibleArtifact（candidate-only）。
+#   - approval_required_for 声明 `visual_bible:approve`：用户批准是成为
+#     accepted visual authority 的显式、可审计状态迁移（D-30-04）。Agent 只能
+#     创建 candidate Artifact 并暂停等待审批，**不能**直接授予或伪造批准；
+#     FastAPI 与确定性 validators（evidence/rights/authority-label）保留
+#     permission / evidence / state-transition / publication 权威。除声明的
+#     审批动作外的任何 ApprovalRequest / Publisher / promotion 动作 →
+#     fail closed。
+#   - 版本由 `version` 钉住（当前 1.0.0）；每次 run 经 skill_version_id 绑定
+#     SkillVersion 血缘（run 绑定 owner/novel/branch、SkillRun、ToolRuns、
+#     input hash、source snapshot、model/runtime lineage、output Artifact
+#     revision）。
+#   - 模型结构化输出走共享 26-06 normalizer + 严格 post-repair validator；
+#     normalization_actions / raw_hash / repaired_hash / warnings 保留在官方
+#     VisualBibleArtifact 上。
+name: build-visual-bible
+version: 1.1.5
+description: >-
+  Phase 30 版本化 Visual Bible 构建技能：给定小说（owner/novel/branch +
+  cutoff + source snapshot + reference assets 元数据），通过 6 个只读域工具
+  （get_novel / get_chapter / get_evidence_span / get_character_state /
+  get_world_rules）收集证据，产出**血缘绑定**的 VisualBibleArtifact：
+  完整 VisualBibleVersionContract（entities / claims / evidence refs /
+  reference assets）作为 candidate-only 官方输出。确定性 evidence/rights/
+  authority-label validator 拥有 legality 权威；`visual_bible:approve` 用户
+  批准后版本才成为 accepted visual authority（D-30-04）。绝不进入 Canon /
+  active pointer；未知工具/权限/血缘/schema drift/错误 owner/approval
+  bypass 一律 fail closed，无官方 Artifact 或域写入。
+allowed_tools:
+  - get_novel
+  - get_chapter
+  - get_evidence_span
+  - search_novel_text
+  - get_character_state
+  - get_world_rules
+read_permissions:
+  - canon
+  - visual_bible
+  - reference_assets
+write_permissions: []
+forbidden_spaces:
+  - canon:original
+  - visual_bible:write
+  - derivative:write
+budget:
+  max_calls: 60
+  max_input_tokens: 60000
+  max_output_tokens: 12000
+  max_cost_usd: "4.00"
+approval_required_for:
+  - visual_bible:approve
+input_schema: ./input.schema.json
+output_schema: ./output.schema.json

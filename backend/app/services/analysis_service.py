@@ -12,13 +12,14 @@ import logging
 import re
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import undefer
 
 from app.models.analysis import AnalysisResult
 from app.models.chunk_build import ChunkHierarchyNode
 from app.models.novel import Chapter, Novel
+from app.models.text_chunk import TextChunk
 from app.services.ai_service import ai_service
 from app.services.chunking.pg_store import (
     create_and_persist_hierarchy_build,
@@ -64,6 +65,23 @@ async def ensure_hierarchy(
     chapters = list(chapters_result.scalars().all())
     if not chapters:
         return None
+
+    # Fail-closed (Bug 4): hierarchy builds link onto text_chunks. A committed
+    # build with 0 text_chunks produces 0 searchable chunks but a "ready" state,
+    # silently breaking retrieval. Refuse to promote such a build — the caller
+    # must run indexing first (POST /api/rag/{novel_id}/index).
+    chunk_count = (
+        await db.execute(
+            select(func.count())
+            .select_from(TextChunk)
+            .where(TextChunk.novel_id == novel.id)
+        )
+    ).scalar() or 0
+    if chunk_count == 0:
+        raise ValueError(
+            f"novel_id={novel.id} 尚无 text_chunks，无法构建层级 build；"
+            f"请先运行索引（POST /api/rag/{novel.id}/index）"
+        )
 
     payload = [
         {

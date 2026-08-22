@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#d96b42" />
+    <title>NovelMind · 离线阅读</title>
+    <style>
+      :root { color-scheme: light; font-family: system-ui, -apple-system, "PingFang SC", sans-serif; }
+      body { min-height: 100vh; margin: 0; display: grid; place-items: center; background: #f8f5ed; color: #33251d; }
+      main { width: min(90vw, 28rem); padding: 2.5rem 1.5rem; text-align: center; }
+      .mark { display: grid; place-items: center; width: 4.5rem; height: 4.5rem; margin: 0 auto 1.5rem; border-radius: 1.25rem; background: #d96b42; color: #fffaf4; font-size: 2rem; box-shadow: 0 1rem 2rem #b03a2e2e; }
+      h1 { margin: 0 0 .75rem; font-size: 1.5rem; }
+      p { margin: 0 0 1.5rem; line-height: 1.7; color: #6d584a; }
+      button { border: 0; border-radius: .75rem; padding: .75rem 1.25rem; background: #d96b42; color: white; font: inherit; cursor: pointer; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="mark" aria-hidden="true">文</div>
+      <h1>当前处于离线状态</h1>
+      <p>已缓存的内容仍可阅读。恢复网络后可重新加载最新内容。</p>
+      <button type="button" onclick="location.reload()">重新加载</button>
+    </main>
+  </body>
+</html>

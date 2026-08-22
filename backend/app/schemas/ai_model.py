@@ -7,17 +7,20 @@ AI 模型配置请求/响应 Pydantic 模型
 """
 
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
+
+
+AIModelProvider = Literal["openai", "anthropic", "gemini", "ollama", "custom"]
 
 
 class AIModelConfigCreate(BaseModel):
     """添加 AI 模型配置请求"""
 
     name: str = Field(..., min_length=1, max_length=100, description="配置名称（唯一）")
-    provider: str = Field(
-        ..., description="提供商: openai / anthropic / ollama / custom"
+    provider: AIModelProvider = Field(
+        ..., description="提供商: openai / anthropic / gemini / ollama / custom"
     )
     model_id: str = Field(
         ...,
@@ -40,7 +43,7 @@ class AIModelConfigUpdate(BaseModel):
     """更新 AI 模型配置请求（所有字段可选）"""
 
     name: Optional[str] = Field(None, min_length=1, max_length=100)
-    provider: Optional[str] = None
+    provider: Optional[AIModelProvider] = None
     model_id: Optional[str] = Field(None, min_length=1, max_length=100)
     api_key: Optional[str] = None
     base_url: Optional[str] = Field(None, max_length=500)
@@ -95,3 +98,28 @@ class AIModelTestResponse(BaseModel):
     latency_ms: int = 0  # 响应延迟（毫秒）
     response_text: Optional[str] = None  # 模型回复内容（截取前 200 字符）
     error: Optional[str] = None  # 失败时的错误信息
+
+
+class AIModelDiscoveryRequest(BaseModel):
+    """通过用户配置的提供商连接发现可用模型。"""
+
+    provider: AIModelProvider
+    base_url: str = Field(..., min_length=1, max_length=500)
+    api_key: Optional[str] = Field(None, max_length=4096)
+
+
+class AIModelDiscoveryItem(BaseModel):
+    id: str
+    name: str
+
+
+class AIModelDiscoveryResponse(BaseModel):
+    models: list[AIModelDiscoveryItem]
+
+
+class AIModelProviderProfile(BaseModel):
+    id: str
+    label: str
+    default_base_url: Optional[str] = None
+    credential_kind: str
+    credential_required: bool

@@ -21,7 +21,11 @@ def test_static_scan_excludes_reader_chat_and_promotion() -> None:
     hits = scan_builder_package_for_forbidden_capabilities()
     assert not any("import" in h and "reader_chat" in h for h in hits)
     root = Path(__file__).resolve().parents[3] / "app" / "services" / "narrative_memory"
-    for path in root.glob("builder_*.py"):
+    # Phase 28-04 split: the worker's call sites live in _worker_*.py mixins;
+    # cover them with the same static text checks as builder_*.py.
+    for path in sorted(
+        list(root.glob("builder_*.py")) + list(root.glob("_worker_*.py"))
+    ):
         source = path.read_text(encoding="utf-8")
         assert "from app.models.reader_chat" not in source
         assert "from app.services.reader_chat" not in source

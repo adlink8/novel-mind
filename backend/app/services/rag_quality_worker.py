@@ -490,10 +490,12 @@ class RagQualityWorker:
         *,
         lease_seconds: int = LEASE_SECONDS,
         secret: str = DEFAULT_SIGNING_SECRET,
+        retrieve_fn: Callable | None = None,
     ) -> None:
         self.store: QualityJobRepository = store or quality_job_store
         self.lease_seconds = lease_seconds
         self.secret = secret
+        self.retrieve_fn = retrieve_fn
 
     async def create_job(
         self,
@@ -802,7 +804,7 @@ class RagQualityWorker:
                     baseline=baseline,
                     health=health,
                     secret=self.secret,
-                    retrieve_fn=retrieve_fn,
+                    retrieve_fn=retrieve_fn or self.retrieve_fn,
                     answer_fn=answer_fn,
                     judge_fn=judge_fn,
                     stage_cache=job.stage_cache,
@@ -826,7 +828,7 @@ class RagQualityWorker:
                     baseline=baseline,
                     health=health,
                     secret=self.secret,
-                    retrieve_fn=retrieve_fn,
+                    retrieve_fn=retrieve_fn or self.retrieve_fn,
                     answer_fn=answer_fn,
                     judge_fn=judge_fn,
                     stage_cache=job.stage_cache,
@@ -953,7 +955,11 @@ class RagQualityWorker:
 
 def make_quality_worker(session: AsyncSession, **kwargs: Any) -> RagQualityWorker:
     """Factory: owner-scoped API uses session-backed QualityRun repository."""
-    return RagQualityWorker(store=QualityRunRepository(session), **kwargs)
+    from app.services.rag_quality.local_retrieval import retrieve_local
+
+    return RagQualityWorker(
+        store=QualityRunRepository(session), retrieve_fn=retrieve_local, **kwargs
+    )
 
 
 # Module singleton for scripts / offline use (in-memory only).

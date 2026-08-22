@@ -5,7 +5,7 @@
  * 状态经 useAIModels()（Zustand aiConfigStore）共享。
  */
 
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Bot,
   CheckCircle2,
@@ -30,17 +30,21 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useAIModels } from "@/hooks/use-ai-models";
-import type { AIModelConfig } from "@/lib/api";
+import {
+  aiModelsApi,
+  type AIModelConfig,
+  type AIModelDiscoveryItem,
+  type AIModelProviderProfile,
+} from "@/lib/api";
 import { SettingsSection } from "./settings-section";
 
 /** AI 服务提供商选项列表 */
-const providerOptions: { value: string; label: string }[] = [
-  { value: "vertex_google", label: "Google Cloud Vertex" },
-  { value: "gemini", label: "Google AI Studio" },
-  { value: "openai", label: "OpenAI" },
-  { value: "anthropic", label: "Anthropic" },
-  { value: "ollama", label: "Ollama" },
-  { value: "custom", label: "自定义" },
+const fallbackProviderProfiles: AIModelProviderProfile[] = [
+  { id: "custom", label: "OpenAI 兼容服务", credential_kind: "api_key", credential_required: false },
+  { id: "gemini", label: "Google AI Studio", credential_kind: "api_key", credential_required: true },
+  { id: "openai", label: "OpenAI", credential_kind: "api_key", credential_required: true },
+  { id: "anthropic", label: "Anthropic", credential_kind: "api_key", credential_required: true },
+  { id: "ollama", label: "Ollama", credential_kind: "none", credential_required: false },
 ];
 
 /** 提供商显示名称映射 */
@@ -49,9 +53,6 @@ const providerLabels: Record<string, string> = {
   anthropic: "Anthropic",
   ollama: "Ollama",
   custom: "自定义",
-  vertex_google: "Google Cloud Vertex",
-  vertex: "Google Cloud Vertex",
-  vertex_ai: "Google Cloud Vertex",
   gemini: "Google AI Studio",
   google: "Google",
 };
@@ -62,9 +63,6 @@ const providerIcons: Record<string, React.ComponentType<{ className?: string }>>
   anthropic: Sparkles,
   ollama: Gauge,
   custom: Wrench,
-  vertex_google: Sparkles,
-  vertex: Sparkles,
-  vertex_ai: Sparkles,
   gemini: Sparkles,
   google: Sparkles,
 };
@@ -95,11 +93,69 @@ export function ModelsSection({ chapter }: { chapter: string }) {
   const [formData, setFormData] = useState({
     name: "",
     model_id: "",
-    provider: "vertex_google" as AIModelConfig["provider"],
+    provider: "custom" as AIModelConfig["provider"],
     base_url: "",
     api_key: "",
   });
   const [addLoading, setAddLoading] = useState(false);
+  const [providerProfiles, setProviderProfiles] = useState(fallbackProviderProfiles);
+  const [discoveredModels, setDiscoveredModels] = useState<AIModelDiscoveryItem[]>([]);
+  const [discoveryState, setDiscoveryState] = useState<"idle" | "loading" | "error">("idle");
+
+  useEffect(() => {
+    let active = true;
+    void aiModelsApi.providers().then((response) => {
+      if (!active || response.data.length === 0) return;
+      setProviderProfiles(response.data);
+      setFormData((current) => {
+        if (current.base_url) return current;
+        const profile = response.data.find((item) => item.id === current.provider);
+        return { ...current, base_url: profile?.default_base_url ?? "" };
+      });
+    }).catch(() => {
+      // 保留内置回退，设置页仍可手工输入连接信息。
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const activeProvider = useMemo(
+    () => providerProfiles.find((item) => item.id === formData.provider),
+    [formData.provider, providerProfiles]
+  );
+
+  const handleProviderChange = useCallback(
+    (provider: AIModelConfig["provider"]) => {
+      const profile = providerProfiles.find((item) => item.id === provider);
+      setFormData((previous) => ({
+        ...previous,
+        provider,
+        base_url: profile?.default_base_url ?? "",
+        model_id: "",
+      }));
+      setDiscoveredModels([]);
+      setDiscoveryState("idle");
+    },
+    [providerProfiles]
+  );
+
+  const handleDiscoverModels = useCallback(async () => {
+    if (!formData.base_url.trim() || discoveryState === "loading") return;
+    setDiscoveryState("loading");
+    try {
+      const response = await aiModelsApi.discover({
+        provider: formData.provider,
+        base_url: formData.base_url,
+        api_key: formData.api_key || undefined,
+      });
+      setDiscoveredModels(response.data.models);
+      setDiscoveryState("idle");
+    } catch {
+      setDiscoveredModels([]);
+      setDiscoveryState("error");
+    }
+  }, [discoveryState, formData.api_key, formData.base_url, formData.provider]);
 
   /**
    * 处理添加模型
@@ -115,9 +171,12 @@ export function ModelsSection({ chapter }: { chapter: string }) {
         provider: formData.provider,
         base_url: formData.base_url || undefined,
         api_key: formData.api_key || undefined,
+        is_default: models.length === 0,
       });
       // 重置表单数据
-      setFormData({ name: "", model_id: "", provider: "vertex_google", base_url: "", api_key: "" });
+      setFormData({ name: "", model_id: "", provider: "custom", base_url: "", api_key: "" });
+      setDiscoveredModels([]);
+      setDiscoveryState("idle");
       setAddDialogOpen(false);
       fetchModels(); // 刷新模型列表
     } catch {
@@ -125,7 +184,7 @@ export function ModelsSection({ chapter }: { chapter: string }) {
     } finally {
       setAddLoading(false);
     }
-  }, [formData, addModel, fetchModels]);
+  }, [formData, models.length, addModel, fetchModels]);
 
   /** 测试模型连接 */
   const handleTestConnection = useCallback(
@@ -298,6 +357,42 @@ export function ModelsSection({ chapter }: { chapter: string }) {
               />
             </div>
 
+            {discoveredModels.length > 0 && (
+              <div className="space-y-2">
+                <label htmlFor="discovered-model" className="text-sm font-medium">
+                  已发现模型
+                </label>
+                <select
+                  id="discovered-model"
+                  aria-label="已发现模型"
+                  value={
+                    discoveredModels.some((item) => item.id === formData.model_id)
+                      ? formData.model_id
+                      : ""
+                  }
+                  onChange={(event) => {
+                    const selected = discoveredModels.find(
+                      (item) => item.id === event.target.value
+                    );
+                    if (!selected) return;
+                    setFormData((prev) => ({
+                      ...prev,
+                      model_id: selected.id,
+                      name: prev.name.trim() ? prev.name : selected.name,
+                    }));
+                  }}
+                  className="h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring/50"
+                >
+                  <option value="">选择一个模型</option>
+                  {discoveredModels.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             {/* 模型 ID 输入 */}
             <div className="space-y-2">
               <label className="text-sm font-medium">{"模型 ID"}</label>
@@ -312,19 +407,15 @@ export function ModelsSection({ chapter }: { chapter: string }) {
 
             {/* 服务提供商选择 */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">{"服务提供商"}</label>
+              <label htmlFor="model-provider" className="text-sm font-medium">{"服务提供商"}</label>
               <select
+                id="model-provider"
                 value={formData.provider}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    provider: e.target.value as AIModelConfig["provider"],
-                  }))
-                }
+                onChange={(e) => handleProviderChange(e.target.value)}
                 className="h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring/50"
               >
-                {providerOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
+                {providerProfiles.map((opt) => (
+                  <option key={opt.id} value={opt.id}>
                     {opt.label}
                   </option>
                 ))}
@@ -333,11 +424,12 @@ export function ModelsSection({ chapter }: { chapter: string }) {
 
             {/* Base URL 输入（可选，用于自定义 API 地址） */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">
+              <label htmlFor="model-base-url" className="text-sm font-medium">
                 {"Base URL"}{" "}
                 <span className="text-muted-foreground font-normal">({"可选"})</span>
               </label>
               <Input
+                id="model-base-url"
                 placeholder={"自定义 API 地址，例如：https://api.example.com/v1"}
                 value={formData.base_url}
                 onChange={(e) =>
@@ -348,18 +440,41 @@ export function ModelsSection({ chapter }: { chapter: string }) {
 
             {/* API Key 输入（可选，密码类型） */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">
+              <label htmlFor="model-api-key" className="text-sm font-medium">
                 {"API Key"}{" "}
-                <span className="text-muted-foreground font-normal">({"可选"})</span>
+                <span className="text-muted-foreground font-normal">
+                  ({activeProvider?.credential_required ? "必填" : "可选"})
+                </span>
               </label>
               <Input
+                id="model-api-key"
                 type="password"
-                placeholder={"模型服务 API Key"}
+                placeholder={
+                  activeProvider?.credential_kind === "none"
+                      ? "该供应商通常无需凭据"
+                      : `${activeProvider?.label ?? "模型服务"} API Key`
+                }
                 value={formData.api_key}
                 onChange={(e) =>
                   setFormData((prev) => ({ ...prev, api_key: e.target.value }))
                 }
               />
+            </div>
+
+            <div className="flex items-center gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => void handleDiscoverModels()}
+                disabled={!formData.base_url.trim() || discoveryState === "loading"}
+              >
+                {discoveryState === "loading" ? "获取中..." : "获取模型列表"}
+              </Button>
+              {discoveryState === "error" && (
+                <p className="text-xs text-destructive" role="alert">
+                  获取失败，请检查 URL、密钥和服务端白名单
+                </p>
+              )}
             </div>
 
             {/* 操作按钮：取消 + 添加 */}

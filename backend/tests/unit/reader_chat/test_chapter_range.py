@@ -17,6 +17,7 @@ from app.schemas.reader_chat import (
     MessageView,
 )
 from app.services.reader_chat import context as context_module
+from app.services.reader_chat import context_manifest
 from app.services.reader_chat.context import (
     MAX_RANGE_CONTEXT_CODE_POINTS,
     MAX_SELECTION_CODE_POINTS,
@@ -384,7 +385,7 @@ async def test_assemble_range_manifest_aggregates_chapters_and_filters_range(
         _retrieved(9, "hierarchy:n-after"),  # beyond effective end -> dropped
     ]
     monkeypatch.setattr(
-        context_module, "retrieve_visible_evidence", _fake_retrieval(items)
+        context_manifest, "retrieve_visible_evidence", _fake_retrieval(items)
     )
 
     manifest = await assemble_range_context_manifest(
@@ -427,7 +428,7 @@ async def test_assemble_range_manifest_aggregates_chapters_and_filters_range(
 async def test_assemble_range_manifest_rejects_forged_client_refs(monkeypatch):
     novel = SimpleNamespace(id=2, owner_id=1, reading_progress={})
     monkeypatch.setattr(
-        context_module, "retrieve_visible_evidence", _fake_retrieval([])
+        context_manifest, "retrieve_visible_evidence", _fake_retrieval([])
     )
     with pytest.raises(SelectionValidationError) as exc:
         await assemble_range_context_manifest(

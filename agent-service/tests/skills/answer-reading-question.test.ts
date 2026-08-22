@@ -1,12 +1,25 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { Value } from "typebox/value";
+import {
+  normalizeStructuredOutput,
+  canonicalHash,
+  type NormalizeContract,
+} from "../../src/structured-output/normalizer.js";
+import {
+  assertValidStructuredOutput,
+  validateNormalizedOutput,
+  StructuredOutputBlockedError,
+} from "../../src/structured-output/validator.js";
 
 /**
- * Skill-local 契约测试（25.2-07）：
+ * Skill-local 契约测试（25.2-07 / 26-05）：
  * 校验 answer-reading-question skill 包自身 —— schema 有效性、D-09 字段、只读白名单、
  * registry-valid fail-closed（未知工具/禁写/审批/叙事记忆）、双 fixture 通过 schema、
- * schema-mismatch 负面用例、取消语义。不加载 loader（25.2-05 的活），不写后端。
+ * schema-mismatch 负面用例、取消语义。26-05 增补：Phase 26 锚定/source_snapshot、
+ * normalization trail、共享 26-06 normalizer/validator 消费（无本地修复路径）与
+ * fail-closed 语义（无 ApprovalRequest/Publisher、wrong owner/version/cutoff、
+ * schema drift → 零官方写入）。不加载 loader（25.2-05 的活），不写后端。
  */
 
 const SKILL_DIR = new URL("../../src/skills/answer-reading-question/", import.meta.url);
@@ -218,6 +231,10 @@ describe("answer-reading-question skill package", () => {
         "parent_revision",
         "model_lineage",
         "source_versions",
+        "producing_skill",
+        "producing_skill_version",
+        "skill_version_id",
+        "normalization",
       ]) {
         expect(schema.properties).toHaveProperty(field);
       }
@@ -229,6 +246,57 @@ describe("answer-reading-question skill package", () => {
         "published",
         "rejected",
       ]);
+    });
+
+    it("output.schema.json 声明 26-06 normalization trail 形状（raw_hash/repaired_hash/actions/warnings）", () => {
+      const schema = readSkillJson("output.schema.json") as Record<string, any>;
+      const normalization = schema.properties.normalization;
+      expect(normalization.type).toBe("object");
+      expect(normalization.required).toEqual([
+        "raw_hash",
+        "repaired_hash",
+        "normalization_actions",
+        "warnings",
+      ]);
+      expect(normalization.properties.raw_hash.pattern).toBe("^[0-9a-f]{64}$");
+      expect(normalization.properties.repaired_hash.pattern).toBe("^[0-9a-f]{64}$");
+      // actions 每项至少 path/action/after；action 仅声明修复种类（无本地修复路径）。
+      expect(normalization.properties.normalization_actions.items.required).toEqual([
+        "path",
+        "action",
+        "after",
+      ]);
+      expect(normalization.properties.normalization_actions.items.properties.action.enum).toEqual([
+        "alias",
+        "alias_dedup",
+        "enum_canonicalize",
+        "container_shape",
+        "lineage_merge",
+      ]);
+    });
+
+    it("input.schema.json 声明 Phase 26 锚定与 source_snapshot（selection/chapter_range/branch/source_snapshot）", () => {
+      const schema = readSkillJson("input.schema.json") as Record<string, any>;
+      for (const field of ["question", "novel_id", "branch", "chapter_range", "selection", "source_snapshot"]) {
+        expect(schema.properties).toHaveProperty(field);
+      }
+      // Reader 选区锚（D-10）：仅引用定位，不携带原始选区文本。
+      expect(schema.properties.selection.required).toEqual([
+        "chapter_id",
+        "source_start",
+        "source_end",
+        "chapter_content_hash",
+      ]);
+      expect(schema.properties.selection.properties.kind.const).toBe("selection");
+      expect(schema.properties.selection.properties.chapter_content_hash.pattern).toBe(
+        "^[0-9a-f]{64}$",
+      );
+      // D-07 冻结 source snapshot 血缘。
+      expect(schema.properties.source_snapshot.required).toEqual(["snapshot_hash"]);
+      expect(schema.properties.source_snapshot.properties.snapshot_hash.pattern).toBe(
+        "^[0-9a-f]{64}$",
+      );
+      expect(schema.additionalProperties).toBe(false);
     });
   });
 
@@ -426,6 +494,319 @@ describe("answer-reading-question skill package", () => {
       expect(manifest.write_permissions).toEqual([]);
       expect(manifest.approval_required_for).toEqual([]);
       expect(validateSkillContract(manifest)).toEqual([]);
+    });
+  });
+
+  describe("Phase 26 input 锚定与 source_snapshot 正/负用例", () => {
+    const inputSchema = readSkillJson("input.schema.json");
+
+    it("Reader selection 锚合法 → 通过", () => {
+      const input = {
+        question: "阿宁在竹林里看见了谁？",
+        novel_id: 1,
+        selection: {
+          kind: "selection",
+          chapter_id: 1,
+          source_start: 0,
+          source_end: 12,
+          chapter_content_hash: "a".repeat(64),
+        },
+      };
+      expect(Value.Check(inputSchema, input)).toBe(true);
+    });
+
+    it("Analysis chapter_range 锚 + source_snapshot 合法 → 通过", () => {
+      const input = {
+        question: "第一章发生了什么？",
+        novel_id: 1,
+        chapter_range: { chapter_start: 1, chapter_end: 5 },
+        source_snapshot: {
+          snapshot_hash: "b".repeat(64),
+          dataset_lineage: "queryplan-questions-v1",
+        },
+      };
+      expect(Value.Check(inputSchema, input)).toBe(true);
+    });
+
+    it("branch 非空字符串 → 通过（owner/novel/branch 血缘绑定）", () => {
+      expect(
+        Value.Check(inputSchema, { question: "q", novel_id: 1, branch: "alt-ending" }),
+      ).toBe(true);
+    });
+
+    it("selection 的 chapter_content_hash 非 64-hex → 拒绝", () => {
+      expect(
+        Value.Check(inputSchema, {
+          question: "q",
+          novel_id: 1,
+          selection: {
+            kind: "selection",
+            chapter_id: 1,
+            source_start: 0,
+            source_end: 12,
+            chapter_content_hash: "not-a-hash",
+          },
+        }),
+      ).toBe(false);
+    });
+
+    it("source_snapshot 缺 snapshot_hash → 拒绝", () => {
+      expect(
+        Value.Check(inputSchema, {
+          question: "q",
+          novel_id: 1,
+          source_snapshot: { dataset_lineage: "queryplan-questions-v1" },
+        }),
+      ).toBe(false);
+    });
+
+    it("selection 缺 chapter_id → 拒绝", () => {
+      expect(
+        Value.Check(inputSchema, {
+          question: "q",
+          novel_id: 1,
+          selection: { source_start: 0, source_end: 5, chapter_content_hash: "c".repeat(64) },
+        }),
+      ).toBe(false);
+    });
+  });
+
+  describe("Phase 26 normalization trail 正/负用例", () => {
+    const outputSchema = readSkillJson("output.schema.json");
+    const example = readSkillJson("examples/basic.json") as { expected_output: any };
+    const trail = example.expected_output.normalization as Record<string, any>;
+
+    it("合法 normalization trail（noop 修复）→ 通过", () => {
+      expect(Value.Check(outputSchema, example.expected_output)).toBe(true);
+    });
+
+    it("带 alias/enum/container 修复动作的 trail（path/action/after）→ 通过", () => {
+      const envelope = {
+        ...example.expected_output,
+        normalization: {
+          raw_hash: "0".repeat(64),
+          repaired_hash: "0".repeat(64),
+          normalization_actions: [
+            { path: "producing_skill", action: "alias", before: "skill_name", after: "answer-reading-question", reason: "declared alias" },
+            { path: "answer.answer_blocks", action: "container_shape", before: { block_id: "b1" }, after: [{ block_id: "b1" }], reason: "declared wrap" },
+            { path: "status", action: "enum_canonicalize", before: "candidate", after: "candidate", reason: "declared enum" },
+          ],
+          warnings: ["enum canonicalization applied"],
+        },
+      };
+      expect(Value.Check(outputSchema, envelope)).toBe(true);
+    });
+
+    it("normalization 缺 raw_hash → 拒绝", () => {
+      const { raw_hash, ...broken } = trail;
+      expect(
+        Value.Check(outputSchema, { ...example.expected_output, normalization: { ...broken } }),
+      ).toBe(false);
+    });
+
+    it("normalization 的 repaired_hash 非 64-hex → 拒绝", () => {
+      expect(
+        Value.Check(outputSchema, {
+          ...example.expected_output,
+          normalization: { ...trail, repaired_hash: "short" },
+        }),
+      ).toBe(false);
+    });
+
+    it("normalization_actions 项缺 action/after → 拒绝（修复必须可审计）", () => {
+      expect(
+        Value.Check(outputSchema, {
+          ...example.expected_output,
+          normalization: {
+            ...trail,
+            normalization_actions: [{ path: "producing_skill" }],
+          },
+        }),
+      ).toBe(false);
+    });
+
+    it("normalization_actions 项 action 非声明修复种类 → 拒绝", () => {
+      expect(
+        Value.Check(outputSchema, {
+          ...example.expected_output,
+          normalization: {
+            ...trail,
+            normalization_actions: [
+              { path: "answer", action: "hallucinate_fact", after: { x: 1 } },
+            ],
+          },
+        }),
+      ).toBe(false);
+    });
+
+    it("skill schema 声明但不由它强制 normalization（权威在后端 wire 模型）", () => {
+      // 26-06 共享 validator 校验的是不含 trail 的 repaired payload；official 信封的
+      // normalization required 强制在 backend CitedAnswerArtifact（finalize 完整性门）。
+      const { normalization: _drop, ...withoutTrail } = example.expected_output;
+      expect(Value.Check(outputSchema, withoutTrail)).toBe(true);
+    });
+  });
+
+  describe("共享 26-06 normalizer/validator 消费（无本地修复路径）", () => {
+    const outputSchema = readSkillJson("output.schema.json");
+
+    /** 代表 cited_answer 信封的声明式修复契约（与 26-06 ENVELOPE_CONTRACT 同源）。 */
+    const contract: NormalizeContract = {
+      aliases: {
+        producing_skill: ["skill_name"],
+        producing_skill_version: ["skill_version"],
+      },
+      containerShapes: {
+        "answer.answer_blocks": "wrap_array",
+      },
+      lineageFields: {
+        owner_id: "ownerId",
+        novel_id: "novelId",
+        skill_version_id: "skillVersionId",
+        model_lineage: "modelLineage",
+        source_versions: "sourceVersions",
+        input_hash: "inputHash",
+        branch: "branch",
+        evidence_refs: "evidenceRefs",
+      },
+      requiredFields: [
+        "type",
+        "schema_version",
+        "producing_skill",
+        "producing_skill_version",
+        "owner_id",
+        "novel_id",
+        "skill_version_id",
+        "model_lineage",
+        "source_versions",
+        "input_hash",
+        "evidence_refs",
+        "answer",
+        "status",
+      ],
+    };
+
+    const lineage = (): Record<string, unknown> => ({
+      ownerId: 1,
+      novelId: 1,
+      skillVersionId: 1,
+      modelLineage: { provider: "fixture", model: "stub-model", revision: "stub-1" },
+      sourceVersions: { novel: "v1" },
+      inputHash: "a".repeat(64),
+      branch: null,
+      evidenceRefs: ["evidence:1"],
+    });
+
+    function rawModelOutput(): Record<string, unknown> {
+      return {
+        type: "cited_answer",
+        schema_version: "cited-answer.v1",
+        skill_name: "answer-reading-question",
+        skill_version: "1.0.0",
+        answer: {
+          answer_blocks: {
+            block_id: "b1",
+            text: "阿宁在竹林里看见了使者的身影。",
+            evidence_refs: ["evidence:1"],
+          },
+        },
+        status: "candidate",
+      };
+    }
+
+    it("alias/container 修复后 repaired payload 通过 skill output schema + 严格 validator", () => {
+      const result = normalizeStructuredOutput(rawModelOutput(), contract, lineage());
+      expect(result.status).toBe("ok");
+      const outcome = validateNormalizedOutput(result, {
+        schema: outputSchema,
+        allowedEvidenceRefs: ["evidence:1"],
+        requiredProtectedFields: ["owner_id", "novel_id", "evidence_refs", "input_hash"],
+        requireEvidenceRefs: true,
+      });
+      expect(outcome.status).toBe("valid");
+      expect(outcome.verified_raw_hash).toBe(result.raw_hash);
+      expect(outcome.verified_repaired_hash).toBe(result.repaired_hash);
+    });
+
+    it("unsafe-repair：修复路径触及受保护字段 → contract-invalid → blocked", () => {
+      const unsafe: NormalizeContract = {
+        ...contract,
+        aliases: { evidence_refs: ["refs"] }, // 受保护字段 alias 禁止
+      };
+      const result = normalizeStructuredOutput(rawModelOutput(), unsafe, lineage());
+      expect(result.status).toBe("blocked");
+      expect(result.blocked_reason).toContain("contract-invalid");
+      expect(result.repaired).toBeNull();
+    });
+
+    it("strict-validator 失败：repaired payload 被篡改（stale repaired_hash）→ blocked", () => {
+      const result = normalizeStructuredOutput(rawModelOutput(), contract, lineage());
+      expect(result.status).toBe("ok");
+      (result.repaired as Record<string, unknown>).status = "published";
+      const outcome = validateNormalizedOutput(result, { schema: outputSchema });
+      expect(outcome.status).toBe("blocked");
+      expect(outcome.errors.join(";")).toContain("stale repaired_hash");
+    });
+
+    it("assertValidStructuredOutput 抛 StructuredOutputBlockedError（agent loop fail-closed）", () => {
+      const result = normalizeStructuredOutput(rawModelOutput(), contract, lineage());
+      expect(result.status).toBe("ok");
+      (result.repaired as Record<string, unknown>).status = "approved";
+      expect(() =>
+        assertValidStructuredOutput(result, { schema: outputSchema }),
+      ).toThrowError(StructuredOutputBlockedError);
+    });
+  });
+
+  describe("Phase 26 fail-closed 语义（SKILL.md / skill.yaml）", () => {
+    it("SKILL.md 声明无 ApprovalRequest / 无 Publisher / 无 promotion", () => {
+      const skill = readSkillText("SKILL.md");
+      expect(skill).toContain("ApprovalRequest");
+      expect(skill).toContain("Publisher");
+      expect(skill).toContain("approval_required_for: []");
+      expect(skill).toContain("fail closed");
+    });
+
+    it("SKILL.md 声明未知工具/白名单外调用 → fail closed", () => {
+      const skill = readSkillText("SKILL.md");
+      expect(skill).toContain("白名单外");
+      expect(skill).toContain("get_narrative_memory");
+    });
+
+    it("SKILL.md 声明 wrong owner/version/cutoff/schema drift → 稳定 blocked/cancelled 零写入", () => {
+      const skill = readSkillText("SKILL.md");
+      for (const token of ["wrong owner", "wrong skill_version", "wrong cutoff", "schema drift", "零写入"]) {
+        expect(skill).toContain(token);
+      }
+    });
+
+    it("SKILL.md 声明共享 normalizer/validator，不引入本地修复路径", () => {
+      const skill = readSkillText("SKILL.md").replace(/\s+/g, " ");
+      expect(skill).toContain("共享 26-06 normalizer");
+      expect(skill).toContain("严格 post-repair validator");
+      // 粗体包夹可能跨行断词，用去空白匹配。
+      expect(skill.replace(/\s+/g, "")).toContain("不引入任何本地修复路径");
+      expect(skill).toContain("normalization_actions");
+      expect(skill).toContain("raw_hash");
+      expect(skill).toContain("repaired_hash");
+      expect(skill).toContain("warnings");
+    });
+
+    it("SKILL.md 声明 heuristic candidate-only（无 evidence_refs → BLOCKED_NO_EVIDENCE）", () => {
+      const skill = readSkillText("SKILL.md");
+      expect(skill).toContain("BLOCKED_NO_EVIDENCE");
+      expect(skill).toContain("candidate-only");
+    });
+
+    it("skill.yaml 无任何 ApprovalRequest/Publisher 动作声明", () => {
+      const manifest = parseSkillYaml(readSkillText("skill.yaml")) as unknown as SkillManifest & {
+        publisher?: unknown;
+      };
+      // 只读契约：无审批动作、无写权限、无任何 publisher/发布动作键。
+      expect(manifest.approval_required_for).toEqual([]);
+      expect(manifest.write_permissions).toEqual([]);
+      expect("publisher" in manifest).toBe(false);
+      expect(Object.keys(manifest)).not.toContain("publish_action");
     });
   });
 });

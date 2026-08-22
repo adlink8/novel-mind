@@ -93,7 +93,7 @@ describe("agent-service run API (POST /agent/novels/{novel_id}/runs)", () => {
   function installDefaultBackendMock() {
     fetchMock.mockClear(); // 清调用记录，避免跨测试累积干扰计数断言
     fetchMock.mockImplementation((url: string, init?: RequestInit) => {
-      if (url === `${baseUrl}/api/agent/skills/answer-reading-question/versions`) {
+      if (url.includes("/versions") && init?.method === "GET") {
         return Promise.resolve(
           new Response(JSON.stringify({ items: [{ id: 5, status: "active" }], total: 1 }), {
             status: 200,
@@ -245,6 +245,49 @@ describe("agent-service run API (POST /agent/novels/{novel_id}/runs)", () => {
     expect(finalizeCalls).toHaveLength(0);
   });
 
+  it("agent_end stopReason=error → finalize POST(stop_reason=error) 先于 run_end(failed)，且无 cancel（落库防 run 永久卡 queued）", async () => {
+    installDefaultBackendMock();
+    const session = fakeSession();
+    await startServer(session);
+
+    const res = await fetch(`http://127.0.0.1:${port}/agent/novels/1/runs`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: AUTH },
+      body: JSON.stringify({ question: "阿宁在竹林里看见了谁？" }),
+    });
+    session.emit({ type: "message_update", assistantMessageEvent: { type: "text_delta", delta: "错" } });
+    // agent_end：stopReason=error（上游异常）→ 必须落库 finalize（failed + 0 artifact），
+    // 而非仅发帧——否则后端 run 全程 status='queued' 永不迁移。
+    session.finish([
+      {
+        role: "assistant",
+        stopReason: "error",
+        provider: "novelmind",
+        model: "reader-chat-default",
+        usage: { input: 5, output: 6 },
+        content: [],
+      },
+    ]);
+
+    const frames = await collectSse(res);
+    const runEnd = frames.find((f) => (f as { type: string }).type === "run_end");
+    expect(runEnd).toMatchObject({ type: "run_end", runId: "42", status: "failed", error_code: "upstream_error" });
+
+    // error → finalize POST 且 stop_reason='error'；不用 cancel（queued→cancelled 语义错误）
+    const finalizeCalls = fetchMock.mock.calls.filter(
+      (c) => String(c[0]).endsWith("/finalize") && (c[1] as RequestInit)?.method === "POST",
+    );
+    expect(finalizeCalls).toHaveLength(1);
+    const finalizeBody = JSON.parse((finalizeCalls[0][1] as RequestInit).body as string) as Record<string, unknown>;
+    expect(finalizeBody.stop_reason).toBe("error");
+    expect(finalizeBody.envelope).toEqual({});
+    // model_lineage 从 last assistant 消息透传
+    expect(finalizeBody.model_lineage).toEqual({ provider: "novelmind", model: "reader-chat-default" });
+
+    const cancelCalls = fetchMock.mock.calls.filter((c) => String(c[0]).endsWith("/cancel"));
+    expect(cancelCalls).toHaveLength(0);
+  });
+
   it("客户端断开（fetch abort）→ session.abort() + 后端 cancel POST（disconnect-cancel）", async () => {
     installDefaultBackendMock();
     const session = fakeSession();
@@ -352,5 +395,294 @@ describe("agent-service run API (POST /agent/novels/{novel_id}/runs)", () => {
     const skill = loadSkill("answer-reading-question");
     expect(skill.allowedTools).toContain("get_chapter");
     expect(skill.allowedTools).not.toContain("get_narrative_memory");
+  });
+
+  it("P1: 分析/生图 skill 经 SSE 不再被 question 注入 422（input 原样校验）", async () => {
+    installDefaultBackendMock();
+    const session = fakeSession();
+    await startServer(session);
+    const res = await fetch(`http://127.0.0.1:${port}/agent/novels/6/runs`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: AUTH },
+      body: JSON.stringify({
+        question: "为第1章生成插图",
+        skill: "illustrate-scene",
+        input: {
+          prompt_revision_id: 1,
+          visual_bible_version_id: 1,
+          scene_spec_revision_id: 1,
+          source_snapshot_id: "ss-1",
+          job_key: "p1-test",
+        },
+      }),
+    });
+    // 不再 422（question 不再注入 → schema additionalProperties:false 通过）。
+    expect(res.status).toBe(200);
+    // prompt 收到非空占位（question 缺省时用 skill 名兜底）。
+    expect(session.prompt).toHaveBeenCalled();
+    const promptCalls = session.prompt.mock.calls as unknown[];
+    expect(promptCalls.length).toBeGreaterThan(0);
+    const firstArg = (promptCalls[0] as [unknown])[0];
+    expect(String(firstArg ?? "").length).toBeGreaterThan(0);
+  });
+
+  it("body.skill 缺省 → 服务端按意图自动路由（route-skill 返回的主 skill 生效，Agent 选 skill）", async () => {
+    fetchMock.mockClear();
+    fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+      if (String(url).endsWith("/route-skill") && init?.method === "POST") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({ skills: ["detect-key-scenes"], primary: "detect-key-scenes" }),
+            { status: 200, headers: { "content-type": "application/json" } },
+          ),
+        );
+      }
+      if (String(url).includes("/versions") && init?.method === "GET") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ items: [{ id: 9, status: "active" }], total: 1 }), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          }),
+        );
+      }
+      if (String(url).endsWith("/skill-runs") && init?.method === "POST") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ run: { id: 43 }, internal_token: "tok-43" }), {
+            status: 202,
+            headers: { "content-type": "application/json" },
+          }),
+        );
+      }
+      if (String(url).endsWith("/finalize") && init?.method === "POST") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ artifact: { id: 8 } }), { status: 200 }),
+        );
+      }
+      return Promise.resolve(
+        new Response(JSON.stringify({ error: { code: "upstream_error" } }), { status: 502 }),
+      );
+    });
+
+    const session = fakeSession();
+    createSessionMock.mockReset();
+    createSessionMock.mockResolvedValue(session);
+    server = createApp({
+      fetchImpl: fetchMock as unknown as typeof fetch,
+      createSessionImpl: createSessionMock as unknown as (opts: unknown) => Promise<never>,
+    });
+    await new Promise<void>((resolve) => server.listen(0, () => resolve()));
+    const addr = server.address();
+    const routePort = typeof addr === "object" && addr ? addr.port : 0;
+
+    const res = await fetch(`http://127.0.0.1:${routePort}/agent/novels/1/runs`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: AUTH },
+      body: JSON.stringify({ question: "第1章有哪些关键场景" }),
+    });
+    expect(res.status).toBe(200);
+
+    const createOpts = createSessionMock.mock.calls[0]?.[0] as { skill?: { name?: string } };
+    expect(createOpts.skill?.name).toBe("detect-key-scenes");
+    // 技能版本查询指向自动路由的 skill。
+    const versionCalls = fetchMock.mock.calls.filter((c) => String(c[0]).includes("/versions"));
+    expect(String(versionCalls[0][0])).toContain("detect-key-scenes");
+    await res.body?.cancel();
+  });
+
+  it("自动路由到 illustrate-scene → run-create input 合并服务端 input_anchor（不再 422）", async () => {
+    fetchMock.mockClear();
+    fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+      if (String(url).endsWith("/route-skill") && init?.method === "POST") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              skills: ["illustrate-scene"],
+              primary: "illustrate-scene",
+              input_anchor: {
+                prompt_revision_id: 1,
+                visual_bible_version_id: 1,
+                scene_spec_revision_id: 1,
+                source_snapshot_id: "ss-real",
+                job_key: "auto-test",
+              },
+            }),
+            { status: 200, headers: { "content-type": "application/json" } },
+          ),
+        );
+      }
+      if (String(url).includes("/versions") && init?.method === "GET") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ items: [{ id: 33, status: "active" }], total: 1 }), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          }),
+        );
+      }
+      if (String(url).endsWith("/skill-runs") && init?.method === "POST") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ run: { id: 44 }, internal_token: "tok-44" }), {
+            status: 202,
+            headers: { "content-type": "application/json" },
+          }),
+        );
+      }
+      if (String(url).endsWith("/finalize") && init?.method === "POST") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ artifact: { id: 9 } }), { status: 200 }),
+        );
+      }
+      return Promise.resolve(
+        new Response(JSON.stringify({ error: { code: "upstream_error" } }), { status: 502 }),
+      );
+    });
+
+    const session = fakeSession();
+    createSessionMock.mockReset();
+    createSessionMock.mockResolvedValue(session);
+    server = createApp({
+      fetchImpl: fetchMock as unknown as typeof fetch,
+      createSessionImpl: createSessionMock as unknown as (opts: unknown) => Promise<never>,
+    });
+    await new Promise<void>((resolve) => server.listen(0, () => resolve()));
+    const addr = server.address();
+    const routePort = typeof addr === "object" && addr ? addr.port : 0;
+
+    const res = await fetch(`http://127.0.0.1:${routePort}/agent/novels/6/runs`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: AUTH },
+      body: JSON.stringify({ question: "帮我画第1章的竹林场景" }),
+    });
+    // 不再 422：input 合并了服务端解析的锚，illustrate-scene schema 校验通过。
+    expect(res.status).toBe(200);
+
+    // run-create 请求体携带全部 5 个锚 + novel_id，且不注入 question。
+    const runCreateCalls = fetchMock.mock.calls.filter(
+      (c) => String(c[0]).endsWith("/skill-runs") && (c[1] as RequestInit)?.method === "POST",
+    );
+    expect(runCreateCalls).toHaveLength(1);
+    const runCreateBody = JSON.parse((runCreateCalls[0][1] as RequestInit).body as string) as {
+      input?: Record<string, unknown>;
+    };
+    expect(runCreateBody.input).toMatchObject({
+      novel_id: 6,
+      prompt_revision_id: 1,
+      visual_bible_version_id: 1,
+      scene_spec_revision_id: 1,
+      source_snapshot_id: "ss-real",
+      job_key: "auto-test",
+    });
+    expect(runCreateBody.input?.["question"]).toBeUndefined();
+    await res.body?.cancel();
+  });
+
+  it("route-skill 不可用/失败 → 保守回退 answer-reading-question（默认行为保留）", async () => {
+    // 默认 mock 对 route-skill 返回 502 → 回退问答 skill。
+    installDefaultBackendMock();
+    const session = fakeSession();
+    await startServer(session);
+
+    const res = await fetch(`http://127.0.0.1:${port}/agent/novels/1/runs`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: AUTH },
+      body: JSON.stringify({ question: "阿宁在竹林里看见了谁？" }),
+    });
+    expect(res.status).toBe(200);
+    const createOpts = createSessionMock.mock.calls[0]?.[0] as { skill?: { name?: string } };
+    expect(createOpts.skill?.name).toBe("answer-reading-question");
+    const versionCalls = fetchMock.mock.calls.filter((c) => String(c[0]).includes("/versions"));
+    expect(String(versionCalls[0][0])).toContain("answer-reading-question");
+    await res.body?.cancel();
+  });
+
+  it("显式 body.skill 覆盖自动路由（不调用 route-skill）", async () => {
+    installDefaultBackendMock();
+    const session = fakeSession();
+    await startServer(session);
+
+    const res = await fetch(`http://127.0.0.1:${port}/agent/novels/1/runs`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: AUTH },
+      body: JSON.stringify({ question: "q", skill: "answer-reading-question" }),
+    });
+    expect(res.status).toBe(200);
+    const routeCalls = fetchMock.mock.calls.filter((c) => String(c[0]).endsWith("/route-skill"));
+    expect(routeCalls).toHaveLength(0);
+    await res.body?.cancel();
+  });
+
+  it("DB declarative_only runtime manifest 驱动 Pi：不调用任意本地路径，prompt 进入 system prompt", async () => {
+    const runtimeManifest = {
+      owner_id: 7,
+      novel_id: 1,
+      skill_version_id: 91,
+      name: "chapter-notes",
+      version: "1.0.0",
+      description: "fixture",
+      prompt: "Use only supplied evidence.",
+      execution_mode: "declarative_only",
+      allowed_tools: ["get_novel"],
+      read_permissions: ["canon"],
+      write_permissions: [],
+      forbidden_spaces: ["canon:original"],
+      budget: { max_tokens: 800 },
+      approval_required_for: [],
+      input_schema: {
+        type: "object",
+        required: ["question"],
+        properties: { question: { type: "string" }, novel_id: { type: "integer" } },
+        additionalProperties: false,
+      },
+      output_schema: { type: "object" },
+      checksum: "20112e732d64ea984070e85f6be7a500f62da6fc2e6d13f904a0614c076ccca4",
+    };
+    fetchMock.mockClear();
+    fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+      if (url.includes("/versions") && init?.method === "GET") {
+        return Promise.resolve(new Response(JSON.stringify({
+          items: [{ id: 91, status: "active", runtime_manifest: runtimeManifest }],
+        }), { status: 200, headers: { "content-type": "application/json" } }));
+      }
+      if (url.endsWith("/skill-runs") && init?.method === "POST") {
+        return Promise.resolve(new Response(JSON.stringify({
+          run: { id: 91, owner_id: 7, novel_id: 1, skill_version_id: 91, input_hash: "a".repeat(64) },
+          internal_token: "tok-91",
+          runtime_manifest: runtimeManifest,
+        }), { status: 202, headers: { "content-type": "application/json" } }));
+      }
+      if (url.endsWith("/finalize") && init?.method === "POST") {
+        return Promise.resolve(new Response(JSON.stringify({}), { status: 200 }));
+      }
+      if (url.endsWith("/cancel") && init?.method === "POST") {
+        return Promise.resolve(new Response(JSON.stringify({}), { status: 200 }));
+      }
+      return Promise.resolve(new Response(JSON.stringify({ error: { code: "upstream_error" } }), { status: 502 }));
+    });
+    const session = fakeSession();
+    createSessionMock.mockReset();
+    createSessionMock.mockResolvedValue(session);
+    const localLoader = vi.fn(() => { throw new Error("custom skill must not load a local path"); });
+    server = createApp({
+      fetchImpl: fetchMock as unknown as typeof fetch,
+      loadSkillImpl: localLoader as unknown as (name: string) => never,
+      createSessionImpl: createSessionMock as unknown as (opts: unknown) => Promise<never>,
+    });
+    await new Promise<void>((resolve) => server.listen(0, resolve));
+    const addr = server.address();
+    const customPort = typeof addr === "object" && addr ? addr.port : 0;
+    const res = await fetch(`http://127.0.0.1:${customPort}/agent/novels/1/runs`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: AUTH },
+      body: JSON.stringify({ skill: "chapter-notes", question: "整理章节" }),
+    });
+    expect(res.status).toBe(200);
+    session.finish([{ role: "assistant", stopReason: "error", content: [] }]);
+    await collectSse(res);
+    expect(localLoader).not.toHaveBeenCalled();
+    const opts = createSessionMock.mock.calls[0]?.[0] as { skill: { name: string; instructions: string; executionMode?: string } };
+    expect(opts.skill).toMatchObject({
+      name: "chapter-notes",
+      instructions: "Use only supplied evidence.",
+      executionMode: "declarative_only",
+    });
   });
 });

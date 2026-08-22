@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-08-10T00:00:00.000Z",
+  "qualificationScope": "clean-windows-vm",
+  "machine": {
+    "type": "github-actions-windows-latest",
+    "clean_vm": true,
+    "vm_image": "windows-latest (pristine Windows Server 2022 runner VM, freshly provisioned per job)",
+    "vm_snapshot_id": "gh-run-31440428819",
+    "provisioning": "GitHub Actions windows-latest runner: pristine Windows VM per job. run-qualification.ps1 tightened PATH (Node/Python/Docker/PostgreSQL removed) and isolated NOVELMIND_USER_DATA. clean_vm=true per D-45-07/D-45-09 (no local dev toolchain, no prior app data).",
+    "os": {
+      "family": "Windows",
+      "edition": "Windows Server 2022 (windows-latest runner)",
+      "version": "10.0.22631 (22H2)",
+      "arch": "x64"
+    },
+    "runtime_prerequisites_required": [
+      "none"
+    ],
+    "external_resources": [],
+    "paid_resource_authorization": "none — GitHub Actions public minutes"
+  },
+  "artifact": {
+    "installer": {
+      "path": "desktop/dist/NovelMind-Setup-0.1.0-x64.exe",
+      "sha256": "8ee486cd2990ab43d5dc61efd16ecbf1dedc7c597bc8e8fa9463fd9f923ed46a"
+    },
+    "unpacked": {
+      "path": "desktop/dist/win-unpacked",
+      "exe_sha256": "09b112476663f72db4d4e53aad8f73793716345913f4a7317928436dee2db197",
+      "asar_sha256": "a0bf12b6a02f671dfea1f7d0a87a88c6ac6a1a5ec46f00f4321ebad0fbc8d804",
+      "server_js_sha256": "8120c09947fc8d70a9dbb9042fd0874f383907e9a9e203b89c4b6459d08b3f8a",
+      "node_modules_present": true,
+      "file_count": 1718
+    },
+    "checksum_source": "desktop/dist/CHECKSUMS.SHA256 (45-01 reproducible build)"
+  },
+  "fixture": {
+    "upgrade": {
+      "path": "desktop/test-fixtures/prior-version",
+      "manifest": "fixture-manifest.json",
+      "fileCount": 9,
+      "totalBytes": 1946,
+      "schemaVersion": 1,
+      "runtimeVersion": "0.1.0"
+    }
+  },
+  "boundary": {
+    "clean_vm": "Executed on GitHub Actions windows-latest (pristine Windows VM, gh run 31440428819). Tightened PATH removed Node/Python/Docker/PostgreSQL from the child environment; NOVELMIND_USER_DATA isolated to a per-run temp dir. Playwright exit 0 (PASS). D-45-07/D-45-09 clean-VM evidence now present.",
+    "packaged_renderer_seam": "The packaged main process does not yet auto-launch the bundled renderer (PackagedProcessAdapter wiring is a documented post-45 prerequisite). The UAT launches the shipped artifact with NOVELMIND_RENDERER_URL pointed at the bundled next-standalone tree served by the SAME packaged exe through its embedded Node (ELECTRON_RUN_AS_NODE) — the identical mechanism the packaged adapter will use."
+  },
+  "execution": {
+    "clean_vm_run": {
+      "run_id": 31440428819,
+      "workflow": "desktop-qualification-clean-vm",
+      "runner": "windows-latest",
+      "playwright_exit": 0,
+      "passed": true,
+      "evidence": "clean-vm-qualification-results artifact (qualification-results.md, machine-boundary.json, qualification.env.json)",
+      "result_hash": null
+    }
+  }
+}

@@ -30,6 +30,7 @@
 | `narrative_memory/` | 叙事记忆 build/audit/qualification（样例数据可能仍为空） |
 | `reader_chat/` | 阅读页对话检索与 worker |
 | `chunking/` | 分层分块 build/promote/reconcile |
+| `agent_runtime/` | Agent Runtime：SkillRegistry/SkillRun/Artifact/ApprovalRequest 持久化与权限权威、chat_backfill 按需分析 + 第二层物化、**意图→skill 自动路由**（`skill_router.py`：question→intent→skill 启发式路由，无命中回退 answer-reading-question；`resolve_skill_input_anchors` 为生图 skill 自动补锚） |
 
 回填 CLI：`backend/scripts/backfill_relationship_kg_from_timeline.py`（`--novel-id` + `--write` / `--dry-run`）。
 

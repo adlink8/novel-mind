@@ -22,6 +22,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.database import async_session_factory
+from app.core import url_security
+from app.models.ai_model import AIModelConfig
 from app.models.reader_chat import (
     ReaderContextEvidenceRef,
     ReaderContextManifest,
@@ -49,6 +51,8 @@ from app.services.reader_chat.gateway import (
     business_validate_answer,
     canonical_hash,
 )
+from app.services.provider_catalog import canonical_provider, provider_profiles
+from app.services.agent_runtime.reader_bridge import enqueue_reader_chat_skill_run
 
 logger = logging.getLogger(__name__)
 
@@ -104,6 +108,8 @@ class _LiteLLMTransport:
             temperature=float(DECODING["temperature"]),
             max_tokens=max_tokens,
             stream=False,
+            api_key=kwargs.get("api_key"),
+            api_base=kwargs.get("api_base"),
         )
         usage_obj = getattr(response, "usage", None)
         if isinstance(response, dict):
@@ -146,61 +152,76 @@ def _load_prompt() -> str:
     return PROMPT_PATH.read_text(encoding="utf-8")
 
 
-def resolve_reader_chat_deployment() -> ModelDeployment:
-    """Resolve and freeze one deployment for reader_chat (no transparent fallback).
+async def resolve_reader_chat_deployment(
+    *,
+    owner_id: int,
+    sessions: async_sessionmaker[AsyncSession] = async_session_factory,
+) -> ModelDeployment:
+    """Resolve exactly one safe active default owned by ``owner_id``.
 
-    Prefer the project chat provider (e.g. Vertex) over static AI-router pools that
-    still list placeholder OpenAI keys — those leave jobs stuck after auth failure.
+    Reader Chat deliberately has no process-wide or environment model fallback.
+    The returned deployment carries the write-only credential only in memory for
+    the immediate transport boundary; lineage serialization excludes it.
     """
 
-    from app.config import settings
-
-    provider = (settings.chat_provider or "").strip().lower()
-    if provider in ("vertex_google", "vertex", "vertex_ai", "google_vertex"):
-        # model_id must be the bare Vertex model name. Gateway calls
-        # transport with deployment.resolved_name = f"{provider}/{model_id}".
-        # Double-prefixing (vertex_google/vertex_google/...) yields HTTP 404.
-        raw = (
-            settings.default_chat_model
-            or settings.vertex_model
-            or "gemini-3.5-flash-lite"
-        ).strip()
-        for prefix in (
-            "vertex_google/",
-            "vertex_ai/",
-            "vertex/",
-            "gcp/",
-            "google/",
-        ):
-            if raw.lower().startswith(prefix):
-                raw = raw[len(prefix) :]
-                break
-        model_id = raw or "gemini-3.5-flash-lite"
-        return ModelDeployment(
-            provider="vertex_google",
-            model_id=model_id,
-            revision=model_id,
-            supports_structured_output=True,
-            input_price_per_million=Decimal("0.15"),
-            output_price_per_million=Decimal("0.60"),
+    async with sessions() as session:
+        result = await session.execute(
+            select(AIModelConfig)
+            .where(
+                AIModelConfig.owner_id == owner_id,
+                AIModelConfig.is_active.is_(True),
+                AIModelConfig.is_default.is_(True),
+            )
+            .order_by(AIModelConfig.id)
         )
+        configs = list(result.scalars().all())
 
-    from app.services.ai_router import ai_router
+    if not configs:
+        raise DependencyPaused("owner_default_model_missing")
+    if len(configs) != 1:
+        raise DependencyPaused("owner_default_model_ambiguous")
 
-    tier = ai_router.route_task("reader_chat")
-    provider = tier.provider
-    model_id = tier.model_id
-    # Approximate per-million from cost_per_1k (×1000).
-    per_million = Decimal(str(tier.cost_per_1k)) * Decimal(1000)
+    configured = configs[0]
+    try:
+        provider = canonical_provider(configured.provider)
+    except ValueError as exc:
+        raise DependencyPaused("owner_default_model_provider_unsupported") from exc
+
+    model_id = (configured.model_id or "").strip()
+    if not model_id:
+        raise DependencyPaused("owner_default_model_id_missing")
+
+    profile = next(
+        (item for item in provider_profiles() if item["id"] == provider),
+        None,
+    )
+    if profile is None:
+        raise DependencyPaused("owner_default_model_provider_unsupported")
+
+    api_key = (configured.api_key or "").strip() or None
+    # Custom is OpenAI-compatible, but unlike catalog discovery its invocation
+    # contract requires both explicit credentials and an explicit endpoint.
+    if bool(profile["credential_required"]) or provider == "custom":
+        if not api_key:
+            raise DependencyPaused("owner_default_model_api_key_missing")
+    if provider == "custom" and not configured.base_url:
+        raise DependencyPaused("owner_default_model_base_url_missing")
+
+    try:
+        safe_base_url = await url_security.validate_ai_base_url(configured.base_url)
+    except Exception as exc:  # noqa: BLE001 - stable fail-closed dependency class
+        raise DependencyPaused("owner_default_model_base_url_invalid") from exc
+
     return ModelDeployment(
         provider=provider,
         model_id=model_id,
-        revision=model_id,
+        revision=f"ai_model_config:{configured.id}",
         supports_structured_output=True,
-        input_price_per_million=per_million if per_million > 0 else Decimal("0.15"),
-        output_price_per_million=(
-            per_million * Decimal(3) if per_million > 0 else Decimal("0.60")
-        ),
+        input_price_per_million=Decimal("0.15"),
+        output_price_per_million=Decimal("0.60"),
+        config_id=configured.id,
+        api_key=api_key,
+        base_url=safe_base_url,
     )
 
 
@@ -271,11 +292,18 @@ class _ControlledE2ETransport:
         }
 
 
-def production_runtime() -> ReaderChatWorkerRuntime:
+async def production_runtime(job_id: int) -> ReaderChatWorkerRuntime:
     import os
 
-    deployment = resolve_reader_chat_deployment()
     sessions = async_session_factory
+    async with sessions() as session:
+        job = await session.get(ReaderGenerationJob, job_id)
+    if job is None:
+        raise DependencyPaused("reader_chat_job_missing")
+    deployment = await resolve_reader_chat_deployment(
+        owner_id=job.owner_id,
+        sessions=sessions,
+    )
     transport: Any
     if os.environ.get("NOVELMIND_READER_CHAT_CONTROLLED_TRANSPORT") == "1":
         # E2E / qualification only — never used in production configs.
@@ -301,16 +329,17 @@ def production_runtime() -> ReaderChatWorkerRuntime:
 
 
 async def dispatch_reader_chat_job(job_id: int) -> None:
-    """BackgroundTasks entrypoint; durable lease makes repeated dispatch safe.
+    """BackgroundTasks entrypoint for the Pi-backed reader runtime.
 
-    Never raise to the ASGI background runner — HTTP already returned 202 and
-    the job remains durable for later reclaim/retry if this process fails.
+    ReaderGenerationJob remains the public durable job, but ordinary reading
+    questions are handed to a versioned SkillRun.  The agent-service poller is
+    the only component that executes the model call.
     """
 
     try:
-        await run_reader_chat_worker(job_id, runtime=production_runtime())
+        await enqueue_reader_chat_skill_run(job_id)
     except Exception:
-        _SAFE_LOG.exception("reader_chat background dispatch failed job_id=%s", job_id)
+        _SAFE_LOG.exception("reader_chat Pi handoff failed job_id=%s", job_id)
 
 
 async def run_reader_chat_worker(
@@ -424,6 +453,8 @@ async def run_reader_chat_worker(
             conversation_id=context["conversation_id"],
             owner_id=context["owner_id"],
             novel_id=context["novel_id"],
+            question=str(context.get("user_body") or ""),
+            source_status=(context.get("prompt_inputs") or {}).get("source_status"),
         )
         _SAFE_LOG.info(
             "reader_chat job completed job_id=%s response_hash=%s blocks=%s",
@@ -723,6 +754,8 @@ async def _try_exact_recovery(
                 conversation_id=context["conversation_id"],
                 owner_id=context["owner_id"],
                 novel_id=context["novel_id"],
+                question=str(context.get("user_body") or ""),
+                source_status=(context.get("prompt_inputs") or {}).get("source_status"),
             )
             return True
     return False
@@ -739,6 +772,8 @@ async def _publish_assistant(
     conversation_id: int,
     owner_id: int,
     novel_id: int,
+    question: str = "",
+    source_status: dict[str, str] | None = None,
 ) -> None:
     # Final cancel check immediately before publication.
     if await _is_cancel_requested(sessions, job_id):
@@ -825,6 +860,29 @@ async def _publish_assistant(
         job.status_reason = "published"
         job.response_hash = response_hash
         job.error_code = None
+
+        # ── 问答按需分析（Phase 40 / chat_backfill）──
+        # abstain（证据不足：无 answer_blocks 且带 uncertainty）时，按不足维度
+        # 触发对应分析 skill run（origin='chat_backfill'）。异步后台分析，不阻塞
+        # 当前 abstain 答案返回；下一轮检索经物化后的域表可见候选证据。
+        # 受控扩展：本函数额外写 origin='chat_backfill' 的 skill_runs（幂等/去重）。
+        if not envelope.answer_blocks and envelope.uncertainty is not None:
+            unavailable = [
+                dim
+                for dim, st in (source_status or {}).items()
+                if st in ("unavailable", "absent")
+            ]
+            if unavailable and question:
+                from app.services.agent_runtime.backfill import create_backfill_runs
+
+                await create_backfill_runs(
+                    session,
+                    owner_id=owner_id,
+                    novel_id=novel_id,
+                    user_message_id=user_message_id,
+                    question=question,
+                    unavailable_dimensions=unavailable,
+                )
 
 
 async def _finish_job(

@@ -1,0 +1,101 @@
+{
+  "input": {
+    "novel_id": 1,
+    "branch": "aurora-redemption",
+    "fork": "fork-aurora",
+    "visual_fork_version_id": 11,
+    "scene_spec_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+    "candidate_asset_id": 21,
+    "source_snapshot_id": "novel:1:fork-aurora",
+    "source_snapshot_hash": "2222222222222222222222222222222222222222222222222222222222222222",
+    "evidence_refs": ["chapter:1", "chapter:2"],
+    "requested_action": ["publish_derivative_visual"]
+  },
+  "expected_output": {
+    "type": "branch_visual_bible",
+    "schema_version": "branch-visual-bible.v1",
+    "owner_id": 1,
+    "novel_id": 1,
+    "branch": "aurora-redemption",
+    "producing_skill": "illustrate-derivative-scene",
+    "producing_skill_version": "1.0.0",
+    "skill_version_id": 1,
+    "model_lineage": {
+      "provider": "fixture",
+      "model": "stub-model",
+      "revision": "stub-1"
+    },
+    "source_versions": {
+      "novel": "v1",
+      "source_snapshot_hash": "2222222222222222222222222222222222222222222222222222222222222222"
+    },
+    "input_hash": "3333333333333333333333333333333333333333333333333333333333333333",
+    "evidence_refs": ["chapter:1", "chapter:2"],
+    "revision": {
+      "schema_version": "branch-illustration-revision.v1",
+      "artifact_kind": "branch_illustration_revision",
+      "authority_space": "derivative",
+      "fork": "fork-aurora",
+      "visual_version": {
+        "version_id": 11,
+        "version_key": "dv-aurora",
+        "version_hash": "4444444444444444444444444444444444444444444444444444444444444444"
+      },
+      "source_snapshot": {
+        "source_snapshot_id": "novel:1:fork-aurora",
+        "source_snapshot_hash": "2222222222222222222222222222222222222222222222222222222222222222",
+        "source_manifest_hash": "5555555555555555555555555555555555555555555555555555555555555555",
+        "cutoff_chapter": 8
+      },
+      "scene_spec_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+      "candidate_asset": {
+        "candidate_asset_id": 21,
+        "asset_id": "dv-0123456789abcdef",
+        "asset_key": "aurora-scene-3",
+        "content_hash": "6666666666666666666666666666666666666666666666666666666666666666",
+        "mime_type": "image/png"
+      },
+      "identity_lineage": [
+        {
+          "stable_id": "char-arya",
+          "entity_key": "char-arya",
+          "entity_type": "character",
+          "source_entity_hash": "7777777777777777777777777777777777777777777777777777777777777777"
+        }
+      ],
+      "source_refs": [
+        {
+          "asset_key": "dv-arya",
+          "asset_id": "dv-obj-1",
+          "source_asset_id": "obj-1",
+          "source_bytes_hash": "8888888888888888888888888888888888888888888888888888888888888888"
+        }
+      ],
+      "generator_lineage": {
+        "provider": "mock",
+        "provider_model": "mock-1"
+      },
+      "divergence_manifest_hash": "9999999999999999999999999999999999999999999999999999999999999999",
+      "consistency_verdict": "unavailable",
+      "validator_report": {
+        "evaluator_id": "derivative-visual-consistency.cross_chapter.v1",
+        "verdict": "unavailable",
+        "reasons": ["insufficient_chapters"]
+      },
+      "review_state": "candidate"
+    },
+    "tool_runs": [
+      { "tool_name": "get_novel", "calls": 1 },
+      { "tool_name": "get_chapter", "calls": 1 },
+      { "tool_name": "publish_derivative_visual", "calls": 1 }
+    ],
+    "status": "candidate",
+    "parent_revision": null,
+    "normalization": {
+      "raw_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "repaired_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "normalization_actions": [],
+      "warnings": []
+    }
+  }
+}

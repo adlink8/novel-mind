@@ -1,0 +1,214 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "WorldModelCandidateArtifact",
+  "description": "World Model Candidate Artifact 信封（Phase 27 / D-01..D-06）。镜像 backend app.schemas.agent_runtime.WorldModelCandidateArtifact：type / schema_version / owner / novel / branch / producing skill+version / model lineage / source versions / input_hash / evidence_refs / candidates / status / parent_revision / normalization。Agent 产出的是候选投影（typed world-model candidates），不是事实；确定性 WorldModel Validator/Gate 拥有发布权威。candidates.tool_runs 携带 ToolRun 血缘（tool_name/calls），候选 claim 的 authority label 保持原样，绝不静默升级为 canon_fact（D-01）。artifact_id / revision_id 由后端确定性 finalizer 在写入时分配，不在本信封内。",
+  "type": "object",
+  "required": [
+    "type",
+    "schema_version",
+    "owner_id",
+    "novel_id",
+    "producing_skill",
+    "producing_skill_version",
+    "skill_version_id",
+    "model_lineage",
+    "source_versions",
+    "input_hash",
+    "evidence_refs",
+    "candidates",
+    "status"
+  ],
+  "properties": {
+    "type": {
+      "const": "world_model_candidate"
+    },
+    "schema_version": {
+      "const": "world-model-candidate.v1"
+    },
+    "owner_id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "novel_id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "branch": {
+      "type": ["string", "null"],
+      "description": "衍生分支；原始主线为 null"
+    },
+    "producing_skill": {
+      "type": "string",
+      "minLength": 1
+    },
+    "producing_skill_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "skill_version_id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "model_lineage": {
+      "type": "object",
+      "description": "agent runtime + 模型血缘（provider/model/revision）"
+    },
+    "source_versions": {
+      "type": "object",
+      "description": "数据源版本（novel/chapter/检索等；source snapshot 血缘）"
+    },
+    "input_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "运行输入规范化 JSON 的 SHA-256（重放追溯）"
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1,
+      "description": "leaf 证据引用，必须 ⊆ 冻结 manifest 白名单（D-07/D-08）"
+    },
+    "candidates": {
+      "type": "object",
+      "description": "Agent 提案的类型化世界模型候选（D-02 immutable candidates-only）。tool_runs 携带 ToolRun 血缘；claims 是候选主张（authority label 原样保留）。",
+      "required": ["projection_version", "tool_runs", "claims"],
+      "properties": {
+        "projection_version": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "候选所针对的世界模型版本（scope 绑定）"
+        },
+        "tool_runs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["tool_name", "calls"],
+            "properties": {
+              "tool_name": { "type": "string", "minLength": 1 },
+              "calls": { "type": "integer", "minimum": 0 }
+            }
+          },
+          "description": "ToolRun 血缘：本 run 使用的 allowlist 工具与调用次数"
+        },
+        "claims": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": [
+              "claim_kind",
+              "claim_key",
+              "proposition",
+              "authority",
+              "confidence",
+              "disclosure_cutoff",
+              "evidence_refs"
+            ],
+            "properties": {
+              "claim_kind": {
+                "type": "string",
+                "enum": [
+                  "event",
+                  "causal_edge",
+                  "character_state",
+                  "character_knowledge",
+                  "world_rule",
+                  "rule_exception",
+                  "entity",
+                  "entity_link"
+                ]
+              },
+              "claim_key": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 180
+              },
+              "proposition": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1000
+              },
+              "subject": {
+                "type": ["string", "null"],
+                "maxLength": 100
+              },
+              "authority": {
+                "type": "string",
+                "enum": [
+                  "canon_fact",
+                  "probable_inference",
+                  "literary_interpretation",
+                  "user_interpretation"
+                ],
+                "description": "D-01 四 label；绝不静默升级为 canon_fact"
+              },
+              "confidence": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "disclosure_cutoff": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "evidence_refs": {
+                "type": "array",
+                "items": { "type": "string" },
+                "minItems": 1
+              },
+              "details": {
+                "type": ["object", "null"],
+                "description": "claim 形态的附加结构化细节（事件区间/边端点/例外 rule_key 等）"
+              }
+            }
+          }
+        }
+      }
+    },
+    "status": {
+      "enum": ["candidate", "validated", "approved", "published", "rejected"],
+      "description": "产物状态；finalize 写入时恒为 candidate（无自动 promotion）"
+    },
+    "parent_revision": {
+      "type": ["string", "null"],
+      "description": "父修订引用；首个修订为 null"
+    },
+    "normalization": {
+      "type": "object",
+      "description": "26-06 修复血缘 trail：repaired_hash 是对不含本 trail 的 repaired payload 的 canonical SHA-256；raw_hash 是原始模型输出的 canonical SHA-256；normalization_actions 每项含 path/action/after。",
+      "required": ["raw_hash", "repaired_hash", "normalization_actions", "warnings"],
+      "properties": {
+        "raw_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "repaired_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "normalization_actions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path", "action", "after"],
+            "properties": {
+              "path": { "type": "string", "minLength": 1 },
+              "action": {
+                "type": "string",
+                "enum": ["alias", "alias_dedup", "enum_canonicalize", "container_shape", "lineage_merge"]
+              },
+              "before": {},
+              "after": {},
+              "reason": { "type": "string" }
+            }
+          }
+        },
+        "warnings": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,305 @@
+{
+  "schemaVersion": 1,
+  "phase": "41",
+  "plan": "03",
+  "decisionArtifact": ".planning/phases/41-electron-architecture-and-packaging-proof/41-DECISION.md",
+  "generated": "2026-08-10T09:15:36Z",
+  "sourceCommit": "5167eee",
+  "objective": "Honest, evidence-based measurement of bundled-runtime feasibility for the five Phase 41 topology components. Any component without executable startup/readiness/shutdown evidence from the proof layout, or any command that resolves a user-installed runtime or Docker, is FAIL. Unknown/unproven fields are failed (fail-closed, D-41-04/D-41-06).",
+  "environment": {
+    "proofRoot": "desktop/proof",
+    "dockerAvailable": true,
+    "dockerSimulatedUnavailable": true,
+    "systemNode": { "version": "v24.13.0", "note": "present on user PATH; excluded in verify simulation" },
+    "systemPython": { "version": "3.14.2", "note": "present on user PATH; excluded in verify simulation" },
+    "devVenvPython": {
+      "version": "3.13.14",
+      "pyvenvHome": "C:/Users/li/.workbuddy/binaries/python/versions/3.13.12",
+      "note": "backend/venv is a dev venv pinned to a user-installed base interpreter; it is not a relocatable bundled runtime"
+    },
+    "electron": {
+      "packageVersion": "43.3.0",
+      "distPresent": false,
+      "embeddedNodeDeclared": "v24.18.1",
+      "note": "desktop/proof/node_modules/electron/dist/electron.exe is ABSENT; embedded Node v24.18.1 is package metadata, not present/verifiable in the proof layout"
+    },
+    "postgres": { "evidence": "docker-compose.yml service db image pgvector/pgvector:pg16", "windowsNativeEvidence": false },
+    "vectorStore": { "evidence": "docker-compose.yml service chroma image chromadb/chroma:latest", "bundledEvidence": false }
+  },
+  "components": [
+    {
+      "id": "next",
+      "displayName": "Next.js standalone renderer",
+      "runtime": {
+        "name": "Next.js standalone server (Node)",
+        "version": "next 16.3.0-canary.6 / react 19.2.7",
+        "executable": {
+          "kind": "electron-embedded-node",
+          "declaredPath": "resources/next-standalone/server.js",
+          "presentInProofLayout": false,
+          "proven": false,
+          "note": "41-02 started server.js with SYSTEM node v24.13.0 from PATH (next-server.ts spawn('node', ['server.js']); build-next-standalone.ps1 Start-Process -FilePath 'node'). Electron 43.3.0 embedded Node v24.18.1 is declared but electron dist binary is absent from the proof layout, so no bundled/embedded executable start is recorded."
+        }
+      },
+      "resourcePath": {
+        "value": "frontend/.next/standalone (+ deterministically copied public/ and .next/static)",
+        "proven": true,
+        "note": "Standalone tree built and asset-copied by 41-02 (build-next-standalone.ps1); 13-route parity and static-asset assertions passed."
+      },
+      "mutableDataPath": {
+        "value": "no server-side mutable data; log sink declared under %APPDATA%/NovelMind/logs/next",
+        "proven": false,
+        "note": "topology.ts declares the log-sink/app-data contract (WRITABLE-INSTALL-PATH fail-closed) but packaged writable-path operation under %APPDATA% has not been exercised."
+      },
+      "licenseRedistribution": {
+        "value": "Next.js MIT; React MIT. Canary pin required (next 16.3.0-canary.6).",
+        "proven": true,
+        "note": "MIT permits redistribution with license text; canary drift risk documented in 41-RESEARCH."
+      },
+      "startupCommand": {
+        "command": "node server.js (cwd=<standalone>, env PORT=<loopback>, HOSTNAME=127.0.0.1)",
+        "tokens": ["node"],
+        "resolvesUserRuntime": true,
+        "resolvesDocker": false,
+        "proven": false,
+        "note": "Resolves node.exe v24.13.0 from the user PATH — violates the no-user-runtime contract (D-41-04). No bundled/embedded Node executable is present in the proof layout to replace it."
+      },
+      "readinessEvidence": {
+        "source": "desktop/proof/tests/route-parity.spec.ts — HTTP 200 on /, 13-route parity, static assets, hydration, client navigation",
+        "proven": true,
+        "files": [
+          { "path": "desktop/proof/tests/route-inventory.json", "hash": "d8bac42f3ecc56c25480c9f7ce8cac7db928fc98736ba941ba1bec4162c624d5" },
+          { "path": "desktop/proof/tests/route-parity.spec.ts", "hash": "55fe17184c624e010b4f7be209c1fe48723236dd4ff1cfc6be065253b8eb66d0" }
+        ]
+      },
+      "shutdownEvidence": {
+        "source": "taskkill /T /F process-tree termination + residual-process check (build-next-standalone.ps1; next-server.ts stop())",
+        "proven": true,
+        "files": [
+          { "path": "desktop/proof/scripts/build-next-standalone.ps1", "hash": "7e29502c4dcd368a105a4c203c89702fc0d6e322e781b947be8d29058ba5eb3e" },
+          { "path": "desktop/proof/src/next-server.ts", "hash": "0f1513b8b06ece32f07e1cf62186614d563757b115bbff93552a56f68f81231d" }
+        ]
+      },
+      "runtimeArtifact": {
+        "path": "frontend/.next/standalone/server.js",
+        "hash": "8120c09947fc8d70a9dbb9042fd0874f383907e9a9e203b89c4b6459d08b3f8a",
+        "note": "Built standalone server artifact (gitignored .next tree) — hash pins the exact artifact the parity proof exercised."
+      },
+      "verdict": "FAIL",
+      "verdictReason": "startup command resolves user-installed node (v24.13.0); no bundled/embedded Node executable present in proof layout (electron dist absent); packaged writable-path operation unproven. Readiness (13 routes/assets) and owned shutdown are proven but cannot grant GO while the executable row fails."
+    },
+    {
+      "id": "fastapi",
+      "displayName": "FastAPI backend (Python)",
+      "runtime": {
+        "name": "Python + FastAPI/uvicorn",
+        "version": "Python 3.13.14 (dev venv); requirements.txt: fastapi>=0.115, uvicorn[standard]>=0.32, sqlalchemy>=2.0, asyncpg, psycopg2-binary, alembic, litellm, chromadb==1.5.9, sentence-transformers, torch (transitive)",
+        "executable": {
+          "kind": "bundled-script",
+          "declaredPath": "resources/backend/run-backend.mjs",
+          "presentInProofLayout": false,
+          "proven": false,
+          "note": "No bundled Python runtime exists in the proof layout. backend/venv is a dev venv whose pyvenv.cfg 'home' points to user-installed C:/Users/li/.workbuddy/binaries/python/versions/3.13.12 — not relocatable, not bundled."
+        }
+      },
+      "resourcePath": {
+        "value": "backend/ (app/, migrations/, alembic.ini)",
+        "proven": true,
+        "note": "Source tree exists in repo; no packaged resource layout proven."
+      },
+      "mutableDataPath": {
+        "value": "backend/uploads/, backend/storage/, backend/artifacts/ (packaged target: %APPDATA%/NovelMind — unproven)",
+        "proven": false,
+        "note": "Dev writable dirs live inside the repo tree; no %APPDATA% redirection proven."
+      },
+      "licenseRedistribution": {
+        "value": "fastapi MIT; uvicorn BSD-3-Clause; litellm MIT; sentence-transformers Apache-2.0; torch BSD-3-Clause (large binary wheels); redistribution license bundle unproven",
+        "proven": false,
+        "note": "Torch/sentence-transformers redistribution (size + license text) is a known unresolved packaging risk (41-RESEARCH)."
+      },
+      "startupCommand": {
+        "command": "backend/venv/Scripts/python.exe -m uvicorn app.main:app (dev venv; pyvenv.cfg home -> user Python 3.13.12)",
+        "tokens": ["python.exe"],
+        "resolvesUserRuntime": true,
+        "resolvesDocker": false,
+        "proven": false,
+        "note": "Dev venv depends on a user-installed base interpreter; no Windows packagable Python path proven."
+      },
+      "readinessEvidence": {
+        "source": "none — no successful FastAPI start recorded from the proof layout",
+        "proven": false,
+        "files": []
+      },
+      "shutdownEvidence": {
+        "source": "none — no owned FastAPI process-tree shutdown recorded",
+        "proven": false,
+        "files": []
+      },
+      "verdict": "FAIL",
+      "verdictReason": "no bundled Python runtime; dev venv resolves a user-installed base interpreter; no readiness/shutdown evidence from the proof layout; redistribution of torch/sentence-transformers unproven."
+    },
+    {
+      "id": "agent_service",
+      "displayName": "Node Agent Service",
+      "runtime": {
+        "name": "Node Agent Service (start.mjs)",
+        "version": "engines node >=22.19.0; @earendil-works/pi-* 0.83.0; Electron embedded Node v24.18.1 declared (satisfies >=22.19.0) but not present in proof layout",
+        "executable": {
+          "kind": "electron-embedded-node",
+          "declaredPath": "resources/agent-service/start.mjs",
+          "presentInProofLayout": false,
+          "proven": false,
+          "note": "agent-service/start.mjs exists in the repo but not under a proof resource root, and no embedded-node runtime is present (electron dist absent). No successful start recorded."
+        }
+      },
+      "resourcePath": {
+        "value": "agent-service/ (start.mjs, dist/, vendor/, packages.lock.json)",
+        "proven": true,
+        "note": "Source tree exists; packaged resource layout not proven."
+      },
+      "mutableDataPath": {
+        "value": "agent-service session/storage via pi-storage-sqlite-node (packaged target: %APPDATA%/NovelMind — unproven)",
+        "proven": false,
+        "note": "SQLite-backed storage location under packaged %APPDATA% not proven."
+      },
+      "licenseRedistribution": {
+        "value": "@earendil-works/pi-* 0.83.0 redistribution rights unverified; ajv MIT, ajv-formats MIT, yaml MIT, typebox Apache-2.0",
+        "proven": false,
+        "note": "The pi packages are the primary agent runtime dependency; license/redistribution note not recorded in agent-service/package.json."
+      },
+      "startupCommand": {
+        "command": "none recorded — no successful bundled start. Would run start.mjs under Electron embedded Node v24.18.1 (declared, absent).",
+        "tokens": [],
+        "resolvesUserRuntime": false,
+        "resolvesDocker": false,
+        "proven": false,
+        "note": "Version floor (>=22.19.0) is satisfied by the declared Electron Node v24.18.1 on paper only; no executable start evidence."
+      },
+      "readinessEvidence": {
+        "source": "none — no successful agent-service start recorded from the proof layout",
+        "proven": false,
+        "files": []
+      },
+      "shutdownEvidence": {
+        "source": "none — no owned agent-service process-tree shutdown recorded",
+        "proven": false,
+        "files": []
+      },
+      "verdict": "FAIL",
+      "verdictReason": "no executable start from the proof layout; embedded Node runtime absent; pi package redistribution licensing unresolved."
+    },
+    {
+      "id": "postgres_pgvector",
+      "displayName": "PostgreSQL 16 + pgvector",
+      "runtime": {
+        "name": "PostgreSQL 16 + pgvector extension",
+        "version": "pgvector/pgvector:pg16 (docker image); no Windows native distribution referenced",
+        "executable": {
+          "kind": "bundled-binary",
+          "declaredPath": "resources/pgsql/bin/postgres.exe",
+          "presentInProofLayout": false,
+          "proven": false,
+          "note": "No Windows-native PostgreSQL/pgvector binaries exist anywhere in the repo or proof layout."
+        }
+      },
+      "resourcePath": {
+        "value": "docker image only (pgvector/pgvector:pg16)",
+        "proven": false,
+        "note": "Docker-supplied in dev (docker-compose.yml db service); not packaged evidence."
+      },
+      "mutableDataPath": {
+        "value": "pgdata docker volume (packaged target: %APPDATA%/NovelMind/pgdata — unproven)",
+        "proven": false,
+        "note": "Docker named volume in dev; packaged data dir not proven."
+      },
+      "licenseRedistribution": {
+        "value": "PostgreSQL License (permissive); pgvector PostgreSQL License; Windows binary redistribution unproven",
+        "proven": false,
+        "note": "Bundling a Windows PostgreSQL distribution (and the pgvector extension build) has no recorded distribution path."
+      },
+      "startupCommand": {
+        "command": "docker compose up db (image pgvector/pgvector:pg16)",
+        "tokens": ["docker"],
+        "resolvesUserRuntime": false,
+        "resolvesDocker": true,
+        "proven": false,
+        "note": "Current startup requires Docker — violates D-41-04."
+      },
+      "readinessEvidence": {
+        "source": "none — docker healthcheck pg_isready only; no bundled start recorded",
+        "proven": false,
+        "files": []
+      },
+      "shutdownEvidence": {
+        "source": "none — docker compose lifecycle only; no owned bundled process-tree shutdown recorded",
+        "proven": false,
+        "files": []
+      },
+      "verdict": "FAIL",
+      "verdictReason": "only Docker-image evidence exists; no Windows-native bundled distribution, no readiness/shutdown evidence from a bundled start."
+    },
+    {
+      "id": "vector_store",
+      "displayName": "ChromaDB vector store",
+      "runtime": {
+        "name": "ChromaDB vector store",
+        "version": "chromadb/chroma:latest (docker image); python client chromadb==1.5.9 in backend/requirements.txt",
+        "executable": {
+          "kind": "bundled-binary",
+          "declaredPath": "resources/vector-store/bin/vector-store.exe",
+          "presentInProofLayout": false,
+          "proven": false,
+          "note": "No bundled Chroma server exists in the repo or proof layout; the docker image is the only server evidence."
+        }
+      },
+      "resourcePath": {
+        "value": "docker image only (chromadb/chroma:latest)",
+        "proven": false,
+        "note": "Docker-supplied in dev (docker-compose.yml chroma service); not packaged evidence."
+      },
+      "mutableDataPath": {
+        "value": "chromadata docker volume (packaged target: %APPDATA%/NovelMind/chroma — unproven)",
+        "proven": false,
+        "note": "Docker named volume in dev; packaged data dir not proven."
+      },
+      "licenseRedistribution": {
+        "value": "Chroma Apache-2.0; server binary distribution/bundling unproven",
+        "proven": false,
+        "note": "Embedded-mode (python client) vs bundled-server choice is unresolved (41-RESEARCH)."
+      },
+      "startupCommand": {
+        "command": "docker compose up chroma (image chromadb/chroma:latest)",
+        "tokens": ["docker"],
+        "resolvesUserRuntime": false,
+        "resolvesDocker": true,
+        "proven": false,
+        "note": "Current startup requires Docker — violates D-41-04."
+      },
+      "readinessEvidence": {
+        "source": "none — no bundled Chroma start recorded; docker image exposes HTTP on :8000 in dev",
+        "proven": false,
+        "files": []
+      },
+      "shutdownEvidence": {
+        "source": "none — docker compose lifecycle only; no owned bundled process-tree shutdown recorded",
+        "proven": false,
+        "files": []
+      },
+      "verdict": "FAIL",
+      "verdictReason": "only Docker-image evidence exists; embedded vs bundled-server decision unresolved; no readiness/shutdown evidence from a bundled start."
+    }
+  ],
+  "overall": {
+    "verdict": "NO-GO",
+    "reason": "Zero of five components satisfies the no-Docker/no-user-runtime executable-start contract. next/agent_service lack a bundled or embedded Node executable in the proof layout; fastapi lacks any bundled Python; postgres_pgvector and vector_store are Docker-image-only. Phase 42-45 execution readiness is therefore blocked (D-41-06).",
+    "failedPrerequisites": [
+      "PREREQ-1 Bundled Node executable: prove server.js (next) and start.mjs (agent_service) start from a bundled/embedded Node binary inside the resource tree (e.g. Electron embedded Node v24.18.1 via ELECTRON_RUN_AS_NODE=1, or a packaged node.exe) with loopback readiness and owned shutdown. Today every recorded start resolves system node; electron dist binary is absent from the proof layout.",
+      "PREREQ-2 Bundled Python for FastAPI: prove a relocatable/standalone Python runtime under the resource root runs uvicorn + backend deps + alembic migrations with writable data under %APPDATA%/NovelMind. The dev venv depends on user-installed Python 3.13.12.",
+      "PREREQ-3 PostgreSQL 16 + pgvector Windows-native distribution: replace the Docker image with a Windows-native bundled distribution and prove init/start/readiness/shutdown on a loopback port. pgvector Windows build/redistribution is unproven.",
+      "PREREQ-4 Vector store bundling: decide embedded mode (chromadb python library inside the bundled FastAPI venv) or a bundled Chroma server, and prove start/readiness/shutdown. Only the Docker image exists today.",
+      "PREREQ-5 Licensing/redistribution: record and bundle redistribution rights for torch/sentence-transformers/litellm (FastAPI AI path), the pgvector extension distribution, Chroma, and @earendil-works/pi-* agent packages; each bundled runtime needs an explicit license/redistribution note.",
+      "PREREQ-6 Packaged writable-path operation: exercise %APPDATA%/NovelMind writable layout (logs, data, sqlite, pgdata, chroma) so the mutable-data row is proven, not just declared by the topology contract."
+    ],
+    "replanningBoundary": "NO-GO may revise packaging internals (per-component bundling adapters, runtime distribution sources, embedded-vs-server vector choice) in a revised 41-03 replan. It must NOT: (a) expand into a broad UI rewrite, (b) weaken the no-Docker/no-user-runtime contract (D-41-04), (c) reduce the 13-route coverage already proven (D-41-02), or (d) alter Phase 22's independent 0/3 blocked verdict. Evidence-hash tampering or an absent mandatory row deterministically forces NO-GO (T-41-03-01); the decision records commands, versions, fixture and timestamp (T-41-03-02)."
+  }
+}

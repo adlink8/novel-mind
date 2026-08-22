@@ -1,0 +1,928 @@
+{
+  "schema_version": "world-model-entity.v1",
+  "description": "Phase 27-03 typed world entity/rule/faction/place/item candidate corpus (REQ-WM-03). Each scenario is a self-contained gate submission with owner/novel/version/cutoff, evidence refs, authority, confidence, aliases, membership/ownership/spatial/item-state links, world rules with first-class exceptions. Alias similarity only produces review candidates (never a silent merge); Reader Chat / user conversation is never a fact source; authority is never implicitly upgraded.",
+  "scenarios": {
+    "valid": {
+      "scope": {
+        "owner_id": 1,
+        "novel_id": 1,
+        "version_id": 1,
+        "source_snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "disclosure_cutoff": 3,
+        "approvals": ["user_interpretation"]
+      },
+      "entities": [
+        {
+          "claim_kind": "entity",
+          "entity_key": "e-place-lin-an",
+          "entity_type": "place",
+          "primary_name": "临安",
+          "description": "临安城，故事主舞台。",
+          "aliases": [{"alias": "临安城"}],
+          "source_kind": "canon_source",
+          "authority": "probable_inference",
+          "confidence": 0.9,
+          "disclosure_cutoff": 1,
+          "source_refs": [
+            {
+              "evidence_id": "ev-place",
+              "chapter_id": 1,
+              "chapter_number": 1,
+              "source_start": 0,
+              "source_end": 90,
+              "content_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+              "source_snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          ],
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 1
+        },
+        {
+          "claim_kind": "entity",
+          "entity_key": "e-faction-southern",
+          "entity_type": "faction",
+          "primary_name": "南境叛军",
+          "description": "起兵对抗朝廷的南方军队。",
+          "aliases": [],
+          "source_kind": "canon_source",
+          "authority": "probable_inference",
+          "confidence": 0.85,
+          "disclosure_cutoff": 2,
+          "source_refs": [
+            {
+              "evidence_id": "ev-faction",
+              "chapter_id": 2,
+              "chapter_number": 2,
+              "source_start": 10,
+              "source_end": 130,
+              "content_hash": "2222222222222222222222222222222222222222222222222222222222222222",
+              "source_snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          ],
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 1
+        },
+        {
+          "claim_kind": "entity",
+          "entity_key": "e-item-seal",
+          "entity_type": "item",
+          "primary_name": "传国玉玺",
+          "description": "传说中镇国之宝。",
+          "aliases": [],
+          "source_kind": "canon_source",
+          "authority": "probable_inference",
+          "confidence": 0.8,
+          "disclosure_cutoff": 3,
+          "source_refs": [
+            {
+              "evidence_id": "ev-seal",
+              "chapter_id": 3,
+              "chapter_number": 3,
+              "source_start": 40,
+              "source_end": 160,
+              "content_hash": "3333333333333333333333333333333333333333333333333333333333333333",
+              "source_snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          ],
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 1
+        },
+        {
+          "claim_kind": "entity",
+          "entity_key": "e-char-lin-an",
+          "entity_type": "entity",
+          "primary_name": "林安",
+          "description": "出身寒门的年轻将领。",
+          "aliases": [{"alias": "林将军"}],
+          "source_kind": "canon_source",
+          "authority": "probable_inference",
+          "confidence": 0.9,
+          "disclosure_cutoff": 1,
+          "source_refs": [
+            {
+              "evidence_id": "ev-char",
+              "chapter_id": 1,
+              "chapter_number": 1,
+              "source_start": 0,
+              "source_end": 80,
+              "content_hash": "4444444444444444444444444444444444444444444444444444444444444444",
+              "source_snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          ],
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 1
+        }
+      ],
+      "links": [
+        {
+          "claim_kind": "entity_link",
+          "link_key": "link-membership-lin-an",
+          "link_kind": "member_of",
+          "source_key": "e-char-lin-an",
+          "target_key": "e-faction-southern",
+          "source_kind": "canon_source",
+          "authority": "probable_inference",
+          "confidence": 0.75,
+          "disclosure_cutoff": 2,
+          "source_refs": [
+            {
+              "evidence_id": "ev-faction",
+              "chapter_id": 2,
+              "chapter_number": 2,
+              "source_start": 10,
+              "source_end": 130,
+              "content_hash": "2222222222222222222222222222222222222222222222222222222222222222",
+              "source_snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          ],
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 1
+        },
+        {
+          "claim_kind": "entity_link",
+          "link_key": "link-owns-seal",
+          "link_kind": "owns",
+          "source_key": "e-char-lin-an",
+          "target_key": "e-item-seal",
+          "source_kind": "canon_source",
+          "authority": "probable_inference",
+          "confidence": 0.7,
+          "disclosure_cutoff": 3,
+          "source_refs": [
+            {
+              "evidence_id": "ev-seal",
+              "chapter_id": 3,
+              "chapter_number": 3,
+              "source_start": 40,
+              "source_end": 160,
+              "content_hash": "3333333333333333333333333333333333333333333333333333333333333333",
+              "source_snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          ],
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 1
+        },
+        {
+          "claim_kind": "entity_link",
+          "link_key": "link-located-faction",
+          "link_kind": "located_in",
+          "source_key": "e-faction-southern",
+          "target_key": "e-place-lin-an",
+          "source_kind": "canon_source",
+          "authority": "probable_inference",
+          "confidence": 0.8,
+          "disclosure_cutoff": 2,
+          "source_refs": [
+            {
+              "evidence_id": "ev-faction",
+              "chapter_id": 2,
+              "chapter_number": 2,
+              "source_start": 10,
+              "source_end": 130,
+              "content_hash": "2222222222222222222222222222222222222222222222222222222222222222",
+              "source_snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          ],
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 1
+        },
+        {
+          "claim_kind": "entity_link",
+          "link_key": "link-carried-seal",
+          "link_kind": "carried_by",
+          "source_key": "e-item-seal",
+          "target_key": "e-char-lin-an",
+          "source_kind": "canon_source",
+          "authority": "probable_inference",
+          "confidence": 0.7,
+          "disclosure_cutoff": 3,
+          "source_refs": [
+            {
+              "evidence_id": "ev-seal",
+              "chapter_id": 3,
+              "chapter_number": 3,
+              "source_start": 40,
+              "source_end": 160,
+              "content_hash": "3333333333333333333333333333333333333333333333333333333333333333",
+              "source_snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          ],
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 1
+        }
+      ],
+      "rules": [
+        {
+          "claim_kind": "rule",
+          "rule_key": "rule-seal",
+          "rule_name": "传国玉玺镇国",
+          "statement": "传国玉玺在，则国运不坠。",
+          "source_kind": "canon_source",
+          "authority": "probable_inference",
+          "confidence": 0.8,
+          "disclosure_cutoff": 3,
+          "source_refs": [
+            {
+              "evidence_id": "ev-seal",
+              "chapter_id": 3,
+              "chapter_number": 3,
+              "source_start": 40,
+              "source_end": 160,
+              "content_hash": "3333333333333333333333333333333333333333333333333333333333333333",
+              "source_snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          ],
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 1
+        }
+      ],
+      "exceptions": [
+        {
+          "claim_kind": "rule_exception",
+          "exception_key": "exc-seal-usurp",
+          "rule_key": "rule-seal",
+          "applies_to": "e-char-lin-an",
+          "statement": "若天子失位，则玉玺不镇国运。",
+          "source_kind": "canon_source",
+          "authority": "probable_inference",
+          "confidence": 0.7,
+          "disclosure_cutoff": 3,
+          "source_refs": [
+            {
+              "evidence_id": "ev-seal",
+              "chapter_id": 3,
+              "chapter_number": 3,
+              "source_start": 40,
+              "source_end": 160,
+              "content_hash": "3333333333333333333333333333333333333333333333333333333333333333",
+              "source_snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          ],
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 1
+        }
+      ]
+    },
+    "alias_collision": {
+      "scope": {
+        "owner_id": 1,
+        "novel_id": 1,
+        "version_id": 2,
+        "source_snapshot_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "disclosure_cutoff": 3,
+        "approvals": []
+      },
+      "entities": [
+        {
+          "claim_kind": "entity",
+          "entity_key": "e-faction-nan",
+          "entity_type": "faction",
+          "primary_name": "南境军",
+          "description": "南境驻扎的军队。",
+          "aliases": [{"alias": "南军"}],
+          "source_kind": "canon_source",
+          "authority": "probable_inference",
+          "confidence": 0.85,
+          "disclosure_cutoff": 2,
+          "source_refs": [
+            {
+              "evidence_id": "ev-nan",
+              "chapter_id": 1,
+              "chapter_number": 1,
+              "source_start": 0,
+              "source_end": 80,
+              "content_hash": "5555555555555555555555555555555555555555555555555555555555555555",
+              "source_snapshot_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            }
+          ],
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 2
+        },
+        {
+          "claim_kind": "entity",
+          "entity_key": "e-faction-nanjiang",
+          "entity_type": "faction",
+          "primary_name": "南疆军",
+          "description": "南疆起兵的军队。",
+          "aliases": [{"alias": "南军"}],
+          "source_kind": "canon_source",
+          "authority": "probable_inference",
+          "confidence": 0.8,
+          "disclosure_cutoff": 2,
+          "source_refs": [
+            {
+              "evidence_id": "ev-nanjiang",
+              "chapter_id": 1,
+              "chapter_number": 1,
+              "source_start": 90,
+              "source_end": 170,
+              "content_hash": "6666666666666666666666666666666666666666666666666666666666666666",
+              "source_snapshot_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            }
+          ],
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 2
+        },
+        {
+          "claim_kind": "entity",
+          "entity_key": "e-place-lin-an",
+          "entity_type": "place",
+          "primary_name": "临安",
+          "description": "临安城。",
+          "aliases": [],
+          "source_kind": "canon_source",
+          "authority": "probable_inference",
+          "confidence": 0.9,
+          "disclosure_cutoff": 1,
+          "source_refs": [
+            {
+              "evidence_id": "ev-place2",
+              "chapter_id": 1,
+              "chapter_number": 1,
+              "source_start": 0,
+              "source_end": 60,
+              "content_hash": "7777777777777777777777777777777777777777777777777777777777777777",
+              "source_snapshot_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            }
+          ],
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 2
+        },
+        {
+          "claim_kind": "entity",
+          "entity_key": "e-place-lin-anfu",
+          "entity_type": "place",
+          "primary_name": "临安府",
+          "description": "临安府衙。",
+          "aliases": [],
+          "source_kind": "canon_source",
+          "authority": "probable_inference",
+          "confidence": 0.85,
+          "disclosure_cutoff": 1,
+          "source_refs": [
+            {
+              "evidence_id": "ev-lin-anfu",
+              "chapter_id": 1,
+              "chapter_number": 1,
+              "source_start": 200,
+              "source_end": 260,
+              "content_hash": "8888888888888888888888888888888888888888888888888888888888888888",
+              "source_snapshot_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            }
+          ],
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 2
+        }
+      ],
+      "links": [],
+      "rules": [],
+      "exceptions": []
+    },
+    "rule_exception": {
+      "scope": {
+        "owner_id": 1,
+        "novel_id": 1,
+        "version_id": 3,
+        "source_snapshot_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "disclosure_cutoff": 4,
+        "approvals": []
+      },
+      "entities": [
+        {
+          "claim_kind": "entity",
+          "entity_key": "e-char-lin-an",
+          "entity_type": "entity",
+          "primary_name": "林安",
+          "description": "年轻将领。",
+          "aliases": [],
+          "source_kind": "canon_source",
+          "authority": "probable_inference",
+          "confidence": 0.9,
+          "disclosure_cutoff": 1,
+          "source_refs": [
+            {
+              "evidence_id": "ev-char2",
+              "chapter_id": 1,
+              "chapter_number": 1,
+              "source_start": 0,
+              "source_end": 80,
+              "content_hash": "9999999999999999999999999999999999999999999999999999999999999999",
+              "source_snapshot_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+            }
+          ],
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 3
+        }
+      ],
+      "links": [],
+      "rules": [
+        {
+          "claim_kind": "rule",
+          "rule_key": "rule-magic",
+          "rule_name": "符法通则",
+          "statement": "以符施法必须持符者本人在场。",
+          "source_kind": "canon_source",
+          "authority": "probable_inference",
+          "confidence": 0.8,
+          "disclosure_cutoff": 2,
+          "source_refs": [
+            {
+              "evidence_id": "ev-magic",
+              "chapter_id": 2,
+              "chapter_number": 2,
+              "source_start": 0,
+              "source_end": 120,
+              "content_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa2",
+              "source_snapshot_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+            }
+          ],
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 3
+        }
+      ],
+      "exceptions": [
+        {
+          "claim_kind": "rule_exception",
+          "exception_key": "exc-magic-moon",
+          "rule_key": "rule-magic",
+          "applies_to": "e-char-lin-an",
+          "statement": "月蚀之夜，代持符可施法。",
+          "source_kind": "canon_source",
+          "authority": "probable_inference",
+          "confidence": 0.7,
+          "disclosure_cutoff": 3,
+          "source_refs": [
+            {
+              "evidence_id": "ev-magic-exc",
+              "chapter_id": 3,
+              "chapter_number": 3,
+              "source_start": 30,
+              "source_end": 140,
+              "content_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbd",
+              "source_snapshot_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+            }
+          ],
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 3
+        }
+      ]
+    },
+    "ownership": {
+      "scope": {
+        "owner_id": 1,
+        "novel_id": 1,
+        "version_id": 4,
+        "source_snapshot_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "disclosure_cutoff": 3,
+        "approvals": []
+      },
+      "entities": [
+        {
+          "claim_kind": "entity",
+          "entity_key": "e-char-lin-an",
+          "entity_type": "entity",
+          "primary_name": "林安",
+          "description": "年轻将领。",
+          "aliases": [],
+          "source_kind": "canon_source",
+          "authority": "probable_inference",
+          "confidence": 0.9,
+          "disclosure_cutoff": 1,
+          "source_refs": [
+            {
+              "evidence_id": "ev-char3",
+              "chapter_id": 1,
+              "chapter_number": 1,
+              "source_start": 0,
+              "source_end": 80,
+              "content_hash": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+              "source_snapshot_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+            }
+          ],
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 4
+        },
+        {
+          "claim_kind": "entity",
+          "entity_key": "e-item-sword",
+          "entity_type": "item",
+          "primary_name": "鸣鸿刀",
+          "description": "林家祖传之刀。",
+          "aliases": [],
+          "source_kind": "canon_source",
+          "authority": "probable_inference",
+          "confidence": 0.85,
+          "disclosure_cutoff": 2,
+          "source_refs": [
+            {
+              "evidence_id": "ev-sword",
+              "chapter_id": 2,
+              "chapter_number": 2,
+              "source_start": 0,
+              "source_end": 100,
+              "content_hash": "edededededededededededededededededededededededededededededededed",
+              "source_snapshot_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+            }
+          ],
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 4
+        },
+        {
+          "claim_kind": "entity",
+          "entity_key": "e-place-camp",
+          "entity_type": "place",
+          "primary_name": "北境大营",
+          "description": "北境驻军营地。",
+          "aliases": [],
+          "source_kind": "canon_source",
+          "authority": "probable_inference",
+          "confidence": 0.8,
+          "disclosure_cutoff": 2,
+          "source_refs": [
+            {
+              "evidence_id": "ev-camp",
+              "chapter_id": 2,
+              "chapter_number": 2,
+              "source_start": 120,
+              "source_end": 220,
+              "content_hash": "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe",
+              "source_snapshot_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+            }
+          ],
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 4
+        }
+      ],
+      "links": [
+        {
+          "claim_kind": "entity_link",
+          "link_key": "link-owns-sword",
+          "link_kind": "owns",
+          "source_key": "e-char-lin-an",
+          "target_key": "e-item-sword",
+          "source_kind": "canon_source",
+          "authority": "probable_inference",
+          "confidence": 0.8,
+          "disclosure_cutoff": 2,
+          "source_refs": [
+            {
+              "evidence_id": "ev-sword",
+              "chapter_id": 2,
+              "chapter_number": 2,
+              "source_start": 0,
+              "source_end": 100,
+              "content_hash": "edededededededededededededededededededededededededededededededed",
+              "source_snapshot_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+            }
+          ],
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 4
+        },
+        {
+          "claim_kind": "entity_link",
+          "link_key": "link-located-lin-an",
+          "link_kind": "located_in",
+          "source_key": "e-char-lin-an",
+          "target_key": "e-place-camp",
+          "source_kind": "canon_source",
+          "authority": "probable_inference",
+          "confidence": 0.8,
+          "disclosure_cutoff": 2,
+          "source_refs": [
+            {
+              "evidence_id": "ev-camp",
+              "chapter_id": 2,
+              "chapter_number": 2,
+              "source_start": 120,
+              "source_end": 220,
+              "content_hash": "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe",
+              "source_snapshot_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+            }
+          ],
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 4
+        },
+        {
+          "claim_kind": "entity_link",
+          "link_key": "link-carried-sword",
+          "link_kind": "carried_by",
+          "source_key": "e-item-sword",
+          "target_key": "e-char-lin-an",
+          "source_kind": "canon_source",
+          "authority": "probable_inference",
+          "confidence": 0.8,
+          "disclosure_cutoff": 2,
+          "source_refs": [
+            {
+              "evidence_id": "ev-sword",
+              "chapter_id": 2,
+              "chapter_number": 2,
+              "source_start": 0,
+              "source_end": 100,
+              "content_hash": "edededededededededededededededededededededededededededededededed",
+              "source_snapshot_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+            }
+          ],
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 4
+        }
+      ],
+      "rules": [],
+      "exceptions": []
+    },
+    "wrong_owner": {
+      "scope": {
+        "owner_id": 1,
+        "novel_id": 1,
+        "version_id": 5,
+        "source_snapshot_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "disclosure_cutoff": 2,
+        "approvals": []
+      },
+      "entities": [
+        {
+          "claim_kind": "entity",
+          "entity_key": "e-stolen",
+          "entity_type": "place",
+          "primary_name": "他人之地",
+          "description": "声称属于另一个作者的地名。",
+          "aliases": [],
+          "source_kind": "canon_source",
+          "authority": "probable_inference",
+          "confidence": 0.8,
+          "disclosure_cutoff": 1,
+          "source_refs": [
+            {
+              "evidence_id": "ev-stolen",
+              "chapter_id": 1,
+              "chapter_number": 1,
+              "source_start": 0,
+              "source_end": 50,
+              "content_hash": "1212121212121212121212121212121212121212121212121212121212121212",
+              "source_snapshot_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+            }
+          ],
+          "owner_id": 2,
+          "novel_id": 1,
+          "version_id": 5
+        }
+      ],
+      "links": [],
+      "rules": [],
+      "exceptions": []
+    },
+    "chat_contamination": {
+      "scope": {
+        "owner_id": 1,
+        "novel_id": 1,
+        "version_id": 6,
+        "source_snapshot_hash": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "disclosure_cutoff": 3,
+        "approvals": ["canon_fact", "user_interpretation"]
+      },
+      "entities": [
+        {
+          "claim_kind": "entity",
+          "entity_key": "e-chat-place",
+          "entity_type": "place",
+          "primary_name": "读者虚构之城",
+          "description": "来自读者讨论的虚构地点。",
+          "aliases": [],
+          "source_kind": "reader_chat",
+          "authority": "probable_inference",
+          "confidence": 0.9,
+          "disclosure_cutoff": 2,
+          "source_refs": [
+            {
+              "evidence_id": "ev-chat-place",
+              "chapter_id": 2,
+              "chapter_number": 2,
+              "source_start": 0,
+              "source_end": 80,
+              "content_hash": "3434343434343434343434343434343434343434343434343434343434343434",
+              "source_snapshot_hash": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+            }
+          ],
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 6
+        }
+      ],
+      "rules": [
+        {
+          "claim_kind": "rule",
+          "rule_key": "rule-chat",
+          "rule_name": "读者推断的规则",
+          "statement": "读者讨论中推断的规则。",
+          "source_kind": "user_conversation",
+          "authority": "canon_fact",
+          "confidence": 0.9,
+          "disclosure_cutoff": 2,
+          "source_refs": [
+            {
+              "evidence_id": "ev-chat-rule",
+              "chapter_id": 2,
+              "chapter_number": 2,
+              "source_start": 100,
+              "source_end": 180,
+              "content_hash": "5656565656565656565656565656565656565656565656565656565656565656",
+              "source_snapshot_hash": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+            }
+          ],
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 6
+        }
+      ],
+      "links": [],
+      "exceptions": []
+    },
+    "spoiler_cutoff": {
+      "scope": {
+        "owner_id": 1,
+        "novel_id": 1,
+        "version_id": 7,
+        "source_snapshot_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+        "disclosure_cutoff": 2,
+        "approvals": []
+      },
+      "entities": [
+        {
+          "claim_kind": "entity",
+          "entity_key": "e-spoiler-twin",
+          "entity_type": "entity",
+          "primary_name": "隐藏的双生子",
+          "description": "第五章才会披露的秘密身份。",
+          "aliases": [],
+          "source_kind": "canon_source",
+          "authority": "probable_inference",
+          "confidence": 0.9,
+          "disclosure_cutoff": 5,
+          "source_refs": [
+            {
+              "evidence_id": "ev-spoiler",
+              "chapter_id": 5,
+              "chapter_number": 5,
+              "source_start": 0,
+              "source_end": 90,
+              "content_hash": "7878787878787878787878787878787878787878787878787878787878787878",
+              "source_snapshot_hash": "1111111111111111111111111111111111111111111111111111111111111111"
+            }
+          ],
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 7
+        }
+      ],
+      "links": [],
+      "rules": [],
+      "exceptions": []
+    },
+    "authority_upgrade": {
+      "scope": {
+        "owner_id": 1,
+        "novel_id": 1,
+        "version_id": 8,
+        "source_snapshot_hash": "2222222222222222222222222222222222222222222222222222222222222222",
+        "disclosure_cutoff": 2,
+        "approvals": []
+      },
+      "entities": [
+        {
+          "claim_kind": "entity",
+          "entity_key": "e-upgrade",
+          "entity_type": "faction",
+          "primary_name": "未证实的势力",
+          "description": "尝试将推断直接写成 canon_fact。",
+          "aliases": [],
+          "source_kind": "canon_source",
+          "authority": "canon_fact",
+          "confidence": 0.9,
+          "disclosure_cutoff": 1,
+          "source_refs": [
+            {
+              "evidence_id": "ev-upgrade",
+              "chapter_id": 1,
+              "chapter_number": 1,
+              "source_start": 0,
+              "source_end": 60,
+              "content_hash": "9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a",
+              "source_snapshot_hash": "2222222222222222222222222222222222222222222222222222222222222222"
+            }
+          ],
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 8
+        }
+      ],
+      "links": [],
+      "rules": [],
+      "exceptions": []
+    },
+    "user_interpretation_unapproved": {
+      "scope": {
+        "owner_id": 1,
+        "novel_id": 1,
+        "version_id": 9,
+        "source_snapshot_hash": "3333333333333333333333333333333333333333333333333333333333333333",
+        "disclosure_cutoff": 2,
+        "approvals": []
+      },
+      "entities": [
+        {
+          "claim_kind": "entity",
+          "entity_key": "e-user-place",
+          "entity_type": "place",
+          "primary_name": "读者解读之地",
+          "description": "未获得确认的用户解读不得落库。",
+          "aliases": [],
+          "source_kind": "canon_source",
+          "authority": "user_interpretation",
+          "confidence": 0.6,
+          "disclosure_cutoff": 1,
+          "source_refs": [
+            {
+              "evidence_id": "ev-user",
+              "chapter_id": 1,
+              "chapter_number": 1,
+              "source_start": 0,
+              "source_end": 55,
+              "content_hash": "bcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbc",
+              "source_snapshot_hash": "3333333333333333333333333333333333333333333333333333333333333333"
+            }
+          ],
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 9
+        }
+      ],
+      "links": [],
+      "rules": [],
+      "exceptions": []
+    },
+    "stale_evidence": {
+      "scope": {
+        "owner_id": 1,
+        "novel_id": 1,
+        "version_id": 10,
+        "source_snapshot_hash": "4444444444444444444444444444444444444444444444444444444444444444",
+        "disclosure_cutoff": 2,
+        "approvals": []
+      },
+      "entities": [
+        {
+          "claim_kind": "entity",
+          "entity_key": "e-stale",
+          "entity_type": "place",
+          "primary_name": "旧快照之地",
+          "description": "引用已过时的来源快照。",
+          "aliases": [],
+          "source_kind": "canon_source",
+          "authority": "probable_inference",
+          "confidence": 0.8,
+          "disclosure_cutoff": 1,
+          "source_refs": [
+            {
+              "evidence_id": "ev-stale",
+              "chapter_id": 1,
+              "chapter_number": 1,
+              "source_start": 0,
+              "source_end": 70,
+              "content_hash": "dededededededededededededededededededededededededededededededede",
+              "source_snapshot_hash": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+            }
+          ],
+          "owner_id": 1,
+          "novel_id": 1,
+          "version_id": 10
+        }
+      ],
+      "links": [],
+      "rules": [],
+      "exceptions": []
+    }
+  }
+}

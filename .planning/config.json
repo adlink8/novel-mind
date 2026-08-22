@@ -1,12 +1,12 @@
 {
   "project": "NovelMind",
   "baseline_branch": "master",
-  "baseline_commit": "912ca6b423d6c2309bc2972cbfc083c4eaa280e1",
-  "active_milestone": "v1.1",
-  "active_phase": "22-ci-nightly-gap-closure",
-  "active_plan": "22-G2",
-  "status": "blocked",
-  "auto_start": ".planning/phases/22-ci-nightly-gap-closure/22-G2-PLAN.md",
+  "baseline_commit": "29be2fa3928ada9e9211ffa08f3af0eec734bb95",
+  "active_milestone": "v1.6",
+  "active_phase": "46-provider-protocol-unification-and-live-qualification",
+  "active_plan": "46-01",
+  "status": "in_progress",
+  "auto_start": ".planning/phases/46-provider-protocol-unification-and-live-qualification/46-01-PLAN.md",
   "gate_overrides": {
     "phase_22_to_26": {
       "authorized": true,
@@ -22,6 +22,93 @@
       "reason": "User explicitly authorized skipping the Phase 22 3/3 gate to start the Phase 25.2-01 Pi SDK spike (interactive confirmation, AskUserQuestion).",
       "preserve_phase_22_verdict": true,
       "upstream_verification_still_required": true
+    },
+    "phase_26_execution": {
+      "authorized": true,
+      "authorized_at": "2026-08-02",
+      "scope": "execution_phase_26-01_to_26-06",
+      "reason": "User explicitly authorized skipping the Phase 22 3/3 gate for Phase 26 implementation (interactive confirmation, AskUserQuestion).",
+      "preserve_phase_22_verdict": true,
+      "upstream_verification_still_required": true
+    },
+    "phase_27_execution": {
+      "authorized": true,
+      "authorized_at": "2026-08-03",
+      "scope": "execution_phase_27-01_to_27-05",
+      "reason": "User explicitly authorized skipping the Phase 22 3/3 gate for Phase 27 implementation (interactive confirmation, AskUserQuestion).",
+      "preserve_phase_22_verdict": true,
+      "upstream_verification_still_required": true
+    },
+    "phase_28_execution": {
+      "authorized": true,
+      "authorized_at": "2026-08-03",
+      "scope": "execution_phase_28-01_to_28-05",
+      "reason": "User authorized continuing phase execution and skipping the Phase 22 3/3 gate (multi-agent progression, no limit).",
+      "preserve_phase_22_verdict": true,
+      "upstream_verification_still_required": true
+    },
+    "phase_29_execution": {
+      "authorized": true,
+      "authorized_at": "2026-08-03",
+      "scope": "execution_phase_29-01_to_29-05",
+      "reason": "User authorized continuing phase execution and skipping the Phase 22 3/3 gate for Phase 29 implementation (interactive confirmation, AskUserQuestion).",
+      "preserve_phase_22_verdict": true,
+      "upstream_verification_still_required": true
+    },
+    "phase_30_execution": {
+      "authorized": true,
+      "authorized_at": "2026-08-03",
+      "scope": "execution_phase_30-01_to_30-05",
+      "reason": "User authorized continuing phase execution and skipping the Phase 22 3/3 gate for Phase 30 implementation (interactive confirmation, AskUserQuestion).",
+      "preserve_phase_22_verdict": true,
+      "upstream_verification_still_required": true
+    },
+    "phase_31_execution": {
+      "authorized": true,
+      "authorized_at": "2026-08-03",
+      "scope": "execution_phase_31-01_to_31-04",
+      "reason": "User authorized continuing phase execution and skipping the Phase 22 3/3 gate for Phase 31 implementation (interactive confirmation, AskUserQuestion).",
+      "preserve_phase_22_verdict": true,
+      "upstream_verification_still_required": true
+    },
+    "phase_32_execution": {
+      "authorized": true,
+      "authorized_at": "2026-08-03",
+      "scope": "execution_phase_32-01_to_32-05",
+      "reason": "User authorized continuing phase execution and skipping the Phase 22 3/3 gate for Phase 32 implementation (interactive confirmation, AskUserQuestion).",
+      "preserve_phase_22_verdict": true,
+      "upstream_verification_still_required": true
+    },
+    "phase_33_execution": {
+      "authorized": true,
+      "authorized_at": "2026-08-03",
+      "scope": "execution_phase_33-01_to_33-05",
+      "reason": "User authorized continuing phase execution and skipping the Phase 22 3/3 gate for Phase 33 implementation (interactive confirmation, AskUserQuestion).",
+      "preserve_phase_22_verdict": true,
+      "upstream_verification_still_required": true
+    },
+    "phase_34_execution": {
+      "authorized": true,
+      "authorized_at": "2026-08-04",
+      "scope": "execution_phase_34-01_to_34-05",
+      "reason": "User authorized continuing phase execution and skipping the Phase 22 3/3 gate for Phase 34 implementation (interactive confirmation, AskUserQuestion).",
+      "preserve_phase_22_verdict": true,
+      "upstream_verification_still_required": true
+    },
+    "phase_35_39_execution": {
+      "authorized": true,
+      "authorized_at": "2026-08-04",
+      "scope": "execution_phase_35-01_to_39-05",
+      "reason": "User authorized continuing phase execution through Phase 39 and skipping the Phase 22 3/3 gate (interactive confirmation, AskUserQuestion).",
+      "preserve_phase_22_verdict": true,
+      "upstream_verification_still_required": true
+    },
+    "phase_42_45_execution": {
+      "authorized": true,
+      "authorized_at": "2026-08-10",
+      "scope": "execution_phase_42-01_to_45-04",
+      "reason": "User explicitly authorized completing phases 42-45 (interactive confirmation) despite Phase 41-03 NO-GO; prerequisite #1 (bundled Node via ELECTRON_RUN_AS_NODE) proven; remaining prerequisites to be closed within 42-45.",
+      "preserve_phase_41_verdict": true
     }
   },
   "commit_docs": true,
@@ -52,6 +139,7 @@
     "backlog": "999.x"
   },
   "workflow": {
-    "_auto_chain_active": false
+    "_auto_chain_active": false,
+    "nyquist_validation": true
   }
 }

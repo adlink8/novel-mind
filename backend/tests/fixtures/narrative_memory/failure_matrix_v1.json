@@ -1,0 +1,128 @@
+{
+  "schema_version": "1",
+  "description": "Phase 28-01 failure injection matrix for whole-book builder recovery (D-02/D-03/D-04).",
+  "matrix": [
+    {
+      "id": "crash-after-reserve",
+      "class": "crash",
+      "inject_at": "after_budget_reservation",
+      "stage_kind": "chapter_state",
+      "expected_terminal": "isolated",
+      "expected_reason_code": "internal_error",
+      "recoverable": true,
+      "retry_policy": "requeue_manually"
+    },
+    {
+      "id": "crash-mid-transport",
+      "class": "crash",
+      "inject_at": "during_transport",
+      "stage_kind": "chapter_state",
+      "expected_terminal": "isolated",
+      "expected_reason_code": "provider_transport_error",
+      "recoverable": true,
+      "retry_policy": "requeue_manually"
+    },
+    {
+      "id": "retry-preserves-completed",
+      "class": "retry",
+      "inject_at": "second_attempt",
+      "stage_kind": "chapter_state",
+      "expected_terminal": "completed",
+      "expected_reason_code": "completed_candidate",
+      "recoverable": true,
+      "retry_policy": "resume_skips_terminal"
+    },
+    {
+      "id": "cancel-before-transport",
+      "class": "cancel",
+      "inject_at": "cancel_requested",
+      "stage_kind": "chapter_state",
+      "expected_terminal": "isolated",
+      "expected_reason_code": "cancel_requested",
+      "recoverable": false,
+      "retry_policy": "new_run"
+    },
+    {
+      "id": "provider-5xx",
+      "class": "provider",
+      "inject_at": "transport_raise",
+      "stage_kind": "chapter_state",
+      "expected_terminal": "isolated",
+      "expected_reason_code": "provider_transport_error",
+      "recoverable": true,
+      "retry_policy": "requeue_manually"
+    },
+    {
+      "id": "provider-schema-invalid",
+      "class": "provider",
+      "inject_at": "invalid_output",
+      "stage_kind": "chapter_state",
+      "expected_terminal": "isolated",
+      "expected_reason_code": "schema_invalid",
+      "recoverable": true,
+      "retry_policy": "requeue_manually"
+    },
+    {
+      "id": "budget-exceeded",
+      "class": "budget",
+      "inject_at": "reserve_reject",
+      "stage_kind": "chapter_state",
+      "expected_terminal": "isolated",
+      "expected_reason_code": "budget_exceeded",
+      "recoverable": true,
+      "retry_policy": "pause_and_adjust_budget"
+    },
+    {
+      "id": "budget-unknown-pricing",
+      "class": "budget",
+      "inject_at": "unknown_price",
+      "stage_kind": "chapter_state",
+      "expected_terminal": "isolated",
+      "expected_reason_code": "unknown_pricing",
+      "recoverable": true,
+      "retry_policy": "pause_until_pricing"
+    },
+    {
+      "id": "stale-cache-source-drift",
+      "class": "stale-cache",
+      "inject_at": "source_checksum_changed",
+      "stage_kind": "chapter_state",
+      "expected_terminal": "blocked",
+      "expected_reason_code": "source_snapshot_drift",
+      "recoverable": true,
+      "retry_policy": "rebuild_chapter_only"
+    },
+    {
+      "id": "stale-cache-lineage-drift",
+      "class": "stale-cache",
+      "inject_at": "model_lineage_changed",
+      "stage_kind": "chapter_state",
+      "expected_terminal": "blocked",
+      "expected_reason_code": "stale_cache_rejected",
+      "recoverable": true,
+      "retry_policy": "rebuild_chapter_only"
+    },
+    {
+      "id": "owner-mismatch",
+      "class": "owner",
+      "inject_at": "wrong_owner_resume",
+      "stage_kind": "chapter_state",
+      "expected_terminal": "blocked",
+      "expected_reason_code": "owner_mismatch",
+      "recoverable": false,
+      "retry_policy": "authorize_owner"
+    },
+    {
+      "id": "chapter-isolation-blocks-dependents",
+      "class": "isolation",
+      "inject_at": "chapter_failure",
+      "stage_kind": "chapter_state",
+      "expected_terminal": "isolated",
+      "expected_reason_code": "internal_error",
+      "dependent_terminal": "blocked",
+      "dependent_reason_code": "dependency_failed",
+      "recoverable": true,
+      "retry_policy": "resume_without_whole_book_restart"
+    }
+  ]
+}

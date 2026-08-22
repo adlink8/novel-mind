@@ -63,12 +63,12 @@ Downstream agents MUST read these before planning or implementing.
 - `backend/app/services/eval_service.py` - eval result persistence and metric pattern.
 
 ### Local Reference Project
-- `C:\Users\li\Desktop\数据分析\.planning\codebase\ARCHITECTURE.md` - layered SQLite + Chroma + graph relation pipeline.
-- `C:\Users\li\Desktop\数据分析\integration\db\DEPRECATED.md` - explicit rule that vector similarity is not graph truth.
-- `C:\Users\li\Desktop\数据分析\integration\scripts\build_graph_relation_candidates_v2.py` - LLM candidate proposal after coarse recall.
-- `C:\Users\li\Desktop\数据分析\integration\scripts\judge_graph_relations.py` - LLM relation judgment with structured output.
-- `C:\Users\li\Desktop\数据分析\integration\scripts\evaluate_graph_relation_judgments.py` - deterministic evidence gate before accepted graph edges.
-- `C:\Users\li\Desktop\数据分析\integration\scripts\build_conversation_graph.py` - accepted-edge graph projection.
+- `C:\Users\<user>\Desktop\数据分析\.planning\codebase\ARCHITECTURE.md` - layered SQLite + Chroma + graph relation pipeline.
+- `C:\Users\<user>\Desktop\数据分析\integration\db\DEPRECATED.md` - explicit rule that vector similarity is not graph truth.
+- `C:\Users\<user>\Desktop\数据分析\integration\scripts\build_graph_relation_candidates_v2.py` - LLM candidate proposal after coarse recall.
+- `C:\Users\<user>\Desktop\数据分析\integration\scripts\judge_graph_relations.py` - LLM relation judgment with structured output.
+- `C:\Users\<user>\Desktop\数据分析\integration\scripts\evaluate_graph_relation_judgments.py` - deterministic evidence gate before accepted graph edges.
+- `C:\Users\<user>\Desktop\数据分析\integration\scripts\build_conversation_graph.py` - accepted-edge graph projection.
 
 </canonical_refs>
 

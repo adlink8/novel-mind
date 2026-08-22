@@ -22,11 +22,18 @@ ChromaDB 向量存储服务
 
 import asyncio
 import logging
+import os
 from typing import Any
 
 import chromadb
 
 logger = logging.getLogger(__name__)
+
+
+def _env_or(default: str, name: str) -> str:
+    """Read a runtime override from the environment (NOVELMIND_ prefix)."""
+    value = os.getenv(name)
+    return value if value not in (None, "") else default
 
 
 class VectorStoreError(Exception):
@@ -41,16 +48,18 @@ class VectorStore:
     所有方法均为异步，内部使用 asyncio.to_thread 包装同步调用。
     """
 
-    def __init__(self, host: str = "localhost", port: int = 8001):
+    def __init__(self, host: str | None = None, port: int | None = None):
         """
         初始化 ChromaDB HTTP 客户端。
 
         Args:
-            host: ChromaDB 服务地址
-            port: ChromaDB 服务端口（docker-compose 中映射的宿主机端口）
+            host: ChromaDB 服务地址。默认 localhost；可由环境变量
+                NOVELMIND_VECTOR_HOST 覆盖（桌面运行时的动态端口注入通道）。
+            port: ChromaDB 服务端口。默认 8001；可由环境变量
+                NOVELMIND_VECTOR_PORT 覆盖（docker-compose 中映射的宿主机端口）。
         """
-        self.host = host
-        self.port = port
+        self.host = host if host is not None else _env_or("localhost", "NOVELMIND_VECTOR_HOST")
+        self.port = port if port is not None else int(_env_or("8001", "NOVELMIND_VECTOR_PORT"))
         self._client = None
 
     @property

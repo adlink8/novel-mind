@@ -12,9 +12,21 @@ cd backend
 .\.venv\Scripts\python.exe -m pip_audit --local --skip-editable
 ```
 
-结果（2026-06-13）：236 tests passed；Ruff 0；Bandit 0 High/Medium；pip-audit 0。已知的 `chromadb` 非关键风险单独跟踪，不阻断当前基线。
+结果（2026-08-15）：3595 passed；另有 15 个预存失败为环境问题（Windows 控制台编码断言 + ChromaDB 未启动），与本分支无关。已知的 `chromadb` 非关键风险单独跟踪，不阻断当前基线。
+
+分类门禁：每个测试文件必须声明 `pytestmark = pytest.mark.unit|contract|integration|live` 之一（`pytest.ini` 注册，`--strict-markers` 启用），否则收集失败。测试按 `tests/unit/`、`contract/`、`integration/`、`adversarial/`、`live/` 分层。
 
 测试覆盖健康检查、认证、匿名拒绝、跨用户小说/模型隔离、上传编码、路径约束、SSRF、加密兼容、文件事务回滚、持久化导入任务、语义分块、向量存储、混合检索、RAG 评测和端到端流程。SQLite 测试不能替代 PostgreSQL migration 验证。
+
+## Agent Service
+
+```powershell
+cd agent-service
+npm test
+npm run build
+```
+
+结果（2026-08-15）：vitest 1146 tests passed。`npm run build` 为 typecheck（tsc）+ skill 资源同步进 dist。
 
 ## Frontend
 

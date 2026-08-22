@@ -98,7 +98,7 @@ def test_migration_chain_is_serial_from_18appsetting1():
 
 def _kg_judgment(**overrides):
     judgment = MagicMock()
-    judgment.model_name = overrides.get("model_name", "vertex_google/gemini")
+    judgment.model_name = overrides.get("model_name", "gemini/gemini-2.5-flash")
     judgment.structured_output = overrides.get("structured_output", {})
     judgment.raw_output = overrides.get("raw_output", {})
     return judgment

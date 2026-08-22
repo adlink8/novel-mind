@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "CitedAnswerArtifact",
-  "description": "Cited Answer Artifact 信封（D-10）。镜像 backend app.schemas.agent_runtime.CitedAnswerArtifact：type / schema_version / owner / novel / branch / producing skill+version / model lineage / source versions / input_hash / evidence_refs / answer / status / parent_revision。",
+  "description": "Cited Answer Artifact 信封（D-10 / 26-06）。镜像 backend app.schemas.agent_runtime.CitedAnswerArtifact：type / schema_version / owner / novel / branch / producing skill+version / model lineage / source versions / input_hash / evidence_refs / answer / status / parent_revision / normalization。normalization 是 26-06 修复血缘 trail（raw_hash / repaired_hash / normalization_actions / warnings）：本 schema 声明并校验其形状；权威的 required 强制在 backend CitedAnswerArtifact wire 模型（finalize 完整性门）。artifact_id / revision_id 由后端确定性 finalizer 在写入时分配，不在本信封内。",
   "type": "object",
   "required": [
     "type",
@@ -55,7 +55,7 @@
     },
     "source_versions": {
       "type": "object",
-      "description": "数据源版本（novel/chapter/检索等）"
+      "description": "数据源版本（novel/chapter/检索等；source snapshot 血缘）"
     },
     "input_hash": {
       "type": "string",
@@ -66,7 +66,7 @@
       "type": "array",
       "items": { "type": "string" },
       "minItems": 1,
-      "description": "引证列表，必须 ⊆ 冻结 manifest 白名单"
+      "description": "引证列表，必须 ⊆ 冻结 manifest 白名单（leaf/raw 证据，D-08）"
     },
     "answer": {
       "type": "object",
@@ -113,11 +113,47 @@
     },
     "status": {
       "enum": ["candidate", "validated", "approved", "published", "rejected"],
-      "description": "产物状态；finalize 写入时恒为 candidate"
+      "description": "产物状态；finalize 写入时恒为 candidate（无自动 promotion）"
     },
     "parent_revision": {
       "type": ["string", "null"],
       "description": "父修订引用；首个修订为 null"
+    },
+    "normalization": {
+      "type": "object",
+      "description": "26-06 修复血缘 trail：repaired_hash 是对不含本 trail 的 repaired payload 的 canonical SHA-256；raw_hash 是原始模型输出的 canonical SHA-256；normalization_actions 每项含 path/action/after。",
+      "required": ["raw_hash", "repaired_hash", "normalization_actions", "warnings"],
+      "properties": {
+        "raw_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "repaired_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "normalization_actions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path", "action", "after"],
+            "properties": {
+              "path": { "type": "string", "minLength": 1 },
+              "action": {
+                "type": "string",
+                "enum": ["alias", "alias_dedup", "enum_canonicalize", "container_shape", "lineage_merge"]
+              },
+              "before": {},
+              "after": {},
+              "reason": { "type": "string" }
+            }
+          }
+        },
+        "warnings": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
     }
   },
   "additionalProperties": false

@@ -20,9 +20,11 @@ from contextlib import asynccontextmanager
 from sqlalchemy.engine import make_url
 
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from app.middleware.desktop_local_auth import DesktopLocalAuthMiddleware
 from app.api import (
     novels,
     analysis,
@@ -34,17 +36,49 @@ from app.api import (
     rag,
     search,
 )
+from app.api.agent_tools import router as agent_tools_router
+from app.api.agent_skills import router as agent_skills_router
+from app.api.agent_runs import router as agent_runs_router
+from app.api.agent_artifacts import router as agent_artifacts_router
+from app.api.agent_approvals import router as agent_approvals_router
+from app.api.agent_service_runs import service_router as agent_service_router
+from app.api.chapter_batches import router as chapter_batches_router
 from app.api.clues import router as clues_router
 from app.api.asset_audit import router as asset_audit_router
 from app.api.eval import router as eval_router
+from app.api.gateway import router as gateway_router
 from app.api.knowledge import router as knowledge_router
 from app.api.narrative_memory import router as narrative_memory_router
 from app.api.reader_chat import router as reader_chat_router
+from app.api.user_preference_memory import router as user_preference_memory_router
 from app.api.relationships import router as relationships_router
 from app.api.settings import router as settings_router
+from app.api.tool_connectors import router as tool_connectors_router, run_router as tool_connector_run_router
 from app.api.usage import router as usage_router
+from app.api.visual_bible import router as visual_bible_router
+from app.api.key_scenes import router as key_scenes_router
+from app.api.scene_specs import router as scene_specs_router
+from app.api.prompt_revisions import router as prompt_revisions_router
+from app.api.illustrations import router as illustrations_router
+from app.api.illustration_anchors import router as illustration_anchors_router
+from app.api.export import router as export_router
+from app.api.bookmarks import router as bookmarks_router
+from app.api.canon_fork import router as canon_fork_router
+from app.api.canon_retrieval import router as canon_retrieval_router
+from app.api.derivative_projects import router as derivative_projects_router
+from app.api.derivative_chapters import router as derivative_chapters_router
+from app.api.derivative_revisions import router as derivative_revisions_router
+from app.api.derivative_context import router as derivative_context_router
+from app.api.derivative_generation import router as derivative_generation_router
+from app.api.derivative_overrides import router as derivative_overrides_router
+from app.api.derivative_visual import router as derivative_visual_router
+from app.api.derivative_visual_assets import router as derivative_visual_assets_router
+from app.api.derivative_visual_review import router as derivative_visual_review_router
+from app.api.agent_derivative_edits import router as agent_derivative_edits_router
+from app.api.derivative_export import router as derivative_export_router
 from app.config import settings
 from app.core.logging import RequestLoggingMiddleware, setup_logging
+from app.services.agent_tools.errors import AgentToolError
 
 logger = logging.getLogger("novelmind")
 
@@ -149,6 +183,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# 桌面本地会话认证（Phase 44-02 / D-44-04）：显式配置 NOVELMIND_LOCAL_AUTH_SECRET
+# 后，对本地桌面会话强制 audience/expiry 绑定的 Bearer 令牌；未配置时仅允许
+# 127.0.0.1/::1 回环来源（浏览器开发模式走现有 JWT/cookie，不被隐式绕过）。
+app.add_middleware(DesktopLocalAuthMiddleware, secret=settings.local_auth_secret)
+
 
 # ── 全局异常处理 ──
 
@@ -181,6 +220,60 @@ async def value_error_handler(request: Request, exc: ValueError):
     )
 
 
+# 智能体工具错误 → 冻结错误码信封 {error: {code, message}}（25.2-02 / D-07）。
+# 该错误类型只由 agent-tools 门面抛出，因此不影响其他 API 的错误形状。
+@app.exception_handler(AgentToolError)
+async def agent_tool_error_handler(request: Request, exc: AgentToolError):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"error": {"code": exc.code, "message": exc.message}},
+    )
+
+
+# 请求校验失败（FastAPI 422）: agent-tools / gateway 路径包装为冻结的
+# invalid_input 错误码；其余路径保持 FastAPI 默认 422 形状，避免回归。
+@app.exception_handler(RequestValidationError)
+async def request_validation_error_handler(
+    request: Request, exc: RequestValidationError
+):
+    if request.url.path.startswith("/api/agent-tools") or request.url.path.startswith(
+        "/api/gateway"
+    ):
+        # 字段级明细浮现给模型（agent-tools 的主要调用方）：泛化消息会让模型
+        # 盲目重试同一错误参数（E2E 实测 422 死循环烧穿 max_calls 预算）。
+        details: list[str] = []
+        for err in exc.errors()[:5]:
+            loc = ".".join(str(part) for part in err.get("loc", ()))
+            msg = str(err.get("msg", ""))
+            entry = f"{loc}: {msg}".strip(": ")
+            if entry:
+                details.append(entry)
+        message = "参数校验失败"
+        if details:
+            message = f"{message}（{'; '.join(details)}）"[:500]
+        # 诊断日志：记录失败请求体（工具参数，无密钥——令牌只在 header），
+        # 否则模型的参数错误形状完全不可观测。
+        try:
+            body = await request.body()
+            logger.warning(
+                "agent-tools 422 %s body=%s errors=%s",
+                request.url.path,
+                body[:300].decode("utf-8", errors="replace"),
+                details,
+            )
+        except Exception:
+            pass
+        return JSONResponse(
+            status_code=422,
+            content={"error": {"code": "invalid_input", "message": message}},
+        )
+    from fastapi.encoders import jsonable_encoder
+
+    return JSONResponse(
+        status_code=422, content={"detail": jsonable_encoder(exc.errors())}
+    )
+
+
 # ── 注册 API 路由 ──
 # 每个路由模块负责一个业务领域，prefix 定义 URL 前缀，tags 用于 Swagger 分组
 app.include_router(auth.router, prefix="/api/auth", tags=["认证"])
@@ -203,6 +296,8 @@ app.include_router(
 app.include_router(fanfiction.router, prefix="/api/fanfiction", tags=["同人文"])
 app.include_router(models.router, prefix="/api/models", tags=["AI 模型"])
 app.include_router(settings_router, prefix="/api/settings", tags=["设置中心"])
+app.include_router(tool_connectors_router, prefix="/api/extensions", tags=["受限 Tool 扩展"])
+app.include_router(tool_connector_run_router, prefix="/api/agent-tools", tags=["受限 Tool 运行代理"])
 app.include_router(usage_router, prefix="/api/usage", tags=["用量统计"])
 app.include_router(rag.router, prefix="/api/novels", tags=["RAG 检索"])
 app.include_router(knowledge_router)
@@ -212,6 +307,156 @@ app.include_router(
     reader_chat_router,
     prefix="/api/novels",
     tags=["阅读器对话"],
+)
+app.include_router(
+    user_preference_memory_router,
+    prefix="/api/memory/preferences",
+    tags=["用户习惯记忆"],
+)
+app.include_router(
+    agent_tools_router,
+    prefix="/api/agent-tools",
+    tags=["智能体工具"],
+)
+app.include_router(
+    gateway_router,
+    prefix="/api/gateway",
+    tags=["模型网关"],
+)
+app.include_router(
+    agent_skills_router,
+    prefix="/api/agent",
+    tags=["智能体运行时"],
+)
+app.include_router(
+    agent_runs_router,
+    prefix="/api/agent",
+    tags=["智能体运行时"],
+)
+app.include_router(
+    chapter_batches_router,
+    prefix="/api/agent",
+    tags=["章节分析批量编排"],
+)
+app.include_router(
+    agent_artifacts_router,
+    prefix="/api/agent",
+    tags=["智能体运行时"],
+)
+app.include_router(
+    agent_approvals_router,
+    prefix="/api/agent",
+    tags=["智能体运行时"],
+)
+app.include_router(
+    agent_service_router,
+    prefix="/api/agent",
+    tags=["智能体运行时（service）"],
+)
+app.include_router(
+    visual_bible_router,
+    prefix="/api/novels",
+    tags=["视觉圣经"],
+)
+app.include_router(
+    key_scenes_router,
+    prefix="/api/novels",
+    tags=["关键场景"],
+)
+app.include_router(
+    scene_specs_router,
+    prefix="/api/novels",
+    tags=["场景规格"],
+)
+app.include_router(
+    prompt_revisions_router,
+    prefix="/api/novels",
+    tags=["提示词修订"],
+)
+app.include_router(
+    illustrations_router,
+    prefix="/api/novels",
+    tags=["插图生成"],
+)
+app.include_router(
+    illustration_anchors_router,
+    prefix="/api/novels",
+    tags=["插图锚点"],
+)
+app.include_router(
+    export_router,
+    prefix="/api/novels",
+    tags=["小说导出"],
+)
+app.include_router(
+    bookmarks_router,
+    prefix="/api/novels",
+    tags=["书签"],
+)
+app.include_router(
+    canon_fork_router,
+    prefix="/api/novels",
+    tags=["Canon Fork"],
+)
+app.include_router(
+    canon_retrieval_router,
+    prefix="/api/novels",
+    tags=["Canon Fork Retrieval"],
+)
+app.include_router(
+    derivative_projects_router,
+    prefix="/api/novels",
+    tags=["Derivative Projects"],
+)
+app.include_router(
+    derivative_chapters_router,
+    prefix="/api/novels",
+    tags=["Derivative Chapters"],
+)
+app.include_router(
+    derivative_revisions_router,
+    prefix="/api/novels",
+    tags=["Derivative Revisions"],
+)
+app.include_router(
+    derivative_context_router,
+    prefix="/api/novels",
+    tags=["Derivative Context Packages"],
+)
+app.include_router(
+    derivative_generation_router,
+    prefix="/api/novels",
+    tags=["Derivative Generation Jobs"],
+)
+app.include_router(
+    derivative_overrides_router,
+    prefix="/api/novels",
+    tags=["Derivative Overrides"],
+)
+app.include_router(
+    derivative_visual_router,
+    prefix="/api/novels",
+    tags=["Derivative Visual"],
+)
+app.include_router(
+    derivative_visual_assets_router,
+    prefix="/api/novels",
+    tags=["Derivative Visual Assets"],
+)
+app.include_router(
+    derivative_visual_review_router,
+    prefix="/api/novels",
+    tags=["Derivative Visual Review"],
+)
+app.include_router(
+    agent_derivative_edits_router,
+    prefix="/api/agent",
+    tags=["Agent Derivative Edits"],
+)
+app.include_router(
+    derivative_export_router,
+    prefix="/api/novels",
+    tags=["Derivative Export"],
 )
 
 

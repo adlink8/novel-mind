@@ -1,0 +1,4 @@
+[
+  { "id": "novel-001", "title": "Whispers of the Star Sea", "genre": "Sci-Fi", "createdAt": "2026-06-01T08:00:00.000Z", "wordCount": 12800, "status": "in-progress" },
+  { "id": "novel-002", "title": "Fogbound Notebook", "genre": "Mystery", "createdAt": "2026-06-15T09:30:00.000Z", "wordCount": 9400, "status": "draft" }
+]

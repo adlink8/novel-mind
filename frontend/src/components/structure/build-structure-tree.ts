@@ -43,7 +43,13 @@ function isStageKeyLabel(label: string): boolean {
 /** Fallback tree when no NM candidate: book root + one node per chapter. */
 export function buildChapterFallbackTree(
   chapterCount: number,
-  options?: { titles?: Record<number, string> }
+  options?: {
+    titles?: Record<number, string>;
+    chapters?: ReadonlyArray<{
+      chapter_number: number;
+      title?: string | null;
+    }>;
+  }
 ): StructureTreeNode[] {
   const n = Math.max(0, Math.floor(chapterCount));
   if (n < 1) {
@@ -59,25 +65,39 @@ export function buildChapterFallbackTree(
     ];
   }
 
-  const children: StructureTreeNode[] = [];
-  for (let i = 1; i <= n; i += 1) {
-    children.push({
-      id: `chapter:${i}`,
-      kind: "chapter",
-      label: formatChapterLabel(i, options?.titles?.[i]),
-      chapterStart: i,
-      chapterEnd: i,
-      children: [],
-    });
-  }
+  const actualChapters = [...(options?.chapters ?? [])]
+    .filter(
+      (chapter) =>
+        Number.isInteger(chapter.chapter_number) && chapter.chapter_number >= 1
+    )
+    .sort((a, b) => a.chapter_number - b.chapter_number);
+  const chapterNumbers = actualChapters.length
+    ? [...new Set(actualChapters.map((chapter) => chapter.chapter_number))]
+    : Array.from({ length: n }, (_, index) => index + 1);
+  const actualTitles = new Map(
+    actualChapters.map((chapter) => [chapter.chapter_number, chapter.title])
+  );
+  const children: StructureTreeNode[] = chapterNumbers.map((chapterNumber) => ({
+    id: `chapter:${chapterNumber}`,
+    kind: "chapter",
+    label: formatChapterLabel(
+      chapterNumber,
+      actualTitles.get(chapterNumber) ?? options?.titles?.[chapterNumber]
+    ),
+    chapterStart: chapterNumber,
+    chapterEnd: chapterNumber,
+    children: [],
+  }));
+  const firstChapter = chapterNumbers[0];
+  const lastChapter = chapterNumbers[chapterNumbers.length - 1];
 
   return [
     {
       id: "book",
       kind: "book",
       label: "全书结构",
-      chapterStart: 1,
-      chapterEnd: n,
+      chapterStart: firstChapter,
+      chapterEnd: lastChapter,
       children,
     },
   ];

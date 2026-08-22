@@ -1,0 +1,358 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CompileSceneSpecOutput",
+  "description": "SceneSpecArtifact / PromptArtifact 信封（D-32-01..D-32-04 / Phase 32）。镜像 backend app.schemas.agent_runtime.SceneSpecArtifact / PromptArtifact：type / schema_version / owner / novel / branch / producing skill+version / model lineage / source versions / input_hash / evidence_refs / tool_runs / status / parent_revision / normalization。`scene_spec` 负载携带完整 SceneSpecContract（spec_key / scene_candidate_hash / visual_bible_revision_hash / source snapshot / cutoff / compiler lineage / details / negative_constraints / uncertainties），`prompt_revision` 负载携带完整 PromptRevisionContract（adapter lineage + 可重放 input_hash/prompt_hash），其 review_state 恒为 candidate——approval（`scene_spec:approve`）只授权 Phase 33 消费，是显式、append-only 的服务端状态迁移（D-32-04），Agent 绝不能伪造批准；确定性 Canon/Visual Bible 一致性与未支持细节 validator 拥有 legality 权威（D-32-02），无 unsupported Canon。artifact_id / revision_id / skill_run_id 由后端确定性 finalizer 在写入时分配，模型输出不含。",
+  "type": "object",
+  "oneOf": [
+    { "$ref": "#/definitions/scene_spec_artifact" },
+    { "$ref": "#/definitions/prompt_artifact" }
+  ],
+  "definitions": {
+    "scene_spec_payload": {
+      "type": "object",
+      "description": "完整 SceneSpecContract：D-32-01..D-32-04 确定性编译候选。review_state 恒为 candidate——frozen/approved 是显式、append-only 的服务端状态迁移（scene_spec:approve，只授权 Phase 33 消费），绝不由 Agent 声称。",
+      "required": [
+        "schema_version",
+        "artifact_kind",
+        "owner_id",
+        "novel_id",
+        "spec_key",
+        "revision_number",
+        "scene_candidate_hash",
+        "visual_bible_revision_hash",
+        "source_snapshot_id",
+        "source_snapshot_hash",
+        "cutoff_chapter",
+        "schema_hash",
+        "compiler_id",
+        "compiler_version",
+        "policy_hash",
+        "content_hash",
+        "details",
+        "negative_constraints",
+        "uncertainties",
+        "review_state"
+      ],
+      "properties": {
+        "schema_version": { "const": "scene-spec.v1" },
+        "artifact_kind": { "const": "scene_spec" },
+        "owner_id": { "type": "integer", "minimum": 1 },
+        "novel_id": { "type": "integer", "minimum": 1 },
+        "spec_key": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "revision_number": { "type": "integer", "minimum": 1 },
+        "scene_candidate_id": { "type": ["integer", "null"], "minimum": 1 },
+        "scene_candidate_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "visual_bible_revision_id": { "type": ["integer", "null"], "minimum": 1 },
+        "visual_bible_revision_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "source_snapshot_id": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "source_snapshot_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "cutoff_chapter": { "type": "integer", "minimum": 1 },
+        "schema_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "compiler_id": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "compiler_version": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "policy_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "config_hash": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" },
+        "content_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "details": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["detail_key", "kind", "source", "text", "spoiler_cutoff"],
+            "properties": {
+              "detail_key": { "type": "string", "minLength": 1 },
+              "kind": {
+                "type": "string",
+                "enum": ["subject", "action", "setting", "composition", "style", "continuity"]
+              },
+              "source": { "type": "string", "enum": ["evidence", "visual_bible", "user_interpretation"] },
+              "text": { "type": "string", "minLength": 1 },
+              "author": { "type": ["string", "null"] },
+              "rationale": { "type": ["string", "null"] },
+              "spoiler_cutoff": { "type": "integer", "minimum": 1 },
+              "evidence_refs": { "type": "array", "items": { "type": "object" } },
+              "visual_bible_refs": { "type": "array", "items": { "type": "object" } }
+            }
+          }
+        },
+        "negative_constraints": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["constraint_key", "scope", "source", "text", "spoiler_cutoff"],
+            "properties": {
+              "constraint_key": { "type": "string", "minLength": 1 },
+              "scope": { "type": "string", "enum": ["costume", "era", "identity", "style", "physical", "continuity"] },
+              "source": { "type": "string", "enum": ["evidence", "visual_bible", "user_interpretation"] },
+              "text": { "type": "string", "minLength": 1 },
+              "author": { "type": ["string", "null"] },
+              "rationale": { "type": ["string", "null"] },
+              "spoiler_cutoff": { "type": "integer", "minimum": 1 },
+              "evidence_refs": { "type": "array", "items": { "type": "object" } },
+              "visual_bible_refs": { "type": "array", "items": { "type": "object" } }
+            }
+          }
+        },
+        "uncertainties": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["uncertainty_key", "reason", "detail"],
+            "properties": {
+              "uncertainty_key": { "type": "string", "minLength": 1 },
+              "reason": { "type": "string" },
+              "detail": { "type": "string" }
+            }
+          }
+        },
+        "review_state": {
+          "const": "candidate",
+          "description": "candidate-only：approval 是显式、append-only 的服务端状态迁移（D-32-04，只授权 Phase 33 消费），Agent 声称任何其它 review_state（approval bypass）→ fail closed"
+        }
+      },
+      "additionalProperties": false
+    },
+    "prompt_revision_payload": {
+      "type": "object",
+      "description": "完整 PromptRevisionContract：provider-neutral 确定性派生（D-32-01/D-32-03）。prompt 字符串永远不是权威；prompt_text/sections 必须由 scene_spec 确定性重放。review_state 恒为 candidate。",
+      "required": [
+        "schema_version",
+        "artifact_kind",
+        "owner_id",
+        "novel_id",
+        "prompt_key",
+        "revision_number",
+        "scene_spec_hash",
+        "visual_bible_revision_hash",
+        "source_snapshot_id",
+        "source_snapshot_hash",
+        "cutoff_chapter",
+        "schema_hash",
+        "prompt_schema_hash",
+        "compiler_version",
+        "adapter_id",
+        "adapter_version",
+        "config_hash",
+        "input_hash",
+        "prompt_hash",
+        "sections",
+        "negative_constraints",
+        "uncertainties",
+        "prompt_text",
+        "review_state"
+      ],
+      "properties": {
+        "schema_version": { "const": "prompt-revision.v1" },
+        "artifact_kind": { "const": "prompt_revision" },
+        "owner_id": { "type": "integer", "minimum": 1 },
+        "novel_id": { "type": "integer", "minimum": 1 },
+        "prompt_key": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "revision_number": { "type": "integer", "minimum": 1 },
+        "parent_prompt_revision_id": { "type": ["integer", "null"], "minimum": 1 },
+        "scene_spec_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "visual_bible_revision_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "source_snapshot_id": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "source_snapshot_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "cutoff_chapter": { "type": "integer", "minimum": 1 },
+        "schema_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "prompt_schema_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "compiler_version": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "adapter_id": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "adapter_version": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "config_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "input_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "prompt_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "sections": { "type": "object", "description": "Canonical provider-neutral sections（SPEC_SECTION_ORDER keys）" },
+        "negative_constraints": { "type": "array", "items": { "type": "string" } },
+        "uncertainties": { "type": "array", "items": { "type": "string" } },
+        "prompt_text": { "type": "string", "minLength": 1 },
+        "redacted_preview": { "type": ["string", "null"] },
+        "review_state": {
+          "const": "candidate",
+          "description": "candidate-only：approval 是显式、append-only 的服务端状态迁移（D-32-04），Agent 声称任何其它 review_state（approval bypass）→ fail closed"
+        }
+      },
+      "additionalProperties": false
+    },
+    "scene_spec_artifact": {
+      "type": "object",
+      "required": [
+        "type",
+        "schema_version",
+        "owner_id",
+        "novel_id",
+        "producing_skill",
+        "producing_skill_version",
+        "skill_version_id",
+        "model_lineage",
+        "source_versions",
+        "input_hash",
+        "evidence_refs",
+        "scene_spec",
+        "tool_runs",
+        "status",
+        "normalization"
+      ],
+      "properties": {
+        "type": { "const": "scene_spec" },
+        "schema_version": { "const": "scene-spec.v1" },
+        "owner_id": { "type": "integer", "minimum": 1 },
+        "novel_id": { "type": "integer", "minimum": 1 },
+        "branch": { "type": ["string", "null"], "description": "衍生分支；原始主线为 null" },
+        "producing_skill": { "type": "string", "minLength": 1 },
+        "producing_skill_version": { "type": "string", "minLength": 1 },
+        "skill_version_id": { "type": "integer", "minimum": 1 },
+        "model_lineage": { "type": "object", "description": "agent runtime + 模型血缘（provider/model/revision）" },
+        "source_versions": { "type": "object", "description": "数据源版本（novel/chapter/source snapshot 血缘）" },
+        "input_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$", "description": "运行输入规范化 JSON 的 SHA-256（重放追溯）" },
+        "evidence_refs": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1,
+          "description": "leaf 证据引用，必须 ⊆ 冻结 manifest 白名单（D-32-02 leaf-evidence 资格门）"
+        },
+        "skill_run_id": { "type": ["integer", "null"], "minimum": 1, "description": "SkillRun ID（后端 run 创建时分配；模型输出不含）" },
+        "artifact_id": { "type": ["integer", "null"], "minimum": 1, "description": "Artifact ID（后端确定性 finalizer 写入时分配；模型输出不含）" },
+        "revision_id": { "type": ["integer", "null"], "minimum": 1, "description": "ArtifactRevision ID（后端确定性 finalizer 写入时分配；模型输出不含）" },
+        "scene_spec": { "$ref": "#/definitions/scene_spec_payload" },
+        "tool_runs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["tool_name", "calls"],
+            "properties": {
+              "tool_name": { "type": "string", "minLength": 1 },
+              "calls": { "type": "integer", "minimum": 0 }
+            }
+          },
+          "description": "ToolRun 血缘：本 run 使用的 allowlist 工具与调用次数"
+        },
+        "status": {
+          "enum": ["candidate", "validated", "approved", "published", "rejected"],
+          "description": "产物状态；finalize 写入时恒为 candidate（无自动 promotion）"
+        },
+        "parent_revision": { "type": ["string", "null"], "description": "父修订引用；首个修订为 null" },
+        "normalization": {
+          "type": "object",
+          "description": "26-06 修复血缘 trail：repaired_hash 是对不含本 trail 的 repaired payload 的 canonical SHA-256；raw_hash 是原始模型输出的 canonical SHA-256；normalization_actions 每项含 path/action/after。",
+          "required": ["raw_hash", "repaired_hash", "normalization_actions", "warnings"],
+          "properties": {
+            "raw_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "repaired_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "normalization_actions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["path", "action", "after"],
+                "properties": {
+                  "path": { "type": "string", "minLength": 1 },
+                  "action": {
+                    "type": "string",
+                    "enum": ["alias", "alias_dedup", "enum_canonicalize", "container_shape", "lineage_merge"]
+                  },
+                  "before": {},
+                  "after": {},
+                  "reason": { "type": "string" }
+                }
+              }
+            },
+            "warnings": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "prompt_artifact": {
+      "type": "object",
+      "required": [
+        "type",
+        "schema_version",
+        "owner_id",
+        "novel_id",
+        "producing_skill",
+        "producing_skill_version",
+        "skill_version_id",
+        "model_lineage",
+        "source_versions",
+        "input_hash",
+        "evidence_refs",
+        "prompt_revision",
+        "scene_spec",
+        "tool_runs",
+        "status",
+        "normalization"
+      ],
+      "properties": {
+        "type": { "const": "prompt" },
+        "schema_version": { "const": "prompt-revision.v1" },
+        "owner_id": { "type": "integer", "minimum": 1 },
+        "novel_id": { "type": "integer", "minimum": 1 },
+        "branch": { "type": ["string", "null"], "description": "衍生分支；原始主线为 null" },
+        "producing_skill": { "type": "string", "minLength": 1 },
+        "producing_skill_version": { "type": "string", "minLength": 1 },
+        "skill_version_id": { "type": "integer", "minimum": 1 },
+        "model_lineage": { "type": "object", "description": "agent runtime + 模型血缘（provider/model/revision）" },
+        "source_versions": { "type": "object", "description": "数据源版本（novel/chapter/source snapshot 血缘）" },
+        "input_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$", "description": "运行输入规范化 JSON 的 SHA-256（重放追溯）" },
+        "evidence_refs": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1,
+          "description": "leaf 证据引用，必须 ⊆ 冻结 manifest 白名单（D-32-02 leaf-evidence 资格门）"
+        },
+        "skill_run_id": { "type": ["integer", "null"], "minimum": 1, "description": "SkillRun ID（后端 run 创建时分配；模型输出不含）" },
+        "artifact_id": { "type": ["integer", "null"], "minimum": 1, "description": "Artifact ID（后端确定性 finalizer 写入时分配；模型输出不含）" },
+        "revision_id": { "type": ["integer", "null"], "minimum": 1, "description": "ArtifactRevision ID（后端确定性 finalizer 写入时分配；模型输出不含）" },
+        "prompt_revision": { "$ref": "#/definitions/prompt_revision_payload" },
+        "scene_spec": { "$ref": "#/definitions/scene_spec_payload" },
+        "tool_runs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["tool_name", "calls"],
+            "properties": {
+              "tool_name": { "type": "string", "minLength": 1 },
+              "calls": { "type": "integer", "minimum": 0 }
+            }
+          },
+          "description": "ToolRun 血缘：本 run 使用的 allowlist 工具与调用次数"
+        },
+        "status": {
+          "enum": ["candidate", "validated", "approved", "published", "rejected"],
+          "description": "产物状态；finalize 写入时恒为 candidate（无自动 promotion）"
+        },
+        "parent_revision": { "type": ["string", "null"], "description": "父修订引用；首个修订为 null" },
+        "normalization": {
+          "type": "object",
+          "description": "26-06 修复血缘 trail：repaired_hash 是对不含本 trail 的 repaired payload 的 canonical SHA-256；raw_hash 是原始模型输出的 canonical SHA-256；normalization_actions 每项含 path/action/after。",
+          "required": ["raw_hash", "repaired_hash", "normalization_actions", "warnings"],
+          "properties": {
+            "raw_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "repaired_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "normalization_actions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["path", "action", "after"],
+                "properties": {
+                  "path": { "type": "string", "minLength": 1 },
+                  "action": {
+                    "type": "string",
+                    "enum": ["alias", "alias_dedup", "enum_canonicalize", "container_shape", "lineage_merge"]
+                  },
+                  "before": {},
+                  "after": {},
+                  "reason": { "type": "string" }
+                }
+              }
+            },
+            "warnings": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
