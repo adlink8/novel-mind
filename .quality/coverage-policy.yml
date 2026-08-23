@@ -49,8 +49,10 @@ coverage:
         - "src/hooks/use-ai-models.ts"
         - "src/hooks/use-eval.ts"
         - "src/hooks/use-novels.ts"
-        - "src/stores/**"
-        - "src/lib/api/**"
+        - "src/stores/**/*.ts"
+        - "src/stores/**/*.tsx"
+        - "src/lib/api/**/*.ts"
+        - "src/lib/api/**/*.tsx"
   diff_coverage:
     minimum: 90
 
