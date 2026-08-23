@@ -50,6 +50,9 @@ env:
   # service-lock URLs (host ports from docker-compose.ci.yml)
   NOVELMIND_DATABASE_URL: postgresql+asyncpg://novelmind:novelmind@127.0.0.1:5433/novelmind_ci
   NOVELMIND_CHROMA_URL: http://127.0.0.1:8002
+  # Offline tiktoken encoding (litellm >=1.92 dropped the bundled cache;
+  # import-time download of cl100k_base fails on restricted networks).
+  CUSTOM_TIKTOKEN_CACHE_DIR: ${{ github.workspace }}/backend/tests/fixtures/tiktoken_cache
 
 jobs:
   # ---------------------------------------------------------------------------
