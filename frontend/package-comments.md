@@ -7,7 +7,6 @@
 | 包名 | 用途 |
 |------|------|
 | `@base-ui/react` | 无样式基础 UI 组件库，提供可访问的底层组件（对话框、菜单等） |
-| `@tanstack/react-query` | 异步状态管理，处理 API 请求的缓存、重试、加载状态 |
 | `axios` | HTTP 客户端，用于调用后端 REST API |
 | `class-variance-authority` (cva) | CSS 类名变体管理，根据 props 动态生成样式类（与 Tailwind 配合） |
 | `clsx` | 条件性 CSS 类名拼接工具 |
@@ -19,7 +18,6 @@
 | `react-dom` | React DOM 渲染器，将 React 组件渲染到浏览器 |
 | `shadcn` | shadcn/ui 组件库（基于 Radix UI + Tailwind），提供高质量预制组件 |
 | `tailwind-merge` | 智能合并 Tailwind CSS 类名，解决类名冲突问题 |
-| `tw-animate-css` | Tailwind CSS 动画扩展，提供过渡和动画类 |
 | `zustand` | 轻量级状态管理库，管理全局应用状态（如当前小说、编辑器状态等） |
 
 ## devDependencies（开发依赖）

@@ -12,7 +12,7 @@
       frontend/.next/static)
 
   The source server.js hash MUST match the pinned hash in
-  desktop/proof/runtime-manifest.json (the exact artifact the 13-route parity
+  desktop/proof/runtime-manifest.json (the exact artifact the route-parity
   proof exercised); a mismatch fails closed. The staged tree is emitted to
   <desktop>/dist/staged/next-standalone and the inventory to
   <desktop>/dist/staged/staged-manifest.json.

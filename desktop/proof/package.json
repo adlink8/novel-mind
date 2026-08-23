@@ -9,7 +9,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "vitest run --exclude tests/route-parity.spec.ts",
     "start": "node src/main.ts"
   },
   "devDependencies": {

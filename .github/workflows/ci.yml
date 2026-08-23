@@ -633,6 +633,9 @@ jobs:
           NEXT_PUBLIC_API_URL: /api
         run: npm run build
 
+      - name: Current desktop standalone route parity
+        run: node desktop/scripts/check-current-route-parity.mjs
+
       - name: Playwright (desktop + 390px, retries=0)
         working-directory: frontend
         env:

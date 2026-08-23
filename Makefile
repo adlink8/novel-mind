@@ -15,15 +15,12 @@ dev-frontend:  ## 启动前端开发服务器（固定 3005）
 	cd frontend && BACKEND_URL=http://127.0.0.1:8010 npx next dev --port 3005 --hostname 127.0.0.1
 
 dev-agent:  ## 启动 agent-service（固定 3100）
-	cd agent-service && NOVELMIND_GATEWAY_TOKEN=dev-agent-gateway-token-local FASTAPI_BASE_URL=http://127.0.0.1:8010 PORT=3100 node start.mjs
+	cd agent-service && NOVELMIND_GATEWAY_TOKEN=dev-agent-gateway-token-local FASTAPI_BASE_URL=http://127.0.0.1:8010 PORT=3100 npm run start
 
 dev-all:  ## 一键保活全部服务（后端/前端/agent；ZCodeProxy 需手动启动）
 	@echo "使用 scripts/keep-alive.ps1 保活后端 8010 + 前端 3005 + agent 3100"
 	@echo "ZCodeProxy（生图代理 3001）为独立程序，请手动启动"
 	@powershell -ExecutionPolicy Bypass -File scripts/keep-alive.ps1
-
-dev-frontend:  ## 启动前端开发服务器
-	cd frontend && npm run dev
 
 dev:  ## 启动 Docker 数据库服务
 	docker compose up -d db chroma

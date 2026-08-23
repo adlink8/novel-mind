@@ -142,7 +142,7 @@
 | 属性 | 内容 |
 |---|---|
 | **职责** | SkillRegistry/SkillVersion/SkillRun/Artifact/ArtifactRevision/NovelAgentProfile/ApprovalRequest 持久化与权限权威；external_evidence 物化（`prohibited_from_canon=true`，不可发布）；最终 validator 拒绝 mcp:// 引用 |
-| **主要文件** | `backend/app/services/agent_runtime/`、`backend/app/api/agent.py`、`agent_tools.py`、`gateway.py`、`backend/app/models/agent_runtime.py` |
+| **主要文件** | `backend/app/services/agent_runtime/`、`backend/app/api/agent_runs.py`、`agent_artifacts.py`、`agent_approvals.py`、`agent_tools.py`、`gateway.py`、`backend/app/models/agent_runtime.py` |
 | **状态** | VERIFIED（集成 24 + adversarial 56 + CI 37 passed，2026-08-02） |
 | **上游** | agent-service（经 gateway） |
 | **下游** | PostgreSQL（Alembic `20260801_2601` head） |
@@ -178,8 +178,8 @@
 
 | 属性 | 内容 |
 |---|---|
-| **职责** | React 组件：认证门禁、小说卡片、上传、阅读器、搜索和 shadcn/ui 基础组件 |
-| **主要文件** | `auth-gate.tsx`、`novel-card.tsx`、`novel-upload-dialog.tsx`、`reader/`、`search/`、`ui/` |
+| **职责** | React 组件：认证门禁、书架、上传、阅读器、搜索和基础 UI 组件 |
+| **主要文件** | `auth-gate.tsx`、`bookshelf/`、`novel-upload-dialog.tsx`、`reader/`、`search/`、`ui/` |
 | **状态** | PARTIAL（阅读与搜索组件已实现；编辑器、时间线和人物图仍未实现） |
 | **上游** | 页面层 |
 | **下游** | API 客户端、Stores |

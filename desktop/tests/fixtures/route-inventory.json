@@ -1,0 +1,133 @@
+{
+  "schemaVersion": 1,
+  "generatedFrom": "frontend/src/app (14 page.tsx routes, 2026-08-23)",
+  "note": "Frozen 14-route proof inventory for standalone parity. Dynamic routes use deterministic fixture params; the suite FAILS if the discovered route count differs from 14 (no padding). 9 static + 5 dynamic. Excludes _global-error/_not-found/manifest.webmanifest which are not business routes.",
+  "expectedRouteCount": 14,
+  "fixture": {
+    "novelId": "1",
+    "keySceneSetId": "7",
+    "user": { "id": 1, "username": "proof", "email": "proof@example.com", "is_active": true }
+  },
+  "groups": [
+    {
+      "id": "static-root",
+      "label": "root",
+      "routes": [
+        {
+          "path": "/",
+          "params": {},
+          "markers": ["让每一段故事"],
+          "testIds": []
+        }
+      ]
+    },
+    {
+      "id": "static-workbench",
+      "label": "workbench",
+      "routes": [
+        {
+          "path": "/analysis",
+          "params": {},
+          "markers": ["结构工作台"],
+          "testIds": []
+        },
+        {
+          "path": "/eval",
+          "params": {},
+          "markers": ["数据加载失败"],
+          "testIds": []
+        },
+        {
+          "path": "/search",
+          "params": {},
+          "markers": ["原文检索"],
+          "testIds": []
+        },
+        {
+          "path": "/settings",
+          "params": {},
+          "markers": ["设置中心"],
+          "testIds": []
+        },
+        {
+          "path": "/settings/extensions",
+          "params": {},
+          "markers": ["Skills / Tools 管理"],
+          "testIds": []
+        },
+        {
+          "path": "/writing",
+          "params": {},
+          "markers": ["创作中心"],
+          "testIds": []
+        }
+      ]
+    },
+    {
+      "id": "static-library",
+      "label": "library",
+      "routes": [
+        {
+          "path": "/novels",
+          "params": {},
+          "markers": ["我的书架"],
+          "testIds": []
+        },
+        {
+          "path": "/timeline-prototype",
+          "params": {},
+          "markers": ["时间线"],
+          "testIds": []
+        }
+      ]
+    },
+    {
+      "id": "dynamic-novel",
+      "label": "novel reader",
+      "routes": [
+        {
+          "path": "/novels/[id]",
+          "params": { "id": "1" },
+          "markers": ["加载小说失败，请重试"],
+          "testIds": []
+        }
+      ]
+    },
+    {
+      "id": "dynamic-novel-tools",
+      "label": "novel tools",
+      "routes": [
+        {
+          "path": "/novels/[id]/illustrations",
+          "params": { "id": "1" },
+          "markers": [],
+          "testIds": ["illustration-error"]
+        },
+        {
+          "path": "/novels/[id]/scene-spec",
+          "params": { "id": "1" },
+          "markers": [],
+          "testIds": ["scene-spec-error"]
+        },
+        {
+          "path": "/novels/[id]/visual-bible",
+          "params": { "id": "1" },
+          "markers": [],
+          "testIds": ["visual-bible-error"]
+        }
+      ]
+    },
+    {
+      "id": "dynamic-novel-key-scenes",
+      "label": "key scene set",
+      "routes": [
+        {
+          "path": "/novels/[id]/key-scenes/[setId]",
+          "params": { "id": "1", "setId": "7" },
+          "markers": [],
+          "testIds": ["key-scene-error"]
+        }
+      ]
+    }
+  ]
+}

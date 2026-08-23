@@ -1,11 +1,9 @@
 /**
- * Frozen 13-route inventory for the Electron route-parity suite
+ * Frozen route inventory for the Electron route-parity suite
  * (Phase 42, Plan 42-03, Task 2 / T-42-03-02).
  *
- * Loads the SAME frozen inventory the Phase 41 proof consumed
- * (`desktop/proof/tests/route-inventory.json`) so Electron parity compares
- * against the identical 13-route surface — no drift, no padding. A missing
- * inventory file fails the suite deterministically.
+ * Loads the current inventory beside this module. Historical Phase 41 evidence remains
+ * immutable under desktop/proof; this inventory follows the live frontend route surface.
  */
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -31,10 +29,6 @@ interface RouteInventory {
 
 const INVENTORY_FILE = path.resolve(
   __dirname,
-  "..",
-  "..",
-  "proof",
-  "tests",
   "route-inventory.json",
 );
 
@@ -43,7 +37,7 @@ try {
   inventory = JSON.parse(readFileSync(INVENTORY_FILE, "utf8")) as RouteInventory;
 } catch (err) {
   throw new Error(
-    `frozen route inventory missing at ${INVENTORY_FILE} — the Electron parity suite cannot run without it`,
+    `current route inventory missing at ${INVENTORY_FILE} — the Electron parity suite cannot run without it`,
     { cause: err },
   );
 }

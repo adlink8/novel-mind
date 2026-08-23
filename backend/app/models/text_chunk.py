@@ -14,7 +14,7 @@ RAG 文本块 ORM 模型
 embedding_status 状态机:
   pending → embedded / failed
   - pending:  等待生成向量
-  - embedded: 向量已写入 Chroma/pgvector
+  - embedded: 向量已写入 Chroma
   - failed:   向量生成失败（可重试）
 """
 
@@ -30,7 +30,7 @@ class TextChunk(TimestampMixin, Base):
     文本块表：存储小说分块后的语义单元。
 
     每个 TextChunk 代表小说中的一个语义段落，用于:
-    1. 生成 embedding 向量 → 写入 Chroma/pgvector
+    1. 生成 embedding 向量 → 写入 Chroma
     2. RAG 检索时作为上下文注入 Prompt
     3. 搜索结果展示时跳转到原文位置
     """

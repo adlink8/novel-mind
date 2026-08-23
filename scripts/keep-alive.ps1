@@ -160,8 +160,8 @@ set HTTP_PROXY=
 set HTTPS_PROXY=
 set http_proxy=
 set https_proxy=
-rem Production mode: requires `npm run build` output in .next (rebuild after frontend changes)
-call npm run start -- --port $FePort --hostname 127.0.0.1 >> "$outLog" 2>&1
+rem Build before launch so the detached server cannot serve stale .next output.
+call npm run build >> "$outLog" 2>&1 && call npm run start -- --port $FePort --hostname 127.0.0.1 >> "$outLog" 2>&1
 "@
     Start-DetachedCmd -Title "novelmind-fe" -BatPath $bat -Body $body
 }
@@ -182,7 +182,7 @@ set HTTP_PROXY=
 set HTTPS_PROXY=
 set http_proxy=
 set https_proxy=
-node start.mjs >> "$outLog" 2>&1
+call npm run start >> "$outLog" 2>&1
 "@
     Start-DetachedCmd -Title "novelmind-agent" -BatPath $bat -Body $body
 }

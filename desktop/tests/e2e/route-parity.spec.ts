@@ -1,12 +1,12 @@
 /**
  * Electron in-app route-parity suite (Phase 42, Plan 42-03, Task 2 / T-42-03-02).
  *
- * Proves the 13 frozen renderer routes serve, hydrate and navigate INSIDE the
+ * Proves the frozen renderer routes serve, hydrate and navigate INSIDE the
  * real Electron shell window (launched via `_electron.launch`) against the Next
  * standalone renderer started by globalSetup on a dynamic loopback port — the
  * same inventory (`fixtures/routes.ts` -> `proof/tests/route-inventory.json`)
  * the Phase 41 proof consumed, so Electron parity compares against the identical
- * 13-route surface with no drift.
+ * frozen route surface with no drift.
  *
  * API mocking mirrors the 41-02 browser proof, but inside the Electron window:
  * `/api/auth/me` returns the fixture user so the app shell (主导航) renders; all
@@ -99,9 +99,9 @@ async function assertRouteServed(route: RouteFixture): Promise<void> {
   await expect(page.getByLabel("主导航"), `app shell hydrated on ${url}`).toBeAttached();
 }
 
-test("frozen inventory contract holds (exactly 13 routes, no drift)", () => {
+test("frozen inventory contract holds (exact route count, no drift)", () => {
   expect(ALL_ROUTES).toHaveLength(EXPECTED_ROUTE_COUNT);
-  expect(EXPECTED_ROUTE_COUNT).toBe(13);
+  expect(EXPECTED_ROUTE_COUNT).toBe(14);
   const paths = ALL_ROUTES.map((r) => r.path);
   expect(new Set(paths).size).toBe(paths.length);
 });

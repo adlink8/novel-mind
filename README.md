@@ -133,7 +133,7 @@ npm install
 $env:NOVELMIND_GATEWAY_TOKEN = "dev-agent-gateway-token-local"
 $env:FASTAPI_BASE_URL = "http://127.0.0.1:8010"
 $env:PORT = 3100
-node start.mjs
+npm run start
 ```
 
 - 前端：`http://localhost:3005`

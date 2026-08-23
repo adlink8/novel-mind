@@ -35,7 +35,6 @@ const PHASE_18_FILES = [
   // 18-03
   "components/page-header.tsx",
   "components/empty-state.tsx",
-  "components/novel-card.tsx",
   "components/search/search-result-card.tsx",
   "components/reader/progress-bar.tsx",
   "components/timeline/timeline-chart.tsx",

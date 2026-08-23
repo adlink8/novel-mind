@@ -8,6 +8,7 @@
   },
   "scripts": {
     "build": "tsc && node scripts/sync-skills.mjs",
+    "start": "npm run build && node start.mjs",
     "test": "vitest run",
     "verify:lockfile": "node scripts/verify-lockfile.mjs",
     "scan:packages": "node scripts/scan-packages.mjs"

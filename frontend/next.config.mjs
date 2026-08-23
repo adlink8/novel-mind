@@ -3,8 +3,8 @@ const nextConfig = {
   agentRules: false,
   // Phase 41 proof (D-41-05): emit a self-contained `.next/standalone` tree that the
   // Electron proof harness can start on a loopback port without `npm install`. The
-  // standalone output does NOT copy public/ or .next/static — the proof build script
-  // copies them deterministically (T-41-02-01).
+  // standalone output does NOT copy public/ or .next/static. The package build script
+  // prepares both so every production build is directly launchable.
   output: "standalone",
   // Public tunnel hostnames must be allowed or dev blocks / hangs client assets.
   // 生产/隧道域名由环境变量注入（个人域名不写死进仓库）：

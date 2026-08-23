@@ -415,7 +415,7 @@ Key metrics:
 |---|---|---|
 | Phase 40 问答按需分析（chat_backfill） | **已实现 2026-08-05**（用户扩展决策：问答证据不足→后台按需触发分析 skill→物化域表 candidate） | 本轮实现 + 测试 |
 | 触发链路 | reader_chat worker 产出 abstain（`uncertainty.reason_code=no_evidence`）后按 QueryDimension 映射触发对应 skill（world_projection/character_state→propose-world-model-candidates、raw_text→detect-key-scenes、relations→build-visual-bible、events/timeline→build-story-arc），每次最多 2 个；SkillRun 增 `origin=chat_backfill` + `backfill_dimension` + `user_message_id` + 部分唯一索引防在途重复 | `backend/app/services/agent_runtime/backfill.py` + `worker.py` |
-| poller 端点 | `GET /api/agent/queued-runs` + `POST /api/agent/queued-runs/{id}/claim`（gateway token 认证、原子 queued→running + lease reclaim + 铸造 internal_token）；finalize/cancel 放宽为 `require_agent_actor` | `backend/app/api/agent.py` |
+| poller 端点 | `GET /api/agent/queued-runs` + `POST /api/agent/queued-runs/{id}/claim`（gateway token 认证、原子 queued→running + lease reclaim + 铸造 internal_token）；finalize/cancel 放宽为 `require_agent_actor` | `backend/app/api/agent_service_runs.py` |
 | agent-service poller | `poller.ts`：轮询 + claim + 复用 session.prompt + finalize（internal token 认证），并发上限、lease reclaim、conflict 静默；`startServer` 启停 | `agent-service/src/poller.ts` |
 | 物化 | `materialize.py`：finalize 成功后 background task 按 artifact.type 记录物化结果；digest 类型（chapter_analysis/story_arc）诚实 skipped，不自动 promotion（域表 candidate 写入依赖既有 gate 前提） | `backend/app/services/agent_runtime/materialize.py` |
 | 前端 | MessageView 增 `backfill_runs`，analysis-chat-panel 渲染「后台分析中/完成」chip | `conversations.py` + `analysis-chat-panel.tsx` |
@@ -438,7 +438,7 @@ Key metrics:
 |---|---|---|
 | Agent 自动路由闭环 | **已实现 2026-08-06**：question→intent→skill 启发式路由，无命中回退 answer-reading-question；**契约恢复**：AGENT-RUNTIME-CONTRACT「The Agent selects versioned Skills」——用户不选 skill，AI 自动路由 | commit `e9f4acd` + `8c21c5c` |
 | 意图路由服务 | `backend/app/services/agent_runtime/skill_router.py`：5 类意图（画图/关系/性格/关键场景/续写）+ 维度可用性补充信号；`route_question_to_skill` 最多 2 skill，同一 skill 去重；无任何命中回退 `answer-reading-question` | `skill_router.py` |
-| route-skill 端点 | `POST /api/agent/novels/{id}/route-skill`：按 owner+novel 过滤 active skill，返回 `{skills, primary, question_hash, input_anchor}`；无 active 命中回退 answer-reading-question；路由是服务端决策，不作为对用户的技能建议 | `backend/app/api/agent.py:159` |
+| route-skill 端点 | `POST /api/agent/novels/{id}/route-skill`：按 owner+novel 过滤 active skill，返回 `{skills, primary, question_hash, input_anchor}`；无 active 命中回退 answer-reading-question；路由是服务端决策，不作为对用户的技能建议 | `backend/app/api/agent_skills.py` |
 | 锚点自动补全 | `resolve_skill_input_anchors`：生图 skill（illustrate-scene）自动从最新**已批准** PromptRevision 血缘解析 prompt_revision_id/visual_bible_version_id/scene_spec_revision_id/source_snapshot_id + 幂等 job_key（`auto-<uuid>`）；无已批准 PromptRevision 或血缘不完整→诚实失败不伪造锚 | `skill_router.py:134` |
 | SSE 自动路由 | agent-service `server.ts`：SSE run body.skill 缺省→调 route-skill 自动路由；显式 body.skill 仅高级覆盖；锚字段只注入 schema 允许的字段（additionalProperties:false 防 422） | `agent-service/src/server.ts:425` |
 | 统一 AI 助手 | 分析页 `AnalysisUnifiedChat`（统一对话窗口，取代 chat/agent 双 tab）+ 阅读页侧边栏 AI 助手（reader-chat-panel 扩展：对话/选区画图/续写快捷入口）；**前端不暴露 skill**，Agent 自动路由 | `frontend/src/components/analysis/analysis-unified-chat.tsx` + `frontend/src/components/reader/reader-chat-panel.tsx` |
@@ -477,3 +477,17 @@ Key metrics:
 结论：v1.5 桌面在证据支持的层级收口（打包、升级、UAT 近似、安全负面、SBOM 全部通过并有
 校验和绑定证据），但**不是 release-ready**：clean-VM、签名/发布、bundled Python/PG/vector、
 main 进程打包适配器接线均为未满足的外部门或 post-45 前置，Phase 22 保持独立 0/3。
+
+---
+
+## 2026-08-23 快照（生效链路与高置信度残余清理）
+
+本快照不改变上面的历史打包证据，也不宣称桌面端 release-ready。
+
+| 项 | 当前值 | 证据 |
+|---|---|---|
+| 启动链路 | Makefile 只保留固定 3005 的前端目标；前端生产启动和 Agent 启动都会先构建，避免运行旧 `.next` / `dist` | `Makefile`、`scripts/keep-alive.ps1`、`agent-service/package.json` |
+| Desktop 路由资格门 | 当前业务路由 **14/14**；本轮 standalone Playwright 静态资源、页面加载、客户端导航 **22/22 PASS**；提交中的当前路由/静态资源门已接入 Browser CI，历史 13 路由证据清单保持哈希不变 | `desktop/tests/fixtures/route-inventory.json`、`desktop/scripts/check-current-route-parity.mjs`、`.github/workflows/ci.yml` |
+| 残余清理 | 删除 3 组未挂载前端组件及专属测试、未使用 Agent API 聚合兼容层；移除 4 个无源码调用依赖 | `frontend/src/components/`、`backend/app/api/`、依赖清单 |
+| 本轮验证 | Backend CI/contract **295 passed**；Frontend **816 passed / 84 files**；Agent **1146 passed / 36 files**；Ruff、ESLint、TypeScript、Frontend build 全部通过 | 本轮本地命令输出 |
+| 发布边界 | Compose 仍不包含完整应用服务；`PackagedProcessAdapter` 仍未接入 main；因此完整服务器部署和桌面发布仍未闭环 | `docker-compose.yml`、`desktop/src/main/index.ts` |

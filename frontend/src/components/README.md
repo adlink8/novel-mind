@@ -9,7 +9,6 @@ React 组件，按功能域分目录组织。
 | `AuthGate` | `auth-gate.tsx` | 认证门禁 — 检查登录状态，未登录显示登录/注册表单 |
 | `AppShell` | `app-shell.tsx` | 响应式应用框架 — 桌面侧栏、移动导航、全局搜索入口 |
 | `PageHeader` | `page-header.tsx` | 页面标题区 — eyebrow、标题、说明和操作插槽 |
-| `NovelCard` | `novel-card.tsx` | 小说卡片 — 封面、标题、作者、状态标签 |
 | `NovelUploadDialog` | `novel-upload-dialog.tsx` | 小说上传对话框 — 文件选择、进度显示 |
 | `EmptyState` | `empty-state.tsx` | 空状态占位 — 无数据时的友好提示 |
 
@@ -42,7 +41,6 @@ React 组件，按功能域分目录组织。
 | 组件 | 文件 | 职责 |
 |---|---|---|
 | `SettingsSection` | `settings/settings-section.tsx` | 章回体小节骨架 — 朱砂章节字 + 衬线标题 + 操作插槽 |
-| `AccountSection` | `settings/account-section.tsx` | 账户区 — 当前用户展示、退出登录 |
 | `RoutingSection` | `settings/routing-section.tsx` | 路由策略迷你书架 — 三本书选出策略，API 持久化 |
 | `ModelsSection` | `settings/models-section.tsx` | AI 模型管理 — 列表、添加 Dialog、测试连接、设默认、删除 |
 | `UsageSection` | `settings/usage-section.tsx` | 用量概览 — `GET /api/usage/summary`，失败显示「暂无数据」 |

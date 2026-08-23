@@ -42,7 +42,7 @@ frontend/src/
 │   ├── auth-gate.tsx       # 认证门禁
 │   ├── app-shell.tsx       # 响应式应用壳（桌面侧栏 + 移动底栏）
 │   ├── page-header.tsx     # 页面容器与统一标题层级
-│   ├── novel-card.tsx      # 小说卡片
+│   ├── bookshelf/          # 当前书架与书本视觉组件
 │   ├── novel-upload-dialog.tsx  # 上传对话框
 │   ├── empty-state.tsx     # 空状态占位
 │   ├── structure/          # 结构树 / 节点面板 / 工作台壳（Phase 20）
@@ -191,10 +191,9 @@ Layout (layout.tsx)
 │           ├── Desktop Sidebar / Mobile Navigation
 │           └── Page Content
 │           ├── HomePage (page.tsx)
-│           │   └── NovelCard[] (novel-card.tsx)
 │           ├── NovelsPage (novels/page.tsx)
 │           │   ├── NovelUploadDialog (novel-upload-dialog.tsx)
-│           │   └── NovelCard[]
+│           │   └── BookShelf (bookshelf/book-shelf.tsx)
 │           ├── NovelDetailPage (novels/[id]/page.tsx)
 │           │   ├── ChapterSidebar (reader/chapter-sidebar.tsx)
 │           │   ├── ReaderContent (reader/reader-content.tsx)
