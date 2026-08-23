@@ -152,37 +152,13 @@ npm audit --registry=https://registry.npmjs.org
 
 ### GitHub Actions
 
-```yaml
-# .github/workflows/backend-tests.yml
-name: Backend Tests
-on: [push, pull_request]
-  branches: [main, master, develop]
+当前由 `.github/workflows/ci.yml` 提供统一 CI：push、pull request 和手动
+`workflow_dispatch` 会执行静态检查、单元/契约测试、覆盖率门禁、OpenAPI、
+PostgreSQL/Chroma 集成测试、浏览器测试，并由 `ci-gate` 汇总结果。
 
-jobs:
-  test:
-    - Checkout
-    - Setup Python 3.11
-    - Install dependencies
-    - Ruff check
-    - Bandit scan
-    - Alembic check
-    - pytest
-
-# .github/workflows/frontend-tests.yml
-name: Frontend Tests
-on: [push, pull_request]
-  branches: [main, master, develop]
-
-jobs:
-  test:
-    - Checkout
-    - Setup Node.js 20
-    - npm install
-    - ESLint
-    - Vitest
-    - Next.js build
-    - npm audit
-```
+自 2026-08-23 起，自动 cron 定时触发暂时停用，避免缺少合格 self-hosted runner
+时反复产生失败记录。需要夜间双模型基准时，仍可在受保护的 `main`/`master`
+分支上手动触发工作流并启用 `run_nightly`；恢复自动定时前必须先确认 runner 可用。
 
 ## VERIFIED 判定标准
 

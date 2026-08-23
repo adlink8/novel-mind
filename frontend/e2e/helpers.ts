@@ -45,44 +45,14 @@ export function uniqueUser(prefix = "e2e") {
   };
 }
 
-async function waitForAuthGate(page: Page) {
-  await page.goto("/");
-  // Brand h1 + form h2 both exist; target the form heading specifically.
-  await expect(
-    page.getByRole("heading", { name: /建立你的故事库|回到你的故事里/ })
-  ).toBeVisible({ timeout: 30_000 });
-}
-
-async function fillAuthForm(
-  page: Page,
-  fields: { username: string; password: string; email?: string }
-) {
-  await page.locator('input[name="username"]').fill(fields.username);
-  if (fields.email != null) {
-    await page.locator('input[name="email"]').fill(fields.email);
-  }
-  await page.locator('input[name="password"]').fill(fields.password);
-}
-
-/** Register + login through the AuthGate UI. */
+/** Register + login through the test-only multi-user API, then open the shell. */
 export async function registerAndLogin(page: Page, user = uniqueUser()) {
-  await waitForAuthGate(page);
-
-  // Switch to register mode if needed
-  const createAccount = page.getByRole("button", { name: /创建账户/ });
-  if (await createAccount.isVisible().catch(() => false)) {
-    await createAccount.click();
-  }
-  await expect(
-    page.getByRole("heading", { name: /建立你的故事库/ })
-  ).toBeVisible({ timeout: 10_000 });
-
-  await fillAuthForm(page, {
-    username: user.username,
-    email: user.email,
-    password: user.password,
-  });
-  await page.getByRole("button", { name: /注册并登录/ }).click();
+  // page.request shares the browser context cookie jar. The product no longer
+  // exposes username/password UI, while qualification still needs distinct
+  // owners for isolation tests.
+  await apiRegister(page.request, user);
+  await apiLogin(page.request, user.username, user.password);
+  await page.goto("/");
 
   // Authenticated shell: desktop rail or mobile bottom nav, per viewport.
   await expectAuthenticatedShell(page);
@@ -97,13 +67,8 @@ export async function registerAndLogin(page: Page, user = uniqueUser()) {
 }
 
 export async function login(page: Page, username: string, password: string) {
-  await waitForAuthGate(page);
-  const hasAccount = page.getByRole("button", { name: /已有账户/ });
-  if (await hasAccount.isVisible().catch(() => false)) {
-    await hasAccount.click();
-  }
-  await fillAuthForm(page, { username, password });
-  await page.getByRole("button", { name: /^登录$/ }).click();
+  await apiLogin(page.request, username, password);
+  await page.goto("/");
   await expectAuthenticatedShell(page);
 }
 
@@ -133,7 +98,7 @@ export async function apiRegister(
   const res = await request.post(`${BACKEND}/api/auth/register`, {
     data: user,
   });
-  if (!res.ok() && res.status() !== 400) {
+  if (!res.ok()) {
     throw new Error(`register failed: ${res.status()} ${await res.text()}`);
   }
   return res;
@@ -144,11 +109,18 @@ export async function apiLogin(
   username: string,
   password: string
 ) {
-  const res = await request.post(`${BACKEND}/api/auth/login`, {
-    data: { username, password },
-  });
-  if (!res.ok()) {
-    throw new Error(`login failed: ${res.status()} ${await res.text()}`);
+  let failure = "login failed";
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    const res = await request.post(`${BACKEND}/api/auth/login`, {
+      data: { username, password },
+    });
+    if (res.ok()) return res;
+
+    failure = `login failed: ${res.status()} ${await res.text()}`;
+    // Registration commits in the request dependency finalizer. A login sent
+    // immediately after 201 can briefly race that commit on CI runners.
+    if (res.status() !== 401 || attempt === 3) break;
+    await new Promise((resolve) => setTimeout(resolve, attempt * 100));
   }
-  return res;
+  throw new Error(failure);
 }

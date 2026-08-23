@@ -55,6 +55,13 @@ def test_no_pull_request_target(workflow: dict) -> None:
     assert "pull_request_target" not in on
 
 
+def test_scheduled_ci_is_paused(workflow: dict) -> None:
+    on = workflow.get("on") or workflow.get(True)
+    assert "schedule" not in on
+    assert "workflow_dispatch" in on
+    assert "run_nightly" in on["workflow_dispatch"]["inputs"]
+
+
 def test_job_timeouts_locked(workflow: dict, policy: dict) -> None:
     vw.assert_job_timeouts(workflow, policy)
     jobs = workflow["jobs"]

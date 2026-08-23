@@ -53,14 +53,14 @@ REQUIRED_ARTIFACTS: dict[str, tuple[str, ...]] = {
         "backend/tests/integration/test_chroma_contract.py",
     ),
     "06-03": (
-        "backend/app/services/rag_fixture.py",
+        "backend/app/services/rag_fixture/__init__.py",
         "backend/evals/fixtures/rag-quality-benchmark.v1.json",
         "backend/evals/calibration/rag-judge-calibration.v1.json",
         "backend/prompts/rag_fixture_generator.v1.txt",
         "backend/prompts/rag_fixture_judge.v1.txt",
     ),
     "06-04": (
-        "backend/app/services/rag_quality.py",
+        "backend/app/services/rag_quality/__init__.py",
         "backend/app/services/rag_quality_worker.py",
         "backend/evals/rag-quality-policy.v1.yml",
         "backend/scripts/run_rag_quality.py",

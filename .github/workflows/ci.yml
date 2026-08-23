@@ -5,8 +5,7 @@
 # Event matrix:
 #   pull_request  — secretless unit/contract + locked Postgres/Chroma + Chromium smoke
 #   push main     — full integration (+ optional live smoke); alert on protected main
-#   schedule      — nightly dual-model benchmark on approved runners
-#   workflow_dispatch — protected ref + approved environment + fixed benchmark commit only
+#   workflow_dispatch — optional nightly benchmark on approved runners; cron is paused
 #
 # Fork safety: no pull_request_target; secret/self-hosted/write jobs never run on PR;
 # alert job never checks out untrusted PR code.
@@ -18,9 +17,6 @@ on:
     branches: [main, master]
   push:
     branches: [main, master]
-  schedule:
-    # Nightly UTC 02:00 — dual-model RAG qualification (D-14 / D-18)
-    - cron: "0 2 * * *"
   workflow_dispatch:
     inputs:
       benchmark_commit:
@@ -38,7 +34,7 @@ permissions:
   contents: read
 
 concurrency:
-  # Group by workflow + ref; PR cancel-in-progress; schedule keeps mid-run baseline (D-13)
+  # Group by workflow + ref; only PR runs are cancelled by newer commits (D-13).
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 

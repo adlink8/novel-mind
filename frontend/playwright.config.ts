@@ -19,6 +19,15 @@ const PORT = Number(process.env.E2E_PORT || 3005);
 const BASE_URL = process.env.E2E_BASE_URL || `http://127.0.0.1:${PORT}`;
 const BACKEND_URL = process.env.BACKEND_URL || "http://127.0.0.1:8010";
 const startBackend = process.env.E2E_START_BACKEND !== "0";
+const E2E_DATABASE_URL =
+  process.env.NOVELMIND_DATABASE_URL ??
+  "postgresql+asyncpg://novelmind:novelmind@127.0.0.1:5433/novelmind_ci";
+const E2E_AUTH_ENABLED = process.env.NOVELMIND_AUTH_ENABLED ?? "true";
+
+// Qualification helpers are spawned by test workers rather than webServer.
+// Keep them on the same isolated DB/auth mode as the backend webServer.
+process.env.NOVELMIND_DATABASE_URL = E2E_DATABASE_URL;
+process.env.NOVELMIND_AUTH_ENABLED = E2E_AUTH_ENABLED;
 
 // Cookie CSRF origin gate must allow the frontend origin used by Playwright.
 const CORS_ORIGINS = JSON.stringify([
@@ -107,10 +116,11 @@ export default defineConfig({
             env: {
               ...process.env,
               NOVELMIND_CORS_ORIGINS: CORS_ORIGINS,
+              // Product auth is local single-user, but E2E qualification needs
+              // distinct API-created owners for isolation and denial tests.
+              NOVELMIND_AUTH_ENABLED: E2E_AUTH_ENABLED,
               // e2e 后端默认打到 CI 隔离库，防止测试数据污染开发库 novelmind
-              NOVELMIND_DATABASE_URL:
-                process.env.NOVELMIND_DATABASE_URL ??
-                "postgresql+asyncpg://novelmind:novelmind@127.0.0.1:5433/novelmind_ci",
+              NOVELMIND_DATABASE_URL: E2E_DATABASE_URL,
             },
           },
         ]

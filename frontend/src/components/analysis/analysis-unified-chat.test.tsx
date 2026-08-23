@@ -226,13 +226,13 @@ describe("AnalysisUnifiedChat", () => {
     renderChat();
     await waitReady();
 
-    expect(screen.getByTestId("analysis-chat-bubble-101")).toHaveClass(
+    expect(await screen.findByTestId("analysis-chat-bubble-101")).toHaveClass(
       "w-fit",
       "ml-auto",
       "max-w-[85%]",
       "sm:max-w-[70%]"
     );
-    expect(screen.getByTestId("analysis-chat-bubble-102")).toHaveClass(
+    expect(await screen.findByTestId("analysis-chat-bubble-102")).toHaveClass(
       "w-fit",
       "mr-auto",
       "max-w-[92%]",

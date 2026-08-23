@@ -390,6 +390,25 @@ async def test_require_agent_actor_valid_jwt_returns_user(db_session, monkeypatc
     assert called
 
 
+async def test_require_agent_actor_valid_cookie_jwt_returns_user(
+    db_session, monkeypatch
+):
+    user = await _make_user(db_session, username="cookieuser")
+    token = create_access_token({"sub": str(user.id)})
+    request = _request(headers={"Cookie": f"{AUTH_COOKIE_NAME}={token}"})
+
+    called = []
+
+    async def fake_get_current_user(request, credentials, db):
+        called.append(credentials)
+        return user
+
+    monkeypatch.setattr("app.core.security.get_current_user", fake_get_current_user)
+    result = await require_agent_actor(5, request, None, db_session)
+    assert result is user
+    assert called == [None]
+
+
 async def test_require_agent_actor_invalid_jwt_falls_back_to_internal_token(
     monkeypatch,
 ):

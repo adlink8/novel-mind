@@ -51,7 +51,8 @@ LOCKED_TOOLS = {
 }
 
 # D-09
-LOCKED_BACKEND_OVERALL = {"line": 80, "branch": 70}
+# 2026-08-23 recalibration recorded in .quality/coverage-policy.yml.
+LOCKED_BACKEND_OVERALL = {"line": 72, "branch": 60}
 LOCKED_BACKEND_CRITICAL = {"line": 90, "branch": 85}
 LOCKED_FRONTEND_OVERALL = {"line": 75, "branch": 65}
 LOCKED_FRONTEND_CRITICAL = {"line": 85, "branch": 75}

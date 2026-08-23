@@ -338,11 +338,24 @@ async def require_agent_actor(
             return AgentActor(id=run.owner_id, novel_id=run.novel_id)
         return await _get_default_workspace_user(db)
 
-    # 1) 先试用户 JWT（浏览器/直接 API）。
+    # Browser sessions carry the user JWT in the HttpOnly cookie. Internal
+    # agent tokens are Bearer-only, so a cookie must be resolved as a user
+    # before considering the internal-token branch.
+    if credentials is None:
+        user = await get_current_user(request, None, db)
+        if user is not None:
+            return user
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="无效的认证凭证",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # 1) 先试用户 JWT（直接 API Bearer 调用）。
     # 注意：token 以 "ey" 开头不代表是有效 JWT——random internal_token 偶发
     # 以 "ey" 开头（~0.02%）。get_current_user 对无效/过期 JWT 抛 401，这里
     # 捕获后继续尝试 internal-token 兜底，避免把内部令牌误判为坏 JWT。
-    if credentials is not None and token.startswith("ey"):
+    if token.startswith("ey"):
         try:
             user = await get_current_user(request, credentials, db)
             if user is not None:

@@ -213,13 +213,13 @@ def test_cli_passes_on_high_coverage(tmp_path: Path):
             "app/core/security.py": (18, 20),
         },
     )
-    # frontend: 15 lines hit + 12/15 branches; critical src/lib/api.ts 10 hit + 9/10
+    # frontend: 15 lines hit + 12/15 branches; critical API client 10 hit + 9/10
     lcov = _lcov(
         tmp_path,
-        [("src/x.ts", [1] * 15), ("src/lib/api.ts", [1] * 10)],
+        [("src/x.ts", [1] * 15), ("src/lib/api/client.ts", [1] * 10)],
         branches={
             "src/x.ts": (12, 15),
-            "src/lib/api.ts": (9, 10),
+            "src/lib/api/client.ts": (9, 10),
         },
     )
     # diff: only added lines in files that are fully hit → 100%
@@ -274,10 +274,10 @@ def test_cli_critical_gate_passes_with_low_overall(tmp_path: Path):
     )
     lcov = _lcov(
         tmp_path,
-        [("src/x.ts", [0, 0, 0]), ("src/lib/api.ts", [1] * 10)],
+        [("src/x.ts", [0, 0, 0]), ("src/lib/api/client.ts", [1] * 10)],
         branches={
             "src/x.ts": (0, 3),
-            "src/lib/api.ts": (9, 10),
+            "src/lib/api/client.ts": (9, 10),
         },
     )
     code = cp.main(
@@ -303,7 +303,7 @@ def test_cli_critical_gate_fails_when_critical_low(tmp_path: Path):
     )
     lcov = _lcov(
         tmp_path,
-        [("src/x.ts", [1] * 50), ("src/lib/api.ts", [0] * 10)],
+        [("src/x.ts", [1] * 50), ("src/lib/api/client.ts", [0] * 10)],
         branches={"src/x.ts": (40, 40)},
     )
     code = cp.main(

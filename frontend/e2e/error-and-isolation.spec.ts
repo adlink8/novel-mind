@@ -18,32 +18,24 @@ import {
 const BACKEND = process.env.BACKEND_URL || "http://127.0.0.1:8010";
 
 test.describe("error and isolation", () => {
-  test("wrong password shows error state", async ({ page }) => {
+  test("wrong password is rejected by the auth API", async ({ page }) => {
     const user = uniqueUser("auth");
     await registerAndLogin(page, user);
 
-    // Logout：壳层已无退出按钮（在设置页）。后端会话是 Cookie + Bearer 双轨，
-    // 需要同时清 cookies 和 sessionStorage 才能真正登出
+    // The product no longer exposes a username/password form. Keep the security
+    // contract at the API boundary used by CI's explicit multi-user mode.
     await page.context().clearCookies();
     await page.evaluate(() => {
       window.sessionStorage.clear();
       window.localStorage.clear();
     });
-    await page.goto("/");
 
-    await expect(page.locator('input[name="username"]')).toBeVisible({
-      timeout: 15_000,
+    const response = await page.request.post(`${BACKEND}/api/auth/login`, {
+      data: { username: user.username, password: "WrongPass999!" },
     });
-    // Ensure login mode
-    const hasAccount = page.getByRole("button", { name: /已有账户/ });
-    if (await hasAccount.isVisible().catch(() => false)) {
-      await hasAccount.click();
-    }
-    await page.locator('input[name="username"]').fill(user.username);
-    await page.locator('input[name="password"]').fill("WrongPass999!");
-    await page.getByRole("button", { name: /^登录$/ }).click();
-    await expect(page.getByText(/用户名或密码错误|登录失败|注册或登录失败/)).toBeVisible({
-      timeout: 15_000,
+    expect(response.status()).toBe(401);
+    expect(await response.json()).toMatchObject({
+      detail: "用户名或密码错误",
     });
   });
 
@@ -54,11 +46,8 @@ test.describe("error and isolation", () => {
     // Create owner + a novel via API if possible
     await apiRegister(request, owner);
     const ownerLogin = await apiLogin(request, owner.username, owner.password);
-    const ownerCookies = await ownerLogin.headersArray();
-    const setCookie = ownerCookies
-      .filter((h) => h.name.toLowerCase() === "set-cookie")
-      .map((h) => h.value.split(";")[0])
-      .join("; ");
+    const ownerToken = ((await ownerLogin.json()) as { access_token: string })
+      .access_token;
 
     // Upload a minimal novel as owner
     const content = "第一章\n隔离测试内容。\n";
@@ -69,7 +58,9 @@ test.describe("error and isolation", () => {
       "isolation.txt"
     );
     const uploadRes = await request.post(`${BACKEND}/api/novels/upload`, {
-      headers: setCookie ? { Cookie: setCookie } : undefined,
+      // Bearer auth avoids the browser-cookie CSRF origin check for this
+      // direct API setup request.
+      headers: { Authorization: `Bearer ${ownerToken}` },
       multipart: {
         file: {
           name: "isolation.txt",

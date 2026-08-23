@@ -42,12 +42,15 @@ coverage:
     critical:
       line: 85
       branch: 75
-      # hooks / store / API client
+      # Business-data hooks / stores / API client. Keep presentation-only and
+      # feature-workspace hooks out of the security/data critical subset; list
+      # the data hooks explicitly so adding an unrelated hook cannot drift it.
       globs:
-        - "src/hooks/**"
+        - "src/hooks/use-ai-models.ts"
+        - "src/hooks/use-eval.ts"
+        - "src/hooks/use-novels.ts"
         - "src/stores/**"
-        - "src/lib/api.ts"
-        - "src/lib/**/api*.ts"
+        - "src/lib/api/**"
   diff_coverage:
     minimum: 90
 
