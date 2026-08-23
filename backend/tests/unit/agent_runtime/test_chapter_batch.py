@@ -12,7 +12,10 @@ from app.services.agent_runtime.chapter_batch import (
 
 
 def _chapters(count: int) -> list[ChapterRef]:
-    return [ChapterRef(id=1000 + number, chapter_number=number) for number in range(1, count + 1)]
+    return [
+        ChapterRef(id=1000 + number, chapter_number=number)
+        for number in range(1, count + 1)
+    ]
 
 
 @pytest.mark.unit
@@ -47,7 +50,10 @@ def test_one_hundred_chapters_keep_model_input_per_chapter_and_resume_cursor():
     assert len(plan.next_window) == 5
     assert plan.pending_chapter_ids == [1006 + offset for offset in range(95)]
     assert max(len(str(item.input)) for item in plan.next_window) < 500
-    assert all(item.input["execution_prompt"] == item.input["question"] for item in plan.next_window)
+    assert all(
+        item.input["execution_prompt"] == item.input["question"]
+        for item in plan.next_window
+    )
 
 
 @pytest.mark.unit

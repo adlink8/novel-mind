@@ -121,7 +121,9 @@ async def test_novel_management_read_backfills_existing_novel_without_reopening_
 
     response = await auth_client.get(f"/api/agent/skills?novel_id={novel.id}")
     assert response.status_code == 200, response.text
-    assert {item["name"] for item in response.json()["items"]} == EXPECTED_BUILTIN_SKILLS
+    assert {
+        item["name"] for item in response.json()["items"]
+    } == EXPECTED_BUILTIN_SKILLS
 
     target = await db_session.scalar(
         select(SkillVersion).where(

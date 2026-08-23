@@ -41,6 +41,8 @@ MARKER_TIMEOUTS = {
 def _enable_interactive_auth_for_legacy_test_suite(monkeypatch):
     """Existing tests opt into multi-user auth; the shipped product defaults off."""
     monkeypatch.setattr(settings, "auth_enabled", True)
+
+
 # browser timeout (60s) is reserved for Playwright; not applied here.
 
 

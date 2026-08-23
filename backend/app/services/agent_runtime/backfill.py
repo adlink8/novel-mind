@@ -153,9 +153,9 @@ async def create_backfill_runs(
         novel = await db.get(Novel, novel_id)
         if novel is None or novel.owner_id != owner_id:
             return None
-        _snapshot_hash, chapters = await SceneBoundaryService(
-            db
-        ).load_source_snapshot(owner_id=owner_id, novel_id=novel_id)
+        _snapshot_hash, chapters = await SceneBoundaryService(db).load_source_snapshot(
+            owner_id=owner_id, novel_id=novel_id
+        )
         if not chapters:
             return None
         cutoff_value = await resolve_chapter_cutoff(db, novel)
@@ -222,7 +222,9 @@ async def create_backfill_runs(
             "branch": None,
         }
         if skill_name in _SNAPSHOT_ANCHORED_SKILLS:
-            anchor = await _resolve_snapshot_anchor(_SNAPSHOT_ANCHORED_SKILLS[skill_name])
+            anchor = await _resolve_snapshot_anchor(
+                _SNAPSHOT_ANCHORED_SKILLS[skill_name]
+            )
             if anchor is None:
                 # 无章节/无进度可锚定：诚实跳过，绝不产出无血缘 run。
                 continue

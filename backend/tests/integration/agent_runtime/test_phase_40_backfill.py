@@ -243,7 +243,9 @@ class TestClaimEndpoint:
         )
         assert resp.status_code == 409
 
-    async def test_claim_token_can_finalize_only_its_exact_run(self, api_client, runtime_factory):
+    async def test_claim_token_can_finalize_only_its_exact_run(
+        self, api_client, runtime_factory
+    ):
         client, factory = api_client
         seed_a = await _seed_owner_novel(factory, suffix="finalize_a")
         seed_b = await _seed_owner_novel(factory, suffix="finalize_b")

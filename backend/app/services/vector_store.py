@@ -58,8 +58,12 @@ class VectorStore:
             port: ChromaDB 服务端口。默认 8001；可由环境变量
                 NOVELMIND_VECTOR_PORT 覆盖（docker-compose 中映射的宿主机端口）。
         """
-        self.host = host if host is not None else _env_or("localhost", "NOVELMIND_VECTOR_HOST")
-        self.port = port if port is not None else int(_env_or("8001", "NOVELMIND_VECTOR_PORT"))
+        self.host = (
+            host if host is not None else _env_or("localhost", "NOVELMIND_VECTOR_HOST")
+        )
+        self.port = (
+            port if port is not None else int(_env_or("8001", "NOVELMIND_VECTOR_PORT"))
+        )
         self._client = None
 
     @property

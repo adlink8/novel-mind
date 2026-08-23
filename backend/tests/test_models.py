@@ -300,6 +300,7 @@ async def test_discover_rejects_unsafe_url_before_outbound_request(
     auth_client: AsyncClient,
 ):
     """模型发现不能访问 metadata、回环或其他未列入白名单的地址。"""
+
     class UnexpectedAsyncClient:
         def __init__(self, **kwargs):
             raise AssertionError("不安全 URL 不应建立外部客户端")

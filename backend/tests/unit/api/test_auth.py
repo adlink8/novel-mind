@@ -157,9 +157,7 @@ async def test_register_and_login_are_closed_when_auth_disabled(
 ):
     monkeypatch.setattr(settings, "auth_enabled", False)
 
-    register_resp = await client.post(
-        "/api/auth/register", json=_payload("closeduser")
-    )
+    register_resp = await client.post("/api/auth/register", json=_payload("closeduser"))
     login_resp = await client.post(
         "/api/auth/login",
         json={"username": "closeduser", "password": VALID_PASSWORD},

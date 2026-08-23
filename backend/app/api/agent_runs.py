@@ -89,7 +89,9 @@ async def accept_skill_run(
     try:
         runtime_manifest = registry_service.skill_runtime_manifest(version)
         connector_versions = await freeze_connector_versions(
-            db, owner_id=current_user.id, allowed_tools=list(version.allowed_tools or [])
+            db,
+            owner_id=current_user.id,
+            allowed_tools=list(version.allowed_tools or []),
         )
         runtime_manifest = runtime_manifest.model_copy(
             update={
@@ -265,7 +267,10 @@ async def finalize_skill_run_endpoint(
         # chat_backfill 只写 candidate 域表；reader_chat 投影回原 ReaderConversation。
         if outcome.status == "completed" and outcome.artifact_id is not None:
             run_row = await db.get(SkillRun, run_id)
-            if run_row is not None and run_row.origin in ("chat_backfill", "reader_chat"):
+            if run_row is not None and run_row.origin in (
+                "chat_backfill",
+                "reader_chat",
+            ):
                 from app.services.agent_runtime.materialize import (
                     materialize_skill_run,
                 )
@@ -291,7 +296,9 @@ async def finalize_skill_run_endpoint(
                 )
 
                 background_tasks.add_task(
-                    reconcile_reader_chat_after_backfill, run_id, sessions=request_factory
+                    reconcile_reader_chat_after_backfill,
+                    run_id,
+                    sessions=request_factory,
                 )
     except Exception as exc:  # noqa: BLE001 — 冻结码映射到 HTTP
         raise HTTPException(

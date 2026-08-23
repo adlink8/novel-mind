@@ -166,7 +166,9 @@ class GetEvidenceSpanRequest(StrictAgentToolModel):
 
     chapter_id: int = Field(..., gt=0, description="章节 ID")
     source_start: int | None = Field(
-        default=None, ge=0, description="切片起点（含，code-point；chunk_id 缺省时必填）"
+        default=None,
+        ge=0,
+        description="切片起点（含，code-point；chunk_id 缺省时必填）",
     )
     source_end: int | None = Field(
         default=None, gt=0, description="切片终点（不含；chunk_id 缺省时必填）"

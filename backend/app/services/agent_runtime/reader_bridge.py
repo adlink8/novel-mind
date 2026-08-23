@@ -77,14 +77,18 @@ def evaluate_backfill_recovery(
     for dimension in required:
         run = latest.get(dimension)
         if run is None:
-            return BackfillRecoveryDecision("waiting", f"missing:{dimension}", (dimension,))
+            return BackfillRecoveryDecision(
+                "waiting", f"missing:{dimension}", (dimension,)
+            )
         status = _run_value(run, "status")
         if status in {"failed", "cancelled"}:
             return BackfillRecoveryDecision("failed", f"backfill_{status}")
         if status == "completed":
             reason = str(_run_value(run, "status_reason") or "")
             if not reason.startswith("materialized:"):
-                return BackfillRecoveryDecision("failed", "backfill_materialization_failed")
+                return BackfillRecoveryDecision(
+                    "failed", "backfill_materialization_failed"
+                )
             continue
         updated_at = _run_time(run)
         if updated_at and _as_utc(current) - updated_at > timeout:
@@ -380,9 +384,7 @@ async def _reconcile_reader_chat_after_backfill_in_session(
         return "skipped:reader_job_not_waiting"
 
     required = tuple(
-        dim
-        for dim in str(job.status_reason).split(":", 1)[1].split(",")
-        if dim
+        dim for dim in str(job.status_reason).split(":", 1)[1].split(",") if dim
     )
     if not required:
         # 历史遗留的 waiting_analysis:<空>：无维度可等待，诚实失败。
@@ -417,7 +419,11 @@ async def _reconcile_reader_chat_after_backfill_in_session(
         # A fresh QueryPlan may reveal another missing dimension.  That is a
         # new observable waiting cycle, not an abstain answer.
         return job.status_reason or WAITING_ANALYSIS
-    return f"reader_skill_requeued:{queued.id}" if queued is not None else "reader_skill_not_queued"
+    return (
+        f"reader_skill_requeued:{queued.id}"
+        if queued is not None
+        else "reader_skill_not_queued"
+    )
 
 
 async def _rebuild_reader_context_manifest(
@@ -558,15 +564,19 @@ async def materialize_reader_chat_answer(
             ReaderContextManifest.user_message_id == job.user_message_id
         )
     )
-    refs = list(
-        (
-            await session.scalars(
-                select(ReaderContextEvidenceRef)
-                .where(ReaderContextEvidenceRef.manifest_id == manifest.id)
-                .order_by(ReaderContextEvidenceRef.sort_order)
-            )
-        ).all()
-    ) if manifest is not None else []
+    refs = (
+        list(
+            (
+                await session.scalars(
+                    select(ReaderContextEvidenceRef)
+                    .where(ReaderContextEvidenceRef.manifest_id == manifest.id)
+                    .order_by(ReaderContextEvidenceRef.sort_order)
+                )
+            ).all()
+        )
+        if manifest is not None
+        else []
+    )
     ref_ids = {ref.evidence_key: ref.id for ref in refs}
 
     conversation = await session.get(

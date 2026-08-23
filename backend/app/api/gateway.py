@@ -216,14 +216,18 @@ async def _resolve_gateway_deployment(
 
     token_hash = hashlib.sha256(run_token.encode("utf-8")).hexdigest()
     run = (
-        await db.execute(
-            select(SkillRun).where(
-                SkillRun.internal_token_hash == token_hash,
-                SkillRun.novel_id == novel_id,
-                SkillRun.status.in_(("queued", "running")),
+        (
+            await db.execute(
+                select(SkillRun).where(
+                    SkillRun.internal_token_hash == token_hash,
+                    SkillRun.novel_id == novel_id,
+                    SkillRun.status.in_(("queued", "running")),
+                )
             )
         )
-    ).scalars().first()
+        .scalars()
+        .first()
+    )
     if run is None:
         raise HTTPException(status_code=401, detail="无效或已终止的 Agent 运行上下文")
 
@@ -232,21 +236,23 @@ async def _resolve_gateway_deployment(
     )
     task = TASK_BY_SKILL.get(skill_name or "")
     configured = (
-        await resolve_task_model(db, owner_id=run.owner_id, task=task)
-        if task
-        else None
+        await resolve_task_model(db, owner_id=run.owner_id, task=task) if task else None
     )
 
     if configured is None:
         configured = (
-            await db.execute(
-                select(AIModelConfig).where(
-                    AIModelConfig.owner_id == run.owner_id,
-                    AIModelConfig.is_active.is_(True),
-                    AIModelConfig.is_default.is_(True),
+            (
+                await db.execute(
+                    select(AIModelConfig).where(
+                        AIModelConfig.owner_id == run.owner_id,
+                        AIModelConfig.is_active.is_(True),
+                        AIModelConfig.is_default.is_(True),
+                    )
                 )
             )
-        ).scalars().first()
+            .scalars()
+            .first()
+        )
     if configured is None:
         raise HTTPException(status_code=409, detail="尚未配置默认 AI 模型")
 
@@ -264,9 +270,13 @@ async def _resolve_gateway_deployment(
         owner_id=run.owner_id,
         model_config_id=configured.id,
         extra_params=dict(configured.extra_params or {}) or None,
-        default_max_tokens=int(configured.max_tokens) if configured.max_tokens else None,
+        default_max_tokens=int(configured.max_tokens)
+        if configured.max_tokens
+        else None,
         default_temperature=(
-            float(configured.temperature) if configured.temperature is not None else None
+            float(configured.temperature)
+            if configured.temperature is not None
+            else None
         ),
     )
 
@@ -320,7 +330,9 @@ async def _non_stream_completion(
             messages=_normalize_messages(payload.messages),
             model=deployment.model,
             temperature=_json_temperature(
-                deployment.skill_name, payload.temperature, deployment.default_temperature
+                deployment.skill_name,
+                payload.temperature,
+                deployment.default_temperature,
             ),
             max_tokens=payload.max_tokens or deployment.default_max_tokens or 4096,
             stream=False,
@@ -407,7 +419,9 @@ async def _stream_completion(
             response_format=_json_response_format(deployment.skill_name),
             max_tokens=payload.max_tokens or deployment.default_max_tokens or 4096,
             temperature=_json_temperature(
-                deployment.skill_name, payload.temperature, deployment.default_temperature
+                deployment.skill_name,
+                payload.temperature,
+                deployment.default_temperature,
             ),
             extra_body=deployment.extra_params,
             api_key=deployment.api_key,

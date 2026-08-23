@@ -202,7 +202,9 @@ async def test_world_model_run_input_not_polluted_by_scene_snapshot(
     db_session: AsyncSession,
 ):
     """snapshot/cutoff 锚定只服务 detect-key-scenes；其它 skill input 不携带。"""
-    owner, novel, message_id = await _seed_novel_with_chapters(db_session, with_skill=False)
+    owner, novel, message_id = await _seed_novel_with_chapters(
+        db_session, with_skill=False
+    )
     registry = SkillRegistry(
         owner_id=owner.id,
         novel_id=novel.id,

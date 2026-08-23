@@ -32,33 +32,57 @@ def _load_snapshot() -> tuple[dict[str, Any], ...]:
     try:
         snapshot = json.loads(SNAPSHOT_PATH.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
-        raise BuiltinManifestError(f"builtin Skill snapshot unavailable: {SNAPSHOT_PATH}") from exc
+        raise BuiltinManifestError(
+            f"builtin Skill snapshot unavailable: {SNAPSHOT_PATH}"
+        ) from exc
     if snapshot.get("schema_version") != SNAPSHOT_SCHEMA_VERSION:
         raise BuiltinManifestError("unsupported builtin Skill snapshot schema")
     names = snapshot.get("allowlisted_skill_names")
     skills = snapshot.get("skills")
-    if not isinstance(names, list) or not isinstance(skills, list) or len(names) != len(skills):
+    if (
+        not isinstance(names, list)
+        or not isinstance(skills, list)
+        or len(names) != len(skills)
+    ):
         raise BuiltinManifestError("builtin Skill snapshot shape is invalid")
 
     result: list[dict[str, Any]] = []
     for skill in skills:
         if not isinstance(skill, dict):
             raise BuiltinManifestError("builtin Skill entry is invalid")
-        payload = {key: skill.get(key) for key in (
-            "name", "version", "description", "prompt", "execution_mode",
-            "allowed_tools", "read_permissions", "write_permissions",
-            "forbidden_spaces", "budget", "approval_required_for",
-            "input_schema", "output_schema",
-        )}
+        payload = {
+            key: skill.get(key)
+            for key in (
+                "name",
+                "version",
+                "description",
+                "prompt",
+                "execution_mode",
+                "allowed_tools",
+                "read_permissions",
+                "write_permissions",
+                "forbidden_spaces",
+                "budget",
+                "approval_required_for",
+                "input_schema",
+                "output_schema",
+            )
+        }
         if payload["execution_mode"] != "builtin" or not payload["prompt"]:
             raise BuiltinManifestError(f"builtin Skill {payload['name']} is incomplete")
         if skill.get("checksum") != _checksum(payload):
-            raise BuiltinManifestError(f"builtin Skill {payload['name']} checksum mismatch")
+            raise BuiltinManifestError(
+                f"builtin Skill {payload['name']} checksum mismatch"
+            )
         if payload["name"] not in names or not payload["allowed_tools"]:
-            raise BuiltinManifestError(f"builtin Skill {payload['name']} is not allowlisted")
+            raise BuiltinManifestError(
+                f"builtin Skill {payload['name']} is not allowlisted"
+            )
         result.append(skill)
     if {skill["name"] for skill in result} != set(names):
-        raise BuiltinManifestError("builtin Skill snapshot names do not match allowlist")
+        raise BuiltinManifestError(
+            "builtin Skill snapshot names do not match allowlist"
+        )
     return tuple(result)
 
 
@@ -68,4 +92,7 @@ BUILTIN_SKILL_NAMES = tuple(skill["name"] for skill in BUILTIN_SKILL_MANIFESTS)
 
 def builtin_skill_manifests() -> tuple[dict[str, Any], ...]:
     """Return defensive copies of all allowlisted builtin Skill contracts."""
-    return tuple(json.loads(json.dumps(skill, ensure_ascii=False)) for skill in BUILTIN_SKILL_MANIFESTS)
+    return tuple(
+        json.loads(json.dumps(skill, ensure_ascii=False))
+        for skill in BUILTIN_SKILL_MANIFESTS
+    )

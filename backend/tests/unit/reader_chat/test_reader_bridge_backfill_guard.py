@@ -97,7 +97,10 @@ async def test_unmapped_unavailable_dimensions_fail_honestly(db_session):
     """knowledge/relationship_observation 无 backfill 映射 → failed，绝不永久等待。"""
     job = await _seed_job(
         db_session,
-        source_status={"knowledge": "absent", "relationship_observation": "unavailable"},
+        source_status={
+            "knowledge": "absent",
+            "relationship_observation": "unavailable",
+        },
     )
 
     result = await _enqueue_reader_skill_run_in_session(db_session, job)
@@ -109,7 +112,9 @@ async def test_unmapped_unavailable_dimensions_fail_honestly(db_session):
 
 
 @pytest.mark.asyncio
-async def test_mapped_unavailable_dimension_never_parks_with_empty_wait_list(db_session):
+async def test_mapped_unavailable_dimension_never_parks_with_empty_wait_list(
+    db_session,
+):
     """有映射的维度：waiting_analysis 必须携带非空维度列表（或诚实失败）。"""
     job = await _seed_job(db_session, source_status={"raw_text": "unavailable"})
 

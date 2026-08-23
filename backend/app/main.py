@@ -53,7 +53,10 @@ from app.api.reader_chat import router as reader_chat_router
 from app.api.user_preference_memory import router as user_preference_memory_router
 from app.api.relationships import router as relationships_router
 from app.api.settings import router as settings_router
-from app.api.tool_connectors import router as tool_connectors_router, run_router as tool_connector_run_router
+from app.api.tool_connectors import (
+    router as tool_connectors_router,
+    run_router as tool_connector_run_router,
+)
 from app.api.usage import router as usage_router
 from app.api.visual_bible import router as visual_bible_router
 from app.api.key_scenes import router as key_scenes_router
@@ -296,8 +299,12 @@ app.include_router(
 app.include_router(fanfiction.router, prefix="/api/fanfiction", tags=["同人文"])
 app.include_router(models.router, prefix="/api/models", tags=["AI 模型"])
 app.include_router(settings_router, prefix="/api/settings", tags=["设置中心"])
-app.include_router(tool_connectors_router, prefix="/api/extensions", tags=["受限 Tool 扩展"])
-app.include_router(tool_connector_run_router, prefix="/api/agent-tools", tags=["受限 Tool 运行代理"])
+app.include_router(
+    tool_connectors_router, prefix="/api/extensions", tags=["受限 Tool 扩展"]
+)
+app.include_router(
+    tool_connector_run_router, prefix="/api/agent-tools", tags=["受限 Tool 运行代理"]
+)
 app.include_router(usage_router, prefix="/api/usage", tags=["用量统计"])
 app.include_router(rag.router, prefix="/api/novels", tags=["RAG 检索"])
 app.include_router(knowledge_router)

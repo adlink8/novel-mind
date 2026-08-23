@@ -522,7 +522,13 @@ def test_normalize_messages_preserves_reasoning_for_thinking_models():
         GatewayChatMessage(
             role="assistant",
             content="",
-            tool_calls=[{"id": "c1", "type": "function", "function": {"name": "t", "arguments": "{}"}}],
+            tool_calls=[
+                {
+                    "id": "c1",
+                    "type": "function",
+                    "function": {"name": "t", "arguments": "{}"},
+                }
+            ],
             reasoning_content="因为……所以……",
             reasoning_details=[{"id": "c1", "signature": "sig"}],
         ),
@@ -551,7 +557,9 @@ async def test_gateway_non_stream_propagates_real_finish_reason(
     fake = _FakeAiService()
     fake.chat_response = _LengthResponse()
     monkeypatch.setattr("app.api.gateway.ai_service", fake, raising=False)
-    novel, run_token = await _seed_skill_run(db_session, skill_name="answer-reading-question")
+    novel, run_token = await _seed_skill_run(
+        db_session, skill_name="answer-reading-question"
+    )
 
     resp = await auth_client.post(
         "/api/gateway/v1/chat/completions",
@@ -560,7 +568,10 @@ async def test_gateway_non_stream_propagates_real_finish_reason(
             "X-NovelMind-Run-Token": run_token,
             "X-NovelMind-Novel-ID": str(novel.id),
         },
-        json={"model": "reader-chat-default", "messages": [{"role": "user", "content": "hi"}]},
+        json={
+            "model": "reader-chat-default",
+            "messages": [{"role": "user", "content": "hi"}],
+        },
     )
     assert resp.status_code == 200
     assert resp.json()["choices"][0]["finish_reason"] == "length"
@@ -574,7 +585,9 @@ async def test_gateway_uses_model_config_defaults_for_budget_params(
     monkeypatch.setattr(settings, "ai_allowed_private_hosts", "127.0.0.1")
     fake = _FakeAiService()
     monkeypatch.setattr("app.api.gateway.ai_service", fake, raising=False)
-    novel, run_token = await _seed_skill_run(db_session, skill_name="answer-reading-question")
+    novel, run_token = await _seed_skill_run(
+        db_session, skill_name="answer-reading-question"
+    )
     await db_session.execute(
         update(AIModelConfig).values(max_tokens=8192, temperature=0.3)
     )
@@ -587,7 +600,10 @@ async def test_gateway_uses_model_config_defaults_for_budget_params(
             "X-NovelMind-Run-Token": run_token,
             "X-NovelMind-Novel-ID": str(novel.id),
         },
-        json={"model": "reader-chat-default", "messages": [{"role": "user", "content": "hi"}]},
+        json={
+            "model": "reader-chat-default",
+            "messages": [{"role": "user", "content": "hi"}],
+        },
     )
     assert resp.status_code == 200
     assert fake.chat_calls[0]["max_tokens"] == 8192
@@ -608,7 +624,9 @@ async def test_gateway_stream_forwards_upstream_finish_reason(
 
     fake = _LengthStreamFake()
     monkeypatch.setattr("app.api.gateway.ai_service", fake, raising=False)
-    novel, run_token = await _seed_skill_run(db_session, skill_name="answer-reading-question")
+    novel, run_token = await _seed_skill_run(
+        db_session, skill_name="answer-reading-question"
+    )
 
     resp = await auth_client.post(
         "/api/gateway/v1/chat/completions",

@@ -2,6 +2,7 @@
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.dialects.postgresql import JSONB
 
 
 revision = "20260812_tool_connectors"
@@ -34,8 +35,8 @@ def upgrade() -> None:
         sa.Column("base_url", sa.String(length=2048), nullable=False),
         sa.Column("path", sa.String(length=2048), nullable=False),
         sa.Column("method", sa.String(length=8), nullable=False),
-        sa.Column("request_schema", sa.JSON(), nullable=False),
-        sa.Column("response_schema", sa.JSON(), nullable=False),
+        sa.Column("request_schema", JSONB(), nullable=False),
+        sa.Column("response_schema", JSONB(), nullable=False),
         sa.Column("enabled", sa.Boolean(), server_default=sa.false(), nullable=False),
         sa.Column("status", sa.String(length=16), server_default="draft", nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),

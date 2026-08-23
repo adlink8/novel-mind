@@ -111,6 +111,7 @@ async def test_reader_chat_resolves_owner_default_model_with_credentials(monkeyp
 
     monkeypatch.setattr("app.config.settings.chat_provider", "openai")
     monkeypatch.setattr("app.config.settings.default_chat_model", "gpt-4o-mini")
+
     async def validate_base_url(value):
         return value
 

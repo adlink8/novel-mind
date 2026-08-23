@@ -8,8 +8,14 @@ from __future__ import annotations
 
 import pytest
 
-from app.services.tool_connectors.http_adapter import FakeHttpAdapter, HttpAdapterResponse
-from app.services.tool_connectors.policy import ConnectorPolicyError, validate_target_url
+from app.services.tool_connectors.http_adapter import (
+    FakeHttpAdapter,
+    HttpAdapterResponse,
+)
+from app.services.tool_connectors.policy import (
+    ConnectorPolicyError,
+    validate_target_url,
+)
 from app.services.tool_connectors.service import dry_run_connector
 
 
@@ -19,7 +25,11 @@ VALID_PAYLOAD = {
     "base_url": "https://api.example.com",
     "path": "/v1/weather",
     "method": "GET",
-    "request_schema": {"type": "object", "properties": {}, "additionalProperties": False},
+    "request_schema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": False,
+    },
     "response_schema": {"type": "object", "properties": {"ok": {"type": "boolean"}}},
     "enabled": False,
 }

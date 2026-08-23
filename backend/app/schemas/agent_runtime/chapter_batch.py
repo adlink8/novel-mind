@@ -20,14 +20,11 @@ class ChapterBatchCreate(StrictAgentRuntimeModel):
         has_range = self.chapter_start is not None or self.chapter_end is not None
         has_ids = self.chapter_ids is not None
         if has_range == has_ids:
-            raise ValueError(
-                "provide either chapter_start+chapter_end or chapter_ids"
-            )
+            raise ValueError("provide either chapter_start+chapter_end or chapter_ids")
         if has_range and (self.chapter_start is None or self.chapter_end is None):
             raise ValueError("chapter_start and chapter_end must be provided together")
-        if (
-            self.chapter_ids is not None
-            and any(value < 1 for value in self.chapter_ids)
+        if self.chapter_ids is not None and any(
+            value < 1 for value in self.chapter_ids
         ):
             raise ValueError("chapter_ids must be positive")
         return self

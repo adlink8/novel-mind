@@ -124,9 +124,7 @@ def production_runtime() -> ClueWorkerRuntime:
     configured_model = (settings.default_chat_model or "gpt-4o-mini").strip()
     judge_model = AIService.litellm_model_name(configured_provider, configured_model)
     provider, model_id = (
-        judge_model.split("/", 1)
-        if "/" in judge_model
-        else ("openai", judge_model)
+        judge_model.split("/", 1) if "/" in judge_model else ("openai", judge_model)
     )
     deployment = ClueModelDeployment(
         provider, model_id, model_id, Decimal("0.15"), Decimal("0.60")

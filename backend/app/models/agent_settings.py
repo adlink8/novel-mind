@@ -14,11 +14,17 @@ class AgentSettings(TimestampMixin, Base):
     owner_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
     )
-    auto_deep_analysis: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    auto_deep_analysis: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )
     memory_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     memory_retention_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    show_analysis_progress: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    notify_analysis_complete: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    show_analysis_progress: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True
+    )
+    notify_analysis_complete: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True
+    )
     auto_create_candidate_artifacts: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False
     )

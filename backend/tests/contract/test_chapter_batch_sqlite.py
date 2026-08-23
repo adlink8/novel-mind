@@ -147,9 +147,7 @@ async def test_batch_endpoint_handles_ten_real_chapters_and_refills_window(
     assert repeated.json()["created_run_ids"] == []
 
     for run in (
-        await db_session.scalars(
-            select(SkillRun).where(SkillRun.novel_id == novel.id)
-        )
+        await db_session.scalars(select(SkillRun).where(SkillRun.novel_id == novel.id))
     ).all():
         run.status = "completed"
     await db_session.commit()
@@ -203,7 +201,9 @@ async def test_successful_finalize_materializes_and_refills_without_polling(
         (
             await db_session.scalars(
                 select(SkillRun)
-                .where(SkillRun.novel_id == novel_id, SkillRun.origin == "chapter_batch")
+                .where(
+                    SkillRun.novel_id == novel_id, SkillRun.origin == "chapter_batch"
+                )
                 .order_by(SkillRun.id)
             )
         ).all()

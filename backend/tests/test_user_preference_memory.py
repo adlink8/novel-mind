@@ -295,9 +295,7 @@ async def test_delete_one_and_all_are_owner_scoped(
     )
     assert forbidden.status_code == 404
 
-    deleted = await auth_client.delete(
-        f"/api/memory/preferences/{own_memories[0].id}"
-    )
+    deleted = await auth_client.delete(f"/api/memory/preferences/{own_memories[0].id}")
     assert deleted.status_code == 204
     assert (await auth_client.get("/api/memory/preferences")).json()["total"] == 1
 

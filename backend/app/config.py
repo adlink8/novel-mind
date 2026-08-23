@@ -101,15 +101,12 @@ class Settings(BaseSettings):
     # 桌面/本地单用户产品默认不启用交互式注册和密码登录。关闭时，普通用户
     # API 绑定到 local_auto_login_username 指定的工作区用户；Agent 网关及
     # per-run 内部令牌仍使用各自独立的认证链路。
-    auth_enabled: bool = Field(
-        default=False, validation_alias="NOVELMIND_AUTH_ENABLED"
-    )
+    auth_enabled: bool = Field(default=False, validation_alias="NOVELMIND_AUTH_ENABLED")
 
     # 自定义 AI API 地址只允许访问管理员明确配置的主机。
     # 本地 Ollama 需显式加入，例如: localhost,127.0.0.1
     ai_allowed_hosts: str = (
-        "api.openai.com,api.anthropic.com,"
-        "generativelanguage.googleapis.com,opencode.ai"
+        "api.openai.com,api.anthropic.com,generativelanguage.googleapis.com,opencode.ai"
     )
     ai_allowed_private_hosts: str = "127.0.0.1,localhost"
 

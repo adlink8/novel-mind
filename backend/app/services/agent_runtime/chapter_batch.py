@@ -71,7 +71,12 @@ def _validate_window(concurrency_window: int) -> int:
 
 
 def _batch_id(
-    *, owner_id: int, novel_id: int, cutoff_chapter: int, skill_version_id: int, chapters: Iterable[ChapterRef]
+    *,
+    owner_id: int,
+    novel_id: int,
+    cutoff_chapter: int,
+    skill_version_id: int,
+    chapters: Iterable[ChapterRef],
 ) -> str:
     payload = ":".join(
         [
@@ -85,7 +90,9 @@ def _batch_id(
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
-def _chapter_question(*, novel_id: int, chapter_number: int, cutoff_chapter: int) -> str:
+def _chapter_question(
+    *, novel_id: int, chapter_number: int, cutoff_chapter: int
+) -> str:
     return (
         f"分析小说{novel_id}第{chapter_number}章的人物、事件、线索与连续性；"
         f"cutoff={cutoff_chapter}。先调用get_chapter读取正文，定位原文时用"
@@ -134,7 +141,9 @@ def build_chapter_batch_plan(
 
     window = _validate_window(concurrency_window)
     if owner_id < 1 or novel_id < 1 or cutoff_chapter < 1:
-        raise ChapterBatchError("owner_id, novel_id and cutoff_chapter must be positive")
+        raise ChapterBatchError(
+            "owner_id, novel_id and cutoff_chapter must be positive"
+        )
     normalized = sorted(chapters, key=lambda item: (item.chapter_number, item.id))
     if not normalized:
         raise ChapterBatchError("no real chapters matched the requested batch")
@@ -220,7 +229,9 @@ async def _resolve_real_chapters(
         missing = sorted(set(wanted) - found)
         if missing:
             raise ChapterBatchError("chapter_ids contain chapters outside this novel")
-        refs = [ChapterRef(id=row.id, chapter_number=row.chapter_number) for row in rows]
+        refs = [
+            ChapterRef(id=row.id, chapter_number=row.chapter_number) for row in rows
+        ]
     else:
         if chapter_start is None or chapter_end is None:
             raise ChapterBatchError("chapter_start and chapter_end are required")
@@ -239,7 +250,9 @@ async def _resolve_real_chapters(
                 )
             ).all()
         )
-        refs = [ChapterRef(id=row.id, chapter_number=row.chapter_number) for row in rows]
+        refs = [
+            ChapterRef(id=row.id, chapter_number=row.chapter_number) for row in rows
+        ]
     refs.sort(key=lambda item: (item.chapter_number, item.id))
     if not refs:
         raise ChapterBatchError("no real chapters matched the requested batch")
@@ -248,7 +261,9 @@ async def _resolve_real_chapters(
     return refs
 
 
-def _manifest_for_plan(plan: ChapterBatchPlan, *, requested: dict[str, Any]) -> dict[str, Any]:
+def _manifest_for_plan(
+    plan: ChapterBatchPlan, *, requested: dict[str, Any]
+) -> dict[str, Any]:
     return {
         CHAPTER_BATCH_MANIFEST_KEY: {
             "version": 1,
@@ -445,9 +460,7 @@ async def _refill_existing_batch(
         active += 1
         created_run_ids.append(run.id)
     await db.flush()
-    return _status_for_runs(
-        plan=plan, runs=runs, created_run_ids=created_run_ids
-    )
+    return _status_for_runs(plan=plan, runs=runs, created_run_ids=created_run_ids)
 
 
 def _status_for_runs(
@@ -455,7 +468,14 @@ def _status_for_runs(
 ) -> dict[str, Any]:
     by_chapter = _latest_runs_by_chapter(runs)
     chapter_items = []
-    counts = {"queued": 0, "running": 0, "completed": 0, "failed": 0, "cancelled": 0, "pending": 0}
+    counts = {
+        "queued": 0,
+        "running": 0,
+        "completed": 0,
+        "failed": 0,
+        "cancelled": 0,
+        "pending": 0,
+    }
     for item in plan.chapters:
         row = by_chapter.get(item.id)
         state = row.status if row is not None else "pending"
@@ -520,7 +540,9 @@ async def create_or_resume_chapter_batch(
         raise ChapterBatchError("novel is outside owner scope")
     progress = await resolve_progress_snapshot(db, novel)
     cutoff = int(progress.cutoff_chapter_number)
-    version = await _active_analyze_chapter_version(db, owner_id=owner_id, novel_id=novel_id)
+    version = await _active_analyze_chapter_version(
+        db, owner_id=owner_id, novel_id=novel_id
+    )
     if version is None:
         raise ChapterBatchError("active analyze-chapter skill is not registered")
     try:
@@ -529,7 +551,9 @@ async def create_or_resume_chapter_batch(
             db, owner_id=owner_id, allowed_tools=list(version.allowed_tools or [])
         )
     except Exception as exc:  # fail closed without changing registry behavior
-        raise ChapterBatchError("analyze-chapter skill contract is unavailable") from exc
+        raise ChapterBatchError(
+            "analyze-chapter skill contract is unavailable"
+        ) from exc
     refs = await _resolve_real_chapters(
         db,
         novel_id=novel_id,
@@ -566,7 +590,11 @@ async def create_or_resume_chapter_batch(
             )
         ).all()
     )
-    runs = [row for row in all_rows if (_batch_manifest(row) or {}).get("batch_id") == plan.batch_id]
+    runs = [
+        row
+        for row in all_rows
+        if (_batch_manifest(row) or {}).get("batch_id") == plan.batch_id
+    ]
     by_chapter = _latest_runs_by_chapter(runs)
     active = sum(1 for row in runs if row.status in ("queued", "running"))
     created_run_ids: list[int] = []
@@ -635,7 +663,9 @@ async def get_chapter_batch_status(
             )
         ).all()
     )
-    runs = [row for row in rows if (_batch_manifest(row) or {}).get("batch_id") == batch_id]
+    runs = [
+        row for row in rows if (_batch_manifest(row) or {}).get("batch_id") == batch_id
+    ]
     if not runs:
         raise ChapterBatchError("chapter batch not found")
     manifest = _batch_manifest(runs[0]) or {}
@@ -647,7 +677,10 @@ async def get_chapter_batch_status(
         novel_id=novel_id,
         cutoff_chapter=int(manifest.get("cutoff_chapter") or 1),
         concurrency_window=int(manifest.get("concurrency_window") or 1),
-        chapters=[ChapterRef(id=int(cid), chapter_number=int(numbers[index])) for index, cid in enumerate(ids)],
+        chapters=[
+            ChapterRef(id=int(cid), chapter_number=int(numbers[index]))
+            for index, cid in enumerate(ids)
+        ],
         next_window=[],
         pending_chapter_ids=[],
     )
@@ -670,12 +703,12 @@ async def resume_chapter_batch(
             )
         ).all()
     )
-    runs = [row for row in rows if (_batch_manifest(row) or {}).get("batch_id") == batch_id]
+    runs = [
+        row for row in rows if (_batch_manifest(row) or {}).get("batch_id") == batch_id
+    ]
     if not runs:
         raise ChapterBatchError("chapter batch not found")
-    return await _refill_existing_batch(
-        db, anchor_run=runs[0], retry_terminal=True
-    )
+    return await _refill_existing_batch(db, anchor_run=runs[0], retry_terminal=True)
 
 
 async def continue_chapter_batch_after_finalize(
@@ -703,9 +736,7 @@ async def continue_chapter_batch_after_finalize(
                 "materialization": materialization,
                 "continuation": "skipped:not_completed",
             }
-        result = await _refill_existing_batch(
-            db, anchor_run=run, retry_terminal=False
-        )
+        result = await _refill_existing_batch(db, anchor_run=run, retry_terminal=False)
         return {
             "materialization": materialization,
             "continuation": "refilled",

@@ -323,22 +323,28 @@ def skill_runtime_manifest(row: SkillVersion) -> SkillRuntimeManifest:
         raise SkillContractError("skill runtime manifest prompt is empty (fail closed)")
     allowed_tools = list(row.allowed_tools or [])
     if not allowed_tools:
-        raise SkillContractError("skill runtime manifest allowed_tools is invalid (fail closed)")
+        raise SkillContractError(
+            "skill runtime manifest allowed_tools is invalid (fail closed)"
+        )
     try:
-        validate_skill_contract({
-            "name": row.name,
-            "version": row.version,
-            "allowed_tools": allowed_tools,
-            "read_permissions": list(row.read_permissions or []),
-            "write_permissions": list(row.write_permissions or []),
-            "forbidden_spaces": list(row.forbidden_spaces or []),
-            "budget": dict(row.budget or {}),
-            "approval_required_for": list(row.approval_required_for or []),
-            "input_schema": stored_input_schema,
-            "output_schema": dict(row.output_schema or {}),
-        })
+        validate_skill_contract(
+            {
+                "name": row.name,
+                "version": row.version,
+                "allowed_tools": allowed_tools,
+                "read_permissions": list(row.read_permissions or []),
+                "write_permissions": list(row.write_permissions or []),
+                "forbidden_spaces": list(row.forbidden_spaces or []),
+                "budget": dict(row.budget or {}),
+                "approval_required_for": list(row.approval_required_for or []),
+                "input_schema": stored_input_schema,
+                "output_schema": dict(row.output_schema or {}),
+            }
+        )
     except SkillContractError:
-        raise SkillContractError("skill runtime manifest allowed_tools is invalid (fail closed)")
+        raise SkillContractError(
+            "skill runtime manifest allowed_tools is invalid (fail closed)"
+        )
     payload = runtime_manifest_payload(
         name=row.name,
         version=row.version,

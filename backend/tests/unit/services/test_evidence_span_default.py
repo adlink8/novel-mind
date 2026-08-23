@@ -35,9 +35,7 @@ def _patch_chapter(monkeypatch: pytest.MonkeyPatch, chapter: _FakeChapter | None
     async def fake_get_chapter(db, chapter_id):
         return chapter
 
-    monkeypatch.setattr(
-        _defaults_world.novel_service, "get_chapter", fake_get_chapter
-    )
+    monkeypatch.setattr(_defaults_world.novel_service, "get_chapter", fake_get_chapter)
 
 
 async def test_content_hash_omitted_is_computed_server_side(

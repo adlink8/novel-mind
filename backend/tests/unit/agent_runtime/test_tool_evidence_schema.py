@@ -51,9 +51,7 @@ def test_skill_run_view_rejects_non_deterministic_tool_summary():
         SkillRunView.model_validate(
             _run(
                 frozen_manifest={
-                    "tool_runs": [
-                        {"tool_name": "get_chapter", "calls": 1, "errors": 2}
-                    ]
+                    "tool_runs": [{"tool_name": "get_chapter", "calls": 1, "errors": 2}]
                 }
             )
         )

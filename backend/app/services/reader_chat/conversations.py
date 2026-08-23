@@ -502,10 +502,9 @@ class ConversationService:
             conversation_id=conversation_id,
             job_id=job_id,
         )
-        if (
-            job.status == GenerationJobStatus.PAUSED_DEPENDENCY.value
-            and str(job.status_reason or "").startswith("waiting_analysis:")
-        ):
+        if job.status == GenerationJobStatus.PAUSED_DEPENDENCY.value and str(
+            job.status_reason or ""
+        ).startswith("waiting_analysis:"):
             # The GET path is also a bounded recovery checkpoint: a stale
             # queued/running backfill cannot leave the public reader job
             # waiting forever when no new poller event arrives.

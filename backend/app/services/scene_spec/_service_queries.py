@@ -52,10 +52,7 @@ class ReadQueryMixin:
                 .order_by(SceneSpecVersionRow.id.asc())
             )
         ).all()
-        return [
-            await view_from_rows(spec=row)
-            for row in rows
-        ]
+        return [await view_from_rows(spec=row) for row in rows]
 
     async def load(
         self, *, owner_id: int, novel_id: int, spec_id: int

@@ -218,7 +218,9 @@ async def local_auto_login(
     except ValueError:
         is_loopback = False
     if not is_loopback:
-        raise HTTPException(status_code=403, detail="本地自动登录仅允许 loopback 客户端")
+        raise HTTPException(
+            status_code=403, detail="本地自动登录仅允许 loopback 客户端"
+        )
 
     validate_cookie_request_origin(request)
 

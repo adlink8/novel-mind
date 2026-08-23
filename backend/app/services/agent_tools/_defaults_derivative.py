@@ -15,7 +15,10 @@ from typing import Any
 
 from app.services.agent_tools.errors import InvalidInputError
 
-from ._tool_views import _agent_edit_proposal_view_for_tool, _fork_proposal_view_for_tool
+from ._tool_views import (
+    _agent_edit_proposal_view_for_tool,
+    _fork_proposal_view_for_tool,
+)
 
 
 async def _default_create_canon_fork(

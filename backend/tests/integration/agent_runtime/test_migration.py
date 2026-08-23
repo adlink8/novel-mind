@@ -111,7 +111,8 @@ def test_skill_version_execution_mode_column_is_on_single_head(
     engine = create_engine(empty_postgres)
     with engine.connect() as conn:
         columns = {
-            column["name"]: column for column in inspect(conn).get_columns("skill_versions")
+            column["name"]: column
+            for column in inspect(conn).get_columns("skill_versions")
         }
         assert columns["execution_mode"]["nullable"] is False
         assert columns["execution_mode"]["default"] is not None
@@ -122,7 +123,10 @@ def test_skill_version_execution_mode_column_is_on_single_head(
         for line in (heads.stdout + heads.stderr).splitlines()
         if line.strip() and not line.strip().startswith("INFO")
     ]
-    assert len([line for line in head_lines if line.split()[0] == "20260813_skillmode"]) == 1
+    assert (
+        len([line for line in head_lines if line.split()[0] == "20260813_skillmode"])
+        == 1
+    )
     engine.dispose()
 
 

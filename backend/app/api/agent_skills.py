@@ -31,7 +31,10 @@ from app.schemas.agent_runtime import (
     SkillVersionView,
     SkillVersionStatusUpdate,
 )
-from app.schemas.agent_tools_catalog import ToolCapabilityCatalogView, ToolCapabilityView
+from app.schemas.agent_tools_catalog import (
+    ToolCapabilityCatalogView,
+    ToolCapabilityView,
+)
 from app.services.agent_runtime import registry as registry_service
 from app.services.agent_runtime.registry import SkillContractError
 
@@ -90,7 +93,10 @@ async def get_tool_capability_catalog(
     del current_user  # authentication is the boundary; catalog is not owner data.
     from app.services.agent_tools.catalog import list_tool_capabilities
 
-    items = [ToolCapabilityView.model_validate(item.__dict__) for item in list_tool_capabilities()]
+    items = [
+        ToolCapabilityView.model_validate(item.__dict__)
+        for item in list_tool_capabilities()
+    ]
     return {
         "items": items,
         "total": len(items),
@@ -149,9 +155,9 @@ async def list_skill_versions(
         "items": [
             {
                 **_view_from_version(item),
-                "runtime_manifest": registry_service.skill_runtime_manifest(item).model_dump(
-                    mode="json"
-                ),
+                "runtime_manifest": registry_service.skill_runtime_manifest(
+                    item
+                ).model_dump(mode="json"),
             }
             for item in items
         ],

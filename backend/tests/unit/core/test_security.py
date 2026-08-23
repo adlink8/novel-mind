@@ -213,9 +213,7 @@ async def test_get_current_user_ignores_stale_jwt_when_auth_disabled(
     default_user = await _make_user(db_session, username="admin")
     stale_user = await _make_user(db_session, username="old-user")
     stale_token = create_access_token({"sub": str(stale_user.id)})
-    credentials = HTTPAuthorizationCredentials(
-        scheme="Bearer", credentials=stale_token
-    )
+    credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials=stale_token)
     monkeypatch.setattr(settings, "auth_enabled", False)
     monkeypatch.setattr(settings, "local_auto_login_username", "admin")
 

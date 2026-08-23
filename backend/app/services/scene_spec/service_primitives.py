@@ -121,8 +121,7 @@ async def view_from_rows(*, spec: SceneSpecVersionRow) -> SceneSpecView:
                 spoiler_cutoff=item["spoiler_cutoff"],
                 evidence_keys=list(item.get("evidence_keys") or []),
                 visual_bible_stable_ids=[
-                    ref["stable_id"]
-                    for ref in (item.get("visual_bible_refs") or [])
+                    ref["stable_id"] for ref in (item.get("visual_bible_refs") or [])
                 ],
             )
             for item in details
@@ -350,9 +349,7 @@ def sections_from_payload(payload: Mapping[str, Any]) -> dict[str, str]:
     return build_prompt_sections(spec)
 
 
-def same_provenance(
-    existing: SceneSpecVersionRow, spec: SceneSpecContract
-) -> bool:
+def same_provenance(existing: SceneSpecVersionRow, spec: SceneSpecContract) -> bool:
     """Replay requires identical provenance, not just identical content hash:
     the same source candidate, the same approved Visual Bible revision and
     the same source snapshot. A retry with a different candidate/revision but

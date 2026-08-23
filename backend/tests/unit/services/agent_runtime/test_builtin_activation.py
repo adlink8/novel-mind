@@ -50,7 +50,9 @@ def test_builtin_catalog_uses_all_allowlisted_skill_assets() -> None:
         "illustrate-derivative-scene",
         "prepare-export",
     }
-    answer = next(item for item in contracts if item["name"] == "answer-reading-question")
+    answer = next(
+        item for item in contracts if item["name"] == "answer-reading-question"
+    )
     assert answer["version"] == "1.0.0"
     assert answer["allowed_tools"] == [
         "get_novel",
@@ -102,9 +104,7 @@ async def test_ensure_builtin_skills_does_not_reopen_disabled_skill(db_session) 
         status="deprecated",
     )
 
-    await ensure_builtin_skills(
-        db_session, owner_id=novel.owner_id, novel_id=novel.id
-    )
+    await ensure_builtin_skills(db_session, owner_id=novel.owner_id, novel_id=novel.id)
 
     assert disabled_version.status == "deprecated"
     versions = (
@@ -139,8 +139,11 @@ async def test_novel_creation_initializes_builtin_skills(db_session) -> None:
     )
     assert count == 15
 
+
 @pytest.mark.asyncio
-async def test_novel_management_read_backfills_existing_novel(auth_client, db_session) -> None:
+async def test_novel_management_read_backfills_existing_novel(
+    auth_client, db_session
+) -> None:
     owner = await db_session.scalar(select(User).where(User.username == "testuser"))
     novel = Novel(owner_id=owner.id, title="Existing without defaults", status="ready")
     db_session.add(novel)

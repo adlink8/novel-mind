@@ -21,7 +21,10 @@ from app.schemas.tool_connectors import (
     ToolDryRunRequest,
     ToolDryRunResponse,
 )
-from app.services.tool_connectors.http_adapter import FakeHttpAdapter, HttpAdapterResponse
+from app.services.tool_connectors.http_adapter import (
+    FakeHttpAdapter,
+    HttpAdapterResponse,
+)
 from app.services.tool_connectors.policy import ConnectorPolicyError
 from app.services.tool_connectors.service import (
     append_connector_version,
@@ -82,14 +85,18 @@ def _view(version: ToolConnectorVersion) -> ToolConnectorView:
     )
 
 
-@router.post("/tools", response_model=ToolConnectorView, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/tools", response_model=ToolConnectorView, status_code=status.HTTP_201_CREATED
+)
 async def create_tool_connector(
     payload: ToolConnectorPayload,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_user),
 ):
     try:
-        return _view(await create_connector(db, owner_id=current_user.id, payload=payload))
+        return _view(
+            await create_connector(db, owner_id=current_user.id, payload=payload)
+        )
     except ConnectorPolicyError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
@@ -98,11 +105,15 @@ async def create_tool_connector(
 async def list_tool_connectors(
     db: AsyncSession = Depends(get_db), current_user: User = Depends(require_user)
 ):
-    rows = list(await db.scalars(
-        select(ToolConnectorVersion)
-        .where(ToolConnectorVersion.owner_id == current_user.id)
-        .order_by(ToolConnectorVersion.connector_id, ToolConnectorVersion.version.desc())
-    ))
+    rows = list(
+        await db.scalars(
+            select(ToolConnectorVersion)
+            .where(ToolConnectorVersion.owner_id == current_user.id)
+            .order_by(
+                ToolConnectorVersion.connector_id, ToolConnectorVersion.version.desc()
+            )
+        )
+    )
     latest_by_connector: dict[int, ToolConnectorVersion] = {}
     for row in rows:
         latest_by_connector.setdefault(row.connector_id, row)
@@ -110,7 +121,9 @@ async def list_tool_connectors(
     return {"items": [_view(row) for row in items], "total": len(items)}
 
 
-async def _owned_latest(db: AsyncSession, owner_id: int, connector_id: int) -> ToolConnectorVersion:
+async def _owned_latest(
+    db: AsyncSession, owner_id: int, connector_id: int
+) -> ToolConnectorVersion:
     row = await latest_version(db, owner_id=owner_id, connector_id=connector_id)
     if row is None:
         raise HTTPException(status_code=404, detail="Tool connector not found")
@@ -118,14 +131,25 @@ async def _owned_latest(db: AsyncSession, owner_id: int, connector_id: int) -> T
 
 
 @router.get("/tools/{connector_id}", response_model=ToolConnectorView)
-async def get_tool_connector(connector_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_user)):
+async def get_tool_connector(
+    connector_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
     return _view(await _owned_latest(db, current_user.id, connector_id))
 
 
 @router.put("/tools/{connector_id}", response_model=ToolConnectorView)
-async def update_tool_connector(connector_id: int, payload: ToolConnectorPayload, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_user)):
+async def update_tool_connector(
+    connector_id: int,
+    payload: ToolConnectorPayload,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
     try:
-        row = await append_connector_version(db, owner_id=current_user.id, connector_id=connector_id, payload=payload)
+        row = await append_connector_version(
+            db, owner_id=current_user.id, connector_id=connector_id, payload=payload
+        )
     except ConnectorPolicyError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     if row is None:
@@ -134,9 +158,15 @@ async def update_tool_connector(connector_id: int, payload: ToolConnectorPayload
 
 
 @router.post("/tools/{connector_id}/validate", response_model=ToolConnectorView)
-async def validate_tool_connector(connector_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_user)):
+async def validate_tool_connector(
+    connector_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
     try:
-        row = await validate_connector(db, owner_id=current_user.id, connector_id=connector_id)
+        row = await validate_connector(
+            db, owner_id=current_user.id, connector_id=connector_id
+        )
     except ConnectorPolicyError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     if row is None:
@@ -145,9 +175,19 @@ async def validate_tool_connector(connector_id: int, db: AsyncSession = Depends(
 
 
 @router.patch("/tools/{connector_id}/status", response_model=ToolConnectorView)
-async def update_tool_connector_status(connector_id: int, payload: ToolConnectorStatusUpdate, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_user)):
+async def update_tool_connector_status(
+    connector_id: int,
+    payload: ToolConnectorStatusUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
     try:
-        row = await set_connector_status(db, owner_id=current_user.id, connector_id=connector_id, status=payload.status)
+        row = await set_connector_status(
+            db,
+            owner_id=current_user.id,
+            connector_id=connector_id,
+            status=payload.status,
+        )
     except ConnectorPolicyError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     if row is None:
@@ -156,7 +196,12 @@ async def update_tool_connector_status(connector_id: int, payload: ToolConnector
 
 
 @router.post("/tools/{connector_id}/dry-run", response_model=ToolDryRunResponse)
-async def dry_run_tool_connector(connector_id: int, payload: ToolDryRunRequest, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_user)):
+async def dry_run_tool_connector(
+    connector_id: int,
+    payload: ToolDryRunRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
     row = await _owned_latest(db, current_user.id, connector_id)
     adapter = FakeHttpAdapter(
         HttpAdapterResponse(
@@ -191,7 +236,9 @@ async def run_frozen_tool_connector(
         (item for item in snapshots if item.get("tool_name") == tool_name), None
     )
     if snapshot is None:
-        raise HTTPException(status_code=404, detail="connector not enabled for this run")
+        raise HTTPException(
+            status_code=404, detail="connector not enabled for this run"
+        )
 
     row = await db.scalar(
         select(ToolConnectorVersion).where(

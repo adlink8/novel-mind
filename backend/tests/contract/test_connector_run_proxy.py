@@ -4,8 +4,14 @@ from __future__ import annotations
 
 import pytest
 
-from app.services.tool_connectors.http_adapter import FakeHttpAdapter, HttpAdapterResponse
-from app.services.tool_connectors.service import connector_checksum, execute_frozen_connector
+from app.services.tool_connectors.http_adapter import (
+    FakeHttpAdapter,
+    HttpAdapterResponse,
+)
+from app.services.tool_connectors.service import (
+    connector_checksum,
+    execute_frozen_connector,
+)
 from app.services.tool_connectors.policy import ConnectorPolicyError
 
 
@@ -22,7 +28,10 @@ def _connector(**overrides):
         "path": "/v1/weather",
         "method": "GET",
         "request_schema": {"type": "object", "additionalProperties": False},
-        "response_schema": {"type": "object", "properties": {"ok": {"type": "boolean"}}},
+        "response_schema": {
+            "type": "object",
+            "properties": {"ok": {"type": "boolean"}},
+        },
     }
     values.update(overrides)
     return type("Connector", (), values)()

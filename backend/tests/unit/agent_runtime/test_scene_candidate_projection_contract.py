@@ -47,7 +47,12 @@ TS_PROJECTED_SET = {
             "source_start": 0,
             "source_end": 10,
             "source_hash": "1" * 64,
-            "coordinates": {"cast": ["林安"], "place": "庭院", "time": None, "pov": None},
+            "coordinates": {
+                "cast": ["林安"],
+                "place": "庭院",
+                "time": None,
+                "pov": None,
+            },
             "spoiler_cutoff": 3,
             "salience_reasons": [
                 {"reason_code": "plot_turn", "detail": "袭击发生", "score": 0.9}

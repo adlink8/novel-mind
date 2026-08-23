@@ -4,7 +4,17 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, JSONB, TimestampMixin
@@ -34,13 +44,19 @@ class ToolConnectorVersion(Base):
 
     __tablename__ = "tool_connector_versions"
     __table_args__ = (
-        UniqueConstraint("connector_id", "version", name="uq_tool_connector_versions_version"),
+        UniqueConstraint(
+            "connector_id", "version", name="uq_tool_connector_versions_version"
+        ),
         CheckConstraint(
             "status IN ('draft','validated','active','disabled')",
             name="ck_tool_connector_versions_status",
         ),
-        CheckConstraint("method IN ('GET','POST')", name="ck_tool_connector_versions_method"),
-        Index("idx_tool_connector_versions_owner", "owner_id", "connector_id", "version"),
+        CheckConstraint(
+            "method IN ('GET','POST')", name="ck_tool_connector_versions_method"
+        ),
+        Index(
+            "idx_tool_connector_versions_owner", "owner_id", "connector_id", "version"
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -58,7 +74,9 @@ class ToolConnectorVersion(Base):
     method: Mapped[str] = mapped_column(String(8), nullable=False)
     request_schema: Mapped[dict] = mapped_column(JSONB, nullable=False)
     response_schema: Mapped[dict] = mapped_column(JSONB, nullable=False)
-    enabled: Mapped[bool] = mapped_column(nullable=False, default=False, server_default="false")
+    enabled: Mapped[bool] = mapped_column(
+        nullable=False, default=False, server_default="false"
+    )
     status: Mapped[str] = mapped_column(
         String(16), nullable=False, default="draft", server_default="draft"
     )

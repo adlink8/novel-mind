@@ -19,7 +19,14 @@ DEFAULT_AGENT_SETTINGS = {
     "notify_analysis_complete": True,
     "auto_create_candidate_artifacts": False,
 }
-TASK_NAMES = ("qa", "deep_analysis", "continuation", "illustration", "rag_eval", "embedding")
+TASK_NAMES = (
+    "qa",
+    "deep_analysis",
+    "continuation",
+    "illustration",
+    "rag_eval",
+    "embedding",
+)
 
 
 async def resolve_task_model(
@@ -51,9 +58,7 @@ async def resolve_task_model(
 
 async def _binding_values(db: AsyncSession, *, owner_id: int) -> AgentTaskModelBindings:
     result = await db.execute(
-        select(AgentTaskModelBinding).where(
-            AgentTaskModelBinding.owner_id == owner_id
-        )
+        select(AgentTaskModelBinding).where(AgentTaskModelBinding.owner_id == owner_id)
     )
     values = {task: None for task in TASK_NAMES}
     for binding in result.scalars():
@@ -118,16 +123,12 @@ async def set_agent_settings(
             raise ValueError("任务绑定的模型不存在或不属于当前用户")
 
     await db.execute(
-        delete(AgentTaskModelBinding).where(
-            AgentTaskModelBinding.owner_id == owner_id
-        )
+        delete(AgentTaskModelBinding).where(AgentTaskModelBinding.owner_id == owner_id)
     )
     for task, model_id in requested.items():
         if model_id is not None:
             db.add(
-                AgentTaskModelBinding(
-                    owner_id=owner_id, task=task, model_id=model_id
-                )
+                AgentTaskModelBinding(owner_id=owner_id, task=task, model_id=model_id)
             )
     await db.flush()
     return AgentSettingsResponse(

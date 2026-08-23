@@ -45,7 +45,9 @@ async def _owned_novel(db_session) -> Novel:
     return novel
 
 
-async def test_tool_catalog_is_authenticated_and_contains_exact_capabilities(auth_client):
+async def test_tool_catalog_is_authenticated_and_contains_exact_capabilities(
+    auth_client,
+):
     response = await auth_client.get("/api/agent/tools/catalog")
 
     assert response.status_code == 200
@@ -61,7 +63,10 @@ async def test_tool_catalog_is_authenticated_and_contains_exact_capabilities(aut
         set(item) >= {"name", "category", "approval_required", "user_configurable"}
         for item in payload["items"]
     )
-    assert all("shell" not in item["name"] and "code" not in item["name"] for item in payload["items"])
+    assert all(
+        "shell" not in item["name"] and "code" not in item["name"]
+        for item in payload["items"]
+    )
 
 
 async def test_declarative_skill_can_register_from_catalog_and_change_status(
@@ -76,7 +81,10 @@ async def test_declarative_skill_can_register_from_catalog_and_change_status(
         "version": "1.0.0",
         "description": "把章节要点整理成声明式笔记。",
         "prompt": "请根据输入章节整理要点，不得补写原文未提供的事实。",
-        "input_schema": {"type": "object", "properties": {"chapter_id": {"type": "integer"}}},
+        "input_schema": {
+            "type": "object",
+            "properties": {"chapter_id": {"type": "integer"}},
+        },
         "output_schema": {"type": "object", "properties": {"notes": {"type": "array"}}},
         "allowed_tools": [tool_name],
         "budget": {"max_tool_calls": 3, "max_tokens": 800},
@@ -108,7 +116,9 @@ async def test_declarative_skill_can_register_from_catalog_and_change_status(
     assert changed.json()["status"] == "draft"
 
 
-async def test_skill_registration_rejects_tools_outside_catalog(auth_client, db_session):
+async def test_skill_registration_rejects_tools_outside_catalog(
+    auth_client, db_session
+):
     novel = await _owned_novel(db_session)
     response = await auth_client.post(
         "/api/agent/skills",
@@ -145,7 +155,9 @@ async def test_skill_can_register_connector_and_run_accept_freezes_active_versio
     )
     assert connector.status_code == 201
     connector_id = connector.json()["id"]
-    assert (await auth_client.post(f"/api/extensions/tools/{connector_id}/validate")).status_code == 200
+    assert (
+        await auth_client.post(f"/api/extensions/tools/{connector_id}/validate")
+    ).status_code == 200
     assert (
         await auth_client.patch(
             f"/api/extensions/tools/{connector_id}/status", json={"status": "active"}

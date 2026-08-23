@@ -15,7 +15,15 @@ class HttpAdapterResponse:
 
 
 class HttpToolAdapter(Protocol):
-    async def request(self, *, method: str, url: str, body: bytes, timeout: float, max_response_bytes: int) -> HttpAdapterResponse: ...
+    async def request(
+        self,
+        *,
+        method: str,
+        url: str,
+        body: bytes,
+        timeout: float,
+        max_response_bytes: int,
+    ) -> HttpAdapterResponse: ...
 
 
 class FakeHttpAdapter:
@@ -25,7 +33,22 @@ class FakeHttpAdapter:
         self.response = response
         self.calls: list[dict] = []
 
-    async def request(self, *, method: str, url: str, body: bytes, timeout: float, max_response_bytes: int) -> HttpAdapterResponse:
-        self.calls.append({"method": method, "url": url, "body": body, "timeout": timeout, "max_response_bytes": max_response_bytes})
+    async def request(
+        self,
+        *,
+        method: str,
+        url: str,
+        body: bytes,
+        timeout: float,
+        max_response_bytes: int,
+    ) -> HttpAdapterResponse:
+        self.calls.append(
+            {
+                "method": method,
+                "url": url,
+                "body": body,
+                "timeout": timeout,
+                "max_response_bytes": max_response_bytes,
+            }
+        )
         return self.response
-

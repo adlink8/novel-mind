@@ -59,7 +59,9 @@ async def api_client(migrated_postgres: str, monkeypatch):
         _async_url(migrated_postgres), pool_pre_ping=True, poolclass=NullPool
     )
     factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    monkeypatch.setattr("app.core.security.settings.novelmind_gateway_token", GATEWAY_TOKEN)
+    monkeypatch.setattr(
+        "app.core.security.settings.novelmind_gateway_token", GATEWAY_TOKEN
+    )
 
     async def override_get_db():
         async with factory() as session:
@@ -116,7 +118,11 @@ async def _seed(factory, *, count: int = 100) -> dict[str, int | str]:
                 "read_permissions": ["novel:read"],
                 "write_permissions": [],
                 "forbidden_spaces": ["canon:original", "derivative:write"],
-                "budget": {"max_calls": 40, "max_input_tokens": 1000, "max_output_tokens": 1000},
+                "budget": {
+                    "max_calls": 40,
+                    "max_input_tokens": 1000,
+                    "max_output_tokens": 1000,
+                },
                 "approval_required_for": [],
                 "input_schema": {"type": "object"},
                 "output_schema": {"type": "object"},
@@ -171,7 +177,10 @@ async def test_batch_100_is_idempotent_and_refills_only_after_terminal_runs(
         assert len(runs) == 4
         assert {run.origin for run in runs} == {"chapter_batch"}
         assert all(run.input.get("question") for run in runs)
-        assert all(run.input.get("execution_prompt") == run.input.get("question") for run in runs)
+        assert all(
+            run.input.get("execution_prompt") == run.input.get("question")
+            for run in runs
+        )
         for run in runs:
             run.status = "completed"
         await session.commit()
@@ -196,7 +205,9 @@ async def test_batch_100_is_idempotent_and_refills_only_after_terminal_runs(
 
 
 @pytest.mark.asyncio
-async def test_batch_chapter_ids_resolve_real_rows_and_cutoff(api_client, runtime_factory):
+async def test_batch_chapter_ids_resolve_real_rows_and_cutoff(
+    api_client, runtime_factory
+):
     client, factory = api_client
     seed = await _seed(factory, count=10)
     headers = {"Authorization": f"Bearer {seed['token']}"}
@@ -337,9 +348,7 @@ async def test_failed_and_cancelled_runs_wait_for_explicit_resume(
         rows[2].status = "completed"
         completed_run_id = rows[2].id
 
-    continued = await continue_chapter_batch_after_finalize(
-        factory, completed_run_id
-    )
+    continued = await continue_chapter_batch_after_finalize(factory, completed_run_id)
     assert continued["batch"]["failed"] == 1
     assert continued["batch"]["cancelled"] == 1
     assert continued["batch"]["queued"] == 3

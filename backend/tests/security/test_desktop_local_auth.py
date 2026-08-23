@@ -14,7 +14,6 @@ from starlette.routing import Route
 pytestmark = pytest.mark.unit
 
 from app.middleware.desktop_local_auth import (
-    LOCAL_AUTH_ALGORITHMS,
     LOCAL_AUTH_BACKEND_AUDIENCE,
     LOCAL_AUTH_ISSUER,
     DesktopLocalAuthMiddleware,
@@ -41,7 +40,11 @@ def _mint_token(
         "iss": iss,
         "aud": aud,
         "iat": int((now + (iat_offset or timedelta(0))).timestamp()),
-        "exp": int((now + (exp_offset if exp_offset is not None else timedelta(minutes=5))).timestamp()),
+        "exp": int(
+            (
+                now + (exp_offset if exp_offset is not None else timedelta(minutes=5))
+            ).timestamp()
+        ),
         "jti": jti or "jti-1234",
         "sid": sid,
     }
@@ -94,7 +97,9 @@ async def test_wrong_audience_rejected():
     async with await _client(TEST_SECRET) as ac:
         resp = await ac.get(
             "/api/ping",
-            headers={"Authorization": f"Bearer {_mint_token(aud='novelmind-agent-local')}"},
+            headers={
+                "Authorization": f"Bearer {_mint_token(aud='novelmind-agent-local')}"
+            },
         )
         assert resp.status_code == 401
 

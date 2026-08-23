@@ -92,7 +92,10 @@ def _verify_token(token: str, secret: str) -> bool:
         return False
     # iat 必须在过去（jwt 已按 leeway 校验 exp；iat 未来值视为无效）。
     iat = payload.get("iat")
-    if not isinstance(iat, (int, float)) or iat > time.time() + LOCAL_AUTH_LEEWAY_SECONDS:
+    if (
+        not isinstance(iat, (int, float))
+        or iat > time.time() + LOCAL_AUTH_LEEWAY_SECONDS
+    ):
         return False
     return True
 

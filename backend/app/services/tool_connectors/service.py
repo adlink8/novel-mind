@@ -100,15 +100,22 @@ def connector_url(connector: Any) -> str:
     return url
 
 
-async def latest_version(db: AsyncSession, *, owner_id: int, connector_id: int) -> ToolConnectorVersion | None:
+async def latest_version(
+    db: AsyncSession, *, owner_id: int, connector_id: int
+) -> ToolConnectorVersion | None:
     return await db.scalar(
         select(ToolConnectorVersion)
-        .where(ToolConnectorVersion.owner_id == owner_id, ToolConnectorVersion.connector_id == connector_id)
+        .where(
+            ToolConnectorVersion.owner_id == owner_id,
+            ToolConnectorVersion.connector_id == connector_id,
+        )
         .order_by(ToolConnectorVersion.version.desc())
     )
 
 
-async def create_connector(db: AsyncSession, *, owner_id: int, payload: ToolConnectorPayload) -> ToolConnectorVersion:
+async def create_connector(
+    db: AsyncSession, *, owner_id: int, payload: ToolConnectorPayload
+) -> ToolConnectorVersion:
     validate_target_url(payload.base_url)
     validate_json_schema(payload.request_schema)
     validate_json_schema(payload.response_schema)
@@ -118,15 +125,25 @@ async def create_connector(db: AsyncSession, *, owner_id: int, payload: ToolConn
     version_data = payload.model_dump()
     version_data["enabled"] = False
     version = ToolConnectorVersion(
-        connector_id=connector.id, owner_id=owner_id, version=1, **version_data, status="draft"
+        connector_id=connector.id,
+        owner_id=owner_id,
+        version=1,
+        **version_data,
+        status="draft",
     )
     db.add(version)
     await db.flush()
     return version
 
 
-async def append_connector_version(db: AsyncSession, *, owner_id: int, connector_id: int, payload: ToolConnectorPayload) -> ToolConnectorVersion | None:
-    connector = await db.scalar(select(ToolConnector).where(ToolConnector.id == connector_id, ToolConnector.owner_id == owner_id))
+async def append_connector_version(
+    db: AsyncSession, *, owner_id: int, connector_id: int, payload: ToolConnectorPayload
+) -> ToolConnectorVersion | None:
+    connector = await db.scalar(
+        select(ToolConnector).where(
+            ToolConnector.id == connector_id, ToolConnector.owner_id == owner_id
+        )
+    )
     if connector is None:
         return None
     validate_target_url(payload.base_url)
@@ -136,14 +153,20 @@ async def append_connector_version(db: AsyncSession, *, owner_id: int, connector
     version_data = payload.model_dump()
     version_data["enabled"] = False
     version = ToolConnectorVersion(
-        connector_id=connector_id, owner_id=owner_id, version=(current.version + 1 if current else 1), **version_data, status="draft"
+        connector_id=connector_id,
+        owner_id=owner_id,
+        version=(current.version + 1 if current else 1),
+        **version_data,
+        status="draft",
     )
     db.add(version)
     await db.flush()
     return version
 
 
-async def validate_connector(db: AsyncSession, *, owner_id: int, connector_id: int) -> ToolConnectorVersion | None:
+async def validate_connector(
+    db: AsyncSession, *, owner_id: int, connector_id: int
+) -> ToolConnectorVersion | None:
     version = await latest_version(db, owner_id=owner_id, connector_id=connector_id)
     if version is None:
         return None
@@ -158,20 +181,31 @@ async def validate_connector(db: AsyncSession, *, owner_id: int, connector_id: i
     return version
 
 
-async def set_connector_status(db: AsyncSession, *, owner_id: int, connector_id: int, status: str) -> ToolConnectorVersion | None:
+async def set_connector_status(
+    db: AsyncSession, *, owner_id: int, connector_id: int, status: str
+) -> ToolConnectorVersion | None:
     version = await latest_version(db, owner_id=owner_id, connector_id=connector_id)
     if version is None:
         return None
-    allowed = {"draft": {"validated"}, "validated": {"active", "disabled"}, "active": {"disabled"}, "disabled": set()}
+    allowed = {
+        "draft": {"validated"},
+        "validated": {"active", "disabled"},
+        "active": {"disabled"},
+        "disabled": set(),
+    }
     if status not in allowed.get(version.status, set()):
-        raise ConnectorPolicyError(f"invalid connector transition {version.status}->{status}")
+        raise ConnectorPolicyError(
+            f"invalid connector transition {version.status}->{status}"
+        )
     version.status = status
     version.enabled = status == "active"
     await db.flush()
     return version
 
 
-async def dry_run_connector(connector: Any, *, request: dict[str, Any], adapter: HttpToolAdapter) -> dict[str, Any]:
+async def dry_run_connector(
+    connector: Any, *, request: dict[str, Any], adapter: HttpToolAdapter
+) -> dict[str, Any]:
     if connector.status != "active" or not connector.enabled:
         raise ConnectorPolicyError("only enabled active connectors can run")
     url = connector_url(connector)
@@ -182,7 +216,13 @@ async def dry_run_connector(connector: Any, *, request: dict[str, Any], adapter:
         pass
     validate_json_payload(request, connector.request_schema)
     body = json_bytes(request)
-    response = await adapter.request(method=connector.method, url=url, body=body, timeout=MAX_TIMEOUT_SECONDS, max_response_bytes=MAX_RESPONSE_BYTES)
+    response = await adapter.request(
+        method=connector.method,
+        url=url,
+        body=body,
+        timeout=MAX_TIMEOUT_SECONDS,
+        max_response_bytes=MAX_RESPONSE_BYTES,
+    )
     if len(response.body) > MAX_RESPONSE_BYTES:
         raise ConnectorPolicyError("Tool response exceeds the byte limit")
     validate_target_url(response.final_url)
@@ -191,7 +231,11 @@ async def dry_run_connector(connector: Any, *, request: dict[str, Any], adapter:
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise ConnectorPolicyError("Tool response must be valid JSON") from exc
     validate_json_payload(decoded, connector.response_schema)
-    return {"status_code": response.status_code, "headers": response.headers, "body": decoded}
+    return {
+        "status_code": response.status_code,
+        "headers": response.headers,
+        "body": decoded,
+    }
 
 
 async def execute_frozen_connector(
@@ -231,7 +275,11 @@ async def execute_frozen_connector(
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise ConnectorPolicyError("Tool response must be valid JSON") from exc
     validate_json_payload(decoded, connector.response_schema)
-    return {"status_code": response.status_code, "headers": response.headers, "body": decoded}
+    return {
+        "status_code": response.status_code,
+        "headers": response.headers,
+        "body": decoded,
+    }
 
 
 def _is_ip_literal(host: str) -> bool:

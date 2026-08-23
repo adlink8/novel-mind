@@ -72,7 +72,9 @@ def list_tool_capabilities() -> tuple[ToolCapability, ...]:
             ToolCapability(
                 name=name,
                 category=category,
-                approval_required=(category != "read" and name != "generate_image_candidate"),
+                approval_required=(
+                    category != "read" and name != "generate_image_candidate"
+                ),
             )
         )
     return tuple(capabilities)
