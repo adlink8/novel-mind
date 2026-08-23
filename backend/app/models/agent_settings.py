@@ -1,6 +1,13 @@
 """Owner-scoped Agent settings and task model bindings."""
 
-from sqlalchemy import Boolean, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    ForeignKey,
+    Integer,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin
@@ -10,6 +17,12 @@ class AgentSettings(TimestampMixin, Base):
     """Typed Agent switches owned by exactly one user."""
 
     __tablename__ = "agent_settings"
+    __table_args__ = (
+        CheckConstraint(
+            "memory_retention_days IS NULL OR memory_retention_days >= 1",
+            name="ck_agent_settings_retention_days",
+        ),
+    )
 
     owner_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
@@ -36,6 +49,10 @@ class AgentTaskModelBinding(TimestampMixin, Base):
     __tablename__ = "agent_task_model_bindings"
     __table_args__ = (
         UniqueConstraint("owner_id", "task", name="uq_agent_task_binding_owner_task"),
+        CheckConstraint(
+            "task IN ('qa','deep_analysis','continuation','illustration','rag_eval','embedding')",
+            name="ck_agent_task_binding_task",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
