@@ -166,12 +166,30 @@ export const narrativeMemoryApi = {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Pick the latest candidate version for preview (highest version_id). Never "active production". */
+/** Pick the best candidate version for preview (prioritizing highest node count/completeness, then version_id). */
 export function pickLatestPreviewVersion(
   versions: NmVersionListItem[]
 ): NmVersionListItem | null {
   if (!versions.length) return null;
-  return [...versions].sort((a, b) => b.version_id - a.version_id)[0] ?? null;
+  const eligible = versions.filter(
+    (v) =>
+      v.readiness === "sealed_candidate" || v.readiness === "preview_eligible"
+  );
+  const pool = eligible.length > 0 ? eligible : versions;
+
+  const countNodes = (v: NmVersionListItem): number => {
+    if (!v.node_counts) return 0;
+    return Object.values(v.node_counts).reduce(
+      (sum, val) => sum + (typeof val === "number" ? val : 0),
+      0
+    );
+  };
+
+  return (
+    [...pool].sort(
+      (a, b) => countNodes(b) - countNodes(a) || b.version_id - a.version_id
+    )[0] ?? null
+  );
 }
 
 export const NM_PREVIEW_BADGE_LABEL = "叙事记忆候选 · 预览未发布";

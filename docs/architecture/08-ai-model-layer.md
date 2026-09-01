@@ -1,188 +1,79 @@
-# 08 — AI 模型配置与调用层
+# 08 — AI 模型配置与统一调用层 (AI Provider & Unified Protocol Layer)
 
-AI 模型的配置管理、密钥加密、调用路由与成本统计。
+AI 模型的配置管理、密钥安全加密、五大多模态提供商归一化适配、运行时动态发现与调用路由。
+
+---
 
 ## 架构概览
 
 ```
-用户配置 AI 模型
+用户配置 / 动态发现 AI 模型 (/api/models/discover)
   → AIModelConfig ORM 存储（API Key Fernet 加密）
+  → 五大统一 Provider 适配器 (OpenAI / Anthropic / Ollama / DeepSeek / OpenCode)
   → ai_router 按任务类型和层级选择最优模型
-  → ai_service (LiteLLM) 统一调用外部 AI API
-  → AIUsageLog 记录调用成本和延迟
+  → ai_service / Pi Gateway 统一执行与流式输出
+  → AIUsageLog 记录调用成本与延迟
 ```
 
-## AI 模型配置
+---
 
-### AIModelConfig 模型
+## AI 模型配置与五大 Provider 协议
+
+### 1. AIModelConfig 实体模型
 
 **来源**: `backend/app/models/ai_model.py`
 
-| 字段 | 说明 |
-|---|---|
-| `owner_id` | 所有者（FK → users.id CASCADE），同用户下名称唯一 |
-| `name` | 用户自定义显示名称 |
-| `provider` | openai / anthropic / ollama / custom |
-| `model_id` | 如 gpt-4o、claude-3.5-sonnet、qwen2:7b |
-| `api_key` | Fernet 加密密文（`enc:v1` 前缀），读取时自动解密 |
-| `base_url` | 自定义 API 地址 |
-| `tier` | quality / balanced / budget |
-| `is_default` | 是否默认模型 |
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `owner_id` | int (FK → users.id) | 所有者隔离（CASCADE），同用户下名称唯一 |
+| `name` | str | 用户自定义显示名称 |
+| `provider` | str | **五大支持协议**: `openai` / `anthropic` / `ollama` / `deepseek` / `opencode` |
+| `model_id` | str | 模型唯一标识，如 `gpt-4o`, `claude-3-5-sonnet`, `qwen2.5:7b`, `deepseek-chat` |
+| `api_key` | str | Fernet 加密密文（`enc:v1` 前缀），写入加密，读取自动解密 |
+| `base_url` | str? | 自定义 API 地址（受 SSRF 白名单与 IP 过滤安全约束） |
+| `tier` | str | `quality` / `balanced` / `budget` |
+| `is_default` | bool | 是否用户默认模型 |
 
-### API 端点
+---
+
+### 2. API 端点与动态网关发现 (Phase 46)
 
 **来源**: `backend/app/api/models.py`
 
 | 方法 | 路径 | 功能 |
 |---|---|---|
-| `GET` | `/api/models` | 当前用户的模型列表 |
+| `GET` | `/api/models` | 当前用户的模型配置列表 |
+| `GET` | `/api/models/discover` | **动态网关发现**：SSRF 安全扫描并发现局域网或云端可用模型列表 |
 | `POST` | `/api/models` | 添加模型配置 |
 | `PUT` | `/api/models/{id}` | 更新配置 |
 | `DELETE` | `/api/models/{id}` | 删除配置 |
-| `POST` | `/api/models/{id}/test` | 测试模型连接 |
+| `POST` | `/api/models/{id}/test` | 测试模型连接联通性与延迟 |
 | `POST` | `/api/models/{id}/set-default` | 设为默认模型 |
 
-### API Key 加密
+---
 
-参见 [07 认证与安全架构](07-auth-security.md#api-key-加密)。
+### 3. 提供商归一化与清理说明 (Phase 46)
 
-### 默认模型选择
+* **五大统一 Provider 矩阵**:
+  1. **OpenAI**: GPT-4o / GPT-4o-mini / Text-Embedding-3
+  2. **Anthropic**: Claude 3.5 Sonnet / Claude 3.5 Haiku
+  3. **Ollama**: 本地私有化大模型与向量模型（`bge-m3`, `nomic-embed-text`, `qwen2.5`）
+  4. **DeepSeek**: DeepSeek-V3 / DeepSeek-R1 推理与对话
+  5. **OpenCode / Custom**: 兼容 OpenAI 协议的自建大模型网关与私有部署
+* **Vertex AI 清理记录**: 历史 Vertex AI 原生适配器、GCP 凭据依赖与非标接口已在 Phase 46 全部物理移除，实现纯净轻量化统一调用契约。
 
-```
-用户级默认: is_default=True 的 AIModelConfig
-系统回退: 无默认时拒绝调用（不暴露系统级 key）
-```
+---
 
-## AI 调用路由
+## AI 调用路由与任务分级
 
 ### ai_router 模块
 
-**来源**: `backend/app/services/ai_router.py`（8.0KB）
+**来源**: `backend/app/services/ai_router.py`
 
-按任务类型和层级选择模型：
-
-| 任务类型 | 优选 tier | 说明 |
+| 任务类型 | 优选 Tier | 推荐模型与选型逻辑 |
 |---|---|---|
-| chunking → embedding | budget | embedding 任务量最大，优先低成本 |
-| analysis → chat | quality | 分析质量重要，优先高能力模型 |
-| extraction → chat | quality | 知识图谱关系判定需要语义理解，但只输出结构化 judgment |
-| fanfiction → chat | balanced | 创作平衡成本与质量 |
-| summary → chat | balanced | 摘要中等复杂度 |
-
-### ai_service 模块
-
-**来源**: `backend/app/services/ai_service.py`（4.9KB）
-
-LiteLLM 统一封装：
-
-```python
-# Chat 调用
-response = await ai_service.chat(
-    messages=[{"role": "user", "content": "..."}],
-    model=selected_model,
-    max_tokens=4096,
-    temperature=0.7
-)
-
-# Embedding 调用
-vectors = await ai_service.embed(
-    texts=["文本1", "文本2"],
-    model=embedding_model
-)
-
-# 流式调用
-async for chunk in ai_service.stream_chat(messages, model):
-    yield chunk
-```
-
-支持所有 OpenAI-compatible 提供商（OpenAI、Anthropic、Ollama、自定义端点等）。
-
-### 知识图谱 LLM 判定边界
-
-**来源**: `backend/app/services/knowledge/llm_judge.py`
-
-Phase 04 的知识图谱链路强制区分 LLM 与脚本职责：
-
-| 层 | 职责 |
-|---|---|
-| `CandidateRecallService` | 生成 deterministic chunk/entity/time/retrieval recall signals 和 evidence package |
-| `KnowledgeLLMJudgeService` | 通过 `ai_router.route_task("extraction")` 选择模型，仅输出 JSON relation judgment |
-| `KnowledgeGateService` | 脚本执行 schema、evidence、threshold、conflict gates，决定 accepted/rejected/review |
-| `KnowledgeProjectionService` | 只读取 accepted PostgreSQL judgment rows，投影到现有 graph-facing tables |
-
-LLM 输出必须符合 `KnowledgeLLMRelationJudgmentOutput`，只能引用 package 内的 allowed evidence IDs。LLM 不直接写 accepted graph facts；vector/BM25/adjacency/time-window 仅作为 recall signals。
-
-### 知识图谱 Eval 与 Faithfulness
-
-**来源**: `backend/scripts/run_knowledge_graph_eval.py`
-
-离线 eval 使用 `backend/evals/knowledge_graph_fiction_sample.json` 与 `backend/evals/knowledge_graph_history_sample.json`，共 20 个 labeled examples。报告分为：
-
-- `recall_signal_quality`: candidate coverage 和 evidence-bound candidate rate，不代表事实准确性。
-- `accepted_graph_fact_quality`: deterministic gates 后的 accepted precision/recall。
-- `judgment_quality`: schema failures、evidence gate failures、review routing accuracy。
-- `faithfulness`: deterministic citation support；live LLM faithfulness check 为 optional，LLM 不可用时报告 blocked。
-- `cost_latency`: LLM calls、prompt/completion tokens、cost estimate、latency p50/p95，即使 mock/local 成本为 0 也输出。
-
-### SSRF 双重校验
-
-自定义 `base_url` 在配置时和每次 API 调用前执行 SSRF 校验：
-
-```python
-# 配置时
-url_security.validate_url(base_url, allowlist)
-
-# 调用前
-url_security.validate_url(resolved_url, allowlist)
-```
-
-## 成本统计
-
-### AIUsageLog 模型
-
-**来源**: `backend/app/models/ai_usage_log.py`
-
-每次 API 调用自动记录：
-
-| 字段 | 说明 |
-|---|---|
-| `model_name` | 实际使用的模型 |
-| `task_type` | analysis / embedding / fanfiction / summary / timeline |
-| `input_tokens` | 输入 token 数 |
-| `output_tokens` | 输出 token 数 |
-| `cost_usd` | 费用（美元） |
-| `latency_ms` | 响应延迟 |
-| `status` | success / failed / timeout |
-| `novel_id` | 关联小说（逻辑关联，无 FK 约束） |
-
-## 当前状态与未来
-
-### VERIFIED
-
-- 模型配置 CRUD + API Key 加密
-- LiteLLM 统一调用封装（chat + embedding + stream）
-- SSRF 防护（配置时 + 调用前双重校验）
-- Owner 隔离
-
-### PARTIAL
-
-- AI 路由与成本统计：服务骨架存在，**业务生成端点仍未接入**（分析、创作路由返回 501）
-- AIUsageLog 表存在，记录逻辑待接入业务端点
-
-### PLANNED (Phase 3)
-
-Phase 3 AI 分析与创作（剧情分析、人物抽取、时间线、同人续写）将复用本层：
-
-```
-ai_router 选模型 → ai_service 调用 → AIUsageLog 记录
-```
-
-无需修改 AI 模型配置层的核心逻辑。
-
-## 修改后验证
-
-```bash
-cd backend
-source venv/Scripts/activate
-pytest tests/test_ai_model.py -v
-```
+| **RAG Embedding** | `budget` | 向量计算吞吐量大，优先选用 `nomic-embed-text` / `bge-m3` / `text-embedding-3-small` |
+| **Analysis / Chat** | `quality` | 深度阅读理解与结构化生成，优选 `gpt-4o` / `claude-3-5-sonnet` |
+| **Knowledge Extraction** | `quality` | 实体关系判定与双向逻辑裁决，要求极低幻觉率 |
+| **Fanfiction / Creative** | `balanced` | 同人创作与续写，平衡推理成本与文学文采 |
+| **Summary / Outline** | `balanced` | 章节大纲与宏观摘要生成 |

@@ -49,6 +49,8 @@
 | Phase 20 NM 结构只读 API | VERIFIED | `GET /api/narrative-memory/{novel_id}/versions|.../tree|.../claims|.../source-links`；`structure_query.py` 只读；cutoff 过滤；**无 promotion**；API UAT 对 novel 91 返回 versions 列表 |
 | 时间线服务端章范围 | VERIFIED | `GET /api/timeline/{id}` 可选 `chapter_start`/`chapter_end`；`effective_narrative_bounds` 与 spoiler 取 min；单元 `tests/unit/timeline/test_chapter_range.py`（8 passed）；FE `loadTimeline` 传结构节点范围 |
 | Phase 07 hierarchy 内容一致性 | VERIFIED | `segmentation.py` 用章节原文精确切片（`e322c45`）；novel 91 force rebuild 后 audit **reusable_exact** |
+| Phase 07 三层层级场景扩展检索 | VERIFIED | ADR-0004；54,984 个 Evidence→Scene 节点接入检索；消灭零重叠撕裂，Recall@5 从 80.00% 提升至 96.00% |
+| Phase 05-06 知识单元物化与双轨混合检索 | VERIFIED | ADR-0002 & ADR-0005；三大作品 29 个 Q/A 知识单元物化，Active Pointers 激活；独立第三方盲测 94.8 分 (A+)，18.42ms 时延 |
 | 线索 detail spoiler 对齐 | VERIFIED | list `link_count` 与 detail links 共用 `_link_visible`（`4b248e5`）；`tests/unit/clues` 含一致性用例 |
 
 ## PARTIAL

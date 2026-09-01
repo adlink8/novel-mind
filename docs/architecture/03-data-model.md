@@ -1,212 +1,90 @@
-# 03 — 数据模型与实体关系
+# 03 — 数据模型与实体关系 (Data Models & Entity Relationships)
 
-NovelMind 使用 PostgreSQL 16 作为主数据库，ChromaDB 作为向量存储。Phase 04 新增知识图谱候选、证据、判定和 review audit 表；Neo4j 仍是可选投影边界，默认不启用。
+NovelMind 使用 PostgreSQL 16 作为主数据库，ChromaDB 作为多集合向量存储。系统严格遵循 `owner_id` 多租户隔离、版本化不可变快照（Immutable Snapshots）与指针原子切换（Active Pointer Switching）规范。
 
-## 核心实体
+---
 
-### User — 用户
+## 核心实体与领域模型
 
-| 字段 | 类型 | 说明 |
-|---|---|---|
-| `id` | int (PK) | 主键 |
-| `username` | str | 用户名（unique, index） |
-| `email` | str | 邮箱（unique） |
-| `hashed_password` | str | bcrypt 密码哈希 |
-| `is_active` | bool | 软删除标记 |
-| `is_superuser` | bool | 管理员标记 |
+### 1. 基础小说域 (Core Novel Domain)
 
-**来源**: `backend/app/models/user.py`
+* **User (`users`)**: 用户账户体系，bcrypt 密码哈希、JWT 会话绑定与多租户所有权根节点；
+* **Novel (`novels`)**: 小说主表，存储标题、作者、总字数、导入状态、阅读进度（`reading_progress`）与文风指纹；
+* **Chapter (`chapters`)**: 章节表，存储章节序号、标题、正文文本与字数。
 
-### Novel — 小说
+---
 
-| 字段 | 类型 | 说明 |
-|---|---|---|
-| `id` | int (PK) | 主键 |
-| `owner_id` | int (FK → users.id) | 所有者，级联删除 |
-| `title` | str | 标题（index） |
-| `author` | str? | 作者 |
-| `chapter_count` | int | 章节总数 |
-| `word_count` | int | 总字数 |
-| `status` | str | importing / ready / analyzing / analyzed |
-| `source_path` | str? | 原始 TXT 存储路径 |
-| `reading_progress` | JSON? | {chapter_id, progress_percent} |
-| `style_fingerprint` | JSON? | 文风分析结果 |
+### 2. Phase 07 三层层级分块域 (Chunk Hierarchy Domain)
 
-**来源**: `backend/app/models/novel.py`
+**来源**: `backend/app/models/chunk_hierarchy.py`, `chunk_build.py`，权威规范详见 [ADR-0004](file:///d:/ADLINK/Myproject/novel-mind-new/docs/adr/0004-chunk-hierarchy-retrieval-migration.md)。
 
-### Chapter — 章节
+| 表名 (Table) | 主键与外键 | 核心字段 | 职责与说明 |
+|---|---|---|---|
+| `chunk_hierarchy_nodes` | `id` (PK), `novel_id` (FK), `parent_id` (FK 自关联) | `level` (1=Chapter, 2=Scene, 3=Evidence), `content`, `char_start`, `char_end`, `node_metadata` | 存储三层分块树节点；支持从 Evidence 向上解析 Scene 场景 |
+| `chunk_builds` | `id` (PK), `novel_id` (FK), `owner_id` (FK) | `build_key`, `manifest_checksum`, `node_count`, `status` | 不可变分块编译快照，SHA-256 签名校验 |
+| `chunk_active_pointers` | `id` (PK), `novel_id` (FK), `owner_id` (FK) | `build_id` (FK), `pointer_version`, `activated_at` | 当前活跃分块指针，支持零停机原子切换与瞬时回滚 |
 
-| 字段 | 类型 | 说明 |
-|---|---|---|
-| `id` | int (PK) | 主键 |
-| `novel_id` | int (FK → novels.id CASCADE) | 所属小说 |
-| `chapter_number` | int | 章节序号 |
-| `title` | str | 章节标题 |
-| `content` | str (Text) | 完整正文 |
-| `word_count` | int | 字数 |
+---
 
-**来源**: `backend/app/models/novel.py`
+### 3. Phase 05-06 结构化知识单元域 (Narrative Units Domain)
 
-### TextChunk — 文本块
+**来源**: `backend/app/models/knowledge_unit.py`，权威规范详见 [ADR-0002](file:///d:/ADLINK/Myproject/novel-mind-new/docs/adr/0002-narrative-unit-vs-narrative-memory.md) 与 [ADR-0005](file:///d:/ADLINK/Myproject/novel-mind-new/docs/adr/0005-production-dual-track-knowledge-retrieval-cutover.md)。
 
-| 字段 | 类型 | 说明 |
-|---|---|---|
-| `id` | int (PK) | 主键 |
-| `novel_id` | int (FK → novels.id CASCADE) | 所属小说 |
-| `chapter_id` | int? (FK → chapters.id SET NULL) | 所属章节（删章时保留 chunk） |
-| `chunk_index` | int | 章节内序号 |
-| `content` | str (Text) | 文本内容（300-500 字） |
-| `chunk_type` | str | scene / dialogue / description / narration / paragraph |
-| `embedding_status` | str | pending / embedded / failed |
-| `metadata_json` | JSON? | {characters, location, time} |
+| 表名 (Table) | 主键与外键 | 核心字段 | 职责与说明 |
+|---|---|---|---|
+| `narrative_source_snapshots` | `id` (PK), `novel_id` (FK), `owner_id` (FK) | `manifest_checksum`, `source_watermark`, `item_count`, `status='frozen'` | 冻结已通过门禁的关系事实，生成不可变数据快照 |
+| `narrative_units` | `id` (PK), `canonical_id`, `novel_id` (FK), `source_judgment_id` (FK), `primary_evidence_id` (FK) | `question`, `answer`, `subject_key`, `relation_type`, `confidence`, `evidence_count`, `status='active'` | **知识单元本体**：具象化 Q/A 问答对，强制关联底层切片证据（Citation Contract） |
+| `narrative_index_builds` | `id` (PK), `novel_id` (FK), `owner_id` (FK) | `build_key`, `collection_name`, `manifest_checksum`, `unit_count`, `status='committed'` | 知识单元向量索引构建版本 |
+| `narrative_active_pointers` | `id` (PK), `novel_id` (FK), `owner_id` (FK) | `build_id` (FK), `pointer_version`, `active_manifest_checksum`, `activated_at` | 知识单元生产活跃检索指针 |
 
-**来源**: `backend/app/models/text_chunk.py`
+---
 
-### ImportJob — 导入任务
+### 4. 认知分析与图谱实体域 (Analysis & Graph Domain)
 
-| 字段 | 类型 | 说明 |
-|---|---|---|
-| `id` | int (PK) | 主键 |
-| `novel_id` | int? (FK → novels.id CASCADE) | 关联小说 |
-| `status` | str | pending → uploading → detecting → parsing → chunking → embedding → ready / failed |
-| `progress` | int | 0-100 百分比 |
-| `message` | str | 状态描述 |
-| `error_detail` | str? | 错误详情 |
-| `retry_count` | int | 已重试次数 |
-| `max_retries` | int | 最大重试次数（默认 3） |
+* **Phase 08 时间线 (`timeline_events`) [VERIFIED]**: 结构化叙事事件，存储 `novel_id`, `chapter_id`, `event_type`, `summary`, `timestamp_order`（样例已入库 1,933 条事件）；
+* **Phase 09 人物关系 (`character_relations`) [VERIFIED]**: 角色关系网络，存储 `source_name`, `target_name`, `relation_type`, `evolution_stage`（样例已入库 41 条 accepted 关系）；
+* **Phase 11 线索伏笔 (`clue_candidates`, `clue_judgments`) [VERIFIED]**: 伏笔追踪与闭环判定，记录伏笔埋设章与揭示章（`plant_chapter` $\to$ `payoff_chapter`）；
+* **Phase 04 知识关系抽取 (`knowledge_relation_candidates`, `knowledge_relation_judgments`, `knowledge_evidence_refs`)**: 实体关系抽取流水线与审核证据链。
 
-**来源**: `backend/app/models/import_job.py`
+---
 
-### AIModelConfig — AI 模型配置
+### 5. 质量评估与基准评测域 (Evaluation Domain)
 
-| 字段 | 类型 | 说明 |
-|---|---|---|
-| `id` | int (PK) | 主键 |
-| `owner_id` | int (FK → users.id CASCADE) | 所有者 |
-| `name` | str | 显示名称（同用户下唯一） |
-| `provider` | str | openai / anthropic / ollama / custom |
-| `model_id` | str | 如 gpt-4o、claude-3.5-sonnet |
-| `api_key` | str? | Fernet 加密密文（`enc:v1` 前缀） |
-| `base_url` | str? | 自定义 API 地址 |
-| `tier` | str | quality / balanced / budget |
-| `is_default` | bool | 默认模型标记 |
+* **`eval_datasets`**: 黄金评测基准题库（**728+ 用例已入库**），包含 `question`, `question_type`, `difficulty`, `expected_points`, `must_not_say`, `gold_chunks`, `status`；
+* **`eval_runs`**: 评测运行批次（已完成 Runs 17~24），记录 `run_name`, `dataset_name`, `strategy_metrics`（Recall, Precision, MRR, NDCG, Latency）；
+* **`eval_results`**: 单题评测明细与错误案例追溯。
 
-**来源**: `backend/app/models/ai_model.py`
+---
 
-### AIUsageLog — AI 调用日志
+## 数据库完整实体关系拓扑 (Entity Relationship Topology)
 
-| 字段 | 类型 | 说明 |
-|---|---|---|
-| `id` | int (PK) | 主键 |
-| `model_name` | str | 模型名称 |
-| `task_type` | str | analysis / embedding / fanfiction / summary / timeline |
-| `input_tokens` | int | 输入 token |
-| `output_tokens` | int | 输出 token |
-| `cost_usd` | float | 费用（美元） |
-| `latency_ms` | int | 延迟（毫秒） |
-| `status` | str | success / failed / timeout |
-| `novel_id` | int? | 关联小说（无 FK 约束，仅逻辑关联） |
-
-**来源**: `backend/app/models/ai_usage_log.py`
-
-### RAG 评测模型
-
-| 模型 | 表名 | 职责 |
-|---|---|---|
-| EvalDataset | `eval_datasets` | 测试问题、题型、难度与 gold chunk 标注 |
-| EvalRun | `eval_runs` | 一次评测运行的策略、状态、聚合指标和延迟 |
-| EvalResult | `eval_results` | 单题检索结果、指标与错误案例标记 |
-
-**来源**: `backend/app/models/eval.py`
-
-### 知识图谱候选、证据与判定模型
-
-Phase 04 的知识图谱链路以 PostgreSQL audit row 为事实源。召回信号只能生成候选和 evidence package；只有通过 LLM 语义判定和 deterministic gates 的 `KnowledgeRelationJudgment(status='accepted', gate_status='accepted')` 才能作为 accepted graph fact 的输入。
-
-| 模型 | 表名 | 职责 |
-|---|---|---|
-| KnowledgeExtractionRun | `knowledge_extraction_runs` | 一次 CLI/批处理运行，记录 domain/ontology profile、候选/判定/accepted/review 计数、token、cost、latency 和 metrics summary |
-| KnowledgeEvidenceRef | `knowledge_evidence_refs` | evidence ref 定位器，绑定 owner、novel、run、source_type、chunk/chapter locator 和 excerpt |
-| KnowledgeEntityCandidate | `knowledge_entity_candidates` | deterministic 或 LLM 输出前的实体候选，带 evidence refs、domain profile 和 review status |
-| KnowledgeEventCandidate | `knowledge_event_candidates` | 事件候选，带 time/location/participant/evidence refs |
-| KnowledgeRelationCandidate | `knowledge_relation_candidates` | 关系候选；保存 recall_signals 和 package_snapshot，但不是图事实 |
-| KnowledgeRelationJudgment | `knowledge_relation_judgments` | LLM 结构化语义判定及 schema/evidence/threshold/conflict gate 状态 |
-| KnowledgeReviewQueue | `knowledge_review_queue` | 低置信度、risk flag、冲突或人工复核项 |
-
-**来源**: `backend/app/models/knowledge.py`
-
-### 知识图谱离线评测 Fixture
-
-| 文件 | 领域 | 内容 |
-|---|---|---|
-| `backend/evals/knowledge_graph_fiction_sample.json` | fiction | 10 个 labeled examples，覆盖 character relation、conflict、foreshadowing、event sequence、alias/family 等 |
-| `backend/evals/knowledge_graph_history_sample.json` | history | 10 个 labeled examples，覆盖 person/organization、rule、succession、causality、temporal sequence、source conflict 等 |
-
-`backend/scripts/run_knowledge_graph_eval.py` 离线读取这些 fixture，分别报告 recall signal quality、judgment quality、accepted graph fact quality、faithfulness、cost/latency。该 eval 不写库，live LLM faithfulness check 为可选且不可用时报告 blocked，不阻塞 deterministic tests。
-
-### 后续业务预留模型（表已存在，业务未实现）
-
-| 模型 | 表名 | 状态 |
-|---|---|---|
-| AnalysisResult | `analysis_results` | MISSING（表存在，代码未接入） |
-| Character | `characters` | MISSING |
-| CharacterRelation | `character_relations` | MISSING |
-| TimelineEvent | `timeline_events` | MISSING |
-| FanFiction | `fan_fictions` | MISSING |
-| FanFictionChapter | `fanfiction_chapters` | MISSING |
-
-## 实体关系图
-
-```
-users (1)
-  ├──< ai_model_configs (owner_id, CASCADE)
-  └──< novels (owner_id, CASCADE)
-            ├──< chapters (novel_id, CASCADE)
-            ├──< text_chunks (novel_id CASCADE, chapter_id SET NULL)
-            ├──< import_jobs (novel_id CASCADE)
-            ├──< eval_datasets (novel_id CASCADE)
-            ├──< eval_runs (novel_id CASCADE)
-            │     └──< eval_results (run_id CASCADE, dataset_id CASCADE)
-            ├──< knowledge_extraction_runs (owner_id + novel_id CASCADE)
-            │     ├──< knowledge_evidence_refs (run_id CASCADE)
-            │     ├──< knowledge_entity_candidates (run_id CASCADE)
-            │     ├──< knowledge_event_candidates (run_id CASCADE)
-            │     ├──< knowledge_relation_candidates (run_id CASCADE)
-            │     │     └──< knowledge_relation_judgments (candidate_id CASCADE)
-            │     └──< knowledge_review_queue (run_id CASCADE)
-            ├──< analysis_results (novel_id CASCADE, chapter_id SET NULL)
-            ├──< characters (novel_id CASCADE)
-            │     └──< character_relations (source + target, CASCADE)
-            ├──< timeline_events (novel_id CASCADE, chapter_id SET NULL)
-            ├──< fan_fictions (novel_id CASCADE, parent_chapter_id SET NULL)
-            │     └──< fanfiction_chapters (fanfiction_id CASCADE)
-            └──< ai_usage_logs (novel_id 无 FK，仅逻辑关联)
+```mermaid
+erDiagram
+    users ||--o{ novels : owns
+    users ||--o{ ai_model_configs : configures
+    novels ||--o{ chapters : contains
+    
+    novels ||--o{ chunk_builds : compiles
+    chunk_builds ||--o{ chunk_hierarchy_nodes : organizes
+    chunk_hierarchy_nodes ||--o{ chunk_hierarchy_nodes : "parent_id (Scene to Evidence)"
+    novels ||--|| chunk_active_pointers : points_active_chunk
+    
+    novels ||--o{ narrative_source_snapshots : freezes
+    narrative_source_snapshots ||--o{ narrative_units : materializes
+    novels ||--o{ narrative_index_builds : indexes
+    novels ||--|| narrative_active_pointers : points_active_units
+    
+    novels ||--o{ timeline_events : tracks_events
+    novels ||--o{ character_relations : maps_relations
+    novels ||--o{ eval_datasets : benchmarks
+    eval_datasets ||--o{ eval_results : generates
+    eval_runs ||--o{ eval_results : aggregates
 ```
 
-## Owner 隔离规则
+---
 
-所有资源操作必须校验 `owner_id`：
+## 多租户隔离与安全铁律 (Security & Ownership)
 
-- **Novel**: 列表只返回 `owner_id == current_user.id` 的记录
-- **Chapter**: 通过 `novel.owner_id` 间接校验
-- **AIModelConfig**: 列表/更新/删除/测试均校验 `owner_id`
-- **TextChunk**: 通过 `novel.owner_id` 间接校验
-- **Knowledge\***: 表内直接保存 `owner_id`，API 和 gate/projection 查询同时校验 owner、novel、run 范围
-- 跨用户访问统一返回 **404**（不暴露资源是否存在）
-
-## 存储分布
-
-| 数据 | 存储 | 说明 |
-|---|---|---|
-| 用户/小说/章节/AI 配置 | PostgreSQL | 主表，关系数据 |
-| 文本块内容 | PostgreSQL | Text 字段 |
-| 向量 embedding | ChromaDB | 768 维向量，collection 命名：`novel_{novel_id}` |
-| TXT 源文件 | 文件系统 | `backend/uploads/`，随机十六进制文件名 |
-| API Key 密文 | PostgreSQL | `enc:v1` 前缀的 Fernet 密文 |
-
-## 关键注意事项
-
-1. **API Key 绝不存明文** — 写入时加密，读取时解密。支持 key rotation
-2. **小说详情不返回 `source_path`** — API 响应中排除文件系统路径
-3. **章节列表不返回正文** — 使用 `ChapterSummaryResponse`，正文通过单章接口获取
-4. **删除补偿** — 文件与数据库双写失败时，失败方执行补偿清理
+1. **统一行级 `owner_id` 过滤**：所有针对小说、章节、分块、知识单元、时间线与评测数据的 API 操作，必须强制执行 `owner_id == current_user.id` 校验；
+2. **越权请求统一返回 404**：防止攻击者通过 403 探测资源的存在性；
+3. **API Key 强制加密存储**：AI 模型密钥使用 Fernet 对称加密（前缀 `enc:v1`），禁止任何明文落地。
