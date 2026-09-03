@@ -10,7 +10,8 @@
       ...
 """
 
-from pydantic import Field, model_validator
+from typing import Any
+from pydantic import AliasChoices, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 
@@ -44,9 +45,22 @@ class Settings(BaseSettings):
     # ── 数据库 ──
     # 异步 PostgreSQL 连接串，使用 asyncpg 驱动
     # 格式: postgresql+asyncpg://用户名:密码@主机:端口/数据库名
-    database_url: str = (
-        "postgresql+asyncpg://novelmind:novelmind@localhost:5432/novelmind"
+    database_url: str = Field(
+        default="postgresql+asyncpg://novelmind:novelmind@localhost:5432/novelmind",
+        validation_alias=AliasChoices("NOVELMIND_DATABASE_URL", "DATABASE_URL"),
     )
+
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def assemble_db_connection(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            if v.startswith("postgres://"):
+                return v.replace("postgres://", "postgresql+asyncpg://", 1)
+            elif v.startswith("postgresql://") and not v.startswith(
+                "postgresql+asyncpg://"
+            ):
+                return v.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return v
 
     # ── AI 模型 API 密钥 ──
     # 各提供商的密钥和端点，用于 LiteLLM 统一调用

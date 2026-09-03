@@ -23,7 +23,5 @@ COPY . .
 
 EXPOSE 8000
 
-# 启动 FastAPI 应用
-# --host 0.0.0.0: 允许容器外部访问
-# --port 8000: 监听端口
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# 启动 FastAPI 应用（支持动态 PORT 环境变量与自动数据迁移）
+CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
