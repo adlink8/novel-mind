@@ -24,7 +24,12 @@ const nextConfig = {
     return [
       {
         source: "/api/:path*",
-        destination: `${process.env.BACKEND_URL || "http://127.0.0.1:8010"}/api/:path*`,
+        destination: `${
+          process.env.BACKEND_URL ||
+          (process.env.VERCEL
+            ? "https://novelmind-api-83d266d4ae0c.herokuapp.com"
+            : "http://127.0.0.1:8010")
+        }/api/:path*`,
       },
       // 25.2-04：SSE 运行端点直达 agent-service（长连接流绕过 FastAPI 跳转；
       // FastAPI 自有 /api/agent/* 仍走上面的后端 rewrite）。
