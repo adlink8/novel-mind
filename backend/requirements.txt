@@ -23,9 +23,8 @@ chardet>=5.2
 litellm>=1.83.10
 chromadb==1.5.9
 httpx>=0.28
-# 本地 embedding（与数据分析项目一致：bge-small-zh-v1.5）
-sentence-transformers>=3.0
-# torch 由 sentence-transformers 拉取；有 GPU 时可用官方 CUDA 轮子覆盖
+# 本地 embedding（云端部署使用 OpenCode/OpenAI API 模式，避免安装几 GB 的 PyTorch 触发 slug 超限）
+# sentence-transformers>=3.0
 
 
 # Security
