@@ -25,6 +25,7 @@ from typing import List, Optional, Tuple, Dict
 import chardet
 from fastapi import UploadFile
 from sqlalchemy import select, func
+from sqlalchemy.orm import noload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -526,7 +527,11 @@ class NovelService:
         Returns:
             (小说列表, 总数)
         """
-        query = select(Novel).order_by(Novel.created_at.desc())
+        query = (
+            select(Novel)
+            .options(noload(Novel.chapters))
+            .order_by(Novel.created_at.desc())
+        )
         count_query = select(func.count(Novel.id))
 
         # 所有者过滤
