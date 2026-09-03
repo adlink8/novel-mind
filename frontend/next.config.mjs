@@ -8,7 +8,7 @@ const nextConfig = {
   // Electron proof harness can start on a loopback port without `npm install`. The
   // standalone output does NOT copy public/ or .next/static. The package build script
   // prepares both so every production build is directly launchable.
-  output: "standalone",
+  output: process.env.VERCEL ? undefined : "standalone",
   // Public tunnel hostnames must be allowed or dev blocks / hangs client assets.
   // 生产/隧道域名由环境变量注入（个人域名不写死进仓库）：
   //   NOVELMIND_TUNNEL_HOSTS=https://a.example.com,https://b.example.com
