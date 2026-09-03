@@ -2,6 +2,11 @@ import { cpSync, existsSync, mkdirSync, rmSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+if (process.env.VERCEL) {
+  console.log("Skipping standalone preparation on Vercel deployment");
+  process.exit(0);
+}
+
 const frontendRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const standaloneRoot = path.join(frontendRoot, ".next", "standalone");
 
