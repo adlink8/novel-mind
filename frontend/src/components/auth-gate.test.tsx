@@ -48,11 +48,11 @@ describe("AuthGate", () => {
     expect(screen.queryByRole("button", { name: "登录" })).not.toBeInTheDocument();
   });
 
-  it("本地会话初始化失败也不会恢复登录验证页面", async () => {
+  it("会话失效且本地自动登录不可用时展示登录卡片", async () => {
     mocks.me.mockRejectedValue(new Error("anonymous"));
     mocks.localAutoLogin.mockRejectedValue(new Error("bootstrap unavailable"));
     render(<AuthGate><div>工作台内容</div></AuthGate>);
-    expect(await screen.findByText("工作台内容")).toBeInTheDocument();
-    expect(screen.queryByLabelText("密码")).not.toBeInTheDocument();
+    expect(await screen.findByText("NovelMind")).toBeInTheDocument();
+    expect(screen.getByLabelText("密码")).toBeInTheDocument();
   });
 });

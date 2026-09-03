@@ -9,6 +9,7 @@ import {
   Feather,
   LibraryBig,
   ListTree,
+  LogOut,
   PanelLeftClose,
   PanelLeftOpen,
   Search,
@@ -16,6 +17,7 @@ import {
   Sparkles,
 } from "lucide-react";
 
+import { authApi } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 const navigation = [
@@ -171,10 +173,31 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <p className="text-sm font-medium leading-5">
               从原文证据出发，理解、检索与创作。
             </p>
+            <button
+              onClick={async () => {
+                await authApi.logout();
+                window.location.reload();
+              }}
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-border/60 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+              title="退出登录"
+            >
+              <LogOut className="size-3.5" />
+              <span>退出登录</span>
+            </button>
           </div>
         ) : (
-          <div className="mt-auto flex justify-center pb-1" title="AI workspace">
+          <div className="mt-auto flex flex-col items-center gap-2 pb-1" title="AI workspace">
             <Sparkles className="size-4 text-primary" aria-hidden />
+            <button
+              onClick={async () => {
+                await authApi.logout();
+                window.location.reload();
+              }}
+              className="grid size-8 place-items-center rounded-xl text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+              title="退出登录"
+            >
+              <LogOut className="size-3.5" />
+            </button>
           </div>
         )}
       </aside>
@@ -186,13 +209,26 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </span>
           <span className="font-serif text-lg font-semibold">NovelMind</span>
         </Link>
-        <Link
-          href="/search"
-          className="grid size-11 place-items-center rounded-full border bg-card"
-          aria-label="搜索"
-        >
-          <Search className="size-4" />
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/search"
+            className="grid size-10 place-items-center rounded-full border bg-card text-muted-foreground"
+            aria-label="搜索"
+          >
+            <Search className="size-4" />
+          </Link>
+          <button
+            onClick={async () => {
+              await authApi.logout();
+              window.location.reload();
+            }}
+            className="grid size-10 place-items-center rounded-full border bg-card text-muted-foreground transition-colors hover:text-destructive"
+            aria-label="退出登录"
+            title="退出登录"
+          >
+            <LogOut className="size-4" />
+          </button>
+        </div>
       </header>
 
       <main

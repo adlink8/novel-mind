@@ -1,18 +1,18 @@
 "use client";
 
 import { ReactNode, useEffect, useState } from "react";
-
 import { authApi } from "@/lib/api";
+import { LoginCard } from "@/components/login-card";
 
 /**
- * Establish the local single-user session before product requests start.
- *
- * The desktop/local product has no interactive sign-in gate. Backend user
- * identity is still bootstrapped so owner-scoped books and model settings keep
- * their existing isolation semantics.
+ * 统一认证门禁组件：
+ * 1. 尝试使用现有 Cookie / Token 校验会话（authApi.me()）；
+ * 2. 若失败，尝试本地/桌面免密登录模式（authApi.localAutoLogin()）；
+ * 3. 若均未通过，则展示登录卡片，用户验证成功后方可进入系统。
  */
 export function AuthGate({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
+  const [authed, setAuthed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -23,14 +23,13 @@ export function AuthGate({ children }: { children: ReactNode }) {
     void (async () => {
       try {
         await authApi.me();
+        if (!cancelled) setAuthed(true);
       } catch {
-        // Local development and the desktop app use the configured workspace
-        // identity. There is intentionally no username/password fallback UI.
         try {
           await authApi.localAutoLogin();
+          if (!cancelled) setAuthed(true);
         } catch {
-          // Do not revive the removed login gate. Individual API calls retain
-          // their normal error handling if local session bootstrap is broken.
+          if (!cancelled) setAuthed(false);
         }
       } finally {
         if (!cancelled) {
@@ -52,6 +51,10 @@ export function AuthGate({ children }: { children: ReactNode }) {
         正在启动工作区...
       </div>
     );
+  }
+
+  if (!authed) {
+    return <LoginCard onSuccess={() => setAuthed(true)} />;
   }
 
   return <>{children}</>;
