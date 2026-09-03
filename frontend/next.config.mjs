@@ -4,9 +4,6 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
   // Phase 41 proof (D-41-05): emit a self-contained `.next/standalone` tree that the
   // Electron proof harness can start on a loopback port without `npm install`. The
   // standalone output does NOT copy public/ or .next/static. The package build script
