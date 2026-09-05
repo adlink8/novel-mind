@@ -110,19 +110,20 @@ describe("BookShelf", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("书籍名称不能为空");
   });
 
-  it("删除：确认后调用 onDelete", async () => {
+  it("删除：二次确认后调用 onDelete", async () => {
     const onDelete = vi.fn().mockResolvedValue(undefined);
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     render(<BookShelf novels={[novel]} onDelete={onDelete} />);
     fireEvent.click(screen.getByRole("button", { name: "删除《雾城》" }));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "确认删除" }));
     await waitFor(() => expect(onDelete).toHaveBeenCalledWith(7));
   });
 
-  it("删除被取消时不调用 onDelete", () => {
+  it("删除：对话框点取消不调用 onDelete", async () => {
     const onDelete = vi.fn().mockResolvedValue(undefined);
-    vi.spyOn(window, "confirm").mockReturnValue(false);
     render(<BookShelf novels={[novel]} onDelete={onDelete} />);
     fireEvent.click(screen.getByRole("button", { name: "删除《雾城》" }));
+    fireEvent.click(screen.getByRole("button", { name: "取消" }));
     expect(onDelete).not.toHaveBeenCalled();
   });
 

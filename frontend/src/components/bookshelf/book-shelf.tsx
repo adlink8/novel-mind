@@ -68,6 +68,7 @@ export function BookShelf({
   const [opening, setOpening] = useState<OpeningState | null>(null);
   const [stage, setStage] = useState<"fly" | "center" | "open">("fly");
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Novel | null>(null);
   const [renameTarget, setRenameTarget] = useState<Novel | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [renaming, setRenaming] = useState(false);
@@ -111,15 +112,17 @@ export function BookShelf({
     });
   }
 
-  async function handleDelete(novel: Novel) {
+  function handleDelete(novel: Novel) {
     if (!onDelete) return;
-    const ok = window.confirm(
-      `确定删除《${novel.title}》？\n将移除章节与相关索引，此操作不可恢复。`
-    );
-    if (!ok) return;
-    setDeletingId(novel.id);
+    setDeleteTarget(novel); // 二次确认：先弹对话框，用户再次点击「确认删除」才执行
+  }
+
+  async function handleDeleteConfirm() {
+    if (!deleteTarget || !onDelete) return;
+    setDeletingId(deleteTarget.id);
     try {
-      await onDelete(novel.id);
+      await onDelete(deleteTarget.id);
+      setDeleteTarget(null);
     } finally {
       setDeletingId(null);
     }
@@ -319,6 +322,41 @@ export function BookShelf({
           </div>
         </div>
       )}
+
+      {/* 删除二次确认对话框 */}
+      <Dialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open && deletingId === null) setDeleteTarget(null);
+        }}
+      >
+        <DialogContent className="rounded-3xl sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>删除《{deleteTarget?.title}》</DialogTitle>
+            <DialogDescription>
+              将同时删除全部章节、分析内容与叙事记忆，此操作不可恢复。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={deletingId !== null}
+              onClick={() => setDeleteTarget(null)}
+            >
+              取消
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={deletingId !== null}
+              onClick={() => void handleDeleteConfirm()}
+            >
+              {deletingId !== null ? "删除中..." : "确认删除"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* 重命名对话框 */}
       <Dialog
