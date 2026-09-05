@@ -9,6 +9,7 @@ from fastapi import (
     Query,
     BackgroundTasks,
 )
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -252,7 +253,17 @@ async def delete_novel(
     db: AsyncSession = Depends(get_db),
 ):
     """删除小说（仅限所有者或超级用户）"""
-    success = await novel_service.delete_novel(db, novel.id)
+    try:
+        success = await novel_service.delete_novel(db, novel.id)
+    except IntegrityError as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "删除失败：该书的分析数据与库中其他书籍存在交叉引用，"
+                "请先删除与之关联的其他书籍后重试"
+            ),
+        ) from exc
     if not success:
         raise HTTPException(status_code=404, detail="小说不存在")
     return {"message": "已删除"}

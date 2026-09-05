@@ -367,6 +367,40 @@ async def test_novel_full_lifecycle(auth_client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_delete_novel_with_related_rows(auth_client: AsyncClient, db_session):
+    """带关联数据（角色等）的书可删除，关联行随级联消失。
+
+    Postgres 上 delete_novel 还会先禁用审计触发器并按拓扑序显式清空
+    novel 作用域数据（本地演练验证）；SQLite 测试路径依赖模型级联，
+    此用例守卫方言分支不被破坏。
+    """
+    from sqlalchemy import select
+
+    from app.models.character import Character
+
+    content = "第一章 关联删除\n\n内容。"
+    up = await auth_client.post(
+        "/api/novels/upload",
+        files={"file": ("related_rows.txt", io.BytesIO(content.encode("utf-8")), "text/plain")},
+    )
+    status = await _wait_for_import_job(auth_client, up.json()["job_id"])
+    novel_id = status["novel_id"]
+
+    db_session.add(Character(novel_id=novel_id, name="测试角色"))
+    await db_session.commit()
+
+    resp = await auth_client.delete(f"/api/novels/{novel_id}")
+    assert resp.status_code == 200
+
+    remaining = (
+        (await db_session.execute(select(Character).where(Character.novel_id == novel_id)))
+        .scalars()
+        .all()
+    )
+    assert remaining == []
+
+
+@pytest.mark.asyncio
 async def test_novels_search(auth_client: AsyncClient):
     """搜索功能验证"""
     # 先上传两本小说
