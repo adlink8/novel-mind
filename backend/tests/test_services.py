@@ -113,6 +113,43 @@ class TestParseNovel:
         # 多个空行应被合并为两个
         assert "\n\n\n\n" not in chapters[0]["content"]
 
+    def test_parse_ignores_body_lines_with_number_unit(self):
+        """行首恰好是「数字+回/部/回合」的正文句子不应被当成章节标题"""
+        content = (
+            "第一章 开始\n\n"
+            "一回想起剑飞过来的那瞬间，我简直两脚发软。\n"
+            "第二回合要开始了。\n"
+            "第一部是和心灵之友瑞杰路德的邂逅。\n"
+            "1.召唤「无机物」。\n\n"
+            "第二章 继续\n\n正文。"
+        )
+        chapters = novel_service.parse_novel(content)
+        assert [c["title"] for c in chapters] == ["第一章 开始", "第二章 继续"]
+
+    def test_parse_decorated_headings_and_page_merge(self):
+        """识别「_第X章_」与「# 第X章」装饰标题，合并同标题续页并剔除水印行"""
+        content = (
+            "_第一卷 序章_\n"
+            "# 第一卷 序章\n"
+            "正文A。\n"
+            "铅笔小说\n"
+            "(www.x23qb.com)\n"
+            "_第一卷 序章_\n"
+            "# 第一卷 序章(2/2)\n"
+            "正文B。\n"
+            "_第一卷 第一话_\n"
+            "# 第一卷 第一话\n"
+            "正文C。"
+        )
+        chapters = novel_service.parse_novel(content)
+        assert [c["title"] for c in chapters] == ["第一卷 序章", "第一卷 第一话"]
+        assert "正文A" in chapters[0]["content"]
+        assert "正文B" in chapters[0]["content"]
+        assert "正文C" in chapters[1]["content"]
+        assert "铅笔小说" not in chapters[0]["content"]
+        assert "(www.x23qb.com)" not in chapters[0]["content"]
+        assert "(2/2)" not in chapters[0]["content"]
+
 
 class TestUploadNovel:
     """测试 upload_novel 的文件处理"""

@@ -56,6 +56,15 @@ _ENCODING_CANDIDATES = (
 _MAX_CHAPTER_CHARS = 12_000
 _MIN_CHAPTER_CHARS = 2_000
 
+# 分页站每页重复的噪音行（如「铅笔小说 / (www.x23qb.com)」）
+_WATERMARK_LINES = ("铅笔小说", "(www.x23qb.com)")
+# 续页标题尾部的页码后缀（如「第一话 xxx(2/2)」）
+_PAGE_SUFFIX_RE = re.compile(r"\s*[（(]\d+/\d+[)）]\s*$")
+# 章节号核心（数字 + 单位字），供装饰性标题行归一化复用。
+# 数字只认 ASCII：全角数字常见于正文列举（如「２、基司的搜索」），不作为章节号
+_CH_NUMERALS = r"[零一二三四五六七八九十百千0-9]+"
+_CH_UNIT = r"[章节回卷集篇部幕]"
+
 
 def _cjk_ratio(text: str) -> float:
     """统计汉字（CJK Unified Ideographs）占比，用于编码打分。"""
@@ -178,12 +187,18 @@ def _decode_with_fallback(raw: bytes) -> str:
 
 # ────────────────────── 章节分割正则模式 ──────────────────────
 # 5 种模式按优先级排列，覆盖中英文常见章节标题格式
+# 句读守卫：真标题几乎不会以句读结尾，而行首恰好是「数字+回/卷/部…」的正文句子几乎都会
+# （如「一回想起…」「第二回合要开始了。」「1.召唤「无机物」。」）
+_SENTENCE_TAIL_GUARD = r"(?!.*[。！？…；，.!?,;]$)"
+
 CHAPTER_PATTERNS = [
-    r"^第[零一二三四五六七八九十百千\d]+[章节回卷集篇部幕].*$",  # 中文章节号（"第一章 xxx"）
-    r"^[第]?[零一二三四五六七八九十百千\d]+[章节回卷集篇部幕].*$",  # 宽松中文章节（可省略"第"）
+    rf"^第{_CH_NUMERALS}{_CH_UNIT}{_SENTENCE_TAIL_GUARD}.*$",  # 中文章节号（"第一章 xxx"）
+    rf"^[第]?{_CH_NUMERALS}{_CH_UNIT}{_SENTENCE_TAIL_GUARD}.{{0,50}}$",  # 宽松中文章节（可省略"第"，限长防误伤长句）
     r"^Chapter\s+\d+.*$",  # 英文 Chapter（"Chapter 1 xxx"）
     r"^CHAPTER\s+\d+.*$",  # 大写 CHAPTER
-    r"^\d+[\.\s、].+$",  # 数字标题（"1. xxx" 或 "1、xxx"）
+    # 数字标题（"1. xxx" 或 "1、xxx"）；分隔符只允许点/顿号/同行空格，
+    # 不能用 \s（会跨行把「004」这类独立页码行与下一行拼成标题）
+    rf"^[0-9]+(?:[\.、]|[^\S\n]){_SENTENCE_TAIL_GUARD}.+$",
 ]
 
 # 合并为单一正则（OR 关系，多行模式下逐行匹配）
@@ -311,14 +326,20 @@ class NovelService:
         1. 去除 BOM 标记（\ufeff）
         2. 统一换行符（\r\n / \r → \n）
         3. 合并连续空行（3+ 空行 → 2 空行）
-        4. 用正则匹配章节标题位置
-        5. 按标题位置切分文本
-        6. 计算每章字数
+        4. 归一化装饰性标题行（「# 第X话」/「_第X话_」）
+        5. 用正则匹配章节标题位置，合并同标题续页（尾部带 (n/m) 页码）
+        6. 剔除分页水印行与重复标题行，按标题位置切分文本
+        7. 计算每章字数
         """
         # 基础清洗
         content = content.lstrip("\ufeff")  # 去除 UTF-8 BOM
         content = content.replace("\r\n", "\n").replace("\r", "\n")  # 统一换行符
         content = re.sub(r"\n{3,}", "\n\n", content)  # 多个空行合并为两个
+
+        # 归一化装饰性标题行：文库站导出常见「# 第X话」Markdown 前缀与「_第X话_」下划线包裹。
+        # 仅当行核心本身是章节号模式时才剥离装饰，避免误伤正文里引用章节号的行。
+        content = re.sub(rf"(?m)^#{{1,6}}\s+(?=第{_CH_NUMERALS}{_CH_UNIT})", "", content)
+        content = re.sub(rf"(?m)^_+(第{_CH_NUMERALS}{_CH_UNIT}.*?)_+\s*$", r"\1", content)
 
         # 查找所有章节标题位置
         matches = list(CHAPTER_REGEX.finditer(content))
@@ -330,8 +351,20 @@ class NovelService:
             logger.info("未检测到章节标记，按约 %d 字切分全文", _MAX_CHAPTER_CHARS)
             chapters = self._split_by_size(content.strip(), title_prefix="第")
         else:
+            # 合并同一章节的续页：分页站每页重复章节标题，续页标题尾部带 (n/m) 页码。
+            # 比对时忽略空白差异（源文件常见「茱丽叶特 •礼仪」与「茱丽叶特•礼仪」两种排法）
+            headings: List[Tuple[int, str, str]] = []
+            for m in matches:
+                title = _PAGE_SUFFIX_RE.sub("", m.group()).strip()
+                if not title:
+                    continue
+                key = re.sub(r"\s+", "", title)
+                if headings and headings[-1][2] == key:
+                    continue
+                headings.append((m.start(), title, key))
+
             # 处理第一个章节标题前的前言部分（如有）
-            preamble = content[: matches[0].start()].strip()
+            preamble = content[: headings[0][0]].strip()
             if preamble and len(preamble) > 100:  # 前言超过 100 字才单独成章
                 chapters.append(
                     {
@@ -342,19 +375,18 @@ class NovelService:
                 )
 
             # 按标题位置切分各章节
-            for idx, match in enumerate(matches):
-                start = match.start()
+            for idx, (start, title_line, _key) in enumerate(headings):
                 end = (
-                    matches[idx + 1].start() if idx + 1 < len(matches) else len(content)
+                    headings[idx + 1][0] if idx + 1 < len(headings) else len(content)
                 )
 
-                title_line = match.group().strip()
-                body = content[start:end].strip()
+                title = title_line[:100]  # 截断过长标题
+                body = self._strip_page_noise(content[start:end], title_line)
 
                 chapters.append(
                     {
                         "chapter_number": idx + 1,
-                        "title": title_line[:100],  # 截断过长标题
+                        "title": title,
                         "content": body,
                     }
                 )
@@ -373,6 +405,26 @@ class NovelService:
 
         logger.info(f"章节分割完成: 共 {len(chapters)} 章")
         return chapters
+
+    @staticmethod
+    def _strip_page_noise(body: str, title: str) -> str:
+        """剔除分页模板噪音：站点水印行与每页重复的章节标题行（含 (n/m) 续页标头）。
+
+        标题比对忽略空白差异；首处标题行保留，维持「章节正文以标题行开头」的既有行为。
+        """
+        title_key = re.sub(r"\s+", "", title)
+        title_seen = False
+        kept: List[str] = []
+        for line in body.split("\n"):
+            s = line.strip()
+            if s in _WATERMARK_LINES:
+                continue
+            if s and re.sub(r"\s+", "", _PAGE_SUFFIX_RE.sub("", s)) == title_key:
+                if title_seen:
+                    continue
+                title_seen = True
+            kept.append(line)
+        return "\n".join(kept).strip()
 
     def _split_by_size(self, content: str, title_prefix: str = "分段") -> List[dict]:
         """将无标题长文按段落边界切成可读小段。"""
