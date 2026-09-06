@@ -168,8 +168,18 @@ _JSON_CONTRACT_SKILLS = frozenset(
 )
 
 
-def _json_response_format(skill_name: str | None) -> dict[str, str] | None:
-    """分析类 skill 强制 JSON 输出；其余 skill 不约束（问答是散文）。"""
+def _json_response_format(
+    skill_name: str | None, has_tools: bool = False
+) -> dict[str, str] | None:
+    """分析类 skill 强制 JSON 输出；但**带 tools 的轮次绝不强制**。
+
+    OpenAI 兼容 API 在 response_format=json_object 下模型只能输出文本 JSON，
+    原生 tool_calls 被抑制（E2E run 116 实测：wmc 三轮把 search/get_evidence_span
+    写成文本 JSON，内核零执行）。pi 智能体循环每轮都携带 tools，因此护栏仅对
+    无 tools 的请求生效；结构合规仍由 envelope fail-closed + 修复环兜底。
+    """
+    if has_tools:
+        return None
     if skill_name in _JSON_CONTRACT_SKILLS:
         return {"type": "json_object"}
     return None
@@ -338,7 +348,9 @@ async def _non_stream_completion(
             stream=False,
             task_type=deployment.task or "gateway",
             tools=payload.tools,
-            response_format=_json_response_format(deployment.skill_name),
+            response_format=_json_response_format(
+                deployment.skill_name, has_tools=bool(payload.tools)
+            ),
             extra_body=deployment.extra_params,
             api_key=deployment.api_key,
             api_base=deployment.api_base,
@@ -416,7 +428,9 @@ async def _stream_completion(
             model=deployment.model,
             task_type=deployment.task or "gateway",
             tools=payload.tools,
-            response_format=_json_response_format(deployment.skill_name),
+            response_format=_json_response_format(
+                deployment.skill_name, has_tools=bool(payload.tools)
+            ),
             max_tokens=payload.max_tokens or deployment.default_max_tokens or 4096,
             temperature=_json_temperature(
                 deployment.skill_name,
