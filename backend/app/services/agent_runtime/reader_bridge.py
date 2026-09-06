@@ -171,6 +171,17 @@ async def _enqueue_reader_skill_run_in_session(
             job.status_reason = "backfill_unavailable"
             job.error_code = "backfill_unavailable"
             return None
+        runs = await _backfill_runs_for_message(session, job, required)
+        satisfied = _materialized_backfill_dimensions(runs)
+        if set(required) <= satisfied:
+            # 终止守卫：digest 类产物（story_arc）不写域表，重建 manifest 后
+            # 对应证据源依旧不可用；若继续为已满足维度新建 run，每轮 reconcile
+            # 都会触发一次新 run，无限烧预算。backfill 已尽力且产物已物化 →
+            # 诚实失败。
+            job.status = "failed"
+            job.status_reason = "backfill_unavailable"
+            job.error_code = "backfill_unavailable"
+            return None
         await _create_evidence_backfill_runs(session, job, manifest)
         runs = await _backfill_runs_for_message(session, job, required)
         if set(required) - {run.backfill_dimension for run in runs}:
@@ -305,7 +316,33 @@ async def _create_evidence_backfill_runs(
         user_message_id=job.user_message_id,
         question=(await session.get(ReaderMessage, job.user_message_id)).body[:1000],
         unavailable_dimensions=unavailable,
+        chapter_id=await _resolve_question_chapter_anchor(session, job, manifest),
     )
+
+
+async def _resolve_question_chapter_anchor(
+    session: AsyncSession, job: ReaderGenerationJob, manifest: ReaderContextManifest
+) -> int | None:
+    """提问时的章节锚点：优先取消息选区章节，回落阅读进度章节。
+
+    backfill 技能（尤其 build-story-arc）的 allowlist 没有任何能发现章节的
+    工具，run input 不带 chapter_id 时模型只能盲猜 get_chapter id（全部 404），
+    最终零证据 abstain。锚点让 get_chapter/get_evidence_span 有合法入口。
+    """
+    selection_row = await session.scalar(
+        select(ReaderMessageSelection).where(
+            ReaderMessageSelection.user_message_id == job.user_message_id
+        )
+    )
+    if selection_row is not None:
+        return int(selection_row.chapter_id)
+    progress_chapter = (manifest.reading_progress_snapshot or {}).get("chapter_id")
+    if progress_chapter is None:
+        return None
+    try:
+        return int(progress_chapter)
+    except (TypeError, ValueError):
+        return None
 
 
 def _unavailable_dimensions(manifest: ReaderContextManifest) -> list[str]:
@@ -321,6 +358,19 @@ def _backfill_dimensions(unavailable: list[str]) -> tuple[str, ...]:
     from app.services.agent_runtime.backfill import pick_backfill_skills
 
     return tuple(dimension for _, dimension in pick_backfill_skills(unavailable))
+
+
+def _materialized_backfill_dimensions(runs: Iterable[SkillRun]) -> set[str]:
+    """已完成且产物已物化（status_reason=materialized:*）的 backfill 维度。"""
+    satisfied: set[str] = set()
+    for run in runs:
+        if (
+            run.status == "completed"
+            and str(run.status_reason or "").startswith("materialized:")
+            and run.backfill_dimension
+        ):
+            satisfied.add(run.backfill_dimension)
+    return satisfied
 
 
 async def _backfill_runs_for_message(

@@ -132,6 +132,7 @@ async def create_backfill_runs(
     unavailable_dimensions: list[str],
     snapshot_hash: str | None = None,
     cutoff: str | None = None,
+    chapter_id: int | None = None,
 ) -> list[SkillRun]:
     """问答 abstain 后触发 backfill skill runs（幂等、去重）。
 
@@ -221,6 +222,10 @@ async def create_backfill_runs(
             "dimension": dimension,
             "branch": None,
         }
+        if chapter_id is not None:
+            # 章节锚点：backfill 技能 allowlist 无章节发现工具，模型需要合法
+            # 的 get_chapter/get_evidence_span 入口（否则零证据 abstain）。
+            input_payload["chapter_id"] = int(chapter_id)
         if skill_name in _SNAPSHOT_ANCHORED_SKILLS:
             anchor = await _resolve_snapshot_anchor(
                 _SNAPSHOT_ANCHORED_SKILLS[skill_name]
