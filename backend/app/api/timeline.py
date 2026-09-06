@@ -153,7 +153,7 @@ async def start_or_resume(
         from app.models.analysis import AnalysisBudgetLedger
         from app.services.timeline.worker import production_runtime
 
-        policy = production_runtime().budget_policy
+        policy = (await production_runtime()).budget_policy
         ledger = await db.scalar(
             select(AnalysisBudgetLedger).where(AnalysisBudgetLedger.run_id == row.id)
         )

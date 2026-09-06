@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import time
@@ -50,6 +51,9 @@ class ModelDeployment:
     supports_structured_output: bool
     input_price_per_million: Decimal
     output_price_per_million: Decimal
+    # owner 模型配置解析结果携带的直连凭据（仅内存，禁止写入 lineage/审计序列化）
+    api_key: str | None = None
+    base_url: str | None = None
 
     @property
     def resolved_name(self) -> str:
@@ -377,6 +381,7 @@ class PostgresCallRepository:
         *,
         latency_ms: int,
         error_code: str,
+        pause_run: bool = True,
     ) -> None:
         async with self.sessions.begin() as session:
             attempt = await session.get(
@@ -391,7 +396,9 @@ class PostgresCallRepository:
                 if attempt
                 else None
             )
-            if run is not None:
+            # 网关对瞬态错误还有重试预算时不翻 run 状态：未知结果 ≠ 放弃，
+            # 提前置 paused 会让 UI 与实际仍在推进的批跑互相矛盾。
+            if run is not None and pause_run:
                 run.status = "paused_dependency"
                 run.status_reason = "provider_outcome_unknown"
             # 连接失败等未知结果：释放 worst-case 预留，避免 reserved 堆满假预算
@@ -464,6 +471,33 @@ class PostgresCallRepository:
             session.add(attempt)
             await session.flush()
             return attempt
+
+
+# 上游瞬态错误自动重试：有界、退避固定；对 outcome_unknown 的重试存在重复
+# 计费可能，由预算账本上限兜底。
+_TRANSIENT_RETRY_LIMIT = 4
+_TRANSIENT_RETRY_BACKOFF_S = 20.0
+
+
+def _is_transient_provider_error(exc: BaseException) -> bool:
+    """上游瞬态错误（5xx/断连/网关超时）判定。
+
+    按异常类型名判断，避免网关层硬依赖 litellm；认证类、schema 拒绝、
+    预算类错误不在重试之列。
+    """
+    if type(exc).__name__ in {
+        "Timeout",
+        "APIConnectionError",
+        "InternalServerError",
+    }:
+        return True
+    text = str(exc)[:300].lower()
+    return (
+        "timed out" in text
+        or "internal server error" in text
+        or "bad gateway" in text
+        or "overloaded" in text
+    )
 
 
 def _canonical_hash(value: Any) -> str:
@@ -592,7 +626,17 @@ class TimelineModelGateway:
         current_messages = list(messages)
         # repair_index: 本阶段最多 1 次主调用 + 1 次同部署 repair（D-14）
         # durable_attempt_number: PG 持久 attempt 序号，会跨进程递增，不能用来判断是否最后一次 repair
-        for repair_index in (1, 2):
+        # 瞬态上游错误（5xx/断连/网关超时）在同一 repair 轮内有界自动重试：
+        # 长批跑（数百章）不能因上游一次抖动就整体暂停等人工续跑。
+        repair_indexes = iter((1, 2))
+        transient_retries_left = _TRANSIENT_RETRY_LIMIT
+        repair_index: int | None = None
+        while True:
+            if repair_index is None:
+                try:
+                    repair_index = next(repair_indexes)
+                except StopIteration:
+                    break
             reservation_key = f"{stage_key}:repair:{repair_index}"
             request_hash = _canonical_hash(
                 {
@@ -629,22 +673,35 @@ class TimelineModelGateway:
                 )
             started = time.perf_counter()
             try:
+                # owner 配置的直连凭据只进传输层 kwargs，不进 request_hash
+                transport_kwargs: dict[str, Any] = {}
+                if deployment.api_key:
+                    transport_kwargs["api_key"] = deployment.api_key
+                if deployment.base_url:
+                    transport_kwargs["api_base"] = deployment.base_url
                 response = await self.transport.complete(
                     model=deployment.resolved_name,
                     messages=current_messages,
                     response_format=schema,
                     timeout=timeout,
                     num_retries=0,
-                    stream=False,
+                    stream=True,
                     max_tokens=max_output_tokens,
+                    **transport_kwargs,
                 )
             except Exception as exc:
                 latency_ms = int((time.perf_counter() - started) * 1000)
+                # 先决定是否还有瞬态重试预算，再落 attempt 状态：
+                # 会重试时不翻 run 状态（未知结果 ≠ 放弃）
+                will_retry = (
+                    transient_retries_left > 0 and _is_transient_provider_error(exc)
+                )
                 if persistent_attempt is not None:
                     await self.persistence.mark_outcome_unknown(
                         persistent_attempt,
                         latency_ms=latency_ms,
                         error_code=type(exc).__name__,
+                        pause_run=not will_retry,
                     )
                 attempts.append(
                     GatewayAttempt(
@@ -658,6 +715,12 @@ class TimelineModelGateway:
                 )
                 # 保留根因片段，方便前端/运维区分：无 Key、上游 4xx、超时等
                 detail = f"{type(exc).__name__}: {str(exc)[:180]}".replace("\n", " ")
+                if will_retry:
+                    transient_retries_left -= 1
+                    # 不推进 repair 迭代器 → 同一 repair 轮重跑；
+                    # reserve 幂等 / reserve_and_start 会派发新 durable attempt
+                    await asyncio.sleep(_TRANSIENT_RETRY_BACKOFF_S)
+                    continue
                 raise ModelCallFailed(
                     f"provider call outcome is unknown ({detail})",
                     attempts,
@@ -730,6 +793,7 @@ class TimelineModelGateway:
                         ),
                     }
                 ]
+                repair_index = None
                 continue
 
             latency_ms = int((time.perf_counter() - started) * 1000)

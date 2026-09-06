@@ -10,6 +10,7 @@
       ...
 """
 
+from decimal import Decimal
 from typing import Any
 from pydantic import AliasChoices, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings
@@ -71,6 +72,16 @@ class Settings(BaseSettings):
     # 全局回退仅用于尚未绑定 owner 模型配置的后台任务。
     chat_provider: str = "openai"
     default_chat_model: str = "gpt-4o-mini"
+    # 时间线分析 worker 直连部署的计价（每百万 token，USD）——模型换成非
+    # gpt-4o-mini 时必须同步调整，否则预算账本失真。
+    analysis_input_price_per_million: Decimal = Decimal("0.15")
+    analysis_output_price_per_million: Decimal = Decimal("0.60")
+    # litellm 注册表不认识的模型（自定义端点）会被判不支持 structured output
+    # 而直接拦截；端点实测支持 json_schema 时用此开关放行。
+    analysis_force_structured_output: bool = False
+    # 单次模型调用客户端超时（秒）。整章提取的生成时长可超过默认 60s，
+    # 慢端点（如 zen 深度批量）需调大。
+    analysis_call_timeout: float = 60.0
     # 访问外部 AI API 的出站代理；留空则读 HTTPS_PROXY 环境变量。
     https_proxy: str = ""
     ollama_base_url: str = "http://localhost:11434"  # 本地 Ollama 服务地址

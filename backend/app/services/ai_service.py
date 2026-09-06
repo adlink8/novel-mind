@@ -103,6 +103,10 @@ def _sync_provider_env_keys() -> None:
         os.environ.setdefault("GOOGLE_API_KEY", settings.gemini_api_key)
     if settings.openai_api_key:
         os.environ.setdefault("OPENAI_API_KEY", settings.openai_api_key)
+    # base_url 也必须同步：timeline 分析 worker 的 litellm 调用不传 api_base，
+    # 只认 OPENAI_BASE_URL 环境变量；不同步会打到 api.openai.com 而非自定义端点。
+    if settings.openai_base_url:
+        os.environ.setdefault("OPENAI_BASE_URL", settings.openai_base_url)
     if settings.anthropic_api_key:
         os.environ.setdefault("ANTHROPIC_API_KEY", settings.anthropic_api_key)
 

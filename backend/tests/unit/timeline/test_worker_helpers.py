@@ -109,11 +109,156 @@ async def test_litellm_transport_plain_usage_namespace():
 def test_production_runtime_uses_configured_litellm_provider(monkeypatch):
     monkeypatch.setattr("app.config.settings.chat_provider", "gemini")
     monkeypatch.setattr("app.config.settings.default_chat_model", "gemini-2.5-flash")
-    runtime = production_runtime()
+    runtime = _run(production_runtime())
     assert runtime.extraction_deployment.provider == "gemini"
     assert runtime.extraction_deployment.model_id == "gemini-2.5-flash"
     assert isinstance(runtime.gateway.transport, _LiteLLMTransport)
     assert runtime.extraction_prompt
+
+
+def _run(coro):
+    import asyncio
+
+    return asyncio.run(coro)
+
+
+def test_production_runtime_prefers_owner_default_model_config(monkeypatch):
+    from app.services.reader_chat.worker import ModelDeployment as OwnedDeployment
+
+    monkeypatch.setattr("app.config.settings.chat_provider", "openai")
+    monkeypatch.setattr("app.config.settings.default_chat_model", "gpt-4o-mini")
+    monkeypatch.setattr(
+        "app.config.settings.analysis_input_price_per_million", Decimal("0.14")
+    )
+    monkeypatch.setattr(
+        "app.config.settings.analysis_output_price_per_million", Decimal("0.28")
+    )
+
+    async def fake_resolve(*, owner_id, **kwargs):
+        assert owner_id == 2
+        return OwnedDeployment(
+            provider="custom",
+            model_id="deepseek-v4-flash",
+            revision="ai_model_config:13",
+            supports_structured_output=True,
+            input_price_per_million=Decimal("0.15"),
+            output_price_per_million=Decimal("0.60"),
+            config_id=13,
+            api_key="owned-key",
+            base_url="https://opencode.ai/zen/go/v1",
+        )
+
+    monkeypatch.setattr(
+        "app.services.reader_chat.worker.resolve_reader_chat_deployment",
+        fake_resolve,
+    )
+
+    runtime = _run(production_runtime(owner_id=2))
+    deployment = runtime.extraction_deployment
+    # custom 协议映射为 litellm 认识的 openai 兼容名
+    assert deployment.provider == "openai"
+    assert deployment.model_id == "deepseek-v4-flash"
+    assert deployment.revision == "ai_model_config:13"
+    assert deployment.supports_structured_output is True
+    # 计价用分析 worker 的 settings（而非 reader chat 的硬编码价）
+    assert deployment.input_price_per_million == Decimal("0.14")
+    assert deployment.output_price_per_million == Decimal("0.28")
+    # 凭据只在部署对象上，等待网关传入传输层
+    assert deployment.api_key == "owned-key"
+    assert deployment.base_url == "https://opencode.ai/zen/go/v1"
+
+
+def test_production_runtime_owner_config_failure_pauses_honestly(monkeypatch):
+    """owner 配置存在但有毛病 → 带原因暂停，禁止静默回落 env（重演糊涂账）。"""
+    from app.services.reader_chat.gateway import (
+        DependencyPaused as ReaderDependencyPaused,
+    )
+    from app.services.timeline.model_gateway import DependencyPaused
+
+    async def fake_resolve(*, owner_id, **kwargs):
+        raise ReaderDependencyPaused("owner_default_model_api_key_missing")
+
+    monkeypatch.setattr(
+        "app.services.reader_chat.worker.resolve_reader_chat_deployment",
+        fake_resolve,
+    )
+
+    with pytest.raises(DependencyPaused) as excinfo:
+        _run(production_runtime(owner_id=2))
+    assert "owner_default_model_api_key_missing" in str(excinfo.value)
+
+
+def test_production_runtime_env_fallback_without_owner_honors_schema_override(
+    monkeypatch,
+):
+    """owner_id=None（无 run 上下文）才走 env 回退；未知模型靠开关放行。"""
+    monkeypatch.setattr("app.config.settings.chat_provider", "openai")
+    monkeypatch.setattr(
+        "app.config.settings.default_chat_model", "deepseek-v4-flash"
+    )
+    monkeypatch.setattr(
+        "app.config.settings.analysis_force_structured_output", True
+    )
+
+    runtime = _run(production_runtime())
+    deployment = runtime.extraction_deployment
+    assert deployment.provider == "openai"
+    assert deployment.model_id == "deepseek-v4-flash"
+    # litellm 注册表不认识该模型，靠开关放行 structured output
+    assert deployment.supports_structured_output is True
+    assert deployment.api_key is None
+
+
+# ---------------------------------------------------------------------------
+# _LiteLLMTransport streaming accumulation
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_litellm_transport_accumulates_stream(monkeypatch):
+    from types import SimpleNamespace as NS
+
+    chunks = [
+        NS(id="c-1", choices=[NS(delta=NS(content="hel"))], usage=None),
+        NS(id="c-1", choices=[NS(delta=NS(content="lo"))], usage=None),
+        NS(
+            id="c-1",
+            choices=[NS(delta=NS(content=None))],
+            usage=NS(model_dump=lambda: {"prompt_tokens": 5, "completion_tokens": 2}),
+        ),
+    ]
+
+    class _FakeAsyncStream:
+        def __aiter__(self):
+            async def _gen():
+                for chunk in chunks:
+                    yield chunk
+
+            return _gen()
+
+    captured = {}
+
+    async def fake_acompletion(**kwargs):
+        captured.update(kwargs)
+        return _FakeAsyncStream()
+
+    import litellm
+
+    monkeypatch.setattr(litellm, "acompletion", fake_acompletion)
+
+    transport = _LiteLLMTransport()
+    out = await transport.complete(
+        model="openai/deepseek-v4-flash",
+        messages=[{"role": "user", "content": "x"}],
+        stream=False,
+    )
+    # 传输层强制流式并请求 usage，调用方无感
+    assert captured["stream"] is True
+    assert captured["stream_options"] == {"include_usage": True}
+    assert out["content"] == "hello"
+    assert out["id"] == "c-1"
+    assert out["usage"]["prompt_tokens"] == 5
+    assert out["usage"]["completion_tokens"] == 2
 
 
 # ---------------------------------------------------------------------------

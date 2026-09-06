@@ -106,7 +106,18 @@ __all__ = [
 
 async def dispatch_timeline_run(run_id: int) -> None:
     """BackgroundTasks entrypoint; durable checkpoints make repeated dispatch safe."""
-    await run_timeline_worker(run_id, runtime=production_runtime())
+    owner_id = await _load_run_owner(run_id)
+    runtime = await production_runtime(owner_id=owner_id)
+    await run_timeline_worker(run_id, runtime=runtime)
+
+
+async def _load_run_owner(run_id: int) -> int | None:
+    from app.core.database import async_session_factory
+
+    async with async_session_factory() as session:
+        return await session.scalar(
+            select(AnalysisRun.owner_id).where(AnalysisRun.id == run_id)
+        )
 
 
 async def run_timeline_worker(run_id: int, *, runtime: TimelineWorkerRuntime) -> None:
@@ -222,6 +233,8 @@ async def _extract_and_persist(runtime, budget, run, version, build, chapter) ->
                 artifact_checksum=cached.artifact_checksum,
             )
     if output is None:
+        from app.config import settings
+
         result = await runtime.gateway.generate(
             deployment=runtime.extraction_deployment,
             schema=TimelineExtraction,
@@ -254,6 +267,7 @@ async def _extract_and_persist(runtime, budget, run, version, build, chapter) ->
             run_id=run.id,
             stage_key=stage_key,
             cache_key=cache_key.digest,
+            timeout=settings.analysis_call_timeout,
             # 证据全文 + JSON schema/system 开销；实测单章可到 60k+ prompt tokens
             max_input_tokens=min(
                 200_000,

@@ -196,6 +196,8 @@ async def _reconcile_and_persist(runtime, budget, run, version) -> None:
             causal_edges=[],
         )
     if gateway_output is None:
+        from app.config import settings
+
         try:
             gateway_result = await runtime.gateway.generate(
                 deployment=runtime.reconciliation_deployment,
@@ -208,6 +210,7 @@ async def _reconcile_and_persist(runtime, budget, run, version) -> None:
                 run_id=run.id,
                 stage_key=stage_key,
                 cache_key=cache_key,
+                timeout=settings.analysis_call_timeout,
                 max_input_tokens=max(
                     32_768,
                     sum(len(event.description) for event in candidates) * 2 + 24_000,
