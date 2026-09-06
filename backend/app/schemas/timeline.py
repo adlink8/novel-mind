@@ -36,7 +36,10 @@ class EvidenceRef(StrictTimelineModel):
     evidence_id: str = Field(min_length=1, max_length=80)
     source_start: int = Field(ge=0)
     source_end: int = Field(gt=0)
-    content_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    # 不做 64hex pattern 校验：本字段在 rebind_extraction_to_package 中由
+    # Phase 07 包权威覆写（模型逐字节复述长随机 hash 已被证实不可靠，见
+    # rebind docstring），validate_extraction 在 rebind 后做终审比对。
+    content_hash: str = Field(min_length=1, max_length=80)
 
     @model_validator(mode="after")
     def validate_offsets(self) -> "EvidenceRef":

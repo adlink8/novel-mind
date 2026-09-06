@@ -132,7 +132,7 @@ def test_cache_key_contains_every_frozen_identity_component():
 @pytest.mark.asyncio
 async def test_invalid_output_is_not_cached_or_published():
     p = package()
-    transport = FakeTransport('{"events":[],"unexpected":true}')
+    transport = FakeTransport('{"events":[{"candidate_id":null}]}')
     store = InMemoryExtractionStore()
     with pytest.raises(Exception):
         await extractor(transport, store).extract(run_id=1, version_id=2, package=p)

@@ -229,7 +229,7 @@ async def test_gateway_uses_strict_validation_and_one_persisted_repair(db_sessio
     sessions = async_sessionmaker(db_session.bind, expire_on_commit=False)
     # TimelineExtraction 校验前会做轻度 coerce（宽容常见供应商偏差），
     # 因此用 schema 未声明的多余字段（extra="forbid"）触发真正的 schema_rejected。
-    invalid = '{"events": [], "unexpected": true}'
+    invalid = '{"events": [{"candidate_id": null}]}'
     transport = RecordingTransport(
         [
             {"id": "bad", "content": invalid, "usage": {}},

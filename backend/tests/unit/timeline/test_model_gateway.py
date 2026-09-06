@@ -287,7 +287,7 @@ async def test_capability_failure_pauses_before_network_or_budget():
 async def test_local_validation_allows_exactly_one_independently_reserved_repair():
     transport = FakeTransport(
         [
-            {"content": '{"events": [], "unexpected": true}', "usage": {}},
+            {"content": '{"events": [{"candidate_id": null}]}', "usage": {}},
             {"content": VALID, "usage": {"input_tokens": 8, "output_tokens": 3}},
         ]
     )

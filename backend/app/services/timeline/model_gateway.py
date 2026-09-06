@@ -5,8 +5,10 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import re
 import time
 from dataclasses import dataclass, field
+from datetime import datetime
 from decimal import Decimal
 from typing import Any, Callable, Generic, Protocol, TypeVar
 
@@ -515,8 +517,95 @@ def _response_content(response: Any) -> str:
     raise ValueError("provider response has no textual structured content")
 
 
+_EVENT_KEYS = frozenset(
+    {
+        "candidate_id",
+        "title",
+        "description",
+        "event_type",
+        "narrative_chapter_number",
+        "narrative_index",
+        "participants",
+        "story_time",
+        "evidence",
+        "confidence",
+    }
+)
+_PARTICIPANT_KEYS = frozenset({"mention", "entity_id"})
+_REF_KEYS = frozenset(
+    {"chapter_id", "evidence_id", "source_start", "source_end", "content_hash"}
+)
+_CONSTRAINT_KEYS = frozenset(
+    {"source_candidate_id", "target_candidate_id", "relation", "evidence_ids"}
+)
+_STORY_TIME_KEYS = frozenset(
+    {"precision", "expression", "exact_time", "anchor_event_id", "relation",
+     "fuzzy_start", "fuzzy_end"}
+)
+# 每个 precision 下禁止出现的字段（对齐 StoryTime.validate_precision_shape）；
+# 模型常残留冲突字段，coerce 层直接置空，避免整章 schema_rejected。
+_FORBIDDEN_STORY_TIME_FIELDS = {
+    "exact": ("anchor_event_id", "relation", "fuzzy_start", "fuzzy_end"),
+    "relative": ("exact_time", "fuzzy_start", "fuzzy_end"),
+    "fuzzy": ("exact_time", "anchor_event_id", "relation"),
+    "unknown": (
+        "exact_time", "anchor_event_id", "relation", "fuzzy_start", "fuzzy_end",
+    ),
+}
+# rebind 会用包权威值覆写 content_hash；占位只为通过长度约束。
+_HASH_PLACEHOLDER = "0" * 64
+
+
+def _loose_iso_datetime(value: Any) -> str | None:
+    """把模型常见的时间表述规范为 pydantic 可解析的 ISO 字符串；失败返回 None。"""
+    if not isinstance(value, str):
+        return None
+    text = value.strip()
+    if not text:
+        return None
+    # "1976/01/01" → "1976-01-01"；"1976-01-01 12:00:00" pydantic 本身可解析
+    text = text.replace("/", "-")
+    try:
+        datetime.fromisoformat(text)
+        return text
+    except ValueError:
+        pass
+    # 中文日期："1976年1月1日" / "1976年1月1日12点30分"
+    match = re.match(
+        r"^(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日?(?:\s*(\d{1,2})[点时:：]"
+        r"(\d{1,2})分?)?$",
+        text,
+    )
+    if match:
+        year, month, day, hour, minute = match.groups()
+        try:
+            datetime(
+                int(year), int(month), int(day),
+                int(hour or 0), int(minute or 0),
+            )
+        except ValueError:
+            return None
+        base = f"{year}-{int(month):02d}-{int(day):02d}"
+        if hour:
+            return f"{base}T{int(hour):02d}:{int(minute or 0):02d}:00"
+        return base
+    return None
+
+
+def _trim_keys(payload: Any, allowed: frozenset[str]) -> None:
+    """白名单裁剪：extra="forbid" 下模型多吐的任何字段都会炸校验，直接丢弃。"""
+    if isinstance(payload, dict):
+        for key in list(payload):
+            if key not in allowed:
+                del payload[key]
+
+
 def _coerce_timeline_json_blob(content: str) -> str:
-    """模型输出可能在 story_time/evidence 上略松；校验前做最小安全修正。"""
+    """模型输出可能在 story_time/evidence 上略松；校验前做最小安全修正。
+
+    原则：脚本只信 evidence_id（rebind 权威覆写 offsets/hash/chapter），
+    因此对模型回填的 hash/offsets 做占位与修正都是安全的。
+    """
     text = (content or "").strip()
     if text.startswith("```"):
         text = text.removeprefix("```json").removeprefix("```JSON").removeprefix("```")
@@ -527,42 +616,80 @@ def _coerce_timeline_json_blob(content: str) -> str:
         return text
     if not isinstance(data, dict):
         return text
+    _trim_keys(data, frozenset({"events", "story_time_constraints"}))
     events = data.get("events")
     if not isinstance(events, list):
         return text
     for event in events:
         if not isinstance(event, dict):
             continue
+        _trim_keys(event, _EVENT_KEYS)
+        participants = event.get("participants")
+        if isinstance(participants, list):
+            for participant in participants:
+                _trim_keys(participant, _PARTICIPANT_KEYS)
         st = event.get("story_time")
         if isinstance(st, dict):
+            _trim_keys(st, _STORY_TIME_KEYS)
             precision = (st.get("precision") or "unknown").lower()
-            if precision == "relative":
+            if precision == "exact":
+                iso = _loose_iso_datetime(st.get("exact_time"))
+                if iso is not None:
+                    st["exact_time"] = iso
+                else:
+                    st = {"precision": "unknown"}
+                    event["story_time"] = st
+            elif precision == "fuzzy":
+                start_ok = _loose_iso_datetime(st.get("fuzzy_start"))
+                end_ok = _loose_iso_datetime(st.get("fuzzy_end"))
+                if start_ok is not None:
+                    st["fuzzy_start"] = start_ok
+                if end_ok is not None:
+                    st["fuzzy_end"] = end_ok
+                if st.get("fuzzy_start") is not None and start_ok is None:
+                    st["fuzzy_start"] = None
+                if st.get("fuzzy_end") is not None and end_ok is None:
+                    st["fuzzy_end"] = None
+            if st.get("precision") == "relative":
                 if not (
                     st.get("expression")
                     and st.get("anchor_event_id")
                     and st.get("relation")
                 ):
                     event["story_time"] = {"precision": "unknown"}
-            elif precision == "exact":
+            elif st.get("precision") == "exact":
                 if not (st.get("expression") and st.get("exact_time")):
                     event["story_time"] = {"precision": "unknown"}
-            elif precision == "fuzzy":
+            elif st.get("precision") == "fuzzy":
                 if not st.get("expression"):
                     event["story_time"] = {"precision": "unknown"}
-            elif precision not in {"exact", "relative", "fuzzy", "unknown"}:
+            elif st.get("precision") not in {"exact", "relative", "fuzzy", "unknown"}:
                 event["story_time"] = {"precision": "unknown"}
+            # 无论哪种 precision，剥离该档位禁止的字段：模型残留的冲突
+            # 字段会触发 validate_precision_shape 而整章被拒
+            for forbidden in _FORBIDDEN_STORY_TIME_FIELDS.get(
+                st.get("precision"), ()
+            ):
+                st[forbidden] = None
         # offsets/content_hash 不在此伪造：由 rebind_extraction_to_package 用 Phase07 包权威覆写
         evidence = event.get("evidence")
         if isinstance(evidence, list):
             for ref in evidence:
                 if not isinstance(ref, dict):
                     continue
+                _trim_keys(ref, _REF_KEYS)
+                if not isinstance(ref.get("content_hash"), str) or not ref["content_hash"]:
+                    ref["content_hash"] = _HASH_PLACEHOLDER
                 try:
                     if int(ref.get("source_end", 0)) <= int(ref.get("source_start", 0)):
                         ref["source_end"] = int(ref.get("source_start", 0)) + 1
                 except (TypeError, ValueError):
                     ref["source_start"] = 0
                     ref["source_end"] = 1
+    constraints = data.get("story_time_constraints")
+    if isinstance(constraints, list):
+        for constraint in constraints:
+            _trim_keys(constraint, _CONSTRAINT_KEYS)
     if "story_time_constraints" not in data or data["story_time_constraints"] is None:
         data["story_time_constraints"] = []
     return json.dumps(data, ensure_ascii=False)
@@ -744,6 +871,12 @@ class TimelineModelGateway:
             except (ValidationError, ValueError) as exc:
                 response_hash = _canonical_hash(response)
                 latency_ms = int((time.perf_counter() - started) * 1000)
+                # 错误摘要进 error_code（列宽 80）：只存类名时无法事后定位
+                # 是 hash pattern / datetime / extra 字段哪一环炸的
+                reject_detail = str(exc).replace("\n", " ")
+                reject_code = (
+                    f"{type(exc).__name__}: {reject_detail}"[:80]
+                )
                 if persistent_attempt is not None:
                     await self.persistence.complete_attempt(
                         persistent_attempt,
@@ -753,7 +886,7 @@ class TimelineModelGateway:
                         usage=usage,
                         cost_usd=actual_cost,
                         latency_ms=latency_ms,
-                        error_code=type(exc).__name__,
+                        error_code=reject_code,
                     )
                 else:
                     budget.settle(
