@@ -50,6 +50,8 @@ class TimelineWorkerRuntime:
             max_cost_usd=Decimal("200"),
         )
     )
+    # 按章并发提取路数；章节间零依赖，预算/审计由 PG 行锁串行化兜底
+    chapter_concurrency: int = 4
 
 
 class _LiteLLMTransport:
@@ -129,6 +131,7 @@ async def production_runtime(
         extraction_deployment=deployment,
         reconciliation_deployment=deployment,
         extraction_prompt=_load_prompt(),
+        chapter_concurrency=max(1, settings.analysis_chapter_concurrency),
     )
 
 

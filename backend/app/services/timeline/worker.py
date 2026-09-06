@@ -96,6 +96,7 @@ __all__ = [
     "_reconcile_and_persist",
     # orchestration stages owned by this module
     "_extract_and_persist",
+    "_extract_chapters_concurrently",
     "_validate_and_promote",
     "_dispatch_dependent_analysis",
     "_update_progress",
@@ -128,13 +129,16 @@ async def run_timeline_worker(run_id: int, *, runtime: TimelineWorkerRuntime) ->
         run, version, build, chapters = await _prepare_run(runtime, run_id)
         await _raise_if_cancel_requested(runtime.sessions, run_id)
         budget = BudgetGate(runtime.budget_policy)
-        for completed, chapter in enumerate(chapters, start=1):
-            await _extract_and_persist(runtime, budget, run, version, build, chapter)
-            await _raise_if_cancel_requested(runtime.sessions, run_id)
-            await _update_progress(
-                runtime.sessions, run.id, completed, len(chapters), "extracting"
+        if chapters:
+            # 角色注册表全书只读：并发前加载一次，共享给所有章节提取
+            #（原实现每章重复查询一次，并发后既浪费连接又无必要）。
+            character_registry = await _load_character_registry(
+                runtime.sessions, run.novel_id
             )
-        await _raise_if_cancel_requested(runtime.sessions, run_id)
+            await _extract_chapters_concurrently(
+                runtime, budget, run, version, build, chapters, character_registry
+            )
+            await _raise_if_cancel_requested(runtime.sessions, run_id)
         await _reconcile_and_persist(runtime, budget, run, version)
         await _raise_if_cancel_requested(runtime.sessions, run_id)
         await _validate_and_promote(runtime.sessions, run, version)
@@ -155,7 +159,68 @@ async def run_timeline_worker(run_id: int, *, runtime: TimelineWorkerRuntime) ->
         raise
 
 
-async def _extract_and_persist(runtime, budget, run, version, build, chapter) -> None:
+async def _extract_chapters_concurrently(
+    runtime, budget, run, version, build, chapters, character_registry
+) -> None:
+    """按章并发提取（Semaphore 限流），首失败协作式熔断其余章节。
+
+    章节间零数据依赖：各自读自己的 evidence 节点、写自己的 stage_key，
+    预算预留/审计在 PostgresCallRepository 内以 FOR UPDATE 行锁串行化。
+
+    取消语义：不用 TaskGroup 硬取消——在途任务可能正持有 DB 连接执行语句，
+    mid-statement 强杀会留下损坏的连接状态（SQLite StaticPool 单连接下
+    直接击穿测试；生产 asyncpg 也会白白丢弃在途调用）。改为首失败置
+    abort 事件，其余章节在各自的检查点（_extract_and_persist 内多处
+    _raise_if_cancel_requested + 本函数的 acquire 前置检查）主动短路；
+    在途 LLM 调用自然跑完（≤ 单次调用超时），结果在 persist 前被丢弃。
+    异常语义对齐原串行循环：首个失败原样上抛，由 run_timeline_worker
+    的 except 链落 paused/failed/cancelled 状态。
+    """
+    semaphore = asyncio.Semaphore(max(1, runtime.chapter_concurrency))
+    total = len(chapters)
+    completed = 0
+    progress_lock = asyncio.Lock()
+    abort = asyncio.Event()
+    error_lock = asyncio.Lock()
+    first_error: BaseException | None = None
+
+    async def _one(chapter) -> None:
+        nonlocal completed, first_error
+        try:
+            if abort.is_set():
+                return
+            async with semaphore:
+                if abort.is_set():
+                    return
+                await _extract_and_persist(
+                    runtime,
+                    budget,
+                    run,
+                    version,
+                    build,
+                    chapter,
+                    character_registry=character_registry,
+                )
+        except BaseException as exc:
+            async with error_lock:
+                if not abort.is_set():
+                    first_error = exc
+                    abort.set()
+            return
+        # 进度更新不占并发槽位；行锁保证多路同时 +1 不丢计数
+        async with progress_lock:
+            completed += 1
+            done = completed
+        await _update_progress(runtime.sessions, run.id, done, total, "extracting")
+
+    await asyncio.gather(*(asyncio.create_task(_one(ch)) for ch in chapters))
+    if first_error is not None:
+        raise first_error
+
+
+async def _extract_and_persist(
+    runtime, budget, run, version, build, chapter, *, character_registry=None
+) -> None:
     stage_key = f"chapter_extract:{chapter.id}"
     async with runtime.sessions() as session:
         stage = await session.scalar(
@@ -186,7 +251,10 @@ async def _extract_and_persist(runtime, budget, run, version, build, chapter) ->
     if not nodes:
         raise DependencyPaused(f"chapter {chapter.id} has no Phase 07 evidence")
     await _raise_if_cancel_requested(runtime.sessions, run.id)
-    character_registry = await _load_character_registry(runtime.sessions, run.novel_id)
+    if character_registry is None:
+        character_registry = await _load_character_registry(
+            runtime.sessions, run.novel_id
+        )
     package = EvidencePackage.create(
         owner_id=run.owner_id,
         novel_id=run.novel_id,

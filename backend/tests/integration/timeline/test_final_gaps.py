@@ -166,6 +166,9 @@ def _runtime(db_session, transport: FinalGapTransport) -> TimelineWorkerRuntime:
         ),
         extraction_deployment=_deployment("balanced-qualified"),
         reconciliation_deployment=_deployment("quality-qualified"),
+        # 内存 SQLite = StaticPool 单连接，无法多路复用并发会话；
+        # 并发编排语义由 tests/unit 的 fake 编排测试覆盖。
+        chapter_concurrency=1,
     )
 
 

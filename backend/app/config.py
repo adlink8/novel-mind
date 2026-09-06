@@ -82,6 +82,10 @@ class Settings(BaseSettings):
     # 单次模型调用客户端超时（秒）。整章提取的生成时长可超过默认 60s，
     # 慢端点（如 zen 深度批量）需调大。
     analysis_call_timeout: float = 60.0
+    # 时间线 worker 按章并发提取的路数。章节间零数据依赖，预算预留走
+    # DB 行锁串行化，并发安全；调太大会触发上游限流，4-6 是社区经验值
+    # （GraphRAG 对限流供应商推荐 concurrent_requests: 3-10）。
+    analysis_chapter_concurrency: int = 4
     # 访问外部 AI API 的出站代理；留空则读 HTTPS_PROXY 环境变量。
     https_proxy: str = ""
     ollama_base_url: str = "http://localhost:11434"  # 本地 Ollama 服务地址

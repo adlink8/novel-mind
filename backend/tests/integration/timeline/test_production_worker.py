@@ -193,6 +193,9 @@ async def test_first_entry_runs_durable_pipeline_and_repeat_entry_is_idempotent(
         ),
         extraction_deployment=_deployment("balanced-qualified"),
         reconciliation_deployment=_deployment("quality-qualified"),
+        # 内存 SQLite = StaticPool 单连接，无法多路复用并发会话；
+        # 并发编排语义由 tests/unit 的 fake 编排测试覆盖。
+        chapter_concurrency=1,
     )
     dependent_dispatches: list[tuple[int, int, int]] = []
 
@@ -309,6 +312,9 @@ async def test_resume_skips_completed_chapter_after_interruption(
         ),
         extraction_deployment=_deployment("balanced-qualified"),
         reconciliation_deployment=_deployment("quality-qualified"),
+        # 内存 SQLite = StaticPool 单连接，无法多路复用并发会话；
+        # 并发编排语义由 tests/unit 的 fake 编排测试覆盖。
+        chapter_concurrency=1,
     )
 
     async def dispatch(run_id: int) -> None:
@@ -350,6 +356,9 @@ async def test_invalid_reconciliation_falls_back_to_deterministic_pass_through(
         ),
         extraction_deployment=_deployment("balanced-qualified"),
         reconciliation_deployment=_deployment("quality-qualified"),
+        # 内存 SQLite = StaticPool 单连接，无法多路复用并发会话；
+        # 并发编排语义由 tests/unit 的 fake 编排测试覆盖。
+        chapter_concurrency=1,
     )
 
     dependent_dispatches: list[tuple[int, int, int]] = []
