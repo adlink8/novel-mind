@@ -47,6 +47,7 @@ function makePollerDeps(opts?: {
   toolResults?: unknown[];
   emitToolStarts?: number;
   repairTexts?: string[];
+  hangPrompt?: boolean;
 }): {
   deps: PollerDeps;
   session: {
@@ -66,8 +67,16 @@ function makePollerDeps(opts?: {
   const messages = [...(opts?.toolResults ?? []), assistant];
   let listener: ((event: { type?: string }) => void) | undefined;
   let promptCalls = 0;
+  let hangResolve: (() => void) | undefined;
   const session = {
     prompt: vi.fn(async () => {
+      if (opts?.hangPrompt) {
+        // 模拟会话整体挂起（E2E run 117 僵尸 running 场景）。
+        await new Promise<void>((resolve) => {
+          hangResolve = resolve;
+        });
+        return;
+      }
       promptCalls += 1;
       const n = opts?.emitToolStarts ?? 0;
       for (let k = 0; k < n; k += 1) listener?.({ type: "tool_execution_start" });
@@ -86,7 +95,9 @@ function makePollerDeps(opts?: {
       }
     }),
     messages,
-    abort: vi.fn(async () => undefined),
+    abort: vi.fn(async () => {
+      hangResolve?.();
+    }),
     subscribe: vi.fn((fn: (event: { type?: string }) => void) => {
       listener = fn;
       return () => undefined;
@@ -432,7 +443,169 @@ describe("createPoller", () => {
     expect(finals[0].envelope.schema_version).toBe("world-model-candidate.v1");
     expect(finals[0].envelope.candidates.claims.length).toBe(1);
     expect(finals[0].envelope.evidence_refs).toEqual([evidenceKey]);
+    // wmc 的 strict wire schema 禁止 tool_runs（E2E run 118 实测）。
+    expect(finals[0].envelope.tool_runs).toBeUndefined();
   });
+
+  it("build-story-arc backfill finalizes story_arc envelope", async () => {
+    // build-story-arc 是 digest-only 分析技能（materialize 不写域表），但
+    // 信封仍须由 builder 权威合并 lineage；模型只产 outline/mainline 候选
+    // 与 evidence_refs。此前缺 spec → "no envelope builder" 永远失败。
+    const spanHash = "2".repeat(64);
+    const evidenceKey = `qp:1:0:40:${spanHash}`;
+    const { deps, session } = makePollerDeps({
+      lastText: JSON.stringify({
+        type: "story_arc",
+        schema_version: "story-arc.v1",
+        evidence_refs: [evidenceKey],
+        outline_candidate: {
+          schema_version: "outline-candidate.v1",
+          arcs: [{ arc_key: "arc-1", title: "开局弧", summary: "主角确立目标" }],
+          covered_ranges: [{ chapter_min: 1, chapter_max: 1 }],
+          gaps: [],
+          overlaps: [],
+        },
+        mainline_candidate: {
+          volumes: [],
+          global_projection: { summary: "主线：寻找使者" },
+        },
+      }),
+      toolResults: [
+        {
+          role: "toolResult",
+          toolName: "get_evidence_span",
+          isError: false,
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                evidence_key: evidenceKey,
+                chapter_id: 1,
+                chapter_number: 1,
+                novel_id: 6,
+                source_start: 0,
+                source_end: 40,
+                content_hash: spanHash,
+                excerpt: "林安出发寻找使者",
+              }),
+            },
+          ],
+        },
+      ],
+    });
+    const fetchMock = deps.fetchImpl as ReturnType<typeof vi.fn>;
+    installBackendMock(fetchMock, { skillName: "build-story-arc" });
+
+    const poller = createPoller(deps, [], { intervalMs: 10 });
+    const stop = poller.start();
+    await new Promise((r) => setTimeout(r, 50));
+    stop();
+
+    const finals = finalizeCalls(fetchMock);
+    expect(finals.length).toBe(1);
+    expect(finals[0].envelope.type).toBe("story_arc");
+    expect(finals[0].envelope.schema_version).toBe("story-arc.v1");
+    expect(finals[0].envelope.outline_candidate.arcs.length).toBe(1);
+    expect(finals[0].envelope.mainline_candidate.global_projection.summary).toBe(
+      "主线：寻找使者",
+    );
+    expect(finals[0].envelope.evidence_refs).toEqual([evidenceKey]);
+    expect(finals[0].envelope.owner_id).toBe(2);
+    expect(finals[0].envelope.novel_id).toBe(6);
+    expect(finals[0].envelope.input_hash).toBe("a".repeat(64));
+    // StoryArcArtifact 要求 tool_runs min 1（来自 Pi runtime transcript）。
+    expect(Array.isArray(finals[0].envelope.tool_runs)).toBe(true);
+    // story-arc 无 search 工具：证据提示应指向 chapter 锚点路径。
+    const storyPrompt = String(session.prompt.mock.calls[0][0]);
+    expect(storyPrompt).toContain("运行输入");
+    expect(storyPrompt).toContain("章节锚点");
+    expect(storyPrompt).not.toContain("search_novel_text 最多 4 次");
+  });
+
+  it("analysis skill 的运行输入注入首条 prompt（模型可读取 novel_id 等）", async () => {
+    // 根因修复：backfill run 的冻结 input（novel_id/question/dimension）此前
+    // 从不进入模型上下文，SKILL.md 要求"从运行输入读取 novel_id"无从谈起。
+    const { deps, session } = makePollerDeps({
+      lastText: JSON.stringify({
+        type: "world_model_candidate",
+        schema_version: "world-model-candidate.v1",
+        candidates: {
+          projection_version: 1,
+          tool_runs: [],
+          claims: [
+            {
+              claim_kind: "character_state",
+              claim_key: "cs-1",
+              proposition: "林安的目标是找到使者。",
+              subject: "林安",
+              authority: "literary_interpretation",
+              confidence: 0.7,
+              disclosure_cutoff: 1,
+              evidence_refs: ["qp:1:0:40:" + "1".repeat(64)],
+            },
+          ],
+        },
+      }),
+      toolResults: [
+        {
+          role: "toolResult",
+          toolName: "get_evidence_span",
+          isError: false,
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                evidence_key: "qp:1:0:40:" + "1".repeat(64),
+                chapter_id: 1,
+                chapter_number: 1,
+                novel_id: 6,
+                source_start: 0,
+                source_end: 40,
+                content_hash: "1".repeat(64),
+                excerpt: "林安出发寻找使者",
+              }),
+            },
+          ],
+        },
+      ],
+    });
+    const fetchMock = deps.fetchImpl as ReturnType<typeof vi.fn>;
+    installBackendMock(fetchMock, {
+      skillName: "propose-world-model-candidates",
+    });
+
+    const poller = createPoller(deps, [], { intervalMs: 10 });
+    const stop = poller.start();
+    await new Promise((r) => setTimeout(r, 50));
+    stop();
+
+    expect(session.prompt).toHaveBeenCalled();
+    const firstPrompt = String(session.prompt.mock.calls[0][0]);
+    expect(firstPrompt).toContain("运行输入");
+    expect(firstPrompt).toContain('"novel_id"');
+    expect(firstPrompt).toContain("6");
+  });
+
+  it("墙钟熔断：session 挂起时 abort 并进入 failed 终态（不再僵尸 running）", async () => {
+    // E2E run 117：认领后 session.prompt 整体挂起、零活动，call 计数熔断
+    // 探测不到。墙钟到点必须 abort 会话并让 run 走到 failed 终态。
+    const { deps, session } = makePollerDeps({ hangPrompt: true });
+    const fetchMock = deps.fetchImpl as ReturnType<typeof vi.fn>;
+    installBackendMock(fetchMock, {
+      skillName: "build-story-arc",
+      budgetSnapshot: { max_wall_ms: 80 },
+    });
+
+    const poller = createPoller(deps, [], { intervalMs: 10 });
+    const stop = poller.start();
+    await new Promise((r) => setTimeout(r, 400));
+    stop();
+
+    expect(session.abort).toHaveBeenCalled();
+    const finals = finalizeCalls(fetchMock);
+    expect(finals.length).toBe(1);
+    expect(finals[0].stop_reason).toBe("error");
+  }, 5000);
 
   it("信封构建失败时把错误反馈到同一 session 修复（有界 repair loop）", async () => {
     // Slice C：第一次模型输出引用了未物化的 ref（构建 fail closed），

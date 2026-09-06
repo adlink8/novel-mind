@@ -309,6 +309,17 @@ async function executeRun(
         }
       });
     }
+    // 墙钟熔断：认领后 session.prompt 可能整体挂起（E2E run 117 僵尸 running
+    // 7 分钟+，零模型调用零门面调用），call 计数熔断探测不到。到时 abort 会话
+    // 使 prompt 返回，下一行按 wall_clock_exceeded 诚实失败；run 终态由 finalize
+    // 通知回写，杜绝僵尸 running 永久占位（同维度 backfill 去重会被它卡死）。
+    const maxWallMs =
+      Number(claimed.budget_snapshot?.max_wall_ms ?? 0) || 10 * 60 * 1000;
+    let wallExceeded = false;
+    const wallTimer = setTimeout(() => {
+      wallExceeded = true;
+      void session.abort().catch(() => undefined);
+    }, maxWallMs);
     // 信封构建：从 transcript 读最新 assistant 输出并按 skill 构造信封。
     // 每轮 repair 后重读（runtime evidence / tool_runs 随轮次累积）。
     const buildEnvelope = (): {
@@ -370,14 +381,36 @@ async function executeRun(
     // 分析 skill 的收尾指令：弱纪律模型容易陷入开放式工具循环（E2E 实测
     // 60 次调用零输出烧穿预算）；明确「收集到证据 → 立即输出最终 JSON」
     // 的终止条件。reader chat 问答路径不加（保持回答自然风格）。
-    let promptText: string = isAnalysisSkill(skillName)
-      ? `${question}
+    let promptText: string;
+    if (isAnalysisSkill(skillName)) {
+      // 运行输入注入：SKILL.md 要求「从运行输入读取 novel_id」，但冻结 input
+      // 此前从不进入模型上下文（模型只看到 question 文本），弱模型只能输出
+      // blocked/空 JSON（E2E run 110/112 实测）。lineage 字段声明为系统填充，
+      // 防止模型编造 owner_id/input_hash 等（schema strict 会拒绝）。
+      // 证据提示按 allowlist 分流：story-arc 无 search 工具，用 chapter 锚点
+      // 取正文再按偏移物化（run 114/115 实测：无锚点时域工具全 404 → 零证据
+      // abstain）。
+      const runInputJson = JSON.stringify(claimed.input ?? {});
+      const evidenceHint =
+        skillName === "build-story-arc"
+          ? "运行输入中的 chapter_id 是有效章节锚点：先 get_chapter(chapter_id) 取正文，再对要引用的片段调 get_evidence_span(chapter_id, source_start, source_end) 物化证据（offsets 从刚取的正文中数出来，source_end 不得超过正文长度）。"
+          : "search_novel_text 最多 4 次；命中后立即用返回行的 chapter_id + chunk_id 调 get_evidence_span 物化（不要自己算 offsets、不要传其他字段）。若 search 无命中或不可用，改用运行输入中的 chapter_id 直接调 get_evidence_span(chapter_id, source_start, source_end) 物化正文片段作证据。";
+      promptText = `[运行输入] ${runInputJson}
 
-[执行约束] 严格按技能说明的调用示例执行：search_novel_text 最多 4 次；命中后立即用返回行的 chapter_id + chunk_id 调 get_evidence_span 物化（不要自己算 offsets、不要传其他字段）；得到至少 1 个 evidence_key 后立刻输出最终 JSON，不再调用任何工具。`
-      : question;
+${question}
+
+[执行约束] 严格按技能说明的调用示例执行：${evidenceHint}得到至少 1 个 evidence_key 后立刻输出最终 JSON，不再调用任何工具。owner_id / input_hash / skill_version_id / model_lineage / source_versions 等 lineage 字段由系统自动填充，输出中不要编造这些字段。`;
+    } else {
+      promptText = question;
+    }
     try {
       for (let round = 0; ; round += 1) {
         await session.prompt(promptText);
+        if (wallExceeded) {
+          throw new Error(
+            `wall_clock_exceeded: max_wall_ms=${maxWallMs}（会话无响应，墙钟熔断）`,
+          );
+        }
         if (breakerTripped) {
           throw new Error(`budget_exceeded: max_calls=${maxCalls}（运行中熔断）`);
         }
@@ -400,6 +433,7 @@ async function executeRun(
         }
       }
     } finally {
+      clearTimeout(wallTimer);
       unsubscribe?.();
     }
     if (envelopePayload === null) {

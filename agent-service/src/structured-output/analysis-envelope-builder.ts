@@ -41,6 +41,12 @@ interface AnalysisEnvelopeSpec {
   type: string;
   schemaVersion: string;
   contentKey: string;
+  /**
+   * 多顶层内容键（如 story_arc 的 outline_candidate / mainline_candidate）：
+   * 模型直接在顶层输出这些对象，builder 逐键剥离 tool_runs 后并入信封；
+   * 此时 contentKey 不参与信封组装（仅作为单键技能的默认路径）。
+   */
+  contentKeys?: string[];
   /** scene_candidate / visual_bible 信封顶层必须携带 tool_runs（schema min 1）。 */
   requiresToolRuns: boolean;
   /** 从模型输出的 type-specific content 提取 leaf evidence 键（确定性）。 */
@@ -198,6 +204,31 @@ const ANALYSIS_SPECS: Record<string, AnalysisEnvelopeSpec> = {
       return unique(keys);
     },
   },
+  "build-story-arc": {
+    type: "story_arc",
+    schemaVersion: "story-arc.v1",
+    contentKey: "outline_candidate",
+    contentKeys: ["outline_candidate", "mainline_candidate"],
+    requiresToolRuns: true,
+    // story_arc 的 evidence_refs 是模型输出的顶层字符串数组（来自运行时
+    // get_evidence_span 物化结果）；编造的 key fail closed（与 wmc 同门）。
+    collectEvidenceRefs: (_content, parsed, runtimeEvidences) => {
+      const materialized = new Set(collectRuntimeSpans(runtimeEvidences).keys());
+      const refs = unique(
+        arrayOf(parsed.evidence_refs).filter(
+          (ref): ref is string => typeof ref === "string",
+        ),
+      );
+      for (const ref of refs) {
+        if (!materialized.has(ref)) {
+          throw new Error(
+            `analysis-envelope: story_arc evidence_ref ${ref} was not materialized by a runtime get_evidence_span call (fail closed)`,
+          );
+        }
+      }
+      return refs;
+    },
+  },
 };
 
 /** 该 skill 是否由本构造器支持（分析类）。 */
@@ -254,14 +285,28 @@ export function buildAnalysisEnvelope(
     throw new Error("analysis-envelope: model output must be a JSON object");
   }
 
-  const rawContent = parsed[spec.contentKey];
-  if (!isObject(rawContent)) {
-    throw new Error(
-      `analysis-envelope: model output missing ${spec.contentKey} (skill ${skill.name})`,
-    );
+  // 多顶层内容键路径（story_arc）：模型在顶层输出各候选对象；单键路径
+  // 保持原状。两条路径都只采信 type-specific content，lineage 由本构造器
+  // 从 run 上下文权威合并。
+  let content: JsonObject;
+  if (spec.contentKeys) {
+    for (const key of spec.contentKeys) {
+      if (!isObject(parsed[key])) {
+        throw new Error(
+          `analysis-envelope: model output missing ${key} (skill ${skill.name})`,
+        );
+      }
+    }
+    content = parsed;
+  } else {
+    const rawContent = parsed[spec.contentKey];
+    if (!isObject(rawContent)) {
+      throw new Error(
+        `analysis-envelope: model output missing ${spec.contentKey} (skill ${skill.name})`,
+      );
+    }
+    content = stripModelToolRuns(rawContent) as JsonObject;
   }
-
-  const content = stripModelToolRuns(rawContent) as JsonObject;
   // The chapter artifact schema is a runtime contract, not model-authored
   // content. Project its immutable version so harmless model omissions cannot
   // drift or block the deterministic backend integrity gate.
@@ -358,18 +403,40 @@ export function buildAnalysisEnvelope(
 
   // 信封骨架：type-specific content + 可保留的非 lineage 字段。
   // owner/novel/input_hash 等 lineage 字段绝不信任模型——由 run 权威合并。
-  const raw: JsonObject = {
-    type: spec.type,
-    schema_version: spec.schemaVersion,
-    branch,
-    [spec.contentKey]: content,
-    // tool_runs 必须来自 Pi runtime transcript；模型输出同名字段永不采信。
-    tool_runs: runtimeToolRuns,
-    ...(parsed.parent_revision !== undefined
-      ? { parent_revision: parsed.parent_revision }
-      : {}),
-    status: "candidate",
-  };
+  // tool_runs 仅在 wire schema 允许的技能上携带（requiresToolRuns）：
+  // wmc 的 strict schema 禁止该字段（E2E run 118 实测 "Extra inputs are
+  // not permitted"），story-arc 则要求 min 1。
+  const toolRunsField = spec.requiresToolRuns
+    ? {
+        // tool_runs 必须来自 Pi runtime transcript；模型输出同名字段永不采信。
+        tool_runs: runtimeToolRuns,
+      }
+    : {};
+  const raw: JsonObject = spec.contentKeys
+    ? {
+        type: spec.type,
+        schema_version: spec.schemaVersion,
+        branch,
+        ...Object.fromEntries(
+          spec.contentKeys.map((key) => [key, stripModelToolRuns(parsed[key])]),
+        ),
+        ...toolRunsField,
+        ...(parsed.parent_revision !== undefined
+          ? { parent_revision: parsed.parent_revision }
+          : {}),
+        status: "candidate",
+      }
+    : {
+        type: spec.type,
+        schema_version: spec.schemaVersion,
+        branch,
+        [spec.contentKey]: content,
+        ...toolRunsField,
+        ...(parsed.parent_revision !== undefined
+          ? { parent_revision: parsed.parent_revision }
+          : {}),
+        status: "candidate",
+      };
 
   const contract = {
     requiredFields: [
@@ -384,7 +451,7 @@ export function buildAnalysisEnvelope(
       "source_versions",
       "input_hash",
       "evidence_refs",
-      spec.contentKey,
+      ...(spec.contentKeys ?? [spec.contentKey]),
       "status",
       ...(spec.requiresToolRuns ? ["tool_runs"] : []),
     ],
