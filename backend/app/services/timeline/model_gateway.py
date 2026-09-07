@@ -725,9 +725,13 @@ class TimelineModelGateway:
         transport: ModelTransport,
         *,
         persistence: PostgresCallRepository | None = None,
+        transport_headers: dict[str, str] | None = None,
     ) -> None:
         self.transport = transport
         self.persistence = persistence
+        # 随每次 transport 调用发送的固定请求头（如 OpenCode Go 要求的
+        # x-opencode-session 稳定会话标识）；调用方显式传入的 extra_headers 优先。
+        self.transport_headers = transport_headers or {}
 
     async def generate(
         self,
@@ -757,6 +761,10 @@ class TimelineModelGateway:
         # 长批跑（数百章）不能因上游一次抖动就整体暂停等人工续跑。
         repair_indexes = iter((1, 2))
         transient_retries_left = _TRANSIENT_RETRY_LIMIT
+        # zen 网关多上游路由：部分上游拒绝 response_format（结构化输出）。
+        # 首次命中即降级为纯 prompt 契约（schema 已随消息下发）重试，
+        # 不消耗 repair 轮与瞬态重试预算。
+        structured_output_dropped = False
         repair_index: int | None = None
         while True:
             if repair_index is None:
@@ -806,10 +814,12 @@ class TimelineModelGateway:
                     transport_kwargs["api_key"] = deployment.api_key
                 if deployment.base_url:
                     transport_kwargs["api_base"] = deployment.base_url
+                if self.transport_headers:
+                    transport_kwargs["extra_headers"] = dict(self.transport_headers)
                 response = await self.transport.complete(
                     model=deployment.resolved_name,
                     messages=current_messages,
-                    response_format=schema,
+                    response_format=schema if not structured_output_dropped else None,
                     timeout=timeout,
                     num_retries=0,
                     stream=True,
@@ -818,6 +828,23 @@ class TimelineModelGateway:
                 )
             except Exception as exc:
                 latency_ms = int((time.perf_counter() - started) * 1000)
+                if (
+                    not structured_output_dropped
+                    and type(exc).__name__ == "BadRequestError"
+                    and "response_format" in str(exc)
+                ):
+                    structured_output_dropped = True
+                    if persistent_attempt is not None:
+                        await self.persistence.mark_outcome_unknown(
+                            persistent_attempt,
+                            latency_ms=latency_ms,
+                            error_code=type(exc).__name__,
+                            pause_run=False,
+                        )
+                    # 非持久化路径不 release：瞬态重试同样复用 reserve 的
+                    # 幂等语义，同一 reservation 直接覆盖降级后的重试
+                    await asyncio.sleep(_TRANSIENT_RETRY_BACKOFF_S)
+                    continue
                 # 先决定是否还有瞬态重试预算，再落 attempt 状态：
                 # 会重试时不翻 run 状态（未知结果 ≠ 放弃）
                 will_retry = (

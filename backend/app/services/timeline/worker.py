@@ -312,6 +312,10 @@ async def _extract_and_persist(
                     "role": "user",
                     "content": json.dumps(
                         {
+                            # schema 必须随消息下发：zen 网关多上游路由，
+                            # 部分上游拒绝 response_format，此时模型只能
+                            # 靠 prompt 内的 schema 约束输出
+                            "output_schema": TimelineExtraction.model_json_schema(),
                             "scope": {
                                 "owner_id": run.owner_id,
                                 "novel_id": run.novel_id,

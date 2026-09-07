@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
+import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -122,11 +123,19 @@ async def production_runtime(
         deployment = await _resolve_owner_deployment(owner_id)
     else:
         deployment = _env_fallback_deployment(settings, litellm)
+    # OpenCode Go（zen 网关）要求客户端携带稳定会话标识与自定义 UA，
+    # 否则 400：x-opencode-session 用于路由与 prompt 缓存。每个 run 一个
+    # 会话 ID——run 内所有章节共享，跨 run 隔离。
+    go_headers = {
+        "x-opencode-session": uuid.uuid4().hex,
+        "User-Agent": "novelmind-timeline-worker/0.1",
+    }
     return TimelineWorkerRuntime(
         sessions=async_session_factory,
         gateway=TimelineModelGateway(
             _LiteLLMTransport(),
             persistence=PostgresCallRepository(async_session_factory),
+            transport_headers=go_headers,
         ),
         extraction_deployment=deployment,
         reconciliation_deployment=deployment,
