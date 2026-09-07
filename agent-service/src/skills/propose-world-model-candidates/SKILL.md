@@ -86,8 +86,18 @@ state-transition / publication 权威**——Agent 永远不能直接发布 Cano
   编造章节号）、`evidence_refs`（⊆ 冻结白名单）、`details`。
 - 缺 `subject` / `confidence` / `disclosure_cutoff` 任一字段的 claim 会被
   下游物化器整条拒绝（fail closed），宁缺毋滥但字段必须齐全。
+- **claim_kind 选择纪律**：当前只有 `character_state` / `character_knowledge`
+  两类 claim 会被物化到知识投影——`claims` 里**必须至少含 1 条**这两类
+  （把世界事实落到"谁知晓/谁处于什么状态"上，例：subject=老人、
+  claim_kind=character_knowledge、proposition=老人知晓魔石病的传播方式）。
+  `world_rule` / `entity` 等其它类型只能作为**附加**候选，绝不能只输出
+  它们（否则本次 backfill 无物化成果）。
 - `authority` 标签原样保留；**绝不静默升级** probable_inference /
   literary_interpretation / user_interpretation 为 canon_fact（D-01）。
+- **本技能的 backfill run 没有人工审批通道**：`authority` 一律**不得**填
+  `canon_fact`（Gate 会对无审批的 canon_fact 整条拒绝，fail closed）——
+  直接来自原文的事实用 `probable_inference`，推断/演绎用
+  `literary_interpretation`。
 - `candidates.tool_runs` 记录本 run 使用的工具与调用次数（ToolRun 血缘）。
 - 候选只是提案；Gate 逐条裁决后才可能成为持久化投影（D-02 immutable
   candidates-only）。

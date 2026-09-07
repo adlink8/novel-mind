@@ -201,7 +201,10 @@ async def _materialize_world_model_knowledge(
         claims.append(result.claim)
 
     if not claims:
-        return f"skipped:{skipped[0] if skipped else 'all_gate_rejected'}"
+        # 聚合去重后上报（skipped[0] 常是首条 world_rule 的 unmapped，会掩盖
+        # 后续 claim 的真实拒绝原因，如 canon_fact 缺审批——run 132 实测）。
+        summary = ";".join(dict.fromkeys(skipped)) if skipped else "all_gate_rejected"
+        return f"skipped:{summary[:100]}"
     try:
         projection = build_knowledge_candidate(
             owner_id=run.owner_id,
@@ -321,14 +324,18 @@ async def _map_epistemic_claim(
 
 async def _authorized_cutoff(session: AsyncSession, *, novel_id: int) -> int | None:
     from app.models.novel import Novel as NovelModel
+    from app.services.timeline.query import resolve_chapter_cutoff
 
     novel = await session.get(NovelModel, novel_id)
     if novel is None:
         return None
-    # 阅读进度即授权 cutoff（与 chat 路径一致）；无进度时保守取第 1 章。
-    progress = getattr(novel, "reading_progress", None)
-    if isinstance(progress, int) and progress > 0:
-        return progress
+    # 阅读进度即授权 cutoff（与 chat 路径一致）。reading_progress 现为 dict
+    # （chapter_id/progress_percent），复用 timeline 的 resolve_chapter_cutoff
+    # 统一解析——旧实现只认 int，dict 一律兜底第 1 章，导致 knowledge backfill
+    # 的证据章（189）> cutoff(1) 全部被拒（run 126/128/130 实测根因）。
+    cutoff = await resolve_chapter_cutoff(session, novel)
+    if cutoff is not None and int(cutoff) > 0:
+        return int(cutoff)
     return 1
 
 
