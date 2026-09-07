@@ -135,6 +135,24 @@ class GatewayDeployment:
     # 模型档案默认值（AIModelConfig 列）；None 表示未配置，调用方才用内置兜底。
     default_max_tokens: int | None = None
     default_temperature: float | None = None
+    # opencode/zen 强制的稳定会话标识（x-opencode-session，见 _transport_headers）。
+    # 取 per-run token 哈希前缀：同一 SkillRun 的多次调用共享同一会话，
+    # 利于上游路由与 prompt 缓存命中。
+    session_id: str | None = None
+
+
+def _transport_headers(deployment: GatewayDeployment) -> dict[str, str]:
+    """构造上游传输头。
+
+    opencode/zen 自 2026-09 起强制 ``x-opencode-session``（缺失直接 400：
+    "Request is missing x-opencode-session and cannot be routed efficiently"）。
+    与 timeline worker（_worker_runtime.py）同一契约。自定义头对其他 provider
+    无害，故不做条件分支。
+    """
+    return {
+        "x-opencode-session": deployment.session_id or uuid.uuid4().hex,
+        "User-Agent": "novelmind-agent-gateway/0.1",
+    }
 
 
 TASK_BY_SKILL = {
@@ -213,7 +231,7 @@ async def _resolve_gateway_deployment(
     agent-service 不持有 provider key，也不能提交上游地址。
     """
     if requested and requested != "reader-chat-default":
-        return GatewayDeployment(model=requested)
+        return GatewayDeployment(model=requested, session_id=uuid.uuid4().hex)
 
     run_token = request.headers.get("x-novelmind-run-token", "")
     raw_novel_id = request.headers.get("x-novelmind-novel-id", "")
@@ -288,6 +306,7 @@ async def _resolve_gateway_deployment(
             if configured.temperature is not None
             else None
         ),
+        session_id=token_hash[:32],
     )
 
 
@@ -352,6 +371,7 @@ async def _non_stream_completion(
                 deployment.skill_name, has_tools=bool(payload.tools)
             ),
             extra_body=deployment.extra_params,
+            extra_headers=_transport_headers(deployment),
             api_key=deployment.api_key,
             api_base=deployment.api_base,
         )
@@ -438,6 +458,7 @@ async def _stream_completion(
                 deployment.default_temperature,
             ),
             extra_body=deployment.extra_params,
+            extra_headers=_transport_headers(deployment),
             api_key=deployment.api_key,
             api_base=deployment.api_base,
         ):

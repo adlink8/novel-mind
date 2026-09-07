@@ -191,6 +191,8 @@ class AIService:
                 kwargs["response_format"] = _extra["response_format"]
             if _extra.get("extra_body") is not None:
                 kwargs["extra_body"] = _extra["extra_body"]
+            if _extra.get("extra_headers") is not None:
+                kwargs["extra_headers"] = _extra["extra_headers"]
 
             response = await litellm.acompletion(**kwargs)
         except Exception:
@@ -365,6 +367,8 @@ class AIService:
             kwargs["temperature"] = _extra["temperature"]
         if _extra.get("extra_body") is not None:
             kwargs["extra_body"] = _extra["extra_body"]
+        if _extra.get("extra_headers") is not None:
+            kwargs["extra_headers"] = _extra["extra_headers"]
 
         # 请求上游在流末携带 usage（OpenAI 契约）；不支持的 provider 会忽略该选项，
         # 此时 usage 保持 0——宁可记 0，绝不虚构。
