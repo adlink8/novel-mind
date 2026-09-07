@@ -214,10 +214,20 @@ const ANALYSIS_SPECS: Record<string, AnalysisEnvelopeSpec> = {
     // get_evidence_span 物化结果）；编造的 key fail closed（与 wmc 同门）。
     collectEvidenceRefs: (_content, parsed, runtimeEvidences) => {
       const materialized = new Set(collectRuntimeSpans(runtimeEvidences).keys());
+      // 形状容错（26-06 无歧义 container-shape 修复范畴）：模型常把
+      // cited-answer 风格的 `[{evidence_key: "qp:..."}]` 对象数组混进
+      // story_arc 顶层（run 127 实测两轮均栽在此）——只含单一 string
+      // evidence_key 字段的对象可确定性归一为字符串，其余形状维持 fail closed。
       const refs = unique(
-        arrayOf(parsed.evidence_refs).filter(
-          (ref): ref is string => typeof ref === "string",
-        ),
+        arrayOf(parsed.evidence_refs)
+          .map((ref) => {
+            if (typeof ref === "string") return ref;
+            if (isObject(ref) && typeof ref.evidence_key === "string") {
+              return ref.evidence_key;
+            }
+            return null;
+          })
+          .filter((ref): ref is string => typeof ref === "string"),
       );
       for (const ref of refs) {
         if (!materialized.has(ref)) {

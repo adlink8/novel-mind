@@ -522,6 +522,71 @@ describe("createPoller", () => {
     expect(storyPrompt).not.toContain("search_novel_text 最多 4 次");
   });
 
+  it("story_arc evidence_refs 对象形状归一（run 127 回归）", async () => {
+    // run 127 实测：模型两轮都把 cited-answer 风格的
+    // `[{evidence_key: "qp:..."}]` 对象数组混进 story_arc 顶层 →
+    // 被 string 过滤后为空 → "no leaf evidence refs" fail closed。
+    // 修复：单一 string evidence_key 字段的对象确定性归一为字符串
+    // （26-06 无歧义 container-shape 修复范畴）；key 本身必须仍然物化过。
+    const spanHash = "3".repeat(64);
+    const evidenceKey = `qp:2:10:50:${spanHash}`;
+    const { deps, session } = makePollerDeps({
+      lastText: JSON.stringify({
+        type: "story_arc",
+        schema_version: "story-arc.v1",
+        // 对象形状（run 127 的真实死法）
+        evidence_refs: [{ evidence_key: evidenceKey, chapter_id: 2 }],
+        outline_candidate: {
+          schema_version: "outline-candidate.v1",
+          arcs: [{ arc_key: "arc-1", title: "危机弧", summary: "确认老鼠存在" }],
+          covered_ranges: [{ chapter_min: 2, chapter_max: 2 }],
+          gaps: [],
+          overlaps: [],
+        },
+        mainline_candidate: {
+          volumes: [],
+          global_projection: { summary: "主线：确认威胁" },
+        },
+      }),
+      toolResults: [
+        {
+          role: "toolResult",
+          toolName: "get_evidence_span",
+          isError: false,
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                evidence_key: evidenceKey,
+                chapter_id: 2,
+                chapter_number: 2,
+                novel_id: 6,
+                source_start: 10,
+                source_end: 50,
+                content_hash: spanHash,
+                excerpt: "我必须确认老鼠是否真的存在",
+              }),
+            },
+          ],
+        },
+      ],
+    });
+    const fetchMock = deps.fetchImpl as ReturnType<typeof vi.fn>;
+    installBackendMock(fetchMock, { skillName: "build-story-arc" });
+
+    const poller = createPoller(deps, [], { intervalMs: 10 });
+    const stop = poller.start();
+    await new Promise((r) => setTimeout(r, 50));
+    stop();
+
+    const finals = finalizeCalls(fetchMock);
+    expect(finals.length).toBe(1);
+    expect(finals[0].envelope.type).toBe("story_arc");
+    // 归一后的顶层 evidence_refs 必须是字符串数组（StoryArcArtifact 契约）。
+    expect(finals[0].envelope.evidence_refs).toEqual([evidenceKey]);
+    expect(finals[0].envelope.outline_candidate.arcs.length).toBe(1);
+  });
+
   it("analysis skill 的运行输入注入首条 prompt（模型可读取 novel_id 等）", async () => {
     // 根因修复：backfill run 的冻结 input（novel_id/question/dimension）此前
     // 从不进入模型上下文，SKILL.md 要求"从运行输入读取 novel_id"无从谈起。

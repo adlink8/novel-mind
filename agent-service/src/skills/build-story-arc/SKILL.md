@@ -90,7 +90,10 @@ OutlineCandidateArtifact（连续弧线候选）与 MainlineCandidateArtifact
   - `producing_skill` / `producing_skill_version` / `skill_version_id`
   - `model_lineage` 与 `source_versions`
   - `input_hash`（来自 run）
-  - `evidence_refs`（必须 ⊆ frozen manifest 白名单）
+  - `evidence_refs`：**顶层字符串数组**，每个元素就是 `get_evidence_span`
+    响应里 `evidence_key` 的原文（形如 `qp:<chapter_id>:<start>:<end>:<hash>`），
+    必须且只能写成 `["qp:...", ...]`——**禁止** cited-answer 风格的
+    `{"evidence_key": ...}` 对象数组；所有元素 ⊆ frozen manifest 白名单
   - `outline_candidate`：OutlineCandidateArtifact（schema_version、
     policy_version、owner/novel/version、source_snapshot_hash、
     hierarchy_build_id、hierarchy_checksum、input_hash、chapter_min/max、

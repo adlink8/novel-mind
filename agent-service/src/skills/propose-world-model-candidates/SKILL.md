@@ -76,12 +76,16 @@ state-transition / publication 权威**——Agent 永远不能直接发布 Cano
   再增删证据（finalize 落库并作为引用白名单）。
 
 ### 第 4 步：Candidates（typed world-model candidates）
-- 把工具证据综合成**候选主张**（claim），每项含：`claim_kind`（event /
+- 把工具证据综合成**候选主张**（claim），每项**必须**含：`claim_kind`（event /
   causal_edge / character_state / character_knowledge / world_rule /
-  rule_exception / entity / entity_link）、`claim_key`、`proposition`、
+  rule_exception / entity / entity_link）、`claim_key`、`subject`（该主张
+  描述的主体，角色/地点/物品/势力的规范名称，禁止为空）、`proposition`、
   `authority`（D-01 四 label：canon_fact / probable_inference /
-  literary_interpretation / user_interpretation）、`confidence`、
-  `disclosure_cutoff`、`evidence_refs`（⊆ 冻结白名单）、`details`。
+  literary_interpretation / user_interpretation）、`confidence`（0-1 数值）、
+  `disclosure_cutoff`（**填 run input 里 `cutoff_chapter` 的值**，不要自己
+  编造章节号）、`evidence_refs`（⊆ 冻结白名单）、`details`。
+- 缺 `subject` / `confidence` / `disclosure_cutoff` 任一字段的 claim 会被
+  下游物化器整条拒绝（fail closed），宁缺毋滥但字段必须齐全。
 - `authority` 标签原样保留；**绝不静默升级** probable_inference /
   literary_interpretation / user_interpretation 为 canon_fact（D-01）。
 - `candidates.tool_runs` 记录本 run 使用的工具与调用次数（ToolRun 血缘）。
@@ -102,10 +106,11 @@ state-transition / publication 权威**——Agent 永远不能直接发布 Cano
       {
         "claim_kind": "world_rule",
         "claim_key": "稳定的机器可读键",
+        "subject": "主张主体的规范名称",
         "proposition": "候选主张的自然语言陈述",
         "authority": "probable_inference",
         "confidence": 0.6,
-        "disclosure_cutoff": 1,
+        "disclosure_cutoff": 313,
         "evidence_refs": ["仅填工具响应里实际返回的证据 key"],
         "details": {}
       }

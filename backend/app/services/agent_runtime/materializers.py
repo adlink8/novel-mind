@@ -245,9 +245,11 @@ async def _map_epistemic_claim(
     proposition = raw.get("proposition")
     if not claim_key or not subject or not proposition:
         return None
-    disclosure_cutoff = raw.get("disclosure_cutoff")
-    if not isinstance(disclosure_cutoff, int) or disclosure_cutoff < 1:
-        return None
+    # disclosure_cutoff 是血缘锚定字段，程序权威注入（run 已授权 cutoff），
+    # 模型输出值只作 sanity 参考——模型常照抄 SKILL 示例的字面值（如 1），
+    # 导致 known_at > cutoff 被整条拒绝（run 126 实测）。Gate 用同一 cutoff
+    # 裁决，注入值与其一致，不引入越权披露。
+    disclosure_cutoff = int(cutoff)
     authority_raw = raw.get("authority")
     authority = (
         Authority(authority_raw)
