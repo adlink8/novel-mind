@@ -260,12 +260,30 @@ async def _resolve_world_model_version(
     novel_id: int,
     version_id: int | None,
 ) -> int:
-    """显式 version 直接返回；缺省取该 owner/novel 最新版本（无 → 404-hide）。"""
+    """显式 version 直接返回；缺省取该 owner/novel 最新版本（无 → 404-hide）。
+
+    依次 fallback：事件表 → 实体表 → 知识表。run 133 知识表已落库，但事件表
+    可能为空（旧 backfill 只物化 knowledge），不能因事件表空就 NotFoundError。
+    任一非空列表取最大值（列表已升序，取 [-1]）；全空才 NotFoundError。
+    """
     if version_id is not None:
         return int(version_id)
-    versions = await WorldModelEventRepository(db).list_versions(
-        owner_id=owner_id, novel_id=novel_id
-    )
-    if not versions:
-        raise NotFoundError("world-model projection not found in owner scope")
-    return versions[-1]
+    from app.services.world_model.entity_repository import WorldEntityRepository
+    from app.services.world_model.knowledge_repository import KnowledgeRepository
+
+    candidates = [
+        await WorldModelEventRepository(db).list_versions(
+            owner_id=owner_id, novel_id=novel_id
+        ),
+        await WorldEntityRepository(db).list_versions(
+            owner_id=owner_id, novel_id=novel_id
+        ),
+        await KnowledgeRepository(db).list_versions(
+            owner_id=owner_id, novel_id=novel_id
+        ),
+    ]
+    for versions in candidates:
+        if versions:
+            # 列表已升序，取最新版本。
+            return versions[-1]
+    raise NotFoundError("world-model projection not found in owner scope")

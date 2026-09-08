@@ -86,12 +86,31 @@ state-transition / publication 权威**——Agent 永远不能直接发布 Cano
   编造章节号）、`evidence_refs`（⊆ 冻结白名单）、`details`。
 - 缺 `subject` / `confidence` / `disclosure_cutoff` 任一字段的 claim 会被
   下游物化器整条拒绝（fail closed），宁缺毋滥但字段必须齐全。
-- **claim_kind 选择纪律**：当前只有 `character_state` / `character_knowledge`
-  两类 claim 会被物化到知识投影——`claims` 里**必须至少含 1 条**这两类
-  （把世界事实落到"谁知晓/谁处于什么状态"上，例：subject=老人、
-  claim_kind=character_knowledge、proposition=老人知晓魔石病的传播方式）。
-  `world_rule` / `entity` 等其它类型只能作为**附加**候选，绝不能只输出
-  它们（否则本次 backfill 无物化成果）。
+- **claim_kind 选择纪律**：`claims` 里**必须至少含 1 条任一 `claim_kind` 的
+  合格 claim**（不再只有 `character_state` / `character_knowledge` 可物化）。
+  八类 claim 现在都有物化路由——`event` / `causal_edge` 落到事件表投影
+  （`WorldModelEventRepository`），`world_rule` / `rule_exception` / `entity` /
+  `entity_link` 落到实体表投影（`WorldEntityRepository`），`character_state` /
+  `character_knowledge` 落到知识表。但**每类有专属必填字段**，缺字段整条
+  fail closed（物料器返回 skipped，绝不伪造通过）。字段表：
+
+  | claim_kind | 专属必填字段（其余公共字段见上文） |
+  | --- | --- |
+  | `event` | `title`、`description`、`effective`（章节号区间 `{start,end}`，可只有 `start`；可缺省空区间）；需 `evidence_refs` ≥ 1 |
+  | `causal_edge` | `source_event_key`、`target_event_key`（须指向**同一输出里**某条 `event` claim 的 `claim_key`）、`edge_type` ∈ caused/triggered/responded/blocked；`evidence_refs` 可空（空则 gate 以 co_occurrence_only 拒绝） |
+  | `world_rule` | `rule_name`（稳定短名）；需 `evidence_refs` ≥ 1 |
+  | `rule_exception` | `rule_key`（须指向**同一输出里**某条 `world_rule` claim 的 `claim_key`）、`applies_to`（可选，指向同输出 `entity` claim 的 `claim_key`）；需 `evidence_refs` ≥ 1 |
+  | `entity` | `entity_type` ∈ entity/faction/place/item、`primary_name`（与 `subject` 相同可复用）；需 `evidence_refs` ≥ 1 |
+  | `entity_link` | `link_kind` ∈ member_of/allegiance/controls/owns/located_in/carried_by、`source_key`/`target_key`（须指向**同一输出里**某条 `entity` claim 的 `claim_key`）；需 `evidence_refs` ≥ 1 |
+
+  `character_state` / `character_knowledge` 仍需 `subject` + `proposition`
+  （见原纪律）。`causal_edge` / `rule_exception` / `entity_link` 的端点必须
+  是**本次输出**里同批次已通过的 claim（`event`/`world_rule`/`entity`），
+  指向未知键会被 gate/物料器 fail closed（分别报 `unknown_endpoint` /
+  `unknown_rule` / `unknown_endpoint`）。
+  **保留**：canon_fact 禁令与宁缺毋滥原则不变；公共字段（`confidence` 须真
+  实数值、`disclosure_cutoff` 程序注入、`evidence_refs` ⊆ 冻结白名单）对所有
+  类型一致。
 - `authority` 标签原样保留；**绝不静默升级** probable_inference /
   literary_interpretation / user_interpretation 为 canon_fact（D-01）。
 - **本技能的 backfill run 没有人工审批通道**：`authority` 一律**不得**填
@@ -132,6 +151,40 @@ state-transition / publication 权威**——Agent 永远不能直接发布 Cano
 - `claim_kind` ∈ event / causal_edge / character_state / character_knowledge /
   world_rule / rule_exception / entity / entity_link；`authority` 四值见第 4 步，
   绝不静默升级。
+
+- `event` + `character_knowledge` 混合最小示例（端点互指须同输出内一致）：
+
+```json
+{
+  "candidates": {
+    "claims": [
+      {
+        "claim_kind": "event",
+        "claim_key": "prophecy_revealed",
+        "title": "预言现世",
+        "description": "林安在剑冢触发了古老预言。",
+        "authority": "probable_inference",
+        "confidence": 0.7,
+        "effective": {"start": 3, "end": 3},
+        "disclosure_cutoff": 313,
+        "evidence_refs": ["qp:88:0:120:<sha256>"],
+        "details": {}
+      },
+      {
+        "claim_kind": "character_knowledge",
+        "claim_key": "lin_an_knows_prophecy",
+        "subject": "林安",
+        "proposition": "林安知晓了剑冢预言。",
+        "authority": "probable_inference",
+        "confidence": 0.6,
+        "disclosure_cutoff": 313,
+        "evidence_refs": ["qp:88:0:120:<sha256>"],
+        "details": {}
+      }
+    ]
+  }
+}
+```
 - `evidence_refs` 只能引用**本 run `get_evidence_span` 实际返回**的
   `evidence_key`（选择制：先 `search_novel_text` 发现区间，再
   `get_evidence_span` 物化，最后按 key 引用）；编造或引用未物化的 key →
