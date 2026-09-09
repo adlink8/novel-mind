@@ -23,6 +23,7 @@ from app.models.novel import Chapter, Novel
 from app.models.text_chunk import TextChunk
 from app.services.vector_store import vector_store
 from app.services.ai_service import ai_service
+from app.services.retrieval_cache import retrieval_cache
 
 logger = logging.getLogger(__name__)
 
@@ -389,6 +390,9 @@ class HybridSearchService:
             搜索结果列表，每项包含 chunk_id, content, score, metadata
         """
         try:
+            cached = retrieval_cache.get(novel_id, query, top_k)
+            if cached is not None:
+                return cached
             # 生成查询向量
             query_embeddings = await ai_service.embedding(texts=[query])
             query_embedding = query_embeddings[0]
@@ -419,6 +423,7 @@ class HybridSearchService:
                     }
                 )
 
+            retrieval_cache.set(novel_id, query, top_k, results)
             return results
         except Exception as e:
             logger.warning("向量搜索失败 novel_%d: %s", novel_id, e)
